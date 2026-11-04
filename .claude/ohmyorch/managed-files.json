@@ -1,0 +1,69 @@
+{
+  "files": {
+    ".claude/ohmyorch/project.json": {
+      "base": "cfdcd60d9f412b2732303824f3ea742459241b76d1a9ce9a0b99ec025b948ba9",
+      "begin": "",
+      "end": "",
+      "kind": "config",
+      "pluginVersion": "0.0.1",
+      "sha256": "cfdcd60d9f412b2732303824f3ea742459241b76d1a9ce9a0b99ec025b948ba9"
+    },
+    ".gitignore": {
+      "base": "09587ca00cc15466af80c2754b844d7f2df09c40f9c4c988a8c6c181cc182fbb",
+      "begin": "# OHMYORCH:BEGIN ignores",
+      "end": "# OHMYORCH:END ignores",
+      "kind": "block",
+      "pluginVersion": "0.0.1",
+      "sha256": "09587ca00cc15466af80c2754b844d7f2df09c40f9c4c988a8c6c181cc182fbb"
+    },
+    "CLAUDE.md": {
+      "base": "61c8ae1837bbcd15f7b0257dc337a4cb2ff310fb64ac7e85da39e84d0e5e3aca",
+      "begin": "<!-- OHMYORCH:BEGIN project -->",
+      "end": "<!-- OHMYORCH:END project -->",
+      "kind": "block",
+      "pluginVersion": "0.0.1",
+      "sha256": "61c8ae1837bbcd15f7b0257dc337a4cb2ff310fb64ac7e85da39e84d0e5e3aca"
+    },
+    "SPEC-LOGS/README.md": {
+      "base": "13f628d7874c62c724e4e04094b2300a7f661ecd7e6d8e934f813f429b2d1418",
+      "begin": "",
+      "end": "",
+      "kind": "scaffold",
+      "pluginVersion": "0.0.1",
+      "sha256": "13f628d7874c62c724e4e04094b2300a7f661ecd7e6d8e934f813f429b2d1418"
+    },
+    "openspec/changes/archive/README.md": {
+      "base": "dfe156e2b2373accefe5c217e5a2f984a5b629591f926440ea97df8e4439e76c",
+      "begin": "",
+      "end": "",
+      "kind": "scaffold",
+      "pluginVersion": "0.0.1",
+      "sha256": "dfe156e2b2373accefe5c217e5a2f984a5b629591f926440ea97df8e4439e76c"
+    },
+    "openspec/config.yaml": {
+      "base": "a1ae1c19251937c60465a45e4779edfd60708559b2b99d5d76465464ec5f72dc",
+      "begin": "",
+      "end": "",
+      "kind": "scaffold",
+      "pluginVersion": "0.0.1",
+      "sha256": "a1ae1c19251937c60465a45e4779edfd60708559b2b99d5d76465464ec5f72dc"
+    },
+    "openspec/delivery/README.md": {
+      "base": "70c7730d7600d658a95988bffde6b473c03bd96655a8f7a5f0efabcc8d7b41b0",
+      "begin": "",
+      "end": "",
+      "kind": "scaffold",
+      "pluginVersion": "0.0.1",
+      "sha256": "70c7730d7600d658a95988bffde6b473c03bd96655a8f7a5f0efabcc8d7b41b0"
+    },
+    "openspec/specs/README.md": {
+      "base": "c5dacac78404a4498f004bdd7d9ff663c06f021d95ac9e072e3ed7a64ddac1e0",
+      "begin": "",
+      "end": "",
+      "kind": "scaffold",
+      "pluginVersion": "0.0.1",
+      "sha256": "c5dacac78404a4498f004bdd7d9ff663c06f021d95ac9e072e3ed7a64ddac1e0"
+    }
+  },
+  "schemaVersion": 1
+}

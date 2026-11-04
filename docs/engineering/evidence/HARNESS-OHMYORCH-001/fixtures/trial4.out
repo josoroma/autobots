@@ -1,0 +1,33 @@
+== B1: revision not in this copy is unverifiable, so set it to HEAD first
+SPECS edit at recorded HEAD (expect 0) rc=0
+-- commit moves HEAD
+SPECS edit after commit (expect 2) rc=2
+BLOCKED  SPECS.md
+  CODEBASE.md describes f1f7ed7d78d0fb149c2c5c98e1a171cf919edb10, but HEAD has moved on (2 file(s) changed).
+-- refresh revision, working tree only
+SPECS edit after refresh (expect 0) rc=0
+== B2: fingerprint across goal start, refresh and stop-hook state
+Action:  select
+stop while ACTIVE rc=2 (expect 2)
+fingerprint before=ef4180ce6d60ab0c after=ef4180ce6d60ab0c
+delivery.owner sandbox-probe 
+== B3: delivery block records the reason and allows stop
+Goal EPIC-1 recorded as BLOCKED — fixture: harness verification failed after review and test passed
+| Status | BLOCKED |
+| Reason | fixture: harness verification failed after review and test passed |
+stop after block rc=0 (expect 0)
+== B3: reopen refuses a passing change
+error: openspec/changes/us-1-1-h0-repository-prerequisite-inventory/tasks.md not found
+== B5: captured list includes untracked files
+1
+== bridge manifest command
+harness rc=0
+72
+== story_manifest on this copy: capture, compare, then edit a bound file
+PASS: capture: US-1.1: 2 files, fingerpr
+capture rc=0
+PASS: compare: US-1.1: 2 files match the reviewed manifest
+compare rc=0 (expect 0)
+FAIL: compare: US-1.1: verdicts are stale for the current files
+  changed: product.py
+compare rc=1 (expect 1)

@@ -15,3 +15,10 @@ node_modules/
 infra/supabase/volumes/
 supabase/.temp/
 supabase/.branches/
+
+# OHMYORCH:BEGIN ignores
+.claude/ohmyorch/runtime/
+.claude/ohmyorch/backups/
+.claude/ohmyorch/approvals.local.json
+
+# OHMYORCH:END ignores

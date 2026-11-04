@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "work_item_id": "HARNESS-OHMYORCH-001",
+  "completed_at_utc": "2026-11-04T21:27:46.787508+00:00",
+  "base_revision": "5e46124c4541113a36c1597bbd1ea4b20daa3e73",
+  "tree_state": "uncommitted working tree on the base revision",
+  "input_fingerprint": "4c34982dff2663f9c2adc65b28718d70a7acf211c991847bba40241adf01a92c",
+  "input_file_count": 72,
+  "input_manifest_location": ".checks/harness/latest.json (ignored; rewritten by the next verification)",
+  "python_version": "3.12.16",
+  "harness_status": "passed",
+  "tests_executed": 69,
+  "checks": [
+    {
+      "id": "project_configuration",
+      "status": "passed"
+    },
+    {
+      "id": "backlog_validation",
+      "status": "passed"
+    },
+    {
+      "id": "harness_behavior_tests",
+      "status": "passed"
+    }
+  ],
+  "tools": {
+    "openspec": "1.13.2",
+    "jq": "1.7.1",
+    "bash": "3.2.57",
+    "claude_code": "2.1.314",
+    "plugin": "0.0.1",
+    "plugin_commit": "fddfbf53c8c10d45782796cc9a7edf95bc8d3a07"
+  },
+  "evidence_kinds": {
+    "static": [
+      "all review passes",
+      "delivery reopen refusal (code reading)"
+    ],
+    "fixture": [
+      "fixtures/trial2.out",
+      "fixtures/trial3.out",
+      "fixtures/trial4.out",
+      "tests/harness"
+    ],
+    "live": [
+      "one plugin PreToolUse refusal in the authoring session",
+      "plugin skills and agents appearing without a restart, observed once"
+    ],
+    "mocked": [],
+    "disposable_database": []
+  },
+  "requirement_mapping": {
+    "DH-W01": "work item Plan",
+    "DH-W02": "work item Implemented",
+    "DH-W03": "work item Review (static; no reviewer-computed fingerprint; last small fixes not re-reviewed)",
+    "DH-W04": "this manifest, summary.md, fixtures/",
+    "DH-W05": "runbooks/ohmyorch-delivery.md (install and initialize run; deliver, stop, resume and recovery not live)",
+    "DH-W06": "not claimed for any US-* story; setup item only"
+  },
+  "not_tested": [
+    "delegated role identity",
+    "full story lifecycle",
+    "archive and mark-done on a real change",
+    "evidence-review step",
+    "resume after remediation",
+    "live plugin Stop hook delivery",
+    "real hook payload sizes",
+    "whether openspec status or validate rewrite files bound by story_manifest"
+  ],
+  "open_decisions": [],
+  "not_claimed": [
+    "H0 or H1 completion",
+    "product acceptance",
+    "any US-* story delivered"
+  ]
+}

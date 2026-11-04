@@ -1,0 +1,6 @@
+# OHMYORCH:BEGIN ignores
+.claude/ohmyorch/runtime/
+.claude/ohmyorch/backups/
+.claude/ohmyorch/approvals.local.json
+
+# OHMYORCH:END ignores

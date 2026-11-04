@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "enabled": true,
+  "documents": {
+    "prd": "PRD-LangChain-Deep-Agents.md",
+    "specs": "SPECS.md",
+    "codebase": "CODEBASE.md"
+  },
+  "openspec": {
+    "root": "openspec",
+    "schema": "spec-driven"
+  },
+  "output": {
+    "pages": "docs/pages",
+    "epicLogs": "SPEC-LOGS"
+  },
+  "delivery": {
+    "maxStalls": 3
+  },
+  "fastValidation": {
+    "enabled": false,
+    "script": "scripts/fast-validate.sh"
+  }
+}

@@ -148,13 +148,48 @@ class HookTests(unittest.TestCase):
             (root / '.claude/settings.json').write_text(json.dumps(settings))
             self.assertTrue(any('asynchronous enforcement' in error for error in config_errors(root)))
 
-    def test_malformed_and_oversized_payload_fail_closed(self):
-        for raw in (b'{bad', b'[]', b'x' * 65537):
+    def test_malformed_payload_fails_closed(self):
+        for raw in (b'{bad', b'[]'):
             result = subprocess.run([sys.executable, str(ROOT / '.claude/hooks/dispatch.py')],
                                     input=raw, capture_output=True, timeout=5)
             self.assertEqual(result.returncode, 2)
             self.assertEqual(result.stdout, b'')
             self.assertNotIn(raw[:20], result.stderr)
+
+    def post_edit_payload(self, size: int) -> bytes:
+        """A valid PostToolUse object of exactly `size` bytes."""
+        payload = {'hook_event_name': 'PostToolUse', 'tool_name': 'Edit',
+                   'tool_input': {'file_path': 'SPECS.md'}, 'tool_response': {'originalFile': ''}}
+        padding = size - len(json.dumps(payload).encode())
+        payload['tool_response']['originalFile'] = 'x' * padding
+        raw = json.dumps(payload).encode()
+        self.assertEqual(len(raw), size)
+        return raw
+
+    def test_input_cap_applies_to_valid_json_at_its_boundary(self):
+        limit = 1048576  # A large SPECS.md or PRD edit must fit; see dispatch.py.
+        for size, expected in ((300000, 0), (limit, 0), (limit + 1, 2)):
+            with self.subTest(size=size):
+                result = subprocess.run([sys.executable, str(ROOT / '.claude/hooks/dispatch.py')],
+                                        input=self.post_edit_payload(size), capture_output=True, timeout=5)
+                self.assertEqual(result.returncode, expected, result.stderr)
+
+    def test_ohmyorch_runtime_state_is_not_a_verification_input(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state = root / '.claude/ohmyorch'
+            (state / 'runtime/session').mkdir(parents=True)
+            (state / 'backups').mkdir()
+            (state / 'project.json').write_text('{}')
+            before = fingerprint(root)
+            (state / 'runtime/delivery.owner.json').write_text('{"updatedAt": 1}')
+            (state / 'runtime/session/loop.state').write_text('1')
+            (state / 'backups/op.bak').write_text('x')
+            (state / 'approvals.local.json').write_text('{}')
+            self.assertEqual(before, fingerprint(root))
+            # Reviewed configuration still counts.
+            (state / 'project.json').write_text('{"changed": true}')
+            self.assertNotEqual(before, fingerprint(root))
 
     def test_pending_app_profile_is_not_a_pass(self):
         result = subprocess.run([sys.executable, str(ROOT / 'scripts/verify.py'), '--profile', 'db'],

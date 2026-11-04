@@ -60,8 +60,11 @@ class Story:
     line: int
     body: list[tuple[int, str]] = field(default_factory=list)
     status: str = ""
+    status_line: int = 0
     dependencies: list[str] = field(default_factory=list)
     external_dependencies: list[str] = field(default_factory=list)
+    unresolved_questions: list[str] = field(default_factory=list)
+    qualified_dependency: bool = False
     tasks: list[Task] = field(default_factory=list)
 
 
@@ -295,7 +298,7 @@ def validate_story(story: Story, base: Path, root: Path, issues: list[Issue]) ->
     status_lines = [(n, text) for n, text in sections.get("Status", []) if text.strip()]
     # The user-story prose follows Status, before Source, in the upstream shape.
     if status_lines:
-        story.status = status_lines[0][1].strip()
+        story.status_line, story.status = status_lines[0][0], status_lines[0][1].strip()
     if story.status not in STATUSES:
         issues.append(Issue(story.line, f"{story.id} has invalid or missing Status"))
     prose = "\n".join(text for _, text in status_lines[1:])
@@ -319,6 +322,7 @@ def validate_story(story: Story, base: Path, root: Path, issues: list[Issue]) ->
             if match[1] in story.dependencies:
                 issues.append(Issue(number, f"duplicate dependency {match[1]}"))
             story.dependencies.append(match[1])
+            story.qualified_dependency |= text not in {match[1], match[1] + "."}
         elif re.fullmatch(r"External: \S.*", text):
             story.external_dependencies.append(text.removeprefix("External: "))
         else:
@@ -337,6 +341,7 @@ def validate_story(story: Story, base: Path, root: Path, issues: list[Issue]) ->
 
     questions = list_items(sections.get("Open Questions", []), issues, "Open Questions")
     unresolved = [text for _, text in questions if not is_none(text)]
+    story.unresolved_questions = unresolved
     if not questions:
         issues.append(Issue(story.line, f"{story.id} requires Open Questions or '- None'"))
     if unresolved and any(is_none(text) for _, text in questions):
@@ -523,6 +528,40 @@ def validate_text(text: str, root: Path, path: Path, *, navigation: bool = True)
     return document
 
 
+def promotable(document: Document) -> list[Story]:
+    """BLOCKED stories whose only blocker was declared story dependencies, all now DONE.
+
+    External dependencies and open questions (including source conflicts) are human
+    decisions, so those stories stay BLOCKED. A BLOCKED story that declares no story
+    dependency is blocked for an unrecorded reason and is also left alone, as is one
+    whose dependency line carries prose that could hide another blocker.
+
+    A human hold on a story whose dependencies are all DONE must be recorded as an
+    open question or External dependency; a bare BLOCKED status would be promoted.
+    """
+    status = {story.id: story.status for story in document.stories}
+    return [
+        story for story in document.stories
+        if story.status == "BLOCKED" and story.dependencies and not story.qualified_dependency
+        and not story.external_dependencies and not story.unresolved_questions
+        and all(status.get(dependency) == "DONE" for dependency in story.dependencies)
+    ]
+
+
+def promote_text(text: str, document: Document) -> tuple[str, list[str]]:
+    """Set each promotable story to READY; only its own Status line changes."""
+    lines = text.splitlines(keepends=True)  # Same numbering as parse_document.
+    promoted = []
+    for story in promotable(document):
+        line = lines[story.status_line - 1]
+        content = line.rstrip("\r\n")
+        if content != "Status: BLOCKED":
+            raise ValueError(f"{story.id}: refusing to promote an unexpected Status line")
+        lines[story.status_line - 1] = "Status: READY" + line[len(content):]
+        promoted.append(story.id)
+    return "".join(lines), promoted
+
+
 def write_if_unchanged(path: Path, original: bytes, updated: bytes) -> None:
     """Atomic replacement, preserving mode and refusing an observed concurrent edit."""
     mode = stat.S_IMODE(path.stat().st_mode)
@@ -548,7 +587,7 @@ def main(argv: list[str] | None = None) -> int:
         print('ERROR: Python 3.12+ is required; use the qualified python3.12 interpreter.', file=sys.stderr)
         return 2
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("validate", "render"))
+    parser.add_argument("command", choices=("validate", "render", "promote"))
     parser.add_argument("--path", default="SPECS.md", help="file relative to project root")
     parser.add_argument("--project-root", type=Path, default=Path.cwd())
     args = parser.parse_args(argv)
@@ -564,6 +603,18 @@ def main(argv: list[str] | None = None) -> int:
             for issue in document.issues:
                 print(f"FAIL: {issue}", file=sys.stderr)
             return 1
+        if args.command == "promote":
+            text, promoted = promote_text(text, document)
+            document = validate_text(text, root, path, navigation=False)
+            if document.issues:
+                for issue in document.issues:
+                    print(f"FAIL: {issue}", file=sys.stderr)
+                return 1
+            updated = render_text(text, document).encode("utf-8")
+            if updated != original:
+                write_if_unchanged(path, original, updated)
+            print(f"PASS: promote: {', '.join(promoted) or 'no story eligible'}")
+            return 0
         if args.command == "render":
             updated = render_text(text, document).encode("utf-8")
             if updated != original:

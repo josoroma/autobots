@@ -1,0 +1,5 @@
+Action:  select Story:   US-1.2 
+active changes:        0
+select US-1.2 with unique old_string (expect 0) rc=0
+premature DONE on US-1.2 (expect refusal) rc=0
+Goal EPIC-1 recorded as STOPPED

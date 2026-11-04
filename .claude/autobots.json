@@ -17,7 +17,14 @@
     "repository": "https://github.com/josoroma/OhMyOrch",
     "commit": "fddfbf53c8c10d45782796cc9a7edf95bc8d3a07",
     "agent": "plugins/ohmyorch/agents/spec-ingestor.md",
-    "checkout": "research/upstream/OhMyOrch"
+    "checkout": "research/upstream/OhMyOrch",
+    "delivery_plugin": {
+      "decision": "docs/engineering/decisions/0002-ohmyorch-delivery-loop.md",
+      "install": "ohmyorch@ohmyorch-marketplace",
+      "scope": "local",
+      "bridge_rule": ".claude/rules/ohmyorch-delivery.md",
+      "event_delivery_qualification": "not_qualified_one_pretooluse_event_observed"
+    }
   },
   "verification": {
     "implemented_profiles": ["harness"],

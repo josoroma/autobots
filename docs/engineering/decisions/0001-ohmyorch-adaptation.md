@@ -1,6 +1,6 @@
 # Decision 0001: project-local OhMyOrch ingestion adaptation
 
-**Date:** 2026-11-04. **Authority:** explicit user request in this session.
+**Date:** 2026-11-04. **Authority:** explicit user request in this session. **Superseded in part by:** [Decision 0002](0002-ohmyorch-delivery-loop.md), for the plugin install and OpenSpec/continuation exclusions only.
 
 ## Requested behavior
 

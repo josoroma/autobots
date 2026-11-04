@@ -36,6 +36,9 @@ def input_manifest(root: Path) -> dict[str, str]:
         if (not path.is_file() or path.is_symlink()
                 or '__pycache__' in relative.parts
                 or relative.as_posix().startswith('docs/engineering/evidence/')
+                # OhMyOrch session state: rewritten on every delivery refresh and ignored by Git.
+                or relative.as_posix().startswith(('.claude/ohmyorch/runtime/', '.claude/ohmyorch/backups/'))
+                or path.name == 'approvals.local.json'
                 or path.name == 'settings.local.json'
                 or path.name.startswith('.env')
                 or path.suffix in {'.pyc', '.log'}):

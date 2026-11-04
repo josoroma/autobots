@@ -5,3 +5,15 @@
 Project-specific workflows live in `.claude/skills`; focused roles live in `.claude/agents`. Use `autobots-spec-ingest` to ingest or refresh the source-traceable backlog. Its read-only ingestor returns content for the coordinator to persist. Resolve documents through `.claude/autobots.json`.
 
 The project hooks run local deterministic scripts. They do not configure an assistant model, install OhMyOrch as a plugin, start product services or authorize additional inference providers. Follow the documented runbook to inspect configuration and verify scripts; do not mistake a configuration file for proven live event delivery.
+
+<!-- OHMYORCH:BEGIN project -->
+## OhMyOrch project workflow
+
+Use the installed plugin's /ohmyorch:doctor and /ohmyorch:deliver commands.
+Project intent: PRD-LangChain-Deep-Agents.md. Backlog: SPECS.md.
+Current-state evidence: CODEBASE.md (generate it only through analysis).
+Delegate implementation, review and testing independently. Specialists persist
+their own verdicts; the main session derives resumption from project artifacts.
+Generic rules are bundled in the plugin; updates never copy executable code here.
+
+<!-- OHMYORCH:END project -->

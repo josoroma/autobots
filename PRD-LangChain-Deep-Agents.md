@@ -1,5 +1,7 @@
 # PRD: AutoGPT-inspired application with LangChain, LangGraph, and Deep Agents
 
+CODEBASE Context: skipped (product intent predates implementation; CODEBASE.md describes only development tooling and supplies no requirements)
+
 **Status:** finalized product requirements and architecture decisions; implementation and release qualification are pending. No application integration or cloud-model qualification is claimed complete.  
 **Research date:** November 4, 2026, America/Costa_Rica.  
 **Product baseline:** [PRD-AutoGPT.md](./PRD-AutoGPT.md).  

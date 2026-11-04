@@ -12,7 +12,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
 from harness_lib import report_state  # noqa: E402
 
-MAX_INPUT = 65536
+# A PostToolUse event for a 127 KB PRD edit exceeded the old 64 KiB cap; it appears to carry the file.
+MAX_INPUT = 1048576
 
 
 def is_secret(path: Path) -> bool:

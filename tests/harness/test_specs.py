@@ -276,6 +276,89 @@ class SpecsTests(unittest.TestCase):
         self.assertEqual(1, result.returncode)
         self.assertEqual(original, self.path.read_text(encoding="utf-8"))
 
+    def promoted(self, text: str) -> list[str]:
+        parsed = specs.validate_text(text, self.root, self.path, navigation=False)
+        self.assertEqual([], parsed.issues)
+        return specs.promote_text(text, parsed)[1]
+
+    def test_promote_requires_every_declared_dependency_done(self) -> None:
+        done = story(status="DONE", done=True)
+        self.assertEqual(["US-1.2"], self.promoted(document(done, story("US-1.2", status="BLOCKED", dependency="US-1.1"))))
+        partial = document(done, story("US-1.2", status="BLOCKED"), story("US-1.3", status="BLOCKED", dependency="US-1.1\n- US-1.2"))
+        self.assertEqual([], self.promoted(partial))
+        # One round only: promotion to READY does not satisfy a dependent story.
+        chain = document(done, story("US-1.2", status="BLOCKED", dependency="US-1.1"), story("US-1.3", status="BLOCKED", dependency="US-1.2"))
+        self.assertEqual(["US-1.2"], self.promoted(chain))
+
+    def test_promote_leaves_human_decisions_blocked(self) -> None:
+        done = story(status="DONE", done=True)
+        cases = {
+            "external": story("US-1.2", status="BLOCKED", dependency="US-1.1\n- External: paid qualification"),
+            "question": story("US-1.2", status="BLOCKED", dependency="US-1.1", question="Which destination is first?"),
+            "conflict": story("US-1.2", status="BLOCKED", dependency="US-1.1", question="Sources conflict on retries."),
+            "undeclared": story("US-1.2", status="BLOCKED"),
+            "clarification": story("US-1.2", status="NEEDS CLARIFICATION", dependency="US-1.1", question="Which one?"),
+        }
+        for name, blocked in cases.items():
+            with self.subTest(name):
+                self.assertEqual([], self.promoted(document(done, blocked)))
+
+    def test_promote_refuses_a_dependency_line_with_trailing_prose(self) -> None:
+        # The parser records only the first ID, so prose could hide a second blocker.
+        done = story(status="DONE", done=True)
+        for line in ("US-1.1 and US-1.3", "US-1.1 after External approval", "US-1.1 is delivered."):
+            with self.subTest(line):
+                self.assertEqual([], self.promoted(document(done, story("US-1.2", status="BLOCKED", dependency=line), story("US-1.3", status="BLOCKED"))))
+        self.assertEqual(["US-1.2"], self.promoted(document(done, story("US-1.2", status="BLOCKED", dependency="US-1.1."))))
+
+    def test_promote_only_touches_blocked_stories(self) -> None:
+        done = story(status="DONE", done=True)
+        for status in ("READY", "IN PROGRESS"):
+            with self.subTest(status):
+                self.assertEqual([], self.promoted(document(done, story("US-1.2", status=status, dependency="US-1.1"))))
+
+    def test_change_line_is_valid_only_in_the_status_block(self) -> None:
+        line = "Change: `openspec/changes/validate-a-bounded-change/`"
+        self.assertEqual([], self.errors(document(story(status="IN PROGRESS").replace("Status: IN PROGRESS\n", f"Status: IN PROGRESS\n{line}\n"))))
+        self.assertTrue(self.errors(document(story(status="IN PROGRESS").replace("Tasks:\n", f"Tasks:\n{line}\n"))))
+
+    def test_cli_promote_refuses_unexpected_status_line_without_writing(self) -> None:
+        original = self.render(document(story(status="DONE", done=True), story("US-1.2", status="BLOCKED", dependency="US-1.1"))).replace("Status: BLOCKED\n", "Status: BLOCKED  \n")
+        self.path.write_text(original, encoding="utf-8")
+        result = subprocess.run([sys.executable, str(SCRIPT), "promote", "--project-root", str(self.root)], capture_output=True, text=True, check=False)
+        self.assertEqual(2, result.returncode)
+        self.assertIn("unexpected Status line", result.stderr)
+        self.assertEqual(original, self.path.read_text(encoding="utf-8"))
+
+    def test_cli_promote_changes_only_status_and_navigation(self) -> None:
+        self.path.write_text(self.render(document(
+            story(status="DONE", done=True),
+            story("US-1.2", status="BLOCKED", dependency="US-1.1"),
+            story("US-1.3", status="BLOCKED", dependency="External: operator decision"),
+        )), encoding="utf-8")
+        before = self.path.read_text(encoding="utf-8")
+        result = subprocess.run([sys.executable, str(SCRIPT), "promote", "--project-root", str(self.root)], capture_output=True, text=True, check=False)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("US-1.2", result.stdout)
+        self.assertNotIn("US-1.3", result.stdout)
+        after = self.path.read_text(encoding="utf-8")
+        context = before.index("## Product Context")
+        self.assertEqual(before[context:].replace("Status: BLOCKED", "Status: READY", 1), after[after.index("## Product Context"):])
+        self.assertEqual([], self.errors(after, navigation=True))
+        again = subprocess.run([sys.executable, str(SCRIPT), "promote", "--project-root", str(self.root)], capture_output=True, text=True, check=False)
+        self.assertEqual(0, again.returncode, again.stderr)
+        self.assertIn("no story eligible", again.stdout)
+        self.assertEqual(after, self.path.read_text(encoding="utf-8"))
+
+    def test_cli_promote_preserves_crlf(self) -> None:
+        original = self.render(document(story(status="DONE", done=True), story("US-1.2", status="BLOCKED", dependency="US-1.1"))).replace("\n", "\r\n")
+        self.path.write_bytes(original.encode("utf-8"))
+        result = subprocess.run([sys.executable, str(SCRIPT), "promote", "--project-root", str(self.root)], capture_output=True, text=True, check=False)
+        self.assertEqual(0, result.returncode, result.stderr)
+        after = self.path.read_bytes().decode("utf-8")
+        self.assertIn("Status: READY\r\n", after)
+        self.assertNotIn("\n", after.replace("\r\n", ""))
+
     def test_cli_rejects_path_outside_root(self) -> None:
         result = subprocess.run([sys.executable, str(SCRIPT), "validate", "--project-root", str(self.root), "--path", str(SCRIPT)], capture_output=True, text=True, check=False)
         self.assertEqual(2, result.returncode)
