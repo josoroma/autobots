@@ -1,0 +1,30 @@
+{
+  "research_date": "2026-11-04",
+  "source_url": "https://huggingface.co/api/models?author=Qwen&search=Qwen3.8&limit=100",
+  "models": [
+    {
+      "id": "Qwen/Qwen3.8-27B",
+      "sha": null
+    },
+    {
+      "id": "Qwen/Qwen3.8-Flash-Next",
+      "sha": null
+    },
+    {
+      "id": "Qwen/Qwen3.8-2.4T-A95B",
+      "sha": null
+    },
+    {
+      "id": "Qwen/Qwen3.8-27B-FP8",
+      "sha": null
+    },
+    {
+      "id": "Qwen/Qwen3.8-Flash-Next-FP8",
+      "sha": null
+    },
+    {
+      "id": "Qwen/Qwen3.8-2.4T-A95B-FP8",
+      "sha": null
+    }
+  ]
+}

@@ -1,0 +1,1016 @@
+{
+  "research_date": "2026-11-04",
+  "scope": "Metadata only; model weights not downloaded. Sizes are artifact bytes, not inference RAM.",
+  "models": [
+    {
+      "model_id": "Qwen/Qwen3.5-4B",
+      "source_url": "https://huggingface.co/api/models/Qwen/Qwen3.5-4B?blobs=true",
+      "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "last_modified": "2026-03-02T00:52:52.000Z",
+      "license": "apache-2.0",
+      "license_name": null,
+      "license_link": "https://huggingface.co/Qwen/Qwen3.5-4B/blob/main/LICENSE",
+      "base_model": [
+        "Qwen/Qwen3.5-4B-Base"
+      ],
+      "gated": false,
+      "safetensors": {
+        "parameters": {
+          "BF16": 4659861248,
+          "F32": 3840
+        },
+        "total": 4659865088
+      },
+      "weight_files": [
+        {
+          "file": "model.safetensors-00001-of-00002.safetensors",
+          "bytes": 5329398688
+        },
+        {
+          "file": "model.safetensors-00002-of-00002.safetensors",
+          "bytes": 3990429408
+        }
+      ]
+    },
+    {
+      "model_id": "Qwen/Qwen3.5-9B",
+      "source_url": "https://huggingface.co/api/models/Qwen/Qwen3.5-9B?blobs=true",
+      "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "last_modified": "2026-03-02T00:51:43.000Z",
+      "license": "apache-2.0",
+      "license_name": null,
+      "license_link": "https://huggingface.co/Qwen/Qwen3.5-9B/blob/main/LICENSE",
+      "base_model": [
+        "Qwen/Qwen3.5-9B-Base"
+      ],
+      "gated": false,
+      "safetensors": {
+        "parameters": {
+          "BF16": 9653100528,
+          "F32": 3840
+        },
+        "total": 9653104368
+      },
+      "weight_files": [
+        {
+          "file": "model.safetensors-00001-of-00004.safetensors",
+          "bytes": 5276436216
+        },
+        {
+          "file": "model.safetensors-00002-of-00004.safetensors",
+          "bytes": 5335161512
+        },
+        {
+          "file": "model.safetensors-00003-of-00004.safetensors",
+          "bytes": 5368717440
+        },
+        {
+          "file": "model.safetensors-00004-of-00004.safetensors",
+          "bytes": 3325995712
+        }
+      ]
+    },
+    {
+      "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+      "source_url": "https://huggingface.co/api/models/Qwen/Qwen3-4B-Instruct-2507?blobs=true",
+      "revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+      "last_modified": "2025-09-17T06:56:53.000Z",
+      "license": "apache-2.0",
+      "license_name": null,
+      "license_link": "https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507/blob/main/LICENSE",
+      "base_model": null,
+      "gated": false,
+      "safetensors": {
+        "parameters": {
+          "BF16": 4022468096
+        },
+        "total": 4022468096
+      },
+      "weight_files": [
+        {
+          "file": "model-00001-of-00003.safetensors",
+          "bytes": 3957900840
+        },
+        {
+          "file": "model-00002-of-00003.safetensors",
+          "bytes": 3987450520
+        },
+        {
+          "file": "model-00003-of-00003.safetensors",
+          "bytes": 99630640
+        }
+      ]
+    },
+    {
+      "model_id": "Youssofal/Qwen3.5-4B-MTPLX-Optimized-Speed",
+      "source_url": "https://huggingface.co/api/models/Youssofal/Qwen3.5-4B-MTPLX-Optimized-Speed?blobs=true",
+      "revision": "550153beba237bb1f2f6ccba31ccedfe48ff78ec",
+      "last_modified": "2026-09-17T08:43:13.000Z",
+      "license": "apache-2.0",
+      "license_name": null,
+      "license_link": null,
+      "base_model": "Qwen/Qwen3.5-4B",
+      "gated": false,
+      "safetensors": {
+        "parameters": {
+          "U32": 4204789760,
+          "BF16": 960768,
+          "F32": 768
+        },
+        "total": 4205751296
+      },
+      "weight_files": [
+        {
+          "file": "model.safetensors",
+          "bytes": 2367238661
+        },
+        {
+          "file": "mtp.safetensors",
+          "bytes": 86701062
+        },
+        {
+          "file": "mtp/weights.safetensors",
+          "bytes": 86701040
+        }
+      ]
+    },
+    {
+      "model_id": "Youssofal/Qwen3.5-9B-MTPLX-Optimized-Speed",
+      "source_url": "https://huggingface.co/api/models/Youssofal/Qwen3.5-9B-MTPLX-Optimized-Speed?blobs=true",
+      "revision": "86c7eb1b9155a45dd70a898743d7acfc13e12b25",
+      "last_modified": "2026-09-24T07:14:23.000Z",
+      "license": "apache-2.0",
+      "license_name": null,
+      "license_link": null,
+      "base_model": null,
+      "gated": false,
+      "safetensors": {
+        "parameters": {
+          "U32": 8952741888,
+          "BF16": 457071088,
+          "F32": 768
+        },
+        "total": 9409812208
+      },
+      "weight_files": [
+        {
+          "file": "model-00001-of-00002.safetensors",
+          "bytes": 5358172442
+        },
+        {
+          "file": "model-00002-of-00002.safetensors",
+          "bytes": 1918175495
+        },
+        {
+          "file": "model-vision.safetensors",
+          "bytes": 912058025
+        },
+        {
+          "file": "mtp.safetensors",
+          "bytes": 486582837
+        }
+      ]
+    },
+    {
+      "model_id": "ibm-granite/granite-4.2-3b",
+      "source_url": "https://huggingface.co/api/models/ibm-granite/granite-4.2-3b?blobs=true",
+      "revision": "4e9c275e232f10211ec88644d106a1f6a1b60e06",
+      "last_modified": "2026-10-20T20:44:28.000Z",
+      "license": "apache-2.0",
+      "license_name": null,
+      "license_link": null,
+      "base_model": [
+        "ibm-granite/granite-4.1-3b-base"
+      ],
+      "gated": false,
+      "safetensors": {
+        "parameters": {
+          "BF16": 3659737600
+        },
+        "total": 3659737600
+      },
+      "weight_files": [
+        {
+          "file": "model-00001-of-00002.safetensors",
+          "bytes": 5358533712
+        },
+        {
+          "file": "model-00002-of-00002.safetensors",
+          "bytes": 1960983408
+        }
+      ]
+    },
+    {
+      "model_id": "ibm-granite/granite-4.2-8b",
+      "source_url": "https://huggingface.co/api/models/ibm-granite/granite-4.2-8b?blobs=true",
+      "revision": "a7042144125ce5ae64f89610e8289647fc000b9a",
+      "last_modified": "2026-10-20T23:00:24.000Z",
+      "license": "apache-2.0",
+      "license_name": null,
+      "license_link": null,
+      "base_model": [
+        "ibm-granite/granite-4.1-8b-base"
+      ],
+      "gated": false,
+      "safetensors": {
+        "parameters": {
+          "BF16": 8791592960
+        },
+        "total": 8791592960
+      },
+      "weight_files": [
+        {
+          "file": "model-00001-of-00004.safetensors",
+          "bytes": 5335320208
+        },
+        {
+          "file": "model-00002-of-00004.safetensors",
+          "bytes": 5285049768
+        },
+        {
+          "file": "model-00003-of-00004.safetensors",
+          "bytes": 5360555872
+        },
+        {
+          "file": "model-00004-of-00004.safetensors",
+          "bytes": 1602302184
+        }
+      ]
+    },
+    {
+      "model_id": "LiquidAI/LFM3-1.7B",
+      "source_url": "https://huggingface.co/api/models/LiquidAI/LFM3-1.7B?blobs=true",
+      "revision": "0dc4268b561499c648c7ba7c9466bf3d8d01517a",
+      "last_modified": "2026-11-03T18:08:34.000Z",
+      "license": "other",
+      "license_name": "lfm1.0",
+      "license_link": "LICENSE",
+      "base_model": "LiquidAI/LFM3-1.7B-Base",
+      "gated": false,
+      "safetensors": {
+        "parameters": {
+          "BF16": 1728801536
+        },
+        "total": 1728801536
+      },
+      "weight_files": [
+        {
+          "file": "model.safetensors",
+          "bytes": 3457635448
+        }
+      ]
+    },
+    {
+      "model_id": "HuggingFaceTB/SmolLM3-3B",
+      "source_url": "https://huggingface.co/api/models/HuggingFaceTB/SmolLM3-3B?blobs=true",
+      "revision": "a07cc9a04f16550a088caea529712d1d335b0ac1",
+      "last_modified": "2025-09-10T12:28:11.000Z",
+      "license": "apache-2.0",
+      "license_name": null,
+      "license_link": null,
+      "base_model": [
+        "HuggingFaceTB/SmolLM3-3B-Base"
+      ],
+      "gated": false,
+      "safetensors": {
+        "parameters": {
+          "BF16": 3075098624
+        },
+        "total": 3075098624
+      },
+      "weight_files": [
+        {
+          "file": "model-00001-of-00002.safetensors",
+          "bytes": 4966315264
+        },
+        {
+          "file": "model-00002-of-00002.safetensors",
+          "bytes": 1183919744
+        }
+      ]
+    },
+    {
+      "model_id": "microsoft/Phi-4-mini-instruct",
+      "source_url": "https://huggingface.co/api/models/microsoft/Phi-4-mini-instruct?blobs=true",
+      "revision": "cfbefacb99257ffa30c83adab238a50856ac3083",
+      "last_modified": "2025-12-10T20:24:40.000Z",
+      "license": "mit",
+      "license_name": null,
+      "license_link": "https://huggingface.co/microsoft/Phi-4-mini-instruct/resolve/main/LICENSE",
+      "base_model": null,
+      "gated": false,
+      "safetensors": {
+        "parameters": {
+          "BF16": 3836021760
+        },
+        "total": 3836021760
+      },
+      "weight_files": [
+        {
+          "file": "model-00001-of-00002.safetensors",
+          "bytes": 4903637712
+        },
+        {
+          "file": "model-00002-of-00002.safetensors",
+          "bytes": 2768428504
+        }
+      ]
+    },
+    {
+      "model_id": "mistralai/Ministral-3-3B-Instruct-2512",
+      "source_url": "https://huggingface.co/api/models/mistralai/Ministral-3-3B-Instruct-2512?blobs=true",
+      "revision": "b35d4dfe56c142746f54dbd64f579faab2744308",
+      "last_modified": "2026-07-15T12:21:35.000Z",
+      "license": "apache-2.0",
+      "license_name": null,
+      "license_link": null,
+      "base_model": [
+        "mistralai/Ministral-3-3B-Base-2512"
+      ],
+      "gated": false,
+      "safetensors": {
+        "parameters": {
+          "BF16": 822899712,
+          "F8_E4M3": 3026190336
+        },
+        "total": 3849090048
+      },
+      "weight_files": [
+        {
+          "file": "consolidated.safetensors",
+          "bytes": 4672089108
+        },
+        {
+          "file": "model.safetensors",
+          "bytes": 4672099184
+        }
+      ]
+    },
+    {
+      "model_id": "numind/NuExtract3",
+      "source_url": "https://huggingface.co/api/models/numind/NuExtract3?blobs=true",
+      "revision": "c99dc8f5641b866aa0192b6ea78f84bf9f3535f1",
+      "last_modified": "2026-08-20T19:44:14.000Z",
+      "license": "apache-2.0",
+      "license_name": null,
+      "license_link": "https://huggingface.co/numind/NuExtract3/blob/main/LICENSE",
+      "base_model": [
+        "Qwen/Qwen3.5-4B"
+      ],
+      "gated": false,
+      "safetensors": {
+        "parameters": {
+          "BF16": 4539265536
+        },
+        "total": 4539265536
+      },
+      "weight_files": [
+        {
+          "file": "model.safetensors",
+          "bytes": 9078620504
+        },
+        {
+          "file": "model_mtp.safetensors",
+          "bytes": 241200704
+        }
+      ]
+    },
+    {
+      "model_id": "numind/NuExtract3-GGUF",
+      "source_url": "https://huggingface.co/api/models/numind/NuExtract3-GGUF?blobs=true",
+      "revision": "28a1aae6288c5d50bdf999ca2e572240966d669b",
+      "last_modified": "2026-08-25T18:42:35.000Z",
+      "license": "apache-2.0",
+      "license_name": null,
+      "license_link": "https://huggingface.co/numind/NuExtract3/blob/main/LICENSE",
+      "base_model": "numind/NuExtract3",
+      "gated": false,
+      "safetensors": null,
+      "weight_files": [
+        {
+          "file": "NuExtract3-Q2_K.gguf",
+          "bytes": 1959166944
+        },
+        {
+          "file": "NuExtract3-Q3_K_M.gguf",
+          "bytes": 2318805984
+        },
+        {
+          "file": "NuExtract3-Q4_K_M.gguf",
+          "bytes": 2783445984
+        },
+        {
+          "file": "NuExtract3-Q5_K_M.gguf",
+          "bytes": 3161424864
+        },
+        {
+          "file": "NuExtract3-Q6_K.gguf",
+          "bytes": 3563027424
+        },
+        {
+          "file": "NuExtract3-Q8_0.gguf",
+          "bytes": 4610579424
+        },
+        {
+          "file": "mmproj-NuExtract3-BF16.gguf",
+          "bytes": 675569184
+        }
+      ]
+    },
+    {
+      "model_id": "numind/NuExtract3-mlx-4bits",
+      "source_url": "https://huggingface.co/api/models/numind/NuExtract3-mlx-4bits?blobs=true",
+      "revision": "29c38269f94054282bf9ea97a20dfc6bb8bbefea",
+      "last_modified": "2026-05-19T13:14:43.000Z",
+      "license": null,
+      "license_name": null,
+      "license_link": null,
+      "base_model": "numind/NuExtract3",
+      "gated": false,
+      "safetensors": {
+        "parameters": {
+          "U32": 4204789760,
+          "BF16": 334475776
+        },
+        "total": 4539265536
+      },
+      "weight_files": [
+        {
+          "file": "model.safetensors",
+          "bytes": 3034299183
+        }
+      ]
+    },
+    {
+      "model_id": "google/functiongemma-270m-it",
+      "source_url": "https://huggingface.co/api/models/google/functiongemma-270m-it?blobs=true",
+      "revision": "39eccb091651513a5dfb56892d3714c1b5b8276c",
+      "last_modified": "2026-01-14T09:33:54.000Z",
+      "license": "gemma",
+      "license_name": null,
+      "license_link": null,
+      "base_model": null,
+      "gated": "manual",
+      "safetensors": {
+        "parameters": {
+          "BF16": 268098176
+        },
+        "total": 268098176
+      },
+      "weight_files": [
+        {
+          "file": "model.safetensors",
+          "bytes": 536223056
+        }
+      ]
+    },
+    {
+      "model_id": "Qwen/Qwen3.8-27B",
+      "source_url": "https://huggingface.co/api/models/Qwen/Qwen3.8-27B?blobs=true",
+      "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "last_modified": "2026-08-14T15:00:01.000Z",
+      "license": "apache-2.0",
+      "license_name": null,
+      "license_link": null,
+      "base_model": null,
+      "gated": false,
+      "safetensors": {
+        "parameters": {
+          "BF16": 27781427952
+        },
+        "total": 27781427952
+      },
+      "weight_files": [
+        {
+          "file": "model-00001-of-00018.safetensors",
+          "bytes": 3966730552
+        },
+        {
+          "file": "model-00002-of-00018.safetensors",
+          "bytes": 3043080328
+        },
+        {
+          "file": "model-00003-of-00018.safetensors",
+          "bytes": 2542796952
+        },
+        {
+          "file": "model-00004-of-00018.safetensors",
+          "bytes": 3988973152
+        },
+        {
+          "file": "model-00005-of-00018.safetensors",
+          "bytes": 2099339864
+        },
+        {
+          "file": "model-00006-of-00018.safetensors",
+          "bytes": 3979553696
+        },
+        {
+          "file": "model-00007-of-00018.safetensors",
+          "bytes": 2108759344
+        },
+        {
+          "file": "model-00008-of-00018.safetensors",
+          "bytes": 3979553696
+        },
+        {
+          "file": "model-00009-of-00018.safetensors",
+          "bytes": 2108759344
+        },
+        {
+          "file": "model-00010-of-00018.safetensors",
+          "bytes": 3979553696
+        },
+        {
+          "file": "model-00011-of-00018.safetensors",
+          "bytes": 2108759344
+        },
+        {
+          "file": "model-00012-of-00018.safetensors",
+          "bytes": 3979553696
+        },
+        {
+          "file": "model-00013-of-00018.safetensors",
+          "bytes": 2108759344
+        },
+        {
+          "file": "model-00014-of-00018.safetensors",
+          "bytes": 3979553696
+        },
+        {
+          "file": "model-00015-of-00018.safetensors",
+          "bytes": 2108759344
+        },
+        {
+          "file": "model-00016-of-00018.safetensors",
+          "bytes": 3979564040
+        },
+        {
+          "file": "model-00017-of-00018.safetensors",
+          "bytes": 2108759344
+        },
+        {
+          "file": "model-00018-of-00018.safetensors",
+          "bytes": 3392197344
+        }
+      ]
+    },
+    {
+      "model_id": "mlx-community/Qwen3.8-27B-4bit",
+      "source_url": "https://huggingface.co/api/models/mlx-community/Qwen3.8-27B-4bit?blobs=true",
+      "revision": "10c35caafbb80f7dc6a7a432cdd11af10a6d4818",
+      "last_modified": "2026-09-14T12:37:43.000Z",
+      "license": "apache-2.0",
+      "license_name": null,
+      "license_link": null,
+      "base_model": "Qwen/Qwen3.8-27B",
+      "gated": false,
+      "safetensors": {
+        "parameters": {
+          "U32": 26893352960,
+          "BF16": 463375600
+        },
+        "total": 27356728560
+      },
+      "weight_files": [
+        {
+          "file": "model-00001-of-00003.safetensors",
+          "bytes": 5343268662
+        },
+        {
+          "file": "model-00002-of-00003.safetensors",
+          "bytes": 5354185130
+        },
+        {
+          "file": "model-00003-of-00003.safetensors",
+          "bytes": 5357087557
+        }
+      ]
+    },
+    {
+      "model_id": "mlx-community/Qwen3.8-27B-6bit",
+      "source_url": "https://huggingface.co/api/models/mlx-community/Qwen3.8-27B-6bit?blobs=true",
+      "error": "HTTP Error 401: Unauthorized"
+    },
+    {
+      "model_id": "mlx-community/Qwen3.8-27B-8bit",
+      "source_url": "https://huggingface.co/api/models/mlx-community/Qwen3.8-27B-8bit?blobs=true",
+      "revision": "815b83c0df8ffd1d1b5244cf75fd6ef14fca9ef9",
+      "last_modified": "2026-08-14T16:16:16.000Z",
+      "license": "apache-2.0",
+      "license_name": null,
+      "license_link": null,
+      "base_model": "Qwen/Qwen3.8-27B",
+      "gated": false,
+      "safetensors": {
+        "parameters": {
+          "U32": 26893352960,
+          "BF16": 463375600
+        },
+        "total": 27356728560
+      },
+      "weight_files": [
+        {
+          "file": "model-00001-of-00006.safetensors",
+          "bytes": 5317707581
+        },
+        {
+          "file": "model-00002-of-00006.safetensors",
+          "bytes": 5354102610
+        },
+        {
+          "file": "model-00003-of-00006.safetensors",
+          "bytes": 5354184694
+        },
+        {
+          "file": "model-00004-of-00006.safetensors",
+          "bytes": 5337309653
+        },
+        {
+          "file": "model-00005-of-00006.safetensors",
+          "bytes": 5292848464
+        },
+        {
+          "file": "model-00006-of-00006.safetensors",
+          "bytes": 2845065477
+        }
+      ]
+    },
+    {
+      "model_id": "mlx-community/Qwen3.8-27B-bf16",
+      "source_url": "https://huggingface.co/api/models/mlx-community/Qwen3.8-27B-bf16?blobs=true",
+      "revision": "6f265714824f3c38d4452baa1628aef3d9b9aae9",
+      "last_modified": "2026-08-14T16:16:11.000Z",
+      "license": "apache-2.0",
+      "license_name": null,
+      "license_link": null,
+      "base_model": "Qwen/Qwen3.8-27B",
+      "gated": false,
+      "safetensors": {
+        "parameters": {
+          "BF16": 27356728560
+        },
+        "total": 27356728560
+      },
+      "weight_files": [
+        {
+          "file": "model-00001-of-00011.safetensors",
+          "bytes": 5229165261
+        },
+        {
+          "file": "model-00002-of-00011.safetensors",
+          "bytes": 5321764754
+        },
+        {
+          "file": "model-00003-of-00011.safetensors",
+          "bytes": 5321764861
+        },
+        {
+          "file": "model-00004-of-00011.safetensors",
+          "bytes": 5321764870
+        },
+        {
+          "file": "model-00005-of-00011.safetensors",
+          "bytes": 5343801131
+        },
+        {
+          "file": "model-00006-of-00011.safetensors",
+          "bytes": 5321764862
+        },
+        {
+          "file": "model-00007-of-00011.safetensors",
+          "bytes": 5321764852
+        },
+        {
+          "file": "model-00008-of-00011.safetensors",
+          "bytes": 5321764844
+        },
+        {
+          "file": "model-00009-of-00011.safetensors",
+          "bytes": 5343801175
+        },
+        {
+          "file": "model-00010-of-00011.safetensors",
+          "bytes": 4323452933
+        },
+        {
+          "file": "model-00011-of-00011.safetensors",
+          "bytes": 2542796942
+        }
+      ]
+    },
+    {
+      "model_id": "PocketAiHub/Qwen3.8-27B-MLX",
+      "source_url": "https://huggingface.co/api/models/PocketAiHub/Qwen3.8-27B-MLX?blobs=true",
+      "revision": "dcc3732f8c93ccf5580bf7a55e4ae639a40f194c",
+      "last_modified": "2026-08-16T02:11:38.000Z",
+      "license": "apache-2.0",
+      "license_name": null,
+      "license_link": null,
+      "base_model": "Qwen/Qwen3.8-27B",
+      "gated": false,
+      "safetensors": null,
+      "weight_files": [
+        {
+          "file": "2bit/model-00001-of-00003.safetensors",
+          "bytes": 5362277859
+        },
+        {
+          "file": "2bit/model-00002-of-00003.safetensors",
+          "bytes": 5172986098
+        },
+        {
+          "file": "2bit/model-00003-of-00003.safetensors",
+          "bytes": 476774751
+        },
+        {
+          "file": "4bit/model-00001-of-00003.safetensors",
+          "bytes": 5343268662
+        },
+        {
+          "file": "4bit/model-00002-of-00003.safetensors",
+          "bytes": 5354185130
+        },
+        {
+          "file": "4bit/model-00003-of-00003.safetensors",
+          "bytes": 5357087557
+        },
+        {
+          "file": "6bit/model-00001-of-00005.safetensors",
+          "bytes": 5362726174
+        },
+        {
+          "file": "6bit/model-00002-of-00005.safetensors",
+          "bytes": 5344282130
+        },
+        {
+          "file": "6bit/model-00003-of-00005.safetensors",
+          "bytes": 5331479350
+        },
+        {
+          "file": "6bit/model-00004-of-00005.safetensors",
+          "bytes": 5331479370
+        },
+        {
+          "file": "6bit/model-00005-of-00005.safetensors",
+          "bytes": 1407912945
+        },
+        {
+          "file": "8bit/model-00001-of-00006.safetensors",
+          "bytes": 5317707581
+        },
+        {
+          "file": "8bit/model-00002-of-00006.safetensors",
+          "bytes": 5354102610
+        },
+        {
+          "file": "8bit/model-00003-of-00006.safetensors",
+          "bytes": 5354184694
+        },
+        {
+          "file": "8bit/model-00004-of-00006.safetensors",
+          "bytes": 5337309653
+        },
+        {
+          "file": "8bit/model-00005-of-00006.safetensors",
+          "bytes": 5292848464
+        },
+        {
+          "file": "8bit/model-00006-of-00006.safetensors",
+          "bytes": 2845065477
+        },
+        {
+          "file": "bf16/model-00001-of-00011.safetensors",
+          "bytes": 5229165261
+        },
+        {
+          "file": "bf16/model-00002-of-00011.safetensors",
+          "bytes": 5321764754
+        },
+        {
+          "file": "bf16/model-00003-of-00011.safetensors",
+          "bytes": 5321764861
+        },
+        {
+          "file": "bf16/model-00004-of-00011.safetensors",
+          "bytes": 5321764870
+        },
+        {
+          "file": "bf16/model-00005-of-00011.safetensors",
+          "bytes": 5343801131
+        },
+        {
+          "file": "bf16/model-00006-of-00011.safetensors",
+          "bytes": 5321764862
+        },
+        {
+          "file": "bf16/model-00007-of-00011.safetensors",
+          "bytes": 5321764852
+        },
+        {
+          "file": "bf16/model-00008-of-00011.safetensors",
+          "bytes": 5321764844
+        },
+        {
+          "file": "bf16/model-00009-of-00011.safetensors",
+          "bytes": 5343801175
+        },
+        {
+          "file": "bf16/model-00010-of-00011.safetensors",
+          "bytes": 4323452933
+        },
+        {
+          "file": "bf16/model-00011-of-00011.safetensors",
+          "bytes": 2542796942
+        }
+      ]
+    },
+    {
+      "model_id": "mlx-community/Qwen3.5-9B-4bit",
+      "source_url": "https://huggingface.co/api/models/mlx-community/Qwen3.5-9B-4bit?blobs=true",
+      "revision": "8b2b98c00a6b4d291155e4890773ca8f769aee53",
+      "last_modified": "2026-03-02T16:42:26.000Z",
+      "license": "apache-2.0",
+      "license_name": null,
+      "license_link": "https://huggingface.co/Qwen/Qwen3.5-9B/blob/main/LICENSE",
+      "base_model": [
+        "Qwen/Qwen3.5-9B-Base"
+      ],
+      "gated": false,
+      "safetensors": {
+        "parameters": {
+          "U32": 8952741888,
+          "BF16": 457071088,
+          "F32": 768
+        },
+        "total": 9409813744
+      },
+      "weight_files": [
+        {
+          "file": "model-00001-of-00002.safetensors",
+          "bytes": 5349771222
+        },
+        {
+          "file": "model-00002-of-00002.safetensors",
+          "bytes": 600449850
+        }
+      ]
+    },
+    {
+      "model_id": "ibm-granite/granite-4.2-3b-q4-mlx",
+      "source_url": "https://huggingface.co/api/models/ibm-granite/granite-4.2-3b-q4-mlx?blobs=true",
+      "revision": "0c6f39b1827afd5eb2c1c3b13751929857434953",
+      "last_modified": "2026-09-02T20:46:04.000Z",
+      "license": "apache-2.0",
+      "license_name": null,
+      "license_link": null,
+      "base_model": [
+        "ibm-granite/granite-4.2-3b"
+      ],
+      "gated": false,
+      "safetensors": {
+        "parameters": {
+          "U32": 3659530240,
+          "BF16": 207360
+        },
+        "total": 3659737600
+      },
+      "weight_files": [
+        {
+          "file": "model.safetensors",
+          "bytes": 2059005430
+        }
+      ]
+    },
+    {
+      "model_id": "mlx-community/SmolLM3-3B-4bit",
+      "source_url": "https://huggingface.co/api/models/mlx-community/SmolLM3-3B-4bit?blobs=true",
+      "revision": "d3a7e0594d6642dbcfb7d149bed8b0bdf49f95ce",
+      "last_modified": "2025-07-08T16:16:14.000Z",
+      "license": "apache-2.0",
+      "license_name": null,
+      "license_link": null,
+      "base_model": "HuggingFaceTB/SmolLM3-3B",
+      "gated": false,
+      "safetensors": {
+        "parameters": {
+          "U32": 3074949120,
+          "BF16": 149504
+        },
+        "total": 3075098624
+      },
+      "weight_files": [
+        {
+          "file": "model.safetensors",
+          "bytes": 1730051993
+        }
+      ]
+    },
+    {
+      "model_id": "Youssofal/Qwen3.8-27B-MTPLX-Optimized-Speed",
+      "source_url": "https://huggingface.co/api/models/Youssofal/Qwen3.8-27B-MTPLX-Optimized-Speed?blobs=true",
+      "revision": "1d5087d2062c02b279180a53e4016cf9cd7a3d7e",
+      "last_modified": "2026-09-24T07:14:21.000Z",
+      "license": "apache-2.0",
+      "base_model": "Qwen/Qwen3.8-27B",
+      "weight_files": [
+        {
+          "file": "model-00001-of-00004.safetensors",
+          "bytes": 5355017068
+        },
+        {
+          "file": "model-00002-of-00004.safetensors",
+          "bytes": 5326635766
+        },
+        {
+          "file": "model-00003-of-00004.safetensors",
+          "bytes": 5362328225
+        },
+        {
+          "file": "model-00004-of-00004.safetensors",
+          "bytes": 3478828572
+        },
+        {
+          "file": "model-vision.safetensors",
+          "bytes": 921497225
+        },
+        {
+          "file": "mtp.safetensors",
+          "bytes": 238934249
+        }
+      ]
+    },
+    {
+      "model_id": "Youssofal/Qwen3.8-27B-MTPLX-Bare-Speed",
+      "source_url": "https://huggingface.co/api/models/Youssofal/Qwen3.8-27B-MTPLX-Bare-Speed?blobs=true",
+      "revision": "b59d7002368575f08a58ba0d26686b53a9c162d6",
+      "last_modified": "2026-09-17T08:43:34.000Z",
+      "license": "apache-2.0",
+      "base_model": "Qwen/Qwen3.8-27B",
+      "weight_files": [
+        {
+          "file": "model-00001-of-00003.safetensors",
+          "bytes": 5328325648
+        },
+        {
+          "file": "model-00002-of-00003.safetensors",
+          "bytes": 5354185130
+        },
+        {
+          "file": "model-00003-of-00003.safetensors",
+          "bytes": 4450532735
+        },
+        {
+          "file": "model-vision.safetensors",
+          "bytes": 921497225
+        },
+        {
+          "file": "mtp.safetensors",
+          "bytes": 238934249
+        }
+      ]
+    },
+    {
+      "model_id": "Youssofal/Qwen3.8-27B-MTPLX-Optimized-Quality",
+      "source_url": "https://huggingface.co/api/models/Youssofal/Qwen3.8-27B-MTPLX-Optimized-Quality?blobs=true",
+      "revision": "300a4ac6c6058585e80571ff6c910819711843ec",
+      "last_modified": "2026-09-22T22:02:55.000Z",
+      "license": "apache-2.0",
+      "base_model": "Qwen/Qwen3.8-27B",
+      "weight_files": [
+        {
+          "file": "model-00001-of-00006.safetensors",
+          "bytes": 5305469313
+        },
+        {
+          "file": "model-00002-of-00006.safetensors",
+          "bytes": 5354102628
+        },
+        {
+          "file": "model-00003-of-00006.safetensors",
+          "bytes": 5337392986
+        },
+        {
+          "file": "model-00004-of-00006.safetensors",
+          "bytes": 5292847128
+        },
+        {
+          "file": "model-00005-of-00006.safetensors",
+          "bytes": 5354102635
+        },
+        {
+          "file": "model-00006-of-00006.safetensors",
+          "bytes": 1935805825
+        },
+        {
+          "file": "model-vision.safetensors",
+          "bytes": 921497225
+        },
+        {
+          "file": "mtp.safetensors",
+          "bytes": 451270903
+        }
+      ]
+    }
+  ]
+}

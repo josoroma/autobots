@@ -1,0 +1,114 @@
+{
+  "research_date": "2026-11-04",
+  "scope": "Hugging Face metadata and tokenizer-only encoding checks using existing tokenizers package. No model weights downloaded or inference performed. llguidance grammar binding not tested.",
+  "models": [
+    {
+      "model_id": "mlx-community/Qwen3-14B-4bit",
+      "revision": "a4d9b2df59d2c150bef02fcbe0d91046b7ca33a4",
+      "source_url": "https://huggingface.co/api/models/mlx-community/Qwen3-14B-4bit?blobs=true",
+      "license": "apache-2.0",
+      "weight_bytes": 8307898514,
+      "tokenizer_sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+      "marker_encodings": {
+        "<tool_call>": [
+          151657
+        ],
+        "</tool_call>": [
+          151658
+        ],
+        "<think>": [
+          151667
+        ],
+        "</think>": [
+          151668
+        ]
+      },
+      "chat_template_sha256": "87a2728cb8dc9fe424d624542f6060ec05a1d285ebbec578bb078900e33396b5",
+      "tokenizer_config_url": "https://huggingface.co/mlx-community/Qwen3-14B-4bit/blob/a4d9b2df59d2c150bef02fcbe0d91046b7ca33a4/tokenizer_config.json",
+      "template_contains_json_name_arguments_example": true,
+      "template_contains_double_braced_name_example": false
+    },
+    {
+      "model_id": "mlx-community/Qwen3-8B-4bit",
+      "revision": "545dc4251c05440727734bcd94334791f6ab0192",
+      "source_url": "https://huggingface.co/api/models/mlx-community/Qwen3-8B-4bit?blobs=true",
+      "license": "apache-2.0",
+      "weight_bytes": 4607835174,
+      "tokenizer_sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+      "marker_encodings": {
+        "<tool_call>": [
+          151657
+        ],
+        "</tool_call>": [
+          151658
+        ],
+        "<think>": [
+          151667
+        ],
+        "</think>": [
+          151668
+        ]
+      },
+      "chat_template_sha256": "87a2728cb8dc9fe424d624542f6060ec05a1d285ebbec578bb078900e33396b5",
+      "tokenizer_config_url": "https://huggingface.co/mlx-community/Qwen3-8B-4bit/blob/545dc4251c05440727734bcd94334791f6ab0192/tokenizer_config.json",
+      "template_contains_json_name_arguments_example": true,
+      "template_contains_double_braced_name_example": false
+    },
+    {
+      "model_id": "mlx-community/Qwen2.5-14B-Instruct-4bit",
+      "revision": "dad510143ae5cdb1466778bde3161460f9e9f604",
+      "source_url": "https://huggingface.co/api/models/mlx-community/Qwen2.5-14B-Instruct-4bit?blobs=true",
+      "license": "apache-2.0",
+      "weight_bytes": 8309494233,
+      "tokenizer_sha256": "a8506e7111b80c6d8635951a02eab0f4e1a8e4e5772da83846579e97b16f61bf",
+      "marker_encodings": {
+        "<tool_call>": [
+          151657
+        ],
+        "</tool_call>": [
+          151658
+        ],
+        "<think>": [
+          13708,
+          766,
+          29
+        ],
+        "</think>": [
+          522,
+          26865,
+          29
+        ]
+      },
+      "chat_template_sha256": "d5495a1e5db0611132a97e46a65dbb64a642a499421228b9c8b93229097fa9a4",
+      "tokenizer_config_url": "https://huggingface.co/mlx-community/Qwen2.5-14B-Instruct-4bit/blob/dad510143ae5cdb1466778bde3161460f9e9f604/tokenizer_config.json",
+      "template_contains_json_name_arguments_example": true,
+      "template_contains_double_braced_name_example": false
+    },
+    {
+      "model_id": "mlx-community/DeepHermes-3-Mistral-24B-Preview-4bit",
+      "revision": "b88d5c8f9db41fc38c0b9538dca74c8aa309592a",
+      "source_url": "https://huggingface.co/api/models/mlx-community/DeepHermes-3-Mistral-24B-Preview-4bit?blobs=true",
+      "license": "apache-2.0",
+      "weight_bytes": 13260212741,
+      "tokenizer_sha256": "34052292bd34d64656292b62b1686f6463443ad3d9bdb6420468d4a6314e73c1",
+      "marker_encodings": {
+        "<tool_call>": [
+          131075
+        ],
+        "</tool_call>": [
+          131076
+        ],
+        "<think>": [
+          131073
+        ],
+        "</think>": [
+          131074
+        ]
+      },
+      "chat_template_sha256": "47d5a7b4840c2ff2dfa0828b2465a654bef3a6cdfe032e5e105f395e4ceee812",
+      "tokenizer_config_url": "https://huggingface.co/mlx-community/DeepHermes-3-Mistral-24B-Preview-4bit/blob/b88d5c8f9db41fc38c0b9538dca74c8aa309592a/tokenizer_config.json",
+      "template_contains_tools_reference": false,
+      "template_contains_tool_calls_reference": false
+    }
+  ]
+}

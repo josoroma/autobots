@@ -1,0 +1,8 @@
+{
+  "repository": "https://github.com/josoroma/OhMyOrch",
+  "commit": "fddfbf53c8c10d45782796cc9a7edf95bc8d3a07",
+  "source": "plugins/ohmyorch/agents/spec-ingestor.md",
+  "source_sha256": "091932c9408125f9b54e9748bc7f443ff11cd3033ad2ded0f7baa1a60bbcaa5d",
+  "checkout": "research/upstream/OhMyOrch",
+  "adaptation": "Project-authored local skill/agent/scripts; no upstream plugin installed or executed."
+}

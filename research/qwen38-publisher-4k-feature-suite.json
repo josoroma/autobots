@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "model": "Qwen3.8-27B",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "status": "stable-variants-passed-with-experimental-2bit-results",
+  "environment": {
+    "hardware": "Apple M5 Max, 18 CPU cores, 128 GB unified memory",
+    "operating_system": "macOS 26.4 (25E246), arm64",
+    "mlx_version": "0.32.0",
+    "mlx_vlm_version": "0.6.8"
+  },
+  "methodology": {
+    "temperature": 0.0,
+    "seed": 0,
+    "thinking": false,
+    "requested_context_tokens": 4096,
+    "actual_prompt_tokens": 4105,
+    "generation_tokens": 9,
+    "needle": "COBALT-7319",
+    "needle_fraction": 0.5985130111524164,
+    "measurement": "one warmed deterministic run per variant after quality, tool-calling, and video gates",
+    "caveat": "These are single-run local measurements, not multi-run statistical estimates. Decode throughput is based on a nine-token exact retrieval response. The 2-bit build is experimental and did not pass every preceding feature gate."
+  },
+  "gates": {
+    "quality_cases_per_variant": 12,
+    "tool_cases_per_variant": 8,
+    "video_cases_per_variant": 1,
+    "long_context_cases_per_variant": 1,
+    "stable_variants_quality_passed": true,
+    "stable_variants_tool_calling_passed": true,
+    "stable_variants_video_understanding_passed": true,
+    "all_4k_retrieval_passed": true
+  },
+  "variants": [
+    {
+      "name": "2bit",
+      "display_name": "2-bit AWQ (experimental)",
+      "precision": "2-bit affine AWQ, group size 32",
+      "load_seconds": 1.2000875419471413,
+      "suite_peak_memory_gb": 15.996718646,
+      "quality_pass_count": 11,
+      "tool_pass_count": 3,
+      "video_passed": false,
+      "context_4k": {
+        "passed": true,
+        "actual": "COBALT-7319",
+        "prompt_tokens_per_second": 541.6686141010011,
+        "generation_tokens_per_second": 38.83085340417284,
+        "elapsed_seconds": 7.821810916007962,
+        "peak_memory_gb": 15.996718646
+      },
+      "report": "workspace/runs/pocketai-qwen3.8-27b-mlx-2bit/feature-suite-4k.json",
+      "report_sha256": "be7e465b2db3e3e7650cefde8a4b5a3d7ec6726c408164c2797d9f583573cc8b",
+      "release_status": "experimental"
+    },
+    {
+      "name": "4bit",
+      "precision": "4-bit affine, group size 64",
+      "load_seconds": 1.8978124170098454,
+      "suite_peak_memory_gb": 21.798522422,
+      "quality_pass_count": 12,
+      "tool_pass_count": 8,
+      "video_passed": true,
+      "context_4k": {
+        "passed": true,
+        "actual": "COBALT-7319",
+        "prompt_tokens_per_second": 733.1382063547569,
+        "generation_tokens_per_second": 36.60379169669472,
+        "elapsed_seconds": 5.855730499984929,
+        "peak_memory_gb": 21.798522422
+      },
+      "report": "workspace/runs/pocketai-qwen3.8-27b-mlx-4bit/feature-suite-4k.json",
+      "report_sha256": "9ea8832473012839d1be31a82857615d964b1da964a0eb60e2f5a173ee61993c"
+    },
+    {
+      "name": "6bit",
+      "precision": "6-bit affine, group size 64",
+      "load_seconds": 2.4163106250052806,
+      "suite_peak_memory_gb": 29.535178294,
+      "quality_pass_count": 12,
+      "tool_pass_count": 8,
+      "video_passed": true,
+      "context_4k": {
+        "passed": true,
+        "actual": "COBALT-7319",
+        "prompt_tokens_per_second": 584.6942568389246,
+        "generation_tokens_per_second": 26.210665774236258,
+        "elapsed_seconds": 7.376715332997264,
+        "peak_memory_gb": 29.535178294,
+        "prefill_percent_of_4bit": 79.752255682607,
+        "decode_percent_of_4bit": 71.60642261168547
+      },
+      "report": "workspace/runs/pocketai-qwen3.8-27b-mlx-6bit/feature-suite-4k.json",
+      "report_sha256": "580a0c7455bb5946e3a15ac54ddc4522399a895601167c65adbb290dc4cb26d6"
+    },
+    {
+      "name": "8bit",
+      "precision": "8-bit affine, group size 64",
+      "load_seconds": 2.918848250003066,
+      "suite_peak_memory_gb": 37.26947487,
+      "quality_pass_count": 12,
+      "tool_pass_count": 8,
+      "video_passed": true,
+      "context_4k": {
+        "passed": true,
+        "actual": "COBALT-7319",
+        "prompt_tokens_per_second": 600.1327126896556,
+        "generation_tokens_per_second": 20.131199501927366,
+        "elapsed_seconds": 7.302978374995291,
+        "peak_memory_gb": 37.26947487,
+        "prefill_percent_of_4bit": 81.85805997938381,
+        "decode_percent_of_4bit": 54.997579673542916
+      },
+      "report": "workspace/runs/pocketai-qwen3.8-27b-mlx-8bit/feature-suite-4k.json",
+      "report_sha256": "c154a42c01c8753ceb54400d79a965e78928f0b550a59bb4a9e201373dd88222"
+    },
+    {
+      "name": "bf16",
+      "display_name": "16-bit BF16",
+      "precision": "unquantized bfloat16",
+      "load_seconds": 5.321755707991542,
+      "suite_peak_memory_gb": 58.294554166,
+      "quality_pass_count": 12,
+      "tool_pass_count": 8,
+      "video_passed": true,
+      "context_4k": {
+        "passed": true,
+        "actual": "COBALT-7319",
+        "prompt_tokens_per_second": 623.7733470559801,
+        "generation_tokens_per_second": 10.773876577080248,
+        "elapsed_seconds": 7.429425292008091,
+        "peak_memory_gb": 58.294554166,
+        "prefill_percent_of_4bit": 85.08264085123174,
+        "decode_percent_of_4bit": 29.433771960988174
+      },
+      "report": "workspace/runs/pocketai-qwen3.8-27b-mlx-bf16/feature-suite-4k.json",
+      "report_sha256": "39ccdd2fd028242737dfbdeeabac23b14f04cd6bd8ece1fc4a57311179be649b"
+    }
+  ],
+  "command_template": "scripts/lab.sh .venv/bin/python scripts/validate_qwen38_27b_mlx_features.py --model workspace/exports/mlx/pocketai-qwen3.8-27b-mlx-VARIANT --report workspace/runs/pocketai-qwen3.8-27b-mlx-VARIANT/feature-suite-4k.json --long-context-tokens 4096"
+}

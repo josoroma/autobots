@@ -1,0 +1,88 @@
+{
+  "observed_at_utc": "2026-11-04T18:02:06.126296+00:00",
+  "scope": "Public package metadata and source inspection only; no package install, local secret inspection, provider authentication or model inference.",
+  "selected_package": {
+    "name": "@openrouter/ai-sdk-provider",
+    "version": "3.1.0",
+    "type": "module",
+    "engines": {
+      "node": ">=22"
+    },
+    "peer_dependencies": {
+      "ai": "^7.0.0",
+      "zod": "^3.25.76 || ^4.1.8"
+    },
+    "registry_url": "https://registry.npmjs.org/@openrouter/ai-sdk-provider/3.1.0",
+    "tarball_url": "https://registry.npmjs.org/@openrouter/ai-sdk-provider/-/ai-sdk-provider-3.1.0.tgz",
+    "registry_shasum": "67afdd5c797e5365633f78085348cf1dac2b501f",
+    "registry_integrity": "sha512-BQy1TA9fKrh47s9ivsO6FY5QimN7GUF0i8Qon3pkxQclEgShso0dClpcWn8OIyPLEZZPFaFKgI8TW4S/O0p0Dw==",
+    "downloaded_sha256": "2db5cfe6bd6d625fbede2e0563a8161f53ac7730b41a5422098d82acaf0bdc3a",
+    "downloaded_sha1_matches_registry": true
+  },
+  "inspected_archive_members": {
+    "package/package.json": {
+      "sha256": "6d7c46e6b7d42f255b76849d043786b583dc62290569730f3d758b35248fcab4",
+      "bytes": 2393
+    },
+    "package/README.md": {
+      "sha256": "ff857015079be8245fe0c223f938637b9e8ea1db9f8d163854072f789a8bbd96",
+      "bytes": 17384
+    },
+    "package/dist/index.js": {
+      "sha256": "6a34db98a9aa74622f20f517b7e28043fe8e9b61b9d2d02d47500b3bbda65645",
+      "bytes": 210549
+    },
+    "package/dist/index.d.ts": {
+      "sha256": "3f4c351176667c84fbcb6ecd37ce6d2e2ef6ea948a8b710dd2618199c2a84fff",
+      "bytes": 40653
+    }
+  },
+  "published_api_observations": {
+    "language_model_interface": "LanguageModelV4",
+    "factory": "createOpenRouter",
+    "chat_selection": "provider.chat(modelId, settings)",
+    "explicit_api_key": true,
+    "base_url_option": "baseURL",
+    "compatibility_option": "strict",
+    "routing_options": [
+      "require_parameters",
+      "allow_fallbacks"
+    ],
+    "type_surface_verified_in": "package/dist/index.d.ts",
+    "runtime_or_typecheck_completed": false
+  },
+  "durability_caveat": {
+    "published_js_workflow_symbol_occurrences": {
+      "WORKFLOW_SERIALIZE": 1,
+      "WORKFLOW_DESERIALIZE": 1
+    },
+    "published_js_workflow_symbol_lines": [
+      {
+        "line": 635,
+        "text": "var WORKFLOW_SERIALIZE = Symbol.for(\"workflow-serialize\");"
+      },
+      {
+        "line": 636,
+        "text": "var WORKFLOW_DESERIALIZE = Symbol.for(\"workflow-deserialize\");"
+      }
+    ],
+    "published_readme_mentions_durable": false,
+    "repository_main_commit": "087abdf3ae7f3b8d7e1eb5d07b8f6036f2b43964",
+    "repository_main_readme_url": "https://raw.githubusercontent.com/OpenRouterTeam/ai-sdk-provider/087abdf3ae7f3b8d7e1eb5d07b8f6036f2b43964/README.md",
+    "repository_main_readme_sha256": "392373a787f04d68468a887173a55dff95058fc0937fee5363f62ec92b018751",
+    "repository_main_readme_has_durable_guidance": true,
+    "conclusion": "The published 3.1.0 JS contains the Workflow symbol declarations but inspection did not establish model serialization hooks. Moving-main guidance does not prove published-release support, and environment restoration alone would not satisfy encrypted workspace credentials. Require descriptor-only request-boundary credential resolution and actual generate/stream/restart/rotation tests before relying on WorkflowAgent integration.",
+    "qualified_durable_integration": false
+  },
+  "primary_sources_checked": [
+    "https://openrouter.ai/docs/guides/community/vercel-ai-sdk",
+    "https://registry.npmjs.org/@openrouter/ai-sdk-provider/3.1.0",
+    "https://registry.npmjs.org/@openrouter/ai-sdk-provider/-/ai-sdk-provider-3.1.0.tgz",
+    "https://github.com/OpenRouterTeam/ai-sdk-provider/blob/087abdf3ae7f3b8d7e1eb5d07b8f6036f2b43964/README.md",
+    "https://nextjs.org/docs/app/guides/environment-variables",
+    "https://openrouter.ai/docs/api/api-reference/api-keys/get-current-api-key",
+    "https://openrouter.ai/docs/guides/routing/provider-selection",
+    "https://openrouter.ai/docs/guides/features/structured-outputs",
+    "https://openrouter.ai/docs/guides/best-practices/reasoning-tokens"
+  ]
+}

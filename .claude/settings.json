@@ -1,0 +1,77 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/homebrew/bin/python3.12",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/dispatch.py"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Read|Write|Edit|MultiEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/homebrew/bin/python3.12",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/dispatch.py"
+            ],
+            "timeout": 10,
+            "onFailure": "block"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/homebrew/bin/python3.12",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/dispatch.py"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/homebrew/bin/python3.12",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/dispatch.py"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/homebrew/bin/python3.12",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/dispatch.py"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

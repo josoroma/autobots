@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-16T00:23:56.134321+00:00",
+  "status": "packaged-not-published",
+  "repository": "PocketAiHub/Qwen3.8-27B-MLX",
+  "visibility": "public",
+  "source_repository": "Qwen/Qwen3.8-27B",
+  "source_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "converter": {
+    "package": "mlx-vlm",
+    "version": "0.6.8"
+  },
+  "mlx_version": "0.32.0",
+  "variants": [
+    {
+      "name": "2bit",
+      "path": "2bit",
+      "display_name": "MLX 2-bit AWQ (experimental)",
+      "precision": "498 language modules affine Q2/group 32; vision tower BF16",
+      "total_size_bytes": 11038990758,
+      "artifact_manifest_sha256": "ae25585ed7396e6337c005126c66dbcc748ea3404a220106814d61d9ea120494",
+      "feature_report": "workspace/runs/pocketai-qwen3.8-27b-mlx-2bit/feature-suite-4k.json",
+      "feature_report_sha256": "be7e465b2db3e3e7650cefde8a4b5a3d7ec6726c408164c2797d9f583573cc8b",
+      "quality_pass_count": 11,
+      "quality_case_count": 12,
+      "tool_pass_count": 3,
+      "tool_case_count": 8,
+      "video_understanding_passed": false,
+      "context_4k": {
+        "passed": true,
+        "expected": "COBALT-7319",
+        "construction": {
+          "requestedTokens": 4096,
+          "formattedTokens": 4105,
+          "fillerRepeats": 269,
+          "needleFraction": 0.5985130111524164,
+          "needle": "COBALT-7319"
+        },
+        "text": "COBALT-7319",
+        "promptTokens": 4105,
+        "generationTokens": 9,
+        "promptTokensPerSecond": 541.6686141010011,
+        "generationTokensPerSecond": 38.83085340417284,
+        "peakMemoryGB": 15.996718646,
+        "finishReason": "stop",
+        "elapsedSeconds": 7.821810916007962
+      },
+      "experimental": true
+    },
+    {
+      "name": "4bit",
+      "path": "4bit",
+      "display_name": "MLX 4-bit",
+      "precision": "498 language modules affine Q4/group 64; vision tower BF16",
+      "total_size_bytes": 16081493231,
+      "artifact_manifest_sha256": "4e1480160d20f59d7fe418131faf83a839bd4294a68cab99fcbdc62d34d0d59b",
+      "feature_report": "workspace/runs/pocketai-qwen3.8-27b-mlx-4bit/feature-suite-4k.json",
+      "feature_report_sha256": "9ea8832473012839d1be31a82857615d964b1da964a0eb60e2f5a173ee61993c",
+      "quality_pass_count": 12,
+      "quality_case_count": 12,
+      "tool_pass_count": 8,
+      "tool_case_count": 8,
+      "video_understanding_passed": true,
+      "context_4k": {
+        "passed": true,
+        "expected": "COBALT-7319",
+        "construction": {
+          "requestedTokens": 4096,
+          "formattedTokens": 4105,
+          "fillerRepeats": 269,
+          "needleFraction": 0.5985130111524164,
+          "needle": "COBALT-7319"
+        },
+        "text": "COBALT-7319",
+        "promptTokens": 4105,
+        "generationTokens": 9,
+        "promptTokensPerSecond": 733.1382063547569,
+        "generationTokensPerSecond": 36.60379169669472,
+        "peakMemoryGB": 21.798522422,
+        "finishReason": "stop",
+        "elapsedSeconds": 5.855730499984929
+      },
+      "experimental": false
+    },
+    {
+      "name": "6bit",
+      "path": "6bit",
+      "display_name": "MLX 6-bit",
+      "precision": "498 language modules affine Q6/group 64; vision tower BF16",
+      "total_size_bytes": 22804831851,
+      "artifact_manifest_sha256": "d3bdcbdc4256e203ebd84c7805bea20bdb984bb0e5eb2cc3f03ed0fcfc418179",
+      "feature_report": "workspace/runs/pocketai-qwen3.8-27b-mlx-6bit/feature-suite-4k.json",
+      "feature_report_sha256": "580a0c7455bb5946e3a15ac54ddc4522399a895601167c65adbb290dc4cb26d6",
+      "quality_pass_count": 12,
+      "quality_case_count": 12,
+      "tool_pass_count": 8,
+      "tool_case_count": 8,
+      "video_understanding_passed": true,
+      "context_4k": {
+        "passed": true,
+        "expected": "COBALT-7319",
+        "construction": {
+          "requestedTokens": 4096,
+          "formattedTokens": 4105,
+          "fillerRepeats": 269,
+          "needleFraction": 0.5985130111524164,
+          "needle": "COBALT-7319"
+        },
+        "text": "COBALT-7319",
+        "promptTokens": 4105,
+        "generationTokens": 9,
+        "promptTokensPerSecond": 584.6942568389246,
+        "generationTokensPerSecond": 26.210665774236258,
+        "peakMemoryGB": 29.535178294,
+        "finishReason": "stop",
+        "elapsedSeconds": 7.376715332997264
+      },
+      "experimental": false
+    },
+    {
+      "name": "8bit",
+      "path": "8bit",
+      "display_name": "MLX 8-bit",
+      "precision": "498 language modules affine Q8/group 64; vision tower BF16",
+      "total_size_bytes": 29528170361,
+      "artifact_manifest_sha256": "061b29a6f23da4e25f50961a8711553ab26e6e61525bee0234305a9e268179e3",
+      "feature_report": "workspace/runs/pocketai-qwen3.8-27b-mlx-8bit/feature-suite-4k.json",
+      "feature_report_sha256": "c154a42c01c8753ceb54400d79a965e78928f0b550a59bb4a9e201373dd88222",
+      "quality_pass_count": 12,
+      "quality_case_count": 12,
+      "tool_pass_count": 8,
+      "tool_case_count": 8,
+      "video_understanding_passed": true,
+      "context_4k": {
+        "passed": true,
+        "expected": "COBALT-7319",
+        "construction": {
+          "requestedTokens": 4096,
+          "formattedTokens": 4105,
+          "fillerRepeats": 269,
+          "needleFraction": 0.5985130111524164,
+          "needle": "COBALT-7319"
+        },
+        "text": "COBALT-7319",
+        "promptTokens": 4105,
+        "generationTokens": 9,
+        "promptTokensPerSecond": 600.1327126896556,
+        "generationTokensPerSecond": 20.131199501927366,
+        "peakMemoryGB": 37.26947487,
+        "finishReason": "stop",
+        "elapsedSeconds": 7.302978374995291
+      },
+      "experimental": false
+    },
+    {
+      "name": "bf16",
+      "path": "bf16",
+      "display_name": "MLX BF16",
+      "precision": "unquantized BF16 reference",
+      "total_size_bytes": 54740455716,
+      "artifact_manifest_sha256": "c2e54341b613f0997d47f82a209b1cc1b5f05228dfdcc7a228c8b24686ef9b87",
+      "feature_report": "workspace/runs/pocketai-qwen3.8-27b-mlx-bf16/feature-suite-4k.json",
+      "feature_report_sha256": "39ccdd2fd028242737dfbdeeabac23b14f04cd6bd8ece1fc4a57311179be649b",
+      "quality_pass_count": 12,
+      "quality_case_count": 12,
+      "tool_pass_count": 8,
+      "tool_case_count": 8,
+      "video_understanding_passed": true,
+      "context_4k": {
+        "passed": true,
+        "expected": "COBALT-7319",
+        "construction": {
+          "requestedTokens": 4096,
+          "formattedTokens": 4105,
+          "fillerRepeats": 269,
+          "needleFraction": 0.5985130111524164,
+          "needle": "COBALT-7319"
+        },
+        "text": "COBALT-7319",
+        "promptTokens": 4105,
+        "generationTokens": 9,
+        "promptTokensPerSecond": 623.7733470559801,
+        "generationTokensPerSecond": 10.773876577080248,
+        "peakMemoryGB": 58.294554166,
+        "finishReason": "stop",
+        "elapsedSeconds": 7.429425292008091
+      },
+      "experimental": false
+    }
+  ],
+  "variant_payload_size_bytes": 134193941917,
+  "root_evidence": {
+    "README.md": "d3d2fcea6c3a6d9ba104633d3e7414416198850dd928e20885f1cc5ae76dcb32",
+    "LICENSE": "bbedc3fda3305820b977265f01b8619d87570a6739de3a5582c3464840f1e57a",
+    "benchmarks/4k-feature-suite.json": "f6f07e21fdbc7338c6bba89ed705a71d94e9d7ff84cf0ca75eb7002b2ae7fbae",
+    "benchmarks/build-evidence.json": "672b90517bd07e4d2371cbd96d7a6176ad7b7bca5084d9dfa4416af31107cd89"
+  }
+}

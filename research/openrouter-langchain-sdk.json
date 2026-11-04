@@ -1,0 +1,360 @@
+{
+  "retrieved_at_utc": "2026-11-04T18:04:53.362448+00:00",
+  "scope": "Public registry metadata and wheel source inspection only. No installation, dependency resolution, credentials, authenticated provider call, or inference.",
+  "packages": {
+    "langchain-openrouter": {
+      "selected_version": "0.2.9",
+      "source_url": "https://pypi.org/pypi/langchain-openrouter/0.2.9/json",
+      "requires_python": "<4.0.0,>=3.10.0",
+      "requires_dist": [
+        "langchain-core<2.0.0,>=1.5.5",
+        "openrouter<1.0.0,>=0.9.2"
+      ],
+      "files": [
+        {
+          "filename": "langchain_openrouter-0.2.9-py3-none-any.whl",
+          "url": "https://files.pythonhosted.org/packages/65/ad/7a0f0f39b92d0b93123d6e11e4bf35a560a07cbf59bfee7ab0c6052d251f/langchain_openrouter-0.2.9-py3-none-any.whl",
+          "sha256": "375a79a4a849069d2254627185210b2f2b9fe84c69326e10d71c3d48f8b41f06",
+          "upload_time": "2026-09-22T04:15:57.853394Z",
+          "yanked": false
+        },
+        {
+          "filename": "langchain_openrouter-0.2.9.tar.gz",
+          "url": "https://files.pythonhosted.org/packages/b6/ad/c908cc9161858fe0c720e8e0d32d64462c5a09bf64e463e1709d679919bc/langchain_openrouter-0.2.9.tar.gz",
+          "sha256": "e3c130bfc58a517811044b6cb56e13b2e7d1ee219c38e025f4522aa0400f9c8e",
+          "upload_time": "2026-09-22T04:15:59.130427Z",
+          "yanked": false
+        }
+      ],
+      "project_urls": {
+        "Changelog": "https://github.com/langchain-ai/langchain/releases?q=%22langchain-openrouter%22",
+        "Documentation": "https://reference.langchain.com/python/integrations/langchain_openrouter/",
+        "Homepage": "https://docs.langchain.com/oss/python/integrations/providers/openrouter",
+        "Issues": "https://github.com/langchain-ai/langchain/issues",
+        "Reddit": "https://www.reddit.com/r/LangChain/",
+        "Repository": "https://github.com/langchain-ai/langchain",
+        "Slack": "https://www.langchain.com/join-community",
+        "Twitter": "https://x.com/langchain_oss"
+      }
+    },
+    "openrouter": {
+      "selected_version": "0.11.46",
+      "source_url": "https://pypi.org/pypi/openrouter/0.11.46/json",
+      "requires_python": ">=3.10",
+      "requires_dist": [
+        "httpcore>=1.0.9",
+        "httpx>=0.28.1",
+        "jsonpath-python>=1.0.6",
+        "pydantic<2.13,>=2.11.2"
+      ],
+      "files": [
+        {
+          "filename": "openrouter-0.11.46-py3-none-any.whl",
+          "url": "https://files.pythonhosted.org/packages/08/e3/0504f94e182c8975750bc9eb280552cf9cec9a7ffe20edeb44a825fa605d/openrouter-0.11.46-py3-none-any.whl",
+          "sha256": "9acbb9922bcae46239ef4364c8ec095284773494fac40c92c61a24e1a1d239b4",
+          "upload_time": "2026-07-20T17:06:22.039063Z",
+          "yanked": false
+        },
+        {
+          "filename": "openrouter-0.11.46.tar.gz",
+          "url": "https://files.pythonhosted.org/packages/5e/61/6a238508a4e4310a7674c360b656a652a8e11973e451c6eca8da8bf45d8d/openrouter-0.11.46.tar.gz",
+          "sha256": "5470af3e7bf25ad84cd410b43bbd4aba3052642d7a5033e5767b35c0ee5608db",
+          "upload_time": "2026-07-20T17:06:23.391915Z",
+          "yanked": false
+        }
+      ],
+      "project_urls": {
+        "repository": "https://github.com/OpenRouterTeam/python-sdk.git"
+      }
+    },
+    "deepagents": {
+      "selected_version": "0.7.32",
+      "source_url": "https://pypi.org/pypi/deepagents/0.7.32/json",
+      "requires_python": "<4.0,>=3.11",
+      "requires_dist": [
+        "langchain<2.0.0,>=1.4.7",
+        "langchain-core<2.0.0,>=1.7.0",
+        "langchain-anthropic<2.0.0,>=1.7.6",
+        "langchain-google-genai<5.0.0,>=4.4.2",
+        "langsmith>=0.14.12",
+        "packaging>=23.2",
+        "wcmatch>=11.0",
+        "langchain-aws<2.0.0,>=1.9.0; extra == \"aws\"",
+        "langchain-quickjs>=0.3.9; extra == \"quickjs\"",
+        "av>=18.0.0; extra == \"video\"",
+        "pillow>=12.3.0; extra == \"video\""
+      ],
+      "files": [
+        {
+          "filename": "deepagents-0.7.32-py3-none-any.whl",
+          "url": "https://files.pythonhosted.org/packages/5d/db/ca785ad20bf1c1255856575d9c31f201abd02bb4fd3a76a8b586d938d7e2/deepagents-0.7.32-py3-none-any.whl",
+          "sha256": "366bd66c786a66c8d639e40f99614d9e5d37236adf4c5b158f0b2cb27956e28b",
+          "upload_time": "2026-10-23T21:30:23.235629Z",
+          "yanked": false
+        },
+        {
+          "filename": "deepagents-0.7.32.tar.gz",
+          "url": "https://files.pythonhosted.org/packages/92/89/5da9546d5e57a4f815d2cc919bd49ed2a62b25816ebd49ce6dca1919bdd8/deepagents-0.7.32.tar.gz",
+          "sha256": "f4154281b04a499015e48c24edf11f59f833fbabd3d87e0898832e8db954aac4",
+          "upload_time": "2026-10-23T21:30:24.677309Z",
+          "yanked": false
+        }
+      ],
+      "project_urls": {
+        "Documentation": "https://reference.langchain.com/python/deepagents/",
+        "Homepage": "https://docs.langchain.com/oss/python/deepagents/overview",
+        "Issues": "https://github.com/langchain-ai/deepagents/issues",
+        "Reddit": "https://www.reddit.com/r/LangChain/",
+        "Repository": "https://github.com/langchain-ai/deepagents",
+        "Slack": "https://www.langchain.com/join-community",
+        "Twitter": "https://x.com/langchain_oss"
+      }
+    },
+    "langchain": {
+      "selected_version": "1.4.8",
+      "source_url": "https://pypi.org/pypi/langchain/1.4.8/json",
+      "requires_python": "<4.0.0,>=3.10.0",
+      "requires_dist": [
+        "langchain-core<2.0.0,>=1.7.4",
+        "langgraph<1.3.0,>=1.2.12",
+        "pydantic>=2.7.4",
+        "langchain-anthropic; extra == \"anthropic\"",
+        "langchain-aws; extra == \"aws\"",
+        "langchain-azure-ai; extra == \"azure-ai\"",
+        "langchain-baseten>=0.2.0; extra == \"baseten\"",
+        "langchain-community; extra == \"community\"",
+        "langchain-deepseek; extra == \"deepseek\"",
+        "langchain-fireworks; extra == \"fireworks\"",
+        "langchain-google-genai; extra == \"google-genai\"",
+        "langchain-google-vertexai; extra == \"google-vertexai\"",
+        "langchain-groq; extra == \"groq\"",
+        "langchain-huggingface; extra == \"huggingface\"",
+        "fastmcp>=4.0.11; extra == \"mcp\"",
+        "langchain-meta; extra == \"meta\"",
+        "langchain-mistralai; extra == \"mistralai\"",
+        "langchain-ollama; extra == \"ollama\"",
+        "langchain-openai; extra == \"openai\"",
+        "langchain-perplexity; extra == \"perplexity\"",
+        "langchain-together; extra == \"together\"",
+        "langchain-xai; extra == \"xai\""
+      ],
+      "files": [
+        {
+          "filename": "langchain-1.4.8-py3-none-any.whl",
+          "url": "https://files.pythonhosted.org/packages/5e/9c/fce50ccf34389a69125120c018dc9a1a4ca436149eddc7145ab49ca30bc3/langchain-1.4.8-py3-none-any.whl",
+          "sha256": "31ddb8688db67f9eb1fd4e77594573ef863b2e3c086397273d4a7a3ff4245b45",
+          "upload_time": "2026-11-02T15:44:45.251608Z",
+          "yanked": false
+        },
+        {
+          "filename": "langchain-1.4.8.tar.gz",
+          "url": "https://files.pythonhosted.org/packages/69/be/4804ba5dcc3fbe50c674e90f1eef5188f2227f4430b7deece7e150ef498a/langchain-1.4.8.tar.gz",
+          "sha256": "66649bcf64650235032ca8e25586a263b68b77a0232bb51e87c129e6a5d8e1b2",
+          "upload_time": "2026-11-02T15:44:46.926048Z",
+          "yanked": false
+        }
+      ],
+      "project_urls": {
+        "Changelog": "https://github.com/langchain-ai/langchain/releases?q=tag%3A%22langchain%3D%3D1%22",
+        "Documentation": "https://reference.langchain.com/python/langchain/langchain/",
+        "Homepage": "https://docs.langchain.com/",
+        "Issues": "https://github.com/langchain-ai/langchain/issues",
+        "Reddit": "https://www.reddit.com/r/LangChain/",
+        "Repository": "https://github.com/langchain-ai/langchain",
+        "Slack": "https://www.langchain.com/join-community",
+        "Twitter": "https://x.com/langchain_oss"
+      }
+    },
+    "langchain-openai": {
+      "selected_version": "1.7.3",
+      "source_url": "https://pypi.org/pypi/langchain-openai/1.7.3/json",
+      "requires_python": "<4.0.0,>=3.10.0",
+      "requires_dist": [
+        "certifi>=2024.6.2",
+        "langchain-core<2.0.0,>=1.7.0",
+        "openai>=2.45.0",
+        "tiktoken>=0.7.0",
+        "aiohttp>=3.11.0; extra == \"azure-identity\"",
+        "azure-identity>=1.25.0; extra == \"azure-identity\""
+      ],
+      "files": [
+        {
+          "filename": "langchain_openai-1.7.3-py3-none-any.whl",
+          "url": "https://files.pythonhosted.org/packages/c4/52/5bcba40b1d7e46f352a727c57c231b820069bc83310f97933e10eccbd935/langchain_openai-1.7.3-py3-none-any.whl",
+          "sha256": "0ab77cc4579b87c50823b7ccb5d8af48d6c6ae2084f156dcdc37151fcc0717e6",
+          "upload_time": "2026-10-26T23:08:32.577902Z",
+          "yanked": false
+        },
+        {
+          "filename": "langchain_openai-1.7.3.tar.gz",
+          "url": "https://files.pythonhosted.org/packages/58/f5/a430230cb50b4b4ade021a5fe5df5a8c5adefa468435d460d2f77f2506ea/langchain_openai-1.7.3.tar.gz",
+          "sha256": "c1d2d0fbd4f542ddcdf176c07abcf4d86c3b716513929250bbef04e3efc5e0b5",
+          "upload_time": "2026-10-26T23:08:33.980224Z",
+          "yanked": false
+        }
+      ],
+      "project_urls": {
+        "Changelog": "https://github.com/langchain-ai/langchain/releases?q=%22langchain-openai%22",
+        "Documentation": "https://reference.langchain.com/python/integrations/langchain_openai/",
+        "Homepage": "https://docs.langchain.com/oss/python/integrations/providers/openai",
+        "Issues": "https://github.com/langchain-ai/langchain/issues",
+        "Reddit": "https://www.reddit.com/r/LangChain/",
+        "Repository": "https://github.com/langchain-ai/langchain",
+        "Slack": "https://www.langchain.com/join-community",
+        "Twitter": "https://x.com/langchain_oss"
+      }
+    },
+    "langgraph": {
+      "selected_version": "1.2.19",
+      "source_url": "https://pypi.org/pypi/langgraph/1.2.19/json",
+      "requires_python": ">=3.10",
+      "requires_dist": [
+        "langchain-core<2,>=1.4.7",
+        "langgraph-checkpoint<5.0.0,>=4.3.0",
+        "langgraph-prebuilt<1.2.0,>=1.1.0",
+        "langgraph-sdk<0.5.0,>=0.4.6",
+        "pydantic>=2.7.4",
+        "xxhash>=3.5.0"
+      ],
+      "files": [
+        {
+          "filename": "langgraph-1.2.19-py3-none-any.whl",
+          "url": "https://files.pythonhosted.org/packages/d7/9e/bd29e368fb16feea8d24270d377d56c34b49afea371717124f19cdfa890c/langgraph-1.2.19-py3-none-any.whl",
+          "sha256": "6094a5cbed52a77d8c74c276fcd2056abde7b2836eab1c7a6b74bacbd1a269b3",
+          "upload_time": "2026-10-30T22:23:31.334338Z",
+          "yanked": false
+        },
+        {
+          "filename": "langgraph-1.2.19.tar.gz",
+          "url": "https://files.pythonhosted.org/packages/ba/10/329dc49ce3fc40e36faafd407f08607fe3fab75613e709a66758b53faac2/langgraph-1.2.19.tar.gz",
+          "sha256": "4a00fa1aad2b5fc2d3a789a8e9eaf993f76218ca924b434902ecf1bbaaf300f6",
+          "upload_time": "2026-10-30T22:23:32.962772Z",
+          "yanked": false
+        }
+      ],
+      "project_urls": {
+        "Changelog": "https://github.com/langchain-ai/langgraph/releases",
+        "Documentation": "https://reference.langchain.com/python/langgraph/",
+        "Homepage": "https://docs.langchain.com/oss/python/langgraph/overview",
+        "Reddit": "https://www.reddit.com/r/LangChain/",
+        "Slack": "https://www.langchain.com/join-community",
+        "Source": "https://github.com/langchain-ai/langgraph/tree/main/libs/langgraph",
+        "Twitter": "https://x.com/langchain_oss"
+      }
+    },
+    "langchain-core": {
+      "selected_version": "1.7.5",
+      "source_url": "https://pypi.org/pypi/langchain-core/1.7.5/json",
+      "requires_python": "<4.0.0,>=3.10.0",
+      "requires_dist": [
+        "certifi>=2026.10.19",
+        "httpx>=0.23.0",
+        "jsonpatch>=1.33.0",
+        "langchain-protocol>=0.0.20",
+        "langsmith<1.0.0,>=0.14.9",
+        "packaging>=23.2.0",
+        "pydantic<3.0.0,>=2.7.4",
+        "pyyaml>=5.3.0",
+        "tenacity!=8.4.0,>=8.1.0",
+        "typing-extensions>=4.7.0",
+        "uuid-utils>=0.12.0"
+      ],
+      "files": [
+        {
+          "filename": "langchain_core-1.7.5-py3-none-any.whl",
+          "url": "https://files.pythonhosted.org/packages/72/e7/336b85cafb3f0d1b9e44cfcd4507b8ae46e2b5db790b33a5e54b08514b63/langchain_core-1.7.5-py3-none-any.whl",
+          "sha256": "bd2629e8ef95cae10700b80bf3732a51f04e264b6629723e009a5dd58f45f496",
+          "upload_time": "2026-11-04T15:49:43.695121Z",
+          "yanked": false
+        },
+        {
+          "filename": "langchain_core-1.7.5.tar.gz",
+          "url": "https://files.pythonhosted.org/packages/63/1f/669c00443914aa5b1c73af4d7b64016c9e51b4a4c3f163ba9b42aa5716ac/langchain_core-1.7.5.tar.gz",
+          "sha256": "d11d25e8603e0fa08ebb3549068e0bfb57448845d49c28caec053b8b6c815e32",
+          "upload_time": "2026-11-04T15:49:45.486225Z",
+          "yanked": false
+        }
+      ],
+      "project_urls": {
+        "Changelog": "https://github.com/langchain-ai/langchain/releases?q=%22langchain-core%3D%3D1%22",
+        "Documentation": "https://reference.langchain.com/python/langchain_core/",
+        "Homepage": "https://docs.langchain.com/",
+        "Issues": "https://github.com/langchain-ai/langchain/issues",
+        "Reddit": "https://www.reddit.com/r/LangChain/",
+        "Repository": "https://github.com/langchain-ai/langchain",
+        "Slack": "https://www.langchain.com/join-community",
+        "Twitter": "https://x.com/langchain_oss"
+      }
+    }
+  },
+  "latest_observed": {
+    "langchain-openrouter": {
+      "version": "0.2.9",
+      "source_url": "https://pypi.org/pypi/langchain-openrouter/json"
+    },
+    "openrouter": {
+      "version": "1.3.117",
+      "source_url": "https://pypi.org/pypi/openrouter/json",
+      "latest_non_yanked_stable_below_1": "0.11.46"
+    },
+    "langchain-core": {
+      "version": "1.7.5",
+      "source_url": "https://pypi.org/pypi/langchain-core/json"
+    }
+  },
+  "dependency_assessment": {
+    "adapter_constraint": "langchain-openrouter 0.2.9 requires langchain-core>=1.5.5,<2.0.0 and openrouter>=0.9.2,<1.0.0",
+    "latest_sdk_conflict": "Standalone openrouter 1.3.117 is outside the adapter constraint; do not combine independent latest versions.",
+    "sdk_candidate": "openrouter 0.11.46 is the highest non-yanked stable 0.x version observed; pin only after resolver and protocol qualification.",
+    "direct_core_constraints": {
+      "deepagents 0.7.32": ">=1.7.0,<2.0.0",
+      "langchain 1.4.8": ">=1.7.4,<2.0.0",
+      "langchain-openai 1.7.3": ">=1.7.0,<2.0.0",
+      "langchain-openrouter 0.2.9": ">=1.5.5,<2.0.0"
+    },
+    "direct_core_intersection": ">=1.7.4,<2.0.0; latest observed langchain-core 1.7.5 is within these direct ranges.",
+    "qualification": "This is a metadata compatibility observation, not a resolved/tested lock. Full transitive solver, imports, serialization, stream/reasoning/tool round trips, and real selected-route qualification remain release gates.",
+    "additional_constraint": "openrouter 0.11.46 requires pydantic>=2.11.2,<2.13; full resolution must respect this upper bound."
+  },
+  "source_inspection": {
+    "wheel_sha256": "375a79a4a849069d2254627185210b2f2b9fe84c69326e10d71c3d48f8b41f06",
+    "source_path": "langchain_openrouter/chat_models.py",
+    "source_sha256": "5026abde213b10520090a05f7df35be0216cde0f47746b7dac80bb2b2acbc085",
+    "release_source_url": "https://github.com/langchain-ai/langchain/blob/langchain-openrouter%3D%3D0.2.9/libs/partners/openrouter/langchain_openrouter/chat_models.py",
+    "observations": [
+      {
+        "lines": "167-177,223-233",
+        "finding": "api_key/base_url aliases are supported; timeout is milliseconds; max_retries=0 disables SDK retries."
+      },
+      {
+        "lines": "307-314,779-817",
+        "finding": "openrouter_provider is serialized as provider; route is optional; unspecified temperature/top_p are omitted."
+      },
+      {
+        "lines": "900-951",
+        "finding": "bind_tools supports tool_choice, strict and optional parallel_tool_calls; named choice becomes the function selector object."
+      },
+      {
+        "lines": "953-960",
+        "finding": "with_structured_output explicitly supports function_calling and json_schema, defaulting to function_calling."
+      },
+      {
+        "lines": "1210-1269,1322-1331",
+        "finding": "Reasoning-detail fragments are merged before assistant-message serialization, and reasoning content/details are retained for continuation."
+      },
+      {
+        "lines": "1366-1388,1454-1473",
+        "finding": "Response and streaming conversion retain reasoning details; streaming usage may include cost metadata."
+      }
+    ],
+    "limitations": "Source behavior is not an actual OpenRouter call result. Application checkpoint serialization, compaction preservation, current-model parameters, and compatible SDK serialization still require qualification."
+  },
+  "primary_documentation": [
+    "https://docs.langchain.com/oss/python/integrations/chat/openrouter",
+    "https://docs.langchain.com/oss/python/integrations/chat/openai",
+    "https://openrouter.ai/docs/guides/routing/provider-selection",
+    "https://openrouter.ai/docs/guides/features/structured-outputs",
+    "https://openrouter.ai/docs/guides/best-practices/reasoning-tokens",
+    "https://openrouter.ai/docs/api/api-reference/api-keys/get-current-api-key"
+  ]
+}

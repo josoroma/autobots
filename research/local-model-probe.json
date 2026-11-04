@@ -1,0 +1,134 @@
+{
+  "research_date": "2026-11-04",
+  "base_url": "http://127.0.0.1:18080",
+  "model": "mtplx-bonsai-2-27b-optimized-speed",
+  "scope": "Single-seed HTTP protocol smoke checks; not SDK integration or agent quality evaluation.",
+  "tests": [
+    {
+      "name": "health_and_identity",
+      "ok": true,
+      "seconds": 0.019,
+      "detail": {
+        "health_ok": true,
+        "generation_mode": "mtp",
+        "model_path": "/Users/josoroma/Models/Ternary-Bonsai-2-27B-MTPLX-Optimized-Speed",
+        "models": [
+          {
+            "id": "mtplx-bonsai-2-27b-optimized-speed",
+            "object": "model",
+            "created": 1793807435,
+            "owned_by": "mtplx",
+            "capability": "chat",
+            "supports_vision": true,
+            "modalities": {
+              "input": [
+                "text",
+                "image"
+              ],
+              "output": [
+                "text"
+              ]
+            },
+            "context_length": 8192,
+            "max_context_length": 8192,
+            "max_model_len": 8192
+          }
+        ]
+      }
+    },
+    {
+      "name": "automatic_tool_roundtrip",
+      "ok": true,
+      "seconds": 6.28,
+      "detail": {
+        "tool_choice": "auto",
+        "arguments": {
+          "a": 17,
+          "b": 25
+        },
+        "tool_call_id": "call_a0326e06",
+        "first_finish_reason": "tool_calls",
+        "answer": "17 + 25 = 42",
+        "usage_first": {
+          "prompt_tokens": 324,
+          "completion_tokens": 39,
+          "total_tokens": 363,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "usage_second": {
+          "prompt_tokens": 382,
+          "completion_tokens": 11,
+          "total_tokens": 393,
+          "prompt_tokens_details": {
+            "cached_tokens": 363
+          }
+        }
+      }
+    },
+    {
+      "name": "forced_tool_roundtrip",
+      "ok": true,
+      "seconds": 3.812,
+      "detail": {
+        "tool_choice": {
+          "type": "function",
+          "function": {
+            "name": "add_integers"
+          }
+        },
+        "arguments": {
+          "a": 17,
+          "b": 25
+        },
+        "tool_call_id": "call_d1c48ede",
+        "first_finish_reason": "tool_calls",
+        "answer": "17 + 25 = 42",
+        "usage_first": {
+          "prompt_tokens": 375,
+          "completion_tokens": 39,
+          "total_tokens": 414,
+          "prompt_tokens_details": {
+            "cached_tokens": 259
+          }
+        },
+        "usage_second": {
+          "prompt_tokens": 382,
+          "completion_tokens": 11,
+          "total_tokens": 393,
+          "prompt_tokens_details": {
+            "cached_tokens": 363
+          }
+        }
+      }
+    },
+    {
+      "name": "simple_strict_json_schema",
+      "ok": false,
+      "seconds": 0.001,
+      "error": "{\"error\":{\"message\":\"response_format type 'json_schema' requires the optional llguidance dependency (pip install llguidance); refusing to silently return unconstrained output\",\"type\":\"invalid_request_error\",\"code\":\"HTTPException\",\"param\":null}}"
+    },
+    {
+      "name": "text_sse_stream",
+      "ok": true,
+      "seconds": 0.553,
+      "detail": {
+        "chunks": 5,
+        "answer": "local ready",
+        "done": true,
+        "usage": {
+          "prompt_tokens": 20,
+          "completion_tokens": 3,
+          "total_tokens": 23,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        }
+      }
+    }
+  ]
+}

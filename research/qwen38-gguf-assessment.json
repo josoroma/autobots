@@ -1,0 +1,347 @@
+{
+  "assessment_created_at_utc": "2026-11-04T17:44:19.261774+00:00",
+  "probe_finished_at_utc": "2026-11-04T17:41:31.397648+00:00",
+  "served_model": "qwen38-local-qualification",
+  "scope": "Offline interpretation of bounded output checks and reviewed runtime behavior; not a general agent benchmark.",
+  "raw_evidence_modified": false,
+  "raw_report_totals": {
+    "cases_recorded": 15,
+    "passed": 14,
+    "failed": 1,
+    "skipped": 0,
+    "protocol_failures": 0,
+    "semantic_failures": 1,
+    "http_requests": 25,
+    "elapsed_seconds": 162.18,
+    "usage": {
+      "prompt_tokens": 7033,
+      "completion_tokens": 581,
+      "total_tokens": 7614
+    }
+  },
+  "summary": {
+    "total_cases": 15,
+    "raw_output_passed": 14,
+    "raw_output_failed": 1,
+    "qualified": 13,
+    "unsupported": 1,
+    "failed": 1,
+    "skipped": 0,
+    "inconclusive": 0,
+    "all_cases_qualified": false
+  },
+  "cases": [
+    {
+      "case_number": 1,
+      "name": "health_and_identity",
+      "seed": null,
+      "request_ids": [
+        1,
+        2
+      ],
+      "raw_status": "pass",
+      "raw_output_pass": true,
+      "raw_protocol_ok": true,
+      "raw_semantic_ok": null,
+      "raw_failed_checks": [],
+      "contract_qualified": true,
+      "assessment_status": "qualified",
+      "interpretation": "Raw bounded-case verdict retained; no claim beyond its specified checks."
+    },
+    {
+      "case_number": 2,
+      "name": "native_named_strict_tool_roundtrip",
+      "seed": 42,
+      "request_ids": [
+        3,
+        4
+      ],
+      "raw_status": "pass",
+      "raw_output_pass": true,
+      "raw_protocol_ok": true,
+      "raw_semantic_ok": true,
+      "raw_failed_checks": [],
+      "contract_qualified": false,
+      "assessment_status": "unsupported",
+      "interpretation": "The only object-form tool_choice request corresponds to this case, and the server logged a type error and default fallback. The reviewed source defaults to auto. The correct calculator output is retained, but native named-tool enforcement is unsupported and unqualified. A single available tool plus an explicit prompt cannot distinguish automatic selection from enforced named selection.",
+      "correct_response_observed": true,
+      "requested_tool_choice": [
+        {
+          "type": "function",
+          "function": {
+            "name": "add_integers"
+          }
+        }
+      ],
+      "source_review": {
+        "reviewed_runtime": "llama.cpp 0.8.0",
+        "revision": "8642541b255bfb5dc39cd351a178be09013a55d6",
+        "string_default": "auto",
+        "supported_string_choices": [
+          "auto",
+          "none",
+          "required"
+        ],
+        "request_parsing_url": "https://github.com/ggml-org/llama.cpp/blob/8642541b255bfb5dc39cd351a178be09013a55d6/tools/server/server-common.cpp#L1360",
+        "accepted_choices_url": "https://github.com/ggml-org/llama.cpp/blob/8642541b255bfb5dc39cd351a178be09013a55d6/common/chat.cpp#L322",
+        "applicability": "Source review supplied for this run; this offline script does not inspect the executable."
+      },
+      "fallback_diagnostics": [
+        {
+          "line": 29,
+          "text": "0.10.326.665 W Wrong type supplied for parameter 'tool_choice', using default value: [json.exception.type_error.302] type must be string, but is object"
+        }
+      ],
+      "unique_object_request_and_diagnostic": true,
+      "native_named_enforcement_demonstrated": false,
+      "effective_tool_choice": "auto"
+    },
+    {
+      "case_number": 3,
+      "name": "automatic_strict_tool_roundtrip",
+      "seed": 42,
+      "request_ids": [
+        5,
+        6
+      ],
+      "raw_status": "pass",
+      "raw_output_pass": true,
+      "raw_protocol_ok": true,
+      "raw_semantic_ok": true,
+      "raw_failed_checks": [],
+      "contract_qualified": true,
+      "assessment_status": "qualified",
+      "interpretation": "Raw bounded-case verdict retained; no claim beyond its specified checks."
+    },
+    {
+      "case_number": 4,
+      "name": "required_single_allowed_tool_strict_tool_roundtrip",
+      "seed": 42,
+      "request_ids": [
+        7,
+        8
+      ],
+      "raw_status": "pass",
+      "raw_output_pass": true,
+      "raw_protocol_ok": true,
+      "raw_semantic_ok": true,
+      "raw_failed_checks": [],
+      "contract_qualified": true,
+      "assessment_status": "qualified",
+      "interpretation": "Raw bounded-case verdict retained; no claim beyond its specified checks."
+    },
+    {
+      "case_number": 5,
+      "name": "nested_strict_json_schema",
+      "seed": 42,
+      "request_ids": [
+        9
+      ],
+      "raw_status": "pass",
+      "raw_output_pass": true,
+      "raw_protocol_ok": true,
+      "raw_semantic_ok": true,
+      "raw_failed_checks": [],
+      "contract_qualified": true,
+      "assessment_status": "qualified",
+      "interpretation": "Raw bounded-case verdict retained; no claim beyond its specified checks."
+    },
+    {
+      "case_number": 6,
+      "name": "automatic_strict_tool_roundtrip",
+      "seed": 43,
+      "request_ids": [
+        10,
+        11
+      ],
+      "raw_status": "pass",
+      "raw_output_pass": true,
+      "raw_protocol_ok": true,
+      "raw_semantic_ok": true,
+      "raw_failed_checks": [],
+      "contract_qualified": true,
+      "assessment_status": "qualified",
+      "interpretation": "Raw bounded-case verdict retained; no claim beyond its specified checks."
+    },
+    {
+      "case_number": 7,
+      "name": "required_single_allowed_tool_strict_tool_roundtrip",
+      "seed": 43,
+      "request_ids": [
+        12,
+        13
+      ],
+      "raw_status": "pass",
+      "raw_output_pass": true,
+      "raw_protocol_ok": true,
+      "raw_semantic_ok": true,
+      "raw_failed_checks": [],
+      "contract_qualified": true,
+      "assessment_status": "qualified",
+      "interpretation": "Raw bounded-case verdict retained; no claim beyond its specified checks."
+    },
+    {
+      "case_number": 8,
+      "name": "nested_strict_json_schema",
+      "seed": 43,
+      "request_ids": [
+        14
+      ],
+      "raw_status": "pass",
+      "raw_output_pass": true,
+      "raw_protocol_ok": true,
+      "raw_semantic_ok": true,
+      "raw_failed_checks": [],
+      "contract_qualified": true,
+      "assessment_status": "qualified",
+      "interpretation": "Raw bounded-case verdict retained; no claim beyond its specified checks."
+    },
+    {
+      "case_number": 9,
+      "name": "automatic_strict_tool_roundtrip",
+      "seed": 44,
+      "request_ids": [
+        15,
+        16
+      ],
+      "raw_status": "pass",
+      "raw_output_pass": true,
+      "raw_protocol_ok": true,
+      "raw_semantic_ok": true,
+      "raw_failed_checks": [],
+      "contract_qualified": true,
+      "assessment_status": "qualified",
+      "interpretation": "Raw bounded-case verdict retained; no claim beyond its specified checks."
+    },
+    {
+      "case_number": 10,
+      "name": "required_single_allowed_tool_strict_tool_roundtrip",
+      "seed": 44,
+      "request_ids": [
+        17,
+        18
+      ],
+      "raw_status": "pass",
+      "raw_output_pass": true,
+      "raw_protocol_ok": true,
+      "raw_semantic_ok": true,
+      "raw_failed_checks": [],
+      "contract_qualified": true,
+      "assessment_status": "qualified",
+      "interpretation": "Raw bounded-case verdict retained; no claim beyond its specified checks."
+    },
+    {
+      "case_number": 11,
+      "name": "nested_strict_json_schema",
+      "seed": 44,
+      "request_ids": [
+        19
+      ],
+      "raw_status": "pass",
+      "raw_output_pass": true,
+      "raw_protocol_ok": true,
+      "raw_semantic_ok": true,
+      "raw_failed_checks": [],
+      "contract_qualified": true,
+      "assessment_status": "qualified",
+      "interpretation": "Raw bounded-case verdict retained; no claim beyond its specified checks."
+    },
+    {
+      "case_number": 12,
+      "name": "text_sse_stream",
+      "seed": 42,
+      "request_ids": [
+        20
+      ],
+      "raw_status": "pass",
+      "raw_output_pass": true,
+      "raw_protocol_ok": true,
+      "raw_semantic_ok": true,
+      "raw_failed_checks": [],
+      "contract_qualified": true,
+      "assessment_status": "qualified",
+      "interpretation": "Raw bounded-case verdict retained; no claim beyond its specified checks."
+    },
+    {
+      "case_number": 13,
+      "name": "required_single_tool_sse_roundtrip",
+      "seed": 42,
+      "request_ids": [
+        21,
+        22
+      ],
+      "raw_status": "pass",
+      "raw_output_pass": true,
+      "raw_protocol_ok": true,
+      "raw_semantic_ok": true,
+      "raw_failed_checks": [],
+      "contract_qualified": true,
+      "assessment_status": "qualified",
+      "interpretation": "Raw bounded-case verdict retained; no claim beyond its specified checks."
+    },
+    {
+      "case_number": 14,
+      "name": "truncated_json_is_rejected",
+      "seed": 42,
+      "request_ids": [
+        23
+      ],
+      "raw_status": "pass",
+      "raw_output_pass": true,
+      "raw_protocol_ok": true,
+      "raw_semantic_ok": null,
+      "raw_failed_checks": [],
+      "contract_qualified": true,
+      "assessment_status": "qualified",
+      "interpretation": "Raw bounded-case verdict retained; no claim beyond its specified checks."
+    },
+    {
+      "case_number": 15,
+      "name": "bounded_two_hop_invoice_audit",
+      "seed": 42,
+      "request_ids": [
+        24,
+        25
+      ],
+      "raw_status": "fail",
+      "raw_output_pass": false,
+      "raw_protocol_ok": true,
+      "raw_semantic_ok": false,
+      "raw_failed_checks": [
+        {
+          "dimension": "semantic",
+          "name": "correct_step_arguments",
+          "ok": false,
+          "detail": {
+            "invoice_id": "probe-001",
+            "computed_total": 38
+          }
+        }
+      ],
+      "contract_qualified": false,
+      "assessment_status": "failed",
+      "interpretation": "Raw bounded-case verdict retained; no claim beyond its specified checks.",
+      "raw_error": "semantic: correct_step_arguments"
+    }
+  ],
+  "limitations": [
+    "Qualified means the specific bounded case passed; it is not a universal API or model guarantee.",
+    "Correct output from a single-tool prompt cannot establish native named-choice enforcement.",
+    "Required mode with one allowed tool remains a distinct adapter alternative, not native named-choice support.",
+    "A logfile prefix snapshot may precede later benchmark or shutdown log appends.",
+    "Existing semantic failures remain failures; this assessment performs no repair or rerun."
+  ],
+  "inputs": {
+    "probe": {
+      "path": "/Users/josoroma/sites/autobots/research/qwen38-gguf-probe.json",
+      "bytes": 156113,
+      "original_sha256": "15dd6921d1df76ab6e24ca935768cb516068339e2380b473111048db44e10b81"
+    },
+    "server_log": {
+      "path": "/Users/josoroma/sites/autobots/research/qwen38-gguf-server.log",
+      "snapshot_bytes": 33735,
+      "snapshot_sha256": "e4e9ca48758194e0122162a95d4ee9dbad8a49fab83855333e102219358c694a",
+      "hash_scope": "Exact first snapshot_bytes read at assessment time; later appends are outside this hash."
+    }
+  }
+}

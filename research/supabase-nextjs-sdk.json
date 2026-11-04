@@ -1,0 +1,65 @@
+{
+  "retrieved_at_utc": "2026-11-04T18:17:41.270273+00:00",
+  "scope": "Public npm registry metadata only; no package installation, service startup, key access or model inference.",
+  "packages": [
+    {
+      "name": "@supabase/supabase-js",
+      "version": "2.119.0",
+      "source_url": "https://registry.npmjs.org/@supabase/supabase-js/latest",
+      "exact_version_url": "https://registry.npmjs.org/@supabase/supabase-js/2.119.0",
+      "engines": {
+        "node": ">=22.0.0"
+      },
+      "peer_dependencies": {
+        "@opentelemetry/api": ">=1.0.0"
+      },
+      "dependencies": {
+        "@supabase/auth-js": "2.119.0",
+        "@supabase/storage-js": "2.119.0",
+        "@supabase/realtime-js": "2.119.0",
+        "@supabase/functions-js": "2.119.0",
+        "@supabase/postgrest-js": "2.119.0"
+      },
+      "repository": {
+        "url": "https://github.com/supabase/supabase-js.git",
+        "type": "git",
+        "directory": "packages/core/supabase-js"
+      },
+      "license": "MIT",
+      "dist": {
+        "tarball": "https://registry.npmjs.org/@supabase/supabase-js/-/supabase-js-2.119.0.tgz",
+        "shasum": "ac8d844b46fa0b68ae2b0400950b3a2de52b1a62",
+        "integrity": "sha512-MKP49G6bJbPhvsZDegZ/IXS/ITApPgplDCF5+F65KZ5kIArS5Y90WFxwvWYALx2bsxdrSuHvkCiXHYr3dU8+sw=="
+      }
+    },
+    {
+      "name": "@supabase/ssr",
+      "version": "0.12.7",
+      "source_url": "https://registry.npmjs.org/@supabase/ssr/latest",
+      "exact_version_url": "https://registry.npmjs.org/@supabase/ssr/0.12.7",
+      "engines": null,
+      "peer_dependencies": {
+        "@supabase/supabase-js": "^2.114.0"
+      },
+      "dependencies": {
+        "cookie": "^1.0.2"
+      },
+      "repository": {
+        "url": "git+https://github.com/supabase/ssr.git",
+        "type": "git"
+      },
+      "license": "MIT",
+      "dist": {
+        "tarball": "https://registry.npmjs.org/@supabase/ssr/-/ssr-0.12.7.tgz",
+        "shasum": "37d97401b51d1ef21e14f6317258fac2cd6e5645",
+        "integrity": "sha512-wiBtEie1KkRJi9RrZWY3R2imRhX1JY7qMyUCH2z9AUk15gQebNEplM+urbCKamdxaTJLXUU6LlpkJsaxhojCEg=="
+      }
+    }
+  ],
+  "primary_sources": [
+    "https://supabase.com/docs/guides/self-hosting/docker",
+    "https://supabase.com/docs/guides/auth/server-side/creating-a-client?queryGroups=framework&framework=nextjs",
+    "https://supabase.com/docs/guides/database/postgres/row-level-security",
+    "https://supabase.com/docs/guides/storage/buckets/fundamentals"
+  ]
+}

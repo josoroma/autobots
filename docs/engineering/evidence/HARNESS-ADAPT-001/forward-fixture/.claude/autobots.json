@@ -1,0 +1,13 @@
+{
+  "documents": {
+    "product": "PRD.md",
+    "harness": "PRD.md",
+    "providers": "PRD.md",
+    "deployment": "PRD.md",
+    "research": "PRD.md",
+    "comparison": "PRD.md",
+    "specs": "SPECS.md",
+    "codebase": "CODEBASE.md",
+    "contract": "CONTRACT.md"
+  }
+}

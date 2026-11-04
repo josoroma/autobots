@@ -1,0 +1,105 @@
+{
+  "work_item": "IMAGINE-001",
+  "evidence_class": "static_artifact_checks",
+  "exit_code": 0,
+  "observed": {
+    "png_crc_and_dimensions": 6,
+    "prompt_screen_coverage": 6,
+    "gallery_local_references": 29,
+    "unique_gallery_ids": 13,
+    "native_image_dimensions_and_alt": 6,
+    "markdown_file_links": 26,
+    "external_gallery_assets": 0
+  },
+  "expected": "Six valid PNGs; matching prompts; all local files/anchors resolve; correct native dimensions; no external gallery dependencies.",
+  "manifest_sha256": "230b989b8febbcf2969baa7f1e91cbac8ac32f1959007d274d2350c2f9daa976",
+  "verifier_sha256": "0c88701db88c1cab97221d92a521c0c6dd596ee2b24196b9289e42c0220f9203",
+  "source_fingerprints": [
+    {
+      "file": "SPECS.md",
+      "sha256": "f5848bb5900dc80075834b4b81d4f30605d1e6fb5063ed1e81be83ff5efcfdd1"
+    },
+    {
+      "file": "PRD-NextJS.md",
+      "sha256": "64c6daf4a046c760842b00221c3aba27946bd7d4f7f931953e49c44251147b80"
+    },
+    {
+      "file": "PRD-LangChain-Deep-Agents.md",
+      "sha256": "d3481218907795e44becb40eea1a35c9356c41e6209a2dcf1a55ebc1fe8adbd7"
+    },
+    {
+      "file": "PRD-Model-Providers.md",
+      "sha256": "b6624df7adb682b9394fa196efbf8204cc331725f6cab8f18a6ba2f570750dca"
+    },
+    {
+      "file": "PRD-Local-Mac-Deployment.md",
+      "sha256": "54b495e264bbfe7960b5dce5222fe878158c644444835d168c564db77c036491"
+    },
+    {
+      "file": "docs/engineering/option-b-contract.md",
+      "sha256": "6d6ed41bd639c502645b315c72f9d26c27c2cb047f65def044594036f2e75062"
+    }
+  ],
+  "artifact_fingerprints": [
+    {
+      "file": "README.md",
+      "sha256": "592b35ce84b4e3db1f135b048c89fa863a25a63331ffe43352658daa55016aac"
+    },
+    {
+      "file": "index.html",
+      "sha256": "60863037c8003c1c38674612cdc86b793a5d608126597d0d75c8d295a5818d59"
+    },
+    {
+      "file": "prompts.json",
+      "sha256": "bf92cc6806a4f52e61031dc736acdf87d1d9f32bc8d9f4c15c8d18b393725d8b"
+    },
+    {
+      "file": "01-home.png",
+      "width": 1586,
+      "height": 992,
+      "bytes": 1424439,
+      "sha256": "4452676ad078fe86940dd0d79d13a86ae141fc111281efe125405b2ec4394f56"
+    },
+    {
+      "file": "02-run-workspace.png",
+      "width": 1585,
+      "height": 992,
+      "bytes": 1671591,
+      "sha256": "1a05f784572504f46c13cf8ba99691059eed61d01316f2b1334c79e19424afea"
+    },
+    {
+      "file": "03-approval.png",
+      "width": 1585,
+      "height": 992,
+      "bytes": 1695694,
+      "sha256": "164153db980e5c61b9e10af59d560b0fe66b2ae6b1343b1410619d1c9ec0b141"
+    },
+    {
+      "file": "04-result-evidence.png",
+      "width": 1586,
+      "height": 992,
+      "bytes": 1625225,
+      "sha256": "016db525acd1b149d51e2033d86ee2bf69ed782ac4645d74218f84d9ba9887e9"
+    },
+    {
+      "file": "05-model-settings.png",
+      "width": 1586,
+      "height": 992,
+      "bytes": 1625451,
+      "sha256": "a06af6faf5eb95cb8127305d7c9e8df1e052bed19599953b60ad7120243061e2"
+    },
+    {
+      "file": "06-workflow.png",
+      "width": 1586,
+      "height": 992,
+      "bytes": 1492956,
+      "sha256": "23e0a6b35247bd290dbfffa3f34cd6c6e6344c290bb77a6247bcccbf53440855"
+    }
+  ],
+  "not_exercised": [
+    "Browser interaction",
+    "Live application",
+    "Runtime model qualification"
+  ],
+  "command": "python3.12 .checks/IMAGINE-001/artifact-check.py"
+}

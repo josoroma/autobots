@@ -1,0 +1,58 @@
+{
+  "research_date": "2026-11-04",
+  "scope": "Model metadata only; no weights downloaded, runtime installed or inference performed.",
+  "models": [
+    {
+      "model_id": "empero-ai/Qwen3.8-9B-Distill-GGUF",
+      "source_url": "https://huggingface.co/api/models/empero-ai/Qwen3.8-9B-Distill-GGUF?blobs=true",
+      "revision": "760121cd70bb4c36b2b5ec58eb765e0df5987efe",
+      "license": "apache-2.0",
+      "base_model": "empero-ai/Qwen3.8-9B",
+      "selected_files": [
+        {
+          "file": "Qwen3.8-9B-Q4_K_M.gguf",
+          "bytes": 5780090176
+        },
+        {
+          "file": "Qwen3.8-9B-Q6_K.gguf",
+          "bytes": 7558901056
+        },
+        {
+          "file": "Qwen3.8-9B-Q8_0.gguf",
+          "bytes": 9786060096
+        }
+      ]
+    },
+    {
+      "model_id": "empero-ai/Qwen3.8-9B-Distill",
+      "source_url": "https://huggingface.co/api/models/empero-ai/Qwen3.8-9B-Distill?blobs=true",
+      "revision": "0934f3d2327ff2df2197495278c4c46ae5a56bd9",
+      "license": "apache-2.0",
+      "base_model": "Qwen/Qwen3.5-9B",
+      "selected_files": []
+    },
+    {
+      "model_id": "unsloth/Qwen3.5-9B-GGUF",
+      "source_url": "https://huggingface.co/api/models/unsloth/Qwen3.5-9B-GGUF?blobs=true",
+      "revision": "3885219b6810b007914f3a7950a8d1b469d598a5",
+      "license": "apache-2.0",
+      "base_model": [
+        "Qwen/Qwen3.5-9B"
+      ],
+      "selected_files": [
+        {
+          "file": "Qwen3.5-9B-Q4_K_M.gguf",
+          "bytes": 5680522464
+        },
+        {
+          "file": "Qwen3.5-9B-Q6_K.gguf",
+          "bytes": 7458301152
+        },
+        {
+          "file": "Qwen3.5-9B-Q8_0.gguf",
+          "bytes": 9527502048
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "research_date": "2026-11-04",
+  "checks": {
+    "markdown_fences": "pass",
+    "local_links": "pass",
+    "pinned_autogpt_source_paths": "pass",
+    "shared_requirement_ids": "pass",
+    "json_and_python_syntax": "pass",
+    "official_doc_http_links_checked": 54
+  },
+  "files": {
+    "PRD-NextJS.md": {
+      "lines": 639,
+      "words": 7739
+    },
+    "PRD-AutoGPT.md": {
+      "lines": 633,
+      "words": 8664
+    },
+    "README.md": {
+      "lines": 21,
+      "words": 202
+    },
+    "PRD-LangChain-Deep-Agents.md": {
+      "lines": 712,
+      "words": 9564
+    },
+    "PRD-Comparison-Recommendation.md": {
+      "lines": 293,
+      "words": 3817
+    },
+    "LOCAL-MODEL-EVIDENCE.md": {
+      "lines": 113,
+      "words": 1516
+    }
+  },
+  "errors": [],
+  "limits": "Structural/document evidence validation only. No complete application, package lock resolution, SDK integration, AutoGPT test suite or long-horizon model evaluation was run."
+}

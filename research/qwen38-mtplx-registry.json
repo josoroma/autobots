@@ -1,0 +1,37 @@
+{
+  "research_date": "2026-11-04",
+  "source_url": "https://mtplx.com/releases/models.json",
+  "registry_generated_at": "2026-09-24T07:44:40Z",
+  "models": {
+    "Youssofal/Qwen3.8-27B-MTPLX-Optimized-Speed": {
+      "revision": "1d5087d2062c02b279180a53e4016cf9cd7a3d7e",
+      "min_engine_version": "2.7.0",
+      "note": "Quantized MTP draft head: smaller download, same answers, faster decode."
+    },
+    "Youssofal/Qwen3.8-27B-MTPLX-Bare-Speed": {
+      "revision": "b59d7002368575f08a58ba0d26686b53a9c162d6",
+      "min_engine_version": "2.7.0",
+      "note": "Quantized MTP draft head: smaller download, same answers, faster decode."
+    },
+    "Youssofal/Qwen3.8-27B-MTPLX-Optimized-Quality": {
+      "revision": "300a4ac6c6058585e80571ff6c910819711843ec",
+      "min_engine_version": "2.7.0",
+      "note": "Quantized MTP draft head: smaller download, same answers, faster decode."
+    },
+    "Youssofal/Qwen3.8-27B-MTPLX-Optimized-Speed-FP16": {
+      "revision": "d4ac53cd03467030431e799e8805ceccf10530fc",
+      "min_engine_version": "2.7.0",
+      "note": "Quantized MTP draft head: smaller download, same answers, faster decode."
+    },
+    "Youssofal/Qwen3.8-27B-MTPLX-Bare-Speed-FP16": {
+      "revision": "b360801951518da3e7ec6de84b6691476e5c91e2",
+      "min_engine_version": "2.7.0",
+      "note": "Quantized MTP draft head: smaller download, same answers, faster decode."
+    },
+    "Youssofal/Qwen3.8-27B-MTPLX-Optimized-Quality-FP16": {
+      "revision": "9b53320d1e15d40add84584ccf6c5134ef1d332b",
+      "min_engine_version": "2.7.0",
+      "note": "Quantized MTP draft head: smaller download, same answers, faster decode."
+    }
+  }
+}

@@ -1,0 +1,149 @@
+{
+  "work_item": "LUMA-001",
+  "generated_at": "2026-11-04T20:19:20.781091+00:00",
+  "mode": "built-in image_gen",
+  "theme": "User-supplied shadcn Luma",
+  "default_appearance": "dark",
+  "status": "design_concepts_with_sample_data",
+  "canonical_tokens": {
+    "file": "../design/luma.css",
+    "sha256": "cfe0b1e970fd0b87a11d069dd6c22b71745030c5ac908a793767cdc4a2f0103f",
+    "declarations": {
+      ":root": 32,
+      ".dark": 31
+    }
+  },
+  "images": [
+    {
+      "file": "01-home.png",
+      "width": 1586,
+      "height": 992,
+      "bytes": 1406859,
+      "sha256": "3155c4a5ae8eb16f5c3352805c0678dba2135adcc6d6cc84932cd2e3869339e7"
+    },
+    {
+      "file": "02-run-workspace.png",
+      "width": 1586,
+      "height": 992,
+      "bytes": 1469906,
+      "sha256": "f2b4eff4f953b66ca7f8412723f17875e759047b1a1fe3bade6aea6b9289a756"
+    },
+    {
+      "file": "03-approval.png",
+      "width": 1586,
+      "height": 992,
+      "bytes": 1466133,
+      "sha256": "ebb9cd2e12d0a58209e282d9c63dfa4a8d28f5e0b7d4b6f24af73441c3382445"
+    },
+    {
+      "file": "04-result-evidence.png",
+      "width": 1585,
+      "height": 992,
+      "bytes": 1511507,
+      "sha256": "24ea505321b631349d848b73783ab75bdaa3f904504a338720e55864d5f3f868"
+    },
+    {
+      "file": "05-model-settings.png",
+      "width": 1585,
+      "height": 992,
+      "bytes": 1346875,
+      "sha256": "cd2719bab29802b9cb262f5ca1596e2e7dca3804a922e050870afd776f45dd80"
+    },
+    {
+      "file": "06-workflow.png",
+      "width": 1585,
+      "height": 992,
+      "bytes": 1439704,
+      "sha256": "db8193a7ad0f36731dcbadb25c6ac3daf9ba2b5bec1f0ff2a81944f142e697c4"
+    }
+  ],
+  "supporting_files": [
+    {
+      "file": "README.md",
+      "sha256": "110d1adfdac393ad13f797986beaa1dda1c6c9d2b7fdee40772067c2c19444b1"
+    },
+    {
+      "file": "index.html",
+      "sha256": "14754e761666f2e340b1fca4c44483301a1672d77ce666ed4936e9fa4b88e2ce"
+    },
+    {
+      "file": "prompts.json",
+      "sha256": "e8d38848c7a9d3605061f26b2600c3811bafcc1dd5062a8cbe1b45f2f088c166"
+    }
+  ],
+  "source_documents": [
+    {
+      "file": "PRD-AutoGPT.md",
+      "sha256": "9f8d62f548f78f2c5316f4198469f1c71ccc7597ab2eaa127be99348b7bae842"
+    },
+    {
+      "file": "PRD-Comparison-Recommendation.md",
+      "sha256": "1c951a97604374090bc3e1a8d8d11cf03fb51b9c527ab4a9d5b13c16218581c1"
+    },
+    {
+      "file": "PRD-Design-System.md",
+      "sha256": "beb195e3ff97586ba37071c0a572f24d0cf3bab1263b14470ab76e3a63e073ad"
+    },
+    {
+      "file": "PRD-Development-Harness.md",
+      "sha256": "9abf43e5b59421a83721c2a85708d8c7cc4ee8ed5e76a109d92820669da076b5"
+    },
+    {
+      "file": "PRD-LangChain-Deep-Agents.md",
+      "sha256": "462c17d1fea5351e1e402dc5850bda2484bc3446365a67c2d814dfd8cdd8135b"
+    },
+    {
+      "file": "PRD-Local-Mac-Deployment.md",
+      "sha256": "b76b2109cac2f366a9c6df37f7f062ebc3b1999b139bb4f64af543e4c3bff34a"
+    },
+    {
+      "file": "PRD-Model-Providers.md",
+      "sha256": "1289a19ed735061bf6c04fa79bd11e5a0993ce53383b3480232fde09ea1e06c2"
+    },
+    {
+      "file": "PRD-NextJS.md",
+      "sha256": "7de966f056371961841d81db1388c2655999ec3a5f7190cbda5cb1b95837f092"
+    },
+    {
+      "file": "SPECS.md",
+      "sha256": "199a1ceb2a5ae7bf4bb6bb9d975ab55d29d9ef5f680652cf19b0b788f4dff8a8"
+    },
+    {
+      "file": "README.md",
+      "sha256": "c96687306111b06fb23b1cb2a0b8407e2654762f19f99baa6b289483cb92e1c0"
+    },
+    {
+      "file": "CODEBASE.md",
+      "sha256": "c70de7602c274c42cf49f57be637bb56bae4aecc7b01d0631a82130b43320dd5"
+    },
+    {
+      "file": "docs/engineering/option-b-contract.md",
+      "sha256": "78adb3da94d53acaedf7e72b7900e6010cd1b3b59f0f6a18da2227da3716d800"
+    },
+    {
+      "file": "docs/design/luma.css",
+      "sha256": "cfe0b1e970fd0b87a11d069dd6c22b71745030c5ac908a793767cdc4a2f0103f"
+    },
+    {
+      "file": ".claude/autobots.json",
+      "sha256": "ad6e4eec35583048d268d4525562e464a20a67e2ba87994b7222cf8543a73a51"
+    },
+    {
+      "file": ".claude/rules/nextjs.md",
+      "sha256": "4b270476245e438922e949e242093f4b2892839dd4ec16456cbf307a919857fa"
+    },
+    {
+      "file": ".claude/skills/autobots-spec-ingest/SKILL.md",
+      "sha256": "96ed8edafce9a3efdd8e3003504c0ad59b1580d0956404ba0393d145a75fa1fc"
+    }
+  ],
+  "previous_concepts": "archive/warm-green-v1/",
+  "review": {
+    "scope": "Source alignment, exact CSS declarations, dark visual direction, readable primary controls and retained product semantics.",
+    "limitations": [
+      "Raster colors approximate CSS",
+      "Fictional content/status/costs",
+      "No browser/application theme qualification"
+    ]
+  }
+}

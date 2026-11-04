@@ -1,0 +1,32 @@
+{
+  "schema_version": "autobots.harness/v1",
+  "python_executable": "/opt/homebrew/bin/python3.12",
+  "documents": {
+    "specs": "SPECS.md",
+    "codebase": "CODEBASE.md",
+    "contract": "docs/engineering/option-b-contract.md",
+    "product": "PRD-LangChain-Deep-Agents.md",
+    "harness": "PRD-Development-Harness.md",
+    "design": "PRD-Design-System.md",
+    "providers": "PRD-Model-Providers.md",
+    "deployment": "PRD-Local-Mac-Deployment.md",
+    "research": "PRD-AutoGPT.md",
+    "comparison": "PRD-Comparison-Recommendation.md"
+  },
+  "upstream": {
+    "repository": "https://github.com/josoroma/OhMyOrch",
+    "commit": "fddfbf53c8c10d45782796cc9a7edf95bc8d3a07",
+    "agent": "plugins/ohmyorch/agents/spec-ingestor.md",
+    "checkout": "research/upstream/OhMyOrch"
+  },
+  "verification": {
+    "implemented_profiles": ["harness"],
+    "pending_profiles": ["fast", "full", "db", "operations"],
+    "report": ".checks/harness/latest.json"
+  },
+  "assistant": {
+    "minimum_version_for_blocking_hook_failure": "2.1.295",
+    "model_configuration": "unchanged",
+    "event_delivery_qualification": "not_tested"
+  }
+}

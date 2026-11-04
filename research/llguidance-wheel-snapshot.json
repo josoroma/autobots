@@ -1,0 +1,21 @@
+{
+  "research_date": "2026-11-04",
+  "source_url": "https://pypi.org/pypi/llguidance/json",
+  "version": "1.9.1",
+  "requires_python": ">=3.10",
+  "mac_arm64_wheels": [
+    {
+      "filename": "llguidance-1.9.1-cp314-cp314t-macosx_11_0_arm64.whl",
+      "bytes": 3127781,
+      "sha256": "2d7aa419d8b63a528347f73ee57185b4172c8bb09287e5ef9eefe3eb6d709356",
+      "url": "https://files.pythonhosted.org/packages/73/be/bd4f79bb2a88ee1ec0e677b61e4256e6008c677d68c996029af344f4eecc/llguidance-1.9.1-cp314-cp314t-macosx_11_0_arm64.whl"
+    },
+    {
+      "filename": "llguidance-1.9.1-cp39-abi3-macosx_11_0_arm64.whl",
+      "bytes": 3141060,
+      "sha256": "a942487cd6221b793df3a11450881a6c9d25a45460a900c56d99b682633c45fe",
+      "url": "https://files.pythonhosted.org/packages/6e/6e/f4acb8bd966e3533ebc888eeb7854482ece71668e002401a41bbfe37dd07/llguidance-1.9.1-cp39-abi3-macosx_11_0_arm64.whl"
+    }
+  ],
+  "scope": "Metadata only. No wheel downloaded or installed; no runtime compatibility test."
+}

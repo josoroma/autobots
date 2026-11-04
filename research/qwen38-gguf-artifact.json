@@ -1,0 +1,12 @@
+{
+  "source_tag": "qwen3.8:27b-q4_K_M",
+  "manifest_url": "https://registry.ollama.ai/v2/library/qwen3.8/manifests/27b-q4_K_M",
+  "manifest_sha256": "25b843619e944cd0ae6069f94ff4e5e26a16e109ccbc0a66a0f05979ed70098e",
+  "language_model": {
+    "mediaType": "application/vnd.ollama.image.model",
+    "digest": "sha256:f5f1dd8920d417aac2718b0bda3403da274301efdd6760b4f0f4b864ff2ad57d",
+    "size": 16810714464
+  },
+  "projector_downloaded": false,
+  "scope": "Language-model weights for text, tool, schema and streaming evaluation. Vision projector not downloaded."
+}

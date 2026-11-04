@@ -1,0 +1,276 @@
+{
+  "research_date": "2026-11-04",
+  "scope": "Link and artifact structural validation only; no model runtime or quality tests.",
+  "document": "research/HUGGINGFACE-SLM-STRUCTURED-OUTPUT.md",
+  "links": [
+    {
+      "url": "https://ai.google.dev/gemma/docs/functiongemma/model_card",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/QwenLM/Qwen3.8",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/ggml-org/llama.cpp/blob/cd959bae99ff4bed22bef2604f45241c09bbb8c8/common/chat.cpp#L1414",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/ggml-org/llama.cpp/blob/cd959bae99ff4bed22bef2604f45241c09bbb8c8/common/parsers/qwen3-coder.cpp",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/ggml-org/llama.cpp/blob/cd959bae99ff4bed22bef2604f45241c09bbb8c8/docs/build.md",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/ggml-org/llama.cpp/blob/cd959bae99ff4bed22bef2604f45241c09bbb8c8/tools/server/README.md",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/ggml-org/llama.cpp/releases/tag/v0.9.0",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/guidance-ai/llguidance/blob/3d698ee07b3a67b0aef50fb6058612e8fd30aca2/docs/json_schema.md",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/ml-explore/mlx-lm/blob/736ab0d8c1d0edc79c3d798044fe6904e2fa23be/mlx_lm/server.py",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/ml-explore/mlx-lm/blob/ed1fca4cef15a824c5f1702c80f70b4cffc8e4dd/mlx_lm/models/qwen3_vl.py",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/ml-explore/mlx-lm/blob/ed1fca4cef15a824c5f1702c80f70b4cffc8e4dd/mlx_lm/utils.py#L46",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/ollama/ollama/blob/9a3e8177767245acc62b735eba7d5d8a553606d0/openai/openai.go#L110",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/youssofal/MTPLX/blob/9882703f3105363ddc37eca9f97aa09a1d387112/mtplx/backends/registry.py#L2216",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/youssofal/MTPLX/blob/9882703f3105363ddc37eca9f97aa09a1d387112/mtplx/runtime.py#L1219",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/youssofal/MTPLX/blob/v2.12.2/mtplx/constrained.py",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/youssofal/MTPLX/blob/v2.12.2/mtplx/server/openai.py",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/HuggingFaceTB/SmolLM3-3B",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/LiquidAI/LFM3-1.7B",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/LiquidAI/LFM3-1.7B/blob/main/LICENSE",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/NousResearch/DeepHermes-3-Mistral-24B-Preview",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/NousResearch/Hermes-2-Pro-Llama-3-8B",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/NousResearch/Hermes-3-Llama-3.1-8B",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/PocketAiHub/Qwen3.8-27B-MLX/blob/dcc3732f8c93ccf5580bf7a55e4ae639a40f194c/benchmarks/4k-feature-suite.json",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/PocketAiHub/Qwen3.8-27B-MLX/tree/main/2bit",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/PocketAiHub/Qwen3.8-27B-MLX/tree/main/6bit",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/Qwen/Qwen2.5-14B-Instruct/blob/cf98f3b3bbb457ad9e2bb7baf9a0125b6b88caa8/tokenizer_config.json",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/Qwen/Qwen3-14B/blob/40c069824f4251a91eefaf281ebe4c544efd3e18/tokenizer_config.json",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/Qwen/Qwen3-8B/blob/b968826d9c46dd6066d109eabc6255188de91218/tokenizer_config.json",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/Qwen/Qwen3.5-4B",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/Qwen/Qwen3.5-9B",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/Qwen/Qwen3.8-27B/blob/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/chat_template.jinja",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/Youssofal/Qwen3.5-4B-MTPLX-Optimized-Speed",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/Youssofal/Qwen3.5-9B-MTPLX-Optimized-Speed",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/Youssofal/Qwen3.8-27B-MTPLX-Bare-Speed",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/Youssofal/Qwen3.8-27B-MTPLX-Optimized-Quality",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/Youssofal/Qwen3.8-27B-MTPLX-Optimized-Speed",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/empero-ai/Qwen3.8-9B-Distill",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/empero-ai/Qwen3.8-9B-Distill-GGUF",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/google/functiongemma-270m-it",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/ibm-granite/granite-4.2-3b",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/ibm-granite/granite-4.2-3b-q4-mlx",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/microsoft/Phi-4-mini-instruct",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/mlx-community/DeepHermes-3-Mistral-24B-Preview-4bit",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/mlx-community/DeepHermes-3-Mistral-24B-Preview-4bit/blob/b88d5c8f9db41fc38c0b9538dca74c8aa309592a/tokenizer_config.json",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/mlx-community/Hermes-2-Pro-Llama-3-8B-4bit/blob/817b2706f3a705739e5dffe4a196d054c9bd8363/tokenizer_config.json",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/mlx-community/Hermes-3-Llama-3.1-8B-4bit/blob/3fde32264814f68c3d6d71ac333adf447523288a/tokenizer_config.json",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/mlx-community/Qwen2.5-14B-Instruct-4bit",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/mlx-community/Qwen2.5-14B-Instruct-4bit/blob/dad510143ae5cdb1466778bde3161460f9e9f604/tokenizer_config.json",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/mlx-community/Qwen3-14B-4bit",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/mlx-community/Qwen3-8B-4bit",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/mlx-community/Qwen3.5-9B-4bit",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/mlx-community/Qwen3.8-27B-4bit",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/mlx-community/Qwen3.8-27B-4bit/blob/10c35caafbb80f7dc6a7a432cdd11af10a6d4818/config.json",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/mlx-community/Qwen3.8-27B-8bit",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/mlx-community/Qwen3.8-27B-bf16",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/mlx-community/SmolLM3-3B-4bit",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/numind/NuExtract3",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/numind/NuExtract3-mlx-4bits",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-mlx-2bit",
+      "status": 200
+    },
+    {
+      "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF",
+      "status": 200
+    },
+    {
+      "url": "https://mtplx.com/releases/models.json",
+      "status": 200
+    },
+    {
+      "url": "https://ollama.com/library/qwen3.5:9b-q4_K_M",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "https://ollama.com/library/qwen3.8:27b-q4_K_M",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "https://pypi.org/project/llguidance/1.9.1/",
+      "status": 200
+    }
+  ],
+  "document_sha256": "cae4640195aaace6d7615c503454007e3ea4e367392dfc678bac2f1311e875f9",
+  "broken_local_links": [],
+  "word_count": 4095
+}

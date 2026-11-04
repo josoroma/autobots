@@ -1,0 +1,221 @@
+{
+  "validated_at_utc": "2026-11-04T19:37:07.896066+00:00",
+  "scope": "Current Markdown links/anchors, structured backlog/source locations and file hashes; no product/runtime qualification.",
+  "status": "passed",
+  "documents_checked": 49,
+  "links_checked": 481,
+  "backlog": {
+    "epics": 10,
+    "stories": 42,
+    "tasks": 84,
+    "statuses": {
+      "BLOCKED": 39,
+      "NEEDS CLARIFICATION": 1,
+      "READY": 2
+    }
+  },
+  "files": [
+    {
+      "file": ".claude/agents/autobots-architect.md",
+      "sha256": "79b4e20db7c6d2bbc5c38eaea530bbd699a0aee09b1684acd31183cde4fe5f1b"
+    },
+    {
+      "file": ".claude/agents/autobots-database.md",
+      "sha256": "2ec28360b0ddd6196c8435de380f0641562cb915410dc39bc6af327b6e259e53"
+    },
+    {
+      "file": ".claude/agents/autobots-infrastructure.md",
+      "sha256": "42388d98ccb42d2ba5c9589e4238638bacc3e50532d66e260425556397768d93"
+    },
+    {
+      "file": ".claude/agents/autobots-nextjs.md",
+      "sha256": "a611ac87e6052915078dedf589d6e40e43363dae0f9ff9bed2b9a5f24f448fd9"
+    },
+    {
+      "file": ".claude/agents/autobots-python-worker.md",
+      "sha256": "4eb77addade9725c4085938a91b349da439de7421c2e686e2f369d47a693e422"
+    },
+    {
+      "file": ".claude/agents/autobots-reviewer.md",
+      "sha256": "644b5e6ee5715d8fa66b753afd130864d8c81bceb3c8bc0b0f5a830b62b8e1e5"
+    },
+    {
+      "file": ".claude/agents/autobots-spec-ingestor.md",
+      "sha256": "18123b059c5f2d7c512a0160c2d02ba8e624b931f15ab028ba836f40dcffb361"
+    },
+    {
+      "file": ".claude/rules/contracts.md",
+      "sha256": "80c842f675250e0b1bc95b9e764fa5c3dcb606f975d247ae696ef45e338e0d74"
+    },
+    {
+      "file": ".claude/rules/database.md",
+      "sha256": "2257b76ffc02626dc52e78dfd6dc7c6cbe404e934d1935220b9b8cb2683f4992"
+    },
+    {
+      "file": ".claude/rules/delivery.md",
+      "sha256": "94a770b68b955bcd7ad4e0ad481b5676082c9832362ec0299358f1bcf40b3fa7"
+    },
+    {
+      "file": ".claude/rules/infrastructure.md",
+      "sha256": "ff4adce074692959fb0f91a5276d3b726e2b57ffc6f368ec273422b23ac27f0a"
+    },
+    {
+      "file": ".claude/rules/model-gateway.md",
+      "sha256": "011f338f686b4ba9a98c74432e9970cac7804b97c3b23561b8f9ac3a2cdaa21b"
+    },
+    {
+      "file": ".claude/rules/nextjs.md",
+      "sha256": "553e21c16a2305faf1344543c3b6d01e3730a9c51567965802c8e09fdf052151"
+    },
+    {
+      "file": ".claude/rules/python-worker.md",
+      "sha256": "f2b9b247ae86a540cae9b2933fa45f6a5e8d3b37adefe29858bacf18a9136286"
+    },
+    {
+      "file": ".claude/skills/autobots-contracts/SKILL.md",
+      "sha256": "978df34392ed771fdc47e8adf516f00c0d9827dde27f519f9f22f79ecf0e03da"
+    },
+    {
+      "file": ".claude/skills/autobots-docker-local/SKILL.md",
+      "sha256": "872770d89681e1926553cdbefe8415f032068f06c906680d158720cefb6e8ae0"
+    },
+    {
+      "file": ".claude/skills/autobots-durable-worker/SKILL.md",
+      "sha256": "38da747ff5f33e1f67ba7c46a417e104a45f5c4f39ea80d47f40ec52f8e2dd80"
+    },
+    {
+      "file": ".claude/skills/autobots-implement-item/SKILL.md",
+      "sha256": "afd3a46db463d780801589a2184e0ba79241c43f2868b65a6a8842348604cee3"
+    },
+    {
+      "file": ".claude/skills/autobots-model-gateway/SKILL.md",
+      "sha256": "bd0f4d17f040173cf90296ab974356e9a0ebd511832530202ee01a3a997abb0c"
+    },
+    {
+      "file": ".claude/skills/autobots-nextjs/SKILL.md",
+      "sha256": "2ad3f3c12a1181283d477864699cc68ed3f9ca5089d9ac250a03427665e19c70"
+    },
+    {
+      "file": ".claude/skills/autobots-plan-change/SKILL.md",
+      "sha256": "66bc48b49c8f8d628c1a6c774c6111facd3c7331824ceb5c37aa987897a01c2d"
+    },
+    {
+      "file": ".claude/skills/autobots-python/SKILL.md",
+      "sha256": "36ead7580a59b3f37ec26645a521afd5fa88f24b215a5693e7ae1c157c0b7ab6"
+    },
+    {
+      "file": ".claude/skills/autobots-review-change/SKILL.md",
+      "sha256": "a10cab315e485f000b2f0c39dc7d121834e88b03d02d0da5901e842ef8ed25d2"
+    },
+    {
+      "file": ".claude/skills/autobots-runbook-evidence/SKILL.md",
+      "sha256": "229f0126c6d2eff3ac344aa4f7bf3dd000523a75c9f88bb8786bdc45346e71bf"
+    },
+    {
+      "file": ".claude/skills/autobots-spec-ingest/SKILL.md",
+      "sha256": "c62463a908d6ae2e2a7dfb4a710b167b79201ca580870078c31f4f9103274755"
+    },
+    {
+      "file": ".claude/skills/autobots-supabase/SKILL.md",
+      "sha256": "5fd2e0c03d4f97008568c57de8e47f01522b4eb7ba6420e580090c4dce4da8f5"
+    },
+    {
+      "file": ".claude/skills/autobots-verify-change/SKILL.md",
+      "sha256": "2a5443885dacb5f43f77c1e254ca1d21bec3d254973f295ea826d9928410d934"
+    },
+    {
+      "file": "AGENTS.md",
+      "sha256": "f55ddbc882d121ee097e0eb06fbcf230a68ba636a92d2ab34ab8a5ec390783d6"
+    },
+    {
+      "file": "CLAUDE.md",
+      "sha256": "7611b6e32cdff5641f1562a6bb74f2ebfd94ef10fec52bb754e0e38aaa15db8b"
+    },
+    {
+      "file": "CODEBASE.md",
+      "sha256": "62829aa7e40f43e4ae01ca5d6184fef811efdfb401f088769a786b7b56a13d85"
+    },
+    {
+      "file": "PRD-AutoGPT.md",
+      "sha256": "9f8d62f548f78f2c5316f4198469f1c71ccc7597ab2eaa127be99348b7bae842"
+    },
+    {
+      "file": "PRD-Comparison-Recommendation.md",
+      "sha256": "b97d19be948a5c347fa6c5c31a88aeee78bfd6a4b02f5b8004e159ec8a5a9113"
+    },
+    {
+      "file": "PRD-Development-Harness.md",
+      "sha256": "ca8e2a0ac9f0ab4620793788afed49e479be88ffcc0c7e02c495ef3a1b435e1d"
+    },
+    {
+      "file": "PRD-LangChain-Deep-Agents.md",
+      "sha256": "d3481218907795e44becb40eea1a35c9356c41e6209a2dcf1a55ebc1fe8adbd7"
+    },
+    {
+      "file": "PRD-Local-Mac-Deployment.md",
+      "sha256": "54b495e264bbfe7960b5dce5222fe878158c644444835d168c564db77c036491"
+    },
+    {
+      "file": "PRD-Model-Providers.md",
+      "sha256": "b6624df7adb682b9394fa196efbf8204cc331725f6cab8f18a6ba2f570750dca"
+    },
+    {
+      "file": "PRD-NextJS.md",
+      "sha256": "64c6daf4a046c760842b00221c3aba27946bd7d4f7f931953e49c44251147b80"
+    },
+    {
+      "file": "README.md",
+      "sha256": "6ed6aba1adf7a931a9344e0541d3e2ba0d2cc2eacd7d357097e9d021e585f2ad"
+    },
+    {
+      "file": "SPECS.md",
+      "sha256": "f5848bb5900dc80075834b4b81d4f30605d1e6fb5063ed1e81be83ff5efcfdd1"
+    },
+    {
+      "file": "docs/engineering/decisions/0001-ohmyorch-adaptation.md",
+      "sha256": "c53305d6cee32edd966bbe1a7aafe0d4b9464564b4ce6b16e08da108462741cc"
+    },
+    {
+      "file": "docs/engineering/evidence/HARNESS-ADAPT-001/forward-fixture/CODEBASE.md",
+      "sha256": "5a0c1bd94e453ffd54e4f1f697e5f2abd2a822f2f509df1206c78c5f60af441c"
+    },
+    {
+      "file": "docs/engineering/evidence/HARNESS-ADAPT-001/forward-fixture/CONTRACT.md",
+      "sha256": "851af897e1f468219291e5b30b2c7986124446c88b0b82b6cf92d8f7399a9acc"
+    },
+    {
+      "file": "docs/engineering/evidence/HARNESS-ADAPT-001/forward-fixture/PRD.md",
+      "sha256": "7b1ecef3c0675a213d094ec1e86fc86cbd6818d5ad4372023ca2caad8dc39ae2"
+    },
+    {
+      "file": "docs/engineering/evidence/HARNESS-ADAPT-001/forward-fixture/SPECS.md",
+      "sha256": "fd1579ab9a860576155a092259b2138aa07800745a5e1eff12e62c6173ec1d55"
+    },
+    {
+      "file": "docs/engineering/evidence/HARNESS-ADAPT-001/summary.md",
+      "sha256": "bbcd699e283796397324978bc14eeebd8380984cae6df9bd413a6c09220fca3c"
+    },
+    {
+      "file": "docs/engineering/ohmyorch-adaptation.md",
+      "sha256": "0014226ee6c35600a7b0f1a90a63d2c17012db0f3b6875d71253acf598629ead"
+    },
+    {
+      "file": "docs/engineering/option-b-contract.md",
+      "sha256": "6d6ed41bd639c502645b315c72f9d26c27c2cb047f65def044594036f2e75062"
+    },
+    {
+      "file": "docs/engineering/runbooks/development-harness.md",
+      "sha256": "2e05fa4976b279080db8732c6b020930796592122ede3e6e8676139d7689954d"
+    },
+    {
+      "file": "docs/engineering/work-items/HARNESS-ADAPT-001.md",
+      "sha256": "ed53a7b59fe8fbbdf2454565a169cdc58e52454ca915dbc6257a3f83a7cf6c80"
+    }
+  ],
+  "harness_implementation": "specification_and_hook_script_subset",
+  "actual_assistant_event_delivery_tested": false,
+  "application_implemented": false,
+  "supabase_stack_started": false,
+  "openrouter_authenticated_inference_tested": false,
+  "errors": []
+}

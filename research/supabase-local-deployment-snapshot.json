@@ -1,0 +1,35 @@
+{
+  "retrieved_at_utc": "2026-11-04T18:19:41.934117+00:00",
+  "scope": "Public source inspection only; no Docker engine checks, installs, image pulls or service launch.",
+  "release_tag": "self-hosted/v0.8.3",
+  "commit": "bc27d2661edd09a5d0b8d76ce33da6d4071a756e",
+  "tag_url": "https://api.github.com/repos/supabase/supabase/git/ref/tags/self-hosted/v0.8.3",
+  "compose_url": "https://raw.githubusercontent.com/supabase/supabase/bc27d2661edd09a5d0b8d76ce33da6d4071a756e/docker/docker-compose.yml",
+  "compose_sha256": "1bf8df5776dd81e9be15790851b46cdca1d0be8556450d4c88d73089d3b97a8b",
+  "image_references": [
+    "supabase/studio:2026.10.12-sha-3699278",
+    "envoyproxy/envoy:v1.39.1",
+    "supabase/gotrue:v2.197.0",
+    "postgrest/postgrest:v14.18",
+    "supabase/realtime:v2.143.3",
+    "supabase/storage-api:v1.81.0",
+    "darthsim/imgproxy:v3.31.4",
+    "supabase/postgres-meta:v0.100.0",
+    "supabase/edge-runtime:v1.77.4",
+    "supabase/postgres:17.6.1.136",
+    "supabase/supavisor:2.9.13"
+  ],
+  "original_port_snippets": [
+    "    ports:",
+    "      - ${API_GW_HTTP_PORT:-${KONG_HTTP_PORT:-8000}}:8000/tcp",
+    "    volumes:",
+    "      - ./volumes/api/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro",
+    "      - ./volumes/api/envoy/cds.yaml:/etc/envoy/cds.yaml:ro",
+    "    ports:",
+    "      - ${POSTGRES_PORT}:5432",
+    "      - ${POOLER_PROXY_PORT_TRANSACTION}:6543",
+    "    volumes:",
+    "      - ./volumes/pooler/pooler.exs:/etc/pooler/pooler.exs:ro,z"
+  ],
+  "requirement": "Create a reviewed local-only configuration; replace upstream published bindings with explicit loopback ports and verify rendered Compose configuration. Image platforms and startup remain qualification gates."
+}

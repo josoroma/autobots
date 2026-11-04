@@ -1,0 +1,19 @@
+{
+  "scope": "Observed host and process samples during this bounded run; RSS is not a complete unified-memory accounting.",
+  "inputs": {
+    "qwen38-gguf-memory.jsonl": "6779e428db4c83497c29d24ad873382fd9a49c1c1be1e10fe43d7824cac4e154",
+    "qwen38-gguf-session.json": "dbb2f2a4c19c7991190b13ce4b3246658281321f5d66757cab9ec941dba5489a"
+  },
+  "total_samples": 144,
+  "qwen_samples": 142,
+  "peak_observed_rss_bytes": 17787355136,
+  "peak_observed_rss_gib": 16.565765380859375,
+  "post_bonsai_stop_swap_bytes": 166922813,
+  "peak_swap_during_qwen_bytes": 166922813,
+  "swap_growth_during_qwen_bytes": 0,
+  "pressure_levels_during_qwen": [
+    1
+  ],
+  "load_wall_seconds": 10.239,
+  "bonsai_restored": true
+}
