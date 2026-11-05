@@ -62,6 +62,20 @@ Reports are `.checks/<profile>/latest.json`. Each binds to a fingerprint of the 
 
 Not run by any profile: generated contract drift, because no contract exists yet; browser fixtures, because none are configured; and `tests/toolchain`, whose copies bootstrap from registries.
 
+## Validate completion evidence
+
+For a work item that a story's acceptance or the user asks to record under DH-W01–06, start from [the templates](../templates/) and the [evidence contract](../evidence/README.md). Routine OpenSpec delivery does not use this, by Decision 0003.
+
+```sh
+python3.12 scripts/evidence.py fingerprints
+python3.12 scripts/evidence.py validate <work-item-id>
+python3.12 scripts/evidence.py complete <work-item-id>
+```
+
+Expected: `validate` exits 0 with `PASS` only when the record, manifest, summary, review, runbook and fingerprints are consistent and current. Otherwise it exits 1 with one `FAIL:` line per problem, and `complete` leaves the status unchanged. An unusable id exits 2. A hand-written `Status: COMPLETE` is not trusted: `validate` still fails it.
+
+A pass shows internally consistent, current evidence. It does not show that a recorded assertion was correct.
+
 ## Inspect or use the assistant integration
 
 Project configuration is `.claude/settings.json`; the dispatcher is `.claude/hooks/dispatch.py`. The scripts use bounded stdin JSON and invoke no model. The observed Claude Code 2.1.314 is newer than the documented 2.1.295 minimum for blocking hook startup failures; version compatibility is not event-delivery proof.

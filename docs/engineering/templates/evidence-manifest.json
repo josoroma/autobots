@@ -1,0 +1,49 @@
+{
+  "schema_version": "autobots.work-evidence/v1",
+  "template": true,
+  "work_item_id": "{{work_item_id}}",
+  "evidence_id": "{{evidence_id}}",
+  "requirement_ids": ["{{requirement_id}}"],
+  "fingerprint": {
+    "source_manifest_sha256": null,
+    "nonsecret_config_sha256": null,
+    "lockfiles_sha256": {},
+    "generated_contracts_sha256": null,
+    "verifier_sha256": null
+  },
+  "tool_versions": {},
+  "checks": [
+    {
+      "id": "{{check_id}}",
+      "requirement_ids": ["{{requirement_id}}"],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [],
+      "target_ref": "{{target_or_fixture}}",
+      "expected": "{{observable_assertion}}",
+      "observed": null,
+      "status": "not_run",
+      "started_at_utc": null,
+      "finished_at_utc": null,
+      "exit_code": null,
+      "artifacts": []
+    }
+  ],
+  "review": {
+    "author_id": null,
+    "reviewer_id": null,
+    "reviewed_fingerprint": null,
+    "outcome": "pending",
+    "findings": []
+  },
+  "runbook": {
+    "path": "docs/engineering/runbooks/{{runbook_id}}.md",
+    "revision_sha256": null,
+    "exercised_evidence_ids": []
+  },
+  "raw_artifacts": {
+    "local_root": ".checks/{{work_item_id}}/{{evidence_id}}/",
+    "availability": "not_created",
+    "retention": "{{declared_local_policy}}"
+  }
+}

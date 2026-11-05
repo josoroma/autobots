@@ -74,13 +74,13 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-1.4 | H0 portable verification and deterministic hook adapter | DONE | EPIC-1 |
 | US-1.4#1 | Implement the portable profiles and evidence freshness rules. | DONE | US-1.4 |
 | US-1.4#2 | Implement and fixture-test the bounded event-to-check adapter. | DONE | US-1.4 |
-| US-1.5 | H0 work records, independent review and evidence templates | READY | EPIC-1 |
-| US-1.5#1 | Define work-record, review, manifest and runbook templates. | TODO | US-1.5 |
-| US-1.5#2 | Define durable redacted evidence and ignored raw-artifact retention contracts. | TODO | US-1.5 |
-| US-1.6 | H1 deliberate fault and freshness qualification | BLOCKED | EPIC-1 |
+| US-1.5 | H0 work records, independent review and evidence templates | DONE | EPIC-1 |
+| US-1.5#1 | Define work-record, review, manifest and runbook templates. | DONE | US-1.5 |
+| US-1.5#2 | Define durable redacted evidence and ignored raw-artifact retention contracts. | DONE | US-1.5 |
+| US-1.6 | H1 deliberate fault and freshness qualification | READY | EPIC-1 |
 | US-1.6#1 | Implement deliberate failure and correction fixtures. | TODO | US-1.6 |
 | US-1.6#2 | Qualify manifest validation and input-fingerprint invalidation. | TODO | US-1.6 |
-| US-1.7 | H1 disposable database and Compose guards | BLOCKED | EPIC-1 |
+| US-1.7 | H1 disposable database and Compose guards | READY | EPIC-1 |
 | US-1.7#1 | Implement target-checked wrappers and isolated Compose fixtures. | TODO | US-1.7 |
 | US-1.7#2 | Run synthetic migration, seed, grant and Storage negative cases. | TODO | US-1.7 |
 | US-1.8 | H1 independent baseline review and exercised runbook | BLOCKED | EPIC-1 |
@@ -919,7 +919,8 @@ Open Questions:
 
 ### US-1.5: H0 work records, independent review and evidence templates
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-1-5-h0-work-records-independent/`
 
 As a developer
 I want a proportional delivery and evidence contract
@@ -953,15 +954,15 @@ Dependencies:
 - None.
 
 Tasks:
-- [ ] Define work-record, review, manifest and runbook templates.
-- [ ] Define durable redacted evidence and ignored raw-artifact retention contracts.
+- [x] Define work-record, review, manifest and runbook templates.
+- [x] Define durable redacted evidence and ignored raw-artifact retention contracts.
 
 Open Questions:
 - None.
 
 ### US-1.6: H1 deliberate fault and freshness qualification
 
-Status: BLOCKED
+Status: READY
 
 As a developer
 I want known-good and known-bad harness fixtures
@@ -1004,7 +1005,7 @@ Open Questions:
 
 ### US-1.7: H1 disposable database and Compose guards
 
-Status: BLOCKED
+Status: READY
 
 As a developer
 I want qualified disposable infrastructure checks

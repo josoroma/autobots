@@ -33,7 +33,7 @@ python3.12 scripts/verify.py --profile harness
 
 ## Completion evidence
 
-Preserve reviewed redacted manifests/summaries under `docs/engineering/evidence/<work-item-id>/`; bulky raw results belong in ignored `.checks`. Bind results to source/config/lock/verifier fingerprints. Record expected and observed assertions, commands, exit codes, review findings and limitations. Mocked, static, disposable and live evidence are different. Templates, skipped tests and missing tools never count as passing implementation evidence.
+Preserve reviewed redacted manifests/summaries under `docs/engineering/evidence/<work-item-id>/`, from `docs/engineering/templates/` and validated by `scripts/evidence.py`; bulky raw results belong in ignored `.checks`. Bind results to source/config/lock/verifier fingerprints. Record expected and observed assertions, commands, exit codes, review findings and limitations. Mocked, static, disposable and live evidence are different. Templates, skipped tests and missing tools never count as passing implementation evidence.
 
 ## Rule checks and review
 
