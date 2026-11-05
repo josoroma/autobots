@@ -29,7 +29,6 @@ DELIVERY_PLUGIN_QUALIFICATION = 'not_qualified_one_pretooluse_event_observed'
 ALLOWED_LINK_PATHS = frozenset({
     'scripts/verify.py',
     'scripts/specs.py',
-    'scripts/story_manifest.py',
     '.claude/skills/autobots-verify-change/SKILL.md',
     '.claude/skills/autobots-review-change/SKILL.md',
     '.claude/agents/autobots-reviewer.md',

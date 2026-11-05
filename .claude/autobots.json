@@ -19,7 +19,9 @@
     "agent": "plugins/ohmyorch/agents/spec-ingestor.md",
     "checkout": "research/upstream/OhMyOrch",
     "delivery_plugin": {
-      "decision": "docs/engineering/decisions/0002-ohmyorch-delivery-loop.md",
+      "decision": "docs/engineering/decisions/0003-openspec-only-delivery.md",
+      "commit": "9f384fa97ea9bf43d46c2a19770bb580697ccf14",
+      "branch": "openspec-only",
       "install": "ohmyorch@ohmyorch-marketplace",
       "scope": "local",
       "bridge_rule": ".claude/rules/ohmyorch-delivery.md",

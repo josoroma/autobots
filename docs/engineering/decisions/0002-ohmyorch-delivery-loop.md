@@ -1,5 +1,7 @@
 # Decision 0002: run epic delivery through the OhMyOrch plugin
 
+**Superseded in part by [Decision 0003](0003-openspec-only-delivery.md)** for delivery gates, roles and records. The tables below describe the earlier process.
+
 **Date:** 2026-11-04. **Authority:** explicit user request in this session: use OhMyOrch locally to implement epic loops with `deliver` from `SPECS.md`. **Supersedes in part:** [Decision 0001](0001-ohmyorch-adaptation.md), only its "do not install the upstream plugin or import its OpenSpec/archive/continuation machinery" clause. Everything else in 0001 stands.
 
 ## Decision
@@ -44,6 +46,10 @@ By the user on 2026-11-04, except where marked. The protected-path, unmet-Given 
 - **"Any required item":** a Given such as "required ignores are absent" holds if any required item is absent, and a decision that one item is not required removes only that item. Confirmed for all stories.
 - **Arranged preconditions, 2026-11-05:** the unmet-Given exception does not cover a scenario exercising behavior the story implements, when a disposable environment can arrange its precondition. It is arranged and scored from observation, stating that the condition was arranged. The bridge's "merely hard to run" clause remains the coordinator's wording, unconfirmed.
 - **Research payload files:** `research/qwen38-gguf-probe.json` and `research/qwen38-gguf-performance.json` hold model request and response payloads. They are historical experiment evidence, not DH-03 local transcripts, and stay tracked. Their message text has not been read.
+- **Runbook exercise status, 2026-11-05:** the runbook links to the story's evidence, which states last-exercised revision, date, result and what is untested. This departs from SP-018's literal wording, and the user confirmed it, because recording results in the runbook after testing would invalidate the review.
+- **Rigor, 2026-11-05:** from US-1.3 on, the architect critique and adversarial checks run only on stories with real risk. The rule's required gates stay on every story.
+- **Provider SDKs in the lock, 2026-11-05:** `deepagents` 0.7.32 hard-requires `langchain-anthropic` and `langchain-google-genai`, while DH-01 says this milestone adds no Anthropic SDK. They are locked as unused transitive dependencies. Owned code never imports them, a test enforces it, and application inference stays OpenRouter-only.
+- **Node and pnpm, 2026-11-05:** Node is pinned to 22.23.2. pnpm is repo-local through Corepack, without `corepack enable`. No change outside this repository.
 - **Delivery targets:** on 2026-11-04 the user asked to "loop delivery one epic by epic until complete all", which the coordinator reads as naming every epic; that reading is the coordinator's. This does not lift the boundaries above: US-3.4's paid qualification and US-7.2's choice of service remain the user's decisions, and the loop stops there.
 
 ## Limits and known risk

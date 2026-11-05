@@ -8,6 +8,6 @@ Keep writer scopes disjoint. Never repair implementation in a supposedly indepen
 
 Version reviewed redacted summaries/manifests under `docs/engineering/evidence/<work-item-id>/`; ignored `.checks` raw artifacts have explicit retention/availability. Do not save secrets or user content as proof. No automatic model calls, installs, service startup or persistent data changes in hooks.
 
-When delivering through `/ohmyorch:deliver`, also follow [the OhMyOrch bridge](ohmyorch-delivery.md). Its gates add to DH-W01–06 and do not replace them.
+When delivering through `/ohmyorch:deliver`, follow [the OhMyOrch delivery rule](ohmyorch-delivery.md) instead of this DH-W procedure, by the user's decision. Everything else here applies to work outside that loop.
 
 Only `harness` verification is implemented at initial delivery. Unimplemented `fast`, `full`, `db` and `operations` must fail explicitly; harness success cannot establish H1 or product acceptance. Honor current scope: harness adaptation alone does not authorize product construction.

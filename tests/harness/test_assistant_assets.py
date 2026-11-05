@@ -185,7 +185,7 @@ def valid_root(directory: str) -> Path:
     shutil.copyfile(ROOT / '.claude/settings.json', root / '.claude/settings.json')
     (root / 'source.md').write_text('# Source\n')
     (root / 'PRD-Development-Harness.md').write_text('# PRD\n\n### DH-09.1. Work-item evidence contract\n')
-    for name in ('verify.py', 'specs.py', 'story_manifest.py'):
+    for name in ('verify.py', 'specs.py'):
         (root / 'scripts' / name).write_text('# fixture\n')
     for name in ('autobots-verify-change', 'autobots-review-change'):
         (root / f'.claude/skills/{name}/SKILL.md').write_text(f'---\nname: {name}\ndescription: Fixture.\n---\n\n# Skill\n')
@@ -250,7 +250,7 @@ class RuleLinkTests(unittest.TestCase):
         self.assertEqual(config_errors(self.root), [])
 
     def test_each_allowed_target_counts(self):
-        for target in ('../../scripts/verify.py', '../../scripts/specs.py', '../../scripts/story_manifest.py',
+        for target in ('../../scripts/verify.py', '../../scripts/specs.py', 
                        '../skills/autobots-verify-change/SKILL.md', '../skills/autobots-review-change/SKILL.md',
                        '../agents/autobots-reviewer.md',
                        '../../PRD-Development-Harness.md#dh-091-work-item-evidence-contract'):
