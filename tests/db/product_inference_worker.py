@@ -85,8 +85,12 @@ def handle(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={'error': {'code': 500, 'message': 'arranged'}})
     if '[limited]' in goal:
         return httpx.Response(429, json={'error': {'code': 429, 'message': 'arranged'}}, headers={'Retry-After': str(RETRY_AFTER)})
-    usage = {'prompt_tokens': 5, 'completion_tokens': 7, 'total_tokens': 12, 'cost': 0.0001}
+    usage = {'prompt_tokens': 5, 'completion_tokens': 7, 'total_tokens': 12, 'cost': 0.0001, 'completion_tokens_details': {'reasoning_tokens': 3}}
     choice = {'index': 0, **next_reply(body['messages'])}
+    if '[cutoff]' in goal:
+        # Cut off mid tool call, as a real model could be: its arguments aren't valid JSON.
+        cut = {'id': 'call-cut', 'type': 'function', 'function': {'name': 'save_artifact', 'arguments': '{"path": "outputs/rep'}}
+        choice = {'index': 0, 'finish_reason': 'length', 'message': {'role': 'assistant', 'content': None, 'tool_calls': [cut]}}
     return httpx.Response(200, json={'id': 'fake', 'object': 'chat.completion', 'created': 1, 'model': body['model'],
                                      'system_fingerprint': 'fake', 'choices': [choice], 'usage': usage})
 

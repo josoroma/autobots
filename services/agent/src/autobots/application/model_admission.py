@@ -33,6 +33,18 @@ class CostUnavailable(AdmissionRefused):
 
 
 @dataclass(frozen=True)
+class ReplyFacts:
+    """A reply's own account of itself, with no message content."""
+
+    finish_reason: str | None
+    input_tokens: int | None
+    output_tokens: int | None
+    reasoning_tokens: int | None
+    tool_names: tuple[str, ...]
+    invalid_tool_calls: int
+
+
+@dataclass(frozen=True)
 class Pricing:
     """Micro-dollars per million tokens, and per request. Include billable reasoning in output."""
 
@@ -193,6 +205,23 @@ class ModelAdmission:
         await self._connection.execute(
             "update app_private.model_invocations set credential_version = %s where id = %s",
             (version, invocation_id),
+        )
+
+    async def record_reply(self, invocation_id: UUID, facts: ReplyFacts) -> None:
+        """What the reply said about itself. It settles nothing, and holds no message content."""
+        await self._connection.execute(
+            "update app_private.model_invocations set finish_reason = %s, input_tokens = %s, "
+            "output_tokens = %s, reasoning_tokens = %s, tool_names = %s, invalid_tool_calls = %s "
+            "where id = %s",
+            (
+                facts.finish_reason,
+                facts.input_tokens,
+                facts.output_tokens,
+                facts.reasoning_tokens,
+                list(facts.tool_names),
+                facts.invalid_tool_calls,
+                invocation_id,
+            ),
         )
 
     async def settle(

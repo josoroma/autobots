@@ -34,6 +34,7 @@ from autobots.application.model_admission import (
     AdmissionRequest,
     ModelAdmission,
     NoInferenceSlot,
+    ReplyFacts,
 )
 from autobots.application.model_attempts import (
     FailureClass,
@@ -51,6 +52,8 @@ from autobots.contracts.plans import GoalSpec
 CHECK_SECONDS = 1.0
 INCOMPLETE_FINISHES = frozenset({"length", "error", "content_filter"})
 INTERRUPTING = frozenset({"cancelling", "cancelled", "failed", "succeeded"})
+MAX_FACT_CHARS = 100
+MAX_FACT_NAMES = 20
 
 REPAIRABLE = PLAN_REJECTIONS | {"invalid_arguments", "route_not_granted", "scope_expansion_denied"}
 STOPPING = frozenset(
@@ -138,6 +141,28 @@ def _retry_after(error: Exception) -> float | None:
 def _charged(message: AIMessage) -> int | None:
     cost = message.response_metadata.get("cost")
     return None if cost is None else round(float(cost) * 1_000_000)
+
+
+def _count(value: Any) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def reply_facts(message: AIMessage) -> ReplyFacts:
+    """For diagnosing a stopped run. Tool names come from the model, so they're bounded here."""
+    metadata = message.response_metadata
+    usage: Any = message.usage_metadata or {}
+    details = usage.get("output_token_details") or {}
+    finish = metadata.get("finish_reason")
+    return ReplyFacts(
+        finish_reason=finish[:MAX_FACT_CHARS] if isinstance(finish, str) else None,
+        input_tokens=_count(usage.get("input_tokens")),
+        output_tokens=_count(usage.get("output_tokens")),
+        reasoning_tokens=_count(details.get("reasoning")),
+        tool_names=tuple(str(call["name"])[:MAX_FACT_CHARS] for call in message.tool_calls)[
+            :MAX_FACT_NAMES
+        ],
+        invalid_tool_calls=len(message.invalid_tool_calls),
+    )
 
 
 def _finished(message: AIMessage) -> bool:
@@ -374,6 +399,10 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
                     last_ticket[-1].invocation_id, charged
                 )
             raise LoopStopped("lease_lost") from None
+        # Settled by now, so this can't change what the call cost or whether it counted.
+        await ModelAdmission(self._connection).record_reply(
+            last_ticket[-1].invocation_id, reply_facts(replies[-1].result[-1])
+        )
         return replies[-1], output.complete
 
     async def _with_slot(

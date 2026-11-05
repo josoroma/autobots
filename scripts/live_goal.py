@@ -140,7 +140,8 @@ def attempt(root: Path, key_file: Path, limit: int) -> int:
         # Spend comes from the ledger below, as the API's does. The runs table's own column isn't maintained.
         report['run'] = rows(ops, f"select status, limit_micro_usd from public.runs where id = '{run_id}'")
         report['usage'] = rows(ops, f"select * from app_private.run_usage where run_id = '{run_id}'")
-        report['invocations'] = rows(ops, f"select attempt, profile, wire_id, status, failure_class, reserved_micro_usd, charged_micro_usd, upstream_provider, "
+        report['invocations'] = rows(ops, f"select attempt, profile, wire_id, status, failure_class, finish_reason, input_tokens, output_tokens, reasoning_tokens, "
+                                          f"tool_names, invalid_tool_calls, reserved_micro_usd, charged_micro_usd, upstream_provider, "
                                           f"round(extract(epoch from finished_at - created_at)::numeric, 1) as seconds, char_length(accumulated_output) as partial_chars "
                                           f"from app_private.model_invocations where root_run_id = '{run_id}' order by created_at")
         report['receipts'] = rows(ops, f"select tool_id, status, created_at from app_private.tool_receipts where run_id = '{run_id}' order by created_at")

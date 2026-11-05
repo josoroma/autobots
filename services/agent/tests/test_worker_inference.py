@@ -18,6 +18,8 @@ from langchain_core.tools import tool
 from pydantic import SecretStr
 
 from autobots.adapters.loop_middleware import (
+    MAX_FACT_CHARS,
+    MAX_FACT_NAMES,
     AdmittedModel,
     LoopMiddleware,
     LoopStopped,
@@ -25,6 +27,7 @@ from autobots.adapters.loop_middleware import (
     _failure_without_status,
     _finished,
     _retry_after,
+    reply_facts,
 )
 from autobots.adapters.models.catalog import (
     RESERVED_PROMPT_TOKENS,
@@ -602,6 +605,45 @@ def test_only_a_connection_that_never_opened_counts_as_unsent(
 )
 def test_only_a_reply_the_model_finished_can_run(finish: str, finished: bool) -> None:
     assert _finished(AIMessage(content="", response_metadata={"finish_reason": finish})) is finished
+
+
+def test_reply_facts_hold_no_content_and_stay_bounded() -> None:
+    calls = [
+        {"name": "x" * 500, "args": {"content": "the report's text"}, "id": str(number)}
+        for number in range(30)
+    ]
+    message = AIMessage(
+        content="the report's text",
+        tool_calls=calls,
+        invalid_tool_calls=[{"name": "save_artifact", "args": '{"pa', "id": "cut", "error": "bad"}],
+        response_metadata={"finish_reason": "length"},
+        usage_metadata={
+            "input_tokens": 9,
+            "output_tokens": 512,
+            "total_tokens": 521,
+            "output_token_details": {"reasoning": 400},
+        },
+    )
+    facts = reply_facts(message)
+    assert (
+        facts.finish_reason,
+        facts.input_tokens,
+        facts.output_tokens,
+        facts.reasoning_tokens,
+    ) == ("length", 9, 512, 400)
+    assert facts.invalid_tool_calls == 1
+    assert len(facts.tool_names) == MAX_FACT_NAMES and {len(name) for name in facts.tool_names} == {
+        MAX_FACT_CHARS
+    }
+    assert "report" not in repr(facts)
+    # A reply with nothing to report is still a record, not a failure.
+    empty = reply_facts(AIMessage(content=""))
+    assert (
+        empty.finish_reason,
+        empty.output_tokens,
+        empty.tool_names,
+        empty.invalid_tool_calls,
+    ) == (None, None, (), 0)
 
 
 def test_a_refused_summary_stops_the_loop_with_its_reason() -> None:

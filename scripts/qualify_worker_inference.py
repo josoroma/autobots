@@ -106,6 +106,11 @@ def qualify(root: Path) -> int:
                        f"|| coalesce(credential_version::text, '-') || '/' || reserved_micro_usd || '/' || coalesce(charged_micro_usd::text, '-'), ' '), 'none') "
                        f"from app_private.model_invocations where run_id = '{run_id}';")
 
+    def reply_facts(run_id: str) -> list[str]:
+        result = stack.runtime(f"select finish_reason || '/' || input_tokens || '/' || output_tokens || '/' || reasoning_tokens || '/' || tool_names::text "
+                               f"|| '/' || invalid_tool_calls from app_private.model_invocations where run_id = '{run_id}' order by created_at;")
+        return result.stdout.split()
+
     def verdict(run_id: str) -> str:
         return ops.sql(f"select passed::text || '/' || unmet::text from app_private.run_verifications where run_id = '{run_id}' order by created_at desc limit 1;")
 
@@ -184,6 +189,10 @@ def qualify(root: Path) -> int:
                     ledger, ledger == f'{DEEPSEEK}/{DEEPSEEK_WIRE}/succeeded/-/1/{DEEPSEEK_WORST}/100')
         used = {call['key'] for call in calls}
         cases.check('the workspace key was used', 'key one', used == {key_id(KEY_ONE)}, used == {key_id(KEY_ONE)})
+        facts = reply_facts(happy)
+        cases.check('each call records what its reply said about itself', 'tool_calls, then stop, with 5, 7 and 3 tokens, and the tool named',
+                    facts, facts == ['tool_calls/5/7/3/{propose_plan}/0', 'tool_calls/5/7/3/{save_artifact}/0', 'tool_calls/5/7/3/{publish_artifact}/0',
+                                     'tool_calls/5/7/3/{complete_task}/0', 'stop/5/7/3/{}/0'])
 
         # Another run in the same process, frozen to the other profile.
         terra = admit(workspace_a, 'terra', TERRA)
@@ -247,6 +256,15 @@ def qualify(root: Path) -> int:
                     paused and stop_reason(malformed) == 'uncertain_acceptance' and len(sent('malformed')) == 1 and f'/uncertain/uncertain_acceptance/2/{DEEPSEEK_WORST}/-' in ledger)
         code, reply = resume(token_a, malformed)
         cases.check('it cannot resume until reconciled', '409 uncertain_model_call', f'{code} {reply[:80]}', code == 409 and 'uncertain_model_call' in reply)
+
+        # Cut off twice: the one repair runs out, and the ledger shows why the run stopped.
+        cutoff = admit(workspace_a, 'cutoff')
+        finished = settled(cutoff, 'failed')
+        facts = reply_facts(cutoff)
+        cases.check('a run cut off twice stops, and its ledger says so', 'failed, incomplete_output, 2 requests, length with a broken tool call on both',
+                    f'{status(cutoff)}, {stop_reason(cutoff)}, {len(sent("cutoff"))}, {facts}',
+                    finished and stop_reason(cutoff) == 'incomplete_output' and len(sent('cutoff')) == 2
+                    and facts == ['length/5/7/3/{}/1'] * 2)
 
         # A rate limit: the provider's wait is honored, then the retries run out as the policy states.
         limited = admit(workspace_a, 'limited')
