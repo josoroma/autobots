@@ -17,13 +17,16 @@ from goal_loop_script import ROUTE, Script, calls, say  # noqa: E402
 
 from autobots.adapters.object_storage import SupabaseObjectStore  # noqa: E402
 from autobots.application.experts import create_expert, create_session, resolve_binding  # noqa: E402
-from autobots.application.goal_loop import LoopConfig, process_next  # noqa: E402
+from autobots.application.goal_loop import LoopConfig, _finish, process_next  # noqa: E402
 from autobots.application.model_admission import ModelAdmission  # noqa: E402
+from autobots.application.plans import load_goal  # noqa: E402
 from autobots.application.run_usage import RootLimits  # noqa: E402
-from autobots.application.runs import admit_run, apply_command  # noqa: E402
+from autobots.application.worker_leases import claim_run  # noqa: E402
+from autobots.application.runs import Inheritance, admit_run, apply_command  # noqa: E402
 from autobots.contracts.experts import ExpertConfig, SessionExpert  # noqa: E402
 from autobots.domain.models import resolve_role_policy  # noqa: E402
 from autobots.domain.runs import Actor, RunCommand  # noqa: E402
+from autobots.domain.tools import DELEGATION_TOOL  # noqa: E402
 
 URL, BASE = os.environ['AUTOBOTS_DATABASE_URL'], os.environ['AUTOBOTS_STORAGE_BASE']
 SERVICE = SecretStr(os.environ['AUTOBOTS_STORAGE_SERVICE'])
@@ -167,6 +170,82 @@ async def main() -> None:
         check('cancelling a parent cancels its child, and no new call starts', 'both cancelled, 3 calls', (statuses, len(model.seen)), statuses == ('cancelled', 'cancelled') and len(model.seen) == 3)
         files = await value('select count(*) from app_private.run_files where run_id = %s', child)
         check('and the child\'s next effect never happens', '0 files', files, files == 0)
+
+        # B3: the parent's lease expires first, then a cancel. The child must not be stranded.
+        run = await admit()
+        process = await asyncio.create_subprocess_exec(PYTHON, str(HERE / 'assignment_worker.py'), URL, str(helper.id), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        await asyncio.wait_for(process.communicate(), 60)
+        child = await value('select child_run_id from app_private.assignments where parent_run_id = %s', run)
+        await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where run_id = %s", (run,))
+        await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() + interval '1 hour' where run_id = %s", (child,))
+        version = await value('select version from public.runs where id = %s', run)
+        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
+        result = await process_next(db, URL, 'first-settler', lambda: Script(items=[], seen=[], bound=[]), config)
+        parent_state = await value('select status from public.runs where id = %s', run)
+        child_state = await value('select status from public.runs where id = %s', child)
+        job = await (await db.execute('select status, available_at > clock_timestamp() from app_private.run_jobs where run_id = %s', (run,))).fetchone()
+        check('a cancelled parent waits for a child that still has a live owner', 'cancelling, children_settling, job queued for later', (parent_state, result.code if result else None, child_state, job), parent_state == 'cancelling' and result is not None and result.code == 'children_settling' and child_state == 'cancelling' and job[0] == 'queued' and job[1])
+        await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where run_id = %s", (child,))
+        await db.execute("update app_private.run_jobs set available_at = clock_timestamp() where run_id = %s", (run,))
+        result = await process_next(db, URL, 'second-settler', lambda: Script(items=[], seen=[], bound=[]), config)
+        parent_state = await value('select status from public.runs where id = %s', run)
+        child_state = await value('select status from public.runs where id = %s', child)
+        closed = await value('select status from app_private.assignments where parent_run_id = %s', run)
+        holding = await value("select count(*) from app_private.model_invocations where run_id = %s and status = 'dispatched'", child)
+        uncertain = await value("select count(*) from app_private.model_invocations where run_id = %s and status = 'uncertain'", child)
+        check('then both settle, the assignment closes and no slot stays held', 'cancelled, cancelled, finished, 0 dispatched, 1 uncertain', (parent_state, child_state, closed, holding, uncertain), parent_state == 'cancelled' and child_state == 'cancelled' and closed == 'finished' and holding == 0 and uncertain == 1)
+        invocation = await value("select id from app_private.model_invocations where run_id = %s and status = 'uncertain'", child)
+        await ModelAdmission(db).reconcile(invocation, 80)
+
+        # B3 at depth 2: a child that's waiting on its own child must not be recorded as finished.
+        run = await admit()
+        process = await asyncio.create_subprocess_exec(PYTHON, str(HERE / 'assignment_worker.py'), URL, str(helper.id), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        await asyncio.wait_for(process.communicate(), 60)
+        child = await value('select child_run_id from app_private.assignments where parent_run_id = %s', run)
+        snapshot = await value('select policy_snapshot from public.runs where id = %s', child)
+        binding = await resolve_binding(db, WORKSPACE, session.id, expert_id=helper.id)
+        grandchild = (await admit_run(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), goal_text='Do the small part', limit_micro_usd=1_000_000, inherit=Inheritance(parent_run_id=child, root_run_id=run, snapshot=snapshot, tools={'calculate': 1}, paths=('outputs/grand',), instructions='', session_id=session.id, expert_id=binding.expert_id, version=binding.version))).run_id
+        await db.execute('insert into app_private.assignments (id, workspace_id, parent_run_id, child_run_id, root_run_id, operation_id, depth, expert_id, expert_version) values (%s, %s, %s, %s, %s, %s, 2, %s, %s)', (uuid4(), WORKSPACE, child, grandchild, run, str(uuid4()), binding.expert_id, binding.version))
+        grand_lease = await claim_run(db, grandchild, worker_id='grandchild-owner', lease_seconds=3600)
+        await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where run_id in (%s, %s)", (run, child))
+        version = await value('select version from public.runs where id = %s', run)
+        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
+        states = [await value('select status from public.runs where id = %s', item) for item in (run, child, grandchild)]
+        check('a cancel reaches every level', 'all cancelling', states, states == ['cancelling'] * 3)
+        result = await process_next(db, URL, 'depth-settler', lambda: Script(items=[], seen=[], bound=[]), config)
+        states = [await value('select status from public.runs where id = %s', item) for item in (run, child, grandchild)]
+        opened = await value("select count(*) from app_private.assignments where root_run_id = %s and status = 'open'", run)
+        check('with a live grandchild, nothing is recorded as finished', 'all cancelling, both assignments open', (states, opened, result.code if result else None), states == ['cancelling'] * 3 and opened == 2 and result is not None and result.code == 'children_settling')
+        await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second', available_at = clock_timestamp() where run_id = %s", (grandchild,))
+        await db.execute("update app_private.run_jobs set available_at = clock_timestamp() where run_id in (%s, %s)", (run, child))
+        result = await process_next(db, URL, 'depth-settler-2', lambda: Script(items=[], seen=[], bound=[]), config)
+        states = [await value('select status from public.runs where id = %s', item) for item in (run, child, grandchild)]
+        opened = await value("select count(*) from app_private.assignments where root_run_id = %s and status = 'open'", run)
+        check('then every level settles', 'all cancelled, none open', (states, opened), states == ['cancelled'] * 3 and opened == 0)
+        check('a grandchild owner that lost the run settles nothing', 'its lease is gone', grand_lease.generation < await value('select generation from app_private.run_jobs where run_id = %s', grandchild), grand_lease.generation < await value('select generation from app_private.run_jobs where run_id = %s', grandchild))
+        invocation = await value("select id from app_private.model_invocations where run_id = %s and status = 'uncertain'", child)
+        await ModelAdmission(db).reconcile(invocation, 80)
+
+        # B4: the child reached a terminal state, and the parent died before writing that down.
+        run = await admit()
+        process = await asyncio.create_subprocess_exec(PYTHON, str(HERE / 'assignment_worker.py'), URL, str(helper.id), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        await asyncio.wait_for(process.communicate(), 60)
+        child = await value('select child_run_id from app_private.assignments where parent_run_id = %s', run)
+        await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where run_id in (%s, %s)", (run, child))
+        version = await value('select version from public.runs where id = %s', child)
+        await apply_command(db, workspace_id=WORKSPACE, run_id=child, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
+        settled = await claim_run(db, child, worker_id='settle-child', lease_seconds=30)
+        await _finish(db, settled, await load_goal(db, child), 'run_not_running')
+        child_state = await value('select status from public.runs where id = %s', child)
+        invocation = await value("select id from app_private.model_invocations where run_id = %s and status = 'uncertain'", child)
+        await ModelAdmission(db).reconcile(invocation, 80)
+        check('a child can be finished while its assignment is still open', 'cancelled, open', (child_state, await value('select status from app_private.assignments where parent_run_id = %s', run)), child_state == 'cancelled' and await value('select status from app_private.assignments where parent_run_id = %s', run) == 'open')
+        model = Script(items=[say('parent stops')], seen=[], bound=[])
+        result = await process_next(db, URL, 'replay-parent', lambda: model, config)
+        rows = await (await db.execute('select status, result from app_private.assignments where parent_run_id = %s', (run,))).fetchall()
+        reply = [json.loads(item.content) for messages in model.seen for item in messages if item.type == 'tool' and item.name == DELEGATION_TOOL]
+        check('a replay reads the finished child instead of spinning', 'one assignment, finished, the child\'s own status', (len(rows), rows[0][0], rows[0][1].get('run_status') if rows[0][1] else None, reply[-1].get('outcome') if reply else None), len(rows) == 1 and rows[0][0] == 'finished' and rows[0][1].get('run_status') == 'cancelled' and bool(reply) and reply[-1].get('outcome') == 'succeeded')
+        await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where run_id = %s", (run,))
 
         # A real parent dies in its child's model call, and the replacement reattaches.
         run = await admit()

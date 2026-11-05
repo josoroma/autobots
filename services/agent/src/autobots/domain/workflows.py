@@ -113,7 +113,7 @@ def _iteration_errors(
     """Iteration is bounded and explicit: every path out of a foreach goes through one join."""
     errors: list[GraphError] = []
     in_region: set[str] = set()
-    joins_seen: set[str] = set()
+    joins_seen: dict[str, set[str]] = {}
     for name, node in nodes.items():
         if node["block"] != "foreach":
             continue
@@ -125,7 +125,7 @@ def _iteration_errors(
             block = nodes[current]["block"]
             if block == "join":
                 found_join = True
-                joins_seen.add(current)
+                joins_seen.setdefault(current, set()).add(name)
                 continue
             if block == "foreach":
                 errors.append(GraphError("nested_foreach", current))
@@ -140,6 +140,12 @@ def _iteration_errors(
         if not found_join:
             errors.append(GraphError("foreach_without_join", name))
         in_region |= region
+    # Iterations are collected by position, so two lists can't feed one join without losing items.
+    errors.extend(
+        GraphError("join_multiple_foreach", name)
+        for name, sources in joins_seen.items()
+        if len(sources) > 1
+    )
     errors.extend(
         GraphError("join_outside_foreach", name)
         for name, node in nodes.items()

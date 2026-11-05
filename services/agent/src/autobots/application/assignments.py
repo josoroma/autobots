@@ -8,7 +8,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from autobots.application.experts import ExpertRefused, resolve_binding
-from autobots.application.plans import load_goal
+from autobots.application.plans import load_goal, plan_view
 from autobots.application.recovery import outstanding
 from autobots.application.run_usage import LimitReached, RootLimits, consume, ensure_usage
 from autobots.application.runs import Inheritance, admit_run, apply_command
@@ -24,6 +24,10 @@ from autobots.domain.runs import Actor, RunCommand, RunStatus
 from autobots.domain.tools import DELEGATION_TOOL, PLAN_TOOLS, OperationClass
 
 Driver = Callable[[Any, Lease], Awaitable[Any]]
+
+TERMINAL_STATUSES = frozenset(
+    {RunStatus.SUCCEEDED.value, RunStatus.FAILED.value, RunStatus.CANCELLED.value}
+)
 
 
 @dataclass(frozen=True)
@@ -173,13 +177,66 @@ def assign_tool(delegation: Delegation) -> ToolDefinition:
             assignment_id, child = await _create(connection, context, arguments, delegation)
         else:
             assignment_id, child = row[0], row[1]
+            finished = await _finished_child(connection, child)
+            if finished is not None:
+                # The parent died before writing this down. Its job is done, so nothing to claim.
+                return await _close(connection, assignment_id, child, *finished)
             await _resume_if_paused(connection, context, child)
+            await _refuse_if_waiting(connection, child)
         lease = await _claim_child(connection, child, delegation)
         result = await delegation.drive(connection, lease)
-        if result.outcome == "lost":
-            raise ToolFailed("assignment_lost")
+        # Paused first: a child paused directly reports `lost`, as its worker just let go.
         if result.run_status == RunStatus.PAUSED.value:
             raise ToolFailed("assignment_paused")
+        if result.outcome == "lost" or result.code == "children_settling":
+            raise ToolFailed("assignment_lost")
+        return await _close(
+            connection,
+            assignment_id,
+            child,
+            result.outcome,
+            result.code,
+            result.run_status,
+            list(result.completed),
+            list(result.remaining),
+        )
+
+    async def _refuse_if_waiting(connection: Any, child: UUID) -> None:
+        """Its job is done until a person answers, so there's nothing to claim yet."""
+        cursor = await connection.execute("select status from public.runs where id = %s", (child,))
+        if (await cursor.fetchone())[0] in {
+            RunStatus.WAITING_INPUT.value,
+            RunStatus.WAITING_APPROVAL.value,
+        }:
+            raise ToolFailed("assignment_paused")
+
+    async def _finished_child(
+        connection: Any, child: UUID
+    ) -> tuple[str, str | None, str, list[str], list[str]] | None:
+        cursor = await connection.execute(
+            "select r.status, u.stop_reason from public.runs r "
+            "left join app_private.run_usage u on u.run_id = r.id where r.id = %s",
+            (child,),
+        )
+        status, code = await cursor.fetchone()
+        if status not in TERMINAL_STATUSES:
+            return None
+        view = await plan_view(connection, child, await load_goal(connection, child))
+        if status == RunStatus.CANCELLED.value and not str(code).startswith("cancelled"):
+            code = "cancelled"
+        outcome = "succeeded" if status == RunStatus.SUCCEEDED.value else "stopped"
+        return outcome, code, status, list(view.completed), list(view.remaining)
+
+    async def _close(
+        connection: Any,
+        assignment_id: UUID,
+        child: UUID,
+        outcome: str,
+        code: str | None,
+        run_status: str | None,
+        completed: list[Any],
+        remaining: list[Any],
+    ) -> AssignmentResult:
         cursor = await connection.execute(
             "select id from public.artifacts where run_id = %s and status = 'published' "
             "order by created_at",
@@ -189,17 +246,17 @@ def assign_tool(delegation: Delegation) -> ToolDefinition:
         output = AssignmentResult(
             assignment_id=str(assignment_id),
             child_run_id=str(child),
-            outcome=result.outcome,
-            code=result.code,
-            run_status=result.run_status,
-            completed=list(result.completed),
-            remaining=list(result.remaining),
+            outcome=outcome,
+            code=code,
+            run_status=run_status,
+            completed=completed,
+            remaining=remaining,
             artifact_ids=artifacts,
         )
         await connection.execute(
             "update app_private.assignments set status = 'finished', outcome = %s, result = %s, "
             "finished_at = now() where id = %s",
-            (result.outcome, json.dumps(output.model_dump()), assignment_id),
+            (outcome, json.dumps(output.model_dump()), assignment_id),
         )
         return output
 

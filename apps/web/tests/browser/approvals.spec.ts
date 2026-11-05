@@ -135,3 +135,14 @@ test("an owner approves and rejects through the inbox, and a repeat changes noth
     APPROVE,
   );
 });
+
+test("a long request is shown whole, and one too long can't be approved", async ({
+  page,
+}) => {
+  await signIn(page, EMAIL_A, PASSWORD_A);
+  await page.goto("/approvals");
+  await expect(page.getByText(/CONSEQUENTIAL-TAIL/).first()).toBeVisible();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "too long to show whole" }),
+  ).toBeVisible();
+});

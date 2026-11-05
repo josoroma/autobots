@@ -55,6 +55,8 @@ class ReadOffload(BaseModel):
     model_config = TOOL_CONTRACT
 
     offload_id: str = Field(min_length=36, max_length=36)
+    offset: int = Field(default=0, ge=0)
+    limit: int = Field(default=3000, ge=1, le=4000)
 
 
 class OffloadContent(BaseModel):
@@ -63,3 +65,5 @@ class OffloadContent(BaseModel):
     tool_name: str
     content: str
     sha256: str
+    total_chars: int
+    next_offset: int | None

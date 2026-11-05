@@ -149,6 +149,10 @@
             "title": "Arguments",
             "type": "string"
           },
+          "arguments_truncated": {
+            "title": "Arguments Truncated",
+            "type": "boolean"
+          },
           "expires_at": {
             "title": "Expires At",
             "type": "string"
@@ -188,6 +192,7 @@
           "operation_class",
           "argument_hash",
           "arguments",
+          "arguments_truncated",
           "status",
           "expires_at"
         ],

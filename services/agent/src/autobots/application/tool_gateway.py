@@ -249,28 +249,51 @@ class ToolGateway:
         operation_id = _operation_id(scope, tool, parsed)
         context = ToolContext(connection, scope, operation_id)
         # Committed before the effect starts, so a crash leaves a record that it may have happened.
-        cursor = await connection.execute(
-            "insert into app_private.tool_receipts (operation_id, run_id, workspace_id, tool_id, "
-            "tool_version, argument_hash, status, generation, can_readback) "
-            "values (%s, %s, %s, %s, %s, %s, 'started', %s, %s) "
-            "on conflict (operation_id) do nothing returning operation_id",
-            (
-                operation_id,
-                scope.run_id,
-                scope.workspace_id,
-                tool.tool_id,
-                tool.version,
-                argument_hash,
-                scope.generation,
-                tool.reconcile is not None,
-            ),
-        )
-        if await cursor.fetchone() is None:
-            replayed = await self._replay(context, tool, parsed, operation_id)
-            if replayed is not None:
-                return replayed
-            # A crash during this new attempt has to be classified like any other.
-            await _record(context, operation_id, "started", None)
+        # The lease is held for it, so a worker that stalled after its check can't admit anything.
+        try:
+            async with connection.transaction():
+                await hold_lease(connection, scope)
+                cursor = await connection.execute(
+                    "insert into app_private.tool_receipts (operation_id, run_id, workspace_id, "
+                    "tool_id, tool_version, argument_hash, status, generation, can_readback) "
+                    "values (%s, %s, %s, %s, %s, %s, 'started', %s, %s) "
+                    "on conflict (operation_id) do nothing returning operation_id",
+                    (
+                        operation_id,
+                        scope.run_id,
+                        scope.workspace_id,
+                        tool.tool_id,
+                        tool.version,
+                        argument_hash,
+                        scope.generation,
+                        tool.reconcile is not None,
+                    ),
+                )
+                created = await cursor.fetchone() is not None
+            if not created:
+                replayed = await self._replay(context, tool, parsed, operation_id)
+                if replayed is not None:
+                    return replayed
+                # A crash during this new attempt has to be classified like any other.
+                async with connection.transaction():
+                    await hold_lease(connection, scope)
+                    # A ruling covered the last attempt. Its evidence stays, but this one is open.
+                    cursor = await connection.execute(
+                        "update app_private.tool_receipts set status = 'started', result = null, "
+                        "generation = %s, reconciled_at = null, updated_at = now() "
+                        "where operation_id = %s and status <> 'succeeded' "
+                        "returning operation_id",
+                        (scope.generation, operation_id),
+                    )
+                    reopened = await cursor.fetchone() is not None
+                if not reopened:
+                    # A late success or a person's ruling landed since that read. Never send again.
+                    replayed = await self._replay(context, tool, parsed, operation_id)
+                    if replayed is not None:
+                        return replayed
+                    return _denied("lease_lost")
+        except LeaseLost:
+            return _denied("lease_lost")
         return await self._attempt(context, tool, parsed, operation_id)
 
     async def _replay(
@@ -346,8 +369,18 @@ def _visible(tool: ToolDefinition, output: BaseModel) -> tuple[dict[str, Any], b
 async def _record(
     context: ToolContext, operation_id: str, status: str, result: dict[str, Any] | None
 ) -> None:
+    """Only moves a receipt forward. A success is recorded whoever owns the run now, as the effect
+    happened, unless a person already ruled. Anything else speaks only for the attempt on record."""
+    values = (status, json.dumps(result) if result is not None else None, operation_id)
+    if status == "succeeded":
+        await context.connection.execute(
+            "update app_private.tool_receipts set status = %s, result = %s, updated_at = now() "
+            "where operation_id = %s and status <> 'succeeded' and reconciled_at is null",
+            values,
+        )
+        return
     await context.connection.execute(
         "update app_private.tool_receipts set status = %s, result = %s, updated_at = now() "
-        "where operation_id = %s",
-        (status, json.dumps(result) if result is not None else None, operation_id),
+        "where operation_id = %s and status = 'started' and generation <= %s",
+        (*values, context.scope.generation),
     )

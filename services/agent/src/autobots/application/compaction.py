@@ -16,6 +16,8 @@ from autobots.contracts.plans import GoalSpec
 
 LARGE_TOOL_CHARS = 4_000
 PREVIEW_CHARS = 300
+READ_BACK_TOOL = "read_offload"
+READ_PAGES_IN_VIEW = 2
 KEEP_RECENT = 6
 SUMMARY_MARKER = "Summarize the earlier work below"
 
@@ -53,10 +55,21 @@ async def offload_large(
 ) -> list[Any]:
     """Keeps a pointer and a short preview. The same call always maps to the same stored row."""
     view: list[Any] = []
+    pages = [m for m in messages if m.type == "tool" and m.name == READ_BACK_TOOL]
+    kept_pages = {id(m) for m in pages[-READ_PAGES_IN_VIEW:]}
     for message in messages:
         content = message.content
         if message.type != "tool" or not isinstance(content, str):
             view.append(message)
+            continue
+        if message.name == READ_BACK_TOOL:
+            # A bounded page of stored evidence. Offloading it again could never end, and only the
+            # latest stay in view, as a long read would otherwise resend every page on every call.
+            if id(message) in kept_pages:
+                view.append(message)
+            else:
+                stub = json.dumps({"page_dropped": "Read it again with read_offload if needed."})
+                view.append(message.model_copy(update={"content": stub}))
             continue
         if len(content) <= policy.large_tool_chars:
             view.append(message)

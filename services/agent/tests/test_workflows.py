@@ -4,8 +4,11 @@ from typing import Any
 
 import pytest
 
+from autobots.application.run_projection import public_text
+from autobots.domain.workflow_execution import GraphShape, unsettled_nodes
 from autobots.domain.workflows import (
     MAX_FOREACH_ITEMS,
+    _iteration_errors,
     block_versions,
     graph_hash,
     input_errors,
@@ -248,3 +251,37 @@ def test_execution_inputs_match_their_types() -> None:
     assert [e.code for e in input_errors(graph, {})] == ["input_missing"]
     assert [e.code for e in input_errors(graph, {"in": 5})] == ["input_type_mismatch"]
     assert "input_unknown" in [e.code for e in input_errors(graph, {"in": "a", "extra": 1})]
+
+
+def test_two_foreach_regions_cannot_feed_one_join() -> None:
+    nodes = {
+        "left": {"block": "foreach"},
+        "right": {"block": "foreach"},
+        "gather": {"block": "join"},
+    }
+    successors = {"left": {"gather"}, "right": {"gather"}}
+    errors = _iteration_errors(nodes, successors)
+    assert [(error.code, error.node) for error in errors] == [("join_multiple_foreach", "gather")]
+
+
+def test_a_workflow_nothing_can_move_is_not_finished() -> None:
+    shape = GraphShape(
+        nodes={
+            "each": {"block": "foreach"},
+            "body": {"block": "transform"},
+            "gather": {"block": "join"},
+            "end": {"block": "output"},
+        },
+        links_to={},
+        order=["each", "body", "gather", "end"],
+        owner={"body": "each"},
+    )
+    settled = {"each": "succeeded", "gather": "succeeded", "end": "succeeded"}
+    assert unsettled_nodes(shape, settled) == []
+    assert unsettled_nodes(shape, {"each": "succeeded"}) == ["end", "gather"]
+    assert unsettled_nodes(shape, {**settled, "body#0": "running"}) == ["body#0"]
+
+
+def test_a_word_containing_the_key_prefix_is_shown_as_written() -> None:
+    assert public_text("a risk-free change") == "a risk-free change"
+    assert public_text("key sk-or-v1-abcdef") == "key [redacted]"

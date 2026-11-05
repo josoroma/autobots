@@ -232,3 +232,14 @@ def next_steps(
             if step is not None:
                 steps.append(step)
     return steps
+
+
+def unsettled_nodes(shape: GraphShape, statuses: Mapping[str, str]) -> list[str]:
+    """What should have an outcome and doesn't. A foreach body has none when it had no items."""
+    missing = [
+        name
+        for name in shape.nodes
+        if name not in shape.owner and statuses.get(name) not in TERMINAL
+    ]
+    open_instances = [key for key, status in statuses.items() if status not in TERMINAL]
+    return sorted({*missing, *open_instances})

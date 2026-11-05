@@ -18,7 +18,9 @@ from goal_loop_script import ROUTE, Script, calls, say  # noqa: E402
 from autobots.adapters.object_storage import SupabaseObjectStore  # noqa: E402
 from autobots.application.approvals import decide  # noqa: E402
 from autobots.application.experts import create_expert  # noqa: E402
+from autobots.application import workflow_runner  # noqa: E402
 from autobots.application.goal_loop import LoopConfig, process_next  # noqa: E402
+from autobots.application.plans import load_goal  # noqa: E402
 from autobots.application.runs import apply_command  # noqa: E402
 from autobots.application.worker_leases import claim_next  # noqa: E402
 from autobots.application.workflows import create_execution, create_workflow, publish_version  # noqa: E402
@@ -194,8 +196,68 @@ async def main() -> None:
         await apply_command(db, workspace_id=WORKSPACE, run_id=execution.run_id, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
         idle = await advance()
         check('a cancelled execution does not run', 'nothing to do, no instances', (idle, await statuses(execution)), idle is None and await statuses(execution) == {})
-    print(json.dumps({'cases': cases}))
+        # B5: a worker dies after VERIFY commits, and a cancel lands after the last node commits.
+        no_tools = {'nodes': [node('in', 'input', type='string'), node('out', 'output')], 'links': [link('in', 'value', 'out', 'value')]}
+        execution = await start('settle-verifying', no_tools, {'in': 'x'})
+        run = execution.run_id
+        real_command = workflow_runner.apply_command
 
+        async def dies_after_verify(*arguments: Any, **options: Any) -> Any:
+            result = await real_command(*arguments, **options)
+            if options.get('command') is RunCommand.VERIFY:
+                raise RuntimeError('the worker died here')
+            return result
+
+        workflow_runner.apply_command = dies_after_verify
+        try:
+            await advance()
+            died = False
+        except RuntimeError:
+            died = True
+        finally:
+            workflow_runner.apply_command = real_command
+        left = await value('select status from public.runs where id = %s', run)
+        check('a worker can die between VERIFY and COMPLETE', 'died, verifying', (died, left), died and left == 'verifying')
+        await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where run_id = %s", (run,))
+        result = await advance()
+        state = await value('select status from public.runs where id = %s', run)
+        check('a workflow left verifying finishes on the next claim', 'succeeded', (state, result.code if result else None), state == 'succeeded')
+        execution = await start('settle-cancelling', no_tools, {'in': 'x'})
+        lease = await claim_next(db, worker_id='cancelled-under')
+        run = execution.run_id
+        version = await value('select version from public.runs where id = %s', run)
+        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
+        before = await value('select status from public.runs where id = %s', run)
+        await workflow_runner._complete(db, lease, await load_goal(db, run))
+        after = await value('select status from public.runs where id = %s', run)
+        check('a workflow cancelled after its last commit finishes cancelling', 'cancelling, then cancelled', (before, after), before == 'cancelling' and after == 'cancelled')
+
+        # B7 in the real runner: nothing can move, but nothing has finished either.
+        execution = await start('stalled', no_tools, {'in': 'x'})
+        real_pass = workflow_runner._pass
+
+        async def nothing_moves(*_: Any, **__: Any) -> bool:
+            return False
+
+        workflow_runner._pass = nothing_moves
+        try:
+            result = await advance()
+        finally:
+            workflow_runner._pass = real_pass
+        state = await run_state(execution)
+        check('a workflow that stalls fails instead of succeeding', 'failed, workflow_stalled', (state, result.code if result else None), state == 'failed' and result is not None and result.code == 'workflow_stalled')
+
+        # Finding 9: a version published under older rules doesn't run.
+        execution = await start('older-rules', no_tools, {'in': 'x'})
+        real_validate = workflow_runner.validate_graph
+        workflow_runner.validate_graph = lambda _: ['join_multiple_foreach']
+        try:
+            result = await advance()
+        finally:
+            workflow_runner.validate_graph = real_validate
+        state = await run_state(execution)
+        check('a version the rules now reject fails without running', 'failed, workflow_invalid, no instance', (state, result.code if result else None, await statuses(execution)), state == 'failed' and result is not None and result.code == 'workflow_invalid' and await statuses(execution) == {})
+    print(json.dumps({'cases': cases}))
 
 try:
     asyncio.run(main())
