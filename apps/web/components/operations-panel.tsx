@@ -115,9 +115,10 @@ export function OperationsPanel() {
     setMessage(
       reply.ok
         ? "Saved. Nothing is removed until the next retention pass."
-        : "Not saved. Keys can't expire before run content, and windows start at one day.",
+        : "Not saved. Retry keys need a run content window at least as short, and windows start at one day.",
     );
-    await load();
+    // A refused save keeps what was typed, so it can be corrected.
+    if (reply.ok) await load();
   }
 
   if (failed !== null) return <p role="alert">{failed}</p>;

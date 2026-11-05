@@ -23,6 +23,12 @@ MAX_HITS = 10
 _HEADLINE = 'MaxFragments=2, MaxWords=25, MinWords=5, StartSel="", StopSel=""'
 
 
+class MemoryRefused(Exception):
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
 async def store_memory(
     connection: Any,
     *,
@@ -33,6 +39,13 @@ async def store_memory(
     source: dict[str, Any],
     expert_id: UUID | None = None,
 ) -> UUID:
+    if expert_id is not None:
+        cursor = await connection.execute(
+            "select 1 from public.experts where id = %s and workspace_id = %s",
+            (expert_id, workspace_id),
+        )
+        if await cursor.fetchone() is None:
+            raise MemoryRefused("expert_not_found")
     memory_id = uuid4()
     await connection.execute(
         "insert into public.memory_items (id, workspace_id, title, content, source, created_by, "

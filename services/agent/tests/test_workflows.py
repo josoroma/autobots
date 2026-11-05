@@ -1,6 +1,7 @@
 """Golden graphs and every typed refusal, with no database."""
 
 import asyncio
+from dataclasses import replace
 from types import SimpleNamespace
 from typing import Any
 from uuid import uuid4
@@ -8,8 +9,9 @@ from uuid import uuid4
 import pytest
 
 from autobots.application.run_projection import public_text
-from autobots.application.tool_gateway import ToolScope
+from autobots.application.tool_gateway import ToolScope, _operation_id
 from autobots.application.workflow_runner import _run_block, _Stop, _tool
+from autobots.contracts.assignments import AssignSpecialist
 from autobots.domain.workflow_execution import BlockFailed, GraphShape, Step, unsettled_nodes
 from autobots.domain.workflows import (
     MAX_FOREACH_ITEMS,
@@ -374,3 +376,7 @@ def test_equal_foreach_items_are_separate_operations() -> None:
         step = Step(f"a#{iteration}", "a", iteration, "run", {"goal": "x"})
         asyncio.run(_run_block(Recording(), None, scope, agent, step, {}))  # type: ignore[arg-type]
     assert seen == ["a#0", "a#1"]
+    tool = SimpleNamespace(tool_id="t", version=1)
+    arguments = AssignSpecialist(expert_id=str(uuid4()), goal="x")
+    ids = {_operation_id(replace(scope, instance=key), tool, arguments) for key in seen}  # type: ignore[arg-type]
+    assert len(ids) == 2

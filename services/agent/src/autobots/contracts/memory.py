@@ -4,6 +4,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from autobots.contracts.primitives import Identifier
 from autobots.contracts.tools import TOOL_CONTRACT
 
 VIEW = ConfigDict(extra="forbid", frozen=True)
@@ -42,6 +43,8 @@ class MemoryCreate(BaseModel):
 
     title: str = Field(min_length=1, max_length=200)
     content: str = Field(min_length=1, max_length=20000)
+    # Only this Expert's runs can then find it. Without one, the whole workspace's can.
+    expert_id: Identifier | None = None
 
 
 class MemoryCreated(BaseModel):

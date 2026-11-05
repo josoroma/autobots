@@ -14,6 +14,7 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import hmac
+import io
 import json
 import os
 from pathlib import Path
@@ -291,14 +292,9 @@ def restore(backup_dir: Path, backup_key: Path, project: str, gateway_port: int,
     current = compose_hashes(root)
     if current != manifest['compose_files']:
         raise Refused('the Compose files differ from the backup. Restore from the matching revision')
-    plain = backup_dir / '.configuration.tmp'
-    descriptor = os.open(plain, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    try:
-        with os.fdopen(descriptor, 'wb') as sink:
-            open_stream(backup_dir / manifest['components']['configuration']['file'], key, 'configuration', sink)
-        values = parse_env(plain.read_text())
-    finally:
-        plain.unlink(missing_ok=True)
+    sink = io.BytesIO()
+    open_stream(backup_dir / manifest['components']['configuration']['file'], key, 'configuration', sink)
+    values = parse_env(sink.getvalue().decode())
     target = Target(project, db_port, gateway_port)
     require_identity(target, tool_env())
     stack = AppStack(target, root, root / 'infra/supabase/upstream/docker-compose.yml', values=restored_values(values, gateway_port, db_port))
@@ -364,22 +360,20 @@ def verify_restore(backup_dir: Path, backup_key: Path, key_dir: Path, project: s
     check('the restore hold is in place', '1', sql('select count(*) from app_private.installation_holds;').stdout.strip())
     anon = sql('begin; set local role anon; select count(*) from public.runs; rollback;')
     check('an anonymous role reads no runs', True, anon.returncode != 0 or anon.stdout.strip() == '0')
-    plain = backup_dir / '.configuration.tmp'
-    descriptor = os.open(plain, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    try:
-        with os.fdopen(descriptor, 'wb') as sink:
-            open_stream(backup_dir / manifest['components']['configuration']['file'], key, 'configuration', sink)
-        values = parse_env(plain.read_text())
-    finally:
-        plain.unlink(missing_ok=True)
+    sink = io.BytesIO()
+    open_stream(backup_dir / manifest['components']['configuration']['file'], key, 'configuration', sink)
+    values = parse_env(sink.getvalue().decode())
     port = lines(docker('ps', '--filter', f'{LABEL}{project}', '--filter', 'label=com.docker.compose.service=api-gw', '--format', '{{.Ports}}'))[0].split('->')[0].rsplit(':', 1)[-1]
     service = values['SERVICE_ROLE_KEY']
     for artifact in recorded['artifacts']:
         path = sql(f"select object_path from public.artifacts where id = '{artifact['id']}';").stdout.strip()
         address = f'http://127.0.0.1:{port}/storage/v1/object/workspace-artifacts/{path}'
         reply = urlrequest.Request(address, headers={'apikey': service, 'Authorization': f'Bearer {service}'})
-        with urlrequest.urlopen(reply, timeout=30) as response:
-            digest = hashlib.sha256(response.read()).hexdigest()
+        try:
+            with urlrequest.urlopen(reply, timeout=30) as response:
+                digest = hashlib.sha256(response.read()).hexdigest()
+        except OSError as error:
+            digest = type(error).__name__
         check('an artifact reads back with its recorded hash', artifact['sha256'], digest)
     return cases
 

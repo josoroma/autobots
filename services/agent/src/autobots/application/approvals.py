@@ -132,15 +132,39 @@ async def approval_gate(
         if status == "approved":
             if stored_scope != current_scope_hash:
                 return "approval_scope_changed"
-            if expired:
-                return "approval_expired"
-            # A failure nobody ruled on used this decision. A person's ruling grants one more try.
             cursor = await connection.execute(
-                "select 1 from app_private.tool_receipts where operation_id = %s "
-                "and status = 'failed' and reconciled_at is null",
+                "select status, reconciled_at from app_private.tool_receipts "
+                "where operation_id = %s",
                 (operation_id,),
             )
-            return None if await cursor.fetchone() is None else "approval_consumed"
+            receipt = await cursor.fetchone()
+            if receipt is not None and receipt[0] != "failed":
+                # It was already sent, or may have been. Its receipt answers that, whatever the
+                # date, and refusing here would report an effect that happened as not happening.
+                return None
+            if receipt is not None and receipt[1] is None:
+                # A failure nobody ruled on used this decision. A ruling grants one more try.
+                return "approval_consumed"
+            if expired:
+                # Nothing was sent, so this is only stale. A person can look at it again.
+                await connection.execute(
+                    "update public.approval_requests set status = 'pending', decided_by = null, "
+                    "decided_at = null, expires_at = clock_timestamp() + make_interval(secs => %s) "
+                    "where id = %s",
+                    (ttl_seconds, approval_id),
+                )
+                await append_event(
+                    connection,
+                    run_id,
+                    {
+                        "type": "approval.requested",
+                        "approval_id": str(approval_id),
+                        "tool_id": tool_id,
+                    },
+                )
+                await _enter_wait(connection, workspace_id, run_id, generation, str(approval_id))
+                return "approval_pending"
+            return None
         return "approval_rejected" if status == "rejected" else "approval_expired"
 
 
@@ -239,8 +263,9 @@ async def decide(
                 raise ApprovalRefused("approval_run_not_waiting") from None
             await connection.execute(
                 "update public.approval_requests set status = %s, decided_by = %s, "
-                "decided_at = now() where id = %s",
-                (wanted, actor_id, approval_id),
+                "decided_at = now(), expires_at = clock_timestamp() + make_interval(secs => %s) "
+                "where id = %s",
+                (wanted, actor_id, DEFAULT_TTL_SECONDS, approval_id),
             )
             await append_event(
                 connection,

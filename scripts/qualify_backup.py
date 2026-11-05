@@ -177,6 +177,9 @@ def qualify(root: Path) -> int:
         if back.returncode:
             raise Unavailable(f'the restore failed: {back.stderr[-500:]}')
         result = json.loads(back.stdout.strip().splitlines()[-1])
+        held_at = run(['docker', 'exec', f"{restored_project}-db-1", 'psql', '-U', 'supabase_admin', '-d', 'postgres', '-X', '-A', '-t', '-c', "select to_char(created_at at time zone 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS.US') from app_private.installation_holds;"], tool_env()).stdout.strip()
+        rest_started = run(['docker', 'inspect', '-f', '{{.State.StartedAt}}', f'{restored_project}-rest-1'], tool_env()).stdout.strip()[:26]
+        cases.check('the hold is written before other services start', 'hold earlier than the REST service', f'{held_at}, {rest_started}', bool(held_at) and bool(rest_started) and held_at < rest_started)
         verified = backup_tool(root, 'verify', '--backup', str(backup_dir), '--backup-key', str(backup_key), '--key-dir', str(key_dir), '--project', restored_project)
         report = json.loads(verified.stdout.strip().splitlines()[-1]) if verified.stdout.strip() else {'cases': []}
         failed = [case['id'] for case in report['cases'] if not case['passed']]

@@ -49,6 +49,8 @@ test("retention saves, and a key window shorter than content is refused", async 
   await page.getByLabel(/Retry keys/).fill("7");
   await page.getByRole("button", { name: "Save retention" }).click();
   await expect(page.getByText(/Not saved/)).toBeVisible();
+  // What was typed stays, so it can be corrected.
+  await expect(page.getByLabel(/Run content/)).toHaveValue("30");
   await page.getByLabel(/Retry keys/).fill("60");
   await page.getByRole("button", { name: "Save retention" }).click();
   await expect(page.getByText(/Saved\. Nothing is removed/)).toBeVisible();

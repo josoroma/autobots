@@ -102,8 +102,16 @@ async def run_regression(
             (candidate_id,),
         )
         proposed_by = (await cursor.fetchone())[0]
-        if proposed_by and any(str(item["id"]) == proposed_by for item in evidence):
-            failures.append("evidence_is_its_own_run")
+        if proposed_by:
+            cited = [str(item["id"]).lower() for item in evidence]
+            cursor = await connection.execute(
+                "select count(*) from public.artifacts where id::text = any(%s) "
+                "and run_id::text = %s",
+                (cited, proposed_by.lower()),
+            )
+            own_artifacts = (await cursor.fetchone())[0]
+            if proposed_by.lower() in cited or own_artifacts:
+                failures.append("evidence_is_its_own_run")
         if AUTHORITY_CLAIMS.search(content):
             failures.append("claims_authority")
         reviewer_cases = cases or []
@@ -132,7 +140,13 @@ async def run_regression(
 
 
 async def _activate(
-    connection: Any, workspace_id: UUID, kind: str, key: str, version: int, content: str
+    connection: Any,
+    workspace_id: UUID,
+    kind: str,
+    key: str,
+    version: int,
+    content: str,
+    source_run: str | None = None,
 ) -> None:
     await connection.execute(
         "insert into public.knowledge_heads (workspace_id, kind, key, active_version) "
@@ -155,7 +169,8 @@ async def _activate(
     if await cursor.fetchone() is None:
         await connection.execute(
             "insert into public.memory_items (id, workspace_id, title, content, source, "
-            "created_by, key, version) values (%s, %s, %s, %s, %s, %s, %s, %s)",
+            "created_by, key, version, expert_id) values (%s, %s, %s, %s, %s, %s, %s, %s, "
+            "(select expert_id from public.runs where id::text = %s and workspace_id = %s))",
             (
                 uuid4(),
                 workspace_id,
@@ -165,6 +180,8 @@ async def _activate(
                 workspace_id,
                 key,
                 version,
+                source_run,
+                workspace_id,
             ),
         )
 
@@ -211,7 +228,9 @@ async def decide(
                     ),
                 ),
             )
-            await _activate(connection, workspace_id, kind, key, version, content)
+            await _activate(
+                connection, workspace_id, kind, key, version, content, (source or {}).get("run_id")
+            )
             outcome = "promoted"
         await connection.execute(
             "update public.improvement_candidates set status = %s, reviewed_by = %s, "
@@ -235,11 +254,12 @@ async def rollback(
             )
             if await cursor.fetchone() is None:
                 raise ImprovementRefused("version_not_found")
-            await connection.execute(
-                "update public.memory_items set retired_at = now() "
-                "where workspace_id = %s and key = %s and retired_at is null",
-                (workspace_id, key),
-            )
+            if kind == "memory":
+                await connection.execute(
+                    "update public.memory_items set retired_at = now() "
+                    "where workspace_id = %s and key = %s and retired_at is null",
+                    (workspace_id, key),
+                )
             return KnowledgeHead(schema_version=1, kind=kind, key=key, active_version=None)
         cursor = await connection.execute(
             "select content from public.knowledge_versions "

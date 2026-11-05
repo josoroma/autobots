@@ -68,13 +68,14 @@ def occurrences(
         if after < moment <= until:
             found.append(moment)
         day += timedelta(days=1)
-    return found
+    return found[-MAX_OCCURRENCES:]
 
 
 def occurrences_dropped(
     trigger: Mapping[str, Any], after: datetime, until: datetime, listed: int
 ) -> int:
-    """How many fell before the listed ones, so history can say so rather than go quiet."""
+    """How many fell before the listed ones, so history can say so. Exact for intervals, and within
+    a day for daily times, which can move with daylight saving."""
     if trigger["kind"] == "interval":
         step = timedelta(minutes=trigger["minutes"])
         epoch = datetime(2000, 1, 1, tzinfo=UTC)

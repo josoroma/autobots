@@ -164,8 +164,8 @@ async def _run_block(
 ) -> list[tuple[str, int, Any]]:
     block, config = node["block"], node.get("config", {})
     value = step.inputs.get("value")
-    if step.iteration is not None:
-        scope = replace(scope, instance=step.key)
+    # Each node instance is its own work, even with the same tool and arguments as another.
+    scope = replace(scope, instance=step.key)
     if block == "input":
         return [("value", 0, inputs[step.node_id])]
     if block in {"output", "join"}:

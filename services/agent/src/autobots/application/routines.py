@@ -375,7 +375,7 @@ async def _evaluate_one(
                 return 0
         try:
             run_id = await _admit(connection, workspace_id, routine_id, version, config, latest)
-        except (RoutineRefused, WorkflowRefused, IdempotencyConflict) as refused:
+        except (RoutineRefused, WorkflowRefused, IdempotencyConflict, ExpertRefused) as refused:
             await _record(connection, routine_id, latest, version, "blocked", refused.code)
             return 0
         await _record(connection, routine_id, latest, version, "admitted", None, run_id)

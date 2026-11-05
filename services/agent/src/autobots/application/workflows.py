@@ -343,13 +343,15 @@ async def read_execution(connection: Any, workspace_id: UUID, execution_id: UUID
     settled = {item[0] for item in saved}
 
     def _unsaved_status(key: str) -> str:
-        if run_status in {"succeeded", "failed", "cancelled"}:
-            return "not_run"
         if key != current:
-            return "waiting"
+            return "not_run" if run_status in {"succeeded", "failed", "cancelled"} else "waiting"
+        # This node started. On a finished run its effect may have happened, so it can't be
+        # reported as never run.
         if run_status == "waiting_approval" or approval_pending:
             return "waiting_approval"
-        return "running" if run_status == "running" else "stopped_here"
+        if run_status == "running":
+            return "running"
+        return "waiting" if run_status == "queued" else "stopped_here"
 
     instances.extend(
         InstanceView(
@@ -360,7 +362,7 @@ async def read_execution(connection: Any, workspace_id: UUID, execution_id: UUID
             error_code=None,
         )
         for node in graph["nodes"]
-        if node["id"] not in started and node["id"] != current
+        if node["id"] not in started and node["id"] != (current or "").split("#")[0]
     )
     if current and current not in settled:
         # An iteration is keyed apart from its node, so it's added by what's running.

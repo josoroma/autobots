@@ -21,7 +21,7 @@ from autobots.application.approvals import decide, list_approvals  # noqa: E402
 from autobots.application.assignments import Delegation, assign_tool  # noqa: E402
 from autobots.application.experts import create_expert, create_session, resolve_binding  # noqa: E402
 from autobots.application.goal_loop import LoopResult, _scope_guidance  # noqa: E402
-from autobots.application.memory import SEARCH_MEMORY, search, store_memory  # noqa: E402
+from autobots.application.memory import SEARCH_MEMORY, MemoryRefused, search, store_memory  # noqa: E402
 from autobots.application.plans import load_goal  # noqa: E402
 from autobots.application import routines as routines_module  # noqa: E402
 from autobots.application.routines import _admit as routine_admit, create_routine, evaluate_routines  # noqa: E402
@@ -84,8 +84,11 @@ async def effects_and_assignments(db: Any) -> None:
         sends.append(arguments.text)
         return Sent(delivered=True)
 
-    # M1: a readback says not delivered, and a cancel has landed meanwhile.
+    # M1: the cancel lands during the readback, which then says not delivered.
+    cancel_during_readback: list[UUID] = []
+
     async def not_delivered(_: Note, __: ToolContext) -> Sent:
+        await command(cancel_during_readback[0], RunCommand.CANCEL)
         raise NotDelivered
 
     effect = ToolDefinition(tool_id='send_once', version=1, description='Send.', input_model=Note, output_model=Sent, operation_class=OperationClass.REVERSIBLE_INTERNAL_WRITE, handler=send, reconcile=not_delivered)
@@ -93,14 +96,13 @@ async def effects_and_assignments(db: Any) -> None:
     gateway.registry.register(effect)
     await clear()
     run = await admit()
+    cancel_during_readback.append(run)
     lease = await claim_next(db, worker_id='m1')
     done = await gateway.execute(db, scope_of(lease, {'send_once': 1}), 'send_once', {'text': 'first'})
-    operation = done.operation_id
-    await db.execute("update app_private.tool_receipts set status = 'unknown' where operation_id = %s", (operation,))
-    await command(run, RunCommand.CANCEL)
+    await db.execute("update app_private.tool_receipts set status = 'unknown' where operation_id = %s", (done.operation_id,))
     count = len(sends)
     stopped = await gateway._effect(db, scope_of(lease, {'send_once': 1}), effect, Note(text='first'))
-    check('a cancel after the readback stops the resend', 'run_not_running, nothing sent', (stopped.code, len(sends) - count), stopped.code == 'run_not_running' and len(sends) == count)
+    check('a cancel during the readback stops the resend', 'run_not_running, nothing sent', (stopped.code, len(sends) - count), stopped.code == 'run_not_running' and len(sends) == count)
 
     async def hangs(_: Note, __: ToolContext) -> Sent:
         await asyncio.sleep(60)
@@ -143,7 +145,31 @@ async def effects_and_assignments(db: Any) -> None:
     run, lease, row = await approved_run('lapses')
     await db.execute("update public.approval_requests set expires_at = clock_timestamp() - interval '1 second' where id = %s", (row['id'],))
     late = await gateway.execute(db, scope_of(lease, {'gated': 1}), 'gated', {'text': 'lapses'})
-    check("an approval that's out of date no longer releases the effect", 'approval_expired, nothing attempted', (late.code, attempts), late.code == 'approval_expired' and not attempts)
+    asked_again = await value('select status from public.approval_requests where id = %s', row['id'])
+    check('an unused approval past its time asks a person again', 'approval_pending, nothing attempted', (late.code, asked_again, attempts), late.code == 'approval_pending' and asked_again == 'pending' and not attempts)
+
+    # The blocker from the second review: what already happened is read back, whatever the date.
+    delivered: list[str] = []
+
+    async def delivers(arguments: Note, _: ToolContext) -> Sent:
+        delivered.append(arguments.text)
+        return Sent(delivered=True)
+
+    done_tool = ToolDefinition(tool_id='gated_ok', version=1, description='Send.', input_model=Note, output_model=Sent, operation_class=OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE, handler=delivers, approval_required=True)
+    gateway.registry.register(done_tool)
+    await clear()
+    run = await admit()
+    lease = await claim_next(db, worker_id='replay')
+    await gateway.execute(db, scope_of(lease, {'gated_ok': 1}), 'gated_ok', {'text': 'sent once'})
+    row = [item for item in await list_approvals(db, WORKSPACE, 'pending') if item['run_id'] == run][0]
+    await decide(db, workspace_id=WORKSPACE, actor_id=ACTOR, approval_id=row['id'], idempotency_key=str(uuid4()), decision='approve', argument_hash=row['argument_hash'])
+    await db.execute("update app_private.run_jobs set status = 'queued', available_at = clock_timestamp() where run_id = %s", (run,))
+    lease = await claim_run(db, run, worker_id='replay-2')
+    sent = await gateway.execute(db, scope_of(lease, {'gated_ok': 1}), 'gated_ok', {'text': 'sent once'})
+    await db.execute("update public.approval_requests set expires_at = clock_timestamp() - interval '1 second' where id = %s", (row['id'],))
+    replayed = await gateway.execute(db, scope_of(lease, {'gated_ok': 1}), 'gated_ok', {'text': 'sent once'})
+    check('a replay past the approval time returns the delivered result', 'succeeded, replayed, one delivery', (sent.outcome.value, replayed.outcome.value, replayed.replayed, len(delivered)), replayed.outcome.value == 'succeeded' and replayed.replayed and len(delivered) == 1)
+
     run, lease, row = await approved_run('used up')
     first = await gateway.execute(db, scope_of(lease, {'gated': 1}), 'gated', {'text': 'used up'})
     second = await gateway.execute(db, scope_of(lease, {'gated': 1}), 'gated', {'text': 'used up'})
@@ -207,6 +233,20 @@ async def effects_and_assignments(db: Any) -> None:
         raised = str(error)
     state = await value('select status from app_private.assignments where child_run_id = %s', waiting_child)
     check('a child waiting for a person pauses its parent, and stays assigned', 'assignment_paused, open', (raised, state), raised == 'assignment_paused' and state == 'open')
+    drives = 0
+
+    async def counts(_: Any, child_lease: Any) -> LoopResult:
+        nonlocal drives
+        drives += 1
+        return LoopResult('waiting', 'approval_pending', 'waiting_approval', None, (), (), (), {})
+
+    await db.execute("update public.runs set status = 'waiting_approval' where id = %s", (waiting_child,))
+    try:
+        await assign_tool(Delegation(counts, RootLimits(), 30, asyncio.sleep)).handler(AssignSpecialist(expert_id=str(expert.id), goal='Part'), context)
+        raised = 'closed'
+    except ToolFailed as error:
+        raised = str(error)
+    check('a replay does not spin on a child still waiting', 'assignment_paused, no drive', (raised, drives), raised == 'assignment_paused' and drives == 0)
 
     # M7: a live model has to be told what it can reach.
     goal = await load_goal(db, parent)
@@ -309,6 +349,12 @@ async def retention_and_readiness(db: Any) -> None:
     finally:
         worker_module.evaluate_routines = real
     check('with Storage down, no routine is evaluated', '0 evaluations', (down, calls), down is False and calls == 0)
+    purged_with_storage_down = await terminal()
+    await write_policy(db, WORKSPACE, ACTOR, RetentionPolicy(run_days=30))
+    await worker_module.maintenance_step(worker_module.no_credential, Down())(db)
+    swept = await value('select content_purged_at is not null from public.runs where id = %s', purged_with_storage_down)
+    check('but declared retention still runs', 'purged', swept, swept is True)
+    await write_policy(db, WORKSPACE, ACTOR, RetentionPolicy())
     refusal = await worker_module.unattended_refusal(db, Down())
     check('and it says why', 'storage_unreachable', refusal, refusal == 'storage_unreachable')
 
@@ -412,6 +458,12 @@ async def workflows_routines_memory(db: Any) -> None:
     paths = [hit['source'].get('path') for hit in hits if hit['kind'] == 'evidence']
     memories = [hit['snippet'] for hit in hits if hit['kind'] == 'memory']
     check("a run's search stays in its own files", 'only its own path', (lease.run_id == mine, paths), set(paths) <= {'outputs/mine.md'} and 'outputs/secret.md' not in paths)
+    with_foreign_expert = 'stored'
+    try:
+        await store_memory(db, workspace_id=WORKSPACE, actor_id=ACTOR, title='x', content='x', source={'kind': 'test'}, expert_id=uuid4())
+    except MemoryRefused as error:
+        with_foreign_expert = error.code
+    check('memory can only name an Expert in its own workspace', 'expert_not_found', with_foreign_expert, with_foreign_expert == 'expert_not_found')
     check("and another Expert's memory stays hidden", 'the shared item only', memories, len(memories) == 1 and 'shared' in memories[0])
     wide = await search(db, WORKSPACE, word)
     check("an owner's own search still sees everything in the workspace", 'both files and both items', len(wide), len(wide) == 4)

@@ -193,21 +193,26 @@ def maintenance_step(
 ) -> Step:
     """Expired approvals, due routines and declared retention, each safe from many workers."""
     last_retention: list[float] = []
+    said: list[str] = []
 
     async def step(connection: Any) -> bool:
         if await is_held(connection):
             return False
         await expire_due(connection)
-        refused = await unattended_refusal(connection, store)
-        if refused is not None:
-            # A routine is admission too, so it waits on the same readiness a person would.
-            log_event(logger, "worker.unattended_work_waiting", logging.WARNING, reason=refused)
-            return False
 
         async def check(workspace_id: UUID) -> str:
             return await credential_check(connection, workspace_id)
 
-        admitted = await evaluate_routines(connection, check)
+        # A routine is admission too, so it waits on the same readiness a person would. Retention
+        # below doesn't: it removes content, and waits on Storage by itself.
+        refused = await unattended_refusal(connection, store)
+        admitted = 0
+        if refused is None:
+            admitted = await evaluate_routines(connection, check)
+            said[:] = []
+        elif said != [refused]:
+            said[:] = [refused]
+            log_event(logger, "worker.routines_waiting", logging.WARNING, reason=refused)
         now = asyncio.get_running_loop().time()
         if not last_retention or now - last_retention[0] >= retention_seconds:
             last_retention[:] = [now]

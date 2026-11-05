@@ -1359,6 +1359,18 @@
             "title": "Content",
             "type": "string"
           },
+          "expert_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expert Id"
+          },
           "title": {
             "maxLength": 200,
             "minLength": 1,

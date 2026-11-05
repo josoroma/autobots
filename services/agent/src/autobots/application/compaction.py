@@ -166,6 +166,12 @@ def _offload_ids(messages: Sequence[Any]) -> list[str]:
     return found
 
 
+def _delimited(message: Any) -> str:
+    # A closing tag inside the text can't end the data early.
+    text = _text(message)[:LARGE_TOOL_CHARS].replace("</earlier>", "")
+    return f'<earlier role="{message.type}">{text}</earlier>'
+
+
 def summary_request(earlier: Sequence[Any], previous: StoredSummary | None) -> str:
     parts = [
         f"{SUMMARY_MARKER}, briefly. Say what was done and found, not what to do. "
@@ -175,10 +181,7 @@ def summary_request(earlier: Sequence[Any], previous: StoredSummary | None) -> s
     if previous is not None:
         parts.append(f"Earlier summary:\n{previous.summary}")
     # Up to the offload threshold, so nothing vanishes without a stored copy to point back to.
-    parts.extend(
-        f'<earlier role="{message.type}">{_text(message)[:LARGE_TOOL_CHARS]}</earlier>'
-        for message in earlier
-    )
+    parts.extend(_delimited(message) for message in earlier)
     return "\n\n".join(parts)
 
 

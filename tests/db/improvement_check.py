@@ -25,6 +25,8 @@ from autobots.domain.models import resolve_role_policy  # noqa: E402
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE, OTHER = UUID(sys.argv[1]), UUID(sys.argv[2])
+PROPOSING_RUN = uuid4()
+UNDO_WORD = f'qz{uuid4().hex[:10]}'
 ACTOR = uuid4()
 cases = []
 
@@ -54,7 +56,7 @@ async def main() -> None:
             return ImprovementProposal(kind=kind, key=key, content=content, evidence=[EvidenceRef(kind='run', id=str(item)) for item in chosen], regression_cases=[RegressionCase(must_contain=must or content[:10])])
 
         # Nothing reads a proposal until it's promoted.
-        candidate = await propose(db, WORKSPACE, proposal('deploy-window', 'Deploys happen on Thursdays at noon.'), {'kind': 'run', 'run_id': str(run)})
+        candidate = await propose(db, WORKSPACE, proposal('deploy-window', 'Deploys happen on Thursdays at noon.'), {'kind': 'run', 'run_id': str(PROPOSING_RUN)})
         found = await search(db, WORKSPACE, 'Thursdays')
         check('a proposal alone changes nothing a run can read', 'no hits', [hit.title for hit in found], found == [])
         try:
@@ -70,10 +72,10 @@ async def main() -> None:
         found = await search(db, WORKSPACE, 'Thursdays')
         check('a review promotes it as a new version', 'promoted, found', (outcome, [hit.source.get('version') for hit in found]), outcome == 'promoted' and found[0].source['version'] == 1)
         provenance = await value("select provenance from public.knowledge_versions where candidate_id = %s", candidate)
-        check('with provenance back to its evidence and reviewer', 'the run, the reviewer', provenance['reviewed_by'] == str(ACTOR), provenance['evidence'][0]['id'] == str(run) and provenance['reviewed_by'] == str(ACTOR) and provenance['source']['run_id'] == str(run))
+        check('with provenance back to its evidence and reviewer', 'the run, the reviewer', provenance['reviewed_by'] == str(ACTOR), provenance['evidence'][0]['id'] == str(run) and provenance['reviewed_by'] == str(ACTOR) and provenance['source']['run_id'] == str(PROPOSING_RUN))
 
         # A new version, and rollback.
-        second = await propose(db, WORKSPACE, proposal('deploy-window', 'Deploys moved to Mondays at noon.', must='Mondays'), {'kind': 'run', 'run_id': str(run)})
+        second = await propose(db, WORKSPACE, proposal('deploy-window', 'Deploys moved to Mondays at noon.', must='Mondays'), {'kind': 'run', 'run_id': str(PROPOSING_RUN)})
         await reviewed(second)
         await decide(db, WORKSPACE, second, ACTOR, 'promote')
         now_found = await search(db, WORKSPACE, 'Mondays')
@@ -185,12 +187,12 @@ async def main() -> None:
         own = await propose(db, WORKSPACE, proposal('own-evidence', 'Deploys on Fridays.'), {'kind': 'model', 'run_id': str(run)})
         results = await reviewed(own, [{'must_contain': 'Fridays'}])
         check('a run cannot cite itself as evidence', 'evidence_is_its_own_run', results['failures'], 'evidence_is_its_own_run' in results['failures'])
-        first_time = await propose(db, WORKSPACE, proposal('undo-first', 'Undo this zanzibar later.'), {'kind': 'test'})
-        await reviewed(first_time, [{'must_contain': 'zanzibar'}])
+        first_time = await propose(db, WORKSPACE, proposal('undo-first', f'Undo this {UNDO_WORD} later.'), {'kind': 'test'})
+        await reviewed(first_time, [{'must_contain': UNDO_WORD}])
         await decide(db, WORKSPACE, first_time, ACTOR, 'promote')
-        found = await search(db, WORKSPACE, 'zanzibar')
+        found = await search(db, WORKSPACE, UNDO_WORD)
         head = await rollback(db, WORKSPACE, 'memory', 'undo-first', 0)
-        after_undo = await search(db, WORKSPACE, 'zanzibar')
+        after_undo = await search(db, WORKSPACE, UNDO_WORD)
         check('a bad first promotion can be undone', 'found, then nothing active', (len(found), head.active_version, len(after_undo)), len(found) >= 1 and head.active_version is None and not after_undo)
     print(json.dumps({'cases': cases}))
 

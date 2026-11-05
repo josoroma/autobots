@@ -1360,6 +1360,18 @@ export const schemas = {
         "title": "Content",
         "type": "string"
       },
+      "expert_id": {
+        "anyOf": [
+          {
+            "format": "uuid",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Expert Id"
+      },
       "title": {
         "maxLength": 200,
         "minLength": 1,
@@ -3983,6 +3995,7 @@ export function parseLocalStatus(value: unknown): LocalStatus {
 
 export interface MemoryCreate {
   content: string;
+  expert_id?: string | null;
   title: string;
 }
 
