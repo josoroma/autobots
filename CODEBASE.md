@@ -49,9 +49,9 @@ The design artifacts include `PRD-Design-System.md`, the user-supplied light/dar
 
 ## Product implementation status
 
-There is no implemented Next.js application, FastAPI service, LangGraph worker, application migration/seed set or project Supabase stack in this workspace. No local model runtime is part of the selected design. Public OpenRouter catalog research does not establish authenticated live model qualification.
+The Next.js application, FastAPI service, LangGraph goal loop and application migrations and seeds exist, as the bullets below describe, and have run only on disposable stacks with a scripted model. No persistent project Supabase stack is configured. No worker that calls a real model exists: the product worker runs maintenance only, and goals have only run under test fixtures. No local model runtime is part of the selected design. Public OpenRouter catalog research does not establish authenticated live model qualification.
 
-No application lockfile/toolchain qualification or persistent database operation has been performed by this harness adaptation. The `harness` profile is limited to the delivered development tooling. `fast` and `full` add the scaffold's static checks, tests and build. `db` runs synthetic fixtures on a disposable Docker target. Future `operations` must report unavailable until implemented and tested.
+No application lockfile/toolchain qualification or persistent database operation has been performed by this harness adaptation. The `harness` profile is limited to the delivered development tooling. `fast` and `full` add the scaffold's static checks, tests and build. `db` runs synthetic fixtures on a disposable Docker target. `operations` still reports unavailable, though `scripts/qualify_operations.py`, `scripts/qualify_backup.py` and `scripts/qualify_upgrade.py` now exist and run on their own.
 
 ## Integration points
 
