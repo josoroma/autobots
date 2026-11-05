@@ -14,6 +14,7 @@ const TOOLS = [
   { id: "save_artifact", label: "Save run files" },
   { id: "publish_artifact", label: "Publish artifacts" },
   { id: "search_memory", label: "Search memory" },
+  { id: "propose_improvement", label: "Propose improvements for review" },
 ];
 const PROFILES = [
   { id: "", label: "Workspace setting" },

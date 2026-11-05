@@ -12,6 +12,8 @@ const MESSAGES: Record<string, string> = {
   owner_required: "Only the workspace owner can decide.",
   approval_expired: "This request expired, so it was not approved.",
   approval_mismatch: "The request changed. Reload and review it again.",
+  approval_too_large:
+    "This request is too long to show whole, so it can't be approved. Reject it, or have it made smaller.",
   approval_already_decided: "This request was already decided.",
   approval_run_not_waiting:
     "The run isn't waiting for this decision. Resume it first.",
@@ -125,9 +127,17 @@ export function ApprovalsPanel() {
             <p className="text-sm">
               Effect: {approval.operation_class.replaceAll("_", " ")}
             </p>
-            <pre className="bg-muted overflow-x-auto rounded-md p-3 text-sm">
+            <pre
+              tabIndex={0}
+              className="bg-muted max-h-96 overflow-auto rounded-md p-3 text-sm break-words whitespace-pre-wrap"
+            >
               {approval.arguments}
             </pre>
+            {approval.arguments_truncated ? (
+              <p role="alert" className="text-sm font-medium">
+                {MESSAGES.approval_too_large}
+              </p>
+            ) : null}
             <p className="text-muted-foreground text-sm">
               Expires {new Date(approval.expires_at).toLocaleString()}.{" "}
               <Link href={`/runs/${approval.run_id}`} className="underline">

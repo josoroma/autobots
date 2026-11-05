@@ -18,11 +18,13 @@ from autobots.application.goal_loop import (
     _finish,
     _keep_lease,
     _result,
+    _run_status,
     loop_registry,
 )
 from autobots.application.plans import load_goal
+from autobots.application.recovery import classify_interrupted
 from autobots.application.run_usage import ensure_usage
-from autobots.application.runs import LeaseLost, apply_command
+from autobots.application.runs import LeaseLost, VersionConflict, apply_command
 from autobots.application.tool_gateway import (
     ToolContext,
     ToolDefinition,
@@ -32,7 +34,7 @@ from autobots.application.tool_gateway import (
     ownership_refusal,
 )
 from autobots.application.worker_leases import Lease
-from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.runs import Actor, CommandRefused, RunCommand, RunStatus
 from autobots.domain.tools import DELEGATION_TOOL, OperationClass
 from autobots.domain.workflow_execution import (
     BlockFailed,
@@ -42,7 +44,9 @@ from autobots.domain.workflow_execution import (
     run_predicate,
     run_transform,
     shape_of,
+    unsettled_nodes,
 )
+from autobots.domain.workflows import validate_graph
 
 
 class ApprovalInput(BaseModel):
@@ -72,7 +76,19 @@ APPROVAL_GATE = ToolDefinition(
     operation_class=OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE,
     handler=_release,
 )
-STOPS = frozenset({"approval_pending", "outcome_unknown", "assignment_paused", "lease_lost"})
+# Not this node's failure: it runs again, and any recorded effect comes back from its receipt.
+STOPS = frozenset(
+    {
+        "approval_pending",
+        "outcome_unknown",
+        "assignment_paused",
+        "lease_lost",
+        "run_not_running",
+        "run_not_found",
+        "assignment_lost",
+        "assignment_busy",
+    }
+)
 
 
 class _Stop(Exception):
@@ -254,6 +270,10 @@ async def run_workflow(
     execution_id, inputs, graph = await cursor.fetchone()
     goal = await load_goal(connection, lease.run_id)
     await ensure_usage(connection, lease.run_id)
+    if validate_graph(graph):
+        # Published under older rules. Some shapes lose data, so it fails rather than running.
+        await classify_interrupted(connection, lease.run_id, lease.generation)
+        return await _finish(connection, lease, goal, "workflow_invalid")
     scope = ToolScope(
         lease.workspace_id,
         lease.run_id,
@@ -289,13 +309,27 @@ async def run_workflow(
     statuses, _ = await _load_state(connection, execution_id)
     if any(status == "failed" for status in statuses.values()):
         return await _finish(connection, lease, goal, "workflow_node_failed")
+    if unsettled_nodes(shape, statuses):
+        # Nothing can move, and this isn't finished. That's a failure, never a success.
+        return await _finish(connection, lease, goal, "workflow_stalled")
     return await _complete(connection, lease, goal)
 
 
 async def _complete(connection: Any, lease: Lease, goal: Any) -> LoopResult:
-    """A workflow finishes when every instance is settled, through the normal transitions."""
+    """A workflow finishes when every instance is settled, through the normal transitions.
+
+    A worker can die between the two, so a run already verifying only needs the second.
+    """
+    status = await _run_status(connection, lease)
+    if status == RunStatus.CANCELLING.value:
+        return await _finish(connection, lease, goal, "run_not_running")
+    commands = (
+        (RunCommand.COMPLETE,)
+        if status == RunStatus.VERIFYING.value
+        else (RunCommand.VERIFY, RunCommand.COMPLETE)
+    )
     try:
-        for command in (RunCommand.VERIFY, RunCommand.COMPLETE):
+        for command in commands:
             cursor = await connection.execute(
                 "select version from public.runs where id = %s", (lease.run_id,)
             )
@@ -310,4 +344,7 @@ async def _complete(connection: Any, lease: Lease, goal: Any) -> LoopResult:
             )
     except LeaseLost:
         return await _result(connection, lease, goal, "lost", "lease_lost", None)
+    except (CommandRefused, VersionConflict):
+        # Someone cancelled or paused after that check. `_finish` settles whichever it was.
+        return await _finish(connection, lease, goal, "run_not_running")
     return await _result(connection, lease, goal, "succeeded", None, result.status)

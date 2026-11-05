@@ -32,7 +32,9 @@ from autobots.domain.tools import PLAN_TOOLS
 PAGE_SIZE = 200
 MAX_TEXT = 500
 # Plans and summaries are written by a model, so a key it was shown must not be displayed.
-_SECRETS = re.compile(r"(sk-[A-Za-z0-9_-]{4,}|Bearer\s+[A-Za-z0-9._-]{8,}|eyJ[A-Za-z0-9_-]{10,})")
+_SECRETS = re.compile(
+    r"((?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{4,}|Bearer\s+[A-Za-z0-9._-]{8,}|eyJ[A-Za-z0-9_-]{10,})"
+)
 # Spend comes from the ledger, so the public figures can't drift from what admission counted.
 _NAMES = (
     "id",

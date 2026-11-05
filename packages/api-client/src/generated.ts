@@ -150,6 +150,10 @@ export const schemas = {
         "title": "Arguments",
         "type": "string"
       },
+      "arguments_truncated": {
+        "title": "Arguments Truncated",
+        "type": "boolean"
+      },
       "expires_at": {
         "title": "Expires At",
         "type": "string"
@@ -189,6 +193,7 @@ export const schemas = {
       "operation_class",
       "argument_hash",
       "arguments",
+      "arguments_truncated",
       "status",
       "expires_at"
     ],
@@ -3547,6 +3552,7 @@ export function parseApprovalResult(value: unknown): ApprovalResult {
 export interface ApprovalView {
   argument_hash: string;
   arguments: string;
+  arguments_truncated: boolean;
   expires_at: string;
   id: string;
   operation_class: string;

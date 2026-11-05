@@ -5,6 +5,7 @@ import json
 import os
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -82,6 +83,7 @@ PAUSE_FOR = frozenset(
         "uncertain_model_call",
         "assignment_paused",
         "assignment_lost",
+        "assignment_busy",
         "parent_not_running",
         "outcome_unknown",
         INCOMPATIBLE,
@@ -334,6 +336,7 @@ async def _drive(
     if await execution_block(connection, lease.run_id) is not None:
         # Before any model or checkpoint is touched. A migration never swaps these for it.
         goal = await load_goal(connection, lease.run_id)
+        await classify_interrupted(connection, lease.run_id, lease.generation)
         return await _finish(connection, lease, goal, INCOMPATIBLE)
     cursor = await connection.execute(
         "select 1 from public.workflow_executions where run_id = %s", (lease.run_id,)
@@ -481,8 +484,32 @@ async def _result(
     )
 
 
-async def _settle_children(connection: Any, lease: Lease) -> None:
-    """A cancelled parent's children finish too, and their open assignments close."""
+async def _cancel_stray_child(connection: Any, lease: Lease, child: UUID) -> str:
+    cursor = await connection.execute(
+        "select status, version from public.runs where id = %s", (child,)
+    )
+    status, version = await cursor.fetchone()
+    try:
+        result = await apply_command(
+            connection,
+            workspace_id=lease.workspace_id,
+            run_id=child,
+            command=RunCommand.CANCEL,
+            actor=Actor.USER,
+            expected_version=version,
+        )
+    except (CommandRefused, VersionConflict):
+        # It moved under us. The parent stays queued and looks again.
+        return str(status)
+    return str(result.status)
+
+
+async def _settle_children(connection: Any, lease: Lease) -> datetime | None:
+    """A cancelled parent's children finish too, and their open assignments close.
+
+    Returns when to try again, if a child still has a live owner. A parent that finished without it
+    would leave nothing able to settle that child, as `claim_next` leaves children to their parent.
+    """
     cursor = await connection.execute(
         "select a.id, a.child_run_id, r.status from app_private.assignments a "
         "join public.runs r on r.id = a.child_run_id "
@@ -490,19 +517,44 @@ async def _settle_children(connection: Any, lease: Lease) -> None:
         (lease.run_id,),
     )
     terminal = {RunStatus.CANCELLED.value, RunStatus.FAILED.value, RunStatus.SUCCEEDED.value}
+    retry_at: datetime | None = None
     for assignment_id, child, status in await cursor.fetchall():
+        if status != RunStatus.CANCELLING.value and status not in terminal:
+            # Admitted as the cancel landed, so the cascade missed it. Nothing else would reach it.
+            status = await _cancel_stray_child(connection, lease, child)
         if status not in terminal:
             child_lease = await claim_run(connection, child, worker_id=lease.worker_id)
-            if child_lease is None:
+            settled = None
+            if child_lease is not None:
+                settled = await _finish(
+                    connection, child_lease, await load_goal(connection, child), "run_not_running"
+                )
+            if settled is None or settled.run_status not in terminal:
+                # Still owned, or it has children of its own to wait for.
+                expiry = await connection.execute(
+                    "select greatest(available_at, coalesce(lease_expires_at, available_at), "
+                    "clock_timestamp() + interval '5 seconds') "
+                    "from app_private.run_jobs where run_id = %s",
+                    (child,),
+                )
+                moment = (await expiry.fetchone())[0]
+                retry_at = moment if retry_at is None else max(retry_at, moment)
                 continue
-            await _finish(
-                connection, child_lease, await load_goal(connection, child), "run_not_running"
-            )
         await connection.execute(
             "update app_private.assignments set status = 'finished', outcome = 'cancelled', "
             "finished_at = now() where id = %s",
             (assignment_id,),
         )
+    return retry_at
+
+
+async def _holds_lease(connection: Any, lease: Lease) -> bool:
+    cursor = await connection.execute(
+        "select 1 from app_private.run_jobs where run_id = %s and generation = %s "
+        "and status = 'claimed' and lease_expires_at > clock_timestamp()",
+        (lease.run_id, lease.generation),
+    )
+    return await cursor.fetchone() is not None
 
 
 async def _finish(
@@ -510,12 +562,26 @@ async def _finish(
 ) -> LoopResult:
     view = await plan_view(connection, lease.run_id, goal)
     code = stop_code
+    # Whatever stopped this pass, a run being cancelled finishes that. Anything else is refused.
+    if code != "lease_lost" and await _run_status(connection, lease) == RunStatus.CANCELLING.value:
+        # Settling classifies what's in flight, so a worker that lost the run must not start it.
+        code = "run_not_running" if await _holds_lease(connection, lease) else "lease_lost"
     if code is None and not view.finished:
         code = "plan_missing" if view.version is None else "plan_incomplete"
     command: RunCommand | None
     if code == "run_not_running" and await _run_status(connection, lease) == "cancelling":
         # This worker still owns it, and it is the one who settles the cancellation.
-        await _settle_children(connection, lease)
+        retry_at = await _settle_children(connection, lease)
+        if retry_at is not None:
+            await connection.execute(
+                "update app_private.run_jobs set status = 'queued', lease_owner = null, "
+                "lease_expires_at = null, available_at = %s "
+                "where run_id = %s and generation = %s and status = 'claimed'",
+                (retry_at, lease.run_id, lease.generation),
+            )
+            return await _result(
+                connection, lease, goal, "waiting", "children_settling", RunStatus.CANCELLING.value
+            )
         await classify_interrupted(connection, lease.run_id, lease.generation + 1)
         left = await outstanding(connection, lease.run_id)
         code = (

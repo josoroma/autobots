@@ -1,11 +1,17 @@
 """Golden graphs and every typed refusal, with no database."""
 
+import asyncio
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
+from autobots.application.run_projection import public_text
+from autobots.application.workflow_runner import _Stop, _tool
+from autobots.domain.workflow_execution import BlockFailed, GraphShape, unsettled_nodes
 from autobots.domain.workflows import (
     MAX_FOREACH_ITEMS,
+    _iteration_errors,
     block_versions,
     graph_hash,
     input_errors,
@@ -248,3 +254,63 @@ def test_execution_inputs_match_their_types() -> None:
     assert [e.code for e in input_errors(graph, {})] == ["input_missing"]
     assert [e.code for e in input_errors(graph, {"in": 5})] == ["input_type_mismatch"]
     assert "input_unknown" in [e.code for e in input_errors(graph, {"in": "a", "extra": 1})]
+
+
+def test_two_foreach_regions_cannot_feed_one_join() -> None:
+    nodes = {
+        "left": {"block": "foreach"},
+        "right": {"block": "foreach"},
+        "gather": {"block": "join"},
+    }
+    successors = {"left": {"gather"}, "right": {"gather"}}
+    errors = _iteration_errors(nodes, successors)
+    assert [(error.code, error.node) for error in errors] == [("join_multiple_foreach", "gather")]
+
+
+def test_a_workflow_nothing_can_move_is_not_finished() -> None:
+    shape = GraphShape(
+        nodes={
+            "each": {"block": "foreach"},
+            "body": {"block": "transform"},
+            "gather": {"block": "join"},
+            "end": {"block": "output"},
+        },
+        links_to={},
+        order=["each", "body", "gather", "end"],
+        owner={"body": "each"},
+    )
+    settled = {"each": "succeeded", "gather": "succeeded", "end": "succeeded"}
+    assert unsettled_nodes(shape, settled) == []
+    assert unsettled_nodes(shape, {"each": "succeeded"}) == ["end", "gather"]
+    assert unsettled_nodes(shape, {**settled, "body#0": "running"}) == ["body#0"]
+
+
+def test_a_word_containing_the_key_prefix_is_shown_as_written() -> None:
+    assert public_text("a risk-free change") == "a risk-free change"
+    assert public_text("key sk-or-v1-abcdef") == "key [redacted]"
+
+
+def test_a_join_cannot_mix_a_foreach_with_an_outside_source() -> None:
+    nodes = {
+        "in": {"block": "input"},
+        "each": {"block": "foreach"},
+        "gather": {"block": "join"},
+    }
+    successors = {"in": {"each", "gather"}, "each": {"gather"}}
+    codes = [error.code for error in _iteration_errors(nodes, successors)]
+    assert codes == ["join_mixed_sources"]
+
+
+def test_a_stopped_agent_node_runs_again_instead_of_failing() -> None:
+    class Stopped:
+        def __init__(self, code: str) -> None:
+            self.code = code
+
+        async def execute(self, *_: Any) -> Any:
+            return SimpleNamespace(code=self.code, outcome=SimpleNamespace(value="failed"))
+
+    for code in ("assignment_lost", "assignment_busy", "run_not_running", "run_not_found"):
+        with pytest.raises(_Stop):
+            asyncio.run(_tool(Stopped(code), None, None, "t", {}))  # type: ignore[arg-type]
+    with pytest.raises(BlockFailed):
+        asyncio.run(_tool(Stopped("tool_failed"), None, None, "t", {}))  # type: ignore[arg-type]

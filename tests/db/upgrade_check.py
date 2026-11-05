@@ -99,7 +99,7 @@ async def main(workspace: UUID, queued: UUID, second: UUID, before_hash: str) ->
             check(f'{label} records why', 'incompatible_version', shown, shown == 'incompatible_version')
             version = await value('select version from public.runs where id = %s', run)
             await apply_command(db, workspace_id=workspace, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
-            check(f'{label} leaves the owner able to cancel', 'cancelled', await state(run), await state(run) in ('cancelled', 'cancelling'))
+            check(f'{label} leaves the owner able to cancel', 'cancelled', await state(run), await state(run) == 'cancelled')
             linked = await admit_run(db, workspace_id=workspace, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='Blocked goal', limit_micro_usd=1_000_000, policy=resolve_role_policy(), continues_run_id=run) if await state(run) == 'cancelled' else None
             check(f'{label} can continue as a linked new run on current semantics', 'a new run with the current contract', bool(linked), linked is not None)
             if linked is not None:

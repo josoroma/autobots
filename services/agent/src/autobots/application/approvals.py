@@ -25,6 +25,14 @@ from autobots.domain.runs import RunCommand, RunStatus
 DEFAULT_TTL_SECONDS = 86_400
 
 
+# What a reviewer can be shown whole. Anything longer can be rejected, not approved.
+ARGUMENT_LIMIT = 64_000
+
+
+def exceeds_review_limit(arguments: str) -> bool:
+    return len(arguments) > ARGUMENT_LIMIT
+
+
 class ApprovalRefused(Exception):
     def __init__(self, code: str) -> None:
         super().__init__(code)
@@ -185,16 +193,20 @@ async def decide(
         if existing is not None:
             return DecisionResult(approval_id, existing["status"], True)
         cursor = await connection.execute(
-            "select run_id, status, argument_hash, expires_at <= clock_timestamp() "
-            "from public.approval_requests where id = %s and workspace_id = %s for update",
+            "select run_id, status, argument_hash, expires_at <= clock_timestamp(), "
+            "arguments::text from public.approval_requests "
+            "where id = %s and workspace_id = %s for update",
             (approval_id, workspace_id),
         )
         row = await cursor.fetchone()
         if row is None:
             raise ApprovalRefused("approval_not_found")
-        run_id, status, stored_hash, expired = row
+        run_id, status, stored_hash, expired, arguments = row
         if stored_hash != argument_hash:
             raise ApprovalRefused("approval_mismatch")
+        if decision == "approve" and status == "pending" and exceeds_review_limit(arguments):
+            # The hash proves what's stored, not what anyone read.
+            raise ApprovalRefused("approval_too_large")
         if status != "pending":
             if status == wanted:
                 return DecisionResult(approval_id, status, True)

@@ -21,6 +21,7 @@ class ApprovalView(BaseModel):
     operation_class: str
     argument_hash: str
     arguments: str
+    arguments_truncated: bool
     status: str
     expires_at: str
 

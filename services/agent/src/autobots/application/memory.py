@@ -108,7 +108,15 @@ async def _read_offload(arguments: ReadOffload, context: ToolContext) -> Offload
     row = await cursor.fetchone()
     if row is None:
         raise ToolFailed("offload_not_found")
-    return OffloadContent(tool_name=row[0], content=row[1], sha256=row[2])
+    content: str = row[1]
+    end = arguments.offset + arguments.limit
+    return OffloadContent(
+        tool_name=row[0],
+        content=content[arguments.offset : end],
+        sha256=row[2],
+        total_chars=len(content),
+        next_offset=end if end < len(content) else None,
+    )
 
 
 SEARCH_MEMORY = ToolDefinition(
@@ -125,7 +133,10 @@ SEARCH_MEMORY = ToolDefinition(
 READ_OFFLOAD = ToolDefinition(
     tool_id="read_offload",
     version=1,
-    description="Read back a long tool result that was stored outside the conversation.",
+    description=(
+        "Read back a long tool result stored outside the conversation, a page at a time. "
+        "Keep passing next_offset as offset until it is null."
+    ),
     input_model=ReadOffload,
     output_model=OffloadContent,
     operation_class=OperationClass.READ_ONLY,

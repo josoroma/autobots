@@ -8,7 +8,13 @@ from fastapi import APIRouter, Depends, Header, Query, Request
 from autobots.api.errors import ApiError
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, require_owner
-from autobots.application.approvals import ApprovalRefused, decide, list_approvals
+from autobots.application.approvals import (
+    ARGUMENT_LIMIT,
+    ApprovalRefused,
+    decide,
+    exceeds_review_limit,
+    list_approvals,
+)
 from autobots.application.run_projection import public_text
 from autobots.application.runs import IdempotencyConflict
 from autobots.contracts.approvals import (
@@ -20,7 +26,6 @@ from autobots.contracts.approvals import (
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 Key = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)]
-ARGUMENT_PREVIEW = 4000
 
 
 def _pool(request: Request) -> Any:
@@ -50,7 +55,11 @@ async def get_approvals(
                 tool_version=row["tool_version"],
                 operation_class=row["operation_class"],
                 argument_hash=row["argument_hash"],
-                arguments=public_text(row["arguments"], limit=ARGUMENT_PREVIEW),
+                # Redaction can lengthen text a little, so the cut only ever applies past the limit.
+                arguments=public_text(row["arguments"], limit=ARGUMENT_LIMIT * 2)
+                if not exceeds_review_limit(row["arguments"])
+                else public_text(row["arguments"], limit=ARGUMENT_LIMIT),
+                arguments_truncated=exceeds_review_limit(row["arguments"]),
                 status=row["status"],
                 expires_at=row["expires_at"].isoformat(),
             )
