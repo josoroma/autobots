@@ -31,6 +31,7 @@ export interface ArtifactsRow {
   status: string;
   created_at: string;
   published_at: string | null;
+  bytes_removed_at: string | null;
 }
 
 export interface ExpertVersionsRow {
@@ -164,6 +165,7 @@ export interface RunsRow {
   expert_id: string | null;
   expert_version: number | null;
   root_run_id: string | null;
+  content_purged_at: string | null;
 }
 
 export interface SessionsRow {

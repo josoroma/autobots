@@ -1257,6 +1257,75 @@ export const schemas = {
     "title": "KnowledgeHead",
     "type": "object"
   },
+  "LocalStatus": {
+    "additionalProperties": false,
+    "description": "`scope` is `installation` when the database is down, as no workspace can be verified.",
+    "properties": {
+      "conditions": {
+        "items": {
+          "$ref": "#/components/schemas/OperationCondition"
+        },
+        "title": "Conditions",
+        "type": "array"
+      },
+      "queue": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/QueueStatus"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "ready": {
+        "title": "Ready",
+        "type": "boolean"
+      },
+      "remote_tracing": {
+        "enum": [
+          "disabled",
+          "enabled"
+        ],
+        "title": "Remote Tracing",
+        "type": "string"
+      },
+      "retention": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/RetentionSettings"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "scope": {
+        "enum": [
+          "workspace",
+          "installation"
+        ],
+        "title": "Scope",
+        "type": "string"
+      }
+    },
+    "required": [
+      "schema_version",
+      "ready",
+      "scope",
+      "remote_tracing",
+      "conditions",
+      "queue",
+      "retention"
+    ],
+    "title": "LocalStatus",
+    "type": "object"
+  },
   "MemoryCreate": {
     "additionalProperties": false,
     "properties": {
@@ -1529,6 +1598,43 @@ export const schemas = {
     "title": "OccurrenceView",
     "type": "object"
   },
+  "OperationCondition": {
+    "additionalProperties": false,
+    "properties": {
+      "code": {
+        "title": "Code",
+        "type": "string"
+      },
+      "name": {
+        "enum": [
+          "database",
+          "schema",
+          "storage",
+          "disk",
+          "queue",
+          "worker"
+        ],
+        "title": "Name",
+        "type": "string"
+      },
+      "state": {
+        "enum": [
+          "ok",
+          "degraded",
+          "unavailable"
+        ],
+        "title": "State",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name",
+      "state",
+      "code"
+    ],
+    "title": "OperationCondition",
+    "type": "object"
+  },
   "OutstandingSummary": {
     "additionalProperties": false,
     "description": "Known unknowns. These stay visible, even on a finished run.",
@@ -1690,6 +1796,40 @@ export const schemas = {
     "title": "ProviderStatus",
     "type": "object"
   },
+  "QueueStatus": {
+    "additionalProperties": false,
+    "description": "This workspace's jobs.",
+    "properties": {
+      "claimed": {
+        "minimum": 0.0,
+        "title": "Claimed",
+        "type": "integer"
+      },
+      "expired_leases": {
+        "minimum": 0.0,
+        "title": "Expired Leases",
+        "type": "integer"
+      },
+      "oldest_queued_seconds": {
+        "minimum": 0.0,
+        "title": "Oldest Queued Seconds",
+        "type": "integer"
+      },
+      "queued": {
+        "minimum": 0.0,
+        "title": "Queued",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "queued",
+      "claimed",
+      "expired_leases",
+      "oldest_queued_seconds"
+    ],
+    "title": "QueueStatus",
+    "type": "object"
+  },
   "ReconciliationResult": {
     "additionalProperties": false,
     "properties": {
@@ -1733,6 +1873,87 @@ export const schemas = {
       "name"
     ],
     "title": "RequiredArtifact",
+    "type": "object"
+  },
+  "RetentionApplied": {
+    "additionalProperties": false,
+    "properties": {
+      "keys_expired": {
+        "minimum": 0.0,
+        "title": "Keys Expired",
+        "type": "integer"
+      },
+      "objects_pending": {
+        "minimum": 0.0,
+        "title": "Objects Pending",
+        "type": "integer"
+      },
+      "objects_removed": {
+        "minimum": 0.0,
+        "title": "Objects Removed",
+        "type": "integer"
+      },
+      "purged_runs": {
+        "minimum": 0.0,
+        "title": "Purged Runs",
+        "type": "integer"
+      },
+      "refused": {
+        "additionalProperties": {
+          "type": "integer"
+        },
+        "title": "Refused",
+        "type": "object"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "purged_runs",
+      "refused",
+      "keys_expired",
+      "objects_removed",
+      "objects_pending"
+    ],
+    "title": "RetentionApplied",
+    "type": "object"
+  },
+  "RetentionSettings": {
+    "additionalProperties": false,
+    "description": "A null window keeps everything. Keys must outlive the run content they can answer for.",
+    "properties": {
+      "receipt_days": {
+        "anyOf": [
+          {
+            "maximum": 36500.0,
+            "minimum": 1.0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Receipt Days"
+      },
+      "run_days": {
+        "anyOf": [
+          {
+            "maximum": 36500.0,
+            "minimum": 1.0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Run Days"
+      }
+    },
+    "title": "RetentionSettings",
     "type": "object"
   },
   "RoleBinding": {
@@ -3680,6 +3901,20 @@ export function parseKnowledgeHead(value: unknown): KnowledgeHead {
   return parseWith(schemas, "KnowledgeHead", value) as KnowledgeHead;
 }
 
+export interface LocalStatus {
+  conditions: OperationCondition[];
+  queue: QueueStatus | null;
+  ready: boolean;
+  remote_tracing: "disabled" | "enabled";
+  retention: RetentionSettings | null;
+  schema_version: 1;
+  scope: "workspace" | "installation";
+}
+
+export function parseLocalStatus(value: unknown): LocalStatus {
+  return parseWith(schemas, "LocalStatus", value) as LocalStatus;
+}
+
 export interface MemoryCreate {
   content: string;
   title: string;
@@ -3780,6 +4015,16 @@ export function parseOccurrenceView(value: unknown): OccurrenceView {
   return parseWith(schemas, "OccurrenceView", value) as OccurrenceView;
 }
 
+export interface OperationCondition {
+  code: string;
+  name: "database" | "schema" | "storage" | "disk" | "queue" | "worker";
+  state: "ok" | "degraded" | "unavailable";
+}
+
+export function parseOperationCondition(value: unknown): OperationCondition {
+  return parseWith(schemas, "OperationCondition", value) as OperationCondition;
+}
+
 export interface OutstandingSummary {
   uncertain_calls: number;
   unknown_effects: number;
@@ -3817,6 +4062,17 @@ export function parseProviderStatus(value: unknown): ProviderStatus {
   return parseWith(schemas, "ProviderStatus", value) as ProviderStatus;
 }
 
+export interface QueueStatus {
+  claimed: number;
+  expired_leases: number;
+  oldest_queued_seconds: number;
+  queued: number;
+}
+
+export function parseQueueStatus(value: unknown): QueueStatus {
+  return parseWith(schemas, "QueueStatus", value) as QueueStatus;
+}
+
 export interface ReconciliationResult {
   reconciled_calls: number;
   schema_version: 1;
@@ -3833,6 +4089,28 @@ export interface RequiredArtifact {
 
 export function parseRequiredArtifact(value: unknown): RequiredArtifact {
   return parseWith(schemas, "RequiredArtifact", value) as RequiredArtifact;
+}
+
+export interface RetentionApplied {
+  keys_expired: number;
+  objects_pending: number;
+  objects_removed: number;
+  purged_runs: number;
+  refused: Record<string, unknown>;
+  schema_version: 1;
+}
+
+export function parseRetentionApplied(value: unknown): RetentionApplied {
+  return parseWith(schemas, "RetentionApplied", value) as RetentionApplied;
+}
+
+export interface RetentionSettings {
+  receipt_days?: number | null;
+  run_days?: number | null;
+}
+
+export function parseRetentionSettings(value: unknown): RetentionSettings {
+  return parseWith(schemas, "RetentionSettings", value) as RetentionSettings;
 }
 
 export interface RoleBinding {
@@ -4356,6 +4634,18 @@ export async function searchMemory(options: ClientOptions): Promise<MemorySearch
 
 export async function getModels(options: ClientOptions): Promise<ModelList> {
   return parseModelList(await requestJson(options, "GET", `/v1/models`));
+}
+
+export async function getLocalStatus(options: ClientOptions): Promise<LocalStatus> {
+  return parseLocalStatus(await requestJson(options, "GET", `/v1/operations/local-status`));
+}
+
+export async function setRetention(options: ClientOptions, body: RetentionSettings): Promise<RetentionSettings> {
+  return parseRetentionSettings(await requestJson(options, "PUT", `/v1/operations/retention`, body));
+}
+
+export async function applyRetention(options: ClientOptions): Promise<RetentionApplied> {
+  return parseRetentionApplied(await requestJson(options, "POST", `/v1/operations/retention/apply`));
 }
 
 export async function listRoutines(options: ClientOptions): Promise<RoutineList> {

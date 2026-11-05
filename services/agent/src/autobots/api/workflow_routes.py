@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Request, status
 
 from autobots.api.errors import ApiError
+from autobots.api.operation_routes import require_ready
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, provider_settings, require_owner
 from autobots.application.provider_settings import ProviderSettings
@@ -184,6 +185,7 @@ async def post_version(
     operation_id="createWorkflowExecution",
     response_model=ExecutionBinding,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_ready)],
 )
 async def post_execution(
     workflow_id: UUID,

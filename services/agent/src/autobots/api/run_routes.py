@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Request, status
 
 from autobots.api.errors import ApiError
+from autobots.api.operation_routes import require_ready
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, provider_settings, require_owner
 from autobots.application.experts import ExpertRefused, resolve_binding
@@ -73,6 +74,7 @@ def as_api_error(error: Exception) -> ApiError:
 @router.post(
     "/runs",
     operation_id="admitRun",
+    dependencies=[Depends(require_ready)],
     response_model=RunAccepted,
     status_code=status.HTTP_202_ACCEPTED,
 )

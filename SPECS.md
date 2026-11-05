@@ -183,10 +183,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-8.2#1 | Implement candidate, review, regression and versioned promotion states. | DONE | US-8.2 |
 | US-8.2#2 | Demonstrate isolation and rollback on controlled fixtures. | DONE | US-8.2 |
 | EPIC-9 | Local operations and recovery | — | — |
-| US-9.1 | Local startup, shutdown, health and operational logs | READY | EPIC-9 |
-| US-9.1#1 | Implement safe readiness/lifecycle/status interfaces and local telemetry. | TODO | US-9.1 |
-| US-9.1#2 | Exercise failure, retention and recovery paths in the operations runbook. | TODO | US-9.1 |
-| US-9.2 | Complete isolated backup and restore proof | BLOCKED | EPIC-9 |
+| US-9.1 | Local startup, shutdown, health and operational logs | DONE | EPIC-9 |
+| US-9.1#1 | Implement safe readiness/lifecycle/status interfaces and local telemetry. | DONE | US-9.1 |
+| US-9.1#2 | Exercise failure, retention and recovery paths in the operations runbook. | DONE | US-9.1 |
+| US-9.2 | Complete isolated backup and restore proof | READY | EPIC-9 |
 | US-9.2#1 | Implement versioned backup manifests and isolated restore procedures. | TODO | US-9.2 |
 | US-9.2#2 | Exercise the complete restore with real local assertions and redacted evidence. | TODO | US-9.2 |
 | US-9.3 | Qualified upgrades and checkpoint-compatible continuation | BLOCKED | EPIC-9 |
@@ -2369,7 +2369,8 @@ Phase reference: B7, preserved SP-020. All story completion also requires SP-003
 
 ### US-9.1: Local startup, shutdown, health and operational logs
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-9-1-local-startup-shutdown-health/`
 
 As an operator
 I want documented local lifecycle and readiness
@@ -2406,15 +2407,15 @@ Dependencies:
 - US-2.1
 
 Tasks:
-- [ ] Implement safe readiness/lifecycle/status interfaces and local telemetry.
-- [ ] Exercise failure, retention and recovery paths in the operations runbook.
+- [x] Implement safe readiness/lifecycle/status interfaces and local telemetry.
+- [x] Exercise failure, retention and recovery paths in the operations runbook.
 
 Open Questions:
 - None.
 
 ### US-9.2: Complete isolated backup and restore proof
 
-Status: BLOCKED
+Status: READY
 
 As an operator
 I want a restorable local application backup

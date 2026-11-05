@@ -15,6 +15,7 @@ from autobots.api.event_routes import router as event_router
 from autobots.api.expert_routes import router as expert_router
 from autobots.api.improvement_routes import router as improvement_router
 from autobots.api.memory_routes import router as memory_router
+from autobots.api.operation_routes import router as operation_router
 from autobots.api.routes import router
 from autobots.api.routine_routes import router as routine_router
 from autobots.api.run_routes import router as run_router
@@ -30,7 +31,9 @@ class Pool(Protocol):
 
 
 def default_pool(url: str) -> Pool:
-    return AsyncConnectionPool(url, open=False, min_size=1, max_size=5)
+    return AsyncConnectionPool(
+        url, open=False, min_size=1, max_size=5, check=AsyncConnectionPool.check_connection
+    )
 
 
 def create_app(
@@ -81,4 +84,5 @@ def create_app(
     app.include_router(routine_router)
     app.include_router(memory_router)
     app.include_router(improvement_router)
+    app.include_router(operation_router)
     return app

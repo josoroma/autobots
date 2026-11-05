@@ -238,7 +238,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
                                      'AUTOBOTS_TEST_UPSTREAM_LOG': str(upstream_log), 'AUTOBOTS_TEST_CATALOG_DOWN': str(catalog_down),
                                      'AUTOBOTS_TEST_SERVICE_KEY': stack.values['SERVICE_ROLE_KEY'], 'AUTOBOTS_WEB_REPORT': str(report),
                                      'AUTOBOTS_WEB_OUTPUT': str(root / '.checks/identity/results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots)}
-        result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'approvals', 'effects', 'experts', 'identity', 'settings', 'runs', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
+        result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'browser/operations.spec', 'approvals', 'effects', 'experts', 'identity', 'settings', 'runs', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
                                 env=browser_env)
         # The slice runs last, with a worker, so nothing above sees its jobs claimed.
         stack.runtime("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done';\n")

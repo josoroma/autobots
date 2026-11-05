@@ -45,6 +45,13 @@ class SupabaseObjectStore:
             transport=self._transport,
         )
 
+    async def ping(self) -> None:
+        """Storage itself answering, past the gateway, or StorageUnavailable."""
+        async with self._client() as client:
+            reply = await client.get(f"/bucket/{BUCKET}")
+        if reply.status_code != 200:
+            raise StorageUnavailable(f"the bucket check answered {reply.status_code}")
+
     async def put(self, path: str, content: bytes, media_type: str) -> bool:
         """False when the object already exists. It is never overwritten."""
         async with self._client() as client:

@@ -5,6 +5,7 @@ const NAVIGATION = [
   { href: "/", label: "Home" },
   { href: "/experts", label: "Experts" },
   { href: "/approvals", label: "Approvals" },
+  { href: "/operations", label: "Operations" },
   { href: "/workflows", label: "Workflows" },
   { href: "/settings", label: "Settings" },
   { href: "/settings/models", label: "Models" },
