@@ -2,9 +2,9 @@
 
 **Inspected:** 2026-11-04. **Scope:** descriptive inventory; this file supplies no product requirements.
 
-Analyzed revision: 5e46124c4541113a36c1597bbd1ea4b20daa3e73
+Analyzed revision: 34ae38f591dc2809d95819433bdceb2fb17b9e27
 
-This describes that revision plus the uncommitted OhMyOrch delivery setup in [HARNESS-OHMYORCH-001](docs/engineering/work-items/HARNESS-OHMYORCH-001.md).
+This describes that revision, which includes the OhMyOrch delivery setup in [HARNESS-OHMYORCH-001](docs/engineering/work-items/HARNESS-OHMYORCH-001.md).
 
 ## System Summary
 
@@ -13,7 +13,7 @@ A documentation and development-harness repository. It holds product PRDs, a sou
 ## Repository Map
 
 - `PRD-*.md`, `SPECS.md`: product and harness intent, and the execution backlog.
-- `docs/engineering/`: technical contract, decisions, work items, runbooks and evidence.
+- `docs/engineering/`: technical contract, decisions, work items, runbooks and evidence. `prerequisite-inventory.md` there is the point-in-time inventory of repository assets and local tools.
 - `docs/design/`, `docs/imagine/`: Luma tokens and generated interface concepts.
 - `.claude/`: project skills, agents, rules, hooks and the document map in `autobots.json`.
 - `scripts/`, `tests/harness/`: backlog tooling, harness verifier and their tests.

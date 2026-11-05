@@ -22,3 +22,8 @@ supabase/.branches/
 .claude/ohmyorch/approvals.local.json
 
 # OHMYORCH:END ignores
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.tsbuildinfo
+.pnpm-store/

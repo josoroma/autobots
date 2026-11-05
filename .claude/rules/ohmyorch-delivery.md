@@ -34,6 +34,17 @@ The reviewer may write only `review.md` and the tester only `test-report.md`, an
 | After `test` | Review section: reviewer identity, reviewed fingerprint, findings and dispositions. Evidence summary under `docs/engineering/evidence/<US-id>/`, recording which runbook steps were exercised and which remain untested, and distinguishing mocked, static, disposable and live results |
 | After `mark-done` | Links to verdicts at their archived path, written before the final verification |
 
+## Protected paths
+
+Upstream's write scope stops `ohmyorch:implementer` from writing `.claude/*`, `AGENTS.md`, `CLAUDE.md`, `README*`, `.gitignore`, `openspec/*`, the mapped PRD, `SPECS.md` and `CODEBASE.md`. When a story's acceptance needs such a file, as US-1.2 and US-1.4 do, the user decided on 2026-11-04 that:
+
+1. The plan names each protected path. Without that, stop and report.
+2. The implementer authors the content and returns it under a heading naming the exact path, stating what it could not test because the file was not yet in place.
+3. The coordinator writes it verbatim, before capture, and records in the Implementation section which paths were persisted this way. The coordinator does not edit that content. A needed change goes back to the implementer.
+4. The reviewer checks these files as implementation. The coordinator is not their reviewer.
+
+This covers implementation content only. Verdicts, `goal.md`, `status.md` and `completion.md` stay with their owners, and `SPECS.md` and `CODEBASE.md` stay coordinator-owned. Never use it to change a guard, a hook registration's protection or a story's acceptance. Those need explicit user authority, and a plan cannot grant it.
+
 ## `review` and `test`
 
 Capture immediately before every `review`, including after a reopen. If verification or capture fails, do not delegate: a stale manifest may still be on disk. Run `delivery block --reason` and report it.
@@ -56,7 +67,8 @@ Verdict authors never see the evidence summary. Delegate a read-only review of t
 The upstream completion gate is necessary but not sufficient. All of these must hold:
 
 - The evidence review has no unresolved blocking finding.
-- `test-report.md` has no `UNVERIFIED` row and covers every scenario. Upstream's gate passes `UNVERIFIED` rows and `OpenSpec verify: not run`, and neither qualifies here.
+- `test-report.md` covers every scenario and has no `UNVERIFIED` row, apart from the one exception below. Upstream's gate passes `UNVERIFIED` rows and `OpenSpec verify: not run`, and neither otherwise qualifies here.
+- **Unmet-Given exception, decided by the user on 2026-11-04:** a scenario whose Given is explicitly conditional, such as "Given X is absent", and does not hold today is scored `UNVERIFIED`, never `PASS`. Archive may proceed only if the row states the Given does not hold, re-run probes evidence that, and the evidence summary and work item name the scenario as unexercised. A scenario merely hard to run does not qualify. Nor does one exercising behavior the story implements, when a disposable environment could arrange its precondition. An "any required item is absent" Given holds if any such item is absent; a recorded decision that one item is not required only removes that item.
 - `python3.12 scripts/verify.py --profile harness` passes, reported as harness evidence only.
 - `python3.12 scripts/story_manifest.py compare <US-id>` passes, with its output recorded in the evidence. It fails on any change since capture, except records written after review and Git-ignored files. Never recapture to make it pass. Between this check and the story commit, change nothing but records and what the `archive` and `mark-done` steps themselves change.
 
@@ -95,4 +107,4 @@ Run `python3.12 scripts/specs.py render`, then `validate`. Stale navigation fail
 
 ## Reporting
 
-A delivered story means its acceptance has current evidence. It does not establish H1 or product acceptance unless that story's own gates say so.
+A delivered story means its acceptance has current evidence, apart from any scenario closed under the unmet-Given exception, which is reported as unexercised. It does not establish H1 or product acceptance unless that story's own gates say so.

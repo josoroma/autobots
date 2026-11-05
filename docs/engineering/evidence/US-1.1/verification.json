@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "work_item_id": "US-1.1",
+  "completed_at_utc": "2026-11-05T00:01:47.822897+00:00",
+  "base_revision": "34ae38f591dc2809d95819433bdceb2fb17b9e27",
+  "tree_state": "final working tree before the story commit",
+  "reviewed_fingerprint": "09b978de1c9eaa4bb57629ff84b058a57a9b9f4ee58002fbbbfa86238a72de2c",
+  "input_fingerprint": "30bf64dde02f259c2a63af949ebf1de950a9723e7e928541f6b8af0b4fc35843",
+  "input_manifest": {
+    ".claude/agents/autobots-architect.md": "79b4e20db7c6d2bbc5c38eaea530bbd699a0aee09b1684acd31183cde4fe5f1b",
+    ".claude/agents/autobots-database.md": "2ec28360b0ddd6196c8435de380f0641562cb915410dc39bc6af327b6e259e53",
+    ".claude/agents/autobots-infrastructure.md": "42388d98ccb42d2ba5c9589e4238638bacc3e50532d66e260425556397768d93",
+    ".claude/agents/autobots-nextjs.md": "a611ac87e6052915078dedf589d6e40e43363dae0f9ff9bed2b9a5f24f448fd9",
+    ".claude/agents/autobots-python-worker.md": "4eb77addade9725c4085938a91b349da439de7421c2e686e2f369d47a693e422",
+    ".claude/agents/autobots-reviewer.md": "644b5e6ee5715d8fa66b753afd130864d8c81bceb3c8bc0b0f5a830b62b8e1e5",
+    ".claude/agents/autobots-spec-ingestor.md": "18123b059c5f2d7c512a0160c2d02ba8e624b931f15ab028ba836f40dcffb361",
+    ".claude/autobots.json": "3a770d1df13f08c0c689c74ad8d966197569786b5c0f8f8daa6755e4c053c4ef",
+    ".claude/hooks/dispatch.py": "3b10666deda626d91c0bc7d032ed7c4456e7f8d978e07f243d03f209ce8c266b",
+    ".claude/ohmyorch/managed-bases/09587ca00cc15466af80c2754b844d7f2df09c40f9c4c988a8c6c181cc182fbb": "09587ca00cc15466af80c2754b844d7f2df09c40f9c4c988a8c6c181cc182fbb",
+    ".claude/ohmyorch/managed-bases/13f628d7874c62c724e4e04094b2300a7f661ecd7e6d8e934f813f429b2d1418": "13f628d7874c62c724e4e04094b2300a7f661ecd7e6d8e934f813f429b2d1418",
+    ".claude/ohmyorch/managed-bases/61c8ae1837bbcd15f7b0257dc337a4cb2ff310fb64ac7e85da39e84d0e5e3aca": "61c8ae1837bbcd15f7b0257dc337a4cb2ff310fb64ac7e85da39e84d0e5e3aca",
+    ".claude/ohmyorch/managed-bases/70c7730d7600d658a95988bffde6b473c03bd96655a8f7a5f0efabcc8d7b41b0": "70c7730d7600d658a95988bffde6b473c03bd96655a8f7a5f0efabcc8d7b41b0",
+    ".claude/ohmyorch/managed-bases/a1ae1c19251937c60465a45e4779edfd60708559b2b99d5d76465464ec5f72dc": "a1ae1c19251937c60465a45e4779edfd60708559b2b99d5d76465464ec5f72dc",
+    ".claude/ohmyorch/managed-bases/c5dacac78404a4498f004bdd7d9ff663c06f021d95ac9e072e3ed7a64ddac1e0": "c5dacac78404a4498f004bdd7d9ff663c06f021d95ac9e072e3ed7a64ddac1e0",
+    ".claude/ohmyorch/managed-bases/cfdcd60d9f412b2732303824f3ea742459241b76d1a9ce9a0b99ec025b948ba9": "cfdcd60d9f412b2732303824f3ea742459241b76d1a9ce9a0b99ec025b948ba9",
+    ".claude/ohmyorch/managed-bases/dfe156e2b2373accefe5c217e5a2f984a5b629591f926440ea97df8e4439e76c": "dfe156e2b2373accefe5c217e5a2f984a5b629591f926440ea97df8e4439e76c",
+    ".claude/ohmyorch/managed-files.json": "f9fe00a873b3fea76de09661690ded629c375e567539d00b605b653ffc50a477",
+    ".claude/ohmyorch/project.json": "cfdcd60d9f412b2732303824f3ea742459241b76d1a9ce9a0b99ec025b948ba9",
+    ".claude/rules/contracts.md": "80c842f675250e0b1bc95b9e764fa5c3dcb606f975d247ae696ef45e338e0d74",
+    ".claude/rules/database.md": "2257b76ffc02626dc52e78dfd6dc7c6cbe404e934d1935220b9b8cb2683f4992",
+    ".claude/rules/delivery.md": "49dbe3f93d3fffa491afa2f16053ff200c4e4a9958020d28b1e546feb16ff4d7",
+    ".claude/rules/infrastructure.md": "ff4adce074692959fb0f91a5276d3b726e2b57ffc6f368ec273422b23ac27f0a",
+    ".claude/rules/model-gateway.md": "011f338f686b4ba9a98c74432e9970cac7804b97c3b23561b8f9ac3a2cdaa21b",
+    ".claude/rules/nextjs.md": "4b270476245e438922e949e242093f4b2892839dd4ec16456cbf307a919857fa",
+    ".claude/rules/ohmyorch-delivery.md": "a57dfe053dd20777da6f9fb6a13caa86355aae76718c8513f320d5e90cc6a523",
+    ".claude/rules/python-worker.md": "f2b9b247ae86a540cae9b2933fa45f6a5e8d3b37adefe29858bacf18a9136286",
+    ".claude/settings.json": "1db227eb980c47646402f30b4ba94955ba20a70ca2da358947ad8393cde3e495",
+    ".claude/skills/autobots-contracts/SKILL.md": "978df34392ed771fdc47e8adf516f00c0d9827dde27f519f9f22f79ecf0e03da",
+    ".claude/skills/autobots-docker-local/SKILL.md": "872770d89681e1926553cdbefe8415f032068f06c906680d158720cefb6e8ae0",
+    ".claude/skills/autobots-durable-worker/SKILL.md": "38da747ff5f33e1f67ba7c46a417e104a45f5c4f39ea80d47f40ec52f8e2dd80",
+    ".claude/skills/autobots-implement-item/SKILL.md": "afd3a46db463d780801589a2184e0ba79241c43f2868b65a6a8842348604cee3",
+    ".claude/skills/autobots-model-gateway/SKILL.md": "bd0f4d17f040173cf90296ab974356e9a0ebd511832530202ee01a3a997abb0c",
+    ".claude/skills/autobots-nextjs/SKILL.md": "2ad3f3c12a1181283d477864699cc68ed3f9ca5089d9ac250a03427665e19c70",
+    ".claude/skills/autobots-plan-change/SKILL.md": "66bc48b49c8f8d628c1a6c774c6111facd3c7331824ceb5c37aa987897a01c2d",
+    ".claude/skills/autobots-python/SKILL.md": "36ead7580a59b3f37ec26645a521afd5fa88f24b215a5693e7ae1c157c0b7ab6",
+    ".claude/skills/autobots-review-change/SKILL.md": "a10cab315e485f000b2f0c39dc7d121834e88b03d02d0da5901e842ef8ed25d2",
+    ".claude/skills/autobots-runbook-evidence/SKILL.md": "229f0126c6d2eff3ac344aa4f7bf3dd000523a75c9f88bb8786bdc45346e71bf",
+    ".claude/skills/autobots-spec-ingest/SKILL.md": "96ed8edafce9a3efdd8e3003504c0ad59b1580d0956404ba0393d145a75fa1fc",
+    ".claude/skills/autobots-supabase/SKILL.md": "5fd2e0c03d4f97008568c57de8e47f01522b4eb7ba6420e580090c4dce4da8f5",
+    ".claude/skills/autobots-verify-change/SKILL.md": "2a5443885dacb5f43f77c1e254ca1d21bec3d254973f295ea826d9928410d934",
+    ".gitignore": "e35dc684a15933f5b303b7c74ac7236d892be9e7e280327ad9c08751b63532a7",
+    "AGENTS.md": "f55ddbc882d121ee097e0eb06fbcf230a68ba636a92d2ab34ab8a5ec390783d6",
+    "CLAUDE.md": "1ab8635b1d176c83865c743b578bb8703555ee6032e9135acf158ac7ca41d68c",
+    "CODEBASE.md": "699cd4fad1106d517cfd396bf5a308107c0465eda95ca7bd14ca3bb47e9328f6",
+    "PRD-AutoGPT.md": "9f8d62f548f78f2c5316f4198469f1c71ccc7597ab2eaa127be99348b7bae842",
+    "PRD-Comparison-Recommendation.md": "1c951a97604374090bc3e1a8d8d11cf03fb51b9c527ab4a9d5b13c16218581c1",
+    "PRD-Design-System.md": "beb195e3ff97586ba37071c0a572f24d0cf3bab1263b14470ab76e3a63e073ad",
+    "PRD-Development-Harness.md": "9abf43e5b59421a83721c2a85708d8c7cc4ee8ed5e76a109d92820669da076b5",
+    "PRD-LangChain-Deep-Agents.md": "919844d772794cdfbb4488e31e191cc5b02a5b219dc06ad2a7406e7358c506e6",
+    "PRD-Local-Mac-Deployment.md": "b76b2109cac2f366a9c6df37f7f062ebc3b1999b139bb4f64af543e4c3bff34a",
+    "PRD-Model-Providers.md": "1289a19ed735061bf6c04fa79bd11e5a0993ce53383b3480232fde09ea1e06c2",
+    "PRD-NextJS.md": "7de966f056371961841d81db1388c2655999ec3a5f7190cbda5cb1b95837f092",
+    "README.md": "c96687306111b06fb23b1cb2a0b8407e2654762f19f99baa6b289483cb92e1c0",
+    "SPECS.md": "c627e0427f8c9923b0510337cf2b034030eb04fd196acf69500ab3cca4be8c21",
+    "docs/engineering/decisions/0001-ohmyorch-adaptation.md": "0c0ef1b12c38539acb8fed7b19ea74243b4f8abb30c41b07c5317bc2885a27a2",
+    "docs/engineering/decisions/0002-ohmyorch-delivery-loop.md": "eeb49f0d7fb88baf68fc002cb5dd17ccd0259afff00715ddedfcfedbff03a314",
+    "docs/engineering/ohmyorch-adaptation.md": "12d613a8516b43e12e7159b066deaa5990e00cd86a4800241ef287e6fe7b1816",
+    "docs/engineering/option-b-contract.md": "78adb3da94d53acaedf7e72b7900e6010cd1b3b59f0f6a18da2227da3716d800",
+    "docs/engineering/prerequisite-inventory.md": "54abfa905a39e9cd019c109cbe8f43bb95c4e69ee095ae062bb15260c00dc947",
+    "docs/engineering/runbooks/development-harness.md": "2e05fa4976b279080db8732c6b020930796592122ede3e6e8676139d7689954d",
+    "docs/engineering/runbooks/ohmyorch-delivery.md": "8bf24e467c82bc72cf645cfa1a862180958d41e58eb2380e28a4434793c66287",
+    "docs/engineering/work-items/HARNESS-ADAPT-001.md": "ed53a7b59fe8fbbdf2454565a169cdc58e52454ca915dbc6257a3f83a7cf6c80",
+    "docs/engineering/work-items/HARNESS-OHMYORCH-001.md": "161caaa9d930ef7396089595bcbaeb653067f8639e077f625acdee03c467decd",
+    "docs/engineering/work-items/IMAGINE-001.md": "17e3a89bc20ff0de8450eb124b1adbedb6c4f6c23f0dac2b5da39e101f15eda9",
+    "docs/engineering/work-items/LUMA-001.md": "d3f81999105f147388fab3eb06ee1734e07b5aef701c727d06e21761c831ba61",
+    "docs/engineering/work-items/US-1.1.md": "a7b1cab7c7fc3028f480fbde118913ea64c5334a05cf32ba406be47a5bc543b7",
+    "scripts/harness_lib.py": "330c7992e87764ccd0347e4c2967319cdef1187d1f03f921ae13a89d118b1a6c",
+    "scripts/specs.py": "e1c857b628174bba6e5849ad2bba5a632973f28abac8ea758ea4b03da02f9531",
+    "scripts/story_manifest.py": "49e602a152ae0d3aa638e2536f75aabe75b78cefead1e7878d66b8fd61bd6e18",
+    "scripts/verify.py": "4d5eba1b21375dbaa98e9595c35395ee2cec6701b486deec8260bb689203f268",
+    "tests/harness/test_hooks.py": "1688fd80b6113b2ce985fe94ce824be8ce7c2f9849b29bd6b62561b5c6c781d5",
+    "tests/harness/test_specs.py": "d2cd1250e5005e3648d68ba344116f050c019aa11d844730d8a83208afbd4751",
+    "tests/harness/test_story_manifest.py": "8fc23875b1a220beacf6c00eca247e4ff54a465afcf36472cdb4afd87f27cc7e"
+  },
+  "python_version": "3.12.16",
+  "harness_status": "passed",
+  "tests_executed": 69,
+  "checks": [
+    {
+      "id": "project_configuration",
+      "status": "passed"
+    },
+    {
+      "id": "backlog_validation",
+      "status": "passed"
+    },
+    {
+      "id": "harness_behavior_tests",
+      "status": "passed"
+    }
+  ],
+  "requirement_mapping": {
+    "SP-001 item 1, DH-02 H0.1": "Scenario: Preserve existing work; PASS by ohmyorch:tester",
+    "DH-03, SP-020 H0-01": "Scenario: Establish repository hygiene; PASS by ohmyorch:tester, relying on user decisions listed in summary.md"
+  },
+  "evidence_kinds": {
+    "static": [
+      "local probes",
+      "review passes"
+    ],
+    "disposable": [
+      "tester fixture of two scratch Git repositories"
+    ],
+    "live": [],
+    "mocked": []
+  },
+  "loop_exercised": [
+    "select",
+    "propose",
+    "plan",
+    "implement",
+    "review",
+    "reopen",
+    "test",
+    "evidence review",
+    "completion-gate --record",
+    "openspec archive",
+    "mark-done",
+    "specs.py promote",
+    "delivery stop and start"
+  ],
+  "not_tested": [
+    "real cache tools",
+    "resume after remediation with a human-block step",
+    "plugin upgrade leaving appended .gitignore lines",
+    "event-delivery qualification"
+  ],
+  "not_claimed": [
+    "H0 or H1 completion",
+    "product acceptance"
+  ]
+}

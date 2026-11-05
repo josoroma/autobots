@@ -1,0 +1,18 @@
+{
+  "files": {
+    ".claude/rules/ohmyorch-delivery.md": "a57dfe053dd20777da6f9fb6a13caa86355aae76718c8513f320d5e90cc6a523",
+    ".gitignore": "e35dc684a15933f5b303b7c74ac7236d892be9e7e280327ad9c08751b63532a7",
+    "CODEBASE.md": "699cd4fad1106d517cfd396bf5a308107c0465eda95ca7bd14ca3bb47e9328f6",
+    "SPECS.md": "2658603f7e82393bce206dfd12cb5a31cc4ac6d06949a27caa84350b7333e0da",
+    "docs/engineering/decisions/0002-ohmyorch-delivery-loop.md": "eeb49f0d7fb88baf68fc002cb5dd17ccd0259afff00715ddedfcfedbff03a314",
+    "docs/engineering/prerequisite-inventory.md": "54abfa905a39e9cd019c109cbe8f43bb95c4e69ee095ae062bb15260c00dc947",
+    "openspec/changes/us-1-1-h0-repository-prerequisite-inventory/.openspec.yaml": "a08047dcdac0dd253523541df7ae20de4903ab5e6894afe95ed1ff269079bd22",
+    "openspec/changes/us-1-1-h0-repository-prerequisite-inventory/implementation-plan.md": "1c401285b8cf54b36e1ea1a57e3c03ba929ea022e1a97964c6273f3b493c3055",
+    "openspec/changes/us-1-1-h0-repository-prerequisite-inventory/proposal.md": "453f4426253cea5381468b7df04db5d44287284fb9e595dd5720aa4640923d4d",
+    "openspec/changes/us-1-1-h0-repository-prerequisite-inventory/specs/repository-prerequisite-inventory/spec.md": "f0789becfbef7abc3ae187544b8a8e06da2039955a762e66ab7a01410c742e97",
+    "openspec/changes/us-1-1-h0-repository-prerequisite-inventory/tasks.md": "26f06ab2c201600c9c18e235e140f27622fbb41925da2428953f19aff5ad6da4"
+  },
+  "fingerprint": "09b978de1c9eaa4bb57629ff84b058a57a9b9f4ee58002fbbbfa86238a72de2c",
+  "schema_version": 1,
+  "story": "US-1.1"
+}

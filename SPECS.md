@@ -62,13 +62,13 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | ID | Title | Status | Parent |
 |---|---|---|---|
 | EPIC-1 | Development foundation and Gate 0 | — | — |
-| US-1.1 | H0 repository and prerequisite inventory | READY | EPIC-1 |
-| US-1.1#1 | Inspect repository state and local tool versions. | TODO | US-1.1 |
-| US-1.1#2 | Prepare only missing version-control and ignore configuration. | TODO | US-1.1 |
-| US-1.2 | H0 shared instructions and development assistant assets | BLOCKED | EPIC-1 |
+| US-1.1 | H0 repository and prerequisite inventory | DONE | EPIC-1 |
+| US-1.1#1 | Inspect repository state and local tool versions. | DONE | US-1.1 |
+| US-1.1#2 | Prepare only missing version-control and ignore configuration. | DONE | US-1.1 |
+| US-1.2 | H0 shared instructions and development assistant assets | READY | EPIC-1 |
 | US-1.2#1 | Complete shared instructions and project skills/rules/agents, including the read-only ingestor and paired writing workflow. | TODO | US-1.2 |
 | US-1.2#2 | Validate the local adaptation and record pinned provenance, syntax and optional adapter limitations. | TODO | US-1.2 |
-| US-1.3 | H0 locked toolchains and minimal scaffolding | BLOCKED | EPIC-1 |
+| US-1.3 | H0 locked toolchains and minimal scaffolding | READY | EPIC-1 |
 | US-1.3#1 | Resolve and lock the selected compatible toolchains. | TODO | US-1.3 |
 | US-1.3#2 | Create only the web/API/contract scaffolding needed for harness qualification. | TODO | US-1.3 |
 | US-1.4 | H0 portable verification and deterministic hook adapter | BLOCKED | EPIC-1 |
@@ -740,7 +740,8 @@ Phase reference: H0/H1, preserved SP-020. All story completion also requires SP-
 
 ### US-1.1: H0 repository and prerequisite inventory
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-04-us-1-1-h0-repository-prerequisite-inventory/`
 
 As a developer
 I want an accurate repository and local-tool inventory
@@ -772,15 +773,15 @@ Dependencies:
 - None.
 
 Tasks:
-- [ ] Inspect repository state and local tool versions.
-- [ ] Prepare only missing version-control and ignore configuration.
+- [x] Inspect repository state and local tool versions.
+- [x] Prepare only missing version-control and ignore configuration.
 
 Open Questions:
 - None.
 
 ### US-1.2: H0 shared instructions and development assistant assets
 
-Status: BLOCKED
+Status: READY
 
 As a developer
 I want shared instructions and focused project-local assistant definitions
@@ -829,7 +830,7 @@ Open Questions:
 
 ### US-1.3: H0 locked toolchains and minimal scaffolding
 
-Status: BLOCKED
+Status: READY
 
 As a developer
 I want compatible prepared Node and Python environments

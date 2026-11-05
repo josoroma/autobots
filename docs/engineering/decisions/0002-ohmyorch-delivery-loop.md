@@ -26,12 +26,22 @@ The bridge rule in [`.claude/rules/ohmyorch-delivery.md`](../../../.claude/rules
 | The first non-`DONE` story in `SPECS.md` order is always next | US-2.3 and US-4.3 depend on stories later in their own epic | Not a product decision: stop the goal, deliver the prerequisite as its own target, resume the epic. The backlog is not reordered |
 | `select` creates the change, then edits `SPECS.md` | The planning-handoff guard treats `SPECS.md` as product code while a change has no plan, so that order blocks itself | Edit `SPECS.md` first, while no change is active, then create the change. No guard is skipped |
 | The context-preflight guard blocks `SPECS.md` edits once HEAD passes CODEBASE's recorded revision | Backlog status must still be editable after a commit | Refresh `CODEBASE.md` from the diff and record the new revision before the edit. That is what the guard asks for |
-| The completion gate passes `UNVERIFIED` rows and an unrun OpenSpec verify, and does not bind verdicts to the final diff | DH-W06: required checks stay unpassed until actual evidence exists, and changed inputs invalidate evidence | The DH-W01–06 records, full verified coverage, a passing `harness` verification and `scripts/story_manifest.py compare` are required before `archive`. Upstream's gate alone is not sufficient |
+| The completion gate passes `UNVERIFIED` rows and an unrun OpenSpec verify, and does not bind verdicts to the final diff | DH-W06: required checks stay unpassed until actual evidence exists, and changed inputs invalidate evidence | The DH-W01–06 records, verified coverage apart from the unmet-Given exception, a passing `harness` verification and `scripts/story_manifest.py compare` are required before `archive`. Upstream's gate alone is not sufficient |
 | `delivery reopen` accepts only a blocking review or failing test report | A gap found after both pass must not be archived, and any fix invalidates the verdicts | Record the goal `BLOCKED` with `delivery block --reason`. A human decides the remediation, then a fresh blocking review makes `reopen` valid |
 | Reviewer and tester may write only their own verdict file | DH-W03 needs reviewer identity, fingerprint and dispositions, and review must cover evidence | The coordinator persists DH-W records, copying specialist output. The tester exercises the runbook, and `autobots-reviewer` reviews the evidence summary and runbook before `archive` |
 | Generic `ohmyorch:*` specialists | Layer rules and `autobots-*` roles | The bundled specialists own loop actions, because role checks use their identity. Whether project rules reach them is unqualified, so delegation prompts carry the applicable requirements |
 
 The DH-W requirements are coordinator rules, not mechanical gates; independent review must surface a skipped record.
+
+## Decisions made while delivering US-1.1
+
+All by the user on 2026-11-04, and all recorded in the bridge rule.
+
+- **Protected paths:** `ohmyorch:implementer` cannot write `.claude/*`, `AGENTS.md`, `CLAUDE.md`, `README*`, `.gitignore`, `openspec/*`, the mapped PRD, `SPECS.md` or `CODEBASE.md`, yet US-1.2 and US-1.4 are largely about such files. When a plan names one, the implementer authors the content, the coordinator writes it verbatim, and the reviewer checks it as implementation. The upstream guard is unchanged.
+- **Unmet Given:** a conditional scenario whose Given does not hold is scored `UNVERIFIED`, never `PASS`, and may be archived only under the bridge rule's stated conditions. This is the one exception to "no `UNVERIFIED` row"; the scenario stays visibly unexercised.
+- **Local transcripts (US-1.1 only):** DH-03 says to ignore them, but no source names an in-repository location. They are recorded as not missing, with no rule added, and the inventory states the gap.
+- **Cache ignores (US-1.1):** DH-03 says to ignore caches with no in-use limit, so five categories with no rule (`.pytest_cache/`, `.ruff_cache/`, `.mypy_cache/`, `*.tsbuildinfo`, `.pnpm-store/`) are added in US-1.1 through the reopen route, not deferred to US-1.3. These five close the cache question for US-1.1. Other caches also have no rule and are not claimed as covered: a later story that introduces a tool adds that tool's ignores, and reviewers enforce that.
+- **Delivery targets:** the user named all epics on 2026-11-04, to be delivered one epic at a time until complete. This does not lift the boundaries above: US-3.4's paid qualification and US-7.2's choice of service remain the user's decisions, and the loop stops there.
 
 ## Limits and known risk
 
