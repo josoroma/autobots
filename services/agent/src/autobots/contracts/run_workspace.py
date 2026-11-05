@@ -86,6 +86,16 @@ class ExpertBinding(BaseModel):
     role_bindings: dict[str, str]
 
 
+class AssignmentView(BaseModel):
+    model_config = VIEW
+
+    id: Identifier
+    child_run_id: Identifier
+    expert: str
+    status: Literal["open", "finished"]
+    outcome: str | None
+
+
 class RunWorkspace(BaseModel):
     model_config = VIEW
 
@@ -99,5 +109,6 @@ class RunWorkspace(BaseModel):
     stop_reason: str | None
     verification: VerificationSummary | None
     expert: ExpertBinding | None
+    assignments: list[AssignmentView]
     outstanding: OutstandingSummary
     cursor: int

@@ -15,7 +15,7 @@ from autobots.contracts.experts import (
     SessionView,
 )
 from autobots.domain.models import approved_role
-from autobots.domain.tools import EXPERT_TOOLS, PLAN_TOOLS
+from autobots.domain.tools import DELEGATION_TOOL, EXPERT_TOOLS, PLAN_TOOLS
 
 
 class ExpertRefused(Exception):
@@ -274,6 +274,10 @@ async def resolve_binding(
         expert_id=UUID(entry["expert_id"]),
         version=chosen,
         instructions=config.instructions,
-        tools={**PLAN_TOOLS, **{tool: EXPERT_TOOLS[tool] for tool in config.tools}},
+        tools={
+            **PLAN_TOOLS,
+            **{tool: EXPERT_TOOLS[tool] for tool in config.tools},
+            **({DELEGATION_TOOL: 1} if kind == "coordinator" else {}),
+        },
         role_bindings={role: profile.value for role, profile in config.role_bindings.items()},
     )

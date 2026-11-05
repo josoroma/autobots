@@ -1,0 +1,235 @@
+"""Synchronous specialist assignments with narrowed scope and shared budgets, PRD 8.2 and 8.3."""
+
+import asyncio
+import json
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from typing import Any
+from uuid import UUID, uuid4
+
+from autobots.application.experts import ExpertRefused, resolve_binding
+from autobots.application.plans import load_goal
+from autobots.application.recovery import outstanding
+from autobots.application.run_usage import LimitReached, RootLimits, consume, ensure_usage
+from autobots.application.runs import Inheritance, admit_run, apply_command
+from autobots.application.tool_gateway import (
+    ToolContext,
+    ToolDefinition,
+    ToolFailed,
+    hold_lease,
+)
+from autobots.application.worker_leases import Lease, claim_run
+from autobots.contracts.assignments import AssignmentResult, AssignSpecialist
+from autobots.domain.runs import Actor, RunCommand, RunStatus
+from autobots.domain.tools import DELEGATION_TOOL, PLAN_TOOLS, OperationClass
+
+Driver = Callable[[Any, Lease], Awaitable[Any]]
+
+
+@dataclass(frozen=True)
+class Delegation:
+    drive: Driver
+    limits: RootLimits
+    lease_seconds: float
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
+
+
+def narrowed_tools(
+    parent: dict[str, int],
+    offered: dict[str, int],
+    requested: list[str] | None,
+    depth: int,
+    levels: int,
+) -> dict[str, int]:
+    """Intersects the Expert with the parent. A child can't receive what its parent lacks."""
+    available = {
+        tool: version
+        for tool, version in offered.items()
+        if tool in parent and tool not in PLAN_TOOLS and tool != DELEGATION_TOOL
+    }
+    if requested is not None:
+        if any(tool not in available for tool in requested):
+            raise ToolFailed("scope_expansion_denied")
+        available = {tool: available[tool] for tool in requested}
+    if DELEGATION_TOOL in parent and depth < levels:
+        available[DELEGATION_TOOL] = parent[DELEGATION_TOOL]
+    return {**PLAN_TOOLS, **available}
+
+
+async def _create(
+    connection: Any,
+    context: ToolContext,
+    arguments: AssignSpecialist,
+    delegation: Delegation,
+) -> tuple[UUID, UUID]:
+    """The record is committed with the child and before any dispatch."""
+    scope = context.scope
+    limits = delegation.limits
+    root = scope.budget_run_id
+    cursor = await connection.execute(
+        "select r.session_id, r.policy_snapshot, r.limit_micro_usd, "
+        "coalesce((select a.depth from app_private.assignments a where a.child_run_id = r.id), 0) "
+        "from public.runs r where r.id = %s",
+        (scope.run_id,),
+    )
+    session_id, snapshot, limit, parent_depth = await cursor.fetchone()
+    depth = parent_depth + 1
+    if depth > limits.child_levels:
+        raise ToolFailed("assignment_depth_limit")
+    if session_id is None:
+        raise ToolFailed("route_not_granted")
+    try:
+        binding = await resolve_binding(
+            connection, scope.workspace_id, session_id, expert_id=UUID(arguments.expert_id)
+        )
+    except (ExpertRefused, ValueError):
+        raise ToolFailed("route_not_granted") from None
+    goal = await load_goal(connection, scope.run_id)
+    tools = narrowed_tools(
+        goal.allowed_tools, binding.tools, arguments.tools, depth, limits.child_levels
+    )
+    async with connection.transaction():
+        await hold_lease(connection, scope)
+        cursor = await connection.execute(
+            "select count(*) filter (where status = 'open'), count(*) "
+            "from app_private.assignments where root_run_id = %s",
+            (root,),
+        )
+        open_count, total = await cursor.fetchone()
+        if open_count >= limits.outstanding_assignments:
+            raise ToolFailed("outstanding_assignments_limit")
+        try:
+            await consume(connection, root, "children", limits.children)
+        except LimitReached as reached:
+            raise ToolFailed(reached.code) from None
+        namespace = f"outputs/child-{total + 1}"
+        paths = (*[path for path in goal.allowed_paths if path == "inputs"], namespace)
+        admitted = await admit_run(
+            connection,
+            workspace_id=scope.workspace_id,
+            actor_id=scope.run_id,
+            idempotency_key=str(context.operation_id),
+            goal_text=arguments.goal,
+            limit_micro_usd=limit,
+            acceptance_criteria=tuple(arguments.criteria),
+            inherit=Inheritance(
+                parent_run_id=scope.run_id,
+                root_run_id=root,
+                snapshot=snapshot,
+                tools=tools,
+                paths=paths,
+                instructions=binding.instructions,
+                session_id=session_id,
+                expert_id=binding.expert_id,
+                version=binding.version,
+            ),
+        )
+        assignment_id = uuid4()
+        await connection.execute(
+            "insert into app_private.assignments (id, workspace_id, parent_run_id, child_run_id, "
+            "root_run_id, operation_id, depth, expert_id, expert_version) "
+            "values (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            (
+                assignment_id,
+                scope.workspace_id,
+                scope.run_id,
+                admitted.run_id,
+                root,
+                context.operation_id,
+                depth,
+                binding.expert_id,
+                binding.version,
+            ),
+        )
+    await ensure_usage(connection, admitted.run_id)
+    return assignment_id, admitted.run_id
+
+
+async def _claim_child(connection: Any, child: UUID, delegation: Delegation) -> Lease:
+    """A dead parent's child may still look owned for a moment, so this waits out its lease."""
+    for _ in range(int(delegation.lease_seconds * 5) + 5):
+        lease = await claim_run(
+            connection, child, worker_id="assignment", lease_seconds=delegation.lease_seconds
+        )
+        if lease is not None:
+            return lease
+        await delegation.sleep(0.2)
+    raise ToolFailed("assignment_busy")
+
+
+def assign_tool(delegation: Delegation) -> ToolDefinition:
+    async def run(arguments: AssignSpecialist, context: ToolContext) -> AssignmentResult:
+        connection = context.connection
+        cursor = await connection.execute(
+            "select id, child_run_id, status, result from app_private.assignments "
+            "where operation_id = %s",
+            (context.operation_id,),
+        )
+        row = await cursor.fetchone()
+        if row is not None and row[2] == "finished":
+            # A replayed request reads the existing result. No second specialist starts.
+            return AssignmentResult.model_validate(row[3])
+        if row is None:
+            assignment_id, child = await _create(connection, context, arguments, delegation)
+        else:
+            assignment_id, child = row[0], row[1]
+            await _resume_if_paused(connection, context, child)
+        lease = await _claim_child(connection, child, delegation)
+        result = await delegation.drive(connection, lease)
+        if result.outcome == "lost":
+            raise ToolFailed("assignment_lost")
+        if result.run_status == RunStatus.PAUSED.value:
+            raise ToolFailed("assignment_paused")
+        cursor = await connection.execute(
+            "select id from public.artifacts where run_id = %s and status = 'published' "
+            "order by created_at",
+            (child,),
+        )
+        artifacts = [str(item[0]) for item in await cursor.fetchall()]
+        output = AssignmentResult(
+            assignment_id=str(assignment_id),
+            child_run_id=str(child),
+            outcome=result.outcome,
+            code=result.code,
+            run_status=result.run_status,
+            completed=list(result.completed),
+            remaining=list(result.remaining),
+            artifact_ids=artifacts,
+        )
+        await connection.execute(
+            "update app_private.assignments set status = 'finished', outcome = %s, result = %s, "
+            "finished_at = now() where id = %s",
+            (result.outcome, json.dumps(output.model_dump()), assignment_id),
+        )
+        return output
+
+    async def _resume_if_paused(connection: Any, context: ToolContext, child: UUID) -> None:
+        """Resuming a parent continues its child, unless the child's own wait is still open."""
+        cursor = await connection.execute(
+            "select status, version from public.runs where id = %s", (child,)
+        )
+        status, version = await cursor.fetchone()
+        if status != RunStatus.PAUSED.value:
+            return
+        if (await outstanding(connection, child)).uncertain_calls:
+            raise ToolFailed("assignment_paused")
+        await apply_command(
+            connection,
+            workspace_id=context.scope.workspace_id,
+            run_id=child,
+            command=RunCommand.RESUME,
+            actor=Actor.USER,
+            expected_version=version,
+        )
+
+    return ToolDefinition(
+        tool_id=DELEGATION_TOOL,
+        version=1,
+        description="Give a bounded task to an Expert in this session, and wait for its result.",
+        input_model=AssignSpecialist,
+        output_model=AssignmentResult,
+        operation_class=OperationClass.REVERSIBLE_INTERNAL_WRITE,
+        handler=run,
+        timeout_seconds=delegation.limits.active_seconds,
+        safe_to_repeat=True,
+    )

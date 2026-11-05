@@ -41,9 +41,9 @@ async def outstanding(connection: Any, run_id: UUID) -> Outstanding:
     cursor = await connection.execute(
         "select count(*) filter (where failure_class is distinct from 'charge_not_reported'), "
         "count(*) filter (where failure_class = 'charge_not_reported') "
-        "from app_private.model_invocations where run_id = %s "
+        "from app_private.model_invocations where (run_id = %s or root_run_id = %s) "
         "and status = 'uncertain' and reconciled_at is null",
-        (run_id,),
+        (run_id, run_id),
     )
     calls, unreported = await cursor.fetchone()
     cursor = await connection.execute(

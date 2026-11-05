@@ -153,15 +153,17 @@ def artifact_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port
     report = json.loads(result.stdout.strip().splitlines()[-1])
     for case in report['cases']:
         cases.check(case['id'], case['expected'], case['observed'], case['passed'])
-    checked = subprocess.run([str(root / PYTHON), str(root / 'tests/db/verification_check.py'), workspace_a],
-                             env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'AUTOBOTS_STORAGE_BASE': base, 'AUTOBOTS_STORAGE_SERVICE': stack.values['SERVICE_ROLE_KEY'],
-                                  'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
-                             capture_output=True, text=True, errors='replace', timeout=240, check=False)
-    if checked.returncode:
-        cases.check('the verification check ran', 'exit 0', f'exit {checked.returncode}: {checked.stderr.strip()[-380:]}', False)
-    if checked.stdout.strip():
-        for case in json.loads(checked.stdout.strip().splitlines()[-1])['cases']:
-            cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+    for check_file, arguments, label in (('verification_check.py', [workspace_a], 'verification'),
+                                         ('assignment_check.py', [workspace_a, str(root / PYTHON)], 'assignment')):
+        checked = subprocess.run([str(root / PYTHON), str(root / 'tests/db' / check_file), *arguments],
+                                 env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'AUTOBOTS_STORAGE_BASE': base, 'AUTOBOTS_STORAGE_SERVICE': stack.values['SERVICE_ROLE_KEY'],
+                                      'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
+                                 capture_output=True, text=True, errors='replace', timeout=240, check=False)
+        if checked.returncode:
+            cases.check(f'the {label} check ran', 'exit 0', f'exit {checked.returncode}: {checked.stderr.strip()[-380:]}', False)
+        if checked.stdout.strip():
+            for case in json.loads(checked.stdout.strip().splitlines()[-1])['cases']:
+                cases.check(case['id'], case['expected'], case['observed'], case['passed'])
     # Arranged for the run workspace: text a model wrote, a raw framework event, and lost history.
     loop_run, gap_run = report.get('loop_run', ''), report.get('run_id', '')
     arranged = stack.runtime(

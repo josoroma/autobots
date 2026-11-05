@@ -299,6 +299,26 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
           </>
         )}
       </Card>
+      {snapshot.assignments.length === 0 ? null : (
+        <Card aria-labelledby="assignments-heading" className="space-y-2">
+          <h2 id="assignments-heading" className="text-lg font-medium">
+            Assignments
+          </h2>
+          <ul className="space-y-1 text-sm">
+            {snapshot.assignments.map((assignment) => (
+              <li key={assignment.id} data-assignment={assignment.status}>
+                <a
+                  href={`/runs/${assignment.child_run_id}`}
+                  className="font-medium underline"
+                >
+                  {assignment.expert}
+                </a>
+                : {assignment.outcome ?? assignment.status}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
       <Card aria-labelledby="artifacts-heading" className="space-y-2">
         <h2 id="artifacts-heading" className="text-lg font-medium">
           Artifacts

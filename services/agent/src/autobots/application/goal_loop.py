@@ -27,6 +27,7 @@ from autobots.adapters.loop_middleware import (
 )
 from autobots.adapters.tool_middleware import GatewayMiddleware, visible_tools
 from autobots.application.artifacts import publish_tool, reconcile_run
+from autobots.application.assignments import Delegation, assign_tool
 from autobots.application.plans import load_goal, plan_tools, plan_view
 from autobots.application.recovery import classify_interrupted, open_obligation, outstanding
 from autobots.application.run_usage import (
@@ -44,6 +45,7 @@ from autobots.application.worker_leases import (
     DEFAULT_LEASE_SECONDS,
     Lease,
     claim_next,
+    claim_run,
     heartbeat,
 )
 from autobots.contracts.plans import GoalSpec
@@ -60,6 +62,9 @@ PAUSE_FOR = frozenset(
         "partial_stream",
         "uncertain_acceptance",
         "uncertain_model_call",
+        "assignment_paused",
+        "assignment_lost",
+        "parent_not_running",
     }
 )
 NOT_OURS = frozenset({"lease_lost", "run_not_running", "run_not_found"})
@@ -96,12 +101,16 @@ class LoopResult:
     usage: dict[str, Any]
 
 
-def loop_registry(limits: RootLimits, object_store: Any = None) -> ToolRegistry:
+def loop_registry(
+    limits: RootLimits, object_store: Any = None, delegation: Delegation | None = None
+) -> ToolRegistry:
     registry = ToolRegistry()
     for tool in (CALCULATE, READ_RUN_FILE, SAVE_ARTIFACT, *plan_tools(limits)):
         registry.register(tool)
     if object_store is not None:
         registry.register(publish_tool(object_store))
+    if delegation is not None:
+        registry.register(assign_tool(delegation))
     return registry
 
 
@@ -112,9 +121,10 @@ def build_stage(
     scope: ToolScope,
     config: LoopConfig,
     instructions: str = "",
+    delegation: Delegation | None = None,
 ) -> Any:
     """Explicit tools and middleware. Skills, memory, subagents and a backend stay unset here."""
-    gateway = ToolGateway(loop_registry(config.limits, config.object_store))
+    gateway = ToolGateway(loop_registry(config.limits, config.object_store, delegation))
     return create_deep_agent(
         model=AdmittedModel(delegate=model),
         tools=visible_tools(gateway, scope),
@@ -145,14 +155,27 @@ async def run_goal(
     connection: Any, database_url: str, lease: Lease, model: Any, config: LoopConfig
 ) -> LoopResult:
     goal = await load_goal(connection, lease.run_id)
+    cursor = await connection.execute(
+        "select parent_run_id, coalesce(root_run_id, id) from public.runs where id = %s",
+        (lease.run_id,),
+    )
+    parent, root = await cursor.fetchone()
+
+    async def drive_child(child_connection: Any, child_lease: Lease) -> LoopResult:
+        return await _drive(child_connection, database_url, child_lease, lambda: model, config)
+
+    delegation = Delegation(drive_child, config.limits, config.lease_seconds, config.sleep)
     scope = ToolScope(
         lease.workspace_id,
         lease.run_id,
         lease.generation,
         goal.allowed_tools,
         tuple(goal.allowed_paths),
+        root_run_id=root,
+        parent_run_id=parent,
     )
     await ensure_usage(connection, lease.run_id)
+    await ensure_usage(connection, root)
     # Whatever an earlier owner left is classified first, and nothing is sent until that's done.
     await classify_interrupted(connection, lease.run_id, lease.generation)
     if config.object_store is not None:
@@ -181,7 +204,9 @@ async def run_goal(
     run_config = {**graph_config(lease), "recursion_limit": steps}
     try:
         async with fenced_checkpointer(database_url, lease) as saver:
-            agent = build_stage(connection, model, saver, scope, config, goal.instructions)
+            agent = build_stage(
+                connection, model, saver, scope, config, goal.instructions, delegation
+            )
             state = await agent.aget_state(run_config)
             payload = None if state.next else {"messages": [HumanMessage(_opening(goal))]}
             await agent.ainvoke(payload, run_config, durability=DURABILITY)
@@ -212,6 +237,16 @@ async def process_next(
     lease = await claim_next(connection, worker_id=worker_id, lease_seconds=config.lease_seconds)
     if lease is None:
         return None
+    return await _drive(connection, database_url, lease, model_factory, config)
+
+
+async def _drive(
+    connection: Any,
+    database_url: str,
+    lease: Lease,
+    model_factory: Callable[[], Any],
+    config: LoopConfig,
+) -> LoopResult:
     if lease.run_status != RunStatus.VERIFYING.value:
         result = await run_goal(connection, database_url, lease, model_factory(), config)
         if result.outcome != "candidate":
@@ -338,6 +373,30 @@ async def _result(
     )
 
 
+async def _settle_children(connection: Any, lease: Lease) -> None:
+    """A cancelled parent's children finish too, and their open assignments close."""
+    cursor = await connection.execute(
+        "select a.id, a.child_run_id, r.status from app_private.assignments a "
+        "join public.runs r on r.id = a.child_run_id "
+        "where a.parent_run_id = %s and a.status = 'open'",
+        (lease.run_id,),
+    )
+    terminal = {RunStatus.CANCELLED.value, RunStatus.FAILED.value, RunStatus.SUCCEEDED.value}
+    for assignment_id, child, status in await cursor.fetchall():
+        if status not in terminal:
+            child_lease = await claim_run(connection, child, worker_id=lease.worker_id)
+            if child_lease is None:
+                continue
+            await _finish(
+                connection, child_lease, await load_goal(connection, child), "run_not_running"
+            )
+        await connection.execute(
+            "update app_private.assignments set status = 'finished', outcome = 'cancelled', "
+            "finished_at = now() where id = %s",
+            (assignment_id,),
+        )
+
+
 async def _finish(
     connection: Any, lease: Lease, goal: GoalSpec, stop_code: str | None
 ) -> LoopResult:
@@ -348,6 +407,7 @@ async def _finish(
     command: RunCommand | None
     if code == "run_not_running" and await _run_status(connection, lease) == "cancelling":
         # This worker still owns it, and it is the one who settles the cancellation.
+        await _settle_children(connection, lease)
         await classify_interrupted(connection, lease.run_id, lease.generation + 1)
         left = await outstanding(connection, lease.run_id)
         code = (

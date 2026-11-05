@@ -48,6 +48,21 @@ class RunNotFound(Exception):
 
 
 @dataclass(frozen=True)
+class Inheritance:
+    """A child's admission: its parent's fixed policy, and scope already narrowed from it."""
+
+    parent_run_id: UUID
+    root_run_id: UUID
+    snapshot: dict[str, Any]
+    tools: dict[str, int]
+    paths: tuple[str, ...]
+    instructions: str
+    session_id: UUID
+    expert_id: UUID
+    version: int
+
+
+@dataclass(frozen=True)
 class AdmissionResult:
     run_id: UUID
     version: int
@@ -117,7 +132,9 @@ async def store_receipt(
     )
 
 
-def _snapshot(policy: RolePolicy) -> str:
+def _snapshot(policy: RolePolicy | None) -> str:
+    if policy is None:
+        raise ValueError("a run needs a role policy or an inherited one")
     return json.dumps(
         {
             "version": policy.version,
@@ -135,14 +152,17 @@ async def admit_run(
     idempotency_key: str,
     goal_text: str,
     limit_micro_usd: int,
-    policy: RolePolicy,
+    policy: RolePolicy | None = None,
     acceptance_criteria: tuple[str, ...] = (),
     continues_run_id: UUID | None = None,
     required_artifacts: tuple[RequiredArtifact, ...] = (),
     input_documents: tuple[InputDocument, ...] = (),
     binding: Any = None,
+    inherit: Inheritance | None = None,
 ) -> AdmissionResult:
     """Run, job and first event commit together. A repeat returns the original result."""
+    if inherit is not None:
+        binding = inherit
     goal = goal_text.strip()
     # With no stated criteria, the goal itself is the one thing to meet.
     criteria = [text.strip() for text in acceptance_criteria if text.strip()] or [goal]
@@ -177,7 +197,8 @@ async def admit_run(
         await connection.execute(
             "insert into public.runs (id, workspace_id, status, limit_micro_usd, goal_text, "
             "goal_summary, version, policy_snapshot, continues_run_id, session_id, expert_id, "
-            "expert_version) values (%s, %s, %s, %s, %s, %s, 1, %s, %s, %s, %s, %s)",
+            "expert_version, parent_run_id, root_run_id) "
+            "values (%s, %s, %s, %s, %s, %s, 1, %s, %s, %s, %s, %s, %s, %s)",
             (
                 run_id,
                 workspace_id,
@@ -185,11 +206,13 @@ async def admit_run(
                 limit_micro_usd,
                 goal,
                 goal[:200],
-                _snapshot(policy),
+                json.dumps(inherit.snapshot) if inherit else _snapshot(policy),
                 continues_run_id,
                 binding.session_id if binding else None,
                 binding.expert_id if binding else None,
                 binding.version if binding else None,
+                inherit.parent_run_id if inherit else None,
+                inherit.root_run_id if inherit else None,
             ),
         )
         await connection.execute(
@@ -215,7 +238,7 @@ async def admit_run(
             criteria={f"c{index}": text for index, text in enumerate(criteria, start=1)},
             allowed_tools=dict(binding.tools) if binding else dict(LOOP_TOOL_GRANTS),
             instructions=binding.instructions if binding else "",
-            allowed_paths=list(RUN_FILE_GRANTS),
+            allowed_paths=list(inherit.paths) if inherit else list(RUN_FILE_GRANTS),
             required_artifacts=list(required_artifacts),
         )
         await connection.execute(
@@ -264,10 +287,30 @@ async def _has_unsettled_work(connection: Any, run_id: UUID) -> bool:
     cursor = await connection.execute(
         "select exists (select 1 from app_private.model_invocations where run_id = %s "
         "and status in ('reserved', 'dispatched')) or exists (select 1 from "
-        "app_private.tool_receipts where run_id = %s and status = 'started')",
-        (run_id, run_id),
+        "app_private.tool_receipts where run_id = %s and status = 'started') "
+        "or exists (select 1 from app_private.assignments where parent_run_id = %s "
+        "and status = 'open')",
+        (run_id, run_id, run_id),
     )
     return bool((await cursor.fetchone())[0])
+
+
+async def _cancel_children(connection: Any, workspace_id: UUID, run_id: UUID) -> None:
+    """In the parent's transaction, so a cancel fences the whole tree at once."""
+    cursor = await connection.execute(
+        "select id, version from public.runs where parent_run_id = %s "
+        "and status not in ('succeeded', 'failed', 'cancelled', 'cancelling')",
+        (run_id,),
+    )
+    for child_id, version in await cursor.fetchall():
+        await apply_command(
+            connection,
+            workspace_id=workspace_id,
+            run_id=child_id,
+            command=RunCommand.CANCEL,
+            actor=Actor.USER,
+            expected_version=version,
+        )
 
 
 async def _record_obligation(
@@ -359,6 +402,8 @@ async def apply_command(
             connection, run_id, current.value, following.value, version
         )
         await _record_obligation(connection, run_id, command, detail, response)
+        if command is RunCommand.CANCEL:
+            await _cancel_children(connection, workspace_id, run_id)
         job_status = _job_status(following)
         if following is RunStatus.CANCELLING and not (
             job is not None and job[0] == "claimed" and bool(job[2])
@@ -389,6 +434,7 @@ async def apply_command(
 __all__ = [
     "CommandRefused",
     "IdempotencyConflict",
+    "Inheritance",
     "LeaseLost",
     "LinkRefused",
     "RunNotFound",

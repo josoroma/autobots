@@ -149,9 +149,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-5.1 | Versioned Experts, direct sessions and coordinator routing | DONE | EPIC-5 |
 | US-5.1#1 | Implement Expert/session persistence and revision APIs. | DONE | US-5.1 |
 | US-5.1#2 | Add bounded coordinator routing and the Expert editor. | DONE | US-5.1 |
-| US-5.2 | Scoped synchronous specialist assignments | READY | EPIC-5 |
-| US-5.2#1 | Implement assignment records, namespaces and inherited budgets. | TODO | US-5.2 |
-| US-5.2#2 | Test duplicate delegation, denied expansion and parent cancellation. | TODO | US-5.2 |
+| US-5.2 | Scoped synchronous specialist assignments | DONE | EPIC-5 |
+| US-5.2#1 | Implement assignment records, namespaces and inherited budgets. | DONE | US-5.2 |
+| US-5.2#2 | Test duplicate delegation, denied expansion and parent cancellation. | DONE | US-5.2 |
 | US-5.3 | Argument-bound approvals and durable decision wait | READY | EPIC-5 |
 | US-5.3#1 | Implement approval persistence, validated decision commands and inbox. | TODO | US-5.3 |
 | US-5.3#2 | Exercise tampering, expiry, rejection and interrupted-node replay fixtures. | TODO | US-5.3 |
@@ -1946,7 +1946,8 @@ Open Questions:
 
 ### US-5.2: Scoped synchronous specialist assignments
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-5-2-scoped-synchronous-specialist-assignments/`
 
 As a coordinator user
 I want bounded specialists with isolated task context
@@ -1979,8 +1980,8 @@ Dependencies:
 - US-4.7
 
 Tasks:
-- [ ] Implement assignment records, namespaces and inherited budgets.
-- [ ] Test duplicate delegation, denied expansion and parent cancellation.
+- [x] Implement assignment records, namespaces and inherited budgets.
+- [x] Test duplicate delegation, denied expansion and parent cancellation.
 
 Open Questions:
 - None.

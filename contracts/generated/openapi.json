@@ -132,6 +132,53 @@
         "title": "ArtifactSummary",
         "type": "object"
       },
+      "AssignmentView": {
+        "additionalProperties": false,
+        "properties": {
+          "child_run_id": {
+            "format": "uuid",
+            "title": "Child Run Id",
+            "type": "string"
+          },
+          "expert": {
+            "title": "Expert",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "finished"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "child_run_id",
+          "expert",
+          "status",
+          "outcome"
+        ],
+        "title": "AssignmentView",
+        "type": "object"
+      },
       "BudgetCounters": {
         "additionalProperties": false,
         "properties": {
@@ -1393,6 +1440,13 @@
             "title": "Artifacts",
             "type": "array"
           },
+          "assignments": {
+            "items": {
+              "$ref": "#/components/schemas/AssignmentView"
+            },
+            "title": "Assignments",
+            "type": "array"
+          },
           "criteria": {
             "items": {
               "$ref": "#/components/schemas/CriterionView"
@@ -1482,6 +1536,7 @@
           "stop_reason",
           "verification",
           "expert",
+          "assignments",
           "outstanding",
           "cursor"
         ],

@@ -133,6 +133,53 @@ export const schemas = {
     "title": "ArtifactSummary",
     "type": "object"
   },
+  "AssignmentView": {
+    "additionalProperties": false,
+    "properties": {
+      "child_run_id": {
+        "format": "uuid",
+        "title": "Child Run Id",
+        "type": "string"
+      },
+      "expert": {
+        "title": "Expert",
+        "type": "string"
+      },
+      "id": {
+        "format": "uuid",
+        "title": "Id",
+        "type": "string"
+      },
+      "outcome": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Outcome"
+      },
+      "status": {
+        "enum": [
+          "open",
+          "finished"
+        ],
+        "title": "Status",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "child_run_id",
+      "expert",
+      "status",
+      "outcome"
+    ],
+    "title": "AssignmentView",
+    "type": "object"
+  },
   "BudgetCounters": {
     "additionalProperties": false,
     "properties": {
@@ -1394,6 +1441,13 @@ export const schemas = {
         "title": "Artifacts",
         "type": "array"
       },
+      "assignments": {
+        "items": {
+          "$ref": "#/components/schemas/AssignmentView"
+        },
+        "title": "Assignments",
+        "type": "array"
+      },
       "criteria": {
         "items": {
           "$ref": "#/components/schemas/CriterionView"
@@ -1483,6 +1537,7 @@ export const schemas = {
       "stop_reason",
       "verification",
       "expert",
+      "assignments",
       "outstanding",
       "cursor"
     ],
@@ -1843,6 +1898,18 @@ export interface ArtifactSummary {
 
 export function parseArtifactSummary(value: unknown): ArtifactSummary {
   return parseWith(schemas, "ArtifactSummary", value) as ArtifactSummary;
+}
+
+export interface AssignmentView {
+  child_run_id: string;
+  expert: string;
+  id: string;
+  outcome: string | null;
+  status: "open" | "finished";
+}
+
+export function parseAssignmentView(value: unknown): AssignmentView {
+  return parseWith(schemas, "AssignmentView", value) as AssignmentView;
 }
 
 export interface BudgetCounters {
@@ -2254,6 +2321,7 @@ export function parseRunSummary(value: unknown): RunSummary {
 
 export interface RunWorkspace {
   artifacts: ArtifactSummary[];
+  assignments: AssignmentView[];
   criteria: CriterionView[];
   cursor: number;
   expert: ExpertBinding | null;

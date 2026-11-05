@@ -16,6 +16,8 @@ class OperationClass(StrEnum):
 PLAN_TOOLS = {"propose_plan": 1, "complete_task": 1}
 EXPERT_TOOLS = {"calculate": 1, "read_run_file": 1, "save_artifact": 1, "publish_artifact": 1}
 LOOP_TOOL_GRANTS = {**PLAN_TOOLS, **EXPERT_TOOLS}
+# Only a coordinator session's runs get this, and an Expert's own configuration can't name it.
+DELEGATION_TOOL = "assign_specialist"
 RUN_FILE_GRANTS = ("inputs", "outputs")
 
 # Only these leave an effect, so only these get an operation identity and a receipt.

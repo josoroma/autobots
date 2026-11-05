@@ -36,8 +36,8 @@ from autobots.application.tool_gateway import ToolScope, ownership_refusal
 CHECK_SECONDS = 1.0
 INTERRUPTING = frozenset({"cancelling", "cancelled", "failed", "succeeded"})
 
-REPAIRABLE = PLAN_REJECTIONS | {"invalid_arguments"}
-STOPPING = frozenset({"plan_revisions_limit"})
+REPAIRABLE = PLAN_REJECTIONS | {"invalid_arguments", "route_not_granted", "scope_expansion_denied"}
+STOPPING = frozenset({"plan_revisions_limit", "assignment_paused", "assignment_lost"})
 _ADMITTED: ContextVar[bool] = ContextVar("autobots_model_call_admitted", default=False)
 REPAIR_NOTE = "Your last reply was cut off, so none of it was used. Reply again, more briefly."
 
@@ -131,8 +131,14 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
         refusal = await ownership_refusal(self._connection, self._scope)
         if refusal is not None:
             raise LoopStopped(refusal)
+        if self._scope.parent_run_id is not None:
+            cursor = await self._connection.execute(
+                "select status from public.runs where id = %s", (self._scope.parent_run_id,)
+            )
+            if (await cursor.fetchone())[0] != "running":
+                raise LoopStopped("parent_not_running")
         remaining = self._limits.active_seconds - await active_seconds_used(
-            self._connection, self._scope.run_id
+            self._connection, self._scope.budget_run_id
         )
         if remaining <= 0:
             raise LoopStopped("active_time_limit")
@@ -167,7 +173,9 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
 
     async def _repair(self, code: str) -> None:
         try:
-            await consume(self._connection, self._scope.run_id, "repairs", self._limits.repairs)
+            await consume(
+                self._connection, self._scope.budget_run_id, "repairs", self._limits.repairs
+            )
         except LimitReached:
             raise LoopStopped(code) from None
 
@@ -175,6 +183,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
         self, request: Any, handler: Any, remaining: float
     ) -> tuple[Any, bool]:
         run_id = self._scope.run_id
+        budget = self._scope.budget_run_id
         limit: list[LimitReached] = []
         stopped: list[str] = []
         replies: list[Any] = []
@@ -190,7 +199,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
                 stopped.append(stop.code)
                 raise ProviderFailure(FailureClass.OTHER) from None
             try:
-                await consume(self._connection, run_id, "model_calls", self._limits.model_calls)
+                await consume(self._connection, budget, "model_calls", self._limits.model_calls)
             except LimitReached as reached:
                 limit.append(reached)
                 raise ProviderFailure(FailureClass.OTHER) from None
@@ -218,12 +227,12 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             )
 
         cursor = await self._connection.execute(
-            "select model_calls from app_private.run_usage where run_id = %s", (run_id,)
+            "select model_calls from app_private.run_usage where run_id = %s", (budget,)
         )
         used = (await cursor.fetchone())[0]
         admission_request = AdmissionRequest(
             workspace_id=self._scope.workspace_id,
-            root_run_id=run_id,
+            root_run_id=budget,
             run_id=run_id,
             role=self._route.role,
             profile=self._route.profile,
@@ -282,7 +291,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             try:
                 await consume(
                     self._connection,
-                    self._scope.run_id,
+                    self._scope.budget_run_id,
                     "tool_dispatches",
                     self._limits.tool_dispatches,
                 )

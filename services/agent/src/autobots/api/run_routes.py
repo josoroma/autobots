@@ -266,10 +266,11 @@ async def post_reconcile(
                         schema_version=1, reconciled_calls=existing["reconciled_calls"]
                     )
                 cursor = await connection.execute(
-                    "select id from app_private.model_invocations where run_id = %s "
+                    "select id from app_private.model_invocations "
+                    "where (run_id = %s or root_run_id = %s) "
                     "and status = 'uncertain' and reconciled_at is null "
                     "order by created_at limit 1 for update",
-                    (run_id,),
+                    (run_id, run_id),
                 )
                 row = await cursor.fetchone()
                 if row is not None:

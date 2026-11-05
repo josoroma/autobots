@@ -28,6 +28,13 @@ class ToolScope:
     generation: int
     tools: Mapping[str, int]
     paths: tuple[str, ...] = ()
+    root_run_id: UUID | None = None
+    parent_run_id: UUID | None = None
+
+    @property
+    def budget_run_id(self) -> UUID:
+        """Retries and descendants spend from the same tree, SP-008."""
+        return self.root_run_id or self.run_id
 
 
 @dataclass(frozen=True)

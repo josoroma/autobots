@@ -13,6 +13,7 @@ from autobots.application.runs import RunNotFound
 from autobots.contracts.adapters import run_from_row, run_summary_from_domain
 from autobots.contracts.artifacts import ArtifactSummary
 from autobots.contracts.run_workspace import (
+    AssignmentView,
     CriterionView,
     EventPage,
     ExpertBinding,
@@ -161,6 +162,19 @@ async def _verification(connection: Any, run_id: UUID) -> VerificationSummary | 
     return VerificationSummary(passed=row[0], unmet=row[1], checks=row[2]) if row else None
 
 
+async def _assignments(connection: Any, run_id: UUID) -> list[AssignmentView]:
+    cursor = await connection.execute(
+        "select a.id, a.child_run_id, e.name, a.status, a.outcome "
+        "from app_private.assignments a join public.experts e on e.id = a.expert_id "
+        "where a.parent_run_id = %s order by a.created_at",
+        (run_id,),
+    )
+    return [
+        AssignmentView(id=row[0], child_run_id=row[1], expert=row[2], status=row[3], outcome=row[4])
+        for row in await cursor.fetchall()
+    ]
+
+
 async def _expert(connection: Any, run_id: UUID) -> ExpertBinding | None:
     cursor = await connection.execute(
         "select e.name, r.expert_version, g.spec -> 'allowed_tools', v.config -> 'role_bindings' "
@@ -217,6 +231,7 @@ async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> R
         stop_reason=usage[4],
         verification=await _verification(connection, run_id),
         expert=await _expert(connection, run_id),
+        assignments=await _assignments(connection, run_id),
         outstanding=OutstandingSummary(
             uncertain_calls=left.uncertain_calls,
             unknown_effects=left.unknown_effects,

@@ -68,6 +68,7 @@ export interface RunsRow {
   session_id: string | null;
   expert_id: string | null;
   expert_version: number | null;
+  root_run_id: string | null;
 }
 
 export interface SessionsRow {

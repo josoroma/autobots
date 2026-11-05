@@ -24,18 +24,18 @@ class Lease:
         return str(self.run_id)
 
 
-async def claim_next(
-    connection: Any, *, worker_id: str, lease_seconds: float = DEFAULT_LEASE_SECONDS
+async def _claim(
+    connection: Any, condition: str, values: tuple[Any, ...], worker_id: str, lease_seconds: float
 ) -> Lease | None:
-    """Take one eligible job: queued, or held by an owner whose lease has expired."""
     async with connection.transaction():
         cursor = await connection.execute(
             "select j.run_id, j.workspace_id, r.status, r.version "
             "from app_private.run_jobs j join public.runs r on r.id = j.run_id "
-            "where r.status <> 'paused' and j.available_at <= clock_timestamp() "
-            "and (j.status = 'queued' or "
+            f"where {condition} and r.status <> 'paused' "
+            "and j.available_at <= clock_timestamp() and (j.status = 'queued' or "
             "(j.status = 'claimed' and j.lease_expires_at <= clock_timestamp())) "
-            "order by j.available_at limit 1 for update of j skip locked"
+            "order by j.available_at limit 1 for update of j skip locked",
+            values,
         )
         row = await cursor.fetchone()
         if row is None:
@@ -57,6 +57,22 @@ async def claim_next(
             await record_transition(connection, run_id, status, RunStatus.RUNNING.value, version)
             status = RunStatus.RUNNING.value
     return Lease(run_id, workspace_id, generation, worker_id, attempts, status)
+
+
+async def claim_next(
+    connection: Any, *, worker_id: str, lease_seconds: float = DEFAULT_LEASE_SECONDS
+) -> Lease | None:
+    """Take one eligible job: queued, or held by an owner whose lease has expired.
+
+    A child's job is left to its parent, which runs it and reads its result.
+    """
+    return await _claim(connection, "r.parent_run_id is null", (), worker_id, lease_seconds)
+
+
+async def claim_run(
+    connection: Any, run_id: UUID, *, worker_id: str, lease_seconds: float = DEFAULT_LEASE_SECONDS
+) -> Lease | None:
+    return await _claim(connection, "j.run_id = %s", (run_id,), worker_id, lease_seconds)
 
 
 async def heartbeat(

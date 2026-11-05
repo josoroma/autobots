@@ -176,7 +176,10 @@ def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
                 await hold_lease(context.connection, context.scope)
                 if plan is not None:
                     await consume(
-                        context.connection, run_id, "plan_revisions", limits.plan_revisions
+                        context.connection,
+                        context.scope.budget_run_id,
+                        "plan_revisions",
+                        limits.plan_revisions,
                     )
                 await context.connection.execute(
                     "insert into app_private.plan_versions (run_id, version, tasks, "
