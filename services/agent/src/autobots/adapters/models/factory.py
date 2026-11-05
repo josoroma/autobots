@@ -110,6 +110,9 @@ def chat_model(
 # The SDK otherwise retries 5XX and connection errors with backoff for up to an hour, and
 # `ChatOpenRouter(max_retries=0)` leaves that default in place. Application policy owns every retry.
 NO_SDK_RETRIES = RetryConfig("none", BackoffStrategy(1, 1, 1.0, 1), False)
+# The SDK's own HTTP client otherwise gives up after httpx's 5 seconds, and a model can take longer
+# than that to reply. This sits above the goal loop's bound on a call, so that bound decides.
+REQUEST_TIMEOUT_MS = 130_000
 
 
 def default_sdk_client(
@@ -122,6 +125,7 @@ def default_sdk_client(
         api_key=api_key,
         server_url=OPENROUTER_BASE_URL,
         retry_config=NO_SDK_RETRIES,
+        timeout_ms=REQUEST_TIMEOUT_MS,
         client=http,
         async_client=async_http,
     )

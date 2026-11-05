@@ -62,3 +62,41 @@ MP-07 makes 512 a configurable initial budget, and forbids raising it silently a
 ## Not exercised
 
 Publishing, verification, a succeeded run, the 80% warning, the budget's refusal, Terra, a child run, approvals, compaction, and whether the worker's prompt suits a real model beyond these two tools.
+
+## Trial: 2,048 output tokens, DeepSeek and Terra
+
+**Class: live, on disposable stacks.** Authorized by the user's "Try 2,048 tokens" and "now with openai/gpt-6.1-terra-20261026". Each run had a US$0.25 limit. Run on 2026-11-05 UTC from a scratch worktree at `e83bfd9`, since removed. **No run succeeded, and the trial's changes aren't in this repository, apart from the timeout fix described below.**
+
+The worktree changed `MAX_OUTPUT_TOKENS` to 2,048, let the runner select Terra through `PUT /v1/settings/model-policy`, logged an exception's type and status, and, for run 5 only, set `timeout_ms=120_000`. The diff and raw results are in `.checks/trial-2048/` (ignored, local, no retention beyond this checkout).
+
+| | Run 3 | Run 4 | Run 5 |
+|---|---|---|---|
+| Model | DeepSeek | Terra | DeepSeek |
+| Run, UTC | 23:40 | 23:41 | 23:47 |
+| Client timeout | httpx default, 5s | httpx default, 5s | 120s |
+| Status | `paused` after 10s | `failed` after 20s | `failed` after 32s |
+| Stop reason | `uncertain_acceptance` | `criteria_unmet` | `repair_limit:plan_out_of_scope` |
+| Model calls, tool dispatches, repairs | 1, 0, 0 | 6, 5, 1 | 2, 2, 1 |
+| Largest output, of which reasoning | none recorded | 169, 0 | 197, 17 |
+| Ledger, micro-USD | 0 | 6,825 | 176 |
+
+A second DeepSeek run at 23:44 repeated run 3, and logged `ReadTimeout` with no status after about 5.4s. Run 3 has no such log, so its cause is inferred from the match. Key usage didn't change for either, read about 60 seconds after each run, so no charge is shown for them.
+
+**The 5-second timeout is a defect in this repository's code.** `default_sdk_client` sets no timeout, so the SDK's own `httpx` client applies the 5-second default, well inside the middleware's 120-second bound. A reply that takes longer is recorded as `uncertain_acceptance` and pauses the run. Why these replies were slow isn't established. Run 5's calls took 13.5s and 14.7s for 123 and 197 output tokens, so length doesn't explain it, and the same timeout can apply at 512 tokens.
+
+**Fixed after this trial.** `default_sdk_client` now sets `REQUEST_TIMEOUT_MS`, 130 seconds, above the middleware's bound so that bound decides. This is the one trial change kept in the repository. A fake-transport test covers it, and fails with `5.0` if the setting is removed. No live call has run at 130 seconds: run 5 used 120.
+
+**Run 4, Terra.** It saved a correct report of 99 words, ending in the required line, then called `complete_task` twice, the first of which failed, and stopped. It never called `publish_artifact`, so verification recorded `artifact_missing:report.md`. `SYSTEM_PROMPT` doesn't mention publishing and neither does the goal, which is the likely cause. That's inferred: neither the tools offered nor why `complete_task` failed are recorded.
+
+**Run 5, DeepSeek.** Both of its plans were rejected as `plan_out_of_scope`, which used the run's one repair and stopped it. That means a task named a criterion or tool the goal doesn't allow. Which one isn't recorded, and earlier DeepSeek runs had a plan accepted.
+
+### What this doesn't establish
+
+- **That 2,048 fixes the goal:** DeepSeek never got past planning here, so it didn't reach the work that was cut off before. The largest output in these runs was 197 tokens, so none of them needed more than 512. Only [the nested-schema trial](../US-3.4/summary.md) used more.
+- **That Terra needs 2,048:** nothing in its run came near 512.
+- **That the 120-second timeout is the right value:** it was chosen to match the middleware's bound, for one run.
+- **Repeatability:** one run of each configuration that got past the timeout.
+
+Held in all four runs: no key in any durable row or log file, nothing of the project left behind, other Docker resources unchanged, and the watchdog never fired.
+
+**Spend:** US$0.007001 across these goals, and US$0.00889 with the two above, against ledger figures. Key usage rose by exactly those amounts, to the rounding of its reporting, across the two charged runs.

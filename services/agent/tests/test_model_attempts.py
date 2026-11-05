@@ -10,7 +10,13 @@ import pytest
 from pydantic import SecretStr
 
 from autobots.adapters.models.catalog import CatalogEntry, CatalogSnapshot
-from autobots.adapters.models.factory import chat_model, default_sdk_client, prepare_attempt
+from autobots.adapters.models.factory import (
+    REQUEST_TIMEOUT_MS,
+    chat_model,
+    default_sdk_client,
+    prepare_attempt,
+)
+from autobots.application.goal_loop import LoopConfig
 from autobots.application.model_admission import (
     AdmissionRequest,
     CostUnavailable,
@@ -258,6 +264,33 @@ def test_a_connection_error_is_not_retried_by_the_sdk() -> None:
     with pytest.raises(httpx.TransportError):
         model_over(handle).invoke("hello")
     assert len(calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_slow_reply_outlasts_httpx_default_and_the_goal_loop_bound_decides() -> None:
+    """Left to the default, any reply slower than 5 seconds paused the run as uncertain."""
+    timeouts: list[dict[str, float]] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        timeouts.append(request.extensions["timeout"])
+        return httpx.Response(500, json={"error": {"code": 500, "message": "arranged"}})
+
+    profile = PROFILES[ModelProfileId.DEEPSEEK_FLASH]
+    catalog = CatalogSnapshot(
+        "fixture", NOW, (CatalogEntry(profile.wire_id, profile.canonical_id, frozenset()),)
+    )
+    attempt = prepare_attempt(resolve_role_policy(), ModelRole.CODER, catalog, now=NOW)
+
+    def factory(key: str) -> openrouter.OpenRouter:
+        return default_sdk_client(
+            key, async_http=httpx.AsyncClient(transport=httpx.MockTransport(handle))
+        )
+
+    with pytest.raises(openrouter.errors.OpenRouterError):
+        await chat_model(attempt, SecretStr(ARRANGED_KEY), client_factory=factory).ainvoke("hello")
+    assert len(timeouts) == 1
+    assert timeouts[0]["read"] * 1000 == REQUEST_TIMEOUT_MS
+    assert timeouts[0]["read"] > LoopConfig.model_call_seconds
 
 
 def test_the_default_client_has_sdk_retries_off() -> None:

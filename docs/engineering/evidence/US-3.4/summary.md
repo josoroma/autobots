@@ -103,3 +103,22 @@ This is partial evidence for US-3.4, and **the story isn't complete**. Harness a
 
 The runner's worst-case estimate used DeepSeek's base rate, though the catalog shows that rate doubling in weekday peak windows. It's since been fixed. Reported charges are unaffected, and neither round came near its cap. The per-call cost comparison is from one afternoon, so it may not hold at other hours.
 
+## Third round: nested schemas at 2,048 output tokens
+
+**Class: live.** Run on 2026-11-05, authorized by the user's "Try 2,048 tokens" and "now with openai/gpt-6.1-terra-20261026", from a scratch worktree at `415eaf0`, with only `OUTPUT_TOKENS` changed. **The shared limit in this repository is still 512.** Raw results are in `.checks/trial-2048/` (ignored, local).
+
+| | DeepSeek | Terra |
+|---|---|---|
+| Nested schema, open objects | 0/3: parsed, wrong `place` | Refused with `400`, 3 of 3 |
+| Nested schema, closed objects | 0/3: parsed, wrong `place` | 3/3 |
+| Finish reason of replies | `stop`, all 6 | `stop`, the 3 that replied |
+| Output tokens, of which reasoning | 341–658, 227–561 | 112–116, 32–35 |
+| Reported charges | US$0.001474 | US$0.002147 |
+| Counted against the cap | US$0.001474 | US$0.057443, with worst-case amounts for the 3 refused requests |
+
+**DeepSeek.** The cut-off is gone, as 2,048 tokens left room, and every trial went over 512, so that limit can't hold this output. It still fails: all 6 returned `São José, 東京` where the prompt asks for exactly `São José, 東京 "quoted"`. So a parsed reply wasn't an exact one here. The fixture stops at its first failed check and doesn't record task counts or criteria, so those aren't known. Whether the quotes were the cause isn't established. Only the literal value was tried.
+
+**Terra.** The same as at 512, so the larger limit changed nothing it needed.
+
+What happened when the limit was tried on a real goal is in [the live goal record](../LIVE-GOAL-1/summary.md#trial-2048-output-tokens-deepseek-and-terra). This round doesn't change US-3.4's status.
+
