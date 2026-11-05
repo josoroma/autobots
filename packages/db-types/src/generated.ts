@@ -15,6 +15,22 @@ export interface ArtifactsRow {
   published_at: string | null;
 }
 
+export interface ExpertVersionsRow {
+  expert_id: string;
+  version: number;
+  config: unknown;
+  created_by: string;
+  created_at: string;
+}
+
+export interface ExpertsRow {
+  id: string;
+  workspace_id: string;
+  name: string;
+  latest_version: number;
+  created_at: string;
+}
+
 export interface ModelProfilesRow {
   profile_id: string;
   canonical_id: string;
@@ -49,6 +65,18 @@ export interface RunsRow {
   policy_snapshot: unknown;
   event_sequence: number;
   continues_run_id: string | null;
+  session_id: string | null;
+  expert_id: string | null;
+  expert_version: number | null;
+}
+
+export interface SessionsRow {
+  id: string;
+  workspace_id: string;
+  kind: string;
+  experts: unknown;
+  created_by: string;
+  created_at: string;
 }
 
 export interface WorkspaceMembersRow {

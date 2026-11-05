@@ -230,6 +230,32 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
           )}
         </Card>
       )}
+      {snapshot.expert === null ? null : (
+        <Card aria-labelledby="expert-heading" className="space-y-2">
+          <h2 id="expert-heading" className="text-lg font-medium">
+            Expert
+          </h2>
+          <div data-expert={snapshot.expert.name} className="space-y-1 text-sm">
+            <p>
+              {snapshot.expert.name}, version {snapshot.expert.version}
+            </p>
+            <p>
+              Tools:{" "}
+              {snapshot.expert.tools.length === 0
+                ? "none"
+                : snapshot.expert.tools.join(", ")}
+            </p>
+            <p>
+              Models:{" "}
+              {Object.keys(snapshot.expert.role_bindings).length === 0
+                ? "the workspace setting"
+                : Object.entries(snapshot.expert.role_bindings)
+                    .map(([role, profile]) => `${role}: ${profile}`)
+                    .join(", ")}
+            </p>
+          </div>
+        </Card>
+      )}
       <Card aria-labelledby="goal-heading" className="space-y-2">
         <h2 id="goal-heading" className="text-lg font-medium">
           Goal

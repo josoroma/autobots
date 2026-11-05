@@ -15,6 +15,9 @@ class RunRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     continues_run_id: Identifier | None = None
+    session_id: Identifier | None = None
+    expert_id: Identifier | None = None
+    expert_version: int | None = Field(default=None, ge=1)
     goal_text: str = Field(min_length=1, max_length=20000)
     limit_micro_usd: MicroUsd = 1_000_000
     acceptance_criteria: list[str] = Field(default_factory=list, max_length=20)

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Header, Request, status
 from autobots.api.errors import ApiError
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, provider_settings, require_owner
+from autobots.application.experts import ExpertRefused, resolve_binding
 from autobots.application.model_admission import ModelAdmission
 from autobots.application.provider_settings import ProviderSettings
 from autobots.application.recovery import outstanding
@@ -88,7 +89,21 @@ async def post_run(
                 (workspace_id,),
             )
         ).fetchone()
+        binding = None
+        if body.session_id is not None:
+            try:
+                binding = await resolve_binding(
+                    connection,
+                    workspace_id,
+                    body.session_id,
+                    expert_id=body.expert_id,
+                    version=body.expert_version,
+                )
+            except ExpertRefused as error:
+                status_code = 404 if error.code.endswith("not_found") else 409
+                raise ApiError(status_code, error.code, "That routing isn't available.") from None
         policy = resolve_role_policy(
+            run_role_overrides=binding.role_bindings if binding else None,
             workspace_default=row[0] if row else None,
             workspace_role_overrides=row[1] if row else None,
         )
@@ -103,6 +118,7 @@ async def post_run(
                 acceptance_criteria=tuple(body.acceptance_criteria),
                 continues_run_id=body.continues_run_id,
                 required_artifacts=tuple(body.required_artifacts),
+                binding=binding,
                 input_documents=tuple(body.input_documents),
                 policy=policy,
             )

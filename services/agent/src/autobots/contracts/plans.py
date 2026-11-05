@@ -36,6 +36,7 @@ class GoalSpec(BaseModel):
     allowed_tools: dict[str, int]
     allowed_paths: list[str]
     required_artifacts: list[RequiredArtifact] = Field(default_factory=list)
+    instructions: str = ""
 
 
 class PlanTask(BaseModel):

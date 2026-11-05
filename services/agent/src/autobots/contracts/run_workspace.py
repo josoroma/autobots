@@ -75,6 +75,17 @@ class OutstandingSummary(BaseModel):
     unreported_charges: int
 
 
+class ExpertBinding(BaseModel):
+    """What this run was given. It can't use anything that isn't listed here."""
+
+    model_config = VIEW
+
+    name: str
+    version: int
+    tools: list[str]
+    role_bindings: dict[str, str]
+
+
 class RunWorkspace(BaseModel):
     model_config = VIEW
 
@@ -87,5 +98,6 @@ class RunWorkspace(BaseModel):
     usage: UsageSummary
     stop_reason: str | None
     verification: VerificationSummary | None
+    expert: ExpertBinding | None
     outstanding: OutstandingSummary
     cursor: int

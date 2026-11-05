@@ -7,10 +7,10 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | EPIC-4 |
+| Target | EPIC-5 |
 | Kind | epic |
 | Focus | - |
-| Status | COMPLETE |
+| Status | ACTIVE |
 | Reason | - |
 | Started | 2026-11-05 |
 | Updated | 2026-11-05 |
@@ -19,23 +19,19 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-4.1 | us-4-1-atomic-run-admission-canonical | DONE | Atomic run admission and canonical transition commands |
-| 2 | US-4.2 | us-4-2-fenced-worker-ownership-durable | DONE | Fenced worker ownership and durable checkpoints |
-| 3 | US-4.3 | us-4-3-bounded-goal-planning-model | DONE | Bounded goal planning and model/tool loop |
-| 4 | US-4.4 | us-4-4-versioned-tool-registry-operation | DONE | Versioned tool registry and operation receipts |
-| 5 | US-4.5 | us-4-5-private-artifacts-staged-publication | DONE | Private artifacts with staged publication and reconciliation |
-| 6 | US-4.6 | us-4-6-sanitized-event-replay-run | DONE | Sanitized event replay and run workspace |
-| 7 | US-4.7 | us-4-7-pause-cancellation-interrupted-run | DONE | Pause, cancellation and interrupted-run recovery |
-| 8 | US-4.8 | us-4-8-verify-first-durable-goal | DONE | Verify the first durable goal-to-artifact slice |
+| 1 | US-5.1 | us-5-1-versioned-experts-direct-sessions | DONE | Versioned Experts, direct sessions and coordinator routing |
+| 2 | US-5.2 | us-5-2-scoped-synchronous-specialist-assignments | READY | Scoped synchronous specialist assignments |
+| 3 | US-5.3 | us-5-3-argument-bound-approvals-durable | READY | Argument-bound approvals and durable decision wait |
+| 4 | US-5.4 | us-5-4-consequential-effect-reconciliation-using | BLOCKED | Consequential-effect reconciliation using a mock destination |
 
 ## Next Action
 
-Action: complete
-Story: -
-Change: -
+Action: select
+Story: US-5.2
+Change: us-5-2-scoped-synchronous-specialist-assignments
 Owner: main-session
-Command: none — every story in the goal is DONE
-Reason: all 8 story/stories are DONE
+Command: openspec new change us-5-2-scoped-synchronous-specialist-assignments; set US-5.2 to IN PROGRESS with a Change: line
+Reason: US-5.2 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

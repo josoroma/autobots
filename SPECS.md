@@ -146,10 +146,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-4.8#1 | Exercise the bounded mock/local database/browser slice. | DONE | US-4.8 |
 | US-4.8#2 | Record independent review, recovery assertions and exercised user-flow runbook. | DONE | US-4.8 |
 | EPIC-5 | Experts, specialists and consequential effects | — | — |
-| US-5.1 | Versioned Experts, direct sessions and coordinator routing | READY | EPIC-5 |
-| US-5.1#1 | Implement Expert/session persistence and revision APIs. | TODO | US-5.1 |
-| US-5.1#2 | Add bounded coordinator routing and the Expert editor. | TODO | US-5.1 |
-| US-5.2 | Scoped synchronous specialist assignments | BLOCKED | EPIC-5 |
+| US-5.1 | Versioned Experts, direct sessions and coordinator routing | DONE | EPIC-5 |
+| US-5.1#1 | Implement Expert/session persistence and revision APIs. | DONE | US-5.1 |
+| US-5.1#2 | Add bounded coordinator routing and the Expert editor. | DONE | US-5.1 |
+| US-5.2 | Scoped synchronous specialist assignments | READY | EPIC-5 |
 | US-5.2#1 | Implement assignment records, namespaces and inherited budgets. | TODO | US-5.2 |
 | US-5.2#2 | Test duplicate delegation, denied expansion and parent cancellation. | TODO | US-5.2 |
 | US-5.3 | Argument-bound approvals and durable decision wait | READY | EPIC-5 |
@@ -176,7 +176,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-7.2#1 | Resolve the connector/service and operation scope decision. | TODO | US-7.2 |
 | US-7.2#2 | Implement and qualify only that selected connector under the existing effect contract. | TODO | US-7.2 |
 | EPIC-8 | Scoped memory and reviewed learning | — | — |
-| US-8.1 | Scoped memory, lexical retrieval and safe compaction | BLOCKED | EPIC-8 |
+| US-8.1 | Scoped memory, lexical retrieval and safe compaction | READY | EPIC-8 |
 | US-8.1#1 | Implement scoped store/artifact retrieval and explicit compaction policy. | TODO | US-8.1 |
 | US-8.1#2 | Test provenance, tool/result pairing and evidence retention across summaries. | TODO | US-8.1 |
 | US-8.2 | Reviewed memory and skill promotion with rollback | BLOCKED | EPIC-8 |
@@ -1905,7 +1905,8 @@ Phase reference: B2/B3, preserved SP-020. All story completion also requires SP-
 
 ### US-5.1: Versioned Experts, direct sessions and coordinator routing
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-5-1-versioned-experts-direct-sessions/`
 
 As a specialist owner
 I want persistent Expert configurations and direct or routed sessions
@@ -1937,15 +1938,15 @@ Dependencies:
 - US-4.8
 
 Tasks:
-- [ ] Implement Expert/session persistence and revision APIs.
-- [ ] Add bounded coordinator routing and the Expert editor.
+- [x] Implement Expert/session persistence and revision APIs.
+- [x] Add bounded coordinator routing and the Expert editor.
 
 Open Questions:
 - None.
 
 ### US-5.2: Scoped synchronous specialist assignments
 
-Status: BLOCKED
+Status: READY
 
 As a coordinator user
 I want bounded specialists with isolated task context
@@ -2277,7 +2278,7 @@ Phase reference: B6, preserved SP-020. All story completion also requires SP-003
 
 ### US-8.1: Scoped memory, lexical retrieval and safe compaction
 
-Status: BLOCKED
+Status: READY
 
 As a user
 I want scoped retained evidence with bounded context

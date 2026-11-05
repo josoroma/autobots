@@ -140,6 +140,7 @@ async def admit_run(
     continues_run_id: UUID | None = None,
     required_artifacts: tuple[RequiredArtifact, ...] = (),
     input_documents: tuple[InputDocument, ...] = (),
+    binding: Any = None,
 ) -> AdmissionResult:
     """Run, job and first event commit together. A repeat returns the original result."""
     goal = goal_text.strip()
@@ -152,6 +153,7 @@ async def admit_run(
             "criteria": criteria,
             "continues": str(continues_run_id),
             "required": [item.model_dump() for item in required_artifacts],
+            "expert": [str(binding.expert_id), binding.version] if binding else None,
             "documents": [item.model_dump() for item in input_documents],
         }
     )
@@ -174,8 +176,8 @@ async def admit_run(
         status = RunStatus.QUEUED.value
         await connection.execute(
             "insert into public.runs (id, workspace_id, status, limit_micro_usd, goal_text, "
-            "goal_summary, version, policy_snapshot, continues_run_id) "
-            "values (%s, %s, %s, %s, %s, %s, 1, %s, %s)",
+            "goal_summary, version, policy_snapshot, continues_run_id, session_id, expert_id, "
+            "expert_version) values (%s, %s, %s, %s, %s, %s, 1, %s, %s, %s, %s, %s)",
             (
                 run_id,
                 workspace_id,
@@ -185,6 +187,9 @@ async def admit_run(
                 goal[:200],
                 _snapshot(policy),
                 continues_run_id,
+                binding.session_id if binding else None,
+                binding.expert_id if binding else None,
+                binding.version if binding else None,
             ),
         )
         await connection.execute(
@@ -208,7 +213,8 @@ async def admit_run(
             objective=goal,
             original_request=goal_text,
             criteria={f"c{index}": text for index, text in enumerate(criteria, start=1)},
-            allowed_tools=dict(LOOP_TOOL_GRANTS),
+            allowed_tools=dict(binding.tools) if binding else dict(LOOP_TOOL_GRANTS),
+            instructions=binding.instructions if binding else "",
             allowed_paths=list(RUN_FILE_GRANTS),
             required_artifacts=list(required_artifacts),
         )

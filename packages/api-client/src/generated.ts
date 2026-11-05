@@ -311,6 +311,204 @@ export const schemas = {
     "title": "ExpectedVersion",
     "type": "object"
   },
+  "ExpertBinding": {
+    "additionalProperties": false,
+    "description": "What this run was given. It can't use anything that isn't listed here.",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "type": "string"
+      },
+      "role_bindings": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "title": "Role Bindings",
+        "type": "object"
+      },
+      "tools": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Tools",
+        "type": "array"
+      },
+      "version": {
+        "title": "Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "name",
+      "version",
+      "tools",
+      "role_bindings"
+    ],
+    "title": "ExpertBinding",
+    "type": "object"
+  },
+  "ExpertConfig": {
+    "additionalProperties": false,
+    "description": "Not strict, so JSON strings become enums. Unknown fields and values are still refused.",
+    "properties": {
+      "instructions": {
+        "default": "",
+        "maxLength": 20000,
+        "title": "Instructions",
+        "type": "string"
+      },
+      "purpose": {
+        "default": "",
+        "maxLength": 1000,
+        "title": "Purpose",
+        "type": "string"
+      },
+      "role_bindings": {
+        "additionalProperties": {
+          "$ref": "#/components/schemas/ModelProfileId"
+        },
+        "title": "Role Bindings",
+        "type": "object"
+      },
+      "skills": {
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 50,
+        "title": "Skills",
+        "type": "array"
+      },
+      "tools": {
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 20,
+        "title": "Tools",
+        "type": "array"
+      }
+    },
+    "title": "ExpertConfig",
+    "type": "object"
+  },
+  "ExpertCreate": {
+    "additionalProperties": false,
+    "properties": {
+      "config": {
+        "$ref": "#/components/schemas/ExpertConfig"
+      },
+      "name": {
+        "maxLength": 100,
+        "minLength": 1,
+        "title": "Name",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name",
+      "config"
+    ],
+    "title": "ExpertCreate",
+    "type": "object"
+  },
+  "ExpertList": {
+    "additionalProperties": false,
+    "properties": {
+      "experts": {
+        "items": {
+          "$ref": "#/components/schemas/ExpertView"
+        },
+        "title": "Experts",
+        "type": "array"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "experts"
+    ],
+    "title": "ExpertList",
+    "type": "object"
+  },
+  "ExpertRevision": {
+    "additionalProperties": false,
+    "properties": {
+      "config": {
+        "$ref": "#/components/schemas/ExpertConfig"
+      },
+      "expected_version": {
+        "minimum": 1.0,
+        "title": "Expected Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "expected_version",
+      "config"
+    ],
+    "title": "ExpertRevision",
+    "type": "object"
+  },
+  "ExpertVersionView": {
+    "additionalProperties": false,
+    "properties": {
+      "config": {
+        "$ref": "#/components/schemas/ExpertConfig"
+      },
+      "version": {
+        "title": "Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "version",
+      "config"
+    ],
+    "title": "ExpertVersionView",
+    "type": "object"
+  },
+  "ExpertView": {
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "format": "uuid",
+        "title": "Id",
+        "type": "string"
+      },
+      "latest_version": {
+        "title": "Latest Version",
+        "type": "integer"
+      },
+      "name": {
+        "title": "Name",
+        "type": "string"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "versions": {
+        "items": {
+          "$ref": "#/components/schemas/ExpertVersionView"
+        },
+        "title": "Versions",
+        "type": "array"
+      }
+    },
+    "required": [
+      "schema_version",
+      "id",
+      "name",
+      "latest_version",
+      "versions"
+    ],
+    "title": "ExpertView",
+    "type": "object"
+  },
   "HTTPValidationError": {
     "properties": {
       "detail": {
@@ -736,6 +934,53 @@ export const schemas = {
     "title": "RoleBinding",
     "type": "object"
   },
+  "RouteOption": {
+    "additionalProperties": false,
+    "description": "What a user sees before starting work. Nothing beyond this is granted.",
+    "properties": {
+      "expert_id": {
+        "format": "uuid",
+        "title": "Expert Id",
+        "type": "string"
+      },
+      "name": {
+        "title": "Name",
+        "type": "string"
+      },
+      "purpose": {
+        "title": "Purpose",
+        "type": "string"
+      },
+      "role_bindings": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "title": "Role Bindings",
+        "type": "object"
+      },
+      "tools": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Tools",
+        "type": "array"
+      },
+      "version": {
+        "title": "Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "expert_id",
+      "name",
+      "version",
+      "purpose",
+      "tools",
+      "role_bindings"
+    ],
+    "title": "RouteOption",
+    "type": "object"
+  },
   "RunAccepted": {
     "additionalProperties": false,
     "description": "Not strict, since it is built from database values. It is validated as it is built.",
@@ -960,6 +1205,30 @@ export const schemas = {
         ],
         "title": "Continues Run Id"
       },
+      "expert_id": {
+        "anyOf": [
+          {
+            "format": "uuid",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Expert Id"
+      },
+      "expert_version": {
+        "anyOf": [
+          {
+            "minimum": 1.0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Expert Version"
+      },
       "goal_text": {
         "maxLength": 20000,
         "minLength": 1,
@@ -988,6 +1257,18 @@ export const schemas = {
         "maxItems": 20,
         "title": "Required Artifacts",
         "type": "array"
+      },
+      "session_id": {
+        "anyOf": [
+          {
+            "format": "uuid",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Session Id"
       }
     },
     "required": [
@@ -1124,6 +1405,16 @@ export const schemas = {
         "title": "Cursor",
         "type": "integer"
       },
+      "expert": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ExpertBinding"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
       "objective": {
         "anyOf": [
           {
@@ -1191,6 +1482,7 @@ export const schemas = {
       "usage",
       "stop_reason",
       "verification",
+      "expert",
       "outstanding",
       "cursor"
     ],
@@ -1217,6 +1509,60 @@ export const schemas = {
       "status"
     ],
     "title": "ServiceHealth",
+    "type": "object"
+  },
+  "SessionCreate": {
+    "additionalProperties": false,
+    "properties": {
+      "experts": {
+        "items": {
+          "$ref": "#/components/schemas/SessionExpert"
+        },
+        "maxItems": 20,
+        "minItems": 1,
+        "title": "Experts",
+        "type": "array"
+      },
+      "kind": {
+        "enum": [
+          "direct",
+          "coordinator"
+        ],
+        "title": "Kind",
+        "type": "string"
+      }
+    },
+    "required": [
+      "kind",
+      "experts"
+    ],
+    "title": "SessionCreate",
+    "type": "object"
+  },
+  "SessionExpert": {
+    "additionalProperties": false,
+    "properties": {
+      "expert_id": {
+        "format": "uuid",
+        "title": "Expert Id",
+        "type": "string"
+      },
+      "version": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Version"
+      }
+    },
+    "required": [
+      "expert_id"
+    ],
+    "title": "SessionExpert",
     "type": "object"
   },
   "SessionSummary": {
@@ -1248,6 +1594,44 @@ export const schemas = {
       "workspace_ids"
     ],
     "title": "SessionSummary",
+    "type": "object"
+  },
+  "SessionView": {
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "format": "uuid",
+        "title": "Id",
+        "type": "string"
+      },
+      "kind": {
+        "enum": [
+          "direct",
+          "coordinator"
+        ],
+        "title": "Kind",
+        "type": "string"
+      },
+      "options": {
+        "items": {
+          "$ref": "#/components/schemas/RouteOption"
+        },
+        "title": "Options",
+        "type": "array"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "id",
+      "kind",
+      "options"
+    ],
+    "title": "SessionView",
     "type": "object"
   },
   "TaskView": {
@@ -1528,6 +1912,77 @@ export function parseExpectedVersion(value: unknown): ExpectedVersion {
   return parseWith(schemas, "ExpectedVersion", value) as ExpectedVersion;
 }
 
+export interface ExpertBinding {
+  name: string;
+  role_bindings: Record<string, unknown>;
+  tools: string[];
+  version: number;
+}
+
+export function parseExpertBinding(value: unknown): ExpertBinding {
+  return parseWith(schemas, "ExpertBinding", value) as ExpertBinding;
+}
+
+export interface ExpertConfig {
+  instructions?: string;
+  purpose?: string;
+  role_bindings?: Record<string, unknown>;
+  skills?: string[];
+  tools?: string[];
+}
+
+export function parseExpertConfig(value: unknown): ExpertConfig {
+  return parseWith(schemas, "ExpertConfig", value) as ExpertConfig;
+}
+
+export interface ExpertCreate {
+  config: ExpertConfig;
+  name: string;
+}
+
+export function parseExpertCreate(value: unknown): ExpertCreate {
+  return parseWith(schemas, "ExpertCreate", value) as ExpertCreate;
+}
+
+export interface ExpertList {
+  experts: ExpertView[];
+  schema_version: 1;
+}
+
+export function parseExpertList(value: unknown): ExpertList {
+  return parseWith(schemas, "ExpertList", value) as ExpertList;
+}
+
+export interface ExpertRevision {
+  config: ExpertConfig;
+  expected_version: number;
+}
+
+export function parseExpertRevision(value: unknown): ExpertRevision {
+  return parseWith(schemas, "ExpertRevision", value) as ExpertRevision;
+}
+
+export interface ExpertVersionView {
+  config: ExpertConfig;
+  version: number;
+}
+
+export function parseExpertVersionView(value: unknown): ExpertVersionView {
+  return parseWith(schemas, "ExpertVersionView", value) as ExpertVersionView;
+}
+
+export interface ExpertView {
+  id: string;
+  latest_version: number;
+  name: string;
+  schema_version: 1;
+  versions: ExpertVersionView[];
+}
+
+export function parseExpertView(value: unknown): ExpertView {
+  return parseWith(schemas, "ExpertView", value) as ExpertView;
+}
+
 export interface HTTPValidationError {
   detail?: ValidationError[];
 }
@@ -1672,6 +2127,19 @@ export function parseRoleBinding(value: unknown): RoleBinding {
   return parseWith(schemas, "RoleBinding", value) as RoleBinding;
 }
 
+export interface RouteOption {
+  expert_id: string;
+  name: string;
+  purpose: string;
+  role_bindings: Record<string, unknown>;
+  tools: string[];
+  version: number;
+}
+
+export function parseRouteOption(value: unknown): RouteOption {
+  return parseWith(schemas, "RouteOption", value) as RouteOption;
+}
+
 export interface RunAccepted {
   replayed: boolean;
   run_id: string;
@@ -1739,10 +2207,13 @@ export function parseRunIntentCheck(value: unknown): RunIntentCheck {
 export interface RunRequest {
   acceptance_criteria?: string[];
   continues_run_id?: string | null;
+  expert_id?: string | null;
+  expert_version?: number | null;
   goal_text: string;
   input_documents?: InputDocument[];
   limit_micro_usd?: number;
   required_artifacts?: RequiredArtifact[];
+  session_id?: string | null;
 }
 
 export function parseRunRequest(value: unknown): RunRequest {
@@ -1785,6 +2256,7 @@ export interface RunWorkspace {
   artifacts: ArtifactSummary[];
   criteria: CriterionView[];
   cursor: number;
+  expert: ExpertBinding | null;
   objective: string | null;
   outstanding: OutstandingSummary;
   plan: PlanSummary | null;
@@ -1808,6 +2280,24 @@ export function parseServiceHealth(value: unknown): ServiceHealth {
   return parseWith(schemas, "ServiceHealth", value) as ServiceHealth;
 }
 
+export interface SessionCreate {
+  experts: SessionExpert[];
+  kind: "direct" | "coordinator";
+}
+
+export function parseSessionCreate(value: unknown): SessionCreate {
+  return parseWith(schemas, "SessionCreate", value) as SessionCreate;
+}
+
+export interface SessionExpert {
+  expert_id: string;
+  version?: number | null;
+}
+
+export function parseSessionExpert(value: unknown): SessionExpert {
+  return parseWith(schemas, "SessionExpert", value) as SessionExpert;
+}
+
 export interface SessionSummary {
   schema_version: 1;
   user_id: string;
@@ -1816,6 +2306,17 @@ export interface SessionSummary {
 
 export function parseSessionSummary(value: unknown): SessionSummary {
   return parseWith(schemas, "SessionSummary", value) as SessionSummary;
+}
+
+export interface SessionView {
+  id: string;
+  kind: "direct" | "coordinator";
+  options: RouteOption[];
+  schema_version: 1;
+}
+
+export function parseSessionView(value: unknown): SessionView {
+  return parseWith(schemas, "SessionView", value) as SessionView;
 }
 
 export interface TaskView {
@@ -1872,6 +2373,22 @@ export function parseWorkspaceSummary(value: unknown): WorkspaceSummary {
   return parseWith(schemas, "WorkspaceSummary", value) as WorkspaceSummary;
 }
 
+export async function listExperts(options: ClientOptions): Promise<ExpertList> {
+  return parseExpertList(await requestJson(options, "GET", `/v1/experts`));
+}
+
+export async function createExpert(options: ClientOptions, body: ExpertCreate): Promise<ExpertView> {
+  return parseExpertView(await requestJson(options, "POST", `/v1/experts`, body));
+}
+
+export async function getExpert(options: ClientOptions, expert_id: string): Promise<ExpertView> {
+  return parseExpertView(await requestJson(options, "GET", `/v1/experts/${encodeURIComponent(expert_id)}`));
+}
+
+export async function addExpertVersion(options: ClientOptions, expert_id: string, body: ExpertRevision): Promise<ExpertView> {
+  return parseExpertView(await requestJson(options, "POST", `/v1/experts/${encodeURIComponent(expert_id)}/versions`, body));
+}
+
 export async function getHealth(options: ClientOptions): Promise<ServiceHealth> {
   return parseServiceHealth(await requestJson(options, "GET", `/v1/health`));
 }
@@ -1926,6 +2443,14 @@ export async function getRunWorkspace(options: ClientOptions, run_id: string): P
 
 export async function getSession(options: ClientOptions): Promise<SessionSummary> {
   return parseSessionSummary(await requestJson(options, "GET", `/v1/session`));
+}
+
+export async function createWorkSession(options: ClientOptions, body: SessionCreate): Promise<SessionView> {
+  return parseSessionView(await requestJson(options, "POST", `/v1/sessions`, body));
+}
+
+export async function getWorkSession(options: ClientOptions, session_id: string): Promise<SessionView> {
+  return parseSessionView(await requestJson(options, "GET", `/v1/sessions/${encodeURIComponent(session_id)}`));
 }
 
 export async function putModelPolicy(options: ClientOptions, body: ModelPolicyUpdate): Promise<ModelPolicyState> {

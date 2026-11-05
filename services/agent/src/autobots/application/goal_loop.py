@@ -106,14 +106,19 @@ def loop_registry(limits: RootLimits, object_store: Any = None) -> ToolRegistry:
 
 
 def build_stage(
-    connection: Any, model: Any, saver: Any, scope: ToolScope, config: LoopConfig
+    connection: Any,
+    model: Any,
+    saver: Any,
+    scope: ToolScope,
+    config: LoopConfig,
+    instructions: str = "",
 ) -> Any:
     """Explicit tools and middleware. Skills, memory, subagents and a backend stay unset here."""
     gateway = ToolGateway(loop_registry(config.limits, config.object_store))
     return create_deep_agent(
         model=AdmittedModel(delegate=model),
         tools=visible_tools(gateway, scope),
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=f"{SYSTEM_PROMPT}\n\n{instructions}".strip(),
         middleware=[
             LoopMiddleware(
                 connection,
@@ -176,7 +181,7 @@ async def run_goal(
     run_config = {**graph_config(lease), "recursion_limit": steps}
     try:
         async with fenced_checkpointer(database_url, lease) as saver:
-            agent = build_stage(connection, model, saver, scope, config)
+            agent = build_stage(connection, model, saver, scope, config, goal.instructions)
             state = await agent.aget_state(run_config)
             payload = None if state.next else {"messages": [HumanMessage(_opening(goal))]}
             await agent.ainvoke(payload, run_config, durability=DURABILITY)

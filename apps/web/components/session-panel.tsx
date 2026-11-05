@@ -1,0 +1,167 @@
+"use client";
+
+import { parseSessionView, type SessionView } from "@autobots/api-client";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { csrfFetch } from "@/lib/csrf-fetch";
+
+export function SessionPanel({ sessionId }: { sessionId: string }) {
+  const [session, setSession] = useState<SessionView | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
+  const [goal, setGoal] = useState("");
+  const [chosen, setChosen] = useState<string | null>(null);
+  const [runId, setRunId] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/v1/sessions/${encodeURIComponent(sessionId)}`, {
+      cache: "no-store",
+    })
+      .then(async (reply) => {
+        if (!active) return;
+        if (!reply.ok) {
+          setUnavailable(true);
+          return;
+        }
+        setSession(parseSessionView(await reply.json()));
+      })
+      .catch(() => {
+        if (active) setUnavailable(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [sessionId]);
+
+  async function run(): Promise<void> {
+    if (session === null) return;
+    setProblem(null);
+    setRunId(null);
+    const expertId =
+      session.kind === "direct" ? session.options[0]?.expert_id : chosen;
+    const reply = await csrfFetch("/api/v1/runs", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": crypto.randomUUID(),
+      },
+      body: JSON.stringify({
+        goal_text: goal,
+        session_id: session.id,
+        expert_id: expertId,
+      }),
+    }).catch(() => null);
+    if (reply?.ok === true) {
+      setRunId(((await reply.json()) as { run_id: string }).run_id);
+      return;
+    }
+    const failure = (await reply?.json().catch(() => null)) as {
+      code?: string;
+    } | null;
+    setProblem(
+      failure?.code === "credentials_required"
+        ? "Model-backed work needs an OpenRouter key."
+        : "That could not be started.",
+    );
+  }
+
+  if (unavailable) {
+    return (
+      <p role="alert" data-state="unavailable" className="text-sm">
+        That session is not available.
+      </p>
+    );
+  }
+  if (session === null) {
+    return (
+      <p role="status" className="text-sm">
+        Loading this session.
+      </p>
+    );
+  }
+  const ready =
+    goal.trim() !== "" && (session.kind === "direct" || chosen !== null);
+  return (
+    <>
+      <Card aria-labelledby="options-heading" className="space-y-3">
+        <h2 id="options-heading" className="text-lg font-medium">
+          {session.kind === "direct"
+            ? "Working with"
+            : "This coordinator can route to"}
+        </h2>
+        <ul className="space-y-3 text-sm">
+          {session.options.map((option) => (
+            <li
+              key={option.expert_id}
+              data-option={option.name}
+              className="space-y-1"
+            >
+              {session.kind === "coordinator" ? (
+                <label className="flex items-center gap-2 font-medium">
+                  <input
+                    type="radio"
+                    name="expert"
+                    checked={chosen === option.expert_id}
+                    onChange={() => setChosen(option.expert_id)}
+                  />
+                  {option.name}, version {option.version}
+                </label>
+              ) : (
+                <p className="font-medium">
+                  {option.name}, version {option.version}
+                </p>
+              )}
+              <p data-field="tools">
+                Tools:{" "}
+                {option.tools.length === 0 ? "none" : option.tools.join(", ")}
+              </p>
+              <p data-field="models">
+                Models:{" "}
+                {Object.keys(option.role_bindings).length === 0
+                  ? "the workspace setting"
+                  : Object.entries(option.role_bindings)
+                      .map(([role, profile]) => `${role}: ${profile}`)
+                      .join(", ")}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </Card>
+      <Card aria-labelledby="work-heading" className="space-y-3">
+        <h2 id="work-heading" className="text-lg font-medium">
+          New work
+        </h2>
+        <label htmlFor="session-goal" className="text-sm font-medium">
+          Goal
+        </label>
+        <textarea
+          id="session-goal"
+          rows={3}
+          value={goal}
+          onChange={(event) => setGoal(event.target.value)}
+          className="bg-background border-input block w-full rounded-md border px-3 py-2 text-sm"
+        />
+        <Button onClick={() => void run()} disabled={!ready}>
+          Run
+        </Button>
+        {runId === null ? null : (
+          <p role="status" className="text-sm">
+            Queued.{" "}
+            <Link href={`/runs/${runId}`} className="font-medium underline">
+              Open this run
+            </Link>
+          </p>
+        )}
+        {problem === null ? null : (
+          <p role="alert" className="text-sm">
+            {problem}
+          </p>
+        )}
+      </Card>
+    </>
+  );
+}

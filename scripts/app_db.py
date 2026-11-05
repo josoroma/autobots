@@ -112,7 +112,7 @@ def seed(stack: AppStack, root: Path) -> subprocess.CompletedProcess[str]:
 def reset(stack: AppStack) -> None:
     require_marker(stack)
     result = stack.sql('drop schema if exists app_private cascade;\ndrop schema if exists agent_runtime cascade;\n'
-                       'drop table if exists public.artifacts, public.run_events, public.runs, public.model_profiles, public.workspace_members, '
+                       'drop table if exists public.artifacts, public.run_events, public.runs, public.sessions, public.expert_versions, public.experts, public.model_profiles, public.workspace_members, '
                        'public.workspaces cascade;\ndrop function if exists public.is_workspace_member(uuid);\n'
                        'truncate autobots_disposable.migrations;\n')
     if result.returncode:
@@ -387,6 +387,22 @@ def recovery_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> N
     cases.denied('authenticated cannot read obligations', stack.as_role('authenticated', USER_A, 'select * from app_private.run_obligations'), 'permission denied')
 
 
+def expert_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
+    """Frozen revisions and bounded routing through the runtime role."""
+    url = f'postgresql://autobots_runtime:{stack.runtime_password}@127.0.0.1:{db_port}/postgres'
+    other = 'b0000000-0000-4000-8000-000000000002'
+    result = subprocess.run([str(root / 'services/agent/.venv/bin/python'), str(root / 'tests/db/expert_check.py'), WORKSPACE_A, other],
+                            env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
+                            capture_output=True, text=True, timeout=180, check=False)
+    if result.returncode:
+        cases.check('the expert check ran', 'exit 0', f'exit {result.returncode}: {result.stderr.strip()[-380:]}', False)
+        if not result.stdout.strip():
+            return
+    for case in json.loads(result.stdout.strip().splitlines()[-1])['cases']:
+        cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+    cases.denied('anonymous cannot read Experts', stack.as_role('anon', None, 'select * from public.experts'), 'permission denied')
+
+
 def guard_cases(stack: AppStack, cases: Cases, root: Path) -> None:
     stack.sql("update autobots_disposable.marker set run_id = 'something-else';")
     try:
@@ -442,6 +458,7 @@ def qualify(root: Path, write_types: bool = False) -> int:
         tool_cases(stack, cases, root, db_port)
         loop_cases(stack, cases, root, db_port)
         recovery_cases(stack, cases, root, db_port)
+        expert_cases(stack, cases, root, db_port)
         guard_cases(stack, cases, root)
         type_cases(stack, cases, root, write_types)
         static_cases(cases, root)

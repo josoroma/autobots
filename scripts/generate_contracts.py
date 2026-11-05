@@ -57,7 +57,9 @@ def declaration(name: str, schema: Mapping) -> str:
 
 def operation(path: str, method: str, details: Mapping) -> str:
     """One client function, from a route with an operationId and a JSON response model."""
-    content = details['responses'].get('200', details['responses'].get('202', {})).get('content', {})
+    responses = details['responses']
+    success = next((responses[code] for code in ('200', '201', '202') if code in responses), {})
+    content = success.get('content', {})
     reference = content.get('application/json', {}).get('schema', {}).get('$ref')
     if reference is None or 'operationId' not in details:
         raise ValueError(f'{method} {path} needs an operationId and a JSON response model')

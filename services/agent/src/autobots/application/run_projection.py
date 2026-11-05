@@ -15,6 +15,7 @@ from autobots.contracts.artifacts import ArtifactSummary
 from autobots.contracts.run_workspace import (
     CriterionView,
     EventPage,
+    ExpertBinding,
     OutstandingSummary,
     PlanSummary,
     RunWorkspace,
@@ -23,6 +24,7 @@ from autobots.contracts.run_workspace import (
     VerificationSummary,
 )
 from autobots.contracts.runs import RunEvent, RunSummary
+from autobots.domain.tools import PLAN_TOOLS
 
 PAGE_SIZE = 200
 MAX_TEXT = 500
@@ -159,6 +161,26 @@ async def _verification(connection: Any, run_id: UUID) -> VerificationSummary | 
     return VerificationSummary(passed=row[0], unmet=row[1], checks=row[2]) if row else None
 
 
+async def _expert(connection: Any, run_id: UUID) -> ExpertBinding | None:
+    cursor = await connection.execute(
+        "select e.name, r.expert_version, g.spec -> 'allowed_tools', v.config -> 'role_bindings' "
+        "from public.runs r join public.experts e on e.id = r.expert_id "
+        "join app_private.goal_specs g on g.run_id = r.id "
+        "join public.expert_versions v on v.expert_id = r.expert_id "
+        "and v.version = r.expert_version where r.id = %s",
+        (run_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        return None
+    return ExpertBinding(
+        name=row[0],
+        version=row[1],
+        tools=sorted(tool for tool in row[2] if tool not in PLAN_TOOLS),
+        role_bindings=row[3] or {},
+    )
+
+
 async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> RunWorkspace:
     row = await _require_run(connection, workspace_id, run_id)
     summary = _summary(row)
@@ -194,6 +216,7 @@ async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> R
         ),
         stop_reason=usage[4],
         verification=await _verification(connection, run_id),
+        expert=await _expert(connection, run_id),
         outstanding=OutstandingSummary(
             uncertain_calls=left.uncertain_calls,
             unknown_effects=left.unknown_effects,

@@ -310,6 +310,204 @@
         "title": "ExpectedVersion",
         "type": "object"
       },
+      "ExpertBinding": {
+        "additionalProperties": false,
+        "description": "What this run was given. It can't use anything that isn't listed here.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role_bindings": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Role Bindings",
+            "type": "object"
+          },
+          "tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tools",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "tools",
+          "role_bindings"
+        ],
+        "title": "ExpertBinding",
+        "type": "object"
+      },
+      "ExpertConfig": {
+        "additionalProperties": false,
+        "description": "Not strict, so JSON strings become enums. Unknown fields and values are still refused.",
+        "properties": {
+          "instructions": {
+            "default": "",
+            "maxLength": 20000,
+            "title": "Instructions",
+            "type": "string"
+          },
+          "purpose": {
+            "default": "",
+            "maxLength": 1000,
+            "title": "Purpose",
+            "type": "string"
+          },
+          "role_bindings": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ModelProfileId"
+            },
+            "title": "Role Bindings",
+            "type": "object"
+          },
+          "skills": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Skills",
+            "type": "array"
+          },
+          "tools": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "title": "ExpertConfig",
+        "type": "object"
+      },
+      "ExpertCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/ExpertConfig"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "config"
+        ],
+        "title": "ExpertCreate",
+        "type": "object"
+      },
+      "ExpertList": {
+        "additionalProperties": false,
+        "properties": {
+          "experts": {
+            "items": {
+              "$ref": "#/components/schemas/ExpertView"
+            },
+            "title": "Experts",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "experts"
+        ],
+        "title": "ExpertList",
+        "type": "object"
+      },
+      "ExpertRevision": {
+        "additionalProperties": false,
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/ExpertConfig"
+          },
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_version",
+          "config"
+        ],
+        "title": "ExpertRevision",
+        "type": "object"
+      },
+      "ExpertVersionView": {
+        "additionalProperties": false,
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/ExpertConfig"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "config"
+        ],
+        "title": "ExpertVersionView",
+        "type": "object"
+      },
+      "ExpertView": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "latest_version": {
+            "title": "Latest Version",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/ExpertVersionView"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "schema_version",
+          "id",
+          "name",
+          "latest_version",
+          "versions"
+        ],
+        "title": "ExpertView",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -735,6 +933,53 @@
         "title": "RoleBinding",
         "type": "object"
       },
+      "RouteOption": {
+        "additionalProperties": false,
+        "description": "What a user sees before starting work. Nothing beyond this is granted.",
+        "properties": {
+          "expert_id": {
+            "format": "uuid",
+            "title": "Expert Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "purpose": {
+            "title": "Purpose",
+            "type": "string"
+          },
+          "role_bindings": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Role Bindings",
+            "type": "object"
+          },
+          "tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tools",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expert_id",
+          "name",
+          "version",
+          "purpose",
+          "tools",
+          "role_bindings"
+        ],
+        "title": "RouteOption",
+        "type": "object"
+      },
       "RunAccepted": {
         "additionalProperties": false,
         "description": "Not strict, since it is built from database values. It is validated as it is built.",
@@ -959,6 +1204,30 @@
             ],
             "title": "Continues Run Id"
           },
+          "expert_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expert Id"
+          },
+          "expert_version": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expert Version"
+          },
           "goal_text": {
             "maxLength": 20000,
             "minLength": 1,
@@ -987,6 +1256,18 @@
             "maxItems": 20,
             "title": "Required Artifacts",
             "type": "array"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
           }
         },
         "required": [
@@ -1123,6 +1404,16 @@
             "title": "Cursor",
             "type": "integer"
           },
+          "expert": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpertBinding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "objective": {
             "anyOf": [
               {
@@ -1190,6 +1481,7 @@
           "usage",
           "stop_reason",
           "verification",
+          "expert",
           "outstanding",
           "cursor"
         ],
@@ -1216,6 +1508,60 @@
           "status"
         ],
         "title": "ServiceHealth",
+        "type": "object"
+      },
+      "SessionCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "experts": {
+            "items": {
+              "$ref": "#/components/schemas/SessionExpert"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Experts",
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "direct",
+              "coordinator"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "experts"
+        ],
+        "title": "SessionCreate",
+        "type": "object"
+      },
+      "SessionExpert": {
+        "additionalProperties": false,
+        "properties": {
+          "expert_id": {
+            "format": "uuid",
+            "title": "Expert Id",
+            "type": "string"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "expert_id"
+        ],
+        "title": "SessionExpert",
         "type": "object"
       },
       "SessionSummary": {
@@ -1247,6 +1593,44 @@
           "workspace_ids"
         ],
         "title": "SessionSummary",
+        "type": "object"
+      },
+      "SessionView": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "direct",
+              "coordinator"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/RouteOption"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "id",
+          "kind",
+          "options"
+        ],
+        "title": "SessionView",
         "type": "object"
       },
       "TaskView": {
@@ -1422,6 +1806,382 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/v1/experts": {
+      "get": {
+        "operationId": "listExperts",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpertList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Experts"
+      },
+      "post": {
+        "operationId": "createExpert",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpertCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpertView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Expert"
+      }
+    },
+    "/v1/experts/{expert_id}": {
+      "get": {
+        "operationId": "getExpert",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "expert_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Expert Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpertView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Expert"
+      }
+    },
+    "/v1/experts/{expert_id}/versions": {
+      "post": {
+        "operationId": "addExpertVersion",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "expert_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Expert Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpertRevision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpertView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Version"
+      }
+    },
     "/v1/health": {
       "get": {
         "operationId": "getHealth",
@@ -2706,6 +3466,195 @@
           }
         },
         "summary": "Get Session"
+      }
+    },
+    "/v1/sessions": {
+      "post": {
+        "operationId": "createWorkSession",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Session"
+      }
+    },
+    "/v1/sessions/{session_id}": {
+      "get": {
+        "operationId": "getWorkSession",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Session"
       }
     },
     "/v1/settings/model-policy": {
