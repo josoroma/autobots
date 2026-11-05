@@ -7,10 +7,16 @@ from pydantic import BaseModel
 from pydantic.json_schema import models_json_schema
 
 from autobots.api.app import create_app
+from autobots.contracts.models import EffectiveRolePolicy
 from autobots.contracts.runs import ErrorResponse, RunEvent, RunSummary
 
 # Public models not yet referenced by a route still belong in the contract.
-PUBLIC_MODELS: tuple[type[BaseModel], ...] = (RunSummary, RunEvent, ErrorResponse)
+PUBLIC_MODELS: tuple[type[BaseModel], ...] = (
+    RunSummary,
+    RunEvent,
+    ErrorResponse,
+    EffectiveRolePolicy,
+)
 
 
 def openapi_document() -> dict[str, Any]:

@@ -31,6 +31,34 @@
         "title": "BudgetCounters",
         "type": "object"
       },
+      "EffectiveRolePolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "bindings": {
+            "items": {
+              "$ref": "#/components/schemas/RoleBinding"
+            },
+            "title": "Bindings",
+            "type": "array"
+          },
+          "role_policy_version": {
+            "title": "Role Policy Version",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "role_policy_version",
+          "bindings"
+        ],
+        "title": "EffectiveRolePolicy",
+        "type": "object"
+      },
       "ErrorResponse": {
         "additionalProperties": false,
         "properties": {
@@ -65,6 +93,61 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "ModelProfileId": {
+        "enum": [
+          "openrouter_deepseek_flash",
+          "openrouter_astra"
+        ],
+        "title": "ModelProfileId",
+        "type": "string"
+      },
+      "ModelRole": {
+        "enum": [
+          "coordinator",
+          "router",
+          "planner",
+          "executor",
+          "researcher",
+          "coder",
+          "reviewer",
+          "evaluator",
+          "summarizer",
+          "memory_curator",
+          "skill_learner",
+          "tool_repair",
+          "workflow_generator",
+          "general_purpose"
+        ],
+        "title": "ModelRole",
+        "type": "string"
+      },
+      "RoleBinding": {
+        "additionalProperties": false,
+        "properties": {
+          "canonical_id": {
+            "title": "Canonical Id",
+            "type": "string"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ModelProfileId"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ModelRole"
+          },
+          "wire_id": {
+            "title": "Wire Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "profile",
+          "canonical_id",
+          "wire_id"
+        ],
+        "title": "RoleBinding",
         "type": "object"
       },
       "RunEvent": {

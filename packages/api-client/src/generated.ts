@@ -32,6 +32,34 @@ export const schemas = {
     "title": "BudgetCounters",
     "type": "object"
   },
+  "EffectiveRolePolicy": {
+    "additionalProperties": false,
+    "properties": {
+      "bindings": {
+        "items": {
+          "$ref": "#/components/schemas/RoleBinding"
+        },
+        "title": "Bindings",
+        "type": "array"
+      },
+      "role_policy_version": {
+        "title": "Role Policy Version",
+        "type": "integer"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "role_policy_version",
+      "bindings"
+    ],
+    "title": "EffectiveRolePolicy",
+    "type": "object"
+  },
   "ErrorResponse": {
     "additionalProperties": false,
     "properties": {
@@ -66,6 +94,61 @@ export const schemas = {
       }
     },
     "title": "HTTPValidationError",
+    "type": "object"
+  },
+  "ModelProfileId": {
+    "enum": [
+      "openrouter_deepseek_flash",
+      "openrouter_astra"
+    ],
+    "title": "ModelProfileId",
+    "type": "string"
+  },
+  "ModelRole": {
+    "enum": [
+      "coordinator",
+      "router",
+      "planner",
+      "executor",
+      "researcher",
+      "coder",
+      "reviewer",
+      "evaluator",
+      "summarizer",
+      "memory_curator",
+      "skill_learner",
+      "tool_repair",
+      "workflow_generator",
+      "general_purpose"
+    ],
+    "title": "ModelRole",
+    "type": "string"
+  },
+  "RoleBinding": {
+    "additionalProperties": false,
+    "properties": {
+      "canonical_id": {
+        "title": "Canonical Id",
+        "type": "string"
+      },
+      "profile": {
+        "$ref": "#/components/schemas/ModelProfileId"
+      },
+      "role": {
+        "$ref": "#/components/schemas/ModelRole"
+      },
+      "wire_id": {
+        "title": "Wire Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "role",
+      "profile",
+      "canonical_id",
+      "wire_id"
+    ],
+    "title": "RoleBinding",
     "type": "object"
   },
   "RunEvent": {
@@ -344,6 +427,16 @@ export function parseBudgetCounters(value: unknown): BudgetCounters {
   return parseWith(schemas, "BudgetCounters", value) as BudgetCounters;
 }
 
+export interface EffectiveRolePolicy {
+  bindings: RoleBinding[];
+  role_policy_version: number;
+  schema_version: 1;
+}
+
+export function parseEffectiveRolePolicy(value: unknown): EffectiveRolePolicy {
+  return parseWith(schemas, "EffectiveRolePolicy", value) as EffectiveRolePolicy;
+}
+
 export interface ErrorResponse {
   code: string;
   message: string;
@@ -359,6 +452,29 @@ export interface HTTPValidationError {
 
 export function parseHTTPValidationError(value: unknown): HTTPValidationError {
   return parseWith(schemas, "HTTPValidationError", value) as HTTPValidationError;
+}
+
+export type ModelProfileId = "openrouter_deepseek_flash" | "openrouter_astra";
+
+export function parseModelProfileId(value: unknown): ModelProfileId {
+  return parseWith(schemas, "ModelProfileId", value) as ModelProfileId;
+}
+
+export type ModelRole = "coordinator" | "router" | "planner" | "executor" | "researcher" | "coder" | "reviewer" | "evaluator" | "summarizer" | "memory_curator" | "skill_learner" | "tool_repair" | "workflow_generator" | "general_purpose";
+
+export function parseModelRole(value: unknown): ModelRole {
+  return parseWith(schemas, "ModelRole", value) as ModelRole;
+}
+
+export interface RoleBinding {
+  canonical_id: string;
+  profile: ModelProfileId;
+  role: ModelRole;
+  wire_id: string;
+}
+
+export function parseRoleBinding(value: unknown): RoleBinding {
+  return parseWith(schemas, "RoleBinding", value) as RoleBinding;
 }
 
 export interface RunEvent {

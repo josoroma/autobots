@@ -104,11 +104,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-2.5#2 | Provide typed authenticated BFF-to-Python transport and safe errors. | DONE | US-2.5 |
 | US-2.5#3 | Wire shared shadcn Luma components/tokens and dark-default preference resolution before paint. | DONE | US-2.5 |
 | US-2.5#4 | Verify both appearance modes, accessible states and first-paint behavior with revision-bound browser/screenshots evidence. | DONE | US-2.5 |
-| US-2.6 | Two-profile OpenRouter factory and immutable role policy | READY | EPIC-2 |
-| US-2.6#1 | Implement the two canonical/wire mappings and versioned role resolution. | TODO | US-2.6 |
-| US-2.6#2 | Add mocked catalog, parameter and hidden-default negative tests. | TODO | US-2.6 |
+| US-2.6 | Two-profile OpenRouter factory and immutable role policy | DONE | EPIC-2 |
+| US-2.6#1 | Implement the two canonical/wire mappings and versioned role resolution. | DONE | US-2.6 |
+| US-2.6#2 | Add mocked catalog, parameter and hidden-default negative tests. | DONE | US-2.6 |
 | EPIC-3 | Credentials, model admission and route qualification | — | — |
-| US-3.1 | Server credential precedence and encrypted app storage | BLOCKED | EPIC-3 |
+| US-3.1 | Server credential precedence and encrypted app storage | READY | EPIC-3 |
 | US-3.1#1 | Implement shared precedence, credential references and host-key handling. | TODO | US-3.1 |
 | US-3.1#2 | Qualify encrypted storage, rotation, loss and secret-redaction fixtures. | TODO | US-3.1 |
 | US-3.2 | Settings, missing-key use and explicit run intent | BLOCKED | EPIC-3 |
@@ -1325,7 +1325,8 @@ Open Questions:
 
 ### US-2.6: Two-profile OpenRouter factory and immutable role policy
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-2-6-two-profile-openrouter-factory/`
 
 As a workspace owner
 I want explicit approved model bindings
@@ -1356,8 +1357,8 @@ Dependencies:
 - US-2.2
 
 Tasks:
-- [ ] Implement the two canonical/wire mappings and versioned role resolution.
-- [ ] Add mocked catalog, parameter and hidden-default negative tests.
+- [x] Implement the two canonical/wire mappings and versioned role resolution.
+- [x] Add mocked catalog, parameter and hidden-default negative tests.
 
 Open Questions:
 - None.
@@ -1368,7 +1369,7 @@ Phase reference: B1, preserved SP-020. All story completion also requires SP-003
 
 ### US-3.1: Server credential precedence and encrypted app storage
 
-Status: BLOCKED
+Status: READY
 
 As a workspace owner
 I want safe environment or app-stored credentials
