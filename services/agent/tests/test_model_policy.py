@@ -24,6 +24,7 @@ from autobots.adapters.models.factory import (
     chat_model,
     prepare_attempt,
 )
+from autobots.application.worker_inference import frozen_policy
 from autobots.contracts.models import effective_policy
 from autobots.domain.models import (
     DEFAULT_PROFILE,
@@ -54,11 +55,11 @@ ROLES_FROM_PRD = {
     "general_purpose",
 }
 DEEPSEEK = ModelProfileId.DEEPSEEK_FLASH
-ASTRA = ModelProfileId.ASTRA
+TERRA = ModelProfileId.TERRA
 DEEPSEEK_PARAMETERS = frozenset(
     {"temperature", "top_p", "max_tokens", "parallel_tool_calls", "seed"}
 )
-ASTRA_PARAMETERS = frozenset({"max_tokens", "reasoning"})
+TERRA_PARAMETERS = frozenset({"max_tokens", "reasoning"})
 
 
 def catalog(*entries: CatalogEntry, at: datetime = NOW) -> CatalogSnapshot:
@@ -70,7 +71,7 @@ def healthy_catalog(at: datetime = NOW) -> CatalogSnapshot:
         CatalogEntry(
             PROFILES[DEEPSEEK].wire_id, PROFILES[DEEPSEEK].canonical_id, DEEPSEEK_PARAMETERS
         ),
-        CatalogEntry(PROFILES[ASTRA].wire_id, PROFILES[ASTRA].canonical_id, ASTRA_PARAMETERS),
+        CatalogEntry(PROFILES[TERRA].wire_id, PROFILES[TERRA].canonical_id, TERRA_PARAMETERS),
         at=at,
     )
 
@@ -81,7 +82,7 @@ def test_exactly_two_profiles_with_their_identities() -> None:
             "deepseek/deepseek-v4.1-flash-20261017",
             "deepseek/deepseek-v4.1-flash-1017",
         ),
-        "openrouter_astra": ("openai/gpt-6-astra-20260903", "openai/gpt-6-astra"),
+        "openrouter_terra": ("openai/gpt-6.1-terra-20261026", "openai/gpt-6.1-terra"),
     }
     assert DEFAULT_PROFILE is DEEPSEEK
 
@@ -95,39 +96,39 @@ def test_a_new_workspace_binds_all_14_roles_to_deepseek() -> None:
 def test_the_documented_precedence() -> None:
     coder, router, planner = ModelRole.CODER, ModelRole.ROUTER, ModelRole.PLANNER
     # Workspace default, then a workspace role override over it.
-    policy = resolve_role_policy(workspace_default="openrouter_astra")
-    assert policy.bindings[planner] is ASTRA
+    policy = resolve_role_policy(workspace_default="openrouter_terra")
+    assert policy.bindings[planner] is TERRA
     policy = resolve_role_policy(
-        workspace_default="openrouter_astra",
+        workspace_default="openrouter_terra",
         workspace_role_overrides={"planner": "openrouter_deepseek_flash"},
     )
     assert policy.bindings[planner] is DEEPSEEK
-    assert policy.bindings[coder] is ASTRA
+    assert policy.bindings[coder] is TERRA
     # A run-wide selection applies to every role, over workspace settings.
     policy = resolve_role_policy(
-        run_profile="openrouter_astra",
+        run_profile="openrouter_terra",
         workspace_role_overrides={"planner": "openrouter_deepseek_flash"},
     )
-    assert set(policy.bindings.values()) == {ASTRA}
+    assert set(policy.bindings.values()) == {TERRA}
     # A run-specific role override wins over everything.
     policy = resolve_role_policy(
         run_role_overrides={"router": "openrouter_deepseek_flash"},
-        run_profile="openrouter_astra",
-        workspace_default="openrouter_astra",
+        run_profile="openrouter_terra",
+        workspace_default="openrouter_terra",
     )
     assert policy.bindings[router] is DEEPSEEK
-    assert policy.bindings[coder] is ASTRA
+    assert policy.bindings[coder] is TERRA
 
 
 @pytest.mark.parametrize(
     "arguments",
     [
-        {"run_profile": "openai/gpt-6-astra"},
+        {"run_profile": "openai/gpt-6.1-terra"},
         {"run_profile": "local"},
         {"workspace_default": "openrouter_auto"},
         {"run_role_overrides": {"coder": "anthropic/claude"}},
         {"workspace_role_overrides": {"coder": ""}},
-        {"run_role_overrides": {"embedder": "openrouter_astra"}},
+        {"run_role_overrides": {"embedder": "openrouter_terra"}},
     ],
 )
 def test_an_unknown_profile_or_role_is_refused(arguments: dict[str, Any]) -> None:
@@ -138,13 +139,13 @@ def test_an_unknown_profile_or_role_is_refused(arguments: dict[str, Any]) -> Non
 def test_a_policy_cannot_be_changed_after_admission() -> None:
     policy = resolve_role_policy()
     with pytest.raises(TypeError):
-        policy.bindings[ModelRole.CODER] = ASTRA  # type: ignore[index]
+        policy.bindings[ModelRole.CODER] = TERRA  # type: ignore[index]
 
 
 def test_the_effective_map_can_be_displayed_before_dispatch() -> None:
-    body = effective_policy(resolve_role_policy(run_profile="openrouter_astra"))
+    body = effective_policy(resolve_role_policy(run_profile="openrouter_terra"))
     assert len(body.bindings) == 14
-    assert {binding.wire_id for binding in body.bindings} == {"openai/gpt-6-astra"}
+    assert {binding.wire_id for binding in body.bindings} == {"openai/gpt-6.1-terra"}
 
 
 @pytest.mark.parametrize(
@@ -184,12 +185,12 @@ def test_a_catalog_exactly_at_the_limit_is_accepted() -> None:
 
 
 def test_a_drifted_model_is_never_substituted() -> None:
-    policy = resolve_role_policy(run_profile="openrouter_astra")
+    policy = resolve_role_policy(run_profile="openrouter_terra")
     snapshot = catalog(
         CatalogEntry(
             PROFILES[DEEPSEEK].wire_id, PROFILES[DEEPSEEK].canonical_id, DEEPSEEK_PARAMETERS
         ),
-        CatalogEntry(PROFILES[ASTRA].wire_id, "openai/gpt-7", ASTRA_PARAMETERS),
+        CatalogEntry(PROFILES[TERRA].wire_id, "openai/gpt-7", TERRA_PARAMETERS),
     )
     with pytest.raises(ModelUnavailable, match="drifted"):
         prepare_attempt(policy, ModelRole.CODER, snapshot, now=NOW)
@@ -208,11 +209,11 @@ def test_routing_options_are_refused(option: str) -> None:
 
 
 def test_an_option_the_catalog_lacks_is_refused_for_that_model() -> None:
-    astra = resolve_role_policy(run_profile="openrouter_astra")
+    terra = resolve_role_policy(run_profile="openrouter_terra")
     for option in ("temperature", "top_p", "parallel_tool_calls"):
         with pytest.raises(UnsupportedRequestOption, match=option):
             prepare_attempt(
-                astra, ModelRole.CODER, healthy_catalog(), options={option: 0.5}, now=NOW
+                terra, ModelRole.CODER, healthy_catalog(), options={option: 0.5}, now=NOW
             )
     deepseek = resolve_role_policy()
     attempt = prepare_attempt(
@@ -268,7 +269,7 @@ def recording_factory() -> tuple[list[dict[str, Any]], list[str], Any]:
     ("policy_arguments", "wire_id"),
     [
         ({}, "deepseek/deepseek-v4.1-flash-1017"),
-        ({"run_profile": "openrouter_astra"}, "openai/gpt-6-astra"),
+        ({"run_profile": "openrouter_terra"}, "openai/gpt-6.1-terra"),
     ],
 )
 def test_the_request_on_the_wire(policy_arguments: dict[str, Any], wire_id: str) -> None:
@@ -284,10 +285,10 @@ def test_the_request_on_the_wire(policy_arguments: dict[str, Any], wire_id: str)
     assert not {"models", "route", "plugins"} & set(body)
 
 
-def test_astra_sends_no_sampler_settings_by_default() -> None:
+def test_terra_sends_no_sampler_settings_by_default() -> None:
     requests, _, factory = recording_factory()
     attempt = prepare_attempt(
-        resolve_role_policy(run_profile="openrouter_astra"),
+        resolve_role_policy(run_profile="openrouter_terra"),
         ModelRole.CODER,
         healthy_catalog(),
         now=NOW,
@@ -311,7 +312,9 @@ def test_the_environment_cannot_redirect_the_factory(monkeypatch: pytest.MonkeyP
 
 
 def test_a_real_catalog_snapshot_parses_to_the_approved_association() -> None:
-    data = json.loads((REPOSITORY / "research/openrouter-model-catalog.json").read_text())
+    data = json.loads(
+        (REPOSITORY / "research/openrouter-model-catalog-2026-11-05.json").read_text()
+    )
     found: list[dict[str, Any]] = []
 
     def walk(value: object) -> None:
@@ -327,14 +330,14 @@ def test_a_real_catalog_snapshot_parses_to_the_approved_association() -> None:
 
     walk(data)
     snapshot = parse_catalog({"data": found}, retrieved_at=NOW, revision="dated-snapshot")
-    for profile in (DEEPSEEK, ASTRA):
+    for profile in (DEEPSEEK, TERRA):
         attempt = prepare_attempt(
             resolve_role_policy(run_profile=profile.value), ModelRole.CODER, snapshot, now=NOW
         )
         assert attempt.profile.id is profile
-    astra = resolve_role_policy(run_profile="openrouter_astra")
+    terra = resolve_role_policy(run_profile="openrouter_terra")
     with pytest.raises(UnsupportedRequestOption):
-        prepare_attempt(astra, ModelRole.CODER, snapshot, options={"temperature": 0.1}, now=NOW)
+        prepare_attempt(terra, ModelRole.CODER, snapshot, options={"temperature": 0.1}, now=NOW)
 
 
 def test_only_the_factory_builds_an_inference_client() -> None:
@@ -361,3 +364,22 @@ def test_only_the_factory_builds_an_inference_client() -> None:
 
 def test_fake_transport_helper_stays_available() -> None:
     assert FakeOpenRouter().models() == []
+
+
+@pytest.mark.parametrize(
+    "selection",
+    [
+        {"run_profile": "openrouter_astra"},
+        {"workspace_default": "openrouter_astra"},
+        {"run_role_overrides": {"coder": "openrouter_astra"}},
+    ],
+)
+def test_the_retired_profile_cant_be_selected(selection: dict[str, Any]) -> None:
+    with pytest.raises(UnknownModelProfile):
+        resolve_role_policy(**selection)
+
+
+def test_a_snapshot_frozen_on_the_retired_profile_doesnt_become_another_model() -> None:
+    snapshot = {"bindings": {role.value: "openrouter_astra" for role in ModelRole}}
+    with pytest.raises(UnknownModelProfile):
+        frozen_policy(snapshot)

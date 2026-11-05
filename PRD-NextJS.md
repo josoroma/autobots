@@ -6,7 +6,7 @@
 **Normative contracts:** [PRD-Model-Providers.md](PRD-Model-Providers.md) governs model identities, credentials, selection, budgets and APIs; [PRD-Local-Mac-Deployment.md](PRD-Local-Mac-Deployment.md) governs this Mac's services, ports, storage and lifecycle.  
 **Normative interface design:** [PRD-Design-System.md](PRD-Design-System.md) and the exact [Luma tokens](docs/design/luma.css): shadcn Luma with dark mode as the default.  
 **Package evidence:** [dependency metadata](research/dependency-snapshot.json), [OpenRouter adapter](research/openrouter-nextjs-sdk.json), [Supabase JS/SSR](research/supabase-nextjs-sdk.json).  
-**Architecture:** native local Next.js 16 and a long-lived Workflow worker, AI SDK 7/Workflow SDK 5, Docker-hosted self-managed Supabase PostgreSQL/Auth/Storage, and server-only OpenRouter inference. Every role initially selects `openrouter_deepseek_flash`; `openrouter_astra` is the alternative explicit choice.
+**Architecture:** native local Next.js 16 and a long-lived Workflow worker, AI SDK 7/Workflow SDK 5, Docker-hosted self-managed Supabase PostgreSQL/Auth/Storage, and server-only OpenRouter inference. Every role initially selects `openrouter_deepseek_flash`; `openrouter_terra` is the alternative explicit choice.
 
 Earlier [local-model experiments](research/LOCAL-MODEL-EVIDENCE.md) are superseded research history, not dependencies, deployment options or acceptance evidence for this specification.
 
@@ -30,7 +30,7 @@ A user can ask, “Research these three products, compare them using this rubric
 4. Produces and validates an artifact; tells the user which criteria remain unresolved.
 5. Offers a reusable workflow/routine, showing its inputs and external effects.
 6. Resumes after an app restart and after a later approval without silently repeating a committed external action.
-7. Starts every inference role on the dated DeepSeek Flash profile through OpenRouter; preserves an explicit per-run/workspace/role choice of that profile or Astra, recorded before dispatch.
+7. Starts every inference role on the dated DeepSeek Flash profile through OpenRouter; preserves an explicit per-run/workspace/role choice of that profile or Terra, recorded before dispatch.
 
 The user should understand what happened, what evidence supports the result, and what needs intervention without reading a raw model transcript.
 
@@ -127,7 +127,7 @@ flowchart LR
     W --> E[Durable outbox and SSE projection]
     E --> U
   end
-  M --> O[OpenRouter: selected DeepSeek or Astra]
+  M --> O[OpenRouter: selected DeepSeek or Terra]
   P --> X[Separately permitted task network destinations]
 ```
 
@@ -201,9 +201,9 @@ The [shared provider PRD](PRD-Model-Providers.md) is normative. This section spe
 | Registry entry | Provider | Requested canonical identity | Chat Completions wire `model` |
 |---|---|---|---|
 | `openrouter_deepseek_flash` — initial default | `openrouter` | `deepseek/deepseek-v4.1-flash-20261017` | `deepseek/deepseek-v4.1-flash-1017` |
-| `openrouter_astra` — explicit alternative | `openrouter` | `openai/gpt-6-astra-20260903` | `openai/gpt-6-astra` |
+| `openrouter_terra` — explicit alternative | `openrouter` | `openai/gpt-6.1-terra-20261026` | `openai/gpt-6.1-terra` |
 
-The requested dated strings are exact catalog **`canonical_slug` values**, not the current Chat API `id` strings. Persist both. Before each paid attempt, require catalog metadata no older than five minutes, match the same non-batch Chat ID to the exact canonical identity, and block as `model_unavailable` on missing, ambiguous or changed mapping. An expired catalog that cannot be refreshed blocks new paid requests. The public alias mapping is observed metadata, not a guarantee that OpenRouter hard-pins an immutable snapshot. Do not select an older family alias, Astra Pro, `:batch`, an automatic router, or a newer dated model. Catalog capability claims are not completed inference tests. [Captured catalog](research/openrouter-model-catalog.json), [OpenRouter models API](https://openrouter.ai/api/v1/models)
+The requested dated strings are exact catalog **`canonical_slug` values**, not the current Chat API `id` strings. Persist both. Before each paid attempt, require catalog metadata no older than five minutes, match the same non-batch Chat ID to the exact canonical identity, and block as `model_unavailable` on missing, ambiguous or changed mapping. An expired catalog that cannot be refreshed blocks new paid requests. The public alias mapping is observed metadata, not a guarantee that OpenRouter hard-pins an immutable snapshot. Do not select an older family alias, Terra Pro, `:batch`, an automatic router, or a newer dated model. Catalog capability claims are not completed inference tests. [Captured catalog](research/openrouter-model-catalog.json), [OpenRouter models API](https://openrouter.ai/api/v1/models)
 
 ### 5.2 Defaults, policy selection and immutable bindings
 
@@ -283,7 +283,7 @@ Refresh and store the selected model's advertised parameters and relevant endpoi
 Preserve provider reasoning metadata needed for tool continuation in access-controlled protocol state with its original content/order; it must survive adapter conversion and replay. This is not user-visible private-thought logging. Display concise decision summaries and evidence instead. Record the actual upstream provider for each attempt when reported, otherwise `unknown`; disabled fallback does not pin one upstream host across separate requests. [Reasoning continuation](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens)
 
 - **DeepSeek:** use only its current supported parameter set and reasoning-effort choices, captured in its own versioned request preset.
-- **Astra:** the recorded catalog does not advertise `temperature`, `top_p`, `top_k` or `parallel_tool_calls`; omit them. Reasoning is mandatory and the recorded effort choices exclude `none`; do not offer a reasoning-off control. A small output budget may exhaust reasoning before producing a usable result; report that failure without automatically expanding the budget.
+- **Terra:** the recorded catalog does not advertise `temperature`, `top_p`, `top_k` or `parallel_tool_calls`; omit them. Reasoning is mandatory and the recorded effort choices exclude `none`; do not offer a reasoning-off control. A small output budget may exhaust reasoning before producing a usable result; report that failure without automatically expanding the budget.
 - **Tools:** require catalog support, validate schemas and arguments, verify result IDs, and run adversarial named-choice tests with multiple tools and a conflicting prompt. A correct one-tool response does not establish selector enforcement.
 - **Structured results:** distinguish `tools`/`tool_choice` from `response_format`/`structured_outputs`. Use the appropriate qualified route; always validate complete JSON and semantics locally. An advertisement is not an SDK integration pass.
 - **Planning/verdict tools:** narrow `submit_plan`/`submit_verdict` contracts may be used where appropriate, with independent validation and one bounded repair. This is an explicit output strategy, not permission to execute unconstrained fallback text.
@@ -292,7 +292,7 @@ Preserve provider reasoning metadata needed for tool continuation in access-cont
 
 Initial defaults are **8,192 total context tokens and 512 output tokens per request**, including allowance for provider reasoning where applicable. Count instructions, tool schemas, evidence, summaries and reserved output before dispatch. Reject or compact with an audit event before overflow; never silently truncate acceptance criteria. The catalog's larger theoretical context is not the product's default allocation.
 
-An explicit user profile or audited run-policy revision may configure those limits within qualified model/runtime capacity and existing resource/spend controls. In particular, an Astra response that exhausts 512 tokens is a visible truncation, not permission to expand its budget automatically.
+An explicit user profile or audited run-policy revision may configure those limits within qualified model/runtime capacity and existing resource/spend controls. In particular, an Terra response that exhausts 512 tokens is a visible truncation, not permission to expand its budget automatically.
 
 Keep **two OpenRouter inference slots**, with the same 24 actual model-request limit across roles, children and retries. Release an inference lease before waiting for a child. These conservative application limits govern spend, responsiveness and bounded execution; they are not a local GPU or model-memory capacity estimate.
 
@@ -659,7 +659,7 @@ Use deterministic checks where possible: arithmetic, schema conformity, file exi
 | Cancellation | No new effects admitted after cancellation becomes authoritative; active-effect outcomes accurately reported |
 | Provenance | Every externally sourced final claim required by a task has a resolvable evidence reference |
 | Inference allowlist | Network instrumentation confirms every role, retry, repair, summary and evaluation uses only the admitted OpenRouter route; no hidden default provider or model fallback |
-| Model selection | All 14 roles initialize to DeepSeek Flash; explicit Astra/role choices are frozen at admission; key setup never launches inference or silently reassigns a model |
+| Model selection | All 14 roles initialize to DeepSeek Flash; explicit Terra/role choices are frozen at admission; key setup never launches inference or silently reassigns a model |
 | Credential boundary | MP-A01–MP-A04 and MP-A10–MP-A11 pass: full precedence/whitespace/test rules, invalid environment blocking, invalid-draft preservation, encrypted storage, auth/catalog separation, rotation/restart and tenant isolation; no raw key in bundles, logs or checkpoints |
 | Missing-key flow | MP-A12 passes: local UI, files, history and settings remain available, but all model calls are `credentials_required`; auth-valid save preserves composer draft/selection without dispatch; user Run initiates bounded work |
 | Luma interface | DS-01–DS-05 pass: exact semantic tokens, dark on a fresh visit under either OS preference, explicit light/dark persistence before paint, accessible key flows in both modes, and screenshots bound to the tested revision |
@@ -737,7 +737,7 @@ Do not begin with a marketplace or a large graph canvas. Establish one end-to-en
 | Question / risk | Current decision | Remaining evidence |
 |---|---|---|
 | Where do application services/data run? | Only this Mac: native application/worker and Docker-hosted self-managed Supabase | Port, outbound-connection, restart and local backup/restore checks |
-| Which inference route is allowed? | OpenRouter only; DeepSeek Flash defaults and explicit Astra choice | Actual protocol/task evaluations, canonical-drift and budget tests |
+| Which inference route is allowed? | OpenRouter only; DeepSeek Flash defaults and explicit Terra choice | Actual protocol/task evaluations, canonical-drift and budget tests |
 | Are models qualified by catalog/key validation? | No; metadata/authentication and inference qualification are separate | Tools/schema/SSE, genuine named enforcement, continuation and semantic fixtures |
 | Can the published provider serialize app credentials safely by itself? | Not established for 3.1.0; use descriptor-only wrapper or explicit model-call steps | Environment/app-key restart, rotation and secret-leak tests |
 | Is local Supabase secure by default for this product? | No; configure private buckets, RLS, scoped DB roles and nonexposed runtime/credential schemas | Ownership, cross-scope, backup and key-loss tests |

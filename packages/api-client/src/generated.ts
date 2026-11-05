@@ -1542,7 +1542,7 @@ export const schemas = {
   "ModelProfileId": {
     "enum": [
       "openrouter_deepseek_flash",
-      "openrouter_astra"
+      "openrouter_terra"
     ],
     "title": "ModelProfileId",
     "type": "string"
@@ -4013,7 +4013,7 @@ export function parseModelPolicyUpdate(value: unknown): ModelPolicyUpdate {
   return parseWith(schemas, "ModelPolicyUpdate", value) as ModelPolicyUpdate;
 }
 
-export type ModelProfileId = "openrouter_deepseek_flash" | "openrouter_astra";
+export type ModelProfileId = "openrouter_deepseek_flash" | "openrouter_terra";
 
 export function parseModelProfileId(value: unknown): ModelProfileId {
   return parseWith(schemas, "ModelProfileId", value) as ModelProfileId;

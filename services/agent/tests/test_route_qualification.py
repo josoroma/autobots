@@ -487,3 +487,13 @@ def test_the_closed_schema_closes_every_object(tmp_path: Path) -> None:
     schema = fake.bodies[0]["response_format"]["json_schema"]["schema"]
     assert schema["additionalProperties"] is False
     assert schema["properties"]["tasks"]["items"]["additionalProperties"] is False
+
+
+def test_the_worst_case_uses_the_highest_rate_a_time_window_can_charge() -> None:
+    payload = catalog()
+    payload["data"][0]["pricing"]["overrides"] = [
+        {"utc_days": ["monday"], "prompt": "0.0000003", "completion": "0.0000012"},
+        {"min_prompt_tokens": 272000, "prompt": "0.01", "completion": "0.01"},
+    ]
+    price = rq.price_of(payload, WIRE_ID)
+    assert (price.prompt_usd, price.completion_usd) == (0.0000003, 0.0000012)

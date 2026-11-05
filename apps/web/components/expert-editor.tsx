@@ -19,7 +19,7 @@ const TOOLS = [
 const PROFILES = [
   { id: "", label: "Workspace setting" },
   { id: "openrouter_deepseek_flash", label: "DeepSeek Flash" },
-  { id: "openrouter_astra", label: "Astra" },
+  { id: "openrouter_terra", label: "Terra" },
 ];
 
 type Draft = {

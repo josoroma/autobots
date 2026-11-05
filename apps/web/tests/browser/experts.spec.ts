@@ -61,7 +61,7 @@ test("an owner saves revisions in the editor, and a session shows what it really
   await page.getByLabel("Purpose").fill("Writes reports");
   await page.getByLabel("Instructions").fill("Be concise.");
   await page.getByLabel("Calculate").check();
-  await page.getByLabel("Model for its work").selectOption("openrouter_astra");
+  await page.getByLabel("Model for its work").selectOption("openrouter_terra");
   await page.getByRole("button", { name: "Save revision" }).click();
   await expect(page.locator('[data-message="save"]')).toContainText(
     "Saved as version 2",
@@ -79,7 +79,7 @@ test("an owner saves revisions in the editor, and a session shows what it really
     "Tools: calculate",
   );
   await expect(page.locator('[data-field="models"]')).toContainText(
-    "executor: openrouter_astra",
+    "executor: openrouter_terra",
   );
 
   await page.getByLabel("Goal").fill("Sum the totals");
@@ -152,7 +152,7 @@ test("a revision can't name a shell, an unknown tool, an unapproved model or an 
     [{ tools: ["propose_plan"] }, "expert_tool_not_available"],
     [{ role_bindings: { executor: "openrouter_gpt5" } }, null],
     [
-      { role_bindings: { not_a_role: "openrouter_astra" } },
+      { role_bindings: { not_a_role: "openrouter_terra" } },
       "expert_role_unknown",
     ],
   ];

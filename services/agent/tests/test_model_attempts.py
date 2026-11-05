@@ -62,7 +62,7 @@ class Ledger:
 
 
 def request() -> AdmissionRequest:
-    return AdmissionRequest(uuid4(), uuid4(), uuid4(), "coder", "openrouter_astra", "w", 1, 5)
+    return AdmissionRequest(uuid4(), uuid4(), uuid4(), "coder", "openrouter_terra", "w", 1, 5)
 
 
 def policy(deadline_seconds: float = 900) -> tuple[RetryPolicy, list[float]]:

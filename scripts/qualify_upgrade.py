@@ -37,7 +37,7 @@ BINDINGS = "select id, policy_snapshot, expert_id, expert_version, session_id fr
 
 def extract_prior(root: Path, destination: Path) -> None:
     """Reads git history only. The checkout is untouched."""
-    archive = subprocess.run(['git', 'archive', '--format=tar', PRIOR_REVISION, 'services/agent/src', 'supabase/migrations', 'tests/db'], cwd=root, capture_output=True, timeout=60, check=False)
+    archive = subprocess.run(['git', 'archive', '--format=tar', PRIOR_REVISION, 'services/agent/src', 'supabase/migrations', 'supabase/seeds', 'tests/db'], cwd=root, capture_output=True, timeout=60, check=False)
     if archive.returncode:
         raise Unavailable(f'the prior release {PRIOR_REVISION} is not in this repository')
     with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as tar:
@@ -78,7 +78,8 @@ def qualify(root: Path) -> int:
             raise Unavailable(f'the stack did not start: {started.stderr[-300:]}')
         bootstrap(stack, root)
         applied, problem = apply_migrations(stack, prior / 'supabase/migrations')
-        if problem or seed(stack, root).returncode or stack.sql((root / STORAGE_SQL).read_text()).returncode:
+        # The prior release's own seeds: this release's can name a profile that schema doesn't have.
+        if problem or seed(stack, prior).returncode or stack.sql((root / STORAGE_SQL).read_text()).returncode:
             raise Unavailable(f'prior migrations failed: {problem}')
         cases.check('the prior release schema is applied from its own files', f'{PRIOR_REVISION}', f'{applied} migrations', applied >= 24)
         owner = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], ops.url, email, password)
@@ -160,9 +161,18 @@ print(hashlib.sha256(json.dumps(rows, default=str, sort_keys=True).encode()).hex
         _, refusal = apply_migrations(stack, edited)
         cases.check('an edited applied migration is refused (arranged)', 'refused', refusal and refusal[-60:], bool(refusal) and 'never edit' in refusal)
 
+        # A workspace and a role that chose the model a later release retires.
+        stack.runtime(f"""insert into app_private.model_policies (workspace_id, version, default_profile, role_overrides) values ('{workspace}', 7, 'openrouter_astra', '{{"coder": "openrouter_astra", "planner": "openrouter_deepseek_flash"}}') on conflict (workspace_id) do update set default_profile = excluded.default_profile, role_overrides = excluded.role_overrides;""")
+
         # The real upgrade.
         upgraded, problem = apply_migrations(stack, root / 'supabase/migrations')
         cases.check('this release applies forward over the prior one', 'the new migrations, no error', f'{upgraded}, {problem}', upgraded >= 1 and not problem)
+        reseeded = seed(stack, root)
+        cases.check("this release's seeds apply over the upgraded schema", 'exit 0', reseeded.returncode, reseeded.returncode == 0)
+        policy = ops.sql(f"select default_profile || '/' || (role_overrides ->> 'planner') || '/' || coalesce(role_overrides ->> 'coder', 'none') from app_private.model_policies where workspace_id = '{workspace}';")
+        cases.check('a retired choice returns to the default, and no one moves to a model they did not choose (Decision 0004)', 'deepseek default, planner kept, coder cleared', policy, policy == 'openrouter_deepseek_flash/openrouter_deepseek_flash/none')
+        profile_rows = ops.sql("select string_agg(profile_id, ',' order by profile_id) from public.model_profiles;")
+        cases.check('the approved profiles are DeepSeek and Terra', 'exactly two', profile_rows, profile_rows == 'openrouter_deepseek_flash,openrouter_terra')
         ready = wait(lambda: json.loads(api_call(api_port, ops.internal, token)[1])['ready'] is True, 30)
         cases.check('readiness returns once the schema has caught up', 'ready', ready, ready)
         kept = ops.sql(f"select count(*) from agent_runtime.checkpoints c join public.runs r on r.checkpoint_thread_id = c.thread_id where r.id = '{interrupted}';")

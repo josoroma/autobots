@@ -9,8 +9,8 @@ from langchain_openrouter import ChatOpenRouter
 from pydantic import SecretStr
 
 DEEPSEEK_WIRE_ID = "deepseek/deepseek-v4.1-flash-1017"
-ASTRA_WIRE_ID = "openai/gpt-6-astra"
-APPROVED_WIRE_IDS = frozenset({DEEPSEEK_WIRE_ID, ASTRA_WIRE_ID})
+TERRA_WIRE_ID = "openai/gpt-6.1-terra"
+APPROVED_WIRE_IDS = frozenset({DEEPSEEK_WIRE_ID, TERRA_WIRE_ID})
 ARRANGED_KEY = "arranged-not-a-real-key"
 
 

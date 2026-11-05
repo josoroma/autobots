@@ -74,12 +74,12 @@ async def main() -> None:
         check('the run records its Expert and revision', 'version 2', recorded[2], recorded == (session.id, expert.id, 2))
 
         # Expert model bindings are frozen into the run's own policy.
-        astra = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='x3', name='Bound', config=ExpertConfig(role_bindings={'executor': 'openrouter_astra'}))
-        direct = await create_session(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='s2', kind='direct', experts=[SessionExpert(expert_id=astra.id)])
+        terra = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='x3', name='Bound', config=ExpertConfig(role_bindings={'executor': 'openrouter_terra'}))
+        direct = await create_session(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='s2', kind='direct', experts=[SessionExpert(expert_id=terra.id)])
         bound = await resolve_binding(db, WORKSPACE, direct.id)
         run = await admit(bound, resolve_role_policy(run_role_overrides=bound.role_bindings))
         snapshot = await value('select policy_snapshot from public.runs where id = %s', run)
-        check('an Expert binding reaches the run policy', 'executor astra, others default', (snapshot['bindings']['executor'], snapshot['bindings']['planner']), snapshot['bindings']['executor'] == 'openrouter_astra' and snapshot['bindings']['planner'] == 'openrouter_deepseek_flash')
+        check('an Expert binding reaches the run policy', 'executor terra, others default', (snapshot['bindings']['executor'], snapshot['bindings']['planner']), snapshot['bindings']['executor'] == 'openrouter_terra' and snapshot['bindings']['planner'] == 'openrouter_deepseek_flash')
         lease = await claim_next(db, worker_id='route', lease_seconds=120)
         model = Script(items=[say('x')], seen=[], bound=[])
         result = await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE))
@@ -87,22 +87,22 @@ async def main() -> None:
         run = await admit(bound, resolve_role_policy(run_role_overrides=bound.role_bindings))
         lease = await claim_next(db, worker_id='route', lease_seconds=120)
         model = Script(items=[say('x')], seen=[], bound=[])
-        result = await run_goal(db, URL, lease, model, LoopConfig(route=ModelRoute('executor', 'openrouter_astra', 'fixture/astra', 1000)))
+        result = await run_goal(db, URL, lease, model, LoopConfig(route=ModelRoute('executor', 'openrouter_terra', 'fixture/terra', 1000)))
         check('the bound route runs', 'a model call', len(model.seen), len(model.seen) == 1)
         wire = await value('select wire_id from app_private.model_invocations where run_id = %s', run)
-        check('and admission records that route, with nothing substituted', 'fixture/astra', wire, wire == 'fixture/astra')
+        check('and admission records that route, with nothing substituted', 'fixture/terra', wire, wire == 'fixture/terra')
         check('nothing implicit was added by routing', 'no model role but its own', ModelRole.EXECUTOR.value in bound.role_bindings and len(bound.role_bindings), len(bound.role_bindings) == 1)
 
         # Refusals.
         for label, attempt, code in (
                 ('a session on another workspace', lambda: resolve_binding(db, OTHER, session.id), 'session_not_found'),
                 ('a version that does not exist', lambda: resolve_binding(db, WORKSPACE, session.id, version=99), 'expert_version_not_found'),
-                ('an unlisted Expert', lambda: resolve_binding(db, WORKSPACE, session.id, expert_id=astra.id), 'route_not_granted'),
+                ('an unlisted Expert', lambda: resolve_binding(db, WORKSPACE, session.id, expert_id=terra.id), 'route_not_granted'),
                 ('a stale revision', lambda: add_version(db, workspace_id=WORKSPACE, actor_id=ACTOR, expert_id=expert.id, idempotency_key='x4', expected_version=1, config=ExpertConfig()), 'expert_version_conflict'),
                 ('another workspace saving a revision', lambda: add_version(db, workspace_id=OTHER, actor_id=ACTOR, expert_id=expert.id, idempotency_key='x5', expected_version=2, config=ExpertConfig()), 'expert_not_found'),
                 ('a shell tool', lambda: create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='x6', name='Shell', config=ExpertConfig(tools=['execute'])), 'expert_tool_not_available'),
                 ('another workspace\'s Expert in a session', lambda: create_session(db, workspace_id=OTHER, actor_id=ACTOR, idempotency_key='s3', kind='direct', experts=[SessionExpert(expert_id=expert.id)]), 'expert_not_found'),
-                ('a direct session with two Experts', lambda: create_session(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='s4', kind='direct', experts=[SessionExpert(expert_id=expert.id), SessionExpert(expert_id=astra.id)]), 'session_needs_one_expert')):
+                ('a direct session with two Experts', lambda: create_session(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='s4', kind='direct', experts=[SessionExpert(expert_id=expert.id), SessionExpert(expert_id=terra.id)]), 'session_needs_one_expert')):
             try:
                 await attempt()
                 check(f'{label} is refused', code, 'allowed', False)

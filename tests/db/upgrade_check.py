@@ -70,8 +70,8 @@ async def main(workspace: UUID, queued: UUID, second: UUID, before_hash: str) ->
         check('a saved run gets its contract from the migration', 'graph state 1, tools recorded, marked', contract.get('recorded_by'), contract.get('graph_state') == 1 and contract.get('tools') and contract.get('recorded_by') == 'upgrade')
 
         # A changed workspace default, and a worker configured for it, don't reach a saved run.
-        await db.execute("update app_private.model_policies set default_profile = 'openrouter_astra' where workspace_id = %s", (workspace,))
-        other = ModelRoute('executor', 'openrouter_astra', 'fixture/changed', 1000)
+        await db.execute("update app_private.model_policies set default_profile = 'openrouter_terra' where workspace_id = %s", (workspace,))
+        other = ModelRoute('executor', 'openrouter_terra', 'fixture/changed', 1000)
         invocations = await value('select count(*) from app_private.model_invocations')
         refused = await process_next(db, URL, 'changed-route', fixture([calls(PLAN)]), LoopConfig(route=other, sleep=lambda _: asyncio.sleep(0), lease_seconds=30))
         added = await value('select count(*) from app_private.model_invocations') - invocations
@@ -106,6 +106,15 @@ async def main(workspace: UUID, queued: UUID, second: UUID, before_hash: str) ->
                 recorded = await value('select execution_contract from public.runs where id = %s', linked.run_id)
                 check('the linked run records the current contract', 'current', recorded == current_contract(), recorded == current_contract())
                 await db.execute("update app_private.run_jobs set status = 'done' where run_id = %s", (linked.run_id,))
+
+        # Decision 0004: a run frozen on a retired model stops, and nothing rewrites it to another.
+        retired = (await admit_run(db, workspace_id=workspace, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='Frozen on a retired model', limit_micro_usd=1_000_000, policy=resolve_role_policy())).run_id
+        await db.execute("update public.runs set policy_snapshot = jsonb_set(policy_snapshot, '{bindings,executor}', '\"openrouter_astra\"') where id = %s", (retired,))
+        calls_before = await value('select count(*) from app_private.model_invocations')
+        result = await process_next(db, URL, 'after-retirement', fixture([calls(PLAN)]), config)
+        frozen = await value("select policy_snapshot -> 'bindings' ->> 'executor' from public.runs where id = %s", retired)
+        added = await value('select count(*) from app_private.model_invocations') - calls_before
+        check('a run frozen on a retired model stops with no call, and keeps its binding', 'paused, route_not_bound, no call, still astra', (await state(retired), result.code if result else None, added, frozen), await state(retired) == 'paused' and result is not None and result.code == 'route_not_bound' and added == 0 and frozen == 'openrouter_astra')
 
         # A new admission records its contract.
         fresh = (await admit_run(db, workspace_id=workspace, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='New goal', limit_micro_usd=1_000_000, policy=resolve_role_policy())).run_id

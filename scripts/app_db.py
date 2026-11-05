@@ -178,10 +178,10 @@ def seed_cases(stack: AppStack, cases: Cases, root: Path) -> None:
                 first.returncode == 0 and second.returncode == 0 and before == after and len(before) == 32)
     profiles = rows(stack, "select string_agg(profile_id || '=' || wire_id, ',' order by profile_id) from public.model_profiles;")
     cases.check('reference rows are the two approved profiles', 'exactly SP-006', profiles,
-                profiles == 'openrouter_astra=openai/gpt-6-astra,openrouter_deepseek_flash=deepseek/deepseek-v4.1-flash-1017')
-    edited = stack.runtime("update public.model_profiles set label = 'My label' where profile_id = 'openrouter_astra';")
+                profiles == 'openrouter_deepseek_flash=deepseek/deepseek-v4.1-flash-1017,openrouter_terra=openai/gpt-6.1-terra')
+    edited = stack.runtime("update public.model_profiles set label = 'My label' where profile_id = 'openrouter_terra';")
     seed(stack, root)
-    label = rows(stack, "select label from public.model_profiles where profile_id = 'openrouter_astra';")
+    label = rows(stack, "select label from public.model_profiles where profile_id = 'openrouter_terra';")
     cases.check('a repeated seed keeps a user edit', 'My label', label, edited.returncode == 0 and label == 'My label')
 
 

@@ -33,12 +33,12 @@ Use the project skill `autobots-spec-ingest` to refresh the backlog. Its read-on
 
 Every H0/H1 and product work item follows a proportional **plan → implement → independent review → verify → runbook + evidence** workflow. Record review findings and their disposition, run the required checks against the final changes, and retain reproducible evidence and remaining limitations. Update and exercise the relevant runbook in the qualified disposable environment; if operational behavior is unchanged, record that fact rather than inventing a procedure. Small changes use concise records, not skipped stages. [SPECS.md](SPECS.md) and the [development harness contract](PRD-Development-Harness.md) define the detailed workflow.
 
-All **14 inference roles default to DeepSeek**. Users may select Astra for a run, workspace default or explicit role override:
+All **14 inference roles default to DeepSeek**. Users may select Terra for a run, workspace default or explicit role override:
 
 | Requested canonical snapshot | Verified OpenRouter API request ID |
 |---|---|
 | `deepseek/deepseek-v4.1-flash-20261017` | `deepseek/deepseek-v4.1-flash-1017` |
-| `openai/gpt-6-astra-20260903` | `openai/gpt-6-astra` |
+| `openai/gpt-6.1-terra-20261026` | `openai/gpt-6.1-terra` |
 
 The app must revalidate these catalog mappings before use. It reads server-only `OPENROUTER_API_KEY` from environment/`.env` configuration first. When absent, **Settings → Models → OpenRouter → Save & validate** accepts and securely stores a key. Keys stay out of browser storage, prompts, logs and durable workflow payloads. Without a valid key, local sign-in, settings, drafts and stored files remain available, while every model-backed operation waits. Saving a key does not launch a paid run. There is no fallback to a different model or inference provider.
 

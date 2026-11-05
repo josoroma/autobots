@@ -92,7 +92,16 @@ def price_of(payload: Mapping[str, Any], wire_id: str) -> Price:
         if item.get("id") == wire_id:
             pricing = item.get("pricing") or {}
             try:
-                return Price(float(pricing["prompt"]), float(pricing["completion"]))
+                # Rates can rise by time of day. Long-prompt rates start far above these prompts.
+                rates = [pricing] + [
+                    override
+                    for override in pricing.get("overrides") or []
+                    if "min_prompt_tokens" not in override
+                ]
+                return Price(
+                    max(float(rate["prompt"]) for rate in rates),
+                    max(float(rate["completion"]) for rate in rates),
+                )
             except (KeyError, TypeError, ValueError):
                 break
     raise Refused("the catalog gives no usable price for this route")
@@ -635,7 +644,7 @@ async def qualify(
         "seconds": round(time.monotonic() - built_at, 1),
         "summary": summarize(results),
         "trials": [result.__dict__ for result in results],
-        "not_established": ["H1", "product acceptance", "task quality", "the Astra route"],
+        "not_established": ["H1", "product acceptance", "task quality"],
     }
     # A narrower rerun adds to the record. It never replaces the full corpus's report.
     stem = "report" if profile == "openrouter_deepseek_flash" else f"report-{profile}"

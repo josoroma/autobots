@@ -31,12 +31,12 @@ REPORT = Path('.checks/worker-inference/qualification.json')
 DRIVER = 'tests/db/product_inference_worker.py'
 HELPER = 'tests/db/product_inference_check.py'
 DEEPSEEK = 'openrouter_deepseek_flash'
-ASTRA = 'openrouter_astra'
+TERRA = 'openrouter_terra'
 DEEPSEEK_WIRE = 'deepseek/deepseek-v4.1-flash-1017'
-ASTRA_WIRE = 'openai/gpt-6-astra'
+TERRA_WIRE = 'openai/gpt-6.1-terra'
 # 32,000 input and 512 output tokens at the fake catalog's prices.
 DEEPSEEK_WORST = 33_024
-ASTRA_WORST = 345_600
+TERRA_WORST = 34_560
 KEY_ONE, KEY_TWO, KEY_B, KEY_REJECTED = 'arranged-key-one', 'arranged-key-two', 'arranged-key-b', 'arranged-rejected-key'
 FLAGS = {'require_parameters': True, 'allow_fallbacks': False}
 CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions'
@@ -186,12 +186,12 @@ def qualify(root: Path) -> int:
         cases.check('the workspace key was used', 'key one', used == {key_id(KEY_ONE)}, used == {key_id(KEY_ONE)})
 
         # Another run in the same process, frozen to the other profile.
-        astra = admit(workspace_a, 'astra', ASTRA)
-        finished = settled(astra, 'succeeded')
-        calls = sent('astra')
-        ledger = invocations(astra)
-        cases.check('the route comes from each run, not the worker', 'same process, astra request and ledger', f'{status(astra)}, {sorted({call["model"] for call in calls})}, {ledger}, alive {worker.poll() is None}',
-                    finished and worker.poll() is None and bool(calls) and {call['model'] for call in calls} == {ASTRA_WIRE} and ledger == f'{ASTRA}/{ASTRA_WIRE}/succeeded/-/1/{ASTRA_WORST}/100')
+        terra = admit(workspace_a, 'terra', TERRA)
+        finished = settled(terra, 'succeeded')
+        calls = sent('terra')
+        ledger = invocations(terra)
+        cases.check('the route comes from each run, not the worker', 'same process, terra request and ledger', f'{status(terra)}, {sorted({call["model"] for call in calls})}, {ledger}, alive {worker.poll() is None}',
+                    finished and worker.poll() is None and bool(calls) and {call['model'] for call in calls} == {TERRA_WIRE} and ledger == f'{TERRA}/{TERRA_WIRE}/succeeded/-/1/{TERRA_WORST}/100')
 
         # Rotation reaches the next attempt with no restart.
         save_key(workspace_a, KEY_TWO)
@@ -255,7 +255,7 @@ def qualify(root: Path) -> int:
         cases.check('a refused attempt releases its reservation', 'failed_before_acceptance, charged 0', ledger, ledger.endswith('/0') and 'failed_before_acceptance/rate_limited' in ledger)
 
         # Each workspace's runs used only that workspace's keys, across every run that sent anything.
-        used_a = {call['key'] for tag in ('happy', 'astra', 'rotated', 'malformed', 'limited') for call in sent(tag)}
+        used_a = {call['key'] for tag in ('happy', 'terra', 'rotated', 'malformed', 'limited') for call in sent(tag)}
         used_b = {call['key'] for tag in ('missing', 'rejected') for call in sent(tag)}
         cases.check("one workspace's key never served another's run", 'A used its two keys, B its two', f'{len(used_a)} and {len(used_b)} keys',
                     used_a == {key_id(KEY_ONE), key_id(KEY_TWO)} and used_b == {key_id(KEY_B), key_id(KEY_REJECTED)})
@@ -294,7 +294,7 @@ def qualify(root: Path) -> int:
         cases.check('the second worker stops cleanly too', 'exit 0', exited(second, 40), second.returncode == 0)
 
         # Across every run and process: nothing durable or logged holds a key, and nothing left loopback.
-        runs = "'" + "','".join((happy, astra, rotated, missing, rejected, malformed, limited, cancelling, verifying, unreadable)) + "'"
+        runs = "'" + "','".join((happy, terra, rotated, missing, rejected, malformed, limited, cancelling, verifying, unreadable)) + "'"
         blobs = ops.sql(f"select (select count(*) from agent_runtime.checkpoint_blobs where thread_id in ({runs})) || '/' || "
                         f"(select count(*) from agent_runtime.checkpoint_blobs where thread_id in ({runs}) and encode(blob, 'escape') like '%arranged-%') || '/' || "
                         f"(select count(*) from agent_runtime.checkpoint_writes where thread_id in ({runs}) and encode(blob, 'escape') like '%arranged-%');")

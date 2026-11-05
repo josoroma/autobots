@@ -208,7 +208,7 @@ async def main() -> None:
         await worker(run, lease, RunCommand.REQUEST_INPUT, detail='Which file?')
         await user(run, RunCommand.PAUSE)
         snapshot = await value('select policy_snapshot from public.runs where id = %s', run)
-        await db.execute("insert into app_private.model_policies (workspace_id, version, default_profile, role_overrides) values (%s, 99, 'openrouter_astra', '{}') on conflict (workspace_id) do update set default_profile = 'openrouter_astra'", (WORKSPACE,))
+        await db.execute("insert into app_private.model_policies (workspace_id, version, default_profile, role_overrides) values (%s, 99, 'openrouter_terra', '{}') on conflict (workspace_id) do update set default_profile = 'openrouter_terra'", (WORKSPACE,))
         resumed = await user(run, RunCommand.RESUME)
         check('resume re-enters the queue', 'queued', resumed.status, resumed.status == 'queued')
         processed = await process_next(db, URL, 'after-resume', lambda: Script(items=[calls(PLAN)], seen=[], bound=[]), RESUME_ROUTE)
@@ -226,7 +226,7 @@ async def main() -> None:
 
         run = await admit()
         lease = await claim_next(db, worker_id='bound')
-        other_route = LoopConfig(route=ModelRoute('executor', 'openrouter_astra', 'fixture/other', 1000))
+        other_route = LoopConfig(route=ModelRoute('executor', 'openrouter_terra', 'fixture/other', 1000))
         model = Script(items=[calls(PLAN)], seen=[], bound=[])
         result = await run_goal(db, URL, lease, model, other_route)
         check('a route that differs from the frozen policy is refused', 'route_not_bound, no call', (result.code, len(model.seen)), result.code == 'route_not_bound' and len(model.seen) == 0)
@@ -265,6 +265,8 @@ async def main() -> None:
                 break
             await asyncio.sleep(0.1)
         process.send_signal(signal.SIGSTOP)
+        # Stopped at whichever call it had reached, so what follows compares against that.
+        calls_at_stop = await value('select model_calls from app_private.run_usage where run_id = %s', run)
         waited = 0
         while await value('select lease_expires_at > clock_timestamp() from app_private.run_jobs where run_id = %s', run) and waited < 100:
             await asyncio.sleep(0.1)
@@ -272,7 +274,7 @@ async def main() -> None:
         check('a stopped worker stops renewing, so its lease runs out', 'expired', waited < 100, waited < 100)
         dispatched = await process_next(db, URL, 'replacement', lambda: Script(items=[calls(PLAN)], seen=[], bound=[]), RESUME_ROUTE)
         status = await value("select status from app_private.model_invocations where run_id = %s order by created_at desc limit 1", run)
-        check('recovery classifies the interrupted call before any new dispatch', 'paused, uncertain_model_call, uncertain, no new call', (dispatched.run_status, dispatched.code, status, dispatched.usage['model_calls']), dispatched.run_status == 'paused' and dispatched.code == 'uncertain_model_call' and status == 'uncertain' and dispatched.usage['model_calls'] == 2)
+        check('recovery classifies the interrupted call before any new dispatch', 'paused, uncertain_model_call, uncertain, no new call', (dispatched.run_status, dispatched.code, status, dispatched.usage['model_calls']), dispatched.run_status == 'paused' and dispatched.code == 'uncertain_model_call' and status == 'uncertain' and dispatched.usage['model_calls'] == calls_at_stop)
         process.send_signal(signal.SIGCONT)
         out, err = await asyncio.wait_for(process.communicate(), 60)
         woke = json.loads(out.decode().strip().splitlines()[-1]) if out.strip() else {'error': err.decode()[-300:]}
@@ -285,7 +287,7 @@ async def main() -> None:
         resumed = await user(run, RunCommand.RESUME)
         processed = await process_next(db, URL, 'after-sleep', lambda: Script(items=[calls(('complete_task', {'task_id': 'a', 'evidence': [{'kind': 'artifact', 'reference': 'outputs/a.md'}], 'summary': 's'})), say('stop')], seen=[], bound=[]), RESUME_ROUTE)
         calls_used = processed.usage['model_calls']
-        check('after reconciliation a paid dispatch is allowed again', 'more calls', calls_used, calls_used > 2)
+        check('after reconciliation a paid dispatch is allowed again', 'more calls', calls_used, calls_used > calls_at_stop)
 
         # A response that arrives after recovery classified the call is late evidence.
         run = await admit()

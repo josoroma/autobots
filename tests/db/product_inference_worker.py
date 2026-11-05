@@ -50,7 +50,7 @@ STEPS = (('propose_plan', {'tasks': [TASK]}),
          ('save_artifact', {'path': 'outputs/report.md', 'content': CONTENT}),
          ('publish_artifact', {'path': 'outputs/report.md', 'version': 1}),
          ('complete_task', {'task_id': 'report', 'evidence': EVIDENCE, 'summary': 'Wrote and published the report.'}))
-PRICES = {ModelProfileId.DEEPSEEK_FLASH: ('0.000001', '0.000002'), ModelProfileId.ASTRA: ('0.00001', '0.00005')}
+PRICES = {ModelProfileId.DEEPSEEK_FLASH: ('0.000001', '0.000002'), ModelProfileId.TERRA: ('0.000001', '0.000005')}
 
 
 def fingerprint(key: str) -> str:

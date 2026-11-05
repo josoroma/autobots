@@ -25,7 +25,7 @@ class ModelRole(StrEnum):
 
 class ModelProfileId(StrEnum):
     DEEPSEEK_FLASH = "openrouter_deepseek_flash"
-    ASTRA = "openrouter_astra"
+    TERRA = "openrouter_terra"
 
 
 @dataclass(frozen=True)
@@ -42,10 +42,10 @@ PROFILES: Mapping[ModelProfileId, ModelProfile] = MappingProxyType(
             "deepseek/deepseek-v4.1-flash-20261017",
             "deepseek/deepseek-v4.1-flash-1017",
         ),
-        ModelProfileId.ASTRA: ModelProfile(
-            ModelProfileId.ASTRA,
-            "openai/gpt-6-astra-20260903",
-            "openai/gpt-6-astra",
+        ModelProfileId.TERRA: ModelProfile(
+            ModelProfileId.TERRA,
+            "openai/gpt-6.1-terra-20261026",
+            "openai/gpt-6.1-terra",
         ),
     }
 )

@@ -33,7 +33,7 @@ Expected: `GET /v1/operations/local-status`, or the Operations page, says ready.
 
 ## Turning on inference
 
-**This spends real money once a key exists: every queued run in every workspace with a key sends billed requests to OpenRouter.** Only DeepSeek's adapter has met the real provider ([partial evidence, with its limits](../evidence/US-3.4/summary.md)). Astra hasn't, no goal has run this way with a real model, and strict nested output failed at the 512-token limit. So far this path has run only over a fake transport, as described below. Don't turn it on for real work before US-3.4, except as that story's explicitly authorized, bounded qualification.
+**This spends real money once a key exists: every queued run in every workspace with a key sends billed requests to OpenRouter.** Only DeepSeek's adapter has met the real provider ([partial evidence, with its limits](../evidence/US-3.4/summary.md)). Terra hasn't, no goal has run this way with a real model, and strict nested output failed at the 512-token limit. So far this path has run only over a fake transport, as described below. Don't turn it on for real work before US-3.4, except as that story's explicitly authorized, bounded qualification.
 
 Set the switch where the worker starts, alongside `AUTOBOTS_CONFIG_ROOT`, `AUTOBOTS_SUPABASE_URL`, `AUTOBOTS_SERVICE_ROLE_KEY` and, if the key file isn't in its default place, `AUTOBOTS_PROVIDER_MASTER_KEY_FILE`, all with the same values the API uses. Missing any of the required ones, the worker refuses to start.
 
@@ -45,7 +45,7 @@ Expected: the log's `worker.started` line says `claims_inference` is true, and O
 
 What each job does:
 
-- **Route:** the `executor` binding in the run's frozen `policy_snapshot` picks the profile, so one worker serves DeepSeek and Astra runs side by side. Changing a workspace default never reaches a run already admitted. A run with no approved binding pauses as `route_not_bound`.
+- **Route:** the `executor` binding in the run's frozen `policy_snapshot` picks the profile, so one worker serves DeepSeek and Terra runs side by side. Changing a workspace default never reaches a run already admitted. A run with no approved binding pauses as `route_not_bound`.
 - **Before anything starts:** a job with no usable key or no fresh catalog pauses, with nothing reserved and no request sent. A cancel, or a candidate waiting for verification, still settles, because neither needs a model. A workflow still runs its deterministic blocks, and only its agent blocks stop.
 - **Each attempt:** it rechecks the catalog (no older than five minutes), reads the current key, records a stored key's version in `app_private.model_invocations.credential_version` (an environment key has none), and builds a client used once. A rotated key applies from the next attempt, with no restart.
 - **Spend:** each call asks for at most 512 output tokens and reserves the most the highest rates that can apply could charge for that plus 32,000 input tokens. That input figure is an estimate, because no tokenizer is pinned, so text with more than a token per character can pass it. The prices are read when the job is claimed, so a rise during a job is under-reserved until its next claim, though a price that disappears stops the next attempt. The reply's reported cost settles the attempt.
@@ -65,7 +65,7 @@ These don't pause: after two retries, `rate_limited` (`429`) and `provider_error
 
 **Qualified by** `python3.12 scripts/qualify_worker_inference.py`, on its own disposable stack. It runs the real `worker.main`, SDK and adapter, with a fake HTTP transport and catalog passed from Python, arranged keys, and hostnames beyond loopback refused. It writes `.checks/worker-inference/qualification.json` and its logs under `.checks/worker-inference/logs`, and removes only its own `autobots-disposable-*` project. Other Docker stacks must stay still while it runs, because it compares every container outside its own project.
 
-It makes no paid call, and says nothing about a live route, real response shapes, real prices or real billing. Its fake replies don't exercise compaction, a workflow or child run through this worker, two workers at once, a lost lease, or Astra's mandatory reasoning within 512 output tokens, which belongs to US-3.4.
+It makes no paid call, and says nothing about a live route, real response shapes, real prices or real billing. Its fake replies don't exercise compaction, a workflow or child run through this worker, two workers at once, a lost lease, or Terra's mandatory reasoning within 512 output tokens, which belongs to US-3.4.
 
 ## Reading health
 

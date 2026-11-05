@@ -12,7 +12,7 @@ Provide repository-owned `.claude` configuration with skills, specialist agents,
 
 Every implementation work item follows a proportional **plan → implement → independent review → verify → exercised runbook** record. The record connects the requested behavior to changed code and observed results. It applies to the harness itself as well as later features. One concise record and an existing runbook update can be sufficient; this is an evidence requirement, not a new permission or approval ceremony.
 
-These are **development assistants**, distinct from the application's 14 inference roles and end-user skills. Application execution stays local; application inference stays exclusively on OpenRouter with the approved DeepSeek default and selectable Astra. This milestone adds no model provider, Anthropic SDK, local model server, model-based hook, hosted reviewer or remote CI dependency. It does not assume the two application model IDs work in Claude Code. Any assistant adapter must respect the existing OpenRouter-only constraint; use the portable harness if a compatible assistant route is unavailable.
+These are **development assistants**, distinct from the application's 14 inference roles and end-user skills. Application execution stays local; application inference stays exclusively on OpenRouter with the approved DeepSeek default and selectable Terra. This milestone adds no model provider, Anthropic SDK, local model server, model-based hook, hosted reviewer or remote CI dependency. It does not assume the two application model IDs work in Claude Code. Any assistant adapter must respect the existing OpenRouter-only constraint; use the portable harness if a compatible assistant route is unavailable.
 
 All required quality checks run locally without inference credentials or paid requests. Downloading pinned development dependencies is a bootstrap operation, not a hidden action in an edit hook. Optional assistant reviews cannot replace deterministic gates or silently authorize another service.
 
@@ -144,13 +144,13 @@ When the web tooling is implemented, browser evidence must cover fresh-visit dar
 
 ### Python API, domain and workers
 
-Use the selected Python 3.12 baseline, a `src` package, `pyproject.toml` and committed `uv.lock`. Qualify the combined LangGraph/Deep Agents/OpenRouter/Pydantic dependency set before freezing it. Use `uv sync --locked` for an explicit install; verification uses the locked prepared environment and must not silently update it. [uv locking semantics](https://docs.astral.sh/uv/concepts/projects/sync/)
+Use the selected Python 3.12 baseline, a `src` package, `pyproject.toml` and committed `uv.lock`. Qualify the combined LangGraph/Deep Agents/OpenRouter/Pydantic dependency set before freezing it. Use `uv sync --locked` for an explicit install; verification uses the locked prepared environment and must not silently update it. [uv locking semantics](https://docs.terral.sh/uv/concepts/projects/sync/)
 
 Check lock freshness explicitly and run checks with environment synchronization disabled after bootstrap. Generate OpenAPI through a pure application factory: import-time schema generation must not open database pools, require model keys or contact OpenRouter. Initialize and release resources in the API lifespan so contract checks work before services start. [FastAPI lifespan](https://fastapi.tiangolo.com/advanced/events/)
 
 Use Ruff for lint/format, mypy strict for owned modules, and pytest with qualified async support. Keep third-party typing exceptions narrow and documented. Pydantic models define external contracts; choose explicit coercion/strictness per field. Use timezone-aware UTC dates, exact decimal or integer monetary units, explicit enums/unions and validated identifiers. Do not use float arithmetic for money or encode distinct states as ambiguous nullable fields.
 
-Own DB pools/HTTP clients in process lifecycles; close them on shutdown. Bound timeouts, retries and concurrency. Keep blocking work off the async event loop. Propagate cancellation after cleanup; do not catch and discard it. Tests use controlled clocks and injected transports rather than real time or paid model calls. Ruff check and formatting are separate gates; safe autofix is an explicit operation. [Ruff linter](https://docs.astral.sh/ruff/linter/)
+Own DB pools/HTTP clients in process lifecycles; close them on shutdown. Bound timeouts, retries and concurrency. Keep blocking work off the async event loop. Propagate cancellation after cleanup; do not catch and discard it. Tests use controlled clocks and injected transports rather than real time or paid model calls. Ruff check and formatting are separate gates; safe autofix is an explicit operation. [Ruff linter](https://docs.terral.sh/ruff/linter/)
 
 ### Models, contracts and state
 

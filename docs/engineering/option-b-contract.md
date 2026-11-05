@@ -112,13 +112,13 @@ Use local password Auth with public signup disabled and explicit owner bootstrap
 | Profile | Requested canonical identity | OpenRouter request ID |
 |---|---|---|
 | `openrouter_deepseek_flash` — default | `deepseek/deepseek-v4.1-flash-20261017` | `deepseek/deepseek-v4.1-flash-1017` |
-| `openrouter_astra` — explicit alternative | `openai/gpt-6-astra-20260903` | `openai/gpt-6-astra` |
+| `openrouter_terra` — explicit alternative | `openai/gpt-6.1-terra-20261026` | `openai/gpt-6.1-terra` |
 
 All 14 roles initially bind to DeepSeek: `coordinator`, `router`, `planner`, `executor`, `researcher`, `coder`, `reviewer`, `evaluator`, `summarizer`, `memory_curator`, `skill_learner`, `tool_repair`, `workflow_generator`, `general_purpose`. Maintain role constants for future explicit configuration; children and middleware cannot create hidden model defaults.
 
 Resolve run role override → explicit run-wide profile → workspace role override → workspace default → DeepSeek. Freeze the complete map, canonical/wire IDs, revision references, limits, data scope and credential reference at admission. Changing models for unfinished work creates a linked new run using selected evidence references; it does not reinterpret an old checkpoint. Credential rotation remains late-bound per attempt.
 
-Before each paid attempt, revalidate the exact canonical/wire association with catalog metadata at most five minutes old. Use only OpenRouter Chat Completions with `require_parameters=true` and `allow_fallbacks=false`. Reject unknown profiles, arbitrary base URLs, implicit SDK models, fallback arrays, batch/Pro/router substitutions and additional embedding services. Preserve required opaque reasoning metadata privately; omit unsupported Astra sampler/parallel-tool settings. Catalog support is not runtime qualification.
+Before each paid attempt, revalidate the exact canonical/wire association with catalog metadata at most five minutes old. Use only OpenRouter Chat Completions with `require_parameters=true` and `allow_fallbacks=false`. Reject unknown profiles, arbitrary base URLs, implicit SDK models, fallback arrays, batch/Pro/router substitutions and additional embedding services. Preserve required opaque reasoning metadata privately; omit unsupported Terra sampler/parallel-tool settings. Catalog support is not runtime qualification.
 
 ### SP-007 — credentials and configuration UX
 

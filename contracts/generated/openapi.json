@@ -1541,7 +1541,7 @@
       "ModelProfileId": {
         "enum": [
           "openrouter_deepseek_flash",
-          "openrouter_astra"
+          "openrouter_terra"
         ],
         "title": "ModelProfileId",
         "type": "string"

@@ -7,7 +7,7 @@ import pytest
 from langchain_openrouter import ChatOpenRouter
 
 from conftest import SocketBlockedError
-from fake_openrouter import ARRANGED_KEY, ASTRA_WIRE_ID, DEEPSEEK_WIRE_ID, FakeOpenRouter
+from fake_openrouter import ARRANGED_KEY, DEEPSEEK_WIRE_ID, TERRA_WIRE_ID, FakeOpenRouter
 
 
 def in_chain(error: BaseException | None, kind: type[BaseException]) -> bool:
@@ -18,7 +18,7 @@ def in_chain(error: BaseException | None, kind: type[BaseException]) -> bool:
     return False
 
 
-@pytest.mark.parametrize("wire_id", [DEEPSEEK_WIRE_ID, ASTRA_WIRE_ID])
+@pytest.mark.parametrize("wire_id", [DEEPSEEK_WIRE_ID, TERRA_WIRE_ID])
 def test_each_approved_profile_round_trips_through_the_fake(wire_id: str) -> None:
     fake = FakeOpenRouter()
     assert fake.chat_model(wire_id).invoke("hello").content == "fake reply"
@@ -34,7 +34,7 @@ def test_an_unapproved_model_is_refused() -> None:
 def test_a_fallback_array_is_refused() -> None:
     fake = FakeOpenRouter()
     with pytest.raises(openrouter.errors.OpenRouterError):
-        fake.chat_model(DEEPSEEK_WIRE_ID).invoke("hello", models=[DEEPSEEK_WIRE_ID, ASTRA_WIRE_ID])
+        fake.chat_model(DEEPSEEK_WIRE_ID).invoke("hello", models=[DEEPSEEK_WIRE_ID, TERRA_WIRE_ID])
 
 
 def test_a_missing_key_is_refused_before_any_request() -> None:

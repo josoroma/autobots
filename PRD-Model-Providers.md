@@ -3,16 +3,16 @@
 **Decision date:** 2026-11-04. **Status:** Finalized requirements; implementation and paid cloud qualification pending.  
 **Authority:** Normative for [Next.js](PRD-NextJS.md), [LangChain / Deep Agents](PRD-LangChain-Deep-Agents.md) and the [architecture recommendation](PRD-Comparison-Recommendation.md), alongside the [local Mac deployment contract](PRD-Local-Mac-Deployment.md). This specifies our independent clone, not upstream AutoGPT behavior.
 
-The application, workers, authentication, database, files and durable state run locally on this Mac; **all model inference uses OpenRouter**. Every role defaults to the approved DeepSeek profile, with Astra available through explicit selection. There is no local inference runtime or local-only model profile in scope. Setting a key never starts work or changes model bindings. “Configured” means authentication succeeded, not that model capability or task-quality gates passed. Public documentation/catalog metadata established this revision; paid qualification remains pending.
+The application, workers, authentication, database, files and durable state run locally on this Mac; **all model inference uses OpenRouter**. Every role defaults to the approved DeepSeek profile, with Terra available through explicit selection. There is no local inference runtime or local-only model profile in scope. Setting a key never starts work or changes model bindings. “Configured” means authentication succeeded, not that model capability or task-quality gates passed. Public documentation/catalog metadata established this revision; paid qualification remains pending.
 
 ## MP-01. Approved models and selection
 
 | Profile | Canonical identity | Request identity |
 |---|---|---|
 | `openrouter_deepseek_flash` — initial default | `deepseek/deepseek-v4.1-flash-20261017` | `deepseek/deepseek-v4.1-flash-1017` |
-| `openrouter_astra` — optional | `openai/gpt-6-astra-20260903` | `openai/gpt-6-astra` |
+| `openrouter_terra` — optional | `openai/gpt-6.1-terra-20261026` | `openai/gpt-6.1-terra` |
 
-Cloud mappings are observed in the [dated public catalog snapshot](research/openrouter-model-catalog.json). Do not substitute a moving-family, Pro, batch or routing alias. In particular, Astra’s shorter request ID does not establish an immutable snapshot guarantee.
+[Decision 0004](docs/engineering/decisions/0004-terra-replaces-astra.md) replaced Astra with Terra. The DeepSeek mapping is observed in the [dated public catalog snapshot](research/openrouter-model-catalog.json), and Terra's in the public catalog on 2026-11-05. Do not substitute a moving-family, Pro, batch or routing alias. In particular, Terra’s shorter request ID does not establish an immutable snapshot guarantee.
 
 The registry contains exactly these two profiles. Provide a per-run profile, an owner/admin workspace default for future runs and advanced versioned role bindings. New workspaces assign all 14 roles to `openrouter_deepseek_flash`. Persist the canonical role keys `coordinator`, `router`, `planner`, `executor`, `researcher`, `coder`, `reviewer`, `evaluator`, `summarizer`, `memory_curator`, `skill_learner`, `tool_repair`, `workflow_generator` and `general_purpose` consistently across languages.
 
@@ -44,7 +44,7 @@ Every request must include:
 
 Do not send a `models` fallback array, automatic routing names, provider plugins or implicit server tools. OpenRouter documents that unsupported parameters can otherwise be ignored and provider fallback defaults to enabled. These settings intentionally narrow that behavior. They do not pin one upstream host across separate requests; record the actual upstream provider per attempt when reported, otherwise record `unknown`. No baseline zero-data-retention guarantee is claimed. [Provider routing](https://openrouter.ai/docs/guides/routing/provider-selection).
 
-Maintain capabilities per model and qualified route. The current Astra catalog does not advertise `temperature`, `top_p` or `parallel_tool_calls`; omit them instead of copying another profile's settings. Serialize application tool execution where required without assuming that parameter is available. Reject required unsupported capabilities before dispatch. JSON requests use the qualified `response_format.json_schema` shape and independent final validation. [Structured outputs](https://openrouter.ai/docs/guides/features/structured-outputs).
+Maintain capabilities per model and qualified route. The current Terra catalog does not advertise `temperature`, `top_p` or `parallel_tool_calls`; omit them instead of copying another profile's settings. Serialize application tool execution where required without assuming that parameter is available. Reject required unsupported capabilities before dispatch. JSON requests use the qualified `response_format.json_schema` shape and independent final validation. [Structured outputs](https://openrouter.ai/docs/guides/features/structured-outputs).
 
 Preserve opaque provider reasoning metadata needed for tool continuation as access-controlled protocol state, with the original ordering and content. Do not display it as private thoughts or put it in ordinary activity logs. Present concise decision summaries and evidence instead. [Reasoning continuation requirements](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens).
 
@@ -171,7 +171,7 @@ Use mocked adapters for deterministic credential/error/replay tests and a separa
 
 | Decision | Requirement status | Remaining gate |
 |---|---|---|
-| OpenRouter only; DeepSeek default, explicit Astra choice | Closed | Implement and test all 14 role bindings/inheritance. |
+| OpenRouter only; DeepSeek default, explicit Terra choice | Closed | Implement and test all 14 role bindings/inheritance. |
 | Canonical mapping and no fallback | Closed | Fresh-catalog preflight and drift tests. |
 | Environment-first/in-app credential setup | Closed | UI, authorization, encryption and restart/rotation tests. |
 | Budget, disclosure and error policy | Closed | Reservation concurrency, replay and failure tests. |

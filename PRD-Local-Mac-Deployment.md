@@ -8,7 +8,7 @@ This is the normative deployment contract for the [Next.js implementation](PRD-N
 
 All application execution, durable orchestration, authentication, database records, files, credentials and operational logs run on **this Apple Silicon Mac**. **OpenRouter is the only inference provider**. Its remote models receive the selected task context, so this is a locally hosted application with remote inference, not an offline application or a claim that model providers retain no data.
 
-The initial model for all 14 roles is the approved DeepSeek snapshot; Astra is an explicit alternative. The exact canonical identities, wire IDs, credential flow and budgets are defined in the provider PRD. No Bonsai, MTPLX, MLX, llama.cpp, Ollama, local embedding service, direct OpenAI/DeepSeek API, hosted AI Gateway or hidden evaluator is an application dependency or fallback.
+The initial model for all 14 roles is the approved DeepSeek snapshot; Terra is an explicit alternative. The exact canonical identities, wire IDs, credential flow and budgets are defined in the provider PRD. No Bonsai, MTPLX, MLX, llama.cpp, Ollama, local embedding service, direct OpenAI/DeepSeek API, hosted AI Gateway or hidden evaluator is an application dependency or fallback.
 
 Vercel's libraries may run locally; Vercel hosting is not part of this deployment. Supabase is self-hosted here, not a supabase.com project. Hosted LangSmith, remote workers, remote artifact buckets, managed databases and external log collectors are outside the active design. Optional network tools remain separately governed by the task's explicit tool permissions; they do not introduce another inference provider or hosted application backend.
 
@@ -30,7 +30,7 @@ flowchart TB
     W --> S[Local private Supabase Storage]
     N --> S
     W --> C[Local credential and budget gateway]
-    C --> O[OpenRouter HTTPS: DeepSeek or Astra]
+    C --> O[OpenRouter HTTPS: DeepSeek or Terra]
     W --> T[Local permission-controlled tools]
     T --> X[Optional isolated Docker tool worker]
 ```

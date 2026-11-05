@@ -714,7 +714,7 @@ Source: [Option B users](PRD-LangChain-Deep-Agents.md#21-primary-users), SP-003 
 ## Global Business Rules
 
 1. All application/data/Auth/Storage/workers/logs remain on this Mac. Inference alone uses the approved OpenRouter route; scoped external tools retain separate permission rules. Private app_private and agent_runtime SQL remain excluded from PostgREST/Realtime. Sources: SP-004/SP-005, LM-01–07.
-2. The registry contains only openrouter_deepseek_flash (canonical deepseek/deepseek-v4.1-flash-20261017; wire deepseek/deepseek-v4.1-flash-1017) and explicit openrouter_astra (canonical openai/gpt-6-astra-20260903; wire openai/gpt-6-astra). All 14 roles initially use DeepSeek. Source: SP-006 and MP-01/02.
+2. The registry contains only openrouter_deepseek_flash (canonical deepseek/deepseek-v4.1-flash-20261017; wire deepseek/deepseek-v4.1-flash-1017) and explicit openrouter_terra (canonical openai/gpt-6.1-terra-20261026; wire openai/gpt-6.1-terra). All 14 roles initially use DeepSeek. Source: SP-006 and MP-01/02.
 3. Resolve run-role override, run-wide selection, workspace-role override, workspace default, then DeepSeek. Freeze bindings/data scope/limits at admission; children inherit them. Catalog freshness is at most five minutes with exact canonical matching and no fallback. Source: SP-006.
 4. Missing keys preserve local non-AI use and block every inference path. Environment precedence, app encryption and late-bound credential versions follow MP-03–06; Save and validate does not launch work. Source: SP-007.
 5. Initial limits are two remote slots per workspace, 8K context, 512 output tokens, 24 model calls, 40 tool calls, one invalid-argument/schema repair, two plan revisions, two child levels, four children, two outstanding assignments and 15 minutes active execution. Approval wait has separate expiry. US$1/root and US$5/workspace UTC-day admission budgets include attempts/descendants. These are configurable application limits, not model capacities. Source: SP-008.
@@ -1344,7 +1344,7 @@ Acceptance Criteria:
 Scenario: Resolve the approved role map
   Given a new workspace and optional run/workspace overrides
   When a role policy is resolved
-  Then all 14 initial roles use DeepSeek and the documented precedence selects only approved DeepSeek or explicit Astra bindings
+  Then all 14 initial roles use DeepSeek and the documented precedence selects only approved DeepSeek or explicit Terra bindings
 
 Scenario: Reject drift and implicit routing
   Given stale catalog metadata, canonical drift or an unsupported request option

@@ -74,11 +74,11 @@ from autobots.application.worker_inference import (
 from autobots.application.worker_leases import Lease
 from autobots.domain.models import PROFILES, ModelProfileId, UnknownModelProfile
 from autobots.operations import worker
-from fake_openrouter import ARRANGED_KEY, ASTRA_WIRE_ID, DEEPSEEK_WIRE_ID
+from fake_openrouter import ARRANGED_KEY, DEEPSEEK_WIRE_ID, TERRA_WIRE_ID
 
 NOW = datetime.now(UTC)
 DEEPSEEK = PROFILES[ModelProfileId.DEEPSEEK_FLASH]
-ASTRA = PROFILES[ModelProfileId.ASTRA]
+TERRA = PROFILES[ModelProfileId.TERRA]
 PRICE = {"prompt": "0.000001", "completion": "0.000002"}
 
 
@@ -92,13 +92,13 @@ def catalog_payload(*drop: str, pricing: Any = PRICE) -> dict[str, Any]:
                 "supported_parameters": [name for name in supported if name not in drop],
                 "pricing": pricing,
             }
-            for profile in (DEEPSEEK, ASTRA)
+            for profile in (DEEPSEEK, TERRA)
         ]
     }
 
 
-def snapshot(deepseek_or_astra: str = DEEPSEEK.id.value) -> dict[str, Any]:
-    return {"version": 1, "bindings": {"executor": deepseek_or_astra, "summarizer": DEEPSEEK.id}}
+def snapshot(deepseek_or_terra: str = DEEPSEEK.id.value) -> dict[str, Any]:
+    return {"version": 1, "bindings": {"executor": deepseek_or_terra, "summarizer": DEEPSEEK.id}}
 
 
 def fresh_catalog(**kwargs: Any) -> CatalogSnapshot:
@@ -142,8 +142,8 @@ def test_a_variable_price_has_no_bound_so_a_reservation_refuses_it() -> None:
 
 
 def test_the_policy_is_read_from_the_snapshot_not_a_default() -> None:
-    policy = frozen_policy(snapshot(ASTRA.id.value))
-    assert policy.profile_for(ROLE).wire_id == ASTRA_WIRE_ID
+    policy = frozen_policy(snapshot(TERRA.id.value))
+    assert policy.profile_for(ROLE).wire_id == TERRA_WIRE_ID
 
 
 @pytest.mark.parametrize(
@@ -349,8 +349,8 @@ def test_a_request_carries_the_routes_identity_limits_and_routing_flags() -> Non
 
 def test_the_wire_id_follows_the_runs_binding() -> None:
     fake = Fake()
-    invoke(attempt_model(source_with(fake, [ARRANGED_KEY]), ASTRA.id.value))
-    assert fake.bodies[0]["model"] == ASTRA_WIRE_ID
+    invoke(attempt_model(source_with(fake, [ARRANGED_KEY]), TERRA.id.value))
+    assert fake.bodies[0]["model"] == TERRA_WIRE_ID
 
 
 def test_the_reply_gives_the_loop_what_it_settles_on() -> None:
@@ -468,7 +468,7 @@ def bind_with(
 def test_binding_takes_the_route_from_each_runs_own_snapshot(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    for profile, wire in ((DEEPSEEK, DEEPSEEK_WIRE_ID), (ASTRA, ASTRA_WIRE_ID)):
+    for profile, wire in ((DEEPSEEK, DEEPSEEK_WIRE_ID), (TERRA, TERRA_WIRE_ID)):
         _, config = bind_with(snapshot(profile.id.value), (None, 777), monkeypatch)
         assert (config.route.role, config.route.profile) == ("executor", profile.id.value)
         assert (config.route.wire_id, config.route.worst_case_micro_usd) == (wire, 777)
@@ -496,17 +496,18 @@ def test_the_worst_case_is_an_upper_bound_at_the_stated_limits() -> None:
 
 
 def test_the_real_catalog_prices_both_profiles_within_a_runs_default_cap() -> None:
-    """Astra's long-prompt override starts far above what this app sends, so it doesn't count."""
-    path = Path(__file__).parents[3] / "research/openrouter-model-catalog.json"
+    """Terra's cache-write rate is its highest input rate. Its long-prompt override starts far above
+    what this app sends, so it doesn't count."""
+    path = Path(__file__).parents[3] / "research/openrouter-model-catalog-2026-11-05.json"
     matches = {item["id"]: item for item in json.loads(path.read_text())["matches"]}
-    prices = {wire: parse_pricing(matches[wire]) for wire in (DEEPSEEK_WIRE_ID, ASTRA_WIRE_ID)}
+    prices = {wire: parse_pricing(matches[wire]) for wire in (DEEPSEEK_WIRE_ID, TERRA_WIRE_ID)}
     assert prices[DEEPSEEK_WIRE_ID] == Pricing(300_000, 1_200_000)
-    assert prices[ASTRA_WIRE_ID] == Pricing(12_500_000, 50_000_000)
+    assert prices[TERRA_WIRE_ID] == Pricing(1_250_000, 5_000_000)
     worst = {
         wire: worst_case_cost(price, RESERVED_PROMPT_TOKENS, MAX_OUTPUT_TOKENS)
         for wire, price in prices.items()
     }
-    assert worst == {DEEPSEEK_WIRE_ID: 10_215, ASTRA_WIRE_ID: 425_600}
+    assert worst == {DEEPSEEK_WIRE_ID: 10_215, TERRA_WIRE_ID: 42_560}
 
 
 def test_an_override_this_app_can_reach_still_counts() -> None:

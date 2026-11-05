@@ -96,3 +96,10 @@ This is partial evidence for US-3.4, and **the story isn't complete**. Harness a
 
 1. **Whether Terra replaces Astra,** which keeps the contract's two models. Or whether it becomes the default, at about 5 times DeepSeek's cost per call in this corpus. Either needs a recorded decision.
 2. **DeepSeek's output allowance,** if it stays the default: test a larger one.
+
+### Correction
+
+**The application's second model changed after this was recorded.** [Decision 0004](../../decisions/0004-terra-replaces-astra.md) made Terra an approved profile, replacing Astra, so this file's statements that Terra isn't a profile, and that Astra is selectable, describe that moment.
+
+The runner's worst-case estimate used DeepSeek's base rate, though the catalog shows that rate doubling in weekday peak windows. It's since been fixed. Reported charges are unaffected, and neither round came near its cap. The per-call cost comparison is from one afternoon, so it may not hold at other hours.
+

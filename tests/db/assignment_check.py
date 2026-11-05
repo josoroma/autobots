@@ -55,7 +55,7 @@ async def main() -> None:
             return await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=f'expert-{name}', name=name, config=ExpertConfig(**config_values))
 
         lead = await expert('Assign Lead', tools=['calculate', 'save_artifact', 'publish_artifact'])
-        helper = await expert('Assign Helper', tools=['calculate', 'save_artifact', 'publish_artifact', 'read_run_file'], role_bindings={'executor': 'openrouter_astra'}, instructions='Help.')
+        helper = await expert('Assign Helper', tools=['calculate', 'save_artifact', 'publish_artifact', 'read_run_file'], role_bindings={'executor': 'openrouter_terra'}, instructions='Help.')
         limited = await expert('Assign Limited', tools=['read_run_file'])
         outside = await expert('Assign Outside', tools=['calculate'])
         session = await create_session(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='sess', kind='coordinator', experts=[SessionExpert(expert_id=e.id) for e in (lead, helper, limited)])

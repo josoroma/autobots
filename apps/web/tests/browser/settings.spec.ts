@@ -192,7 +192,7 @@ test("a catalog outage does not undo an authentication-valid save, and is shown 
   const models = await (await page.request.get("/api/models")).json();
   expect(
     models.models.map((model: { profile: string }) => model.profile).sort(),
-  ).toEqual(["openrouter_astra", "openrouter_deepseek_flash"]);
+  ).toEqual(["openrouter_deepseek_flash", "openrouter_terra"]);
   expect(
     models.models.every((model: { available: boolean }) => model.available),
   ).toBe(true);
@@ -267,7 +267,7 @@ test("only an owner can change settings, and a workspace header cannot cross wor
     headers: { ...(await csrf(page)), ...header },
     data: {
       expected_version: 0,
-      default_profile: "openrouter_astra",
+      default_profile: "openrouter_terra",
       role_overrides: {},
     },
   });
@@ -293,7 +293,7 @@ test("the model policy is versioned, and refuses an unapproved value", async ({
     headers,
     data: {
       expected_version: 0,
-      default_profile: "openrouter_astra",
+      default_profile: "openrouter_terra",
       role_overrides: { coder: "openrouter_deepseek_flash" },
     },
   });
@@ -306,7 +306,7 @@ test("the model policy is versioned, and refuses an unapproved value", async ({
   expect(coder.profile).toBe("openrouter_deepseek_flash");
   expect(
     state.policy.bindings.filter(
-      (binding: { profile: string }) => binding.profile === "openrouter_astra",
+      (binding: { profile: string }) => binding.profile === "openrouter_terra",
     ),
   ).toHaveLength(13);
   const stale = await page.request.put("/api/settings/model-policy", {
@@ -322,7 +322,7 @@ test("the model policy is versioned, and refuses an unapproved value", async ({
     headers,
     data: {
       expected_version: 1,
-      default_profile: "openai/gpt-6-astra",
+      default_profile: "openai/gpt-6.1-terra",
       role_overrides: {},
     },
   });
