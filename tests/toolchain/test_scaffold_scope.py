@@ -32,6 +32,8 @@ ALLOWED_PATHS = {
     'services/agent/src/autobots/api/app.py',
     'services/agent/src/autobots/py.typed',
     'services/agent/tests/conftest.py',
+    'services/agent/tests/fake_openrouter.py',
+    'services/agent/tests/test_model_transport.py',
     'services/agent/tests/test_app_factory.py',
     'services/agent/tests/test_environment.py',
     'services/agent/uv.lock',

@@ -77,9 +77,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-1.5 | H0 work records, independent review and evidence templates | DONE | EPIC-1 |
 | US-1.5#1 | Define work-record, review, manifest and runbook templates. | DONE | US-1.5 |
 | US-1.5#2 | Define durable redacted evidence and ignored raw-artifact retention contracts. | DONE | US-1.5 |
-| US-1.6 | H1 deliberate fault and freshness qualification | READY | EPIC-1 |
-| US-1.6#1 | Implement deliberate failure and correction fixtures. | TODO | US-1.6 |
-| US-1.6#2 | Qualify manifest validation and input-fingerprint invalidation. | TODO | US-1.6 |
+| US-1.6 | H1 deliberate fault and freshness qualification | DONE | EPIC-1 |
+| US-1.6#1 | Implement deliberate failure and correction fixtures. | DONE | US-1.6 |
+| US-1.6#2 | Qualify manifest validation and input-fingerprint invalidation. | DONE | US-1.6 |
 | US-1.7 | H1 disposable database and Compose guards | READY | EPIC-1 |
 | US-1.7#1 | Implement target-checked wrappers and isolated Compose fixtures. | TODO | US-1.7 |
 | US-1.7#2 | Run synthetic migration, seed, grant and Storage negative cases. | TODO | US-1.7 |
@@ -962,7 +962,8 @@ Open Questions:
 
 ### US-1.6: H1 deliberate fault and freshness qualification
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-1-6-h1-deliberate-fault-freshness/`
 
 As a developer
 I want known-good and known-bad harness fixtures
@@ -997,8 +998,8 @@ Dependencies:
 - US-1.5
 
 Tasks:
-- [ ] Implement deliberate failure and correction fixtures.
-- [ ] Qualify manifest validation and input-fingerprint invalidation.
+- [x] Implement deliberate failure and correction fixtures.
+- [x] Qualify manifest validation and input-fingerprint invalidation.
 
 Open Questions:
 - None.

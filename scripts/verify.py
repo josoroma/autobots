@@ -19,9 +19,9 @@ import subprocess
 import sys
 import time
 
-from harness_lib import (adapter_status, changed_paths, check_domains, config_errors, fingerprint,
-                         input_manifest, project_root, reduced_env)
-from toolchain import (Step, Unavailable, check_steps, child_env, find_tools, missing_prepared_paths,
+from harness_lib import (FULL_ONLY_CHECKS, adapter_status, changed_paths, check_domains, config_errors,
+                         fingerprint, input_manifest, project_root, reduced_env)
+from toolchain import (LONG, Step, Unavailable, check_steps, child_env, find_tools, missing_prepared_paths,
                        run_step, snapshot, snapshot_differences)
 
 EXIT_PASSED, EXIT_FAILED, EXIT_UNAVAILABLE = 0, 1, 2
@@ -90,7 +90,7 @@ class ToolPlan:
 
 def tool_plan(root: Path, profile: str, changed: Sequence[str] | None) -> tuple[ToolPlan, list[dict]]:
     """The toolchain steps to run and the ones left out. Needs tools only when a step needs them."""
-    known = {*PYTHON_STEPS, *WEB_STEPS, 'build'}
+    known = {*PYTHON_STEPS, *WEB_STEPS, *FULL_ONLY_CHECKS}
     chosen = selected_steps(profile, sorted(known), changed)
     left_out = [{'id': name, 'status': 'not_run', 'reason': OUTSIDE_SCOPE} for name in sorted(known - chosen)]
     if not chosen:
@@ -99,7 +99,8 @@ def tool_plan(root: Path, profile: str, changed: Sequence[str] | None) -> tuple[
     missing = missing_prepared_paths(root, tools)
     if missing:
         raise Unavailable('not prepared, run scripts/toolchain.py bootstrap explicitly; missing: ' + ', '.join(missing))
-    steps = [step for step in check_steps(root, tools) if step.id in chosen]
+    qualification = Step('fault_qualification', (sys.executable, 'scripts/qualify_faults.py'), root, LONG)
+    steps = [step for step in (*check_steps(root, tools), qualification) if step.id in chosen]
     return ToolPlan(steps, child_env(root, tools, verifying=True)), left_out
 
 

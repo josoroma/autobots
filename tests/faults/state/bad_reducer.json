@@ -1,0 +1,30 @@
+{
+  "states": [
+    "queued",
+    "running"
+  ],
+  "events": [
+    {
+      "sequence": 1,
+      "value": "a"
+    },
+    {
+      "sequence": 2,
+      "value": "b"
+    },
+    {
+      "sequence": 1,
+      "value": "a"
+    }
+  ],
+  "expected_reduced": [
+    "b",
+    "a"
+  ],
+  "public_events": [
+    {
+      "type": "run.status",
+      "status": "running"
+    }
+  ]
+}

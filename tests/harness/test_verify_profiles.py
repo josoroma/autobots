@@ -132,8 +132,10 @@ class Profiles(unittest.TestCase):
         left_out = [{'id': 'lint', 'status': 'not_run', 'reason': verify.OUTSIDE_SCOPE}]
         self.run_steps('full', [python_step(self.root, 'build', 'pass')], left_out)
         self.assertFalse(harness_lib.report_state(self.root, 'full')[0])
-        self.run_steps('full', [python_step(self.root, 'mypy', 'pass')])
-        self.assertFalse(harness_lib.report_state(self.root, 'full')[0], 'a full report without build')
+        self.run_steps('full', [python_step(self.root, 'build', 'pass')])
+        self.assertFalse(harness_lib.report_state(self.root, 'full')[0], 'a full report without fault qualification')
+        self.run_steps('full', [python_step(self.root, 'build', 'pass'), python_step(self.root, 'fault_qualification', 'pass')])
+        self.assertTrue(harness_lib.report_state(self.root, 'full')[0])
 
     def test_application_inputs_invalidate_but_environments_do_not(self):
         before = harness_lib.fingerprint(self.root)

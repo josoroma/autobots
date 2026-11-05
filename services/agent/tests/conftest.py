@@ -1,7 +1,13 @@
-"""Block outbound sockets for the whole session, including imports done during collection."""
+"""Block outbound sockets for the whole session, including imports done during collection.
 
+An inherited provider key is removed too, so no test can read a developer's real key.
+"""
+
+import os
 import socket
 from typing import NoReturn
+
+os.environ.pop("OPENROUTER_API_KEY", None)
 
 
 class SocketBlockedError(RuntimeError):

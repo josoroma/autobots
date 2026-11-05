@@ -35,7 +35,7 @@ RECORD_PREFIXES = ('docs/engineering/work-items/', 'docs/engineering/runbooks/')
 LOCKFILES = ('pnpm-lock.yaml', 'services/agent/uv.lock')
 CONFIG_FILES = {'.gitignore', 'package.json', 'pnpm-workspace.yaml', '.node-version',
                 'services/agent/pyproject.toml', 'services/agent/.python-version'}
-VERIFIER_PREFIXES = ('scripts/', 'tests/harness/', 'tests/toolchain/')
+VERIFIER_PREFIXES = ('scripts/', 'tests/harness/', 'tests/toolchain/', 'tests/faults/')
 
 
 def digest(items: Mapping[str, str]) -> str:

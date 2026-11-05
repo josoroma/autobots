@@ -50,7 +50,7 @@ python3.12 scripts/verify.py --profile full
 |---|---|
 | `harness` | Configuration, backlog validation and the deterministic harness tests |
 | `fast` | `harness`, plus the Python steps for `services/agent/`, the web steps for `apps/web/` and `packages/`, and both for shared or check-infrastructure paths such as locks, `contracts/` and `scripts/verify.py`. No build. Everything else is recorded `not_run`, so a documentation-only change needs no prepared environment |
-| `full` | `harness`, plus every step, including `next build` |
+| `full` | `harness`, plus every step, including `next build` and the fault qualification below |
 
 | Exit | Report `status` | Meaning |
 |---|---|---|
@@ -61,6 +61,17 @@ python3.12 scripts/verify.py --profile full
 Reports are `.checks/<profile>/latest.json`. Each binds to a fingerprint of the harness files plus application sources, manifests and locks, but not environments, caches or build output. Any change to those inputs makes every profile's report stale. The `Stop` hook wants a current `fast` or `full` report when uncommitted application or shared paths exist, and otherwise accepts any current report.
 
 Not run by any profile: generated contract drift, because no contract exists yet; browser fixtures, because none are configured; and `tests/toolchain`, whose copies bootstrap from registries.
+
+## Qualify deliberate faults
+
+```sh
+python3.12 scripts/qualify_faults.py
+jq '.status, [.cases[] | select(.status != "passed") | .id]' .checks/faults/latest.json
+```
+
+Expected: exit 0, one `PASS:` line per case, and an empty list. It runs the pinned tools on `tests/faults/`. A good fixture must pass, and a bad one must fail with its case's marker, so a crashed tool does not count as a detected fault. Exit 1 means a case did not behave as expected, and exit 2 that the prepared environments are missing. The `model_real_bad` case runs with a placeholder key, not a real one, and must hit the socket block.
+
+Never fix or remove a bad fixture to make this pass. It shows these checkers catch these faults. It does not qualify the product's state machine, contract generation or model gateway, and establishes neither H1 nor product acceptance.
 
 ## Validate completion evidence
 
