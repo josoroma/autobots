@@ -49,6 +49,12 @@ Expected: `qualify` exits 0, after creating a new disposable database on the pin
 
 **No persistent apply exists.** Applying to a persistent stack needs a target-identity and baseline check that belongs with whichever story first starts one. The framework's checkpoint tables are set up in `agent_runtime` by the migration identity during qualification only; a persistent path must do the same, and workers must never call its `setup()`.
 
+## Credentials and the master key
+
+`autobots.application.credentials` resolves `OPENROUTER_API_KEY` in MP-03's order, and stores app credentials encrypted in `app_private.provider_credentials`. The master key lives at `AUTOBOTS_PROVIDER_MASTER_KEY_FILE`, by default under `~/Library/Application Support/Autobots/secrets/`, outside the repository and any tool workspace. It is created once, on the first save, with a `0700` parent and a `0600` file.
+
+**If it is lost, stored credentials cannot be recovered.** Reads and writes report unavailable storage, and no replacement is generated while encrypted rows exist. Restore the key from its own backup, which is separate from any database backup. Re-entering credentials after a real loss needs an explicit procedure that does not exist yet.
+
 ## Removed from the release
 
 Realtime, Edge Functions and the Supavisor pooler are in the `removed` profile, per LM-03 and LM-04. Studio's and Storage's writable bind mounts became named volumes, so data never lands in the vendored directory.

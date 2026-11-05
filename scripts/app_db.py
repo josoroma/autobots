@@ -261,6 +261,33 @@ def static_cases(cases: Cases, root: Path) -> None:
     cases.check('no ORM history or worker-startup DDL in service code', 'none', ', '.join(found) or 'none', not found)
 
 
+def credential_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
+    """Real encrypted rows through the runtime role, with arranged placeholder values and a temporary key."""
+    workspace, other = 'a0000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000002'
+    url = f'postgresql://autobots_runtime:{stack.runtime_password}@127.0.0.1:{db_port}/postgres'
+    process = subprocess.Popen([str(root / 'services/agent/.venv/bin/python'), str(root / 'tests/db/credential_store_check.py'), workspace, other],
+                               env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
+                               stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    assert process.stdin is not None and process.stdout is not None
+    first = process.stdout.readline()
+    if 'needs_grant' in first:
+        stack.sql(f"insert into app_private.installation_credential_grants values ('{workspace}');\\n")
+        process.stdin.write('\\n')
+        process.stdin.flush()
+    out, err = process.communicate(timeout=120)
+    if process.returncode:
+        cases.check('the credential store check ran', 'exit 0', f'exit {process.returncode}: {err.strip()[-300:]}', False)
+        return
+    for case in json.loads(out.strip().splitlines()[-1])['cases']:
+        cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+    stored = rows(stack, "select count(*) from pg_tables where schemaname = 'public' and tablename like '%credential%';")
+    cases.check('credentials are not in the exposed schema', '0 public tables', stored, stored == '0')
+    denied = stack.as_role('authenticated', USER_A, 'select * from app_private.provider_credentials')
+    cases.denied('authenticated cannot read credentials', denied, 'permission denied')
+    denied = stack.as_role('anon', None, 'select * from app_private.provider_credentials')
+    cases.denied('anonymous cannot read credentials', denied, 'permission denied')
+
+
 def guard_cases(stack: AppStack, cases: Cases, root: Path) -> None:
     stack.sql("update autobots_disposable.marker set run_id = 'something-else';")
     try:
@@ -309,6 +336,7 @@ def qualify(root: Path, write_types: bool = False) -> int:
         access_cases(stack, cases)
         authority_cases(stack, cases)
         framework_cases(stack, cases, root, db_port)
+        credential_cases(stack, cases, root, db_port)
         guard_cases(stack, cases, root)
         type_cases(stack, cases, root, write_types)
         static_cases(cases, root)

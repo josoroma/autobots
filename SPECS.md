@@ -108,13 +108,13 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-2.6#1 | Implement the two canonical/wire mappings and versioned role resolution. | DONE | US-2.6 |
 | US-2.6#2 | Add mocked catalog, parameter and hidden-default negative tests. | DONE | US-2.6 |
 | EPIC-3 | Credentials, model admission and route qualification | — | — |
-| US-3.1 | Server credential precedence and encrypted app storage | READY | EPIC-3 |
-| US-3.1#1 | Implement shared precedence, credential references and host-key handling. | TODO | US-3.1 |
-| US-3.1#2 | Qualify encrypted storage, rotation, loss and secret-redaction fixtures. | TODO | US-3.1 |
-| US-3.2 | Settings, missing-key use and explicit run intent | BLOCKED | EPIC-3 |
+| US-3.1 | Server credential precedence and encrypted app storage | DONE | EPIC-3 |
+| US-3.1#1 | Implement shared precedence, credential references and host-key handling. | DONE | US-3.1 |
+| US-3.1#2 | Qualify encrypted storage, rotation, loss and secret-redaction fixtures. | DONE | US-3.1 |
+| US-3.2 | Settings, missing-key use and explicit run intent | READY | EPIC-3 |
 | US-3.2#1 | Implement the exact safe provider API routes and write-only form. | TODO | US-3.2 |
 | US-3.2#2 | Test source/status separation, rotation/disconnect and draft restoration. | TODO | US-3.2 |
-| US-3.3 | Model admission, spending and uncertain invocation receipts | BLOCKED | EPIC-3 |
+| US-3.3 | Model admission, spending and uncertain invocation receipts | READY | EPIC-3 |
 | US-3.3#1 | Implement slot/cost admission and per-attempt receipts. | TODO | US-3.3 |
 | US-3.3#2 | Test concurrent reservations, UTC rollover, failure classes and cancellation ambiguity. | TODO | US-3.3 |
 | US-3.4 | Qualify each enabled live OpenRouter route | BLOCKED | EPIC-3 |
@@ -1369,7 +1369,8 @@ Phase reference: B1, preserved SP-020. All story completion also requires SP-003
 
 ### US-3.1: Server credential precedence and encrypted app storage
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-3-1-server-credential-precedence-encrypted/`
 
 As a workspace owner
 I want safe environment or app-stored credentials
@@ -1405,15 +1406,15 @@ Dependencies:
 - US-2.6
 
 Tasks:
-- [ ] Implement shared precedence, credential references and host-key handling.
-- [ ] Qualify encrypted storage, rotation, loss and secret-redaction fixtures.
+- [x] Implement shared precedence, credential references and host-key handling.
+- [x] Qualify encrypted storage, rotation, loss and secret-redaction fixtures.
 
 Open Questions:
 - None.
 
 ### US-3.2: Settings, missing-key use and explicit run intent
 
-Status: BLOCKED
+Status: READY
 
 As a workspace owner
 I want write-only provider setup that preserves drafts
@@ -1460,7 +1461,7 @@ Open Questions:
 
 ### US-3.3: Model admission, spending and uncertain invocation receipts
 
-Status: BLOCKED
+Status: READY
 
 As a workspace owner
 I want bounded remote model attempts

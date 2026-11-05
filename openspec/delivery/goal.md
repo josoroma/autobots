@@ -7,10 +7,10 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | EPIC-2 |
+| Target | EPIC-3 |
 | Kind | epic |
 | Focus | - |
-| Status | COMPLETE |
+| Status | ACTIVE |
 | Reason | - |
 | Started | 2026-11-05 |
 | Updated | 2026-11-05 |
@@ -19,21 +19,19 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-2.1 | us-2-1-pinned-local-supabase-service | DONE | Pinned local Supabase service boundary |
-| 2 | US-2.2 | us-2-2-public-contracts-generated-cross | DONE | Public contracts and generated cross-language types |
-| 3 | US-2.3 | us-2-3-local-identity-workspace-grants | DONE | Local identity, workspace grants and private schema isolation |
-| 4 | US-2.4 | us-2-4-application-migrations-deterministic-seeds | DONE | Application migrations and deterministic seeds |
-| 5 | US-2.5 | us-2-5-native-fastapi-next-js | DONE | Native FastAPI, Next.js BFF and Luma shell |
-| 6 | US-2.6 | us-2-6-two-profile-openrouter-factory | DONE | Two-profile OpenRouter factory and immutable role policy |
+| 1 | US-3.1 | us-3-1-server-credential-precedence-encrypted | DONE | Server credential precedence and encrypted app storage |
+| 2 | US-3.2 | us-3-2-settings-missing-key-use | READY | Settings, missing-key use and explicit run intent |
+| 3 | US-3.3 | us-3-3-model-admission-spending-uncertain | READY | Model admission, spending and uncertain invocation receipts |
+| 4 | US-3.4 | us-3-4-qualify-each-enabled-live | BLOCKED | Qualify each enabled live OpenRouter route |
 
 ## Next Action
 
-Action: complete
-Story: -
-Change: -
+Action: select
+Story: US-3.2
+Change: us-3-2-settings-missing-key-use
 Owner: main-session
-Command: none — every story in the goal is DONE
-Reason: all 6 story/stories are DONE
+Command: openspec new change us-3-2-settings-missing-key-use; set US-3.2 to IN PROGRESS with a Change: line
+Reason: US-3.2 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

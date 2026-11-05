@@ -39,6 +39,7 @@ The locks are the full record: `services/agent/uv.lock` and `pnpm-lock.yaml`. `p
 | `fastapi` | 0.162.0 |
 | `psycopg` | 3.3.8, with the `binary` extra |
 | `psycopg-pool` | 3.3.3 |
+| `cryptography` | 50.0.2 |
 | `pyjwt` | 2.15.1 |
 | `uvicorn` | 0.54.0 |
 | `langchain-mcp-adapters` | 0.3.2 |
