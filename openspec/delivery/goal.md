@@ -7,10 +7,10 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | EPIC-6 |
+| Target | EPIC-7 |
 | Kind | epic |
 | Focus | - |
-| Status | COMPLETE |
+| Status | ACTIVE |
 | Reason | - |
 | Started | 2026-11-05 |
 | Updated | 2026-11-05 |
@@ -19,18 +19,17 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-6.1 | us-6-1-typed-immutable-workflow-definition | DONE | Typed immutable workflow definition and validation |
-| 2 | US-6.2 | us-6-2-workflow-readiness-emissions-restart | DONE | Workflow readiness, emissions and restart semantics |
-| 3 | US-6.3 | us-6-3-workflow-editor-execution-monitor | DONE | Workflow editor and execution monitor |
+| 1 | US-7.1 | us-7-1-explicit-routines-deduplicated-scheduled | DONE | Explicit routines and deduplicated scheduled occurrences |
+| 2 | US-7.2 | us-7-2-select-qualify-first-consequential | NEEDS CLARIFICATION | Select and qualify the first consequential connector |
 
 ## Next Action
 
-Action: complete
-Story: -
-Change: -
-Owner: main-session
-Command: none — every story in the goal is DONE
-Reason: all 3 story/stories are DONE
+Action: escalate
+Story: US-7.2
+Change: us-7-2-select-qualify-first-consequential
+Owner: human
+Command: resolve US-7.2 in SPECS.md (a product decision is required)
+Reason: US-7.2 is NEEDS CLARIFICATION, not READY
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

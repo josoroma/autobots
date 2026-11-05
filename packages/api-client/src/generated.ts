@@ -1295,6 +1295,55 @@ export const schemas = {
     "title": "ModelRole",
     "type": "string"
   },
+  "OccurrenceView": {
+    "additionalProperties": false,
+    "properties": {
+      "occurrence_time": {
+        "title": "Occurrence Time",
+        "type": "string"
+      },
+      "reason": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Reason"
+      },
+      "routine_version": {
+        "title": "Routine Version",
+        "type": "integer"
+      },
+      "run_id": {
+        "anyOf": [
+          {
+            "format": "uuid",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Run Id"
+      },
+      "status": {
+        "title": "Status",
+        "type": "string"
+      }
+    },
+    "required": [
+      "occurrence_time",
+      "routine_version",
+      "status",
+      "reason",
+      "run_id"
+    ],
+    "title": "OccurrenceView",
+    "type": "object"
+  },
   "OutstandingSummary": {
     "additionalProperties": false,
     "description": "Known unknowns. These stay visible, even on a finished run.",
@@ -1573,6 +1622,221 @@ export const schemas = {
       "role_bindings"
     ],
     "title": "RouteOption",
+    "type": "object"
+  },
+  "RoutineConfig": {
+    "additionalProperties": false,
+    "properties": {
+      "goal": {
+        "default": "",
+        "maxLength": 20000,
+        "title": "Goal",
+        "type": "string"
+      },
+      "inputs": {
+        "additionalProperties": true,
+        "title": "Inputs",
+        "type": "object"
+      },
+      "limit_micro_usd": {
+        "default": 1000000,
+        "minimum": 0.0,
+        "title": "Limit Micro Usd",
+        "type": "integer"
+      },
+      "overlap": {
+        "const": "skip",
+        "default": "skip",
+        "title": "Overlap",
+        "type": "string"
+      },
+      "target": {
+        "$ref": "#/components/schemas/RoutineTarget"
+      },
+      "timezone": {
+        "default": "America/Costa_Rica",
+        "title": "Timezone",
+        "type": "string"
+      },
+      "tools": {
+        "anyOf": [
+          {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Tools"
+      },
+      "trigger": {
+        "additionalProperties": true,
+        "title": "Trigger",
+        "type": "object"
+      }
+    },
+    "required": [
+      "target",
+      "trigger"
+    ],
+    "title": "RoutineConfig",
+    "type": "object"
+  },
+  "RoutineCreate": {
+    "additionalProperties": false,
+    "properties": {
+      "config": {
+        "$ref": "#/components/schemas/RoutineConfig"
+      },
+      "name": {
+        "maxLength": 100,
+        "minLength": 1,
+        "title": "Name",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name",
+      "config"
+    ],
+    "title": "RoutineCreate",
+    "type": "object"
+  },
+  "RoutineEnabled": {
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "title": "Enabled",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "enabled"
+    ],
+    "title": "RoutineEnabled",
+    "type": "object"
+  },
+  "RoutineList": {
+    "additionalProperties": false,
+    "properties": {
+      "routines": {
+        "items": {
+          "$ref": "#/components/schemas/RoutineView"
+        },
+        "title": "Routines",
+        "type": "array"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "routines"
+    ],
+    "title": "RoutineList",
+    "type": "object"
+  },
+  "RoutineRevision": {
+    "additionalProperties": false,
+    "properties": {
+      "config": {
+        "$ref": "#/components/schemas/RoutineConfig"
+      },
+      "expected_version": {
+        "minimum": 1.0,
+        "title": "Expected Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "expected_version",
+      "config"
+    ],
+    "title": "RoutineRevision",
+    "type": "object"
+  },
+  "RoutineTarget": {
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "format": "uuid",
+        "title": "Id",
+        "type": "string"
+      },
+      "kind": {
+        "enum": [
+          "expert",
+          "workflow"
+        ],
+        "title": "Kind",
+        "type": "string"
+      },
+      "version": {
+        "minimum": 1.0,
+        "title": "Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "kind",
+      "id",
+      "version"
+    ],
+    "title": "RoutineTarget",
+    "type": "object"
+  },
+  "RoutineView": {
+    "additionalProperties": false,
+    "properties": {
+      "config": {
+        "$ref": "#/components/schemas/RoutineConfig"
+      },
+      "enabled": {
+        "title": "Enabled",
+        "type": "boolean"
+      },
+      "id": {
+        "format": "uuid",
+        "title": "Id",
+        "type": "string"
+      },
+      "latest_version": {
+        "title": "Latest Version",
+        "type": "integer"
+      },
+      "name": {
+        "title": "Name",
+        "type": "string"
+      },
+      "occurrences": {
+        "items": {
+          "$ref": "#/components/schemas/OccurrenceView"
+        },
+        "title": "Occurrences",
+        "type": "array"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "id",
+      "name",
+      "enabled",
+      "latest_version",
+      "config",
+      "occurrences"
+    ],
+    "title": "RoutineView",
     "type": "object"
   },
   "RunAccepted": {
@@ -3188,6 +3452,18 @@ export function parseModelRole(value: unknown): ModelRole {
   return parseWith(schemas, "ModelRole", value) as ModelRole;
 }
 
+export interface OccurrenceView {
+  occurrence_time: string;
+  reason: string | null;
+  routine_version: number;
+  run_id: string | null;
+  status: string;
+}
+
+export function parseOccurrenceView(value: unknown): OccurrenceView {
+  return parseWith(schemas, "OccurrenceView", value) as OccurrenceView;
+}
+
 export interface OutstandingSummary {
   uncertain_calls: number;
   unknown_effects: number;
@@ -3265,6 +3541,80 @@ export interface RouteOption {
 
 export function parseRouteOption(value: unknown): RouteOption {
   return parseWith(schemas, "RouteOption", value) as RouteOption;
+}
+
+export interface RoutineConfig {
+  goal?: string;
+  inputs?: Record<string, unknown>;
+  limit_micro_usd?: number;
+  overlap?: "skip";
+  target: RoutineTarget;
+  timezone?: string;
+  tools?: string[] | null;
+  trigger: Record<string, unknown>;
+}
+
+export function parseRoutineConfig(value: unknown): RoutineConfig {
+  return parseWith(schemas, "RoutineConfig", value) as RoutineConfig;
+}
+
+export interface RoutineCreate {
+  config: RoutineConfig;
+  name: string;
+}
+
+export function parseRoutineCreate(value: unknown): RoutineCreate {
+  return parseWith(schemas, "RoutineCreate", value) as RoutineCreate;
+}
+
+export interface RoutineEnabled {
+  enabled: boolean;
+}
+
+export function parseRoutineEnabled(value: unknown): RoutineEnabled {
+  return parseWith(schemas, "RoutineEnabled", value) as RoutineEnabled;
+}
+
+export interface RoutineList {
+  routines: RoutineView[];
+  schema_version: 1;
+}
+
+export function parseRoutineList(value: unknown): RoutineList {
+  return parseWith(schemas, "RoutineList", value) as RoutineList;
+}
+
+export interface RoutineRevision {
+  config: RoutineConfig;
+  expected_version: number;
+}
+
+export function parseRoutineRevision(value: unknown): RoutineRevision {
+  return parseWith(schemas, "RoutineRevision", value) as RoutineRevision;
+}
+
+export interface RoutineTarget {
+  id: string;
+  kind: "expert" | "workflow";
+  version: number;
+}
+
+export function parseRoutineTarget(value: unknown): RoutineTarget {
+  return parseWith(schemas, "RoutineTarget", value) as RoutineTarget;
+}
+
+export interface RoutineView {
+  config: RoutineConfig;
+  enabled: boolean;
+  id: string;
+  latest_version: number;
+  name: string;
+  occurrences: OccurrenceView[];
+  schema_version: 1;
+}
+
+export function parseRoutineView(value: unknown): RoutineView {
+  return parseWith(schemas, "RoutineView", value) as RoutineView;
 }
 
 export interface RunAccepted {
@@ -3645,6 +3995,26 @@ export async function getHealth(options: ClientOptions): Promise<ServiceHealth> 
 
 export async function getModels(options: ClientOptions): Promise<ModelList> {
   return parseModelList(await requestJson(options, "GET", `/v1/models`));
+}
+
+export async function listRoutines(options: ClientOptions): Promise<RoutineList> {
+  return parseRoutineList(await requestJson(options, "GET", `/v1/routines`));
+}
+
+export async function createRoutine(options: ClientOptions, body: RoutineCreate): Promise<RoutineView> {
+  return parseRoutineView(await requestJson(options, "POST", `/v1/routines`, body));
+}
+
+export async function getRoutine(options: ClientOptions, routine_id: string): Promise<RoutineView> {
+  return parseRoutineView(await requestJson(options, "GET", `/v1/routines/${encodeURIComponent(routine_id)}`));
+}
+
+export async function setRoutineEnabled(options: ClientOptions, routine_id: string, body: RoutineEnabled): Promise<RoutineView> {
+  return parseRoutineView(await requestJson(options, "POST", `/v1/routines/${encodeURIComponent(routine_id)}/enabled`, body));
+}
+
+export async function addRoutineVersion(options: ClientOptions, routine_id: string, body: RoutineRevision): Promise<RoutineView> {
+  return parseRoutineView(await requestJson(options, "POST", `/v1/routines/${encodeURIComponent(routine_id)}/versions`, body));
 }
 
 export async function admitRun(options: ClientOptions, body: RunRequest): Promise<RunAccepted> {

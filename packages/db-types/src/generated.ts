@@ -57,6 +57,34 @@ export interface ModelProfilesRow {
   seed_version: number;
 }
 
+export interface RoutineOccurrencesRow {
+  routine_id: string;
+  occurrence_time: string;
+  routine_version: number;
+  status: string;
+  reason: string | null;
+  run_id: string | null;
+  created_at: string;
+}
+
+export interface RoutineVersionsRow {
+  routine_id: string;
+  version: number;
+  config: unknown;
+  created_by: string;
+  created_at: string;
+}
+
+export interface RoutinesRow {
+  id: string;
+  workspace_id: string;
+  name: string;
+  latest_version: number;
+  enabled: boolean;
+  evaluated_until: string;
+  created_at: string;
+}
+
 export interface RunEventsRow {
   run_id: string;
   sequence: number;

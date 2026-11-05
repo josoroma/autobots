@@ -169,9 +169,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-6.3#1 | Build subset editing, validation and version selection UI. | DONE | US-6.3 |
 | US-6.3#2 | Expose authorized instance/emission monitoring and reconnect behavior. | DONE | US-6.3 |
 | EPIC-7 | Routines and selected connectors | — | — |
-| US-7.1 | Explicit routines and deduplicated scheduled occurrences | READY | EPIC-7 |
-| US-7.1#1 | Implement versioned routines and occurrence admission. | TODO | US-7.1 |
-| US-7.1#2 | Test duplicate, missed, overlap and timezone cases. | TODO | US-7.1 |
+| US-7.1 | Explicit routines and deduplicated scheduled occurrences | DONE | EPIC-7 |
+| US-7.1#1 | Implement versioned routines and occurrence admission. | DONE | US-7.1 |
+| US-7.1#2 | Test duplicate, missed, overlap and timezone cases. | DONE | US-7.1 |
 | US-7.2 | Select and qualify the first consequential connector | NEEDS CLARIFICATION | EPIC-7 |
 | US-7.2#1 | Resolve the connector/service and operation scope decision. | TODO | US-7.2 |
 | US-7.2#2 | Implement and qualify only that selected connector under the existing effect contract. | TODO | US-7.2 |
@@ -2201,7 +2201,8 @@ Phase reference: B5, preserved SP-020. All story completion also requires SP-003
 
 ### US-7.1: Explicit routines and deduplicated scheduled occurrences
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-7-1-explicit-routines-deduplicated-scheduled/`
 
 As a specialist owner
 I want scoped local recurring work
@@ -2232,8 +2233,8 @@ Dependencies:
 - US-6.2
 
 Tasks:
-- [ ] Implement versioned routines and occurrence admission.
-- [ ] Test duplicate, missed, overlap and timezone cases.
+- [x] Implement versioned routines and occurrence admission.
+- [x] Test duplicate, missed, overlap and timezone cases.
 
 Open Questions:
 - None.
