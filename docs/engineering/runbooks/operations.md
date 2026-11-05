@@ -33,7 +33,7 @@ Expected: `GET /v1/operations/local-status`, or the Operations page, says ready.
 
 ## Turning on inference
 
-**This spends real money once a key exists: every queued run in every workspace with a key sends billed requests to OpenRouter.** No live route has been qualified. So far this path has run only over a fake transport, as described below. Don't turn it on for real work before US-3.4, except as that story's explicitly authorized, bounded qualification.
+**This spends real money once a key exists: every queued run in every workspace with a key sends billed requests to OpenRouter.** Only DeepSeek's adapter has met the real provider ([partial evidence, with its limits](../evidence/US-3.4/summary.md)). Astra hasn't, no goal has run this way with a real model, and strict nested output failed at the 512-token limit. So far this path has run only over a fake transport, as described below. Don't turn it on for real work before US-3.4, except as that story's explicitly authorized, bounded qualification.
 
 Set the switch where the worker starts, alongside `AUTOBOTS_CONFIG_ROOT`, `AUTOBOTS_SUPABASE_URL`, `AUTOBOTS_SERVICE_ROLE_KEY` and, if the key file isn't in its default place, `AUTOBOTS_PROVIDER_MASTER_KEY_FILE`, all with the same values the API uses. Missing any of the required ones, the worker refuses to start.
 
