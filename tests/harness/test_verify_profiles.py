@@ -191,7 +191,7 @@ class Profiles(unittest.TestCase):
         passed, reason = harness_lib.evidence_state(self.root)
         self.assertFalse(passed)
         self.assertIn('db', reason)
-        everything = [python_step(self.root, 'disposable_qualification', 'pass')]
+        everything = [python_step(self.root, name, 'pass') for name in sorted(harness_lib.DB_CHECKS)]
         self.assertEqual(self.run_steps('db', everything), 0)
         self.assertTrue(harness_lib.evidence_state(self.root)[0])
 

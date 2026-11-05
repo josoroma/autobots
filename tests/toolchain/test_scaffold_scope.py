@@ -39,8 +39,8 @@ ALLOWED_PATHS = {
     'services/agent/uv.lock',
 }
 FORBIDDEN_ROOTS = ('supabase', 'infra')
-# US-1.7's disposable fixtures. Product infrastructure stays out until its own story.
-ALLOWED_UNDER_FORBIDDEN = ('infra/disposable/',)
+# US-1.7's disposable fixtures and US-2.1's pinned release. Other infrastructure stays out until its own story.
+ALLOWED_UNDER_FORBIDDEN = ('infra/disposable/', 'infra/supabase/')
 # Importable names of the selected packages. The scaffold's source uses none of them yet.
 PRODUCT_IMPORTS = {'deepagents', 'langgraph', 'langchain', 'langchain_core', 'langchain_openrouter',
                    'langchain_mcp_adapters', 'openrouter', 'psycopg'}

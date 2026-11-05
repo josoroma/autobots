@@ -87,7 +87,7 @@ Expected: exit 1, `REFUSED before any change`, with no Docker call. A target pas
 | A run was killed and left an `autobots-disposable-<id>` project | `python3.12 scripts/disposable_db.py cleanup --project autobots-disposable-<id>` |
 | Exit 2 on a missing image | Pull the digest in the Compose file deliberately. The check never pulls |
 
-This qualifies the wrappers on synthetic fixtures. These images are not the coordinated self-hosted release US-2.1 pins, and this says nothing about the persistent stack.
+This qualifies the wrappers on synthetic fixtures, with images that are not the pinned self-hosted release. The `db` profile separately qualifies that release; see [its runbook](local-supabase.md). Neither says anything about a persistent stack.
 
 ## Qualify deliberate faults
 

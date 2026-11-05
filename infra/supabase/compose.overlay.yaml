@@ -1,0 +1,85 @@
+# Local overlay on the pinned self-hosted release in ./upstream, per LM-03, LM-04 and SP-005.
+# `!override` replaces a list, because Compose would otherwise append and keep upstream's wildcard ports.
+# Read with scripts/supabase_stack.py, which checks the merged result, not this file.
+services:
+  studio:
+    image: supabase/studio:2026.10.12-sha-3699278@sha256:948770ec467f00e6ae34c35018ef7cb23d7b30eb806b42c2cc0d7bcfdcf8a7a8
+    pull_policy: never
+    container_name: !reset null
+    environment:
+      # Empty, whatever the host has, so its assistant stays disabled. No OpenRouter key goes here.
+      OPENAI_API_KEY: ""
+      NEXT_TELEMETRY_DISABLED: "1"
+    volumes: !override
+      - snippets:/app/snippets
+      - edge-functions:/app/edge-functions
+
+  api-gw:
+    image: envoyproxy/envoy:v1.39.1@sha256:57e14a549d7bd43c8d3f6d03e8cfa653e037d4b38e133acd9b54f38c524401b4
+    pull_policy: never
+    container_name: !reset null
+    ports: !override
+      - "127.0.0.1:${AUTOBOTS_GATEWAY_HOST_PORT:?required}:8000/tcp"
+
+  auth:
+    image: supabase/gotrue:v2.197.0@sha256:1736a63078f5922b198c4cbe50f80ab9a2d3b54fe8b7b6cfb2e9dc5dbbc12c6b
+    pull_policy: never
+    container_name: !reset null
+
+  rest:
+    image: postgrest/postgrest:v14.18@sha256:c7cd7e265a85b05248abf53f4473fcec7e327c282d0bd0cf60f1551996d09fcf
+    pull_policy: never
+    container_name: !reset null
+
+  storage:
+    image: supabase/storage-api:v1.81.0@sha256:98ffec5d0678803783c30e404c27f4ec65e97efbe014088f2a86b4b8b54b9f54
+    pull_policy: never
+    container_name: !reset null
+    volumes: !override
+      - storage-data:/var/lib/storage
+
+  imgproxy:
+    image: darthsim/imgproxy:v3.31.4@sha256:73c5dda13199745b0d2d00e4149d4a589c5b2e205dbf335ca05eca8276b54712
+    pull_policy: never
+    container_name: !reset null
+    volumes: !override
+      - storage-data:/var/lib/storage
+
+  meta:
+    image: supabase/postgres-meta:v0.100.0@sha256:145325b7e39f8ef4931d6e8cfd3f6f4d655de09d72a2ccc96d9513542c2202bd
+    pull_policy: never
+    container_name: !reset null
+
+  db:
+    image: supabase/postgres:17.6.1.136@sha256:f371b5f3f2ac0a05703f33d6e6134515fb2498cab708fb948a0aeb7481467c00
+    pull_policy: never
+    container_name: !reset null
+    # LM-04: direct access publishes db:5432. Upstream publishes only the pooler, removed below.
+    ports: !override
+      - "127.0.0.1:${AUTOBOTS_DB_HOST_PORT:?required}:5432"
+    volumes: !override
+      - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/migrations/99-realtime.sql:ro
+      - ./volumes/db/webhooks.sql:/docker-entrypoint-initdb.d/init-scripts/98-webhooks.sql:ro
+      - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:ro
+      - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:ro
+      - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/migrations/97-_supabase.sql:ro
+      - ./volumes/db/logs.sql:/docker-entrypoint-initdb.d/migrations/99-logs.sql:ro
+      - ./volumes/db/pooler.sql:/docker-entrypoint-initdb.d/migrations/99-pooler.sql:ro
+      - db-data:/var/lib/postgresql/data
+      - db-config:/etc/postgresql-custom
+
+  # LM-03: Realtime is optional, durable events use the application's own log. Edge Functions are not the
+  # worker. LM-04: direct database access, so no pooler. Their profile is never selected.
+  realtime:
+    profiles: [removed]
+  functions:
+    profiles: [removed]
+  supavisor:
+    profiles: [removed]
+
+# Named volumes, because upstream's bind mounts would put data inside the vendored release.
+volumes:
+  db-data:
+  storage-data:
+  snippets:
+  edge-functions:

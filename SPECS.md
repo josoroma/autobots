@@ -87,16 +87,16 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-1.8#1 | Review and resolve baseline findings independently. | DONE | US-1.8 |
 | US-1.8#2 | Exercise the harness runbook and publish its versioned evidence. | DONE | US-1.8 |
 | EPIC-2 | Local application foundation | — | — |
-| US-2.1 | Pinned local Supabase service boundary | READY | EPIC-2 |
-| US-2.1#1 | Prepare the pinned release/overlay and resolve image digests. | TODO | US-2.1 |
-| US-2.1#2 | Qualify ARM64, addresses, health and disabled extra AI/telemetry integrations. | TODO | US-2.1 |
+| US-2.1 | Pinned local Supabase service boundary | DONE | EPIC-2 |
+| US-2.1#1 | Prepare the pinned release/overlay and resolve image digests. | DONE | US-2.1 |
+| US-2.1#2 | Qualify ARM64, addresses, health and disabled extra AI/telemetry integrations. | DONE | US-2.1 |
 | US-2.2 | Public contracts and generated cross-language types | READY | EPIC-2 |
 | US-2.2#1 | Define public DTOs and adapters for the initial slice. | TODO | US-2.2 |
 | US-2.2#2 | Generate clients and shared validation/compatibility fixtures. | TODO | US-2.2 |
 | US-2.3 | Local identity, workspace grants and private schema isolation | BLOCKED | EPIC-2 |
 | US-2.3#1 | Implement local owner/session and workspace authorization. | TODO | US-2.3 |
 | US-2.3#2 | Qualify grants, RLS and private Storage with nonprivileged identities. | TODO | US-2.3 |
-| US-2.4 | Application migrations and deterministic seeds | BLOCKED | EPIC-2 |
+| US-2.4 | Application migrations and deterministic seeds | READY | EPIC-2 |
 | US-2.4#1 | Create ordered application migration and seed wrappers. | TODO | US-2.4 |
 | US-2.4#2 | Verify fresh/upgrade replay, repeatability and generated public row types. | TODO | US-2.4 |
 | US-2.5 | Native FastAPI, Next.js BFF and Luma shell | BLOCKED | EPIC-2 |
@@ -1099,7 +1099,8 @@ Phase reference: B0, preserved SP-020. All story completion also requires SP-003
 
 ### US-2.1: Pinned local Supabase service boundary
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-2-1-pinned-local-supabase-service/`
 
 As an operator
 I want a project-scoped local Supabase stack
@@ -1129,8 +1130,8 @@ Dependencies:
 - US-1.8
 
 Tasks:
-- [ ] Prepare the pinned release/overlay and resolve image digests.
-- [ ] Qualify ARM64, addresses, health and disabled extra AI/telemetry integrations.
+- [x] Prepare the pinned release/overlay and resolve image digests.
+- [x] Qualify ARM64, addresses, health and disabled extra AI/telemetry integrations.
 
 Open Questions:
 - None.
@@ -1217,7 +1218,7 @@ Open Questions:
 
 ### US-2.4: Application migrations and deterministic seeds
 
-Status: BLOCKED
+Status: READY
 
 As an operator
 I want one guarded schema and seed history

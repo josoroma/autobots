@@ -47,7 +47,7 @@ NON_INPUT_DIRECTORIES = frozenset({'__pycache__', '.venv', 'node_modules', '.nex
 SHARED_CHECK_FILES = frozenset({*APP_INPUT_FILES, 'scripts/toolchain.py', 'scripts/qualify_faults.py'})
 SHARED_CHECK_PREFIXES = ('contracts/', 'tests/toolchain/', 'tests/faults/')
 RUNNER_FILES = frozenset({'scripts/verify.py', 'scripts/harness_lib.py'})
-DB_CHECK_FILES = frozenset({'scripts/disposable_db.py'})
+DB_CHECK_FILES = frozenset({'scripts/disposable_db.py', 'scripts/supabase_stack.py'})
 DB_CHECK_PREFIXES = ('infra/', 'tests/db/')
 HARNESS_CHECKS = frozenset({'project_configuration', 'backlog_validation', 'harness_behavior_tests'})
 APPLICATION_PROFILES = ('fast', 'full')
@@ -55,6 +55,7 @@ PYTHON_STEPS = frozenset({'python_lock', 'python_env', 'ruff_check', 'ruff_forma
 WEB_STEPS = frozenset({'node_lock', 'node_version', 'lint', 'format_check', 'typegen', 'typecheck'})
 FULL_ONLY_CHECKS = frozenset({'build', 'fault_qualification', 'toolchain_scope_tests'})
 FULL_CHECKS = PYTHON_STEPS | WEB_STEPS | FULL_ONLY_CHECKS
+DB_CHECKS = frozenset({'disposable_qualification', 'supabase_stack_qualification'})
 # Recorded by the verifier itself, so they have no command exit code.
 UNCOMMANDED_CHECKS = frozenset({'project_configuration', 'non_mutation_guard'})
 
@@ -197,7 +198,7 @@ def report_state(root: Path, profile: str = 'harness') -> tuple[bool, str]:
     # Only `fast` may leave steps out, and each one stays visible as `not_run`.
     allowed = {'passed', 'not_run'} if profile == 'fast' else {'passed'}
     required = set(HARNESS_CHECKS) if profile == 'harness' else {*HARNESS_CHECKS, 'non_mutation_guard'}
-    required |= {'full': FULL_CHECKS, 'db': {'disposable_qualification'}}.get(profile, frozenset())
+    required |= {'full': FULL_CHECKS, 'db': DB_CHECKS}.get(profile, frozenset())
     complete = ids == required if profile == 'harness' else required <= ids
     if not complete:
         return False, 'The report lacks the required successful checks.'

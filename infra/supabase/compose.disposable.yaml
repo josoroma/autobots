@@ -1,0 +1,22 @@
+# Marks a disposable qualification target. scripts/supabase_stack.py applies it, and cleanup requires these labels.
+x-labels: &labels
+  autobots.target: disposable
+  autobots.run: ${AUTOBOTS_DISPOSABLE_PROJECT:?required}
+
+services:
+  studio: {labels: *labels}
+  api-gw: {labels: *labels}
+  auth: {labels: *labels}
+  rest: {labels: *labels}
+  storage: {labels: *labels}
+  imgproxy: {labels: *labels}
+  meta: {labels: *labels}
+  db: {labels: *labels}
+
+volumes:
+  db-data: {labels: *labels}
+  db-config: {labels: *labels}
+  storage-data: {labels: *labels}
+  snippets: {labels: *labels}
+  edge-functions: {labels: *labels}
+  deno-cache: {labels: *labels}
