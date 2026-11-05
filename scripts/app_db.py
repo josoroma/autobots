@@ -19,6 +19,7 @@ from pathlib import Path
 import re
 import secrets
 import subprocess
+import tempfile
 import sys
 import time
 
@@ -334,6 +335,22 @@ def worker_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> Non
     cases.denied('the runtime role cannot delete checkpoints', stack.runtime('delete from agent_runtime.checkpoints;\n'), 'permission denied')
 
 
+def tool_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
+    """The gateway through the runtime role, and a real Deep Agents loop with a fake model."""
+    url = f'postgresql://autobots_runtime:{stack.runtime_password}@127.0.0.1:{db_port}/postgres'
+    with tempfile.TemporaryDirectory() as directory:
+        result = subprocess.run([str(root / 'services/agent/.venv/bin/python'), str(root / 'tests/db/tool_gateway_check.py'), WORKSPACE_A],
+                                env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'AUTOBOTS_TOOL_TEMP': directory, 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
+                                capture_output=True, text=True, timeout=180, check=False, cwd=directory)
+    if result.returncode:
+        cases.check('the tool gateway check ran', 'exit 0', f'exit {result.returncode}: {result.stderr.strip()[-700:]}', False)
+        return
+    for case in json.loads(result.stdout.strip().splitlines()[-1])['cases']:
+        cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+    cases.denied('authenticated cannot read receipts', stack.as_role('authenticated', USER_A, 'select * from app_private.tool_receipts'), 'permission denied')
+    cases.denied('the runtime role cannot rewrite run files', stack.runtime("update app_private.run_files set content = 'x';\n"), 'permission denied')
+
+
 def guard_cases(stack: AppStack, cases: Cases, root: Path) -> None:
     stack.sql("update autobots_disposable.marker set run_id = 'something-else';")
     try:
@@ -386,6 +403,7 @@ def qualify(root: Path, write_types: bool = False) -> int:
         admission_cases(stack, cases, root, db_port)
         run_cases(stack, cases, root, db_port)
         worker_cases(stack, cases, root, db_port)
+        tool_cases(stack, cases, root, db_port)
         guard_cases(stack, cases, root)
         type_cases(stack, cases, root, write_types)
         static_cases(cases, root)

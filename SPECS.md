@@ -127,13 +127,13 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-4.2 | Fenced worker ownership and durable checkpoints | DONE | EPIC-4 |
 | US-4.2#1 | Implement lease/heartbeat/fencing and scoped direct checkpointer access. | DONE | US-4.2 |
 | US-4.2#2 | Inject stale-owner and process-death cases at domain/checkpoint boundaries. | DONE | US-4.2 |
-| US-4.3 | Bounded goal planning and model/tool loop | BLOCKED | EPIC-4 |
+| US-4.3 | Bounded goal planning and model/tool loop | READY | EPIC-4 |
 | US-4.3#1 | Compose the minimal explicitly configured Deep Agents stage and plan adapter. | TODO | US-4.3 |
 | US-4.3#2 | Exercise loop bounds and complete argument/result validation with fake models. | TODO | US-4.3 |
-| US-4.4 | Versioned tool registry and operation receipts | READY | EPIC-4 |
-| US-4.4#1 | Implement the narrow read/calculation/artifact tool contracts and central policy gateway. | TODO | US-4.4 |
-| US-4.4#2 | Test denied resources, hidden tools and receipt reuse. | TODO | US-4.4 |
-| US-4.5 | Private artifacts with staged publication and reconciliation | BLOCKED | EPIC-4 |
+| US-4.4 | Versioned tool registry and operation receipts | DONE | EPIC-4 |
+| US-4.4#1 | Implement the narrow read/calculation/artifact tool contracts and central policy gateway. | DONE | US-4.4 |
+| US-4.4#2 | Test denied resources, hidden tools and receipt reuse. | DONE | US-4.4 |
+| US-4.5 | Private artifacts with staged publication and reconciliation | READY | EPIC-4 |
 | US-4.5#1 | Implement staged private uploads and authorized metadata/downloads. | TODO | US-4.5 |
 | US-4.5#2 | Test cross-workspace denial, interruption and hash reconciliation. | TODO | US-4.5 |
 | US-4.6 | Sanitized event replay and run workspace | BLOCKED | EPIC-4 |
@@ -1639,7 +1639,7 @@ Open Questions:
 
 ### US-4.3: Bounded goal planning and model/tool loop
 
-Status: BLOCKED
+Status: READY
 
 As a user
 I want a small agent loop driven by explicit success criteria
@@ -1681,7 +1681,8 @@ Open Questions:
 
 ### US-4.4: Versioned tool registry and operation receipts
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-4-4-versioned-tool-registry-operation/`
 
 As an operator
 I want one enforced tool boundary
@@ -1717,15 +1718,15 @@ Dependencies:
 - US-2.2
 
 Tasks:
-- [ ] Implement the narrow read/calculation/artifact tool contracts and central policy gateway.
-- [ ] Test denied resources, hidden tools and receipt reuse.
+- [x] Implement the narrow read/calculation/artifact tool contracts and central policy gateway.
+- [x] Test denied resources, hidden tools and receipt reuse.
 
 Open Questions:
 - None.
 
 ### US-4.5: Private artifacts with staged publication and reconciliation
 
-Status: BLOCKED
+Status: READY
 
 As a user
 I want durable scoped output files
