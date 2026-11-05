@@ -1,9 +1,11 @@
 """What an operator can see, LM-07: conditions and counts, never an address, path or secret."""
 
 import asyncio
+import json
 import logging
 import shutil
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -24,9 +26,10 @@ REQUIRED_RELATIONS = (
     "agent_runtime.checkpoints",
     "app_private.workspace_retention",
     "app_private.worker_heartbeats",
+    "app_private.installation_holds",
 )
 # Admission stops on these. A missing worker only means a job waits.
-BLOCKING = frozenset({"database", "schema", "storage", "disk"})
+BLOCKING = frozenset({"database", "schema", "storage", "disk", "hold"})
 
 
 @dataclass(frozen=True)
@@ -44,11 +47,12 @@ class QueueCounts:
     oldest_queued_seconds: int
 
 
-async def database_conditions(pool: Any) -> tuple[Condition, Condition]:
+async def database_conditions(pool: Any) -> tuple[Condition, Condition, Condition]:
     if pool is None:
         return (
             Condition("database", "unavailable", "database_not_configured"),
             Condition("schema", "unavailable", "schema_unknown"),
+            Condition("hold", "unavailable", "hold_unknown"),
         )
     try:
         async with asyncio.timeout(DB_SECONDS), pool.connection() as connection:
@@ -57,12 +61,19 @@ async def database_conditions(pool: Any) -> tuple[Condition, Condition]:
                 (list(REQUIRED_RELATIONS),),
             )
             row = await cursor.fetchone()
+            held = False
+            if int(row[0]) == 0:
+                cursor = await connection.execute(
+                    "select 1 from app_private.installation_holds limit 1"
+                )
+                held = await cursor.fetchone() is not None
     except Exception as error:
         # Whatever it was, the database didn't answer. The type is logged, never its message.
         log_event(logger, "database.unavailable", logging.WARNING, error=type(error).__name__)
         return (
             Condition("database", "unavailable", "database_unreachable"),
             Condition("schema", "unavailable", "schema_unknown"),
+            Condition("hold", "unavailable", "hold_unknown"),
         )
     missing = int(row[0])
     return (
@@ -70,6 +81,9 @@ async def database_conditions(pool: Any) -> tuple[Condition, Condition]:
         Condition("schema", "ok", "schema_ready")
         if missing == 0
         else Condition("schema", "unavailable", "schema_behind"),
+        Condition("hold", "unavailable", "restore_hold")
+        if held
+        else Condition("hold", "ok", "no_hold"),
     )
 
 
@@ -94,6 +108,18 @@ def disk_condition(path: Path, minimum_free: int) -> Condition:
     if free < minimum_free:
         return Condition("disk", "degraded", "disk_low")
     return Condition("disk", "ok", "disk_ready")
+
+
+def backup_age_hours(directory: str, now: datetime) -> int | None:
+    """The newest manifest under the backup directory: when it was taken, and nothing else."""
+    newest: datetime | None = None
+    for path in Path(directory).glob("*/manifest.json") if directory else ():
+        try:
+            created = datetime.fromisoformat(json.loads(path.read_text())["created_at"])
+        except (OSError, ValueError, KeyError):
+            continue
+        newest = created if newest is None or created > newest else newest
+    return None if newest is None else max(int((now - newest).total_seconds() // 3600), 0)
 
 
 async def queue_counts(connection: Any, workspace_id: UUID) -> QueueCounts:

@@ -42,6 +42,12 @@ async def resume(workspace: str, run: str) -> None:
         await apply_command(db, workspace_id=UUID(workspace), run_id=UUID(run), command=RunCommand.RESUME, actor=Actor.USER, expected_version=version)
 
 
+async def cancel(workspace: str, run: str) -> None:
+    async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
+        version = (await (await db.execute("select version from public.runs where id = %s", (run,))).fetchone())[0]
+        await apply_command(db, workspace_id=UUID(workspace), run_id=UUID(run), command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
+
+
 class Down:
     async def remove(self, path: str) -> None:
         raise RuntimeError('storage is down')
@@ -173,6 +179,8 @@ async def retention(workspace_a: UUID, workspace_b: UUID, real_run: UUID) -> Non
 if __name__ == '__main__':
     if sys.argv[1] == 'admit':
         asyncio.run(admit(sys.argv[2]))
+    elif sys.argv[1] == 'cancel':
+        asyncio.run(cancel(sys.argv[2], sys.argv[3]))
     elif sys.argv[1] == 'resume':
         asyncio.run(resume(sys.argv[2], sys.argv[3]))
     else:

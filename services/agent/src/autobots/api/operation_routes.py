@@ -1,6 +1,7 @@
 """Local Operations. It has to answer with the database down, so a signed-in user is enough then."""
 
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 from uuid import UUID
@@ -13,6 +14,7 @@ from autobots.api.settings_routes import current_workspace, require_owner
 from autobots.application.operations import (
     DEFAULT_MIN_FREE_BYTES,
     Condition,
+    backup_age_hours,
     database_conditions,
     disk_condition,
     is_ready,
@@ -49,11 +51,11 @@ def _pool(request: Request) -> Any:
 
 
 async def _installation_conditions(request: Request) -> list[Condition]:
-    database, schema = await database_conditions(request.app.state.pool)
+    database, schema, hold = await database_conditions(request.app.state.pool)
     storage = await storage_condition(getattr(request.app.state, "object_store", None))
     minimum = int(os.environ.get("AUTOBOTS_MIN_FREE_BYTES", DEFAULT_MIN_FREE_BYTES))
     disk = disk_condition(Path(os.environ.get("AUTOBOTS_CONFIG_ROOT") or "."), minimum)
-    return [database, schema, storage, disk]
+    return [database, schema, hold, storage, disk]
 
 
 async def require_ready(request: Request) -> None:
@@ -99,6 +101,9 @@ async def get_local_status(
         ],
         queue=queue,
         retention=retention,
+        backup_age_hours=backup_age_hours(
+            os.environ.get("AUTOBOTS_BACKUP_DIR", ""), datetime.now(UTC)
+        ),
     )
 
 
@@ -119,6 +124,7 @@ async def put_retention(
 @router.post(
     "/operations/retention/apply",
     operation_id="applyRetention",
+    dependencies=[Depends(require_ready)],
     response_model=RetentionApplied,
 )
 async def post_retention_apply(request: Request, workspace_id: Owner) -> RetentionApplied:

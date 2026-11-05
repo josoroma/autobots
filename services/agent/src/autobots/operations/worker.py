@@ -25,6 +25,7 @@ from autobots.application.approvals import expire_due
 from autobots.application.provider_settings import ProviderSettings
 from autobots.application.retention import apply_all
 from autobots.application.routines import evaluate_routines
+from autobots.application.worker_leases import is_held
 from autobots.operations.logs import configure_logging, forbid_remote_tracing, log_event
 
 logger = logging.getLogger("autobots.worker")
@@ -169,6 +170,8 @@ def maintenance_step(
     last_retention: list[float] = []
 
     async def step(connection: Any) -> bool:
+        if await is_held(connection):
+            return False
         await expire_due(connection)
 
         async def check(workspace_id: UUID) -> str:

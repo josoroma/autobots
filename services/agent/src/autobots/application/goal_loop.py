@@ -56,6 +56,7 @@ from autobots.application.worker_leases import (
     claim_next,
     claim_run,
     heartbeat,
+    is_held,
 )
 from autobots.contracts.plans import GoalSpec
 from autobots.domain.runs import Actor, CommandRefused, RunCommand, RunStatus
@@ -274,6 +275,8 @@ async def process_next(
     config: LoopConfig,
 ) -> LoopResult | None:
     """Claims one eligible job and takes it as far as it can go in one pass."""
+    if await is_held(connection):
+        return None
     await expire_due(connection)
     lease = await claim_next(connection, worker_id=worker_id, lease_seconds=config.lease_seconds)
     if lease is None:

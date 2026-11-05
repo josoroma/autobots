@@ -29,6 +29,7 @@ test("the owner sees conditions, and no address or secret", async ({
   // This suite runs before the slice starts its worker, so none is running.
   await expect(page.getByText(/No worker is running/)).toBeVisible();
   await expect(page.getByText(/Remote tracing: off/)).toBeVisible();
+  await expect(page.getByText(/Last backup: none found/)).toBeVisible();
   const text = (await page.locator("main").innerText()).toLowerCase();
   for (const leak of ["127.0.0.1", "postgres", "sk-or-", "eyj"]) {
     expect(text).not.toContain(leak);

@@ -24,9 +24,17 @@ class Lease:
         return str(self.run_id)
 
 
+async def is_held(connection: Any) -> bool:
+    """A restored instance holds all its work until a person releases it."""
+    cursor = await connection.execute("select 1 from app_private.installation_holds limit 1")
+    return await cursor.fetchone() is not None
+
+
 async def _claim(
     connection: Any, condition: str, values: tuple[Any, ...], worker_id: str, lease_seconds: float
 ) -> Lease | None:
+    if await is_held(connection):
+        return None
     async with connection.transaction():
         cursor = await connection.execute(
             "select j.run_id, j.workspace_id, r.status, r.version "

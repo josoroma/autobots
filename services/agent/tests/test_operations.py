@@ -4,6 +4,7 @@ import asyncio
 import io
 import json
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ import pytest
 from autobots.application.operations import (
     Condition,
     QueueCounts,
+    backup_age_hours,
     disk_condition,
     is_ready,
     queue_condition,
@@ -92,6 +94,21 @@ def test_langsmith_itself_reads_tracing_as_off(monkeypatch: pytest.MonkeyPatch) 
         monkeypatch.setenv(name, value)
     utils.get_env_var.cache_clear()
     assert not utils.tracing_is_enabled()
+
+
+def test_backup_age_reads_the_newest_manifest_and_ignores_damage(tmp_path: Path) -> None:
+    now = datetime(2026, 11, 5, 12, tzinfo=UTC)
+    assert backup_age_hours("", now) is None
+    assert backup_age_hours(str(tmp_path), now) is None
+    for name, moment in (
+        ("old", "2026-11-01T12:00:00+00:00"),
+        ("new", "2026-11-05T09:30:00+00:00"),
+    ):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "manifest.json").write_text(json.dumps({"created_at": moment}))
+    (tmp_path / "bad").mkdir()
+    (tmp_path / "bad" / "manifest.json").write_text("not json")
+    assert backup_age_hours(str(tmp_path), now) == 2
 
 
 def test_low_disk_is_visible_and_stops_admission(tmp_path: Path) -> None:

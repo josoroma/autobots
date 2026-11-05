@@ -186,10 +186,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-9.1 | Local startup, shutdown, health and operational logs | DONE | EPIC-9 |
 | US-9.1#1 | Implement safe readiness/lifecycle/status interfaces and local telemetry. | DONE | US-9.1 |
 | US-9.1#2 | Exercise failure, retention and recovery paths in the operations runbook. | DONE | US-9.1 |
-| US-9.2 | Complete isolated backup and restore proof | READY | EPIC-9 |
-| US-9.2#1 | Implement versioned backup manifests and isolated restore procedures. | TODO | US-9.2 |
-| US-9.2#2 | Exercise the complete restore with real local assertions and redacted evidence. | TODO | US-9.2 |
-| US-9.3 | Qualified upgrades and checkpoint-compatible continuation | BLOCKED | EPIC-9 |
+| US-9.2 | Complete isolated backup and restore proof | DONE | EPIC-9 |
+| US-9.2#1 | Implement versioned backup manifests and isolated restore procedures. | DONE | US-9.2 |
+| US-9.2#2 | Exercise the complete restore with real local assertions and redacted evidence. | DONE | US-9.2 |
+| US-9.3 | Qualified upgrades and checkpoint-compatible continuation | READY | EPIC-9 |
 | US-9.3#1 | Implement version checks and supported migration/forward-recovery paths. | TODO | US-9.3 |
 | US-9.3#2 | Exercise prior-fixture upgrade and resumed-checkpoint compatibility. | TODO | US-9.3 |
 | EPIC-10 | Product qualification and completion | — | — |
@@ -2415,7 +2415,8 @@ Open Questions:
 
 ### US-9.2: Complete isolated backup and restore proof
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-9-2-complete-isolated-backup-restore/`
 
 As an operator
 I want a restorable local application backup
@@ -2449,15 +2450,15 @@ Dependencies:
 - US-4.7
 
 Tasks:
-- [ ] Implement versioned backup manifests and isolated restore procedures.
-- [ ] Exercise the complete restore with real local assertions and redacted evidence.
+- [x] Implement versioned backup manifests and isolated restore procedures.
+- [x] Exercise the complete restore with real local assertions and redacted evidence.
 
 Open Questions:
 - None.
 
 ### US-9.3: Qualified upgrades and checkpoint-compatible continuation
 
-Status: BLOCKED
+Status: READY
 
 As an operator
 I want reviewed application and Supabase upgrades

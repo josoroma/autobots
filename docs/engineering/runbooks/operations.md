@@ -41,6 +41,7 @@ Expected: `GET /v1/operations/local-status`, or the Operations page, says ready.
 | Disk | `disk_low` | refused | Free space, or lower `AUTOBOTS_MIN_FREE_BYTES` (default 2 GiB). This is the host disk. Docker's VM disk has its own limit and isn't measured. |
 | Queue | `leases_expired` | allowed | A worker stopped mid-job. The next inference worker takes it. |
 | Worker | `worker_absent`, `no_inference_worker` | allowed | Queued work waits. Start a worker. |
+| Hold | `restore_hold` | refused | This is a restored instance. See [the backup and restore runbook](backup-restore.md). |
 
 With the database down the page still answers, with `scope: installation` and no workspace counts. Only an owner sees it while the database is up.
 
@@ -78,6 +79,10 @@ Set per workspace on the Operations page, or with `PUT /v1/operations/retention`
 `receipt_days` can't be shorter than `run_days`. A run is refused, and retried on the next pass, while its tree is active, a continuation of it is active, it has a `started` or `unknown` tool receipt, or an obligation is open. Purges are recorded in `app_private.retention_log`. If Storage is down, rows commit and bytes wait for the next pass.
 
 A purged run has no explanation on its page yet: its artifacts just aren't listed.
+
+## Backup and restore
+
+See [the backup and restore runbook](backup-restore.md).
 
 ## Failure symptoms
 

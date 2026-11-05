@@ -1261,6 +1261,18 @@ export const schemas = {
     "additionalProperties": false,
     "description": "`scope` is `installation` when the database is down, as no workspace can be verified.",
     "properties": {
+      "backup_age_hours": {
+        "anyOf": [
+          {
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Backup Age Hours"
+      },
       "conditions": {
         "items": {
           "$ref": "#/components/schemas/OperationCondition"
@@ -1321,7 +1333,8 @@ export const schemas = {
       "remote_tracing",
       "conditions",
       "queue",
-      "retention"
+      "retention",
+      "backup_age_hours"
     ],
     "title": "LocalStatus",
     "type": "object"
@@ -1609,6 +1622,7 @@ export const schemas = {
         "enum": [
           "database",
           "schema",
+          "hold",
           "storage",
           "disk",
           "queue",
@@ -3902,6 +3916,7 @@ export function parseKnowledgeHead(value: unknown): KnowledgeHead {
 }
 
 export interface LocalStatus {
+  backup_age_hours: number | null;
   conditions: OperationCondition[];
   queue: QueueStatus | null;
   ready: boolean;
@@ -4017,7 +4032,7 @@ export function parseOccurrenceView(value: unknown): OccurrenceView {
 
 export interface OperationCondition {
   code: string;
-  name: "database" | "schema" | "storage" | "disk" | "queue" | "worker";
+  name: "database" | "schema" | "hold" | "storage" | "disk" | "queue" | "worker";
   state: "ok" | "degraded" | "unavailable";
 }
 

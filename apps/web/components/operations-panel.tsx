@@ -14,6 +14,10 @@ const CONDITIONS: Record<string, string> = {
   schema_ready: "The schema has what this version needs.",
   schema_behind: "Migrations are behind this version. New work is refused.",
   schema_unknown: "The schema can't be checked without the database.",
+  no_hold: "Nothing is holding work.",
+  restore_hold:
+    "This instance was restored. All work is held until an operator releases it.",
+  hold_unknown: "Holds can't be checked without the database.",
   storage_ready: "Storage is answering.",
   storage_unreachable: "Storage isn't answering. New work is refused.",
   storage_not_configured: "No Storage is configured. New work is refused.",
@@ -31,6 +35,7 @@ const CONDITIONS: Record<string, string> = {
 const LABELS: Record<string, string> = {
   database: "Database",
   schema: "Schema",
+  hold: "Hold",
   storage: "Storage",
   disk: "Disk",
   queue: "Queue",
@@ -133,6 +138,12 @@ export function OperationsPanel() {
           {status.remote_tracing === "disabled"
             ? "off. Logs stay on this Mac."
             : "on. Check this process's environment."}
+        </p>
+        <p className="text-sm">
+          Last backup:{" "}
+          {status.backup_age_hours === null
+            ? "none found in the configured directory."
+            : `${status.backup_age_hours} hours ago.`}
         </p>
         {status.queue === null ? (
           <p className="text-sm">
