@@ -1,0 +1,112 @@
+"""A real worker process around a scripted model, restarted if it dies. No provider is involved.
+
+The script depends only on the goal and what the conversation holds, so a restarted worker carries
+on from what its checkpoint restored. It kills itself once, when told to, inside a model call.
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+import re
+import signal
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+import psycopg
+from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import AIMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
+from pydantic import SecretStr
+
+from autobots.adapters.loop_middleware import ModelRoute
+from autobots.adapters.object_storage import SupabaseObjectStore
+from autobots.application.goal_loop import LoopConfig, process_next
+
+URL = os.environ['AUTOBOTS_DATABASE_URL']
+MARKER = Path(os.environ['AUTOBOTS_TEST_DIED_MARKER'])
+ROUTE = ModelRoute('executor', 'openrouter_deepseek_flash', 'fixture/model', 1000)
+TASKS = [{'id': 'report', 'title': 'Write the totals report', 'criteria': ['c1'], 'expected_evidence': 'the published report'}]
+PLAN = ('propose_plan', {'tasks': TASKS})
+READ = ('read_run_file', {'path': 'inputs/data.md'})
+PUBLISH = ('publish_artifact', {'path': 'outputs/report.md', 'version': 1})
+DONE = ('complete_task', {'task_id': 'report', 'evidence': [{'kind': 'artifact', 'reference': 'outputs/report.md'}], 'summary': 'Reported the total of the two counts.'})
+FINISHED = 'The report is ready.'
+
+
+def replies(messages: Any, name: str) -> list[dict[str, Any]]:
+    return [json.loads(message.content) for message in messages if message.type == 'tool' and message.name == name]
+
+
+def next_step(goal: str, messages: Any) -> Any:
+    """Each step uses what the tools really returned, so a refused tool can't reach a total."""
+    if 'slice-only-claims' in goal:
+        return 'It is all done, trust me.'
+    if not replies(messages, 'propose_plan'):
+        return PLAN
+    if not replies(messages, 'read_run_file'):
+        return READ
+    document = replies(messages, 'read_run_file')[-1]
+    if document['outcome'] != 'succeeded':
+        return 'The document could not be read.'
+    if not replies(messages, 'calculate'):
+        values = [float(number) for number in re.findall(r': (\d+)', document['output']['content'])]
+        return ('calculate', {'operation': 'sum', 'values': values})
+    total = replies(messages, 'calculate')[-1]
+    if total['outcome'] != 'succeeded':
+        return 'The total could not be calculated.'
+    if not replies(messages, 'save_artifact'):
+        value = int(total['output']['result']) + (1 if 'slice-wrong-total' in goal else 0)
+        return ('save_artifact', {'path': 'outputs/report.md', 'content': f'# Totals\n\nTotal: {value}\n'})
+    if 'slice-no-artifact' not in goal and not replies(messages, 'publish_artifact'):
+        if 'slice-complete' in goal and not MARKER.exists():
+            MARKER.write_text('died')
+            os.kill(os.getpid(), signal.SIGKILL)
+        return PUBLISH
+    if not replies(messages, 'complete_task'):
+        return DONE
+    return FINISHED
+
+
+class GoalScript(BaseChatModel):
+    @property
+    def _llm_type(self) -> str:
+        return 'goal-script'
+
+    def bind_tools(self, tools: Any, **_: Any) -> Any:
+        return self
+
+    def _generate(self, messages: Any, stop: Any = None, run_manager: Any = None, **_: Any) -> ChatResult:
+        goal = ' '.join(str(message.content) for message in messages if message.type == 'human')
+        step = next_step(goal, messages)
+        metadata = {'finish_reason': 'stop', 'cost': 0.0001}
+        if isinstance(step, str):
+            message = AIMessage(content=step, response_metadata=metadata)
+        else:
+            position = sum(item.type == 'ai' for item in messages)
+            message = AIMessage(content='', response_metadata=metadata, tool_calls=[{'name': step[0], 'args': step[1], 'id': f'call-{position}', 'type': 'tool_call'}])
+        return ChatResult(generations=[ChatGeneration(message=message)])
+
+
+async def worker() -> None:
+    store = SupabaseObjectStore(os.environ['AUTOBOTS_STORAGE_BASE'], SecretStr(os.environ['AUTOBOTS_STORAGE_SERVICE']))
+    config = LoopConfig(route=ROUTE, object_store=store, heartbeat_seconds=0.5, lease_seconds=2)
+    async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
+        while True:
+            await process_next(db, URL, f'fixture-{os.getpid()}', GoalScript, config)
+            await asyncio.sleep(0.2)
+
+
+def main() -> None:
+    """Stands in for whatever restarts a worker. A real supervisor isn't part of this story."""
+    if len(sys.argv) > 1 and sys.argv[1] == 'run':
+        asyncio.run(worker())
+        return
+    while True:
+        subprocess.run([sys.executable, __file__, 'run'], check=False)
+
+
+if __name__ == '__main__':
+    main()

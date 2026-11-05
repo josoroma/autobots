@@ -53,7 +53,7 @@ async def main() -> None:
 
         async def admit(workspace: UUID = WORKSPACE) -> UUID:
             await clear()
-            return (await admit_run(db, workspace_id=workspace, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='Write the report', limit_micro_usd=1000, policy=resolve_role_policy(), acceptance_criteria=('Has a summary', 'Has figures'))).run_id
+            return (await admit_run(db, workspace_id=workspace, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='Write the report', limit_micro_usd=1_000_000, policy=resolve_role_policy(), acceptance_criteria=('Has a summary', 'Has figures'))).run_id
 
         async def state_of(run: UUID) -> str:
             return await value('select status from public.runs where id = %s', run)
@@ -101,7 +101,13 @@ async def main() -> None:
         lease = await claim_next(db, worker_id='w')
         await user(run, RunCommand.PAUSE)
         result = await user(run, RunCommand.CANCEL)
-        check('paused cancels directly', 'cancelled', result.status, result.status == 'cancelled')
+        check('paused with its owner still stopping enters cancelling', 'cancelling', result.status, result.status == 'cancelling')
+        run = await admit()
+        lease = await claim_next(db, worker_id='w')
+        await expire(run)
+        await user(run, RunCommand.PAUSE)
+        result = await user(run, RunCommand.CANCEL)
+        check('paused with no owner and no open work cancels directly', 'cancelled', result.status, result.status == 'cancelled')
         run = await admit()
         lease = await claim_next(db, worker_id='w')
         await worker(run, lease, RunCommand.VERIFY)
@@ -234,19 +240,19 @@ async def main() -> None:
                 check(f'{command.value} cannot reopen a terminal run', 'refused', 'applied', False)
             except CommandRefused:
                 check(f'{command.value} cannot reopen a terminal run', 'refused', await state_of(run), await state_of(run) == 'cancelled')
-        linked = await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='Continue it', limit_micro_usd=1000, policy=resolve_role_policy(), continues_run_id=run)
+        linked = await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='Continue it', limit_micro_usd=1_000_000, policy=resolve_role_policy(), continues_run_id=run)
         link = await value('select continues_run_id from public.runs where id = %s', linked.run_id)
         check('continuing takes a new run linked to the old one', 'linked, and the old one stays cancelled', (link == run, await state_of(run)), link == run and await state_of(run) == 'cancelled')
         active = await admit()
         try:
-            await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='x', limit_micro_usd=1000, policy=resolve_role_policy(), continues_run_id=active)
+            await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='x', limit_micro_usd=1_000_000, policy=resolve_role_policy(), continues_run_id=active)
             check('only a terminal run can be continued', 'refused', 'admitted', False)
         except LinkRefused:
             check('only a terminal run can be continued', 'refused', 'refused', True)
         foreign = await admit(OTHER)
         await apply_command(db, workspace_id=OTHER, run_id=foreign, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=1)
         try:
-            await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='x', limit_micro_usd=1000, policy=resolve_role_policy(), continues_run_id=foreign)
+            await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='x', limit_micro_usd=1_000_000, policy=resolve_role_policy(), continues_run_id=foreign)
             check('a run in another workspace cannot be continued', 'refused', 'admitted', False)
         except LinkRefused:
             check('a run in another workspace cannot be continued', 'refused', 'refused', True)
@@ -280,6 +286,19 @@ async def main() -> None:
         processed = await process_next(db, URL, 'after-sleep', lambda: Script(items=[calls(('complete_task', {'task_id': 'a', 'evidence': [{'kind': 'artifact', 'reference': 'outputs/a.md'}], 'summary': 's'})), say('stop')], seen=[], bound=[]), RESUME_ROUTE)
         calls_used = processed.usage['model_calls']
         check('after reconciliation a paid dispatch is allowed again', 'more calls', calls_used, calls_used > 2)
+
+        # A response that arrives after recovery classified the call is late evidence.
+        run = await admit()
+        lease = await claim_next(db, worker_id='late', lease_seconds=120)
+
+        def classified_while_out() -> Any:
+            with psycopg.connect(URL, autocommit=True) as other:
+                other.execute("update app_private.model_invocations set status = 'uncertain', failure_class = 'worker_lost' where run_id = %s and status = 'dispatched'", (run,))
+            return say('late')
+
+        result = await run_goal(db, URL, lease, Script(items=[classified_while_out], seen=[], bound=[]), RESUME_ROUTE)
+        row = await (await db.execute('select status, charged_micro_usd from app_private.model_invocations where run_id = %s', (run,))).fetchone()
+        check('a late response settles the charge as evidence', 'succeeded, 100', row, row == ('succeeded', 100) and result.outcome == 'lost')
 
         # An uncertain call blocks the next pass until it is reconciled.
         await db.execute("update app_private.model_spend_limits set slots = 2 where workspace_id = %s", (WORKSPACE,))

@@ -11,6 +11,7 @@ from autobots.api.settings_routes import current_workspace, provider_settings, r
 from autobots.application.model_admission import ModelAdmission
 from autobots.application.provider_settings import ProviderSettings
 from autobots.application.recovery import outstanding
+from autobots.application.run_projection import read_summary
 from autobots.application.runs import (
     IdempotencyConflict,
     LinkRefused,
@@ -18,8 +19,10 @@ from autobots.application.runs import (
     VersionConflict,
     admit_run,
     apply_command,
+    existing_receipt,
+    request_hash,
+    store_receipt,
 )
-from autobots.contracts.adapters import run_from_row, run_summary_from_domain
 from autobots.contracts.run_commands import (
     ModelCallReconciliation,
     ReconciliationResult,
@@ -35,10 +38,6 @@ from autobots.domain.runs import Actor, CommandRefused, RunCommand
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 Key = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)]
-RUN_COLUMNS = (
-    "id, workspace_id, parent_run_id, status, created_at, updated_at, spent_micro_usd, "
-    "reserved_micro_usd, limit_micro_usd, lease_generation, checkpoint_thread_id, version"
-)
 
 
 def _pool(request: Request) -> Any:
@@ -103,6 +102,8 @@ async def post_run(
                 limit_micro_usd=body.limit_micro_usd,
                 acceptance_criteria=tuple(body.acceptance_criteria),
                 continues_run_id=body.continues_run_id,
+                required_artifacts=tuple(body.required_artifacts),
+                input_documents=tuple(body.input_documents),
                 policy=policy,
             )
         except (IdempotencyConflict, LinkRefused) as error:
@@ -121,15 +122,10 @@ async def get_run(
     run_id: UUID, request: Request, workspace_id: Annotated[UUID, Depends(current_workspace)]
 ) -> RunSummary:
     async with _pool(request).connection() as connection:
-        cursor = await connection.execute(
-            f"select {RUN_COLUMNS} from public.runs where id = %s and workspace_id = %s",
-            (run_id, workspace_id),
-        )
-        row = await cursor.fetchone()
-    if row is None:
+        summary = await read_summary(connection, workspace_id, run_id)
+    if summary is None:
         raise ApiError(404, "run_not_found", "That run is not available.")
-    names = [column.strip() for column in RUN_COLUMNS.split(",")]
-    return run_summary_from_domain(run_from_row(dict(zip(names, row, strict=True))))  # type: ignore[arg-type]
+    return summary
 
 
 async def _require_run(connection: Any, workspace_id: UUID, run_id: UUID) -> None:
@@ -237,21 +233,38 @@ async def post_reconcile(
     run_id: UUID,
     body: ModelCallReconciliation,
     request: Request,
+    key: Key,
+    user: User,
     workspace: Annotated[UUID, Depends(require_owner)],
 ) -> ReconciliationResult:
     """An owner records a charge seen in the provider's own account, for the oldest open call."""
     async with _pool(request).connection() as connection:
         await _require_run(connection, workspace, run_id)
-        cursor = await connection.execute(
-            "select id from app_private.model_invocations where run_id = %s "
-            "and status = 'uncertain' and reconciled_at is null order by created_at limit 1",
-            (run_id,),
-        )
-        row = await cursor.fetchone()
-        if row is None:
-            return ReconciliationResult(schema_version=1, reconciled_calls=0)
-        await ModelAdmission(connection).reconcile(row[0], body.charged_micro_usd)
-    return ReconciliationResult(schema_version=1, reconciled_calls=1)
+        scope = (workspace, user, "reconcile_model_call", str(run_id), key)
+        fingerprint = request_hash({"charged": body.charged_micro_usd})
+        try:
+            async with connection.transaction():
+                existing = await existing_receipt(connection, scope, fingerprint)
+                if existing is not None:
+                    return ReconciliationResult(
+                        schema_version=1, reconciled_calls=existing["reconciled_calls"]
+                    )
+                cursor = await connection.execute(
+                    "select id from app_private.model_invocations where run_id = %s "
+                    "and status = 'uncertain' and reconciled_at is null "
+                    "order by created_at limit 1 for update",
+                    (run_id,),
+                )
+                row = await cursor.fetchone()
+                if row is not None:
+                    await ModelAdmission(connection).reconcile(row[0], body.charged_micro_usd)
+                reconciled = 0 if row is None else 1
+                await store_receipt(
+                    connection, scope, fingerprint, {"reconciled_calls": reconciled}
+                )
+        except IdempotencyConflict as error:
+            raise as_api_error(error) from None
+    return ReconciliationResult(schema_version=1, reconciled_calls=reconciled)
 
 
 @router.post("/runs/{run_id}/cancel", operation_id="cancelRun", response_model=RunCommandResult)

@@ -57,6 +57,24 @@ class UsageSummary(BaseModel):
     plan_revisions: int
 
 
+class VerificationSummary(BaseModel):
+    model_config = VIEW
+
+    passed: bool
+    unmet: list[str]
+    checks: int
+
+
+class OutstandingSummary(BaseModel):
+    """Known unknowns. These stay visible, even on a finished run."""
+
+    model_config = VIEW
+
+    uncertain_calls: int
+    unknown_effects: int
+    unreported_charges: int
+
+
 class RunWorkspace(BaseModel):
     model_config = VIEW
 
@@ -68,4 +86,6 @@ class RunWorkspace(BaseModel):
     artifacts: list[ArtifactSummary]
     usage: UsageSummary
     stop_reason: str | None
+    verification: VerificationSummary | None
+    outstanding: OutstandingSummary
     cursor: int

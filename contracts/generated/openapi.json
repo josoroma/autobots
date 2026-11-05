@@ -323,6 +323,28 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "InputDocument": {
+        "additionalProperties": false,
+        "description": "A controlled document given at admission. Tools can read it and can't change it.",
+        "properties": {
+          "content": {
+            "maxLength": 256000,
+            "title": "Content",
+            "type": "string"
+          },
+          "path": {
+            "pattern": "^inputs/[A-Za-z0-9._-]{1,200}$",
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "content"
+        ],
+        "title": "InputDocument",
+        "type": "object"
+      },
       "ModelAvailability": {
         "additionalProperties": false,
         "properties": {
@@ -480,6 +502,31 @@
         "title": "ModelRole",
         "type": "string"
       },
+      "OutstandingSummary": {
+        "additionalProperties": false,
+        "description": "Known unknowns. These stay visible, even on a finished run.",
+        "properties": {
+          "uncertain_calls": {
+            "title": "Uncertain Calls",
+            "type": "integer"
+          },
+          "unknown_effects": {
+            "title": "Unknown Effects",
+            "type": "integer"
+          },
+          "unreported_charges": {
+            "title": "Unreported Charges",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "uncertain_calls",
+          "unknown_effects",
+          "unreported_charges"
+        ],
+        "title": "OutstandingSummary",
+        "type": "object"
+      },
       "PlanSummary": {
         "additionalProperties": false,
         "properties": {
@@ -634,6 +681,31 @@
           "reconciled_calls"
         ],
         "title": "ReconciliationResult",
+        "type": "object"
+      },
+      "RequiredArtifact": {
+        "additionalProperties": false,
+        "description": "A deterministic check of the bytes, decided at admission.",
+        "properties": {
+          "must_contain": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Must Contain",
+            "type": "array"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "RequiredArtifact",
         "type": "object"
       },
       "RoleBinding": {
@@ -893,12 +965,28 @@
             "title": "Goal Text",
             "type": "string"
           },
+          "input_documents": {
+            "items": {
+              "$ref": "#/components/schemas/InputDocument"
+            },
+            "maxItems": 10,
+            "title": "Input Documents",
+            "type": "array"
+          },
           "limit_micro_usd": {
             "default": 1000000,
             "maximum": 9007199254740991.0,
             "minimum": 0.0,
             "title": "Limit Micro Usd",
             "type": "integer"
+          },
+          "required_artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/RequiredArtifact"
+            },
+            "maxItems": 20,
+            "title": "Required Artifacts",
+            "type": "array"
           }
         },
         "required": [
@@ -1046,6 +1134,9 @@
             ],
             "title": "Objective"
           },
+          "outstanding": {
+            "$ref": "#/components/schemas/OutstandingSummary"
+          },
           "plan": {
             "anyOf": [
               {
@@ -1077,6 +1168,16 @@
           },
           "usage": {
             "$ref": "#/components/schemas/UsageSummary"
+          },
+          "verification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VerificationSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -1088,6 +1189,8 @@
           "artifacts",
           "usage",
           "stop_reason",
+          "verification",
+          "outstanding",
           "cursor"
         ],
         "title": "RunWorkspace",
@@ -1261,6 +1364,33 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "VerificationSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "checks": {
+            "title": "Checks",
+            "type": "integer"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          },
+          "unmet": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unmet",
+            "type": "array"
+          }
+        },
+        "required": [
+          "passed",
+          "unmet",
+          "checks"
+        ],
+        "title": "VerificationSummary",
         "type": "object"
       },
       "WorkspaceSummary": {
@@ -2112,6 +2242,17 @@
           },
           {
             "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
             "name": "x-autobots-internal",
             "required": false,
             "schema": {
@@ -2124,6 +2265,22 @@
                 }
               ],
               "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
             }
           },
           {
@@ -2141,22 +2298,6 @@
                 }
               ],
               "title": "X-Autobots-Workspace"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
             }
           }
         ],

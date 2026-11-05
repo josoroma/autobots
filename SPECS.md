@@ -142,11 +142,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-4.7 | Pause, cancellation and interrupted-run recovery | DONE | EPIC-4 |
 | US-4.7#1 | Implement cancellation propagation and preserved pause/wait context. | DONE | US-4.7 |
 | US-4.7#2 | Run late-result, sleep, retry and competing completion/cancellation fixtures. | DONE | US-4.7 |
-| US-4.8 | Verify the first durable goal-to-artifact slice | READY | EPIC-4 |
-| US-4.8#1 | Exercise the bounded mock/local database/browser slice. | TODO | US-4.8 |
-| US-4.8#2 | Record independent review, recovery assertions and exercised user-flow runbook. | TODO | US-4.8 |
+| US-4.8 | Verify the first durable goal-to-artifact slice | DONE | EPIC-4 |
+| US-4.8#1 | Exercise the bounded mock/local database/browser slice. | DONE | US-4.8 |
+| US-4.8#2 | Record independent review, recovery assertions and exercised user-flow runbook. | DONE | US-4.8 |
 | EPIC-5 | Experts, specialists and consequential effects | — | — |
-| US-5.1 | Versioned Experts, direct sessions and coordinator routing | BLOCKED | EPIC-5 |
+| US-5.1 | Versioned Experts, direct sessions and coordinator routing | READY | EPIC-5 |
 | US-5.1#1 | Implement Expert/session persistence and revision APIs. | TODO | US-5.1 |
 | US-5.1#2 | Add bounded coordinator routing and the Expert editor. | TODO | US-5.1 |
 | US-5.2 | Scoped synchronous specialist assignments | BLOCKED | EPIC-5 |
@@ -183,7 +183,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-8.2#1 | Implement candidate, review, regression and versioned promotion states. | TODO | US-8.2 |
 | US-8.2#2 | Demonstrate isolation and rollback on controlled fixtures. | TODO | US-8.2 |
 | EPIC-9 | Local operations and recovery | — | — |
-| US-9.1 | Local startup, shutdown, health and operational logs | BLOCKED | EPIC-9 |
+| US-9.1 | Local startup, shutdown, health and operational logs | READY | EPIC-9 |
 | US-9.1#1 | Implement safe readiness/lifecycle/status interfaces and local telemetry. | TODO | US-9.1 |
 | US-9.1#2 | Exercise failure, retention and recovery paths in the operations runbook. | TODO | US-9.1 |
 | US-9.2 | Complete isolated backup and restore proof | BLOCKED | EPIC-9 |
@@ -1857,7 +1857,8 @@ Open Questions:
 
 ### US-4.8: Verify the first durable goal-to-artifact slice
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-4-8-verify-first-durable-goal/`
 
 As a user
 I want evidence-backed completion of the initial personal-agent task
@@ -1892,8 +1893,8 @@ Dependencies:
 - US-4.7
 
 Tasks:
-- [ ] Exercise the bounded mock/local database/browser slice.
-- [ ] Record independent review, recovery assertions and exercised user-flow runbook.
+- [x] Exercise the bounded mock/local database/browser slice.
+- [x] Record independent review, recovery assertions and exercised user-flow runbook.
 
 Open Questions:
 - None.
@@ -1904,7 +1905,7 @@ Phase reference: B2/B3, preserved SP-020. All story completion also requires SP-
 
 ### US-5.1: Versioned Experts, direct sessions and coordinator routing
 
-Status: BLOCKED
+Status: READY
 
 As a specialist owner
 I want persistent Expert configurations and direct or routed sessions
@@ -2358,7 +2359,7 @@ Phase reference: B7, preserved SP-020. All story completion also requires SP-003
 
 ### US-9.1: Local startup, shutdown, health and operational logs
 
-Status: BLOCKED
+Status: READY
 
 As an operator
 I want documented local lifecycle and readiness

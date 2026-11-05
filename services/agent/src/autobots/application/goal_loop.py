@@ -1,9 +1,11 @@
 """One bounded pass over an admitted goal. New work stops at a limit, and the result is honest."""
 
 import asyncio
+import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
+from uuid import uuid4
 
 import psycopg
 from deepagents import create_deep_agent
@@ -21,6 +23,7 @@ from autobots.adapters.loop_middleware import (
     LoopMiddleware,
     LoopStopped,
     ModelRoute,
+    UnadmittedModelCall,
 )
 from autobots.adapters.tool_middleware import GatewayMiddleware, visible_tools
 from autobots.application.artifacts import publish_tool, reconcile_run
@@ -36,6 +39,7 @@ from autobots.application.run_usage import (
 from autobots.application.runs import LeaseLost, VersionConflict, apply_command
 from autobots.application.tool_gateway import ToolGateway, ToolRegistry, ToolScope
 from autobots.application.tools import CALCULATE, READ_RUN_FILE, SAVE_ARTIFACT
+from autobots.application.verification import verify_candidate
 from autobots.application.worker_leases import (
     DEFAULT_LEASE_SECONDS,
     Lease,
@@ -74,6 +78,7 @@ class LoopConfig:
     slot_wait_seconds: float = 30.0
     object_store: Any = None
     heartbeat_seconds: float = 20.0
+    model_call_seconds: float = 120.0
     lease_seconds: float = DEFAULT_LEASE_SECONDS
 
 
@@ -117,6 +122,7 @@ def build_stage(
                 config.route,
                 sleep=config.sleep,
                 slot_wait_seconds=config.slot_wait_seconds,
+                model_call_seconds=config.model_call_seconds,
             ),
             GatewayMiddleware(gateway, connection, scope),
         ],
@@ -145,7 +151,12 @@ async def run_goal(
     # Whatever an earlier owner left is classified first, and nothing is sent until that's done.
     await classify_interrupted(connection, lease.run_id, lease.generation)
     if config.object_store is not None:
-        await reconcile_run(connection, config.object_store, lease.workspace_id, lease.run_id)
+        try:
+            await reconcile_run(
+                connection, config.object_store, lease.workspace_id, lease.run_id, scope
+            )
+        except LeaseLost:
+            return await _result(connection, lease, goal, "lost", "lease_lost", None)
     status = await _run_status(connection, lease)
     if status == RunStatus.CANCELLING.value:
         return await _finish(connection, lease, goal, "run_not_running")
@@ -173,6 +184,8 @@ async def run_goal(
         code = stopped.code
     except GraphRecursionError:
         code = "step_limit"
+    except UnadmittedModelCall:
+        code = "unadmitted_model_call"
     except Exception as error:
         if not is_stale_owner(error):
             raise
@@ -194,7 +207,58 @@ async def process_next(
     lease = await claim_next(connection, worker_id=worker_id, lease_seconds=config.lease_seconds)
     if lease is None:
         return None
-    return await run_goal(connection, database_url, lease, model_factory(), config)
+    if lease.run_status != RunStatus.VERIFYING.value:
+        result = await run_goal(connection, database_url, lease, model_factory(), config)
+        if result.outcome != "candidate":
+            return result
+    return await _settle_candidate(connection, database_url, lease, config)
+
+
+async def _settle_candidate(
+    connection: Any, database_url: str, lease: Lease, config: LoopConfig
+) -> LoopResult:
+    """Only recorded checks finish a run. Also picks up a candidate whose worker died."""
+    goal = await load_goal(connection, lease.run_id)
+    beating = asyncio.create_task(_keep_lease(database_url, lease, config))
+    try:
+        report = await verify_candidate(connection, config.object_store, lease, goal)
+    except LeaseLost:
+        return await _result(connection, lease, goal, "lost", "lease_lost", None)
+    finally:
+        beating.cancel()
+    code = None if report.passed else "criteria_unmet"
+    cursor = await connection.execute(
+        "select version from public.runs where id = %s", (lease.run_id,)
+    )
+    version = (await cursor.fetchone())[0]
+    try:
+        # The verdict commits with the transition, so a worker that lost the run records nothing.
+        async with connection.transaction():
+            result = await apply_command(
+                connection,
+                workspace_id=lease.workspace_id,
+                run_id=lease.run_id,
+                command=RunCommand.COMPLETE if report.passed else RunCommand.FAIL,
+                actor=Actor.WORKER,
+                expected_version=version,
+                generation=lease.generation,
+            )
+            await connection.execute(
+                "insert into app_private.run_verifications (id, run_id, passed, unmet, checks) "
+                "values (%s, %s, %s, %s, %s)",
+                (uuid4(), lease.run_id, report.passed, json.dumps(report.unmet), report.checks),
+            )
+            await connection.execute(
+                "update app_private.run_usage set stop_reason = %s where run_id = %s",
+                (code, lease.run_id),
+            )
+    except CommandRefused:
+        # A cancel arrived first. It wins, and this worker settles it.
+        return await _finish(connection, lease, goal, "run_not_running")
+    except (LeaseLost, VersionConflict):
+        return await _result(connection, lease, goal, "lost", "lease_lost", None)
+    outcome = "succeeded" if report.passed else "stopped"
+    return await _result(connection, lease, goal, outcome, code, result.status)
 
 
 async def _keep_lease(database_url: str, lease: Lease, config: LoopConfig) -> None:
@@ -289,6 +353,14 @@ async def _finish(
         command = RunCommand.FINISH_CANCEL
     elif code in NOT_OURS:
         command = None
+        if code == "run_not_running" and await _run_status(connection, lease) == "paused":
+            # Stopped at a safe boundary. The run waits for a resume with nobody holding it.
+            await connection.execute(
+                "update app_private.run_jobs set status = 'done', lease_owner = null, "
+                "lease_expires_at = null where run_id = %s and generation = %s "
+                "and status = 'claimed'",
+                (lease.run_id, lease.generation),
+            )
     elif code is None:
         command = RunCommand.VERIFY
     elif code in PAUSE_FOR:
@@ -297,24 +369,26 @@ async def _finish(
         command = RunCommand.FAIL
     status = None
     if command is not None:
-        await connection.execute(
-            "update app_private.run_usage set stop_reason = %s where run_id = %s",
-            (code, lease.run_id),
-        )
         cursor = await connection.execute(
             "select version from public.runs where id = %s", (lease.run_id,)
         )
         version = (await cursor.fetchone())[0]
         try:
-            result = await apply_command(
-                connection,
-                workspace_id=lease.workspace_id,
-                run_id=lease.run_id,
-                command=command,
-                actor=Actor.WORKER,
-                expected_version=version,
-                generation=lease.generation,
-            )
+            # The reason commits with the transition, so a worker that lost the run writes nothing.
+            async with connection.transaction():
+                result = await apply_command(
+                    connection,
+                    workspace_id=lease.workspace_id,
+                    run_id=lease.run_id,
+                    command=command,
+                    actor=Actor.WORKER,
+                    expected_version=version,
+                    generation=lease.generation,
+                )
+                await connection.execute(
+                    "update app_private.run_usage set stop_reason = %s where run_id = %s",
+                    (code, lease.run_id),
+                )
             status = result.status
         except (LeaseLost, VersionConflict, CommandRefused):
             code = "lease_lost"

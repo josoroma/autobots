@@ -324,6 +324,28 @@ export const schemas = {
     "title": "HTTPValidationError",
     "type": "object"
   },
+  "InputDocument": {
+    "additionalProperties": false,
+    "description": "A controlled document given at admission. Tools can read it and can't change it.",
+    "properties": {
+      "content": {
+        "maxLength": 256000,
+        "title": "Content",
+        "type": "string"
+      },
+      "path": {
+        "pattern": "^inputs/[A-Za-z0-9._-]{1,200}$",
+        "title": "Path",
+        "type": "string"
+      }
+    },
+    "required": [
+      "path",
+      "content"
+    ],
+    "title": "InputDocument",
+    "type": "object"
+  },
   "ModelAvailability": {
     "additionalProperties": false,
     "properties": {
@@ -481,6 +503,31 @@ export const schemas = {
     "title": "ModelRole",
     "type": "string"
   },
+  "OutstandingSummary": {
+    "additionalProperties": false,
+    "description": "Known unknowns. These stay visible, even on a finished run.",
+    "properties": {
+      "uncertain_calls": {
+        "title": "Uncertain Calls",
+        "type": "integer"
+      },
+      "unknown_effects": {
+        "title": "Unknown Effects",
+        "type": "integer"
+      },
+      "unreported_charges": {
+        "title": "Unreported Charges",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "uncertain_calls",
+      "unknown_effects",
+      "unreported_charges"
+    ],
+    "title": "OutstandingSummary",
+    "type": "object"
+  },
   "PlanSummary": {
     "additionalProperties": false,
     "properties": {
@@ -635,6 +682,31 @@ export const schemas = {
       "reconciled_calls"
     ],
     "title": "ReconciliationResult",
+    "type": "object"
+  },
+  "RequiredArtifact": {
+    "additionalProperties": false,
+    "description": "A deterministic check of the bytes, decided at admission.",
+    "properties": {
+      "must_contain": {
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 20,
+        "title": "Must Contain",
+        "type": "array"
+      },
+      "name": {
+        "maxLength": 200,
+        "minLength": 1,
+        "title": "Name",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "title": "RequiredArtifact",
     "type": "object"
   },
   "RoleBinding": {
@@ -894,12 +966,28 @@ export const schemas = {
         "title": "Goal Text",
         "type": "string"
       },
+      "input_documents": {
+        "items": {
+          "$ref": "#/components/schemas/InputDocument"
+        },
+        "maxItems": 10,
+        "title": "Input Documents",
+        "type": "array"
+      },
       "limit_micro_usd": {
         "default": 1000000,
         "maximum": 9007199254740991.0,
         "minimum": 0.0,
         "title": "Limit Micro Usd",
         "type": "integer"
+      },
+      "required_artifacts": {
+        "items": {
+          "$ref": "#/components/schemas/RequiredArtifact"
+        },
+        "maxItems": 20,
+        "title": "Required Artifacts",
+        "type": "array"
       }
     },
     "required": [
@@ -1047,6 +1135,9 @@ export const schemas = {
         ],
         "title": "Objective"
       },
+      "outstanding": {
+        "$ref": "#/components/schemas/OutstandingSummary"
+      },
       "plan": {
         "anyOf": [
           {
@@ -1078,6 +1169,16 @@ export const schemas = {
       },
       "usage": {
         "$ref": "#/components/schemas/UsageSummary"
+      },
+      "verification": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/VerificationSummary"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "required": [
@@ -1089,6 +1190,8 @@ export const schemas = {
       "artifacts",
       "usage",
       "stop_reason",
+      "verification",
+      "outstanding",
       "cursor"
     ],
     "title": "RunWorkspace",
@@ -1264,6 +1367,33 @@ export const schemas = {
     "title": "ValidationError",
     "type": "object"
   },
+  "VerificationSummary": {
+    "additionalProperties": false,
+    "properties": {
+      "checks": {
+        "title": "Checks",
+        "type": "integer"
+      },
+      "passed": {
+        "title": "Passed",
+        "type": "boolean"
+      },
+      "unmet": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Unmet",
+        "type": "array"
+      }
+    },
+    "required": [
+      "passed",
+      "unmet",
+      "checks"
+    ],
+    "title": "VerificationSummary",
+    "type": "object"
+  },
   "WorkspaceSummary": {
     "additionalProperties": false,
     "properties": {
@@ -1406,6 +1536,15 @@ export function parseHTTPValidationError(value: unknown): HTTPValidationError {
   return parseWith(schemas, "HTTPValidationError", value) as HTTPValidationError;
 }
 
+export interface InputDocument {
+  content: string;
+  path: string;
+}
+
+export function parseInputDocument(value: unknown): InputDocument {
+  return parseWith(schemas, "InputDocument", value) as InputDocument;
+}
+
 export interface ModelAvailability {
   available: boolean;
   canonical_id: string;
@@ -1467,6 +1606,16 @@ export function parseModelRole(value: unknown): ModelRole {
   return parseWith(schemas, "ModelRole", value) as ModelRole;
 }
 
+export interface OutstandingSummary {
+  uncertain_calls: number;
+  unknown_effects: number;
+  unreported_charges: number;
+}
+
+export function parseOutstandingSummary(value: unknown): OutstandingSummary {
+  return parseWith(schemas, "OutstandingSummary", value) as OutstandingSummary;
+}
+
 export interface PlanSummary {
   revision_reason: string | null;
   tasks: TaskView[];
@@ -1501,6 +1650,15 @@ export interface ReconciliationResult {
 
 export function parseReconciliationResult(value: unknown): ReconciliationResult {
   return parseWith(schemas, "ReconciliationResult", value) as ReconciliationResult;
+}
+
+export interface RequiredArtifact {
+  must_contain?: string[];
+  name: string;
+}
+
+export function parseRequiredArtifact(value: unknown): RequiredArtifact {
+  return parseWith(schemas, "RequiredArtifact", value) as RequiredArtifact;
 }
 
 export interface RoleBinding {
@@ -1582,7 +1740,9 @@ export interface RunRequest {
   acceptance_criteria?: string[];
   continues_run_id?: string | null;
   goal_text: string;
+  input_documents?: InputDocument[];
   limit_micro_usd?: number;
+  required_artifacts?: RequiredArtifact[];
 }
 
 export function parseRunRequest(value: unknown): RunRequest {
@@ -1626,11 +1786,13 @@ export interface RunWorkspace {
   criteria: CriterionView[];
   cursor: number;
   objective: string | null;
+  outstanding: OutstandingSummary;
   plan: PlanSummary | null;
   run: RunSummary;
   schema_version: 1;
   stop_reason: string | null;
   usage: UsageSummary;
+  verification: VerificationSummary | null;
 }
 
 export function parseRunWorkspace(value: unknown): RunWorkspace {
@@ -1689,6 +1851,16 @@ export interface ValidationError {
 
 export function parseValidationError(value: unknown): ValidationError {
   return parseWith(schemas, "ValidationError", value) as ValidationError;
+}
+
+export interface VerificationSummary {
+  checks: number;
+  passed: boolean;
+  unmet: string[];
+}
+
+export function parseVerificationSummary(value: unknown): VerificationSummary {
+  return parseWith(schemas, "VerificationSummary", value) as VerificationSummary;
 }
 
 export interface WorkspaceSummary {

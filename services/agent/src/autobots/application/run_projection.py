@@ -8,26 +8,50 @@ from pydantic import ValidationError
 
 from autobots.application.artifacts import list_artifacts
 from autobots.application.plans import latest_plan, load_goal
+from autobots.application.recovery import outstanding
 from autobots.application.runs import RunNotFound
 from autobots.contracts.adapters import run_from_row, run_summary_from_domain
 from autobots.contracts.artifacts import ArtifactSummary
 from autobots.contracts.run_workspace import (
     CriterionView,
     EventPage,
+    OutstandingSummary,
     PlanSummary,
     RunWorkspace,
     TaskView,
     UsageSummary,
+    VerificationSummary,
 )
-from autobots.contracts.runs import RunEvent
+from autobots.contracts.runs import RunEvent, RunSummary
 
 PAGE_SIZE = 200
 MAX_TEXT = 500
 # Plans and summaries are written by a model, so a key it was shown must not be displayed.
 _SECRETS = re.compile(r"(sk-[A-Za-z0-9_-]{4,}|Bearer\s+[A-Za-z0-9._-]{8,}|eyJ[A-Za-z0-9_-]{10,})")
-RUN_COLUMNS = (
-    "id, workspace_id, parent_run_id, status, created_at, updated_at, spent_micro_usd, "
-    "reserved_micro_usd, limit_micro_usd, lease_generation, checkpoint_thread_id, version"
+# Spend comes from the ledger, so the public figures can't drift from what admission counted.
+_NAMES = (
+    "id",
+    "workspace_id",
+    "parent_run_id",
+    "status",
+    "created_at",
+    "updated_at",
+    "spent_micro_usd",
+    "reserved_micro_usd",
+    "limit_micro_usd",
+    "lease_generation",
+    "checkpoint_thread_id",
+    "version",
+)
+_SELECT_RUN = (
+    "select r.id, r.workspace_id, r.parent_run_id, r.status, r.created_at, r.updated_at, "
+    "(select coalesce(sum(coalesce(i.charged_micro_usd, 0)), 0)::bigint "
+    "from app_private.model_invocations i where i.root_run_id = r.id), "
+    "(select coalesce(sum(i.reserved_micro_usd) filter (where i.status in "
+    "('reserved', 'dispatched', 'uncertain') and i.reconciled_at is null), 0)::bigint "
+    "from app_private.model_invocations i where i.root_run_id = r.id), "
+    "r.limit_micro_usd, r.lease_generation, r.checkpoint_thread_id, r.version, r.event_sequence "
+    "from public.runs r where r.id = %s and r.workspace_id = %s"
 )
 
 
@@ -54,15 +78,21 @@ def project_event(run_id: UUID, sequence: int, payload: Any, occurred_at: Any) -
 
 
 async def _require_run(connection: Any, workspace_id: UUID, run_id: UUID) -> Any:
-    cursor = await connection.execute(
-        f"select {RUN_COLUMNS}, event_sequence from public.runs "
-        "where id = %s and workspace_id = %s",
-        (run_id, workspace_id),
-    )
+    cursor = await connection.execute(_SELECT_RUN, (run_id, workspace_id))
     row = await cursor.fetchone()
     if row is None:
         raise RunNotFound("that run is not available")
     return row
+
+
+def _summary(row: Any) -> RunSummary:
+    return run_summary_from_domain(run_from_row(dict(zip(_NAMES, row[:-1], strict=True))))  # type: ignore[arg-type]
+
+
+async def read_summary(connection: Any, workspace_id: UUID, run_id: UUID) -> RunSummary | None:
+    cursor = await connection.execute(_SELECT_RUN, (run_id, workspace_id))
+    row = await cursor.fetchone()
+    return None if row is None else _summary(row)
 
 
 async def read_events(
@@ -119,10 +149,19 @@ async def _plan_summary(connection: Any, run_id: UUID) -> PlanSummary | None:
     )
 
 
+async def _verification(connection: Any, run_id: UUID) -> VerificationSummary | None:
+    cursor = await connection.execute(
+        "select passed, unmet, checks from app_private.run_verifications where run_id = %s "
+        "order by created_at desc limit 1",
+        (run_id,),
+    )
+    row = await cursor.fetchone()
+    return VerificationSummary(passed=row[0], unmet=row[1], checks=row[2]) if row else None
+
+
 async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> RunWorkspace:
     row = await _require_run(connection, workspace_id, run_id)
-    names = [column.strip() for column in RUN_COLUMNS.split(",")]
-    summary = run_summary_from_domain(run_from_row(dict(zip(names, row[:-1], strict=True))))  # type: ignore[arg-type]
+    summary = _summary(row)
     try:
         goal = await load_goal(connection, run_id)
         objective: str | None = public_text(goal.objective)
@@ -139,6 +178,7 @@ async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> R
     )
     usage = await cursor.fetchone() or (0, 0, 0, 0, None)
     artifacts = await list_artifacts(connection, workspace_id, run_id)
+    left = await outstanding(connection, run_id)
     return RunWorkspace(
         schema_version=1,
         run=summary,
@@ -153,5 +193,11 @@ async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> R
             plan_revisions=usage[3],
         ),
         stop_reason=usage[4],
+        verification=await _verification(connection, run_id),
+        outstanding=OutstandingSummary(
+            uncertain_calls=left.uncertain_calls,
+            unknown_effects=left.unknown_effects,
+            unreported_charges=left.unreported_charges,
+        ),
         cursor=row[-1],
     )

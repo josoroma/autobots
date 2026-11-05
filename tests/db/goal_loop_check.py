@@ -42,7 +42,7 @@ async def main() -> None:
 
         async def start(workspace: UUID = WORKSPACE) -> Any:
             await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
-            await admit_run(db, workspace_id=workspace, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='Write the report', limit_micro_usd=1000, policy=resolve_role_policy(), acceptance_criteria=('Has a summary', 'Has figures'))
+            await admit_run(db, workspace_id=workspace, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='Write the report', limit_micro_usd=1_000_000, policy=resolve_role_policy(), acceptance_criteria=('Has a summary', 'Has figures'))
             return await claim_next(db, worker_id='loop', lease_seconds=300)
 
         async def go(lease: Any, items: list[Any], limits: RootLimits | None = None, route: ModelRoute = ROUTE) -> tuple[Any, Script]:
@@ -75,8 +75,11 @@ async def main() -> None:
         check('every model call went through admission and settled', '8', settled, settled == 8)
         prompt = str(model.seen[0][-1].content)
         check('the model is given the goal and criteria', 'present', 'c2: Has figures' in prompt, 'c2: Has figures' in prompt and 'Write the report' in prompt)
-        state_text = await value("select coalesce(string_agg(encode(blob, 'escape'), ''), '') from agent_runtime.checkpoint_blobs where thread_id = %s and type <> 'empty'", str(lease.run_id))
-        check('no key or client reaches checkpoint state', 'none', any(word in state_text for word in ('sk-or', 'api_key', 'SecretStr')), not any(word in state_text for word in ('sk-or', 'api_key', 'SecretStr')))
+        state_text = await value("""select (select coalesce(string_agg(encode(blob, 'escape'), ''), '') from agent_runtime.checkpoint_blobs where thread_id = %s)
+                                 || (select coalesce(string_agg(checkpoint::text || metadata::text, ''), '') from agent_runtime.checkpoints where thread_id = %s)
+                                 || (select coalesce(string_agg(encode(blob, 'escape'), ''), '') from agent_runtime.checkpoint_writes where thread_id = %s)""", str(lease.run_id), str(lease.run_id), str(lease.run_id))
+        check('checkpoints were really read', 'non-empty', len(state_text) > 100, len(state_text) > 100)
+        check('a key held by the model client reaches no checkpoint table', 'absent', 'sk-or-planted' in state_text, 'sk-or-planted' not in state_text)
 
         # A model saying it is done does not make it so.
         lease = await start()
@@ -180,7 +183,7 @@ async def main() -> None:
 
         # A real worker process is killed inside a model call, and a new generation inherits everything.
         await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
-        admitted = await admit_run(db, workspace_id=OTHER, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='Write the report', limit_micro_usd=1000, policy=resolve_role_policy(), acceptance_criteria=('Has a summary', 'Has figures'))
+        admitted = await admit_run(db, workspace_id=OTHER, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='Write the report', limit_micro_usd=1_000_000, policy=resolve_role_policy(), acceptance_criteria=('Has a summary', 'Has figures'))
         process = await asyncio.create_subprocess_exec(PYTHON, str(Path(__file__).parent / 'goal_loop_worker.py'), URL, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         _, err = await asyncio.wait_for(process.communicate(), 60)
         check('the worker process was killed mid-loop', 'exit -9', f'exit {process.returncode}: {err.decode()[-300:]}', process.returncode == -9)

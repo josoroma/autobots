@@ -20,7 +20,7 @@ LOOP_TOOL_GRANTS = {
     "complete_task": 1,
     "publish_artifact": 1,
 }
-RUN_FILE_GRANTS = ("outputs",)
+RUN_FILE_GRANTS = ("inputs", "outputs")
 
 # Only these leave an effect, so only these get an operation identity and a receipt.
 EFFECTFUL = frozenset(

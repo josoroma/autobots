@@ -11,6 +11,8 @@ class Outstanding:
 
     uncertain_calls: int
     unknown_effects: int
+    # The call worked and the provider named no charge, so only the amount is open.
+    unreported_charges: int = 0
 
 
 async def classify_interrupted(connection: Any, run_id: UUID, generation: int) -> None:
@@ -37,16 +39,18 @@ async def classify_interrupted(connection: Any, run_id: UUID, generation: int) -
 
 async def outstanding(connection: Any, run_id: UUID) -> Outstanding:
     cursor = await connection.execute(
-        "select count(*) from app_private.model_invocations where run_id = %s "
+        "select count(*) filter (where failure_class is distinct from 'charge_not_reported'), "
+        "count(*) filter (where failure_class = 'charge_not_reported') "
+        "from app_private.model_invocations where run_id = %s "
         "and status = 'uncertain' and reconciled_at is null",
         (run_id,),
     )
-    calls = (await cursor.fetchone())[0]
+    calls, unreported = await cursor.fetchone()
     cursor = await connection.execute(
         "select count(*) from app_private.tool_receipts where run_id = %s and status = 'unknown'",
         (run_id,),
     )
-    return Outstanding(calls, (await cursor.fetchone())[0])
+    return Outstanding(calls, (await cursor.fetchone())[0], unreported)
 
 
 async def open_obligation(connection: Any, run_id: UUID) -> tuple[str, str] | None:

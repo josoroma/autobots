@@ -7,6 +7,7 @@ from autobots.application.tool_gateway import (
     ToolDefinition,
     ToolFailed,
     ToolRegistry,
+    hold_lease,
 )
 from autobots.contracts.tools import (
     CalculateInput,
@@ -56,8 +57,11 @@ async def _existing_save(
 
 
 async def _save(arguments: SaveArtifactInput, context: ToolContext) -> SaveArtifactOutput:
+    if arguments.path.startswith("inputs/"):
+        raise ToolFailed("inputs_read_only")
     digest = hashlib.sha256(arguments.content.encode()).hexdigest()
     async with context.connection.transaction():
+        await hold_lease(context.connection, context.scope)
         # Serializes writers to this path, so two saves can't take one version.
         await context.connection.execute(
             "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
@@ -119,6 +123,8 @@ SAVE_ARTIFACT = ToolDefinition(
     timeout_seconds=5.0,
     resources=lambda arguments: (arguments.path,),
     reconcile=_existing_save,
+    # One transaction with a unique operation ID: if the row isn't there, it never happened.
+    safe_to_repeat=True,
 )
 
 

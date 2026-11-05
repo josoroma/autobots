@@ -83,7 +83,7 @@ async def main() -> dict[str, Any]:
 
         async def scope_for(workspace: UUID = WORKSPACE) -> ToolScope:
             await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
-            await admit_run(db, workspace_id=workspace, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='artifacts', limit_micro_usd=1000, policy=resolve_role_policy())
+            await admit_run(db, workspace_id=workspace, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='artifacts', limit_micro_usd=1_000_000, policy=resolve_role_policy())
             lease = await claim_next(db, worker_id='artifacts', lease_seconds=120)
             return ToolScope(workspace, lease.run_id, lease.generation, {'save_artifact': 1, 'publish_artifact': 1}, ('outputs',))
 
@@ -226,7 +226,7 @@ async def main() -> dict[str, Any]:
 
         # The real loop publishes through the same tool.
         await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
-        await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='Write the report', limit_micro_usd=1000, policy=resolve_role_policy(), acceptance_criteria=('Has a summary', 'Has figures'))
+        await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='Write the report', limit_micro_usd=1_000_000, policy=resolve_role_policy(), acceptance_criteria=('Has a summary', 'Has figures'))
         lease = await claim_next(db, worker_id='loop', lease_seconds=300)
         from goal_loop_script import Script  # noqa: PLC0415
         model = Script(items=[calls(PLAN), calls(('save_artifact', {'path': 'outputs/loop.md', 'content': 'from the loop'})), calls(('publish_artifact', {'path': 'outputs/loop.md', 'version': 1})), say('stop')], seen=[], bound=[])

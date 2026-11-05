@@ -153,6 +153,15 @@ def artifact_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port
     report = json.loads(result.stdout.strip().splitlines()[-1])
     for case in report['cases']:
         cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+    checked = subprocess.run([str(root / PYTHON), str(root / 'tests/db/verification_check.py'), workspace_a],
+                             env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'AUTOBOTS_STORAGE_BASE': base, 'AUTOBOTS_STORAGE_SERVICE': stack.values['SERVICE_ROLE_KEY'],
+                                  'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
+                             capture_output=True, text=True, errors='replace', timeout=240, check=False)
+    if checked.returncode:
+        cases.check('the verification check ran', 'exit 0', f'exit {checked.returncode}: {checked.stderr.strip()[-380:]}', False)
+    if checked.stdout.strip():
+        for case in json.loads(checked.stdout.strip().splitlines()[-1])['cases']:
+            cases.check(case['id'], case['expected'], case['observed'], case['passed'])
     # Arranged for the run workspace: text a model wrote, a raw framework event, and lost history.
     loop_run, gap_run = report.get('loop_run', ''), report.get('run_id', '')
     arranged = stack.runtime(
@@ -212,14 +221,29 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
         processes.append(start([str(next_bin), 'start', '-H', '127.0.0.1', '-p', str(web_port)], web_env, web))
         wait_until_up(f'{api_url}/v1/health', processes[0])
         wait_until_up(web_url, processes[1])
-        result = subprocess.run([str(playwright), 'test', 'identity', 'settings', 'runs', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
-                                env={**env, **artifacts, 'AUTOBOTS_WEB_URL': web_url, 'AUTOBOTS_TEST_OWNER_EMAIL': email, 'AUTOBOTS_TEST_OWNER_PASSWORD': password,
+        browser_env = {**env, **artifacts, 'AUTOBOTS_WEB_URL': web_url, 'AUTOBOTS_TEST_OWNER_EMAIL': email, 'AUTOBOTS_TEST_OWNER_PASSWORD': password,
                                      'AUTOBOTS_TEST_WORKSPACE_A': workspace_a, 'AUTOBOTS_TEST_WORKSPACE_B': workspace_b,
                                      'AUTOBOTS_TEST_OWNER_B_EMAIL': email_b, 'AUTOBOTS_TEST_OWNER_B_PASSWORD': password_b,
                                      'AUTOBOTS_TEST_MEMBER_EMAIL': email_c, 'AUTOBOTS_TEST_MEMBER_PASSWORD': password_c,
                                      'AUTOBOTS_TEST_UPSTREAM_LOG': str(upstream_log), 'AUTOBOTS_TEST_CATALOG_DOWN': str(catalog_down),
                                      'AUTOBOTS_TEST_SERVICE_KEY': stack.values['SERVICE_ROLE_KEY'], 'AUTOBOTS_WEB_REPORT': str(report),
-                                     'AUTOBOTS_WEB_OUTPUT': str(root / '.checks/identity/results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots)})
+                                     'AUTOBOTS_WEB_OUTPUT': str(root / '.checks/identity/results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots)}
+        result = subprocess.run([str(playwright), 'test', 'identity', 'settings', 'runs', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
+                                env=browser_env)
+        # The slice runs last, with a worker, so nothing above sees its jobs claimed.
+        stack.runtime("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done';\n")
+        # Arranged: the settings suite changed the workspace default, and the fixture worker's route is the original.
+        stack.runtime("update app_private.model_policies set default_profile = 'openrouter_deepseek_flash', role_overrides = '{}';\n")
+        slice_report = root / '.checks/identity/playwright-slice.json'
+        slice_report.unlink(missing_ok=True)
+        worker_env = {**tool_env(), 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1', 'AUTOBOTS_DATABASE_URL': runtime_url,
+                      'AUTOBOTS_STORAGE_BASE': base, 'AUTOBOTS_STORAGE_SERVICE': stack.values['SERVICE_ROLE_KEY'],
+                      'AUTOBOTS_TEST_DIED_MARKER': str(config_root / 'worker-died')}
+        processes.append(start([str(root / PYTHON), str(root / 'tests/web/fixture_worker.py')], worker_env, root))
+        slice_result = subprocess.run([str(playwright), 'test', 'slice', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=400, check=False,
+                                      env={**browser_env, 'AUTOBOTS_WEB_REPORT': str(slice_report)})
+        if slice_result.returncode:
+            print(slice_result.stdout[-2500:], file=sys.stderr)
     finally:
         for process in processes:
             stop(process)
@@ -229,6 +253,10 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
     if result.returncode:
         print(result.stdout[-2500:], file=sys.stderr)
     found, _ = summarize(report)
+    if slice_report.exists():
+        found.extend(summarize(slice_report)[0])
+    else:
+        cases.check('the slice suite produced a report', 'a report', 'none', False)
     for case in found:
         cases.check(f"browser: {case['id']}", 'passed', case['status'], case['status'] == 'passed')
     calls = sorted(set(upstream_log.read_text().splitlines()))

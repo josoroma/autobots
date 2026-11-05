@@ -7,6 +7,24 @@ from pydantic import BaseModel, Field
 from autobots.contracts.tools import TOOL_CONTRACT
 
 
+class InputDocument(BaseModel):
+    """A controlled document given at admission. Tools can read it and can't change it."""
+
+    model_config = TOOL_CONTRACT
+
+    path: str = Field(pattern=r"^inputs/[A-Za-z0-9._-]{1,200}$")
+    content: str = Field(max_length=256_000)
+
+
+class RequiredArtifact(BaseModel):
+    """A deterministic check of the bytes, decided at admission."""
+
+    model_config = TOOL_CONTRACT
+
+    name: str = Field(min_length=1, max_length=200)
+    must_contain: list[str] = Field(default_factory=list, max_length=20)
+
+
 class GoalSpec(BaseModel):
     """Set at admission, and never changed by a plan."""
 
@@ -17,6 +35,7 @@ class GoalSpec(BaseModel):
     criteria: dict[str, str]
     allowed_tools: dict[str, int]
     allowed_paths: list[str]
+    required_artifacts: list[RequiredArtifact] = Field(default_factory=list)
 
 
 class PlanTask(BaseModel):

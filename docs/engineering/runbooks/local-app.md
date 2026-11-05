@@ -1,5 +1,7 @@
 # Runbook: local web and API processes
 
+The [first slice runbook](first-slice.md) exercises a goal end to end on disposable services.
+
 ## Scope and prerequisites
 
 Native Next.js on `127.0.0.1:3000` and the Python API on `127.0.0.1:8001`, with the prepared environments from [the toolchains runbook](toolchains.md), and a Supabase stack. No model is called. **Nothing here starts a persistent stack:** only disposable qualification does so far, so the steps below need a stack you already run.

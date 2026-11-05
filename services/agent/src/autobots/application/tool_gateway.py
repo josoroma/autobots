@@ -10,6 +10,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ValidationError
 
+from autobots.application.runs import LeaseLost
 from autobots.domain.runs import RunStatus
 from autobots.domain.tools import EFFECTFUL, OperationClass, ToolOutcome, path_granted
 
@@ -138,6 +139,17 @@ async def ownership_refusal(connection: Any, scope: ToolScope) -> str | None:
     return None
 
 
+async def hold_lease(connection: Any, scope: ToolScope) -> None:
+    """Inside a write's transaction. The share lock serializes it against a new claim."""
+    cursor = await connection.execute(
+        "select 1 from app_private.run_jobs where run_id = %s and generation = %s "
+        "and status = 'claimed' and lease_expires_at > clock_timestamp() for share",
+        (scope.run_id, scope.generation),
+    )
+    if await cursor.fetchone() is None:
+        raise LeaseLost("this worker no longer owns the run")
+
+
 @dataclass(frozen=True)
 class ToolGateway:
     registry: ToolRegistry
@@ -223,6 +235,8 @@ class ToolGateway:
             replayed = await self._replay(context, tool, parsed, operation_id)
             if replayed is not None:
                 return replayed
+            # A crash during this new attempt has to be classified like any other.
+            await _record(context, operation_id, "started", None)
         return await self._attempt(context, tool, parsed, operation_id)
 
     async def _replay(
@@ -268,6 +282,10 @@ class ToolGateway:
             return ToolResult(
                 ToolOutcome.FAILED, str(error) or "tool_failed", operation_id=operation_id
             )
+        except LeaseLost:
+            # The write's transaction refused it, so nothing happened.
+            await _record(context, operation_id, "failed", None)
+            return ToolResult(ToolOutcome.DENIED, "lease_lost", operation_id=operation_id)
         except Exception:
             await _record(context, operation_id, "unknown", None)
             return ToolResult(ToolOutcome.UNKNOWN, "outcome_unknown", operation_id=operation_id)

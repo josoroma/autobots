@@ -6,8 +6,14 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 from uuid import UUID, uuid4
 
-from autobots.application.runs import LeaseLost, append_event
-from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed, ToolScope
+from autobots.application.runs import append_event
+from autobots.application.tool_gateway import (
+    ToolContext,
+    ToolDefinition,
+    ToolFailed,
+    ToolScope,
+    hold_lease,
+)
 from autobots.contracts.artifacts import PublishArtifact, PublishedArtifact
 from autobots.domain.tools import OperationClass
 
@@ -111,13 +117,7 @@ async def publish(
         )
         raise ToolFailed("artifact_hash_mismatch")
     async with connection.transaction():
-        cursor = await connection.execute(
-            "select 1 from app_private.run_jobs where run_id = %s and generation = %s "
-            "and status = 'claimed' and lease_expires_at > clock_timestamp() for share",
-            (scope.run_id, scope.generation),
-        )
-        if await cursor.fetchone() is None:
-            raise LeaseLost("this worker no longer owns the run")
+        await hold_lease(connection, scope)
         await _publish_row(connection, artifact_id, scope.run_id, name, digest)
     return result
 
@@ -136,10 +136,25 @@ class ReconcileReport:
         return not self.incomplete and not self.missing
 
 
+async def _still_owner(connection: Any, owner: ToolScope | None) -> None:
+    """A worker's recovery stops at the moment it loses the run. An operator passes no owner."""
+    if owner is not None:
+        await hold_lease(connection, owner)
+
+
 async def reconcile_run(
-    connection: Any, store: ObjectStore, workspace_id: UUID, run_id: UUID
+    connection: Any,
+    store: ObjectStore,
+    workspace_id: UUID,
+    run_id: UUID,
+    owner: ToolScope | None = None,
 ) -> ReconcileReport:
-    """Compares rows to objects by hash, and assumes nothing about what committed."""
+    """Compares rows to objects by hash, and assumes nothing about what committed.
+
+    Objects are listed before rows are read. A row commits before its upload starts, so each
+    listed object has a visible row, and another worker's fresh upload can't look like an orphan.
+    """
+    listed = await store.names(f"{workspace_id}/{run_id}")
     cursor = await connection.execute(
         "select id, name, object_path, sha256, status from public.artifacts "
         "where run_id = %s and workspace_id = %s",
@@ -156,15 +171,19 @@ async def reconcile_run(
         verified = stored is not None and _digest(stored) == digest
         if status == "staged" and verified:
             async with connection.transaction():
+                await _still_owner(connection, owner)
                 await _publish_row(connection, artifact_id, run_id, name, digest)
             published.append(name)
         elif status == "staged":
-            await connection.execute(
-                "update public.artifacts set status = 'failed' where id = %s", (artifact_id,)
-            )
+            async with connection.transaction():
+                await _still_owner(connection, owner)
+                await connection.execute(
+                    "update public.artifacts set status = 'failed' where id = %s", (artifact_id,)
+                )
             incomplete.append(name)
         elif not verified:
             async with connection.transaction():
+                await _still_owner(connection, owner)
                 await connection.execute(
                     "update public.artifacts set status = 'missing' where id = %s", (artifact_id,)
                 )
@@ -175,8 +194,9 @@ async def reconcile_run(
                 )
             missing.append(name)
     known = {row[2] for row in rows}
-    orphans = [path for path in await store.names(f"{workspace_id}/{run_id}") if path not in known]
+    orphans = [path for path in listed if path not in known]
     for path in orphans:
+        await _still_owner(connection, owner)
         await store.remove(path)
     return ReconcileReport(tuple(published), tuple(incomplete), tuple(missing), tuple(orphans))
 
@@ -223,6 +243,8 @@ def publish_tool(store: ObjectStore) -> ToolDefinition:
     """Bytes come from this run's own saved file, never from arguments the model wrote out again."""
 
     async def run(arguments: PublishArtifact, context: ToolContext) -> PublishedArtifact:
+        if not arguments.path.startswith("outputs/"):
+            raise ToolFailed("artifact_source_not_output")
         cursor = await context.connection.execute(
             "select content from app_private.run_files "
             "where run_id = %s and path = %s and version = %s",

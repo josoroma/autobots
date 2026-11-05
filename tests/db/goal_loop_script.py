@@ -6,6 +6,7 @@ from typing import Any
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
+from pydantic import SecretStr
 
 from autobots.adapters.loop_middleware import ModelRoute
 
@@ -15,6 +16,8 @@ _ids = iter(range(1, 100000))
 
 class Script(BaseChatModel):
     items: list[Any]
+    # Held the way a real client holds a key, to show it stays out of checkpoints.
+    api_key: SecretStr = SecretStr('sk-or-planted-secret-value')
     seen: list[list[Any]] = []
     bound: list[list[str]] = []
 

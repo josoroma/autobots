@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import math
 from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -31,6 +32,9 @@ from autobots.application.model_attempts import (
 from autobots.application.plans import PLAN_REJECTIONS
 from autobots.application.run_usage import LimitReached, RootLimits, active_seconds_used, consume
 from autobots.application.tool_gateway import ToolScope, ownership_refusal
+
+CHECK_SECONDS = 1.0
+INTERRUPTING = frozenset({"cancelling", "cancelled", "failed", "succeeded"})
 
 REPAIRABLE = PLAN_REJECTIONS | {"invalid_arguments"}
 STOPPING = frozenset({"plan_revisions_limit"})
@@ -78,10 +82,21 @@ class AdmittedModel(BaseChatModel):
 
 @dataclass(frozen=True)
 class ModelRoute:
+    """A worker takes this from the run's frozen policy. `run_goal` refuses one that differs."""
+
     role: str
     profile: str
     wire_id: str
     worst_case_micro_usd: int
+
+
+def _retry_after(error: Exception) -> float | None:
+    headers = getattr(getattr(error, "response", None), "headers", None) or {}
+    try:
+        seconds = float(str(headers.get("retry-after")))
+    except ValueError:
+        return None
+    return seconds if math.isfinite(seconds) and seconds >= 0 else None
 
 
 def _charged(message: AIMessage) -> int | None:
@@ -99,6 +114,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
         *,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         slot_wait_seconds: float = 30.0,
+        model_call_seconds: float = 120.0,
     ) -> None:
         super().__init__()
         self._connection = connection
@@ -107,6 +123,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
         self._route = route
         self._sleep = sleep
         self._slot_wait_seconds = slot_wait_seconds
+        self._model_call_seconds = model_call_seconds
         self._lock = asyncio.Lock()
 
     async def _guard(self) -> float:
@@ -121,6 +138,33 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             raise LoopStopped("active_time_limit")
         return remaining
 
+    async def _bounded(self, handler: Any, request: Any, stopped: list[str]) -> Any:
+        """A hung call can't hold a run. Ending it proves nothing about what the provider did.
+
+        Only a cancel interrupts. A pause waits for a safe boundary, and a worker that lost its
+        lease still waits, because the reply is the only evidence of what the call cost.
+        """
+        task = asyncio.ensure_future(handler(request))
+        loop = asyncio.get_running_loop()
+        started = loop.time()
+        try:
+            while True:
+                done, _ = await asyncio.wait({task}, timeout=CHECK_SECONDS)
+                if done:
+                    return task.result()
+                if loop.time() - started >= self._model_call_seconds:
+                    raise ProviderFailure(FailureClass.UNCERTAIN_ACCEPTANCE)
+                cursor = await self._connection.execute(
+                    "select status from public.runs where id = %s", (self._scope.run_id,)
+                )
+                row = await cursor.fetchone()
+                if row is not None and row[0] in INTERRUPTING:
+                    stopped.append("run_not_running")
+                    raise ProviderFailure(FailureClass.UNCERTAIN_ACCEPTANCE)
+        finally:
+            if not task.done():
+                task.cancel()
+
     async def _repair(self, code: str) -> None:
         try:
             await consume(self._connection, self._scope.run_id, "repairs", self._limits.repairs)
@@ -132,11 +176,19 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
     ) -> tuple[Any, bool]:
         run_id = self._scope.run_id
         limit: list[LimitReached] = []
+        stopped: list[str] = []
         replies: list[Any] = []
         last_ticket: list[Any] = []
 
         async def dispatch(ticket: Any) -> ModelOutput:
             last_ticket.append(ticket)
+            # Every attempt, including a retry after its backoff. Nothing has been sent yet, so
+            # the failure closes the reservation as never accepted.
+            try:
+                await self._guard()
+            except LoopStopped as stop:
+                stopped.append(stop.code)
+                raise ProviderFailure(FailureClass.OTHER) from None
             try:
                 await consume(self._connection, run_id, "model_calls", self._limits.model_calls)
             except LimitReached as reached:
@@ -144,7 +196,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
                 raise ProviderFailure(FailureClass.OTHER) from None
             token = _ADMITTED.set(True)
             try:
-                response = await handler(request)
+                response = await self._bounded(handler, request, stopped)
             except ProviderFailure:
                 raise
             except Exception as error:
@@ -154,7 +206,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
                     if isinstance(status, int)
                     else FailureClass.UNCERTAIN_ACCEPTANCE
                 )
-                raise ProviderFailure(failure) from None
+                raise ProviderFailure(failure, retry_after=_retry_after(error)) from None
             finally:
                 _ADMITTED.reset(token)
             message = response.result[-1]
@@ -187,6 +239,8 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
                 ModelAdmission(self._connection), admission_request, dispatch, policy
             )
         except ProviderFailure as failure:
+            if stopped:
+                raise LoopStopped(stopped[0]) from None
             if limit:
                 raise LoopStopped(limit[0].code) from None
             raise LoopStopped(failure.failure.value) from None

@@ -10,7 +10,7 @@ markers are preserved across refreshes.
 | Target | EPIC-4 |
 | Kind | epic |
 | Focus | - |
-| Status | ACTIVE |
+| Status | COMPLETE |
 | Reason | - |
 | Started | 2026-11-05 |
 | Updated | 2026-11-05 |
@@ -26,16 +26,16 @@ markers are preserved across refreshes.
 | 5 | US-4.5 | us-4-5-private-artifacts-staged-publication | DONE | Private artifacts with staged publication and reconciliation |
 | 6 | US-4.6 | us-4-6-sanitized-event-replay-run | DONE | Sanitized event replay and run workspace |
 | 7 | US-4.7 | us-4-7-pause-cancellation-interrupted-run | DONE | Pause, cancellation and interrupted-run recovery |
-| 8 | US-4.8 | us-4-8-verify-first-durable-goal | READY | Verify the first durable goal-to-artifact slice |
+| 8 | US-4.8 | us-4-8-verify-first-durable-goal | DONE | Verify the first durable goal-to-artifact slice |
 
 ## Next Action
 
-Action: select
-Story: US-4.8
-Change: us-4-8-verify-first-durable-goal
+Action: complete
+Story: -
+Change: -
 Owner: main-session
-Command: openspec new change us-4-8-verify-first-durable-goal; set US-4.8 to IN PROGRESS with a Change: line
-Reason: US-4.8 is READY and has no OpenSpec change
+Command: none — every story in the goal is DONE
+Reason: all 8 story/stories are DONE
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

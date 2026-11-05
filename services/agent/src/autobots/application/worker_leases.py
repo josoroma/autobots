@@ -32,7 +32,8 @@ async def claim_next(
         cursor = await connection.execute(
             "select j.run_id, j.workspace_id, r.status, r.version "
             "from app_private.run_jobs j join public.runs r on r.id = j.run_id "
-            "where j.available_at <= clock_timestamp() and (j.status = 'queued' or "
+            "where r.status <> 'paused' and j.available_at <= clock_timestamp() "
+            "and (j.status = 'queued' or "
             "(j.status = 'claimed' and j.lease_expires_at <= clock_timestamp())) "
             "order by j.available_at limit 1 for update of j skip locked"
         )

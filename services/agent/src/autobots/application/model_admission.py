@@ -125,11 +125,16 @@ class ModelAdmission:
                 )
             ).fetchone()
             active, workspace_used, run_used = usage
+            cursor = await self._connection.execute(
+                "select limit_micro_usd from public.runs where id = %s", (request.root_run_id,)
+            )
+            run_row = await cursor.fetchone()
+            run_limit = min(limits[0], run_row[0]) if run_row else limits[0]
             if active >= limits[2]:
                 raise NoInferenceSlot("both inference slots are in use")
             cost = request.worst_case_micro_usd
             run_after, workspace_after = run_used + cost, workspace_used + cost
-            if run_after > limits[0] or workspace_after > limits[1]:
+            if run_after > run_limit or workspace_after > limits[1]:
                 raise BudgetExceeded("this would exceed the spending limit")
             invocation_id = uuid4()
             await self._connection.execute(
@@ -151,7 +156,7 @@ class ModelAdmission:
                     cost,
                 ),
             )
-        run_percent = _percent(run_after, limits[0])
+        run_percent = _percent(run_after, run_limit)
         workspace_percent = _percent(workspace_after, limits[1])
         return Ticket(
             invocation_id,
@@ -171,11 +176,14 @@ class ModelAdmission:
             raise ValueError("this attempt has already been settled")
 
     async def mark_dispatched(self, invocation_id: UUID) -> None:
-        await self._connection.execute(
+        """Raises if recovery closed this reservation meanwhile, so nothing is sent."""
+        cursor = await self._connection.execute(
             "update app_private.model_invocations set status = 'dispatched' "
-            "where id = %s and status = 'reserved'",
+            "where id = %s and status = 'reserved' returning id",
             (invocation_id,),
         )
+        if await cursor.fetchone() is None:
+            raise ValueError("this attempt was closed before it was sent")
 
     async def settle(
         self, invocation_id: UUID, charged_micro_usd: int, *, upstream_provider: str | None = None

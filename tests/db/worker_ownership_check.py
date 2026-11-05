@@ -18,6 +18,7 @@ from worker_graph import build  # noqa: E402
 
 from autobots.adapters.checkpoints import DURABILITY, fenced_checkpointer, graph_config, is_stale_owner  # noqa: E402
 from autobots.application.runs import LeaseLost, admit_run, apply_command  # noqa: E402
+from autobots.application.tool_gateway import ToolScope, ownership_refusal  # noqa: E402
 from autobots.application.worker_leases import claim_next, heartbeat  # noqa: E402
 from autobots.domain.models import resolve_role_policy  # noqa: E402
 from autobots.domain.runs import Actor, RunCommand  # noqa: E402
@@ -130,15 +131,22 @@ async def main() -> None:
                 outcome = await asyncio.wait_for(write, 20)
                 check('and then fails against the new generation', 'stale owner', outcome, outcome == 'stale owner')
 
-        # Pausing or cancelling removes ownership straight away.
+        # A pause reaches a live owner at its next check, and it saves its step and lets go.
         run = await admit()
         lease = await claim_next(db, worker_id='paused', lease_seconds=60)
         await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.PAUSE, actor=Actor.USER, expected_version=2)
+        scope = ToolScope(WORKSPACE, run, lease.generation, {})
+        refusal = await ownership_refusal(db, scope)
+        check('a paused run stops its owner dispatching', 'run_not_running', refusal, refusal == 'run_not_running')
         async with fenced_checkpointer(URL, lease) as saver:
+            saved = await rejected(lambda: build(saver, os.devnull).ainvoke({'seen': []}, graph_config(lease), durability=DURABILITY))
+            check('the owner can still save its step at that boundary', 'accepted', saved, saved == 'accepted')
+            check('a paused run is not claimable', 'no claim', await claim_next(db, worker_id='x') is None, await claim_next(db, worker_id='x') is None)
+            await expire(run)
+            check('even once its owner dies', 'no claim', await claim_next(db, worker_id='x') is None, await claim_next(db, worker_id='x') is None)
+            await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.RESUME, actor=Actor.USER, expected_version=3)
             refused = await rejected(lambda: build(saver, os.devnull).ainvoke({'seen': []}, graph_config(lease), durability=DURABILITY))
-        check('a paused run refuses its former owner', 'stale owner', refused, refused == 'stale owner')
-        check('a paused run is not claimable', 'no claim', await claim_next(db, worker_id='x') is None, await claim_next(db, worker_id='x') is None)
-        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.RESUME, actor=Actor.USER, expected_version=3)
+            check('a resume ends the old owner', 'stale owner', refused, refused == 'stale owner')
         resumed = await claim_next(db, worker_id='after-resume', lease_seconds=60)
         check('a resumed run is claimed by a new generation', 'generation 2', resumed.generation, resumed.generation == 2)
         cancelling = await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=5)

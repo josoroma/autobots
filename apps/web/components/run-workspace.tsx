@@ -205,6 +205,31 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
           {CONNECTION_TEXT[connection]}
         </p>
       </Card>
+      {snapshot.verification === null ? null : (
+        <Card aria-labelledby="verification-heading" className="space-y-2">
+          <h2 id="verification-heading" className="text-lg font-medium">
+            Verification
+          </h2>
+          {snapshot.verification.passed ? (
+            <p data-verification="passed" className="text-sm">
+              {snapshot.verification.checks === 0
+                ? "An artifact was published. No content check was defined for this goal, so its content wasn't judged."
+                : "Every required artifact and check passed."}
+            </p>
+          ) : (
+            <div data-verification="failed" className="space-y-1 text-sm">
+              <p>Not everything required was met:</p>
+              <ul className="list-disc pl-5">
+                {snapshot.verification.unmet.map((item) => (
+                  <li key={item}>
+                    {item.replaceAll("_", " ").replace(":", ": ")}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </Card>
+      )}
       <Card aria-labelledby="goal-heading" className="space-y-2">
         <h2 id="goal-heading" className="text-lg font-medium">
           Goal
@@ -284,9 +309,22 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
         <p className="text-sm">
           {snapshot.usage.model_calls} model calls,{" "}
           {snapshot.usage.tool_dispatches} tool calls, {snapshot.usage.repairs}{" "}
-          repairs. Spent {snapshot.run.budget.spent_micro_usd / 1_000_000} of $
-          {snapshot.run.budget.limit_micro_usd / 1_000_000}.
+          repairs. Spent ${snapshot.run.budget.spent_micro_usd / 1_000_000} of $
+          {snapshot.run.budget.limit_micro_usd / 1_000_000}, with $
+          {snapshot.run.budget.reserved_micro_usd / 1_000_000} reserved.
         </p>
+        {snapshot.outstanding.uncertain_calls +
+          snapshot.outstanding.unknown_effects +
+          snapshot.outstanding.unreported_charges ===
+        0 ? null : (
+          <p data-outstanding="true" className="text-sm">
+            Not settled: {snapshot.outstanding.uncertain_calls} model calls with
+            unknown outcomes, {snapshot.outstanding.unknown_effects} tool
+            effects with unknown outcomes,{" "}
+            {snapshot.outstanding.unreported_charges} calls with no reported
+            charge.
+          </p>
+        )}
       </Card>
       <Card aria-labelledby="timeline-heading" className="space-y-2">
         <h2 id="timeline-heading" className="text-lg font-medium">

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID, uuid4
 
-from autobots.contracts.plans import GoalSpec
+from autobots.contracts.plans import GoalSpec, InputDocument, RequiredArtifact
 from autobots.domain.models import RolePolicy
 from autobots.domain.runs import (
     TERMINAL,
@@ -81,7 +81,7 @@ def _status_changed(previous: str, current: str) -> dict[str, str]:
     return {"type": "run.status_changed", "previous": previous, "current": current}
 
 
-async def _existing_receipt(
+async def existing_receipt(
     connection: Any, scope: tuple[UUID, UUID, str, str, str], fingerprint: str
 ) -> dict[str, Any] | None:
     """Serializes this exact key, so concurrent duplicates wait and then see the first result."""
@@ -104,7 +104,7 @@ async def _existing_receipt(
     return result
 
 
-async def _store_receipt(
+async def store_receipt(
     connection: Any,
     scope: tuple[UUID, UUID, str, str, str],
     fingerprint: str,
@@ -138,6 +138,8 @@ async def admit_run(
     policy: RolePolicy,
     acceptance_criteria: tuple[str, ...] = (),
     continues_run_id: UUID | None = None,
+    required_artifacts: tuple[RequiredArtifact, ...] = (),
+    input_documents: tuple[InputDocument, ...] = (),
 ) -> AdmissionResult:
     """Run, job and first event commit together. A repeat returns the original result."""
     goal = goal_text.strip()
@@ -149,11 +151,13 @@ async def admit_run(
             "limit_micro_usd": limit_micro_usd,
             "criteria": criteria,
             "continues": str(continues_run_id),
+            "required": [item.model_dump() for item in required_artifacts],
+            "documents": [item.model_dump() for item in input_documents],
         }
     )
     scope = (workspace_id, actor_id, "admit_run", str(workspace_id), idempotency_key)
     async with connection.transaction():
-        existing = await _existing_receipt(connection, scope, fingerprint)
+        existing = await existing_receipt(connection, scope, fingerprint)
         if existing is not None:
             return AdmissionResult(
                 UUID(existing["run_id"]), existing["version"], existing["status"], True
@@ -187,12 +191,26 @@ async def admit_run(
             "insert into app_private.run_jobs (run_id, workspace_id) values (%s, %s)",
             (run_id, workspace_id),
         )
+        for document in input_documents:
+            content = document.content
+            await connection.execute(
+                "insert into app_private.run_files (run_id, path, version, content, sha256, "
+                "media_type, operation_id) values (%s, %s, 1, %s, %s, 'text/plain', %s)",
+                (
+                    run_id,
+                    document.path,
+                    content,
+                    hashlib.sha256(content.encode()).hexdigest(),
+                    f"input:{run_id}:{document.path}",
+                ),
+            )
         spec = GoalSpec(
             objective=goal,
             original_request=goal_text,
             criteria={f"c{index}": text for index, text in enumerate(criteria, start=1)},
             allowed_tools=dict(LOOP_TOOL_GRANTS),
             allowed_paths=list(RUN_FILE_GRANTS),
+            required_artifacts=list(required_artifacts),
         )
         await connection.execute(
             "insert into app_private.goal_specs (run_id, spec) values (%s, %s)",
@@ -200,7 +218,7 @@ async def admit_run(
         )
         await append_event(connection, run_id, _status_changed(status, status))
         result = {"run_id": str(run_id), "version": 1, "status": status}
-        await _store_receipt(connection, scope, fingerprint, result)
+        await store_receipt(connection, scope, fingerprint, result)
     return AdmissionResult(run_id, 1, status, False)
 
 
@@ -294,13 +312,15 @@ async def apply_command(
 
     Always the job's row, then the run's, the same order a claim uses, so the two can't deadlock.
     """
-    fingerprint = request_hash({"command": command.value, "expected_version": expected_version})
+    fingerprint = request_hash(
+        {"command": command.value, "expected_version": expected_version, "response": response}
+    )
     scope = None
     if actor_id is not None and idempotency_key is not None:
         scope = (workspace_id, actor_id, command.value, str(run_id), idempotency_key)
     async with connection.transaction():
         if scope is not None:
-            existing = await _existing_receipt(connection, scope, fingerprint)
+            existing = await existing_receipt(connection, scope, fingerprint)
             if existing is not None:
                 return TransitionResult(run_id, existing["version"], existing["status"], False)
         cursor = await connection.execute(
@@ -334,6 +354,20 @@ async def apply_command(
         )
         await _record_obligation(connection, run_id, command, detail, response)
         job_status = _job_status(following)
+        if following is RunStatus.CANCELLING and not (
+            job is not None and job[0] == "claimed" and bool(job[2])
+        ):
+            # Open work with no live owner. Something has to come back and settle it.
+            job_status = "queued"
+        if (
+            following is RunStatus.PAUSED
+            and actor is Actor.USER
+            and job is not None
+            and job[0] == "claimed"
+            and bool(job[2])
+        ):
+            # The owner sees this at its next check, saves its step and lets go.
+            job_status = None
         if job_status is not None:
             await connection.execute(
                 "update app_private.run_jobs set status = %s, lease_owner = null, "
@@ -342,7 +376,7 @@ async def apply_command(
             )
         result = {"version": new_version, "status": following.value}
         if scope is not None:
-            await _store_receipt(connection, scope, fingerprint, result)
+            await store_receipt(connection, scope, fingerprint, result)
     return TransitionResult(run_id, new_version, following.value, True)
 
 

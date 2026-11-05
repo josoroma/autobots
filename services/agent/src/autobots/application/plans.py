@@ -6,7 +6,7 @@ from typing import Any
 from uuid import UUID
 
 from autobots.application.run_usage import LimitReached, RootLimits, consume
-from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed
+from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed, hold_lease
 from autobots.contracts.plans import (
     CompleteTask,
     GoalSpec,
@@ -173,6 +173,7 @@ def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
         version = plan[0] + 1 if plan else 1
         try:
             async with context.connection.transaction():
+                await hold_lease(context.connection, context.scope)
                 if plan is not None:
                     await consume(
                         context.connection, run_id, "plan_revisions", limits.plan_revisions
@@ -191,6 +192,15 @@ def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
             raise ToolFailed(reached.code) from None
         return PlanCommitted(version=version, tasks=[task.id for task in arguments.tasks])
 
+    async def proposed_already(
+        arguments: PlanProposal, context: ToolContext
+    ) -> PlanCommitted | None:
+        """A crash may have committed this exact plan. If not, the transaction left nothing."""
+        plan = await latest_plan(context.connection, context.scope.run_id)
+        if plan is None or plan[1] != arguments.tasks:
+            return None
+        return PlanCommitted(version=plan[0], tasks=[task.id for task in arguments.tasks])
+
     async def complete(arguments: CompleteTask, context: ToolContext) -> TaskCompleted:
         run_id = context.scope.run_id
         plan = await latest_plan(context.connection, run_id)
@@ -206,16 +216,18 @@ def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
         for item in arguments.evidence:
             if not await _evidence_exists(context.connection, run_id, item.kind, item.reference):
                 raise ToolFailed("evidence_invalid")
-        await context.connection.execute(
-            "insert into app_private.plan_evidence (run_id, task_id, evidence, summary) "
-            "values (%s, %s, %s, %s) on conflict (run_id, task_id) do nothing",
-            (
-                run_id,
-                arguments.task_id,
-                json.dumps([item.model_dump() for item in arguments.evidence]),
-                arguments.summary,
-            ),
-        )
+        async with context.connection.transaction():
+            await hold_lease(context.connection, context.scope)
+            await context.connection.execute(
+                "insert into app_private.plan_evidence (run_id, task_id, evidence, summary) "
+                "values (%s, %s, %s, %s) on conflict (run_id, task_id) do nothing",
+                (
+                    run_id,
+                    arguments.task_id,
+                    json.dumps([item.model_dump() for item in arguments.evidence]),
+                    arguments.summary,
+                ),
+            )
         return TaskCompleted(
             task_id=arguments.task_id,
             remaining=sorted(set(tasks) - done - {arguments.task_id}),
@@ -230,6 +242,8 @@ def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
             output_model=PlanCommitted,
             operation_class=OperationClass.REVERSIBLE_INTERNAL_WRITE,
             handler=propose,
+            reconcile=proposed_already,
+            safe_to_repeat=True,
         ),
         ToolDefinition(
             tool_id="complete_task",
@@ -239,5 +253,7 @@ def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
             output_model=TaskCompleted,
             operation_class=OperationClass.REVERSIBLE_INTERNAL_WRITE,
             handler=complete,
+            # Its insert ignores a repeat, so finishing an interrupted attempt can't double it.
+            safe_to_repeat=True,
         ),
     )
