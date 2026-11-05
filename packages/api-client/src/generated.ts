@@ -186,6 +186,25 @@ export const schemas = {
     "title": "CredentialDraft",
     "type": "object"
   },
+  "CriterionView": {
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "title": "Id",
+        "type": "string"
+      },
+      "text": {
+        "title": "Text",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "text"
+    ],
+    "title": "CriterionView",
+    "type": "object"
+  },
   "EffectiveRolePolicy": {
     "additionalProperties": false,
     "properties": {
@@ -235,6 +254,46 @@ export const schemas = {
       "message"
     ],
     "title": "ErrorResponse",
+    "type": "object"
+  },
+  "EventPage": {
+    "additionalProperties": false,
+    "description": "`gap` means retained events can't fill the range, so the client needs a snapshot.",
+    "properties": {
+      "events": {
+        "items": {
+          "$ref": "#/components/schemas/RunEvent"
+        },
+        "title": "Events",
+        "type": "array"
+      },
+      "gap": {
+        "title": "Gap",
+        "type": "boolean"
+      },
+      "next_cursor": {
+        "title": "Next Cursor",
+        "type": "integer"
+      },
+      "run_id": {
+        "format": "uuid",
+        "title": "Run Id",
+        "type": "string"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "run_id",
+      "events",
+      "next_cursor",
+      "gap"
+    ],
+    "title": "EventPage",
     "type": "object"
   },
   "ExpectedVersion": {
@@ -405,6 +464,40 @@ export const schemas = {
     ],
     "title": "ModelRole",
     "type": "string"
+  },
+  "PlanSummary": {
+    "additionalProperties": false,
+    "properties": {
+      "revision_reason": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Revision Reason"
+      },
+      "tasks": {
+        "items": {
+          "$ref": "#/components/schemas/TaskView"
+        },
+        "title": "Tasks",
+        "type": "array"
+      },
+      "version": {
+        "title": "Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "version",
+      "revision_reason",
+      "tasks"
+    ],
+    "title": "PlanSummary",
+    "type": "object"
   },
   "ProviderStatus": {
     "additionalProperties": false,
@@ -851,6 +944,85 @@ export const schemas = {
     "title": "RunSummary",
     "type": "object"
   },
+  "RunWorkspace": {
+    "additionalProperties": false,
+    "properties": {
+      "artifacts": {
+        "items": {
+          "$ref": "#/components/schemas/ArtifactSummary"
+        },
+        "title": "Artifacts",
+        "type": "array"
+      },
+      "criteria": {
+        "items": {
+          "$ref": "#/components/schemas/CriterionView"
+        },
+        "title": "Criteria",
+        "type": "array"
+      },
+      "cursor": {
+        "title": "Cursor",
+        "type": "integer"
+      },
+      "objective": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Objective"
+      },
+      "plan": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/PlanSummary"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "run": {
+        "$ref": "#/components/schemas/RunSummary"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "stop_reason": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Stop Reason"
+      },
+      "usage": {
+        "$ref": "#/components/schemas/UsageSummary"
+      }
+    },
+    "required": [
+      "schema_version",
+      "run",
+      "objective",
+      "criteria",
+      "plan",
+      "artifacts",
+      "usage",
+      "stop_reason",
+      "cursor"
+    ],
+    "title": "RunWorkspace",
+    "type": "object"
+  },
   "ServiceHealth": {
     "additionalProperties": false,
     "description": "Liveness only. Holds no address, version or secret.",
@@ -902,6 +1074,83 @@ export const schemas = {
       "workspace_ids"
     ],
     "title": "SessionSummary",
+    "type": "object"
+  },
+  "TaskView": {
+    "additionalProperties": false,
+    "properties": {
+      "criteria": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Criteria",
+        "type": "array"
+      },
+      "evidence_summary": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Evidence Summary"
+      },
+      "id": {
+        "title": "Id",
+        "type": "string"
+      },
+      "status": {
+        "enum": [
+          "open",
+          "complete"
+        ],
+        "title": "Status",
+        "type": "string"
+      },
+      "title": {
+        "title": "Title",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "title",
+      "status",
+      "criteria",
+      "evidence_summary"
+    ],
+    "title": "TaskView",
+    "type": "object"
+  },
+  "UsageSummary": {
+    "additionalProperties": false,
+    "properties": {
+      "model_calls": {
+        "title": "Model Calls",
+        "type": "integer"
+      },
+      "plan_revisions": {
+        "title": "Plan Revisions",
+        "type": "integer"
+      },
+      "repairs": {
+        "title": "Repairs",
+        "type": "integer"
+      },
+      "tool_dispatches": {
+        "title": "Tool Dispatches",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "model_calls",
+      "tool_dispatches",
+      "repairs",
+      "plan_revisions"
+    ],
+    "title": "UsageSummary",
     "type": "object"
   },
   "ValidationError": {
@@ -1030,6 +1279,15 @@ export function parseCredentialDraft(value: unknown): CredentialDraft {
   return parseWith(schemas, "CredentialDraft", value) as CredentialDraft;
 }
 
+export interface CriterionView {
+  id: string;
+  text: string;
+}
+
+export function parseCriterionView(value: unknown): CriterionView {
+  return parseWith(schemas, "CriterionView", value) as CriterionView;
+}
+
 export interface EffectiveRolePolicy {
   bindings: RoleBinding[];
   role_policy_version: number;
@@ -1047,6 +1305,18 @@ export interface ErrorResponse {
 
 export function parseErrorResponse(value: unknown): ErrorResponse {
   return parseWith(schemas, "ErrorResponse", value) as ErrorResponse;
+}
+
+export interface EventPage {
+  events: RunEvent[];
+  gap: boolean;
+  next_cursor: number;
+  run_id: string;
+  schema_version: 1;
+}
+
+export function parseEventPage(value: unknown): EventPage {
+  return parseWith(schemas, "EventPage", value) as EventPage;
 }
 
 export interface ExpectedVersion {
@@ -1116,6 +1386,16 @@ export type ModelRole = "coordinator" | "router" | "planner" | "executor" | "res
 
 export function parseModelRole(value: unknown): ModelRole {
   return parseWith(schemas, "ModelRole", value) as ModelRole;
+}
+
+export interface PlanSummary {
+  revision_reason: string | null;
+  tasks: TaskView[];
+  version: number;
+}
+
+export function parsePlanSummary(value: unknown): PlanSummary {
+  return parseWith(schemas, "PlanSummary", value) as PlanSummary;
 }
 
 export interface ProviderStatus {
@@ -1243,6 +1523,22 @@ export function parseRunSummary(value: unknown): RunSummary {
   return parseWith(schemas, "RunSummary", value) as RunSummary;
 }
 
+export interface RunWorkspace {
+  artifacts: ArtifactSummary[];
+  criteria: CriterionView[];
+  cursor: number;
+  objective: string | null;
+  plan: PlanSummary | null;
+  run: RunSummary;
+  schema_version: 1;
+  stop_reason: string | null;
+  usage: UsageSummary;
+}
+
+export function parseRunWorkspace(value: unknown): RunWorkspace {
+  return parseWith(schemas, "RunWorkspace", value) as RunWorkspace;
+}
+
 export interface ServiceHealth {
   schema_version: 1;
   status: "ok";
@@ -1260,6 +1556,29 @@ export interface SessionSummary {
 
 export function parseSessionSummary(value: unknown): SessionSummary {
   return parseWith(schemas, "SessionSummary", value) as SessionSummary;
+}
+
+export interface TaskView {
+  criteria: string[];
+  evidence_summary: string | null;
+  id: string;
+  status: "open" | "complete";
+  title: string;
+}
+
+export function parseTaskView(value: unknown): TaskView {
+  return parseWith(schemas, "TaskView", value) as TaskView;
+}
+
+export interface UsageSummary {
+  model_calls: number;
+  plan_revisions: number;
+  repairs: number;
+  tool_dispatches: number;
+}
+
+export function parseUsageSummary(value: unknown): UsageSummary {
+  return parseWith(schemas, "UsageSummary", value) as UsageSummary;
 }
 
 export interface ValidationError {
@@ -1311,6 +1630,10 @@ export async function cancelRun(options: ClientOptions, run_id: string, body: Ru
   return parseRunCommandResult(await requestJson(options, "POST", `/v1/runs/${encodeURIComponent(run_id)}/cancel`, body));
 }
 
+export async function listRunEvents(options: ClientOptions, run_id: string): Promise<EventPage> {
+  return parseEventPage(await requestJson(options, "GET", `/v1/runs/${encodeURIComponent(run_id)}/events`));
+}
+
 export async function submitRunInput(options: ClientOptions, run_id: string, body: RunCommandRequest): Promise<RunCommandResult> {
   return parseRunCommandResult(await requestJson(options, "POST", `/v1/runs/${encodeURIComponent(run_id)}/input`, body));
 }
@@ -1321,6 +1644,10 @@ export async function pauseRun(options: ClientOptions, run_id: string, body: Run
 
 export async function resumeRun(options: ClientOptions, run_id: string, body: RunCommandRequest): Promise<RunCommandResult> {
   return parseRunCommandResult(await requestJson(options, "POST", `/v1/runs/${encodeURIComponent(run_id)}/resume`, body));
+}
+
+export async function getRunWorkspace(options: ClientOptions, run_id: string): Promise<RunWorkspace> {
+  return parseRunWorkspace(await requestJson(options, "GET", `/v1/runs/${encodeURIComponent(run_id)}/workspace`));
 }
 
 export async function getSession(options: ClientOptions): Promise<SessionSummary> {

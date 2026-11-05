@@ -31,6 +31,7 @@ export function GoalComposer() {
   const restored = useSyncExternalStore(subscribe, storedDraft, () => "");
   const [edited, setEdited] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const [runId, setRunId] = useState<string | null>(null);
   const draft = edited ?? restored;
 
   function update(value: string): void {
@@ -54,6 +55,8 @@ export function GoalComposer() {
       body: JSON.stringify({ goal_text: draft }),
     }).catch(() => null);
     if (reply?.ok === true) {
+      const accepted = (await reply.json()) as { run_id: string };
+      setRunId(accepted.run_id);
       setOutcome("queued");
       return;
     }
@@ -105,7 +108,15 @@ export function GoalComposer() {
           ) : outcome === "credential_unavailable" ? (
             "Credential storage is unavailable, so model-backed work is blocked. Your draft is kept."
           ) : outcome === "queued" ? (
-            "Your goal is queued. No worker runs it yet, so no model has been called."
+            <>
+              Your goal is queued. No worker runs it yet, so no model has been
+              called.{" "}
+              {runId === null ? null : (
+                <Link href={`/runs/${runId}`} className="font-medium underline">
+                  Open this run
+                </Link>
+              )}
+            </>
           ) : (
             "That could not be checked. Sign in, then try again. Your draft is kept."
           )}

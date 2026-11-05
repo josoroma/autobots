@@ -136,9 +136,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-4.5 | Private artifacts with staged publication and reconciliation | DONE | EPIC-4 |
 | US-4.5#1 | Implement staged private uploads and authorized metadata/downloads. | DONE | US-4.5 |
 | US-4.5#2 | Test cross-workspace denial, interruption and hash reconciliation. | DONE | US-4.5 |
-| US-4.6 | Sanitized event replay and run workspace | READY | EPIC-4 |
-| US-4.6#1 | Implement durable event projection, cursor transport and typed client. | TODO | US-4.6 |
-| US-4.6#2 | Build the run/plan/artifact inspector with accessible status states. | TODO | US-4.6 |
+| US-4.6 | Sanitized event replay and run workspace | DONE | EPIC-4 |
+| US-4.6#1 | Implement durable event projection, cursor transport and typed client. | DONE | US-4.6 |
+| US-4.6#2 | Build the run/plan/artifact inspector with accessible status states. | DONE | US-4.6 |
 | US-4.7 | Pause, cancellation and interrupted-run recovery | READY | EPIC-4 |
 | US-4.7#1 | Implement cancellation propagation and preserved pause/wait context. | TODO | US-4.7 |
 | US-4.7#2 | Run late-result, sleep, retry and competing completion/cancellation fixtures. | TODO | US-4.7 |
@@ -1768,7 +1768,8 @@ Open Questions:
 
 ### US-4.6: Sanitized event replay and run workspace
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-4-6-sanitized-event-replay-run/`
 
 As a user
 I want an inspectable timeline that survives reconnects
@@ -1801,8 +1802,8 @@ Dependencies:
 - US-4.3
 
 Tasks:
-- [ ] Implement durable event projection, cursor transport and typed client.
-- [ ] Build the run/plan/artifact inspector with accessible status states.
+- [x] Implement durable event projection, cursor transport and typed client.
+- [x] Build the run/plan/artifact inspector with accessible status states.
 
 Open Questions:
 - None.

@@ -24,10 +24,9 @@ function safeError(
  * server, and anything the client sent under that name is dropped. Bodies are forwarded unread and
  * never logged, so a draft key cannot reach a response or a log from this layer.
  */
-export async function forward(
+async function authorized(
   request: NextRequest,
-  apiPath: string,
-): Promise<NextResponse> {
+): Promise<Headers | NextResponse> {
   const config = serverConfig();
   const refusal = guardRequest(
     {
@@ -47,10 +46,21 @@ export async function forward(
   if (session === null) {
     return safeError(401, "not_signed_in", "Sign in first.");
   }
-  const headers = new Headers({
+  return new Headers({
     Authorization: `Bearer ${session}`,
     "X-Autobots-Internal": config.internalToken,
   });
+}
+
+export async function forward(
+  request: NextRequest,
+  apiPath: string,
+): Promise<NextResponse> {
+  const config = serverConfig();
+  const headers = await authorized(request);
+  if (headers instanceof NextResponse) {
+    return headers;
+  }
   for (const name of [
     "content-type",
     "x-autobots-workspace",
@@ -89,6 +99,55 @@ export async function forward(
     return new NextResponse(await reply.arrayBuffer(), {
       status: reply.status,
       headers: replyHeaders,
+    });
+  } catch {
+    return safeError(
+      503,
+      "service_unavailable",
+      "The local API is unavailable.",
+    );
+  }
+}
+
+/**
+ * A live event stream, passed through unbuffered. The browser going away ends this request and its
+ * reader, and nothing else: a run's work belongs to its worker.
+ */
+export async function streamFrom(
+  request: NextRequest,
+  apiPath: string,
+): Promise<Response> {
+  const config = serverConfig();
+  const headers = await authorized(request);
+  if (headers instanceof NextResponse) {
+    return headers;
+  }
+  const workspace = request.headers.get("x-autobots-workspace");
+  if (workspace !== null) {
+    headers.set("x-autobots-workspace", workspace);
+  }
+  try {
+    const reply = await fetch(new URL(apiPath, config.apiUrl), {
+      headers,
+      redirect: "error",
+      signal: request.signal,
+    });
+    if (!reply.ok || reply.body === null) {
+      return new NextResponse(await reply.arrayBuffer(), {
+        status: reply.status,
+        headers: {
+          "Content-Type":
+            reply.headers.get("content-type") ?? "application/json",
+          "Cache-Control": "no-store",
+        },
+      });
+    }
+    return new Response(reply.body, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-store",
+        "X-Accel-Buffering": "no",
+      },
     });
   } catch {
     return safeError(

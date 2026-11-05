@@ -105,6 +105,27 @@ def test_commands_refuse_the_wrong_actor_or_state(
         next_status(current, command, actor)
 
 
+def test_a_raw_payload_never_projects() -> None:
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    from autobots.application.run_projection import project_event, public_text
+
+    now = datetime.now(UTC)
+    for payload in (
+        {"type": "model.reasoning", "text": "private"},
+        {"type": "run.status_changed", "previous": "queued", "current": "paused", "extra": "x"},
+        {"type": "run.status_changed", "previous": "queued"},
+        "just text",
+    ):
+        assert project_event(uuid4(), 1, payload, now) is None
+    good = {"type": "run.status_changed", "previous": "queued", "current": "paused"}
+    assert project_event(uuid4(), 1, good, now) is not None
+    assert public_text("key sk-or-abcdefgh here") == "key [redacted] here"
+    assert public_text("Bearer abcdefghijklmnop") == "[redacted]"
+    assert len(public_text("x" * 900)) == 500
+
+
 def test_cancelling_twice_is_idempotent() -> None:
     assert next_status(RunStatus.CANCELLING, RunCommand.CANCEL, Actor.USER) is None
     assert next_status(RunStatus.CANCELLED, RunCommand.CANCEL, Actor.USER) is None

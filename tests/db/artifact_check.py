@@ -232,6 +232,7 @@ async def main() -> dict[str, Any]:
         model = Script(items=[calls(PLAN), calls(('save_artifact', {'path': 'outputs/loop.md', 'content': 'from the loop'})), calls(('publish_artifact', {'path': 'outputs/loop.md', 'version': 1})), say('stop')], seen=[], bound=[])
         await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE, object_store=store))
         name = await value("select name from public.artifacts where run_id = %s and status = 'published'", lease.run_id)
+        result['loop_run'] = str(lease.run_id)
         check('the loop publishes through the gateway', 'loop.md', name, name == 'loop.md')
         check('the model is offered the publish tool only when storage exists', 'present', 'publish_artifact' in model.bound[0], 'publish_artifact' in model.bound[0])
     return result

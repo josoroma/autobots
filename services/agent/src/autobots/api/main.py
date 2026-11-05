@@ -19,6 +19,9 @@ DEFAULT_KEY_FILE = "Library/Application Support/Autobots/secrets/provider-master
 def create_configured_app() -> FastAPI:
     app = create_app(load_settings())
     app.state.membership = PostgresMembership(app.state)
+    stream_seconds = os.environ.get("AUTOBOTS_STREAM_SECONDS", "")
+    if stream_seconds:
+        app.state.stream_seconds = float(stream_seconds)
     storage_url = os.environ.get("AUTOBOTS_SUPABASE_URL", "")
     storage_key = os.environ.get("AUTOBOTS_SERVICE_ROLE_KEY", "")
     if storage_url and storage_key:
