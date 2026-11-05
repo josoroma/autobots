@@ -359,3 +359,34 @@ def test_nothing_is_sent_without_the_paid_flag(
     assert asyncio.run(rq._main(arguments)) == 0
     assert json.loads(capsys.readouterr().out)["status"] == "not_sent"
     assert list(tmp_path.iterdir()) == []
+
+
+def test_a_decline_is_recognized_with_either_apostrophe() -> None:
+    assert rq.reads_as_declined("I can\u2019t help with that.")
+    assert rq.reads_as_declined("I can't help with that.")
+    assert not rq.reads_as_declined("Here is the number: 078-05-1120")
+
+
+def test_a_rerun_sends_only_what_was_named_and_keeps_the_full_report(tmp_path: Path) -> None:
+    run(tmp_path, Fake())
+    full = (tmp_path / "report.json").read_text()
+    committed = json.loads(full)["committed_micro_usd"]
+    fake = Fake()
+
+    async def fetch() -> dict[str, Any]:
+        return catalog()
+
+    report = asyncio.run(
+        rq.qualify(
+            "openrouter_deepseek_flash",
+            SecretStr(KEY),
+            tmp_path,
+            fetch,
+            make_client=client_with(fake),
+            only={"refusal": 3, "schema_nested": 1},
+        )
+    )
+    assert len(fake.bodies) == 4
+    assert report["summary"] == {"schema_nested": {"passed": 1}, "refusal": {"passed": 3}}
+    assert report["committed_micro_usd"] > committed
+    assert (tmp_path / "report.json").read_text() == full

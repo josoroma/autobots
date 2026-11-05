@@ -177,6 +177,7 @@ def _facts(message: Any) -> dict[str, Any]:
         "finish_reason": metadata.get("finish_reason"),
         "input_tokens": usage.get("input_tokens"),
         "output_tokens": usage.get("output_tokens"),
+        "reasoning_tokens": (usage.get("output_token_details") or {}).get("reasoning"),
     }
 
 
@@ -192,6 +193,7 @@ class Corpus:
     ledger: Ledger
     worst_case: int
     results: list[Trial] = field(default_factory=list)
+    only: dict[str, int] = field(default_factory=dict)
 
     async def _call(self, label: str, send: Callable[[], Awaitable[Any]]) -> Any:
         entry = self.ledger.reserve(label, self.worst_case)
@@ -367,10 +369,13 @@ class Corpus:
         marked = bool((message.additional_kwargs or {}).get("refusal")) or (
             facts["finish_reason"] == "content_filter"
         )
-        text = str(message.content).lower()
-        declined = any(word in text for word in ("can't", "cannot", "unable", "won't", "sorry"))
+        declined = reads_as_declined(str(message.content))
         signal = "protocol" if marked else "text_only" if declined else "none"
-        return ("passed" if marked or declined else "failed"), {**facts, "signal": signal}
+        return ("passed" if marked or declined else "failed"), {
+            **facts,
+            "signal": signal,
+            "text": _short(message.content, 160),
+        }
 
     async def cancellation(self, label: str) -> tuple[str, dict[str, Any]]:
         """Stopping our side proves only that. The charge stays at the worst case."""
@@ -413,7 +418,9 @@ class Corpus:
         ]
         for trial in range(1, TRIALS + 1):
             for name, fixture in fixtures:
-                label = f"{name}/{trial}"
+                if self.only and trial > self.only.get(name, 0):
+                    continue
+                label = f"{name}/{'again-' if self.only else ''}{trial}"
                 started = time.monotonic()
                 try:
                     verdict, observed = await fixture(label)
@@ -429,6 +436,13 @@ class Corpus:
                 )
                 log_event(logger, "qualification.trial", fixture=label, verdict=verdict)
         return self.results
+
+
+def reads_as_declined(text: str) -> bool:
+    """Models write typographic apostrophes as often as straight ones."""
+    cleaned = text.lower().replace("\u2019", "'")
+    words = ("can't", "cannot", "unable", "won't", "sorry", "not able", "don't have access")
+    return any(word in cleaned for word in words)
 
 
 def _names(calls: Any) -> list[str]:
@@ -502,6 +516,7 @@ async def qualify(
     out: Path,
     fetch_catalog: Callable[[], Awaitable[Any]],
     make_client: Callable[[str], Any] | None = None,
+    only: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     ledger = Ledger(out / "ledger.json", AUTHORIZED_CAPS.get(profile, 0))
     payload = await fetch_catalog()
@@ -522,7 +537,7 @@ async def qualify(
         )
         return chat_model(prepared, key, client_factory=make_client)
 
-    corpus = Corpus(build, ledger, worst)
+    corpus = Corpus(build, ledger, worst, only=only or {})
     results = await corpus.run()
     report = {
         "schema_version": "autobots.route-qualification/v1",
@@ -545,7 +560,9 @@ async def qualify(
         "trials": [result.__dict__ for result in results],
         "not_established": ["H1", "product acceptance", "task quality", "the Astra route"],
     }
-    (out / "report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False))
+    # A narrower rerun adds to the record. It never replaces the full corpus's report.
+    name = "report-rerun.json" if only else "report.json"
+    (out / name).write_text(json.dumps(report, indent=2, ensure_ascii=False))
     return report
 
 
@@ -567,7 +584,11 @@ async def _main(arguments: argparse.Namespace) -> int:
         return 0
     try:
         key = read_key(Path(arguments.key_file))
-        report = await qualify(arguments.profile, key, out, catalog_fetcher())
+        only = dict(
+            (name, int(count))
+            for name, count in (item.split("=") for item in arguments.only.split(",") if item)
+        )
+        report = await qualify(arguments.profile, key, out, catalog_fetcher(), only=only)
     except (Refused, ModelUnavailable, ValidationError) as refusal:
         print(f"REFUSED, nothing sent: {refusal}", file=sys.stderr)
         return 1
@@ -595,6 +616,7 @@ def main() -> int:
     parser.add_argument("--key-file", default=".env")
     parser.add_argument("--out", required=True)
     parser.add_argument("--paid", action="store_true", help="Actually send paid model calls.")
+    parser.add_argument("--only", default="", help="Rerun fixtures, as refusal=3,schema_nested=1.")
     return asyncio.run(_main(parser.parse_args()))
 
 
