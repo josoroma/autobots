@@ -137,8 +137,30 @@ def storage_cases(cases: Cases, base: str, anon: str, token_a: str, token_b: str
     cases.check('the bucket has no public read', 'a 4xx refusal', str(status), denied(status))
 
 
+def artifact_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port: int, anon: str, token_a: str, token_b: str,
+                   workspace_a: str, workspace_b: str) -> dict[str, str]:
+    """Publication and recovery against real Storage, through the runtime role."""
+    url = f'postgresql://autobots_runtime:{stack.runtime_password}@127.0.0.1:{db_port}/postgres'
+    result = subprocess.run([str(root / PYTHON), str(root / 'tests/db/artifact_check.py'), workspace_a, workspace_b],
+                            env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'AUTOBOTS_STORAGE_BASE': base, 'AUTOBOTS_STORAGE_ANON': anon,
+                                 'AUTOBOTS_STORAGE_SERVICE': stack.values['SERVICE_ROLE_KEY'], 'AUTOBOTS_TOKEN_A': token_a, 'AUTOBOTS_TOKEN_B': token_b,
+                                 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
+                            capture_output=True, text=True, errors='replace', timeout=240, check=False)
+    if result.returncode:
+        cases.check('the artifact check ran', 'exit 0', f'exit {result.returncode}: {result.stderr.strip()[-380:]}', False)
+    if not result.stdout.strip():
+        return {}
+    report = json.loads(result.stdout.strip().splitlines()[-1])
+    for case in report['cases']:
+        cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+    return {'AUTOBOTS_TEST_ARTIFACT_RUN': report.get('run_id', ''), 'AUTOBOTS_TEST_ARTIFACT_ID': report.get('artifact_id', ''),
+            'AUTOBOTS_TEST_ARTIFACT_TEXT': report.get('expected_text', ''), 'AUTOBOTS_TEST_ARTIFACT_GONE': report.get('gone_id', ''),
+            'AUTOBOTS_TEST_ARTIFACT_TAMPERED': report.get('tampered_id', '')}
+
+
 def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port: int, email: str, password: str,
-                  workspace_a: str, workspace_b: str, email_b: str, password_b: str, email_c: str, password_c: str) -> None:
+                  workspace_a: str, workspace_b: str, email_b: str, password_b: str, email_c: str, password_c: str,
+                  artifacts: Mapping[str, str]) -> None:
     tools = find_tools(root)
     web = root / 'apps/web'
     next_bin, playwright = web / 'node_modules/.bin/next', web / 'node_modules/.bin/playwright'
@@ -166,6 +188,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
     runtime_url = f'postgresql://autobots_runtime:{stack.runtime_password}@127.0.0.1:{db_port}/postgres'
     api_env = {**tool_env(), 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1', 'AUTOBOTS_INTERNAL_TOKEN': internal,
                'AUTOBOTS_JWT_SECRET': stack.values['JWT_SECRET'], 'AUTOBOTS_DATABASE_URL': runtime_url,
+               'AUTOBOTS_SUPABASE_URL': base, 'AUTOBOTS_SERVICE_ROLE_KEY': stack.values['SERVICE_ROLE_KEY'],
                'AUTOBOTS_CONFIG_ROOT': str(config_root), 'AUTOBOTS_PROVIDER_MASTER_KEY_FILE': str(config_root / 'secrets/master.key'),
                'AUTOBOTS_TEST_UPSTREAM_LOG': str(upstream_log), 'AUTOBOTS_TEST_CATALOG_DOWN': str(catalog_down), 'NODE_ENV': 'production'}
     web_env = {**env, 'AUTOBOTS_INTERNAL_TOKEN': internal, 'AUTOBOTS_API_URL': api_url, 'AUTOBOTS_ALLOWED_ORIGIN': web_url, 'NODE_ENV': 'production',
@@ -180,8 +203,8 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
         processes.append(start([str(next_bin), 'start', '-H', '127.0.0.1', '-p', str(web_port)], web_env, web))
         wait_until_up(f'{api_url}/v1/health', processes[0])
         wait_until_up(web_url, processes[1])
-        result = subprocess.run([str(playwright), 'test', 'identity', 'settings', 'runs', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
-                                env={**env, 'AUTOBOTS_WEB_URL': web_url, 'AUTOBOTS_TEST_OWNER_EMAIL': email, 'AUTOBOTS_TEST_OWNER_PASSWORD': password,
+        result = subprocess.run([str(playwright), 'test', 'identity', 'settings', 'runs', 'artifacts', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
+                                env={**env, **artifacts, 'AUTOBOTS_WEB_URL': web_url, 'AUTOBOTS_TEST_OWNER_EMAIL': email, 'AUTOBOTS_TEST_OWNER_PASSWORD': password,
                                      'AUTOBOTS_TEST_WORKSPACE_A': workspace_a, 'AUTOBOTS_TEST_WORKSPACE_B': workspace_b,
                                      'AUTOBOTS_TEST_OWNER_B_EMAIL': email_b, 'AUTOBOTS_TEST_OWNER_B_PASSWORD': password_b,
                                      'AUTOBOTS_TEST_MEMBER_EMAIL': email_c, 'AUTOBOTS_TEST_MEMBER_PASSWORD': password_c,
@@ -252,11 +275,12 @@ def qualify(root: Path) -> int:
         stack.runtime(f"insert into public.runs (id, workspace_id, limit_micro_usd) values ('{run_a}', '{owner_a['workspace_id']}', 1);\n")
         rest_cases(cases, stack, base, anon, token_a, token_b, run_a)
         storage_cases(cases, base, anon, token_a, token_b, owner_a['workspace_id'], owner_b['workspace_id'])
+        artifacts = artifact_cases(root, cases, stack, base, db_port, anon, token_a, token_b, owner_a['workspace_id'], owner_b['workspace_id'])
         email_c, password_c = 'member-c@example.invalid', secrets.token_urlsafe(24)
         owner_c = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_c, password_c)
         stack.runtime(f"insert into public.workspace_members (workspace_id, user_id, role) values ('{owner_a['workspace_id']}', '{owner_c['user_id']}', 'member');\\n")
         browser_cases(root, cases, stack, base, db_port, email_a, password_a, owner_a['workspace_id'], owner_b['workspace_id'],
-                      email_b, password_b, email_c, password_c)
+                      email_b, password_b, email_c, password_c, artifacts)
     finally:
         remove_stack(stack)
     label = f'label=com.docker.compose.project={project}'

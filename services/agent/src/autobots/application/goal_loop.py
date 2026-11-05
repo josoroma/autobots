@@ -22,6 +22,7 @@ from autobots.adapters.loop_middleware import (
     ModelRoute,
 )
 from autobots.adapters.tool_middleware import GatewayMiddleware, visible_tools
+from autobots.application.artifacts import publish_tool
 from autobots.application.plans import load_goal, plan_tools, plan_view
 from autobots.application.run_usage import (
     RootLimits,
@@ -63,6 +64,7 @@ class LoopConfig:
     limits: RootLimits = RootLimits()  # noqa: RUF009 - frozen, so sharing the default is safe.
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
     slot_wait_seconds: float = 30.0
+    object_store: Any = None
 
 
 @dataclass(frozen=True)
@@ -79,10 +81,12 @@ class LoopResult:
     usage: dict[str, Any]
 
 
-def loop_registry(limits: RootLimits) -> ToolRegistry:
+def loop_registry(limits: RootLimits, object_store: Any = None) -> ToolRegistry:
     registry = ToolRegistry()
     for tool in (CALCULATE, READ_RUN_FILE, SAVE_ARTIFACT, *plan_tools(limits)):
         registry.register(tool)
+    if object_store is not None:
+        registry.register(publish_tool(object_store))
     return registry
 
 
@@ -90,7 +94,7 @@ def build_stage(
     connection: Any, model: Any, saver: Any, scope: ToolScope, config: LoopConfig
 ) -> Any:
     """Explicit tools and middleware. Skills, memory, subagents and a backend stay unset here."""
-    gateway = ToolGateway(loop_registry(config.limits))
+    gateway = ToolGateway(loop_registry(config.limits, config.object_store))
     return create_deep_agent(
         model=AdmittedModel(delegate=model),
         tools=visible_tools(gateway, scope),

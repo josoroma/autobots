@@ -57,6 +57,8 @@ class ToolDefinition:
     resources: Callable[[Any], tuple[str, ...]] = lambda _: ()
     # Finds out whether an interrupted effect happened, from the destination rather than memory.
     reconcile: Reconcile | None = None
+    # The destination refuses duplicates, so finishing an interrupted attempt can't repeat it.
+    safe_to_repeat: bool = False
     # Applied to anything returned to the model or stored in a receipt.
     redact: Callable[[dict[str, Any]], dict[str, Any]] = lambda output: output
 
@@ -249,6 +251,8 @@ class ToolGateway:
                 return ToolResult(
                     ToolOutcome.SUCCEEDED, output=visible, operation_id=operation_id, replayed=True
                 )
+        if tool.safe_to_repeat:
+            return None
         await _record(context, operation_id, "unknown", None)
         return ToolResult(
             ToolOutcome.UNKNOWN, "outcome_unknown", operation_id=operation_id, replayed=True

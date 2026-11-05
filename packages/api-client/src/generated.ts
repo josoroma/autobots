@@ -2,6 +2,137 @@
 import { type ClientOptions, parseWith, requestJson } from './runtime.ts';
 
 export const schemas = {
+  "ArtifactList": {
+    "additionalProperties": false,
+    "properties": {
+      "artifacts": {
+        "items": {
+          "$ref": "#/components/schemas/ArtifactSummary"
+        },
+        "title": "Artifacts",
+        "type": "array"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "artifacts"
+    ],
+    "title": "ArtifactList",
+    "type": "object"
+  },
+  "ArtifactMissing": {
+    "additionalProperties": false,
+    "properties": {
+      "artifact_id": {
+        "format": "uuid",
+        "title": "Artifact Id",
+        "type": "string"
+      },
+      "name": {
+        "title": "Name",
+        "type": "string"
+      },
+      "type": {
+        "const": "artifact.missing",
+        "title": "Type",
+        "type": "string"
+      }
+    },
+    "required": [
+      "type",
+      "artifact_id",
+      "name"
+    ],
+    "title": "ArtifactMissing",
+    "type": "object"
+  },
+  "ArtifactPublished": {
+    "additionalProperties": false,
+    "properties": {
+      "artifact_id": {
+        "format": "uuid",
+        "title": "Artifact Id",
+        "type": "string"
+      },
+      "name": {
+        "title": "Name",
+        "type": "string"
+      },
+      "sha256": {
+        "title": "Sha256",
+        "type": "string"
+      },
+      "type": {
+        "const": "artifact.published",
+        "title": "Type",
+        "type": "string"
+      }
+    },
+    "required": [
+      "type",
+      "artifact_id",
+      "name",
+      "sha256"
+    ],
+    "title": "ArtifactPublished",
+    "type": "object"
+  },
+  "ArtifactSummary": {
+    "additionalProperties": false,
+    "description": "Not strict, since it is built from database values. Never holds a storage path.",
+    "properties": {
+      "id": {
+        "format": "uuid",
+        "title": "Id",
+        "type": "string"
+      },
+      "media_type": {
+        "title": "Media Type",
+        "type": "string"
+      },
+      "name": {
+        "title": "Name",
+        "type": "string"
+      },
+      "run_id": {
+        "format": "uuid",
+        "title": "Run Id",
+        "type": "string"
+      },
+      "sha256": {
+        "title": "Sha256",
+        "type": "string"
+      },
+      "size_bytes": {
+        "title": "Size Bytes",
+        "type": "integer"
+      },
+      "status": {
+        "enum": [
+          "published",
+          "missing"
+        ],
+        "title": "Status",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "run_id",
+      "name",
+      "media_type",
+      "size_bytes",
+      "sha256",
+      "status"
+    ],
+    "title": "ArtifactSummary",
+    "type": "object"
+  },
   "BudgetCounters": {
     "additionalProperties": false,
     "properties": {
@@ -509,7 +640,18 @@ export const schemas = {
         "type": "string"
       },
       "payload": {
-        "$ref": "#/components/schemas/RunStatusChanged"
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/RunStatusChanged"
+          },
+          {
+            "$ref": "#/components/schemas/ArtifactPublished"
+          },
+          {
+            "$ref": "#/components/schemas/ArtifactMissing"
+          }
+        ],
+        "title": "Payload"
       },
       "run_id": {
         "format": "uuid",
@@ -825,6 +967,50 @@ export const schemas = {
   }
 } as const;
 
+export interface ArtifactList {
+  artifacts: ArtifactSummary[];
+  schema_version: 1;
+}
+
+export function parseArtifactList(value: unknown): ArtifactList {
+  return parseWith(schemas, "ArtifactList", value) as ArtifactList;
+}
+
+export interface ArtifactMissing {
+  artifact_id: string;
+  name: string;
+  type: "artifact.missing";
+}
+
+export function parseArtifactMissing(value: unknown): ArtifactMissing {
+  return parseWith(schemas, "ArtifactMissing", value) as ArtifactMissing;
+}
+
+export interface ArtifactPublished {
+  artifact_id: string;
+  name: string;
+  sha256: string;
+  type: "artifact.published";
+}
+
+export function parseArtifactPublished(value: unknown): ArtifactPublished {
+  return parseWith(schemas, "ArtifactPublished", value) as ArtifactPublished;
+}
+
+export interface ArtifactSummary {
+  id: string;
+  media_type: string;
+  name: string;
+  run_id: string;
+  sha256: string;
+  size_bytes: number;
+  status: "published" | "missing";
+}
+
+export function parseArtifactSummary(value: unknown): ArtifactSummary {
+  return parseWith(schemas, "ArtifactSummary", value) as ArtifactSummary;
+}
+
 export interface BudgetCounters {
   limit_micro_usd: number;
   reserved_micro_usd: number;
@@ -995,7 +1181,7 @@ export function parseRunCommandResult(value: unknown): RunCommandResult {
 export interface RunEvent {
   causal_ids: string[];
   occurred_at: string;
-  payload: RunStatusChanged;
+  payload: RunStatusChanged | ArtifactPublished | ArtifactMissing;
   run_id: string;
   schema_version: 1;
   sequence: number;
@@ -1115,6 +1301,10 @@ export async function checkRunIntent(options: ClientOptions): Promise<RunIntentC
 
 export async function getRun(options: ClientOptions, run_id: string): Promise<RunSummary> {
   return parseRunSummary(await requestJson(options, "GET", `/v1/runs/${encodeURIComponent(run_id)}`));
+}
+
+export async function listRunArtifacts(options: ClientOptions, run_id: string): Promise<ArtifactList> {
+  return parseArtifactList(await requestJson(options, "GET", `/v1/runs/${encodeURIComponent(run_id)}/artifacts`));
 }
 
 export async function cancelRun(options: ClientOptions, run_id: string, body: RunCommandRequest): Promise<RunCommandResult> {

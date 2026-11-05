@@ -76,12 +76,19 @@ export async function forward(
       signal: AbortSignal.timeout(30_000),
       ...(body === null ? {} : { body }),
     });
+    const replyHeaders = new Headers({
+      "Content-Type": reply.headers.get("content-type") ?? "application/json",
+      "Cache-Control": "no-store",
+    });
+    for (const name of ["content-disposition", "x-content-type-options"]) {
+      const value = reply.headers.get(name);
+      if (value !== null) {
+        replyHeaders.set(name, value);
+      }
+    }
     return new NextResponse(await reply.arrayBuffer(), {
       status: reply.status,
-      headers: {
-        "Content-Type": reply.headers.get("content-type") ?? "application/json",
-        "Cache-Control": "no-store",
-      },
+      headers: replyHeaders,
     });
   } catch {
     return safeError(

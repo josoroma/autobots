@@ -44,6 +44,23 @@ class RunStatusChanged(BaseModel):
     current: RunStatus
 
 
+class ArtifactPublished(BaseModel):
+    model_config = STRICT_CONTRACT
+
+    type: Literal["artifact.published"]
+    artifact_id: Identifier
+    name: str
+    sha256: str
+
+
+class ArtifactMissing(BaseModel):
+    model_config = STRICT_CONTRACT
+
+    type: Literal["artifact.missing"]
+    artifact_id: Identifier
+    name: str
+
+
 class RunEvent(BaseModel):
     """The sanitized public envelope from SP-011. Payloads are typed, so nothing raw can pass."""
 
@@ -54,7 +71,7 @@ class RunEvent(BaseModel):
     sequence: Sequence
     causal_ids: list[Identifier]
     occurred_at: UtcTimestamp
-    payload: RunStatusChanged
+    payload: RunStatusChanged | ArtifactPublished | ArtifactMissing
 
 
 class ErrorResponse(BaseModel):

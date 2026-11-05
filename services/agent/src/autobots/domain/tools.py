@@ -18,6 +18,7 @@ LOOP_TOOL_GRANTS = {
     "save_artifact": 1,
     "propose_plan": 1,
     "complete_task": 1,
+    "publish_artifact": 1,
 }
 RUN_FILE_GRANTS = ("outputs",)
 

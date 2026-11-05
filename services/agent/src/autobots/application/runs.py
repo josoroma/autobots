@@ -54,15 +54,24 @@ def request_hash(payload: dict[str, Any]) -> str:
     return hashlib.sha256(encoded.encode()).hexdigest()
 
 
-async def _append_event(
-    connection: Any, run_id: UUID, sequence: int, previous: str | None, current: str
-) -> None:
-    payload = {"type": "run.status_changed", "previous": previous or current, "current": current}
+async def append_event(connection: Any, run_id: UUID, payload: dict[str, Any]) -> int:
+    """Sequences are gapless per run, and the row update serializes concurrent writers."""
+    cursor = await connection.execute(
+        "update public.runs set event_sequence = event_sequence + 1 where id = %s "
+        "returning event_sequence",
+        (run_id,),
+    )
+    sequence: int = (await cursor.fetchone())[0]
     await connection.execute(
         "insert into public.run_events (run_id, sequence, schema_version, payload, occurred_at) "
         "values (%s, %s, 1, %s, now())",
         (run_id, sequence, json.dumps(payload)),
     )
+    return sequence
+
+
+def _status_changed(previous: str, current: str) -> dict[str, str]:
+    return {"type": "run.status_changed", "previous": previous, "current": current}
 
 
 async def _existing_receipt(
@@ -166,7 +175,7 @@ async def admit_run(
             "insert into app_private.goal_specs (run_id, spec) values (%s, %s)",
             (run_id, spec.model_dump_json()),
         )
-        await _append_event(connection, run_id, 1, None, status)
+        await append_event(connection, run_id, _status_changed(status, status))
         result = {"run_id": str(run_id), "version": 1, "status": status}
         await _store_receipt(connection, scope, fingerprint, result)
     return AdmissionResult(run_id, 1, status, False)
@@ -198,7 +207,7 @@ async def record_transition(
         "update public.runs set status = %s, version = %s, updated_at = now() where id = %s",
         (following, new_version, run_id),
     )
-    await _append_event(connection, run_id, new_version, previous, following)
+    await append_event(connection, run_id, _status_changed(previous, following))
     return new_version
 
 
@@ -283,6 +292,7 @@ __all__ = [
     "RunNotFound",
     "VersionConflict",
     "admit_run",
+    "append_event",
     "apply_command",
     "record_transition",
 ]

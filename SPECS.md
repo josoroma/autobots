@@ -133,9 +133,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-4.4 | Versioned tool registry and operation receipts | DONE | EPIC-4 |
 | US-4.4#1 | Implement the narrow read/calculation/artifact tool contracts and central policy gateway. | DONE | US-4.4 |
 | US-4.4#2 | Test denied resources, hidden tools and receipt reuse. | DONE | US-4.4 |
-| US-4.5 | Private artifacts with staged publication and reconciliation | READY | EPIC-4 |
-| US-4.5#1 | Implement staged private uploads and authorized metadata/downloads. | TODO | US-4.5 |
-| US-4.5#2 | Test cross-workspace denial, interruption and hash reconciliation. | TODO | US-4.5 |
+| US-4.5 | Private artifacts with staged publication and reconciliation | DONE | EPIC-4 |
+| US-4.5#1 | Implement staged private uploads and authorized metadata/downloads. | DONE | US-4.5 |
+| US-4.5#2 | Test cross-workspace denial, interruption and hash reconciliation. | DONE | US-4.5 |
 | US-4.6 | Sanitized event replay and run workspace | READY | EPIC-4 |
 | US-4.6#1 | Implement durable event projection, cursor transport and typed client. | TODO | US-4.6 |
 | US-4.6#2 | Build the run/plan/artifact inspector with accessible status states. | TODO | US-4.6 |
@@ -1727,7 +1727,8 @@ Open Questions:
 
 ### US-4.5: Private artifacts with staged publication and reconciliation
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-4-5-private-artifacts-staged-publication/`
 
 As a user
 I want durable scoped output files
@@ -1759,8 +1760,8 @@ Dependencies:
 - US-4.4
 
 Tasks:
-- [ ] Implement staged private uploads and authorized metadata/downloads.
-- [ ] Test cross-workspace denial, interruption and hash reconciliation.
+- [x] Implement staged private uploads and authorized metadata/downloads.
+- [x] Test cross-workspace denial, interruption and hash reconciliation.
 
 Open Questions:
 - None.

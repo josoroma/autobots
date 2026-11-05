@@ -4,8 +4,10 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI
+from pydantic import SecretStr
 
 from autobots.adapters.models.openrouter_metadata import catalog_fetcher, key_validator
+from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.api.app import create_app
 from autobots.api.membership import PostgresMembership
 from autobots.api.settings import load_settings
@@ -17,6 +19,10 @@ DEFAULT_KEY_FILE = "Library/Application Support/Autobots/secrets/provider-master
 def create_configured_app() -> FastAPI:
     app = create_app(load_settings())
     app.state.membership = PostgresMembership(app.state)
+    storage_url = os.environ.get("AUTOBOTS_SUPABASE_URL", "")
+    storage_key = os.environ.get("AUTOBOTS_SERVICE_ROLE_KEY", "")
+    if storage_url and storage_key:
+        app.state.object_store = SupabaseObjectStore(storage_url, SecretStr(storage_key))
     config_root = os.environ.get("AUTOBOTS_CONFIG_ROOT", "")
     if config_root:
         key_file = os.environ.get("AUTOBOTS_PROVIDER_MASTER_KEY_FILE") or str(

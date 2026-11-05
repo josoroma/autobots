@@ -1,6 +1,137 @@
 {
   "components": {
     "schemas": {
+      "ArtifactList": {
+        "additionalProperties": false,
+        "properties": {
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactSummary"
+            },
+            "title": "Artifacts",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "artifacts"
+        ],
+        "title": "ArtifactList",
+        "type": "object"
+      },
+      "ArtifactMissing": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "format": "uuid",
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "type": {
+            "const": "artifact.missing",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "artifact_id",
+          "name"
+        ],
+        "title": "ArtifactMissing",
+        "type": "object"
+      },
+      "ArtifactPublished": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "format": "uuid",
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "type": {
+            "const": "artifact.published",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "artifact_id",
+          "name",
+          "sha256"
+        ],
+        "title": "ArtifactPublished",
+        "type": "object"
+      },
+      "ArtifactSummary": {
+        "additionalProperties": false,
+        "description": "Not strict, since it is built from database values. Never holds a storage path.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "published",
+              "missing"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "name",
+          "media_type",
+          "size_bytes",
+          "sha256",
+          "status"
+        ],
+        "title": "ArtifactSummary",
+        "type": "object"
+      },
       "BudgetCounters": {
         "additionalProperties": false,
         "properties": {
@@ -508,7 +639,18 @@
             "type": "string"
           },
           "payload": {
-            "$ref": "#/components/schemas/RunStatusChanged"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunStatusChanged"
+              },
+              {
+                "$ref": "#/components/schemas/ArtifactPublished"
+              },
+              {
+                "$ref": "#/components/schemas/ArtifactMissing"
+              }
+            ],
+            "title": "Payload"
           },
           "run_id": {
             "format": "uuid",
@@ -1222,6 +1364,95 @@
           }
         },
         "summary": "Get Run"
+      }
+    },
+    "/v1/runs/{run_id}/artifacts": {
+      "get": {
+        "operationId": "listRunArtifacts",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Artifacts"
       }
     },
     "/v1/runs/{run_id}/cancel": {

@@ -22,6 +22,7 @@ def test_the_schema_builds_without_any_connection() -> None:
         "/v1/runs",
         "/v1/runs/intent",
         "/v1/runs/{run_id}",
+        "/v1/runs/{run_id}/artifacts",
         "/v1/runs/{run_id}/cancel",
         "/v1/runs/{run_id}/input",
         "/v1/runs/{run_id}/pause",
