@@ -1,0 +1,450 @@
+[
+  {
+    "name": "valid run",
+    "model": "RunSummary",
+    "valid": true,
+    "value": {
+      "schema_version": 1,
+      "id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "22222222-2222-4222-8222-222222222222",
+      "parent_run_id": null,
+      "status": "running",
+      "created_at": "2026-11-05T00:00:00Z",
+      "updated_at": "2026-11-05T00:00:01.500Z",
+      "budget": {
+        "spent_micro_usd": 0,
+        "reserved_micro_usd": 5,
+        "limit_micro_usd": 9007199254740991
+      }
+    }
+  },
+  {
+    "name": "valid run with a parent",
+    "model": "RunSummary",
+    "valid": true,
+    "value": {
+      "schema_version": 1,
+      "id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "22222222-2222-4222-8222-222222222222",
+      "parent_run_id": "33333333-3333-4333-8333-333333333333",
+      "status": "running",
+      "created_at": "2026-11-05T00:00:00Z",
+      "updated_at": "2026-11-05T00:00:01.500Z",
+      "budget": {
+        "spent_micro_usd": 0,
+        "reserved_micro_usd": 5,
+        "limit_micro_usd": 9007199254740991
+      }
+    }
+  },
+  {
+    "name": "valid event",
+    "model": "RunEvent",
+    "valid": true,
+    "value": {
+      "schema_version": 1,
+      "run_id": "11111111-1111-4111-8111-111111111111",
+      "sequence": 1,
+      "causal_ids": [],
+      "occurred_at": "2026-11-05T00:00:00+00:00",
+      "payload": {
+        "type": "run.status_changed",
+        "previous": "queued",
+        "current": "running"
+      }
+    }
+  },
+  {
+    "name": "valid error",
+    "model": "ErrorResponse",
+    "valid": true,
+    "value": {
+      "code": "run_not_found",
+      "message": "No such run."
+    }
+  },
+  {
+    "name": "bad identifier: not a UUID",
+    "model": "RunSummary",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "id": "not-a-uuid",
+      "workspace_id": "22222222-2222-4222-8222-222222222222",
+      "parent_run_id": null,
+      "status": "running",
+      "created_at": "2026-11-05T00:00:00Z",
+      "updated_at": "2026-11-05T00:00:01.500Z",
+      "budget": {
+        "spent_micro_usd": 0,
+        "reserved_micro_usd": 5,
+        "limit_micro_usd": 9007199254740991
+      }
+    }
+  },
+  {
+    "name": "bad identifier: a number",
+    "model": "RunSummary",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "id": 12,
+      "workspace_id": "22222222-2222-4222-8222-222222222222",
+      "parent_run_id": null,
+      "status": "running",
+      "created_at": "2026-11-05T00:00:00Z",
+      "updated_at": "2026-11-05T00:00:01.500Z",
+      "budget": {
+        "spent_micro_usd": 0,
+        "reserved_micro_usd": 5,
+        "limit_micro_usd": 9007199254740991
+      }
+    }
+  },
+  {
+    "name": "bad identifier: workspace is empty",
+    "model": "RunSummary",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "",
+      "parent_run_id": null,
+      "status": "running",
+      "created_at": "2026-11-05T00:00:00Z",
+      "updated_at": "2026-11-05T00:00:01.500Z",
+      "budget": {
+        "spent_micro_usd": 0,
+        "reserved_micro_usd": 5,
+        "limit_micro_usd": 9007199254740991
+      }
+    }
+  },
+  {
+    "name": "bad money: a fractional amount",
+    "model": "RunSummary",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "22222222-2222-4222-8222-222222222222",
+      "parent_run_id": null,
+      "status": "running",
+      "created_at": "2026-11-05T00:00:00Z",
+      "updated_at": "2026-11-05T00:00:01.500Z",
+      "budget": {
+        "spent_micro_usd": 1.5,
+        "reserved_micro_usd": 5,
+        "limit_micro_usd": 9007199254740991
+      }
+    }
+  },
+  {
+    "name": "bad money: negative",
+    "model": "RunSummary",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "22222222-2222-4222-8222-222222222222",
+      "parent_run_id": null,
+      "status": "running",
+      "created_at": "2026-11-05T00:00:00Z",
+      "updated_at": "2026-11-05T00:00:01.500Z",
+      "budget": {
+        "spent_micro_usd": -1,
+        "reserved_micro_usd": 5,
+        "limit_micro_usd": 9007199254740991
+      }
+    }
+  },
+  {
+    "name": "bad money: a numeric string",
+    "model": "RunSummary",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "22222222-2222-4222-8222-222222222222",
+      "parent_run_id": null,
+      "status": "running",
+      "created_at": "2026-11-05T00:00:00Z",
+      "updated_at": "2026-11-05T00:00:01.500Z",
+      "budget": {
+        "spent_micro_usd": 0,
+        "reserved_micro_usd": 5,
+        "limit_micro_usd": "100"
+      }
+    }
+  },
+  {
+    "name": "bad money: above the exact integer range",
+    "model": "RunSummary",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "22222222-2222-4222-8222-222222222222",
+      "parent_run_id": null,
+      "status": "running",
+      "created_at": "2026-11-05T00:00:00Z",
+      "updated_at": "2026-11-05T00:00:01.500Z",
+      "budget": {
+        "spent_micro_usd": 0,
+        "reserved_micro_usd": 5,
+        "limit_micro_usd": 9007199254740992
+      }
+    }
+  },
+  {
+    "name": "bad money: a boolean",
+    "model": "RunSummary",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "22222222-2222-4222-8222-222222222222",
+      "parent_run_id": null,
+      "status": "running",
+      "created_at": "2026-11-05T00:00:00Z",
+      "updated_at": "2026-11-05T00:00:01.500Z",
+      "budget": {
+        "spent_micro_usd": 0,
+        "reserved_micro_usd": true,
+        "limit_micro_usd": 9007199254740991
+      }
+    }
+  },
+  {
+    "name": "bad timestamp: not a date",
+    "model": "RunSummary",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "22222222-2222-4222-8222-222222222222",
+      "parent_run_id": null,
+      "status": "running",
+      "created_at": "yesterday",
+      "updated_at": "2026-11-05T00:00:01.500Z",
+      "budget": {
+        "spent_micro_usd": 0,
+        "reserved_micro_usd": 5,
+        "limit_micro_usd": 9007199254740991
+      }
+    }
+  },
+  {
+    "name": "bad timestamp: no offset",
+    "model": "RunSummary",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "22222222-2222-4222-8222-222222222222",
+      "parent_run_id": null,
+      "status": "running",
+      "created_at": "2026-11-05T00:00:00",
+      "updated_at": "2026-11-05T00:00:01.500Z",
+      "budget": {
+        "spent_micro_usd": 0,
+        "reserved_micro_usd": 5,
+        "limit_micro_usd": 9007199254740991
+      }
+    }
+  },
+  {
+    "name": "bad timestamp: not UTC",
+    "model": "RunSummary",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "22222222-2222-4222-8222-222222222222",
+      "parent_run_id": null,
+      "status": "running",
+      "created_at": "2026-11-05T00:00:00+02:00",
+      "updated_at": "2026-11-05T00:00:01.500Z",
+      "budget": {
+        "spent_micro_usd": 0,
+        "reserved_micro_usd": 5,
+        "limit_micro_usd": 9007199254740991
+      }
+    }
+  },
+  {
+    "name": "bad timestamp: an epoch number",
+    "model": "RunSummary",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "22222222-2222-4222-8222-222222222222",
+      "parent_run_id": null,
+      "status": "running",
+      "created_at": "2026-11-05T00:00:00Z",
+      "updated_at": 1794000000,
+      "budget": {
+        "spent_micro_usd": 0,
+        "reserved_micro_usd": 5,
+        "limit_micro_usd": 9007199254740991
+      }
+    }
+  },
+  {
+    "name": "bad enum: unknown status",
+    "model": "RunSummary",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "22222222-2222-4222-8222-222222222222",
+      "parent_run_id": null,
+      "status": "done",
+      "created_at": "2026-11-05T00:00:00Z",
+      "updated_at": "2026-11-05T00:00:01.500Z",
+      "budget": {
+        "spent_micro_usd": 0,
+        "reserved_micro_usd": 5,
+        "limit_micro_usd": 9007199254740991
+      }
+    }
+  },
+  {
+    "name": "bad enum: wrong case",
+    "model": "RunSummary",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "22222222-2222-4222-8222-222222222222",
+      "parent_run_id": null,
+      "status": "RUNNING",
+      "created_at": "2026-11-05T00:00:00Z",
+      "updated_at": "2026-11-05T00:00:01.500Z",
+      "budget": {
+        "spent_micro_usd": 0,
+        "reserved_micro_usd": 5,
+        "limit_micro_usd": 9007199254740991
+      }
+    }
+  },
+  {
+    "name": "bad enum: unknown event type",
+    "model": "RunEvent",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "run_id": "11111111-1111-4111-8111-111111111111",
+      "sequence": 1,
+      "causal_ids": [],
+      "occurred_at": "2026-11-05T00:00:00+00:00",
+      "payload": {
+        "type": "raw.graph_update",
+        "previous": "queued",
+        "current": "running"
+      }
+    }
+  },
+  {
+    "name": "bad schema version",
+    "model": "RunSummary",
+    "valid": false,
+    "value": {
+      "schema_version": 2,
+      "id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "22222222-2222-4222-8222-222222222222",
+      "parent_run_id": null,
+      "status": "running",
+      "created_at": "2026-11-05T00:00:00Z",
+      "updated_at": "2026-11-05T00:00:01.500Z",
+      "budget": {
+        "spent_micro_usd": 0,
+        "reserved_micro_usd": 5,
+        "limit_micro_usd": 9007199254740991
+      }
+    }
+  },
+  {
+    "name": "missing required field",
+    "model": "RunSummary",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "22222222-2222-4222-8222-222222222222",
+      "parent_run_id": null,
+      "created_at": "2026-11-05T00:00:00Z",
+      "updated_at": "2026-11-05T00:00:01.500Z",
+      "budget": {
+        "spent_micro_usd": 0,
+        "reserved_micro_usd": 5,
+        "limit_micro_usd": 9007199254740991
+      }
+    }
+  },
+  {
+    "name": "private field: lease generation on a run",
+    "model": "RunSummary",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "22222222-2222-4222-8222-222222222222",
+      "parent_run_id": null,
+      "status": "running",
+      "created_at": "2026-11-05T00:00:00Z",
+      "updated_at": "2026-11-05T00:00:01.500Z",
+      "budget": {
+        "spent_micro_usd": 0,
+        "reserved_micro_usd": 5,
+        "limit_micro_usd": 9007199254740991
+      },
+      "lease_generation": 3
+    }
+  },
+  {
+    "name": "private field: reasoning in an event payload",
+    "model": "RunEvent",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "run_id": "11111111-1111-4111-8111-111111111111",
+      "sequence": 1,
+      "causal_ids": [],
+      "occurred_at": "2026-11-05T00:00:00+00:00",
+      "payload": {
+        "type": "run.status_changed",
+        "previous": "queued",
+        "current": "running",
+        "reasoning": "private"
+      }
+    }
+  },
+  {
+    "name": "bad sequence: zero",
+    "model": "RunEvent",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "run_id": "11111111-1111-4111-8111-111111111111",
+      "sequence": 0,
+      "causal_ids": [],
+      "occurred_at": "2026-11-05T00:00:00+00:00",
+      "payload": {
+        "type": "run.status_changed",
+        "previous": "queued",
+        "current": "running"
+      }
+    }
+  },
+  {
+    "name": "empty error code",
+    "model": "ErrorResponse",
+    "valid": false,
+    "value": {
+      "code": "",
+      "message": "x"
+    }
+  }
+]

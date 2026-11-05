@@ -60,7 +60,7 @@ python3.12 scripts/verify.py --profile full
 
 Reports are `.checks/<profile>/latest.json`. Each binds to a fingerprint of the harness files plus application sources, manifests and locks, but not environments, caches or build output. Links count by target name, and secret files, evidence output and build output never count. A change to those inputs makes every profile's report stale. `fast` chooses steps from what differs since the newest passing `fast` or `full` report, not from Git, so committing a change does not hide it, and with no passing report it runs both domains. The `Stop` hook likewise wants a current `fast` or `full` report for application or shared inputs, a current `db` report for database inputs, and otherwise any current report. A skipped test fails its profile.
 
-Not run by any profile: generated contract drift, because no contract exists yet; browser fixtures, because none are configured; and most of `tests/toolchain`, whose copies bootstrap from registries; `full` runs only its offline scope tests.
+Not run by any profile: browser fixtures, because none are configured; and most of `tests/toolchain`, whose copies bootstrap from registries; `full` runs only its offline scope tests.
 
 ## Disposable database qualification
 
@@ -88,6 +88,19 @@ Expected: exit 1, `REFUSED before any change`, with no Docker call. A target pas
 | Exit 2 on a missing image | Pull the digest in the Compose file deliberately. The check never pulls |
 
 This qualifies the wrappers on synthetic fixtures, with images that are not the pinned self-hosted release. The `db` profile separately qualifies that release; see [its runbook](local-supabase.md). Neither says anything about a persistent stack.
+
+## Generate and check contracts
+
+Pydantic models in `services/agent/src/autobots/contracts/` own the public API. Changing one needs regenerating:
+
+```sh
+python3.12 scripts/generate_contracts.py write
+python3.12 scripts/generate_contracts.py check
+```
+
+Expected: `check` exits 0 with `PASS`. On drift it exits 1 and names the file, and `fast` and `full` fail. Exit 2 means the prepared Python environment is missing. Generation builds the pure application, opens nothing and needs no key. `contracts/fixtures/boundary-cases.json` is the shared set of valid and invalid values that both the Python and TypeScript tests read.
+
+Unknown enum values are refused at the boundary, in both languages, on either side of a version change. A new value therefore needs its consumers regenerated first, and `schema_version` raised if it changes meaning.
 
 ## Qualify deliberate faults
 

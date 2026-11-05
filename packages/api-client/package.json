@@ -1,5 +1,10 @@
 {
   "name": "@autobots/api-client",
   "version": "0.0.0",
-  "private": true
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/generated.ts",
+    "./runtime": "./src/runtime.ts"
+  }
 }

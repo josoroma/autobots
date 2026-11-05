@@ -44,15 +44,17 @@ APP_INPUT_DIRECTORIES = ('apps', 'services', 'packages', 'contracts', 'infra', '
 NON_INPUT_DIRECTORIES = frozenset({'__pycache__', '.venv', 'node_modules', '.next', '.pytest_cache',
                                    '.ruff_cache', '.mypy_cache'})
 # A change here can affect every check, so `fast` conservatively runs both application domains.
-SHARED_CHECK_FILES = frozenset({*APP_INPUT_FILES, 'scripts/toolchain.py', 'scripts/qualify_faults.py'})
+SHARED_CHECK_FILES = frozenset({*APP_INPUT_FILES, 'scripts/toolchain.py', 'scripts/qualify_faults.py',
+                                'scripts/generate_contracts.py'})
 SHARED_CHECK_PREFIXES = ('contracts/', 'tests/toolchain/', 'tests/faults/')
 RUNNER_FILES = frozenset({'scripts/verify.py', 'scripts/harness_lib.py'})
 DB_CHECK_FILES = frozenset({'scripts/disposable_db.py', 'scripts/supabase_stack.py'})
 DB_CHECK_PREFIXES = ('infra/', 'tests/db/')
 HARNESS_CHECKS = frozenset({'project_configuration', 'backlog_validation', 'harness_behavior_tests'})
 APPLICATION_PROFILES = ('fast', 'full')
-PYTHON_STEPS = frozenset({'python_lock', 'python_env', 'ruff_check', 'ruff_format', 'mypy', 'pytest'})
-WEB_STEPS = frozenset({'node_lock', 'node_version', 'lint', 'format_check', 'typegen', 'typecheck'})
+PYTHON_STEPS = frozenset({'python_lock', 'python_env', 'ruff_check', 'ruff_format', 'mypy', 'pytest', 'contract_drift'})
+WEB_STEPS = frozenset({'node_lock', 'node_version', 'lint', 'format_check', 'typegen', 'typecheck', 'contract_drift',
+                       'api_client_typecheck', 'api_client_tests'})
 FULL_ONLY_CHECKS = frozenset({'build', 'fault_qualification', 'toolchain_scope_tests'})
 FULL_CHECKS = PYTHON_STEPS | WEB_STEPS | FULL_ONLY_CHECKS
 DB_CHECKS = frozenset({'disposable_qualification', 'supabase_stack_qualification'})

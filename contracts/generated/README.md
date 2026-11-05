@@ -1,5 +1,3 @@
 # Generated contracts
 
-Location for the versioned OpenAPI and JSON Schema artifacts. They are generated from the Pydantic models and are never hand-written.
-
-US-2.2 owns the generator and the output. Nothing is generated here yet.
+`openapi.json` is generated from the Pydantic models by `scripts/generate_contracts.py` and is never hand-written. `python3.12 scripts/generate_contracts.py check` detects drift.

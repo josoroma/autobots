@@ -1,0 +1,106 @@
+"""Boundary validation from the shared fixtures, and the conversion boundaries around it."""
+
+import json
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+from uuid import UUID
+
+import pytest
+from pydantic import BaseModel, ValidationError
+
+from autobots.contracts.adapters import run_from_row, run_summary_from_domain
+from autobots.contracts.export import openapi_document
+from autobots.contracts.runs import ErrorResponse, RunEvent, RunSummary
+from autobots.domain.runs import NORMAL_EXITS, TERMINAL, RunStatus, can_transition
+from autobots.persistence.rows import RunRow
+from conftest import SocketBlockedError
+
+REPOSITORY = Path(__file__).resolve().parents[3]
+CASES = json.loads((REPOSITORY / "contracts/fixtures/boundary-cases.json").read_text())
+MODELS: dict[str, type[BaseModel]] = {
+    "RunSummary": RunSummary,
+    "RunEvent": RunEvent,
+    "ErrorResponse": ErrorResponse,
+}
+RUN_ID = UUID("11111111-1111-4111-8111-111111111111")
+WORKSPACE_ID = UUID("22222222-2222-4222-8222-222222222222")
+NOW = datetime(2026, 11, 5, tzinfo=UTC)
+
+
+def row(**overrides: Any) -> RunRow:
+    data: RunRow = {
+        "id": RUN_ID,
+        "workspace_id": WORKSPACE_ID,
+        "parent_run_id": None,
+        "status": "running",
+        "created_at": NOW,
+        "updated_at": NOW,
+        "spent_micro_usd": 5,
+        "reserved_micro_usd": 6,
+        "limit_micro_usd": 7,
+        "lease_generation": 3,
+        "checkpoint_thread_id": "private-thread",
+    }
+    data.update(overrides)  # type: ignore[typeddict-item]
+    return data
+
+
+@pytest.mark.parametrize("case", CASES, ids=[case["name"] for case in CASES])
+def test_shared_boundary_case(case: dict[str, Any]) -> None:
+    model = MODELS[case["model"]]
+    encoded = json.dumps(case["value"])
+    if case["valid"]:
+        model.model_validate_json(encoded)
+    else:
+        with pytest.raises(ValidationError):
+            model.model_validate_json(encoded)
+
+
+def test_the_fixtures_cover_each_required_kind() -> None:
+    names = " ".join(case["name"] for case in CASES if not case["valid"])
+    for kind in ("identifier", "money", "timestamp", "enum", "private field"):
+        assert kind in names
+
+
+def test_a_response_built_from_a_row_holds_no_private_field() -> None:
+    summary = run_summary_from_domain(run_from_row(row()))
+    encoded = summary.model_dump_json()
+    assert "private-thread" not in encoded
+    assert "lease" not in encoded
+    assert json.loads(encoded)["budget"]["spent_micro_usd"] == 5
+
+
+def test_an_unknown_stored_status_does_not_reach_a_client() -> None:
+    with pytest.raises(ValueError, match="not_a_status"):
+        run_from_row(row(status="not_a_status"))
+
+
+def test_terminal_runs_never_move() -> None:
+    for current in TERMINAL:
+        for following in RunStatus:
+            assert not can_transition(current, following)
+
+
+def test_normal_exits_match_sp_010() -> None:
+    assert can_transition(RunStatus.QUEUED, RunStatus.RUNNING)
+    assert can_transition(RunStatus.VERIFYING, RunStatus.SUCCEEDED)
+    assert not can_transition(RunStatus.RUNNING, RunStatus.SUCCEEDED)
+    assert not can_transition(RunStatus.PAUSED, RunStatus.RUNNING)
+    assert not can_transition(RunStatus.CANCELLING, RunStatus.RUNNING)
+    assert set(NORMAL_EXITS) | TERMINAL == set(RunStatus)
+
+
+def test_cancellation_is_valid_from_every_nonterminal_state() -> None:
+    for current in set(RunStatus) - TERMINAL:
+        assert can_transition(current, RunStatus.CANCELLED)
+    assert not can_transition(RunStatus.CANCELLING, RunStatus.CANCELLING)
+
+
+def test_generation_needs_no_service_or_credential() -> None:
+    """The socket block and missing key are in force here, so any connection attempt would fail."""
+    with pytest.raises(SocketBlockedError):
+        __import__("socket").create_connection(("127.0.0.1", 9))
+    schemas = openapi_document()["components"]["schemas"]
+    assert {"RunSummary", "RunEvent", "RunStatus", "ErrorResponse"} <= set(schemas)
+    assert schemas["RunSummary"]["additionalProperties"] is False

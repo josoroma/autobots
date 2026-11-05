@@ -27,14 +27,14 @@ from toolchain import (LONG, Step, Unavailable, check_steps, child_env, find_too
 EXIT_PASSED, EXIT_FAILED, EXIT_UNAVAILABLE = 0, 1, 2
 IMPLEMENTED_PROFILES = ('harness', 'fast', 'full', 'db')
 # These report exit 2 for a missing prerequisite, which is not a failed check.
-SELF_REPORTING_STEPS = frozenset({'fault_qualification', 'disposable_qualification', 'supabase_stack_qualification'})
+SELF_REPORTING_STEPS = frozenset({'contract_drift', 'fault_qualification', 'disposable_qualification', 'supabase_stack_qualification'})
 # DH-09.2 class and model transport by step. Evidence reads these, and a plan cannot override them.
-STEP_CLASSES = {'harness_behavior_tests': ('mock', 'none'), 'pytest': ('mock', 'mock'),
+STEP_CLASSES = {'harness_behavior_tests': ('mock', 'none'), 'pytest': ('mock', 'mock'), 'api_client_tests': ('mock', 'none'),
                 'fault_qualification': ('mock', 'mock'), 'disposable_qualification': ('disposable', 'none'),
                 'supabase_stack_qualification': ('disposable', 'none')}
 OUTSIDE_SCOPE = 'outside the changed scope of this fast run'
 NOT_TESTED = ['Claude event delivery', 'Supabase', 'Docker', 'OpenRouter inference', 'complete H0/H1']
-APPLICATION_NOT_TESTED = ['generated contract drift, no contract exists yet', 'browser fixtures, none are configured']
+APPLICATION_NOT_TESTED = ['browser fixtures, none are configured']
 DB_NOT_TESTED = ['the persistent database', 'generated database type drift, no types exist yet',
                  'Claude event delivery', 'OpenRouter inference', 'complete H0/H1']
 
@@ -131,7 +131,11 @@ def tool_plan(root: Path, profile: str, changed: Sequence[str] | None) -> tuple[
     # The offline part of `tests/toolchain`. Its copies bootstrap from registries, so the rest stays manual.
     scope_tests = Step('toolchain_scope_tests', (sys.executable, '-m', 'unittest', 'discover', '-s', 'tests/toolchain',
                                                  '-p', 'test_scaffold_scope.py'), root)
-    steps = [step for step in (*check_steps(root, tools), qualification, scope_tests) if step.id in chosen]
+    web_bin = root / 'apps/web/node_modules/.bin'
+    contracts = (Step('contract_drift', (sys.executable, 'scripts/generate_contracts.py', 'check'), root),
+                 Step('api_client_typecheck', (str(web_bin / 'tsc'), '-p', 'packages/api-client'), root),
+                 Step('api_client_tests', (str(Path(tools.node_dir) / 'node'), '--test', 'packages/api-client/tests/contract.test.ts'), root))
+    steps = [step for step in (*check_steps(root, tools), *contracts, qualification, scope_tests) if step.id in chosen]
     return ToolPlan(steps, child_env(root, tools, verifying=True)), left_out
 
 

@@ -1,0 +1,215 @@
+{
+  "components": {
+    "schemas": {
+      "BudgetCounters": {
+        "additionalProperties": false,
+        "properties": {
+          "limit_micro_usd": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Limit Micro Usd",
+            "type": "integer"
+          },
+          "reserved_micro_usd": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Reserved Micro Usd",
+            "type": "integer"
+          },
+          "spent_micro_usd": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Spent Micro Usd",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "spent_micro_usd",
+          "reserved_micro_usd",
+          "limit_micro_usd"
+        ],
+        "title": "BudgetCounters",
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorResponse",
+        "type": "object"
+      },
+      "RunEvent": {
+        "additionalProperties": false,
+        "description": "The sanitized public envelope from SP-011. Payloads are typed, so nothing raw can pass.",
+        "properties": {
+          "causal_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Causal Ids",
+            "type": "array"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/RunStatusChanged"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "sequence": {
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "title": "Sequence",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "run_id",
+          "sequence",
+          "causal_ids",
+          "occurred_at",
+          "payload"
+        ],
+        "title": "RunEvent",
+        "type": "object"
+      },
+      "RunStatus": {
+        "enum": [
+          "queued",
+          "running",
+          "waiting_input",
+          "waiting_approval",
+          "paused",
+          "verifying",
+          "cancelling",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ],
+        "title": "RunStatus",
+        "type": "string"
+      },
+      "RunStatusChanged": {
+        "additionalProperties": false,
+        "properties": {
+          "current": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "previous": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "type": {
+            "const": "run.status_changed",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "previous",
+          "current"
+        ],
+        "title": "RunStatusChanged",
+        "type": "object"
+      },
+      "RunSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "budget": {
+            "$ref": "#/components/schemas/BudgetCounters"
+          },
+          "created_at": {
+            "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "parent_run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Run Id"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "workspace_id": {
+            "format": "uuid",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "id",
+          "workspace_id",
+          "parent_run_id",
+          "status",
+          "created_at",
+          "updated_at",
+          "budget"
+        ],
+        "title": "RunSummary",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "Autobots Agent API",
+    "version": "0.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {}
+}

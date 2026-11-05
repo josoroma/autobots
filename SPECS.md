@@ -90,21 +90,21 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-2.1 | Pinned local Supabase service boundary | DONE | EPIC-2 |
 | US-2.1#1 | Prepare the pinned release/overlay and resolve image digests. | DONE | US-2.1 |
 | US-2.1#2 | Qualify ARM64, addresses, health and disabled extra AI/telemetry integrations. | DONE | US-2.1 |
-| US-2.2 | Public contracts and generated cross-language types | READY | EPIC-2 |
-| US-2.2#1 | Define public DTOs and adapters for the initial slice. | TODO | US-2.2 |
-| US-2.2#2 | Generate clients and shared validation/compatibility fixtures. | TODO | US-2.2 |
+| US-2.2 | Public contracts and generated cross-language types | DONE | EPIC-2 |
+| US-2.2#1 | Define public DTOs and adapters for the initial slice. | DONE | US-2.2 |
+| US-2.2#2 | Generate clients and shared validation/compatibility fixtures. | DONE | US-2.2 |
 | US-2.3 | Local identity, workspace grants and private schema isolation | BLOCKED | EPIC-2 |
 | US-2.3#1 | Implement local owner/session and workspace authorization. | TODO | US-2.3 |
 | US-2.3#2 | Qualify grants, RLS and private Storage with nonprivileged identities. | TODO | US-2.3 |
 | US-2.4 | Application migrations and deterministic seeds | READY | EPIC-2 |
 | US-2.4#1 | Create ordered application migration and seed wrappers. | TODO | US-2.4 |
 | US-2.4#2 | Verify fresh/upgrade replay, repeatability and generated public row types. | TODO | US-2.4 |
-| US-2.5 | Native FastAPI, Next.js BFF and Luma shell | BLOCKED | EPIC-2 |
+| US-2.5 | Native FastAPI, Next.js BFF and Luma shell | READY | EPIC-2 |
 | US-2.5#1 | Implement native app factories and lifespan/configuration boundaries. | TODO | US-2.5 |
 | US-2.5#2 | Provide typed authenticated BFF-to-Python transport and safe errors. | TODO | US-2.5 |
 | US-2.5#3 | Wire shared shadcn Luma components/tokens and dark-default preference resolution before paint. | TODO | US-2.5 |
 | US-2.5#4 | Verify both appearance modes, accessible states and first-paint behavior with revision-bound browser/screenshots evidence. | TODO | US-2.5 |
-| US-2.6 | Two-profile OpenRouter factory and immutable role policy | BLOCKED | EPIC-2 |
+| US-2.6 | Two-profile OpenRouter factory and immutable role policy | READY | EPIC-2 |
 | US-2.6#1 | Implement the two canonical/wire mappings and versioned role resolution. | TODO | US-2.6 |
 | US-2.6#2 | Add mocked catalog, parameter and hidden-default negative tests. | TODO | US-2.6 |
 | EPIC-3 | Credentials, model admission and route qualification | — | — |
@@ -1138,7 +1138,8 @@ Open Questions:
 
 ### US-2.2: Public contracts and generated cross-language types
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-2-2-public-contracts-generated-cross/`
 
 As a developer
 I want one typed public API contract
@@ -1170,8 +1171,8 @@ Dependencies:
 - US-1.8
 
 Tasks:
-- [ ] Define public DTOs and adapters for the initial slice.
-- [ ] Generate clients and shared validation/compatibility fixtures.
+- [x] Define public DTOs and adapters for the initial slice.
+- [x] Generate clients and shared validation/compatibility fixtures.
 
 Open Questions:
 - None.
@@ -1257,7 +1258,7 @@ Open Questions:
 
 ### US-2.5: Native FastAPI, Next.js BFF and Luma shell
 
-Status: BLOCKED
+Status: READY
 
 As a developer
 I want local API and presentation processes with clear ownership and the shared Luma interface
@@ -1321,7 +1322,7 @@ Open Questions:
 
 ### US-2.6: Two-profile OpenRouter factory and immutable role policy
 
-Status: BLOCKED
+Status: READY
 
 As a workspace owner
 I want explicit approved model bindings

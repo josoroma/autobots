@@ -1,5 +1,3 @@
 # @autobots/api-client
 
-Location for the generated TypeScript API client. Its output is generated from the Pydantic/OpenAPI contract and is never hand-written.
-
-US-2.2 owns the generator and the output. Nothing is generated here yet.
+`src/generated.ts` is generated from the Pydantic contracts by `scripts/generate_contracts.py` and is never hand-written. `src/runtime.ts` is the hand-written validator behind every generated `parse` function, because a TypeScript type checks nothing at runtime.
