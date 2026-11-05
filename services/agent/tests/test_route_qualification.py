@@ -457,3 +457,33 @@ def test_a_rerun_sends_only_what_was_named_and_keeps_the_full_report(tmp_path: P
     assert report["summary"] == {"schema_nested": {"passed": 1}, "refusal": {"passed": 3}}
     assert report["committed_micro_usd"] > committed
     assert (tmp_path / "report.json").read_text() == full
+
+
+def test_a_refused_request_keeps_its_reason_and_the_constrained_schema_runs_only_if_asked(
+    tmp_path: Path,
+) -> None:
+    fake = Fake(fail_with=400)
+    only = {"schema_nested_constrained": 1}
+    report = _qualify(tmp_path, fake, "openai_gpt_6_1_terra", only)
+    assert len(fake.bodies) == 1
+    trial = report["trials"][0]
+    assert trial["verdict"] == "unsupported"
+    assert trial["observed"]["status"] == 400
+    assert "detail" in trial["observed"]
+    assert KEY not in json.dumps(report)
+    schema = json.dumps(fake.bodies[0]["response_format"])
+    assert "minItems" in schema
+
+
+def test_the_plain_nested_schema_sends_no_length_keywords(tmp_path: Path) -> None:
+    fake = Fake()
+    _qualify(tmp_path, fake, "openai_gpt_6_1_terra", {"schema_nested": 1})
+    assert "minItems" not in json.dumps(fake.bodies[0]["response_format"])
+
+
+def test_the_closed_schema_closes_every_object(tmp_path: Path) -> None:
+    fake = Fake()
+    _qualify(tmp_path, fake, "openai_gpt_6_1_terra", {"schema_nested_closed": 1})
+    schema = fake.bodies[0]["response_format"]["json_schema"]["schema"]
+    assert schema["additionalProperties"] is False
+    assert schema["properties"]["tasks"]["items"]["additionalProperties"] is False

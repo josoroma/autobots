@@ -52,3 +52,47 @@ This is partial evidence for US-3.4, and **the story isn't complete**. Harness a
 1. **The 512-token limit:** nested plans fail at it. Options are raising the output allowance, lowering reasoning effort if the route honors it, or accepting that strict nested output stays disabled. Either change needs a recorded policy revision.
 2. **Astra:** qualify it separately, or remove it from what can be selected.
 3. **US-3.4's status:** it stays `BLOCKED`, with its `External:` line, until these are decided.
+
+## Second round: Terra, and DeepSeek at low reasoning
+
+**Class: live.** Run on 2026-11-05, authorized by the owner, who named `deepseek/deepseek-v4.1-flash-20261017` and `openai/gpt-6.1-terra-20261026`. Shared runner cap US$0.60, inside the US$1 key limit. Runner from `60b5b5c`, then its fixture additions in the commit holding this text.
+
+**This is qualification only. `openai/gpt-6.1-terra` isn't one of the application's approved profiles, and `PROFILES` didn't change.** The app can't select it.
+
+| | |
+|---|---|
+| Terra route | Request ID `openai/gpt-6.1-terra`, canonical `openai/gpt-6.1-terra-20261026`, US$1 / US$5 per 1M tokens |
+| Calls | 49: Terra 46, DeepSeek 3. None retried, no other model tried |
+| Reported charges | **US$0.012614**, not checked against OpenRouter's dashboard |
+| Counted against the cap | US$0.120134, including worst-case amounts for 7 refused requests and 3 cancelled streams, whose charges weren't reported |
+| Raw results | `.checks/route-qualification/round2/` (ignored, local) |
+
+| Fixture | Terra | DeepSeek |
+|---|---|---|
+| Plain text, automatic and required tools | 9/9 | 9/9, one trial made two calls |
+| Named tool against a conflicting prompt | 3/3 | 3/3 |
+| Strict schema, flat | 3/3 | 3/3 |
+| **Strict schema, nested** | **3/3 with closed objects. Refused with `400` otherwise** | **0/7: 4 at default reasoning and 3 at low. Ran out of tokens** |
+| Output tokens used on nested | 105–125 of 512 | All 512 |
+| Streaming text | 3/3, 39 chunks | 3/3, 7 chunks |
+| Streaming tool arguments | 3/3, 15 chunks, so really fragmented | 3/3, 2 chunks |
+| Continuation, truncation | 6/6 | 6/6 |
+| Refusal | 3/3, in text only | 3/3 on rerun, in text only |
+| Cancellation | Our side stopped. Provider stop and charge unknown | Same |
+| Average reported charge per settled call in the corpus | about US$0.00029 | about US$0.00006 |
+
+**The `400`.** Terra refused nested schemas in 7 of 7 tries: 3 with the runner's first models, 3 with those models without list lengths, and 1 with them. My first explanation, list-length keywords, was wrong. The request sent had no `additionalProperties: false` on any object. With every object closed, it passed 3 of 3. OpenRouter's error text was only "Provider returned error", so the cause is inferred from that one change, not stated by the provider. A flat schema with no such field passed, so the rule isn't simply "every schema needs it".
+
+**DeepSeek at low reasoning.** `reasoning: {effort: "low"}` was accepted and changed almost nothing: 504–552 reasoning tokens, against 553 by default. **An accepted parameter didn't reduce reasoning here**, so this isn't the fix at this limit. Closed objects weren't tried on DeepSeek, as its failure was running out of tokens. A larger output allowance is still untested.
+
+### Second-round limits
+
+- Three trials per fixture on one day, and no task quality, arithmetic or negative-task fixtures. This doesn't show either model is good at the work.
+- That a route refuses some schemas suggests it validates them, but doesn't prove it enforces them on output.
+- Nothing here ran through the worker, the admission ledger or `AdmittedModel`, and Terra can't: it isn't a profile.
+- `provider` was `null` on every call, on both routes.
+
+### Second-round decisions for the owner
+
+1. **Whether Terra replaces Astra,** which keeps the contract's two models. Or whether it becomes the default, at about 5 times DeepSeek's cost per call in this corpus. Either needs a recorded decision.
+2. **DeepSeek's output allowance,** if it stays the default: test a larger one.

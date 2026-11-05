@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any, Literal, cast
 
 from langchain_core.messages import AIMessageChunk, HumanMessage, SystemMessage, ToolMessage
-from pydantic import BaseModel, Field, SecretStr, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError
 
 from autobots.adapters.models.catalog import ModelUnavailable, parse_catalog, validated_entry
 from autobots.adapters.models.factory import PreparedAttempt, chat_model, checked_options
@@ -172,12 +172,34 @@ class Task(BaseModel):
     id: str
     title: str
     priority: Literal["low", "high"]
-    criteria: list[str] = Field(min_length=1)
+    criteria: list[str]
 
 
 class Plan(BaseModel):
     place: str
-    tasks: list[Task] = Field(min_length=2)
+    tasks: list[Task]
+
+
+class ClosedTask(Task):
+    model_config = ConfigDict(extra="forbid")
+
+
+class ClosedPlan(Plan):
+    """The same shape, with every object closed, as OpenAI's strict mode has required."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tasks: list[ClosedTask]  # type: ignore[assignment]
+
+
+class ConstrainedTask(Task):
+    criteria: list[str] = Field(min_length=1)
+
+
+class ConstrainedPlan(Plan):
+    """The same shape with list-length keywords, which not every route's strict mode accepts."""
+
+    tasks: list[ConstrainedTask] = Field(min_length=2)  # type: ignore[assignment]
 
 
 @dataclass
@@ -307,9 +329,17 @@ class Corpus:
         reply = await self._call_structured(label, model, prompt)
         return _structured_verdict(reply)
 
-    async def schema_nested(self, label: str) -> tuple[str, dict[str, Any]]:
+    async def schema_nested_closed(self, label: str) -> tuple[str, dict[str, Any]]:
+        return await self.schema_nested(label, ClosedPlan)
+
+    async def schema_nested_constrained(self, label: str) -> tuple[str, dict[str, Any]]:
+        return await self.schema_nested(label, ConstrainedPlan)
+
+    async def schema_nested(
+        self, label: str, schema: type[Plan] = Plan
+    ) -> tuple[str, dict[str, Any]]:
         model = self.build().with_structured_output(
-            Plan, method="json_schema", strict=True, include_raw=True
+            schema, method="json_schema", strict=True, include_raw=True
         )
         prompt = (
             "Plan two small tasks for a visit to São José. Set place to exactly: São José, 東京 "
@@ -319,7 +349,11 @@ class Corpus:
         verdict, observed = _structured_verdict(reply)
         parsed: Any = reply.get("parsed")
         if verdict == "passed" and not (
-            "São José" in parsed.place and "東京" in parsed.place and '"quoted"' in parsed.place
+            "São José" in parsed.place
+            and "東京" in parsed.place
+            and '"quoted"' in parsed.place
+            and len(parsed.tasks) >= 2
+            and all(task.criteria for task in parsed.tasks)
         ):
             verdict = "failed"
             observed["unicode_and_escapes"] = _short(parsed.place)
@@ -443,6 +477,10 @@ class Corpus:
             ("refusal", self.refusal),
             ("cancellation", self.cancellation),
         ]
+        if "schema_nested_closed" in self.only:
+            fixtures.append(("schema_nested_closed", self.schema_nested_closed))
+        if "schema_nested_constrained" in self.only:
+            fixtures.append(("schema_nested_constrained", self.schema_nested_constrained))
         for trial in range(1, TRIALS + 1):
             for name, fixture in fixtures:
                 if self.only and trial > self.only.get(name, 0):
@@ -488,7 +526,11 @@ def _failure(error: Exception) -> tuple[str, dict[str, Any]]:
         getattr(error, "response", None), "status_code", None
     )
     verdict = "unsupported" if status in {400, 404, 422} else "failed"
-    return verdict, {"error": type(error).__name__, "status": status}
+    observed: dict[str, Any] = {"error": type(error).__name__, "status": status}
+    if verdict == "unsupported":
+        # A refused request says why, and that's the evidence. Redacted and short, as ever.
+        observed["detail"] = _short(error, 300)
+    return verdict, observed
 
 
 def read_key(path: Path) -> SecretStr:
