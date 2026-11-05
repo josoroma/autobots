@@ -13,6 +13,7 @@ from autobots.api.settings import Settings
 
 class MembershipStore(Protocol):
     async def is_member(self, user_id: UUID, workspace_id: UUID) -> bool: ...
+    async def workspaces_for(self, user_id: UUID) -> list[UUID]: ...
 
 
 class DenyAllMembership:
@@ -20,6 +21,9 @@ class DenyAllMembership:
 
     async def is_member(self, user_id: UUID, workspace_id: UUID) -> bool:
         return False
+
+    async def workspaces_for(self, user_id: UUID) -> list[UUID]:
+        return []
 
 
 def app_settings(request: Request) -> Settings:

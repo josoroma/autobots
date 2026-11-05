@@ -6,6 +6,8 @@ const UNAVAILABLE = process.env.AUTOBOTS_WEB_UNAVAILABLE_URL ?? "";
 const INTERNAL = process.env.AUTOBOTS_TEST_INTERNAL_TOKEN ?? "";
 const SESSION_A = process.env.AUTOBOTS_TEST_SESSION_A ?? "";
 const SESSION_B = process.env.AUTOBOTS_TEST_SESSION_B ?? "";
+const SESSION_FORGED = process.env.AUTOBOTS_TEST_SESSION_FORGED ?? "";
+const TOKEN_A = process.env.AUTOBOTS_TEST_TOKEN_A ?? "";
 const WORKSPACE_A = process.env.AUTOBOTS_TEST_WORKSPACE_A ?? "";
 const path = `/api/v1/workspaces/${WORKSPACE_A}`;
 
@@ -43,9 +45,7 @@ test("another workspace's member is refused", async ({ request }) => {
 
 test("no session and a forged session are refused", async ({ request }) => {
   expect((await request.get(path)).status()).toBe(401);
-  const forged = await request.get(path, {
-    headers: session(`${SESSION_A.slice(0, -4)}AAAA`),
-  });
+  const forged = await request.get(path, { headers: session(SESSION_FORGED) });
   expect(forged.status()).toBe(401);
 });
 
@@ -105,7 +105,7 @@ test("the Python API refuses a request without the internal credential", async (
   request,
 }) => {
   const url = `${API}/v1/workspaces/${WORKSPACE_A}`;
-  const bearer = { Authorization: `Bearer ${SESSION_A}` };
+  const bearer = { Authorization: `Bearer ${TOKEN_A}` };
   expect((await request.get(url, { headers: bearer })).status()).toBe(401);
   expect(
     (

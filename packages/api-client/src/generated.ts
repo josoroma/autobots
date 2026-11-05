@@ -240,6 +240,37 @@ export const schemas = {
     "title": "ServiceHealth",
     "type": "object"
   },
+  "SessionSummary": {
+    "additionalProperties": false,
+    "description": "Who the verified session is, and the workspaces membership grants it.",
+    "properties": {
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "user_id": {
+        "format": "uuid",
+        "title": "User Id",
+        "type": "string"
+      },
+      "workspace_ids": {
+        "items": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "title": "Workspace Ids",
+        "type": "array"
+      }
+    },
+    "required": [
+      "schema_version",
+      "user_id",
+      "workspace_ids"
+    ],
+    "title": "SessionSummary",
+    "type": "object"
+  },
   "ValidationError": {
     "properties": {
       "ctx": {
@@ -383,6 +414,16 @@ export function parseServiceHealth(value: unknown): ServiceHealth {
   return parseWith(schemas, "ServiceHealth", value) as ServiceHealth;
 }
 
+export interface SessionSummary {
+  schema_version: 1;
+  user_id: string;
+  workspace_ids: string[];
+}
+
+export function parseSessionSummary(value: unknown): SessionSummary {
+  return parseWith(schemas, "SessionSummary", value) as SessionSummary;
+}
+
 export interface ValidationError {
   ctx?: Record<string, unknown>;
   input?: unknown;
@@ -406,6 +447,10 @@ export function parseWorkspaceSummary(value: unknown): WorkspaceSummary {
 
 export async function getHealth(options: ClientOptions): Promise<ServiceHealth> {
   return parseServiceHealth(await requestJson(options, "GET", `/v1/health`));
+}
+
+export async function getSession(options: ClientOptions): Promise<SessionSummary> {
+  return parseSessionSummary(await requestJson(options, "GET", `/v1/session`));
 }
 
 export async function getWorkspace(options: ClientOptions, workspace_id: string): Promise<WorkspaceSummary> {

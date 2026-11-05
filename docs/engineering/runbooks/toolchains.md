@@ -55,6 +55,8 @@ The locks are the full record: `services/agent/uv.lock` and `pnpm-lock.yaml`. `p
 | `clsx` | 2.1.1 |
 | `lucide-react` | 1.69.0 |
 | `next-themes` | 0.4.6 |
+| `@supabase/ssr` | 0.12.7 |
+| `@supabase/supabase-js` | 2.119.0 |
 | `tailwind-merge` | 3.7.0 |
 | `@axe-core/playwright` | 4.14.0 |
 | `@playwright/test` | 1.64.1 |

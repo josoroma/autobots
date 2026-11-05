@@ -28,12 +28,13 @@ EXIT_PASSED, EXIT_FAILED, EXIT_UNAVAILABLE = 0, 1, 2
 IMPLEMENTED_PROFILES = ('harness', 'fast', 'full', 'db')
 # These report exit 2 for a missing prerequisite, which is not a failed check.
 SELF_REPORTING_STEPS = frozenset({'contract_drift', 'browser_qualification', 'fault_qualification', 'disposable_qualification', 'supabase_stack_qualification',
-                                  'app_db_qualification'})
+                                  'app_db_qualification', 'identity_qualification'})
 # DH-09.2 class and model transport by step. Evidence reads these, and a plan cannot override them.
 STEP_CLASSES = {'harness_behavior_tests': ('mock', 'none'), 'pytest': ('mock', 'mock'), 'api_client_tests': ('mock', 'none'),
                 'web_unit_tests': ('mock', 'none'), 'browser_qualification': ('local_runtime', 'none'),
                 'fault_qualification': ('mock', 'mock'), 'disposable_qualification': ('disposable', 'none'),
-                'supabase_stack_qualification': ('disposable', 'none'), 'app_db_qualification': ('disposable', 'none')}
+                'supabase_stack_qualification': ('disposable', 'none'), 'app_db_qualification': ('disposable', 'none'),
+                'identity_qualification': ('disposable', 'none')}
 OUTSIDE_SCOPE = 'outside the changed scope of this fast run'
 NOT_TESTED = ['Claude event delivery', 'Supabase', 'Docker', 'OpenRouter inference', 'complete H0/H1']
 APPLICATION_NOT_TESTED: list[str] = []
@@ -119,7 +120,8 @@ def tool_plan(root: Path, profile: str, changed: Sequence[str] | None) -> tuple[
     if profile == 'db':
         steps = [Step('disposable_qualification', (sys.executable, 'scripts/disposable_db.py', 'qualify'), root, LONG),
                  Step('supabase_stack_qualification', (sys.executable, 'scripts/supabase_stack.py', 'qualify'), root, LONG),
-                 Step('app_db_qualification', (sys.executable, 'scripts/app_db.py', 'qualify'), root, LONG)]
+                 Step('app_db_qualification', (sys.executable, 'scripts/app_db.py', 'qualify'), root, LONG),
+                 Step('identity_qualification', (sys.executable, 'scripts/qualify_identity.py'), root, LONG)]
         return ToolPlan(steps, reduced_env() | ({'HOME': os.environ['HOME']} if 'HOME' in os.environ else {})), []
     known = set(FULL_CHECKS)
     chosen = selected_steps(profile, sorted(known), changed)

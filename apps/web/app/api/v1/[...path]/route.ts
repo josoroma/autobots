@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { guardRequest, SESSION_COOKIE } from "@/lib/request-guard";
+import { guardRequest } from "@/lib/request-guard";
 import { serverConfig } from "@/lib/server-config";
+import { accessToken } from "@/lib/session";
 
 type Context = { params: Promise<{ path: string[] }> };
 
@@ -37,8 +38,8 @@ async function forward(
   if (refusal !== null) {
     return safeError(403, refusal, "This request was refused.");
   }
-  const session = request.cookies.get(SESSION_COOKIE)?.value;
-  if (session === undefined) {
+  const session = await accessToken();
+  if (session === null) {
     return safeError(401, "not_signed_in", "Sign in first.");
   }
   const { path } = await context.params;

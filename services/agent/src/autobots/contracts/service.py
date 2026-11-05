@@ -21,3 +21,13 @@ class WorkspaceSummary(BaseModel):
 
     schema_version: Literal[1]
     id: Identifier
+
+
+class SessionSummary(BaseModel):
+    """Who the verified session is, and the workspaces membership grants it."""
+
+    model_config = STRICT_CONTRACT
+
+    schema_version: Literal[1]
+    user_id: Identifier
+    workspace_ids: list[Identifier]

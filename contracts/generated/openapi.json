@@ -239,6 +239,37 @@
         "title": "ServiceHealth",
         "type": "object"
       },
+      "SessionSummary": {
+        "additionalProperties": false,
+        "description": "Who the verified session is, and the workspaces membership grants it.",
+        "properties": {
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          },
+          "workspace_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Workspace Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "schema_version",
+          "user_id",
+          "workspace_ids"
+        ],
+        "title": "SessionSummary",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -352,6 +383,68 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/v1/session": {
+      "get": {
+        "operationId": "getSession",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Session"
       }
     },
     "/v1/workspaces/{workspace_id}": {

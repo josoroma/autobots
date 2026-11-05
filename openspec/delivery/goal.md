@@ -7,10 +7,10 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-2.5 |
-| Kind | story |
+| Target | EPIC-2 |
+| Kind | epic |
 | Focus | - |
-| Status | COMPLETE |
+| Status | ACTIVE |
 | Reason | - |
 | Started | 2026-11-05 |
 | Updated | 2026-11-05 |
@@ -19,16 +19,21 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-2.5 | us-2-5-native-fastapi-next-js | DONE | Native FastAPI, Next.js BFF and Luma shell |
+| 1 | US-2.1 | us-2-1-pinned-local-supabase-service | DONE | Pinned local Supabase service boundary |
+| 2 | US-2.2 | us-2-2-public-contracts-generated-cross | DONE | Public contracts and generated cross-language types |
+| 3 | US-2.3 | us-2-3-local-identity-workspace-grants | DONE | Local identity, workspace grants and private schema isolation |
+| 4 | US-2.4 | us-2-4-application-migrations-deterministic-seeds | DONE | Application migrations and deterministic seeds |
+| 5 | US-2.5 | us-2-5-native-fastapi-next-js | DONE | Native FastAPI, Next.js BFF and Luma shell |
+| 6 | US-2.6 | us-2-6-two-profile-openrouter-factory | READY | Two-profile OpenRouter factory and immutable role policy |
 
 ## Next Action
 
-Action: complete
-Story: -
-Change: -
+Action: select
+Story: US-2.6
+Change: us-2-6-two-profile-openrouter-factory
 Owner: main-session
-Command: none — every story in the goal is DONE
-Reason: all 1 story/stories are DONE
+Command: openspec new change us-2-6-two-profile-openrouter-factory; set US-2.6 to IN PROGRESS with a Change: line
+Reason: US-2.6 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

@@ -30,6 +30,9 @@ class Membership:
     async def is_member(self, user_id: UUID, workspace_id: UUID) -> bool:
         return user_id == USER_A and workspace_id == WORKSPACE
 
+    async def workspaces_for(self, user_id: UUID) -> list[UUID]:
+        return [WORKSPACE] if user_id == USER_A else []
+
 
 def token(user: UUID = USER_A, secret: str = SECRET, **overrides: object) -> str:
     claims = {"sub": str(user), "aud": "authenticated", "exp": time.time() + 60, **overrides}
@@ -94,6 +97,17 @@ def test_only_a_member_reaches_a_workspace() -> None:
     assert other.json()["code"] == "forbidden"
 
 
+def test_the_session_route_reports_verified_identity_and_membership() -> None:
+    reply = client().get("/v1/session", headers=headers(token()))
+    assert reply.json() == {
+        "schema_version": 1,
+        "user_id": str(USER_A),
+        "workspace_ids": [str(WORKSPACE)],
+    }
+    assert client().get("/v1/session", headers=headers(token(USER_B))).json()["workspace_ids"] == []
+    assert client().get("/v1/session", headers=headers()).status_code == 401
+
+
 def test_default_membership_denies_everyone() -> None:
     with TestClient(create_app(SETTINGS)) as test_client:
         reply = test_client.get(f"/v1/workspaces/{WORKSPACE}", headers=headers(token()))
@@ -117,6 +131,9 @@ def test_an_unexpected_error_exposes_nothing() -> None:
     class Broken:
         async def is_member(self, user_id: UUID, workspace_id: UUID) -> bool:
             raise RuntimeError("database password leaked here")
+
+        async def workspaces_for(self, user_id: UUID) -> list[UUID]:
+            return []
 
     app = create_app(SETTINGS, membership=Broken())
     reply = TestClient(app, raise_server_exceptions=False).get(

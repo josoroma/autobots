@@ -53,6 +53,13 @@ def session_token(secret: str, user: str) -> str:
     return f'{signing}.{b64(hmac.new(secret.encode(), signing.encode(), hashlib.sha256).digest())}'
 
 
+def session_cookie(access_token: str) -> str:
+    """The value @supabase/ssr stores: its own encoding, with the token signed by the arranged secret."""
+    session = {'access_token': access_token, 'refresh_token': 'fixture', 'token_type': 'bearer', 'expires_in': 1800,
+               'expires_at': int(time.time()) + 1800, 'user': {'id': USER_A, 'aud': 'authenticated', 'app_metadata': {}, 'user_metadata': {}, 'created_at': ''}}
+    return 'base64-' + b64(json.dumps(session).encode())
+
+
 def wait_until_up(url: str, process: subprocess.Popen, seconds: float = 60.0) -> None:
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
@@ -127,7 +134,8 @@ def qualify(root: Path, retain: Path | None) -> int:
     api_env = {**reduced_env(), 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1',
                'AUTOBOTS_INTERNAL_TOKEN': internal, 'AUTOBOTS_JWT_SECRET': jwt_secret,
                'AUTOBOTS_TEST_USER_A': USER_A, 'AUTOBOTS_TEST_WORKSPACE_A': WORKSPACE_A}
-    web_env = {**base, 'AUTOBOTS_INTERNAL_TOKEN': internal, 'AUTOBOTS_API_URL': api_url, 'AUTOBOTS_ALLOWED_ORIGIN': web_url, 'NODE_ENV': 'production'}
+    web_env = {**base, 'AUTOBOTS_INTERNAL_TOKEN': internal, 'AUTOBOTS_API_URL': api_url, 'AUTOBOTS_ALLOWED_ORIGIN': web_url, 'NODE_ENV': 'production',
+               'AUTOBOTS_SUPABASE_URL': f'http://127.0.0.1:{closed_api_port}', 'AUTOBOTS_SUPABASE_ANON_KEY': 'fixture-anon-key'}
     unavailable_env = {**web_env, 'AUTOBOTS_API_URL': f'http://127.0.0.1:{closed_api_port}', 'AUTOBOTS_ALLOWED_ORIGIN': unavailable_url}
     processes = []
     started_at = time.monotonic()
@@ -140,10 +148,13 @@ def qualify(root: Path, retain: Path | None) -> int:
         wait_until_up(web_url, processes[1])
         wait_until_up(unavailable_url, processes[2])
         test_env = {**base, 'AUTOBOTS_WEB_URL': web_url, 'AUTOBOTS_API_URL': api_url, 'AUTOBOTS_WEB_UNAVAILABLE_URL': unavailable_url,
-                    'AUTOBOTS_TEST_INTERNAL_TOKEN': internal, 'AUTOBOTS_TEST_SESSION_A': session_token(jwt_secret, USER_A),
-                    'AUTOBOTS_TEST_SESSION_B': session_token(jwt_secret, USER_B), 'AUTOBOTS_TEST_WORKSPACE_A': WORKSPACE_A,
+                    'AUTOBOTS_TEST_INTERNAL_TOKEN': internal, 'AUTOBOTS_TEST_TOKEN_A': session_token(jwt_secret, USER_A),
+                    'AUTOBOTS_TEST_SESSION_A': session_cookie(session_token(jwt_secret, USER_A)),
+                    'AUTOBOTS_TEST_SESSION_B': session_cookie(session_token(jwt_secret, USER_B)),
+                    'AUTOBOTS_TEST_SESSION_FORGED': session_cookie(session_token('wrong-secret-of-a-similar-length', USER_A)),
+                    'AUTOBOTS_TEST_WORKSPACE_A': WORKSPACE_A,
                     'AUTOBOTS_WEB_REPORT': str(report), 'AUTOBOTS_WEB_OUTPUT': str(output / 'results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots)}
-        result = subprocess.run([str(playwright), 'test', '--config', 'playwright.config.ts'], env=test_env, cwd=web,
+        result = subprocess.run([str(playwright), 'test', 'appearance', 'boundary', '--config', 'playwright.config.ts'], env=test_env, cwd=web,
                                 capture_output=True, text=True, errors='replace', timeout=500, check=False)
     finally:
         for process in processes:

@@ -93,9 +93,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-2.2 | Public contracts and generated cross-language types | DONE | EPIC-2 |
 | US-2.2#1 | Define public DTOs and adapters for the initial slice. | DONE | US-2.2 |
 | US-2.2#2 | Generate clients and shared validation/compatibility fixtures. | DONE | US-2.2 |
-| US-2.3 | Local identity, workspace grants and private schema isolation | READY | EPIC-2 |
-| US-2.3#1 | Implement local owner/session and workspace authorization. | TODO | US-2.3 |
-| US-2.3#2 | Qualify grants, RLS and private Storage with nonprivileged identities. | TODO | US-2.3 |
+| US-2.3 | Local identity, workspace grants and private schema isolation | DONE | EPIC-2 |
+| US-2.3#1 | Implement local owner/session and workspace authorization. | DONE | US-2.3 |
+| US-2.3#2 | Qualify grants, RLS and private Storage with nonprivileged identities. | DONE | US-2.3 |
 | US-2.4 | Application migrations and deterministic seeds | DONE | EPIC-2 |
 | US-2.4#1 | Create ordered application migration and seed wrappers. | DONE | US-2.4 |
 | US-2.4#2 | Verify fresh/upgrade replay, repeatability and generated public row types. | DONE | US-2.4 |
@@ -1179,7 +1179,8 @@ Open Questions:
 
 ### US-2.3: Local identity, workspace grants and private schema isolation
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-2-3-local-identity-workspace-grants/`
 
 As a workspace owner
 I want local authenticated and scoped access
@@ -1211,8 +1212,8 @@ Dependencies:
 - US-2.5
 
 Tasks:
-- [ ] Implement local owner/session and workspace authorization.
-- [ ] Qualify grants, RLS and private Storage with nonprivileged identities.
+- [x] Implement local owner/session and workspace authorization.
+- [x] Qualify grants, RLS and private Storage with nonprivileged identities.
 
 Open Questions:
 - None.

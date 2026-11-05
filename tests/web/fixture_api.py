@@ -18,6 +18,9 @@ class FixtureMembership:
     async def is_member(self, user_id: UUID, workspace_id: UUID) -> bool:
         return (user_id, workspace_id) == self.allowed
 
+    async def workspaces_for(self, user_id: UUID) -> list[UUID]:
+        return [self.allowed[1]] if user_id == self.allowed[0] else []
+
 
 def main() -> None:
     membership = FixtureMembership(os.environ['AUTOBOTS_TEST_USER_A'], os.environ['AUTOBOTS_TEST_WORKSPACE_A'])

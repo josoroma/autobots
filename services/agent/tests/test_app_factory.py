@@ -16,7 +16,11 @@ def test_sockets_are_blocked() -> None:
 
 
 def test_the_schema_builds_without_any_connection() -> None:
-    assert set(create_app().openapi()["paths"]) == {"/v1/health", "/v1/workspaces/{workspace_id}"}
+    assert set(create_app().openapi()["paths"]) == {
+        "/v1/health",
+        "/v1/session",
+        "/v1/workspaces/{workspace_id}",
+    }
 
 
 def test_each_call_builds_a_new_app() -> None:

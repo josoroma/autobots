@@ -48,7 +48,7 @@ SHARED_CHECK_FILES = frozenset({*APP_INPUT_FILES, 'scripts/toolchain.py', 'scrip
                                 'scripts/generate_contracts.py', 'scripts/qualify_web.py'})
 SHARED_CHECK_PREFIXES = ('contracts/', 'tests/toolchain/', 'tests/faults/', 'tests/web/')
 RUNNER_FILES = frozenset({'scripts/verify.py', 'scripts/harness_lib.py'})
-DB_CHECK_FILES = frozenset({'scripts/disposable_db.py', 'scripts/supabase_stack.py', 'scripts/app_db.py'})
+DB_CHECK_FILES = frozenset({'scripts/disposable_db.py', 'scripts/supabase_stack.py', 'scripts/app_db.py', 'scripts/qualify_identity.py'})
 DB_CHECK_PREFIXES = ('infra/', 'supabase/', 'tests/db/', 'packages/db-types/')
 HARNESS_CHECKS = frozenset({'project_configuration', 'backlog_validation', 'harness_behavior_tests'})
 APPLICATION_PROFILES = ('fast', 'full')
@@ -57,7 +57,7 @@ WEB_STEPS = frozenset({'node_lock', 'node_version', 'lint', 'format_check', 'typ
                        'api_client_typecheck', 'api_client_tests', 'web_unit_tests'})
 FULL_ONLY_CHECKS = frozenset({'build', 'fault_qualification', 'toolchain_scope_tests', 'browser_qualification'})
 FULL_CHECKS = PYTHON_STEPS | WEB_STEPS | FULL_ONLY_CHECKS
-DB_CHECKS = frozenset({'disposable_qualification', 'supabase_stack_qualification', 'app_db_qualification'})
+DB_CHECKS = frozenset({'disposable_qualification', 'supabase_stack_qualification', 'app_db_qualification', 'identity_qualification'})
 # Recorded by the verifier itself, so they have no command exit code.
 UNCOMMANDED_CHECKS = frozenset({'project_configuration', 'non_mutation_guard'})
 
