@@ -27,3 +27,7 @@ supabase/.branches/
 .mypy_cache/
 *.tsbuildinfo
 .pnpm-store/
+.corepack/
+.uv/
+.cache/
+next-env.d.ts

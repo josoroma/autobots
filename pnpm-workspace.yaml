@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+
+storeDir: .pnpm-store
+cacheDir: .cache/pnpm
+
+verifyDepsBeforeRun: error
+engineStrict: true
+strictPeerDependencies: true

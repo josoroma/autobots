@@ -2,9 +2,9 @@
 
 **Inspected:** 2026-11-04. **Scope:** descriptive inventory; this file supplies no product requirements.
 
-Analyzed revision: 97149303f46b133bac57638d91113f8d06b55663
+Analyzed revision: 1515fc7c98b08d4117861bd651fcc8eb66357104
 
-This describes that revision, which includes the OhMyOrch delivery setup in [HARNESS-OHMYORCH-001](docs/engineering/work-items/HARNESS-OHMYORCH-001.md) and US-1.1's inventory and five added cache ignore rules.
+This describes that revision, which includes the OhMyOrch delivery setup in [HARNESS-OHMYORCH-001](docs/engineering/work-items/HARNESS-OHMYORCH-001.md), US-1.1's inventory and five added cache ignore rules, and US-1.2's rule mapping checks, derived `assistant_adapter` status and forward ingestion runbook.
 
 ## System Summary
 
@@ -26,7 +26,7 @@ Observed on 2026-11-04, on this Mac. Presence is not qualification of an applica
 
 - Python 3.12.16 at `/opt/homebrew/bin/python3.12`, used by project scripts and hooks.
 - OpenSpec 1.13.2, jq 1.7.1, Bash 3.2.57 and Claude Code 2.1.314, used by OhMyOrch delivery.
-- Node 26.13.0, uv 0.13.6, Supabase CLI 2.98.2 and Docker 29.9.2 are present. pnpm is absent.
+- Node 26.13.0 is the shell default and 22.23.2 is under nvm; `scripts/toolchain.py` selects the pinned 22.23.2 per process. uv 0.13.6, Supabase CLI 2.98.2 and Docker 29.9.2 are present. pnpm is not installed globally; it runs repo-local through Corepack.
 
 ## Evidence Paths
 
@@ -58,8 +58,7 @@ No application lockfile/toolchain qualification or persistent database operation
 - `.claude/autobots.json` maps source documents, backlog, technical contract and this inventory.
 - `.claude/agents/autobots-spec-ingestor.md` reads sources and returns a proposed backlog; its caller writes approved changes.
 - `scripts/specs.py` checks backlog structure, local source references, Gherkin, statuses and dependencies; it generates navigation from story bodies and promotes dependency-blocked stories whose dependencies are DONE. It cannot prove semantic source entailment.
-- `scripts/story_manifest.py` hashes a story's changed files before review and compares them before archive.
-- The upstream `ohmyorch` plugin provides `/ohmyorch:deliver`; `.claude/rules/ohmyorch-delivery.md` bridges it to the project contract.
+- The `ohmyorch` plugin, on a local OpenSpec-only branch, provides `/ohmyorch:deliver`; `.claude/rules/ohmyorch-delivery.md` holds the project's delivery rule.
 - `scripts/verify.py` runs the delivered deterministic harness checks and records current input fingerprints/results locally.
 - `.claude/hooks/dispatch.py` integrates selected events with bounded local checks. Script fixture tests and actual Claude event delivery have separate evidence.
 

@@ -1,0 +1,54 @@
+[project]
+name = "autobots"
+version = "0.0.0"
+description = "Autobots agent service: minimal non-feature scaffold."
+requires-python = "==3.12.*"
+dependencies = [
+  "deepagents==0.7.32",
+  "fastapi==0.162.0",
+  "langchain==1.4.8",
+  "langchain-mcp-adapters==0.3.2",
+  "langchain-openrouter==0.2.9",
+  "langgraph==1.2.19",
+  "langgraph-checkpoint-postgres==3.2.0",
+  "openrouter==0.11.46",
+  "psycopg[binary]==3.3.8",
+]
+
+[dependency-groups]
+dev = [
+  "mypy==2.4.1",
+  "pytest==9.2.0",
+  "pytest-asyncio==1.4.1.post1",
+  "ruff==0.17.3",
+]
+
+[build-system]
+requires = ["uv_build==0.13.6"]
+build-backend = "uv_build"
+
+[tool.uv]
+required-version = "==0.13.6"
+# The editable install follows source edits by itself. Without this, editing `src` makes
+# `uv sync --check` report an outdated environment, which is not dependency drift.
+cache-keys = [{ file = "pyproject.toml" }]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+mypy_path = "src"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "--strict-markers --strict-config"

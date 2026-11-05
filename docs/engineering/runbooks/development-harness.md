@@ -2,7 +2,7 @@
 
 ## Scope and prerequisites
 
-Run from the Autobots workspace on this Mac with Python 3.12 or later. The hook interpreter is explicitly /opt/homebrew/bin/python3.12 (observed 3.12.16). If python3.12 is absent from PATH, use that absolute path. Plain python3 can resolve to macOS 3.9.6 in another process; unsupported versions fail clearly. Application dependency qualification remains separate. No package installation, API key, application model call, Docker or Supabase is needed for these commands; `jq` reads the report, and the forward procedure's one delegation step uses the developer assistant. Read the mapped sources in `.claude/autobots.json` and `CODEBASE.md` before changing the backlog.
+Run from the Autobots workspace on this Mac with Python 3.12 or later. The hook interpreter is explicitly /opt/homebrew/bin/python3.12 (observed 3.12.16). If python3.12 is absent from PATH, use that absolute path. Plain python3 can resolve to macOS 3.9.6 in another process; unsupported versions fail clearly. Application dependency qualification remains separate; the pinned Node and Python environments have their own procedure in [the toolchains runbook](toolchains.md), and nothing here needs them. No package installation, API key, application model call, Docker or Supabase is needed for these commands; `jq` reads the report, and the forward procedure's one delegation step uses the developer assistant. Read the mapped sources in `.claude/autobots.json` and `CODEBASE.md` before changing the backlog.
 
 This runbook covers the implemented `harness` profile. `fast`, `full`, `db` and `operations` remain unimplemented and must return a nonzero unavailable result, not substitute a smaller passing suite. H0/H1 has additional pending requirements.
 
