@@ -166,6 +166,7 @@ export interface RunsRow {
   expert_version: number | null;
   root_run_id: string | null;
   content_purged_at: string | null;
+  execution_contract: unknown | null;
 }
 
 export interface SessionsRow {

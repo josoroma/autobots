@@ -106,6 +106,9 @@ class ToolRegistry:
             raise ValueError(f"{tool.tool_id} v{tool.version} is already registered")
         self._tools[key] = tool
 
+    def versions(self) -> dict[str, int]:
+        return {tool_id: version for tool_id, version in self._tools}
+
     def get(self, tool_id: str, version: int) -> ToolDefinition | None:
         return self._tools.get((tool_id, version))
 

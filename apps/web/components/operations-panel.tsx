@@ -18,6 +18,10 @@ const CONDITIONS: Record<string, string> = {
   restore_hold:
     "This instance was restored. All work is held until an operator releases it.",
   hold_unknown: "Holds can't be checked without the database.",
+  adapter_qualified: "The checkpoint adapter is qualified for this release.",
+  adapter_unqualified:
+    "This release's checkpoint adapter isn't qualified. Saved work and new work wait.",
+  adapter_unknown: "The adapter can't be checked without the database.",
   storage_ready: "Storage is answering.",
   storage_unreachable: "Storage isn't answering. New work is refused.",
   storage_not_configured: "No Storage is configured. New work is refused.",
@@ -36,6 +40,7 @@ const LABELS: Record<string, string> = {
   database: "Database",
   schema: "Schema",
   hold: "Hold",
+  adapter: "Checkpoints",
   storage: "Storage",
   disk: "Disk",
   queue: "Queue",

@@ -1622,6 +1622,7 @@
               "database",
               "schema",
               "hold",
+              "adapter",
               "storage",
               "disk",
               "queue",

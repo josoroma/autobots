@@ -10,6 +10,7 @@ from autobots.api.operation_routes import require_ready
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, provider_settings, require_owner
 from autobots.application.experts import ExpertRefused, resolve_binding
+from autobots.application.goal_loop import execution_block
 from autobots.application.model_admission import ModelAdmission
 from autobots.application.provider_settings import ProviderSettings
 from autobots.application.reconciliation import (
@@ -243,6 +244,11 @@ async def post_resume(
         left = await outstanding(connection, run_id)
         # A tool with a readback resolves itself on replay. Otherwise a person has to say.
         blocked = await has_unresolvable_effect(connection, run_id)
+        blocked_contract = await execution_block(connection, run_id)
+    if blocked_contract is not None:
+        raise ApiError(
+            409, "incompatible_version", "This run can't continue on this release. Start a new one."
+        )
     if left.uncertain_calls:
         raise ApiError(
             409, "uncertain_model_call", "A model call's outcome must be reconciled first."

@@ -2,10 +2,11 @@
 
 import asyncio
 import json
+import os
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import psycopg
 from deepagents import create_deep_agent
@@ -14,6 +15,7 @@ from langgraph.errors import GraphRecursionError
 
 from autobots.adapters.checkpoints import (
     DURABILITY,
+    adapter_qualified,
     fenced_checkpointer,
     graph_config,
     is_stale_owner,
@@ -59,7 +61,9 @@ from autobots.application.worker_leases import (
     is_held,
 )
 from autobots.contracts.plans import GoalSpec
+from autobots.domain.execution import INCOMPATIBLE, incompatibility
 from autobots.domain.runs import Actor, CommandRefused, RunCommand, RunStatus
+from autobots.operations.logs import forbid_remote_tracing
 
 # Waiting can resolve these: a person adds budget or a key, or reconciles an uncertain call.
 PAUSE_FOR = frozenset(
@@ -76,6 +80,9 @@ PAUSE_FOR = frozenset(
         "assignment_lost",
         "parent_not_running",
         "outcome_unknown",
+        INCOMPATIBLE,
+        # A worker on another model, say after a release, leaves the saved run for the right one.
+        "route_not_bound",
     }
 )
 NOT_OURS = frozenset({"lease_lost", "run_not_running", "run_not_found", "approval_pending"})
@@ -155,6 +162,8 @@ def build_stage(
     gateway = ToolGateway(
         loop_registry(config.limits, config.object_store, delegation, config.tools)
     )
+    # Again here, for any caller that skipped a process entry point.
+    forbid_remote_tracing(os.environ)
     return create_deep_agent(
         model=AdmittedModel(delegate=model),
         tools=visible_tools(gateway, scope),
@@ -275,13 +284,22 @@ async def process_next(
     config: LoopConfig,
 ) -> LoopResult | None:
     """Claims one eligible job and takes it as far as it can go in one pass."""
-    if await is_held(connection):
+    if await is_held(connection) or not await adapter_qualified(connection):
         return None
     await expire_due(connection)
     lease = await claim_next(connection, worker_id=worker_id, lease_seconds=config.lease_seconds)
     if lease is None:
         return None
     return await _drive(connection, database_url, lease, model_factory, config)
+
+
+async def execution_block(connection: Any, run_id: UUID) -> str | None:
+    """Why a saved run can't continue under this release, or None. It stays as it was saved."""
+    cursor = await connection.execute(
+        "select execution_contract from public.runs where id = %s", (run_id,)
+    )
+    row = await cursor.fetchone()
+    return incompatibility(None if row is None else row[0])
 
 
 async def _drive(
@@ -291,6 +309,10 @@ async def _drive(
     model_factory: Callable[[], Any],
     config: LoopConfig,
 ) -> LoopResult:
+    if await execution_block(connection, lease.run_id) is not None:
+        # Before any model or checkpoint is touched. A migration never swaps these for it.
+        goal = await load_goal(connection, lease.run_id)
+        return await _finish(connection, lease, goal, INCOMPATIBLE)
     cursor = await connection.execute(
         "select 1 from public.workflow_executions where run_id = %s", (lease.run_id,)
     )
@@ -514,9 +536,11 @@ async def _finish(
                     expected_version=version,
                     generation=lease.generation,
                 )
+                # A run can stop before its first segment, so the row may not exist yet.
                 await connection.execute(
-                    "update app_private.run_usage set stop_reason = %s where run_id = %s",
-                    (code, lease.run_id),
+                    "insert into app_private.run_usage (run_id, stop_reason) values (%s, %s) "
+                    "on conflict (run_id) do update set stop_reason = excluded.stop_reason",
+                    (lease.run_id, code),
                 )
             status = result.status
         except (LeaseLost, VersionConflict, CommandRefused):

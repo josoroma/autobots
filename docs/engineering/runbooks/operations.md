@@ -42,6 +42,7 @@ Expected: `GET /v1/operations/local-status`, or the Operations page, says ready.
 | Queue | `leases_expired` | allowed | A worker stopped mid-job. The next inference worker takes it. |
 | Worker | `worker_absent`, `no_inference_worker` | allowed | Queued work waits. Start a worker. |
 | Hold | `restore_hold` | refused | This is a restored instance. See [the backup and restore runbook](backup-restore.md). |
+| Checkpoints | `adapter_unqualified` | refused, and nothing is claimed | This release's checkpoint adapter has no recorded qualification. See [the upgrade runbook](upgrade.md). |
 
 With the database down the page still answers, with `scope: installation` and no workspace counts. Only an owner sees it while the database is up.
 

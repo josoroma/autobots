@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 VIEW = ConfigDict(extra="forbid", frozen=True)
-Name = Literal["database", "schema", "hold", "storage", "disk", "queue", "worker"]
+Name = Literal["database", "schema", "hold", "adapter", "storage", "disk", "queue", "worker"]
 
 
 class OperationCondition(BaseModel):

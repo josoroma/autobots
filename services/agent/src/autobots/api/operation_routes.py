@@ -51,11 +51,11 @@ def _pool(request: Request) -> Any:
 
 
 async def _installation_conditions(request: Request) -> list[Condition]:
-    database, schema, hold = await database_conditions(request.app.state.pool)
+    database, schema, hold, adapter = await database_conditions(request.app.state.pool)
     storage = await storage_condition(getattr(request.app.state, "object_store", None))
     minimum = int(os.environ.get("AUTOBOTS_MIN_FREE_BYTES", DEFAULT_MIN_FREE_BYTES))
     disk = disk_condition(Path(os.environ.get("AUTOBOTS_CONFIG_ROOT") or "."), minimum)
-    return [database, schema, hold, storage, disk]
+    return [database, schema, hold, adapter, storage, disk]
 
 
 async def require_ready(request: Request) -> None:

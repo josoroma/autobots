@@ -7,6 +7,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from autobots.contracts.plans import GoalSpec, InputDocument, RequiredArtifact
+from autobots.domain.execution import current_contract
 from autobots.domain.models import RolePolicy
 from autobots.domain.runs import (
     TERMINAL,
@@ -197,8 +198,8 @@ async def admit_run(
         await connection.execute(
             "insert into public.runs (id, workspace_id, status, limit_micro_usd, goal_text, "
             "goal_summary, version, policy_snapshot, continues_run_id, session_id, expert_id, "
-            "expert_version, parent_run_id, root_run_id) "
-            "values (%s, %s, %s, %s, %s, %s, 1, %s, %s, %s, %s, %s, %s, %s)",
+            "expert_version, parent_run_id, root_run_id, execution_contract) "
+            "values (%s, %s, %s, %s, %s, %s, 1, %s, %s, %s, %s, %s, %s, %s, %s)",
             (
                 run_id,
                 workspace_id,
@@ -213,6 +214,7 @@ async def admit_run(
                 binding.version if binding else None,
                 inherit.parent_run_id if inherit else None,
                 inherit.root_run_id if inherit else None,
+                json.dumps(current_contract()),
             ),
         )
         await connection.execute(

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
+from autobots.adapters.checkpoints import adapter_qualified
 from autobots.operations.logs import log_event
 
 logger = logging.getLogger("autobots.operations")
@@ -27,9 +28,10 @@ REQUIRED_RELATIONS = (
     "app_private.workspace_retention",
     "app_private.worker_heartbeats",
     "app_private.installation_holds",
+    "agent_runtime.adapter_qualifications",
 )
 # Admission stops on these. A missing worker only means a job waits.
-BLOCKING = frozenset({"database", "schema", "storage", "disk", "hold"})
+BLOCKING = frozenset({"database", "schema", "storage", "disk", "hold", "adapter"})
 
 
 @dataclass(frozen=True)
@@ -47,12 +49,13 @@ class QueueCounts:
     oldest_queued_seconds: int
 
 
-async def database_conditions(pool: Any) -> tuple[Condition, Condition, Condition]:
+async def database_conditions(pool: Any) -> tuple[Condition, Condition, Condition, Condition]:
     if pool is None:
         return (
             Condition("database", "unavailable", "database_not_configured"),
             Condition("schema", "unavailable", "schema_unknown"),
             Condition("hold", "unavailable", "hold_unknown"),
+            Condition("adapter", "unavailable", "adapter_unknown"),
         )
     try:
         async with asyncio.timeout(DB_SECONDS), pool.connection() as connection:
@@ -62,11 +65,13 @@ async def database_conditions(pool: Any) -> tuple[Condition, Condition, Conditio
             )
             row = await cursor.fetchone()
             held = False
+            qualified = False
             if int(row[0]) == 0:
                 cursor = await connection.execute(
                     "select 1 from app_private.installation_holds limit 1"
                 )
                 held = await cursor.fetchone() is not None
+                qualified = await adapter_qualified(connection)
     except Exception as error:
         # Whatever it was, the database didn't answer. The type is logged, never its message.
         log_event(logger, "database.unavailable", logging.WARNING, error=type(error).__name__)
@@ -74,6 +79,7 @@ async def database_conditions(pool: Any) -> tuple[Condition, Condition, Conditio
             Condition("database", "unavailable", "database_unreachable"),
             Condition("schema", "unavailable", "schema_unknown"),
             Condition("hold", "unavailable", "hold_unknown"),
+            Condition("adapter", "unavailable", "adapter_unknown"),
         )
     missing = int(row[0])
     return (
@@ -84,6 +90,9 @@ async def database_conditions(pool: Any) -> tuple[Condition, Condition, Conditio
         Condition("hold", "unavailable", "restore_hold")
         if held
         else Condition("hold", "ok", "no_hold"),
+        Condition("adapter", "ok", "adapter_qualified")
+        if qualified
+        else Condition("adapter", "unavailable", "adapter_unqualified"),
     )
 
 

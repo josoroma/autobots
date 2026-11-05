@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 import re
 import sys
 from collections.abc import MutableMapping
@@ -81,6 +82,13 @@ def forbid_remote_tracing(environ: MutableMapping[str, str]) -> None:
         environ[name] = "false"
     for name in _TRACING_REMOVED:
         environ.pop(name, None)
+    if environ is os.environ:
+        # langsmith caches what it read, so a setting seen before this call would otherwise stick.
+        try:
+            from langsmith import utils
+        except ImportError:
+            return
+        utils.get_env_var.cache_clear()  # type: ignore[attr-defined]
 
 
 def remote_tracing_disabled(environ: MutableMapping[str, str]) -> bool:

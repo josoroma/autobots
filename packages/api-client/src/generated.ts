@@ -1623,6 +1623,7 @@ export const schemas = {
           "database",
           "schema",
           "hold",
+          "adapter",
           "storage",
           "disk",
           "queue",
@@ -4032,7 +4033,7 @@ export function parseOccurrenceView(value: unknown): OccurrenceView {
 
 export interface OperationCondition {
   code: string;
-  name: "database" | "schema" | "hold" | "storage" | "disk" | "queue" | "worker";
+  name: "database" | "schema" | "hold" | "adapter" | "storage" | "disk" | "queue" | "worker";
   state: "ok" | "degraded" | "unavailable";
 }
 

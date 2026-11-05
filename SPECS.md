@@ -189,9 +189,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-9.2 | Complete isolated backup and restore proof | DONE | EPIC-9 |
 | US-9.2#1 | Implement versioned backup manifests and isolated restore procedures. | DONE | US-9.2 |
 | US-9.2#2 | Exercise the complete restore with real local assertions and redacted evidence. | DONE | US-9.2 |
-| US-9.3 | Qualified upgrades and checkpoint-compatible continuation | READY | EPIC-9 |
-| US-9.3#1 | Implement version checks and supported migration/forward-recovery paths. | TODO | US-9.3 |
-| US-9.3#2 | Exercise prior-fixture upgrade and resumed-checkpoint compatibility. | TODO | US-9.3 |
+| US-9.3 | Qualified upgrades and checkpoint-compatible continuation | DONE | EPIC-9 |
+| US-9.3#1 | Implement version checks and supported migration/forward-recovery paths. | DONE | US-9.3 |
+| US-9.3#2 | Exercise prior-fixture upgrade and resumed-checkpoint compatibility. | DONE | US-9.3 |
 | EPIC-10 | Product qualification and completion | — | — |
 | US-10.1 | Held-out task, policy and performance qualification | BLOCKED | EPIC-10 |
 | US-10.1#1 | Run the held-out behavioral and policy/recovery suites without tuning on held-out data. | TODO | US-10.1 |
@@ -2458,7 +2458,8 @@ Open Questions:
 
 ### US-9.3: Qualified upgrades and checkpoint-compatible continuation
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-9-3-qualified-upgrades-checkpoint-compatible/`
 
 As an operator
 I want reviewed application and Supabase upgrades
@@ -2492,8 +2493,8 @@ Dependencies:
 - US-4.2
 
 Tasks:
-- [ ] Implement version checks and supported migration/forward-recovery paths.
-- [ ] Exercise prior-fixture upgrade and resumed-checkpoint compatibility.
+- [x] Implement version checks and supported migration/forward-recovery paths.
+- [x] Exercise prior-fixture upgrade and resumed-checkpoint compatibility.
 
 Open Questions:
 - None.
