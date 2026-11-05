@@ -20,22 +20,48 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from langchain_core.messages import AIMessageChunk, HumanMessage, SystemMessage, ToolMessage
 from pydantic import BaseModel, Field, SecretStr, ValidationError
 
-from autobots.adapters.models.catalog import ModelUnavailable, parse_catalog
-from autobots.adapters.models.factory import chat_model, prepare_attempt
+from autobots.adapters.models.catalog import ModelUnavailable, parse_catalog, validated_entry
+from autobots.adapters.models.factory import PreparedAttempt, chat_model, checked_options
 from autobots.adapters.models.openrouter_metadata import catalog_fetcher
 from autobots.application.run_projection import public_text
-from autobots.domain.models import ModelRole, resolve_role_policy
+from autobots.domain.models import ModelProfile, ModelRole
 from autobots.operations.logs import configure_logging, forbid_remote_tracing, log_event
 
 logger = logging.getLogger("autobots.qualification")
 
+
+@dataclass(frozen=True)
+class Route:
+    """What qualification sends. Separate from `PROFILES`, which is all the application may use."""
+
+    wire_id: str
+    canonical_id: str
+    options: Mapping[str, Any] = field(default_factory=dict)
+
+
+ROUTES = {
+    "openrouter_deepseek_flash": Route(
+        "deepseek/deepseek-v4.1-flash-1017", "deepseek/deepseek-v4.1-flash-20261017"
+    ),
+    "deepseek_low_reasoning": Route(
+        "deepseek/deepseek-v4.1-flash-1017",
+        "deepseek/deepseek-v4.1-flash-20261017",
+        {"reasoning": {"effort": "low"}},
+    ),
+    "openai_gpt_6_1_terra": Route("openai/gpt-6.1-terra", "openai/gpt-6.1-terra-20261026"),
+}
 # What the owner approved, in micro-USD. Another route or a higher figure is a reviewed code change.
-AUTHORIZED_CAPS = {"openrouter_deepseek_flash": 500_000}
+# The last two share one ledger, so together they can't pass that cap.
+AUTHORIZED_CAPS = {
+    "openrouter_deepseek_flash": 500_000,
+    "deepseek_low_reasoning": 600_000,
+    "openai_gpt_6_1_terra": 600_000,
+}
 CONTEXT_TOKENS = 8_192
 OUTPUT_TOKENS = 512
 TRIALS = 3
@@ -194,6 +220,7 @@ class Corpus:
     worst_case: int
     results: list[Trial] = field(default_factory=list)
     only: dict[str, int] = field(default_factory=dict)
+    prefix: str = ""
 
     async def _call(self, label: str, send: Callable[[], Awaitable[Any]]) -> Any:
         entry = self.ledger.reserve(label, self.worst_case)
@@ -420,7 +447,7 @@ class Corpus:
             for name, fixture in fixtures:
                 if self.only and trial > self.only.get(name, 0):
                     continue
-                label = f"{name}/{'again-' if self.only else ''}{trial}"
+                label = f"{self.prefix}{name}/{'again-' if self.only else ''}{trial}"
                 started = time.monotonic()
                 try:
                     verdict, observed = await fixture(label)
@@ -483,29 +510,42 @@ def summarize(results: list[Trial]) -> dict[str, dict[str, int]]:
     return summary
 
 
-def planned_calls() -> int:
+def planned_calls(only: Mapping[str, int] | None = None) -> int:
     # Twelve fixtures, and continuation takes two calls.
-    return 13 * TRIALS
+    if not only:
+        return 13 * TRIALS
+    return sum(count * (2 if name == "continuation" else 1) for name, count in only.items())
 
 
-def preflight(profile: str, payload: Mapping[str, Any], ledger: Ledger) -> tuple[Any, int]:
+def prepare(route: Route, payload: Mapping[str, Any], max_tokens: int = OUTPUT_TOKENS) -> Any:
+    """The checks a real attempt gets: this exact identity, and only options the catalog lists."""
+    now = datetime.now(UTC)
+    catalog = parse_catalog(payload, retrieved_at=now, revision="qualification")
+    profile = cast(ModelProfile, route)
+    entry = validated_entry(profile, catalog, now)
+    options = checked_options(
+        {"max_tokens": max_tokens, **route.options}, entry.supported_parameters
+    )
+    return PreparedAttempt(profile, ModelRole.EXECUTOR, catalog.revision, options)
+
+
+def preflight(
+    profile: str,
+    payload: Mapping[str, Any],
+    ledger: Ledger,
+    only: Mapping[str, int] | None = None,
+) -> tuple[Any, int]:
     """Refuses before any model call, including when the plan can't fit what's left of the cap."""
-    if profile not in AUTHORIZED_CAPS:
+    if profile not in AUTHORIZED_CAPS or profile not in ROUTES:
         raise Refused(f"{profile} isn't authorized for paid qualification")
     if ledger.cap != AUTHORIZED_CAPS[profile]:
         raise Refused("this ledger's cap isn't the authorized one")
-    policy = resolve_role_policy()
-    now = datetime.now(UTC)
-    catalog = parse_catalog(payload, retrieved_at=now, revision="qualification")
-    attempt = prepare_attempt(
-        policy, ModelRole.EXECUTOR, catalog, options={"max_tokens": OUTPUT_TOKENS}
-    )
-    if attempt.profile.id.value != profile:
-        raise Refused("the policy doesn't resolve this role to the authorized route")
+    attempt = prepare(ROUTES[profile], payload)
     worst = price_of(payload, attempt.profile.wire_id).worst_case_micro_usd()
-    if ledger.committed() + worst * planned_calls() > ledger.cap:
+    calls = planned_calls(only)
+    if ledger.committed() + worst * calls > ledger.cap:
         raise Refused(
-            f"{planned_calls()} calls at {worst} micro-USD each won't fit in what's left of the cap"
+            f"{calls} calls at {worst} micro-USD each won't fit in what's left of the cap"
         )
     return attempt, worst
 
@@ -522,22 +562,16 @@ async def qualify(
     payload = await fetch_catalog()
     if payload is None:
         raise Refused("the catalog couldn't be read, so nothing was sent")
-    attempt, worst = preflight(profile, payload, ledger)
+    attempt, worst = preflight(profile, payload, ledger, only)
     built_at = time.monotonic()
-    current = {"payload": payload}
+    route = ROUTES[profile]
 
     def build(max_tokens: int = OUTPUT_TOKENS) -> Any:
-        # The catalog's freshness rule still applies between calls, through the same preparation.
-        policy = resolve_role_policy()
-        catalog = parse_catalog(
-            current["payload"], retrieved_at=datetime.now(UTC), revision="qualification"
-        )
-        prepared = prepare_attempt(
-            policy, ModelRole.EXECUTOR, catalog, options={"max_tokens": max_tokens}
-        )
+        prepared = prepare(route, payload, max_tokens)
         return chat_model(prepared, key, client_factory=make_client)
 
-    corpus = Corpus(build, ledger, worst, only=only or {})
+    prefix = "" if profile == "openrouter_deepseek_flash" else f"{profile}:"
+    corpus = Corpus(build, ledger, worst, only=only or {}, prefix=prefix)
     results = await corpus.run()
     report = {
         "schema_version": "autobots.route-qualification/v1",
@@ -546,6 +580,7 @@ async def qualify(
         "profile": profile,
         "wire_id": attempt.profile.wire_id,
         "canonical_id": attempt.profile.canonical_id,
+        "options": dict(route.options),
         "catalog_price": price_of(payload, attempt.profile.wire_id).__dict__,
         "worst_case_micro_usd_per_call": worst,
         "cap_micro_usd": ledger.cap,
@@ -561,7 +596,8 @@ async def qualify(
         "not_established": ["H1", "product acceptance", "task quality", "the Astra route"],
     }
     # A narrower rerun adds to the record. It never replaces the full corpus's report.
-    name = "report-rerun.json" if only else "report.json"
+    stem = "report" if profile == "openrouter_deepseek_flash" else f"report-{profile}"
+    name = f"{stem}-rerun.json" if only else f"{stem}.json"
     (out / name).write_text(json.dumps(report, indent=2, ensure_ascii=False))
     return report
 

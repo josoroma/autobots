@@ -16,7 +16,14 @@ from autobots.operations import route_qualification as rq
 WIRE_ID = "deepseek/deepseek-v4.1-flash-1017"
 CANONICAL = "deepseek/deepseek-v4.1-flash-20261017"
 KEY = "sk-or-arranged-not-a-real-key"
-PARAMETERS = ["max_tokens", "tools", "tool_choice", "response_format", "structured_outputs"]
+PARAMETERS = [
+    "max_tokens",
+    "tools",
+    "tool_choice",
+    "response_format",
+    "structured_outputs",
+    "reasoning",
+]
 
 
 def catalog(prompt: str = "0.00000015", completion: str = "0.0000006") -> dict[str, Any]:
@@ -314,11 +321,71 @@ def test_the_corpus_stops_cleanly_at_the_cap(tmp_path: Path) -> None:
     assert ledger.committed() <= ledger.cap
 
 
-def test_only_the_authorized_route_can_be_paid_for(tmp_path: Path) -> None:
+def test_only_the_authorized_routes_can_be_paid_for(tmp_path: Path) -> None:
     ledger = rq.Ledger(tmp_path / "ledger.json", 500_000)
     with pytest.raises(rq.Refused, match="isn't authorized"):
         rq.preflight("openrouter_astra", catalog(), ledger)
-    assert rq.AUTHORIZED_CAPS == {"openrouter_deepseek_flash": 500_000}
+    assert rq.AUTHORIZED_CAPS == {
+        "openrouter_deepseek_flash": 500_000,
+        "deepseek_low_reasoning": 600_000,
+        "openai_gpt_6_1_terra": 600_000,
+    }
+    assert set(rq.ROUTES) == set(rq.AUTHORIZED_CAPS)
+
+
+def _with_terra() -> dict[str, Any]:
+    payload = catalog()
+    payload["data"].append(
+        {
+            "id": "openai/gpt-6.1-terra",
+            "canonical_slug": "openai/gpt-6.1-terra-20261026",
+            "supported_parameters": PARAMETERS,
+            "pricing": {"prompt": "0.000001", "completion": "0.000005"},
+        }
+    )
+    return payload
+
+
+def _qualify(tmp_path: Path, fake: Fake, profile: str, only: Any = None) -> dict[str, Any]:
+    async def fetch() -> dict[str, Any]:
+        return _with_terra()
+
+    return asyncio.run(
+        rq.qualify(
+            profile, SecretStr(KEY), tmp_path, fetch, make_client=client_with(fake), only=only
+        )
+    )
+
+
+def test_terra_runs_the_whole_corpus_at_its_own_price_and_no_other_model(tmp_path: Path) -> None:
+    fake = Fake()
+    report = _qualify(tmp_path, fake, "openai_gpt_6_1_terra")
+    assert {body["model"] for body in fake.bodies} == {"openai/gpt-6.1-terra"}
+    assert all(body["provider"]["allow_fallbacks"] is False for body in fake.bodies)
+    assert report["worst_case_micro_usd_per_call"] == 10_752
+    assert report["calls"] == rq.planned_calls()
+    assert (tmp_path / "report-openai_gpt_6_1_terra.json").exists()
+
+
+def test_low_reasoning_is_sent_and_shares_the_terra_cap(tmp_path: Path) -> None:
+    _qualify(tmp_path, Fake(cost=None), "openai_gpt_6_1_terra")
+    spent = json.loads((tmp_path / "ledger.json").read_text())["committed"]
+    fake = Fake()
+    only = {"schema_nested": 3}
+    report = _qualify(tmp_path, fake, "deepseek_low_reasoning", only)
+    assert len(fake.bodies) == 3
+    assert all(body["reasoning"] == {"effort": "low"} for body in fake.bodies)
+    assert {body["model"] for body in fake.bodies} == {WIRE_ID}
+    assert report["committed_micro_usd"] > spent
+    assert report["cap_micro_usd"] == 600_000
+
+
+def test_an_option_the_catalog_doesnt_list_is_refused_before_sending(tmp_path: Path) -> None:
+    payload = catalog()
+    payload["data"][0]["supported_parameters"] = ["max_tokens"]
+    ledger = rq.Ledger(tmp_path / "ledger.json", 600_000)
+    with pytest.raises(ModelUnavailable):
+        rq.preflight("deepseek_low_reasoning", payload, ledger, {"schema_nested": 3})
 
 
 def test_a_catalog_drift_stops_the_run(tmp_path: Path) -> None:
