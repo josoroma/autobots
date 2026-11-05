@@ -111,9 +111,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-3.1 | Server credential precedence and encrypted app storage | DONE | EPIC-3 |
 | US-3.1#1 | Implement shared precedence, credential references and host-key handling. | DONE | US-3.1 |
 | US-3.1#2 | Qualify encrypted storage, rotation, loss and secret-redaction fixtures. | DONE | US-3.1 |
-| US-3.2 | Settings, missing-key use and explicit run intent | READY | EPIC-3 |
-| US-3.2#1 | Implement the exact safe provider API routes and write-only form. | TODO | US-3.2 |
-| US-3.2#2 | Test source/status separation, rotation/disconnect and draft restoration. | TODO | US-3.2 |
+| US-3.2 | Settings, missing-key use and explicit run intent | DONE | EPIC-3 |
+| US-3.2#1 | Implement the exact safe provider API routes and write-only form. | DONE | US-3.2 |
+| US-3.2#2 | Test source/status separation, rotation/disconnect and draft restoration. | DONE | US-3.2 |
 | US-3.3 | Model admission, spending and uncertain invocation receipts | READY | EPIC-3 |
 | US-3.3#1 | Implement slot/cost admission and per-attempt receipts. | TODO | US-3.3 |
 | US-3.3#2 | Test concurrent reservations, UTC rollover, failure classes and cancellation ambiguity. | TODO | US-3.3 |
@@ -1414,7 +1414,8 @@ Open Questions:
 
 ### US-3.2: Settings, missing-key use and explicit run intent
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-3-2-settings-missing-key-use/`
 
 As a workspace owner
 I want write-only provider setup that preserves drafts
@@ -1453,8 +1454,8 @@ Dependencies:
 - US-3.1
 
 Tasks:
-- [ ] Implement the exact safe provider API routes and write-only form.
-- [ ] Test source/status separation, rotation/disconnect and draft restoration.
+- [x] Implement the exact safe provider API routes and write-only form.
+- [x] Test source/status separation, rotation/disconnect and draft restoration.
 
 Open Questions:
 - None.

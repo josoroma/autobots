@@ -20,18 +20,18 @@ markers are preserved across refreshes.
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
 | 1 | US-3.1 | us-3-1-server-credential-precedence-encrypted | DONE | Server credential precedence and encrypted app storage |
-| 2 | US-3.2 | us-3-2-settings-missing-key-use | READY | Settings, missing-key use and explicit run intent |
+| 2 | US-3.2 | us-3-2-settings-missing-key-use | DONE | Settings, missing-key use and explicit run intent |
 | 3 | US-3.3 | us-3-3-model-admission-spending-uncertain | READY | Model admission, spending and uncertain invocation receipts |
 | 4 | US-3.4 | us-3-4-qualify-each-enabled-live | BLOCKED | Qualify each enabled live OpenRouter route |
 
 ## Next Action
 
 Action: select
-Story: US-3.2
-Change: us-3-2-settings-missing-key-use
+Story: US-3.3
+Change: us-3-3-model-admission-spending-uncertain
 Owner: main-session
-Command: openspec new change us-3-2-settings-missing-key-use; set US-3.2 to IN PROGRESS with a Change: line
-Reason: US-3.2 is READY and has no OpenSpec change
+Command: openspec new change us-3-3-model-admission-spending-uncertain; set US-3.3 to IN PROGRESS with a Change: line
+Reason: US-3.3 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

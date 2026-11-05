@@ -33,6 +33,9 @@ class Membership:
     async def workspaces_for(self, user_id: UUID) -> list[UUID]:
         return [WORKSPACE] if user_id == USER_A else []
 
+    async def role_in(self, user_id: UUID, workspace_id: UUID) -> str | None:
+        return "owner" if user_id == USER_A else None
+
 
 def token(user: UUID = USER_A, secret: str = SECRET, **overrides: object) -> str:
     claims = {"sub": str(user), "aud": "authenticated", "exp": time.time() + 60, **overrides}
@@ -134,6 +137,9 @@ def test_an_unexpected_error_exposes_nothing() -> None:
 
         async def workspaces_for(self, user_id: UUID) -> list[UUID]:
             return []
+
+        async def role_in(self, user_id: UUID, workspace_id: UUID) -> str | None:
+            return None
 
     app = create_app(SETTINGS, membership=Broken())
     reply = TestClient(app, raise_server_exceptions=False).get(

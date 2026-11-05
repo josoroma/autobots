@@ -21,6 +21,19 @@ class PostgresMembership:
             )
             return await cursor.fetchone() is not None
 
+    async def role_in(self, user_id: UUID, workspace_id: UUID) -> str | None:
+        pool = self._state.pool
+        if pool is None:
+            return None
+        async with pool.connection() as connection:
+            cursor = await connection.execute(
+                "select role from public.workspace_members "
+                "where user_id = %s and workspace_id = %s",
+                (user_id, workspace_id),
+            )
+            row = await cursor.fetchone()
+            return row[0] if row else None
+
     async def workspaces_for(self, user_id: UUID) -> list[UUID]:
         pool = self._state.pool
         if pool is None:

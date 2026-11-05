@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { AboutServices } from "@/components/about-services";
+import { GoalComposer } from "@/components/goal-composer";
 import { ServiceStatusBadge } from "@/components/service-status-badge";
 import { SignOutButton } from "@/components/sign-out-button";
 import { Card } from "@/components/ui/card";
@@ -40,6 +41,7 @@ export default async function HomePage() {
           </>
         )}
       </Card>
+      <GoalComposer />
       <Card aria-labelledby="services-heading" className="space-y-3">
         <h2 id="services-heading" className="text-lg font-medium">
           Services

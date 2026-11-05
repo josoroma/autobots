@@ -12,6 +12,7 @@ from autobots.api.errors import register_error_handlers
 from autobots.api.routes import router
 from autobots.api.security import DenyAllMembership, MembershipStore
 from autobots.api.settings import Settings
+from autobots.api.settings_routes import router as settings_router
 
 
 class Pool(Protocol):
@@ -57,7 +58,9 @@ def create_app(
     app.state.settings = resolved
     app.state.membership = DenyAllMembership() if membership is None else membership
     app.state.pool = None
+    app.state.provider_context = None
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(resolved.allowed_hosts))
     register_error_handlers(app)
     app.include_router(router)
+    app.include_router(settings_router)
     return app

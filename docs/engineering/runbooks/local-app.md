@@ -32,6 +32,14 @@ AUTOBOTS_SUPABASE_URL=<gateway url> AUTOBOTS_SERVICE_ROLE_KEY=<service role key>
 
 Expected: one line of JSON with the new user and workspace IDs. Exit 1 means a service refused, for example an email already in use. Run it once. `supabase/bootstrap/storage.sql` must already have been applied as the database superuser, because the migration role cannot alter Storage's tables.
 
+## OpenRouter settings
+
+Settings → Models → OpenRouter shows the source, authentication, catalog and live qualification separately. **Save & validate** sends a transient key to this Mac's server, checks `GET /key` and the public catalog, encrypts it and never starts a run. A rejected key or an outage leaves the previous key in place. Disconnect removes only the workspace's stored key.
+
+The API also needs `AUTOBOTS_CONFIG_ROOT`, the absolute directory holding any `.env` files, which every native process shares. With it unset, settings report unavailable. `AUTOBOTS_PROVIDER_MASTER_KEY_FILE` overrides the default key path. The installation's environment key applies only to a workspace with a row in `app_private.installation_credential_grants`.
+
+Only a user's **Run** reaches the credential gate, and it admits nothing yet. Without a key it returns `credentials_required`, and the draft stays in this tab's `sessionStorage`. No credential is stored in the browser.
+
 ## Boundaries
 
 The browser calls only `/api/v1/...` on the same origin. That route refuses a wrong `Host` or `Origin` and, on writes, a missing or mismatched CSRF token, then adds the internal credential on the server. The Supabase session lives in an HttpOnly, same-site cookie, through `@supabase/ssr` on the server only. The API requires the credential on every route, verifies the session token against the Auth JWT secret and checks membership in the database. Browser-supplied user and workspace IDs are not trusted, and errors carry only a code and a short message.

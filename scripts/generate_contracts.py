@@ -66,8 +66,12 @@ def operation(path: str, method: str, details: Mapping) -> str:
     parameters = re.findall(r'{(\w+)}', path)
     arguments = ''.join(f', {parameter}: string' for parameter in parameters)
     url = re.sub(r'{(\w+)}', r'${encodeURIComponent(\1)}', path)
+    body_schema = details.get('requestBody', {}).get('content', {}).get('application/json', {}).get('schema', {}).get('$ref')
+    if body_schema is not None:
+        arguments += f', body: {schema_name(body_schema)}'
+    payload = ', body' if body_schema is not None else ''
     return (f'export async function {name}(options: ClientOptions{arguments}): Promise<{response}> {{\n'
-            f"  return parse{response}(await requestJson(options, {json.dumps(method.upper())}, `{url}`));\n}}\n")
+            f"  return parse{response}(await requestJson(options, {json.dumps(method.upper())}, `{url}`{payload}));\n}}\n")
 
 
 def typescript_client(document: Mapping) -> str:

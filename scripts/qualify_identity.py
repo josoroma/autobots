@@ -6,6 +6,7 @@ admin API, then drives real sign-in, the Python API, the BFF and each exposed se
 only that project. No model is called, and nothing persistent is touched.
 
 Exit codes: 0 passed, 1 a case failed, 2 prerequisite unavailable.
+OpenRouter itself is a local fake that logs each request, and it holds no real credential.
 Passing establishes neither H1 nor product acceptance.
 """
 from __future__ import annotations
@@ -15,8 +16,10 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import secrets
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from urllib import error, request
 
@@ -135,7 +138,7 @@ def storage_cases(cases: Cases, base: str, anon: str, token_a: str, token_b: str
 
 
 def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port: int, email: str, password: str,
-                  workspace_a: str, workspace_b: str) -> None:
+                  workspace_a: str, workspace_b: str, email_b: str, password_b: str, email_c: str, password_c: str) -> None:
     tools = find_tools(root)
     web = root / 'apps/web'
     next_bin, playwright = web / 'node_modules/.bin/next', web / 'node_modules/.bin/playwright'
@@ -151,10 +154,20 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
     from qualify_web import free_port as any_port
     internal = secrets.token_hex(32)
     api_port, web_port = any_port(), any_port()
+    config_root = Path(tempfile.mkdtemp(prefix='autobots-config-'))
+    # The arranged installation key. Only workspace B is granted it, so A exercises the app store.
+    (config_root / '.env.local').write_text('OPENROUTER_API_KEY=sk-or-valid-arranged-installation\\n')
+    stack.sql(f"insert into app_private.installation_credential_grants values ('{workspace_b}');\\n")
+    upstream_log = root / '.checks/identity/upstream.log'
+    upstream_log.parent.mkdir(parents=True, exist_ok=True)
+    upstream_log.write_text('')
+    catalog_down = config_root / 'catalog-down'
     api_url, web_url = f'http://127.0.0.1:{api_port}', f'http://127.0.0.1:{web_port}'
     runtime_url = f'postgresql://autobots_runtime:{stack.runtime_password}@127.0.0.1:{db_port}/postgres'
     api_env = {**tool_env(), 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1', 'AUTOBOTS_INTERNAL_TOKEN': internal,
-               'AUTOBOTS_JWT_SECRET': stack.values['JWT_SECRET'], 'AUTOBOTS_DATABASE_URL': runtime_url}
+               'AUTOBOTS_JWT_SECRET': stack.values['JWT_SECRET'], 'AUTOBOTS_DATABASE_URL': runtime_url,
+               'AUTOBOTS_CONFIG_ROOT': str(config_root), 'AUTOBOTS_PROVIDER_MASTER_KEY_FILE': str(config_root / 'secrets/master.key'),
+               'AUTOBOTS_TEST_UPSTREAM_LOG': str(upstream_log), 'AUTOBOTS_TEST_CATALOG_DOWN': str(catalog_down), 'NODE_ENV': 'production'}
     web_env = {**env, 'AUTOBOTS_INTERNAL_TOKEN': internal, 'AUTOBOTS_API_URL': api_url, 'AUTOBOTS_ALLOWED_ORIGIN': web_url, 'NODE_ENV': 'production',
                'AUTOBOTS_SUPABASE_URL': base, 'AUTOBOTS_SUPABASE_ANON_KEY': stack.values['ANON_KEY']}
     screenshots = root / '.checks/identity/screenshots'
@@ -163,14 +176,16 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
     report.unlink(missing_ok=True)
     processes = []
     try:
-        processes.append(start([str(root / 'services/agent/.venv/bin/uvicorn'), '--factory', 'autobots.api.main:create_configured_app',
-                                '--host', '127.0.0.1', '--port', str(api_port), '--log-level', 'warning'], api_env, root))
+        processes.append(start([str(root / PYTHON), str(root / 'tests/web/fixture_upstream_api.py'), str(api_port)], api_env, root))
         processes.append(start([str(next_bin), 'start', '-H', '127.0.0.1', '-p', str(web_port)], web_env, web))
         wait_until_up(f'{api_url}/v1/health', processes[0])
         wait_until_up(web_url, processes[1])
-        result = subprocess.run([str(playwright), 'test', 'identity', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
+        result = subprocess.run([str(playwright), 'test', 'identity', 'settings', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
                                 env={**env, 'AUTOBOTS_WEB_URL': web_url, 'AUTOBOTS_TEST_OWNER_EMAIL': email, 'AUTOBOTS_TEST_OWNER_PASSWORD': password,
                                      'AUTOBOTS_TEST_WORKSPACE_A': workspace_a, 'AUTOBOTS_TEST_WORKSPACE_B': workspace_b,
+                                     'AUTOBOTS_TEST_OWNER_B_EMAIL': email_b, 'AUTOBOTS_TEST_OWNER_B_PASSWORD': password_b,
+                                     'AUTOBOTS_TEST_MEMBER_EMAIL': email_c, 'AUTOBOTS_TEST_MEMBER_PASSWORD': password_c,
+                                     'AUTOBOTS_TEST_UPSTREAM_LOG': str(upstream_log), 'AUTOBOTS_TEST_CATALOG_DOWN': str(catalog_down),
                                      'AUTOBOTS_TEST_SERVICE_KEY': stack.values['SERVICE_ROLE_KEY'], 'AUTOBOTS_WEB_REPORT': str(report),
                                      'AUTOBOTS_WEB_OUTPUT': str(root / '.checks/identity/results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots)})
     finally:
@@ -184,6 +199,13 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
     found, _ = summarize(report)
     for case in found:
         cases.check(f"browser: {case['id']}", 'passed', case['status'], case['status'] == 'passed')
+    calls = sorted(set(upstream_log.read_text().splitlines()))
+    cases.check('only key metadata and the catalog reached the fake upstream', 'GET /key and GET /models only', ', '.join(calls),
+                calls == ['GET /api/v1/key', 'GET /api/v1/models'])
+    row = rows(stack, f"select count(*) filter (where position('sk-or'::bytea in ciphertext) > 0) from app_private.provider_credentials where workspace_id = '{workspace_a}';")
+    versions = rows(stack, f"select count(*) from app_private.provider_credentials where workspace_id = '{workspace_a}';")
+    cases.check('stored rows hold no plaintext key', '0 of the rows', f'{row} of {versions}', row == '0' and versions != '0')
+    shutil.rmtree(config_root, ignore_errors=True)
 
 
 def qualify(root: Path) -> int:
@@ -230,7 +252,11 @@ def qualify(root: Path) -> int:
         stack.runtime(f"insert into public.runs (id, workspace_id, limit_micro_usd) values ('{run_a}', '{owner_a['workspace_id']}', 1);\n")
         rest_cases(cases, stack, base, anon, token_a, token_b, run_a)
         storage_cases(cases, base, anon, token_a, token_b, owner_a['workspace_id'], owner_b['workspace_id'])
-        browser_cases(root, cases, stack, base, db_port, email_a, password_a, owner_a['workspace_id'], owner_b['workspace_id'])
+        email_c, password_c = 'member-c@example.invalid', secrets.token_urlsafe(24)
+        owner_c = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_c, password_c)
+        stack.runtime(f"insert into public.workspace_members (workspace_id, user_id, role) values ('{owner_a['workspace_id']}', '{owner_c['user_id']}', 'member');\\n")
+        browser_cases(root, cases, stack, base, db_port, email_a, password_a, owner_a['workspace_id'], owner_b['workspace_id'],
+                      email_b, password_b, email_c, password_c)
     finally:
         remove_stack(stack)
     label = f'label=com.docker.compose.project={project}'

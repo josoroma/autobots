@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 const NAVIGATION = [
   { href: "/", label: "Home" },
   { href: "/settings", label: "Settings" },
+  { href: "/settings/models", label: "Models" },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {

@@ -18,7 +18,13 @@ def test_sockets_are_blocked() -> None:
 def test_the_schema_builds_without_any_connection() -> None:
     assert set(create_app().openapi()["paths"]) == {
         "/v1/health",
+        "/v1/models",
+        "/v1/runs/intent",
         "/v1/session",
+        "/v1/settings/model-policy",
+        "/v1/settings/model-providers",
+        "/v1/settings/model-providers/openrouter/credential",
+        "/v1/settings/model-providers/openrouter/validate",
         "/v1/workspaces/{workspace_id}",
     }
 

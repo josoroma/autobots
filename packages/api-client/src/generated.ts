@@ -32,6 +32,29 @@ export const schemas = {
     "title": "BudgetCounters",
     "type": "object"
   },
+  "CredentialDraft": {
+    "additionalProperties": false,
+    "description": "Transient. It is validated and encrypted, and never returned, logged or echoed.",
+    "properties": {
+      "draft_key": {
+        "maxLength": 512,
+        "minLength": 1,
+        "title": "Draft Key",
+        "type": "string"
+      },
+      "expected_version": {
+        "minimum": 0.0,
+        "title": "Expected Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "draft_key",
+      "expected_version"
+    ],
+    "title": "CredentialDraft",
+    "type": "object"
+  },
   "EffectiveRolePolicy": {
     "additionalProperties": false,
     "properties": {
@@ -83,6 +106,21 @@ export const schemas = {
     "title": "ErrorResponse",
     "type": "object"
   },
+  "ExpectedVersion": {
+    "additionalProperties": false,
+    "properties": {
+      "expected_version": {
+        "minimum": 0.0,
+        "title": "Expected Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "expected_version"
+    ],
+    "title": "ExpectedVersion",
+    "type": "object"
+  },
   "HTTPValidationError": {
     "properties": {
       "detail": {
@@ -94,6 +132,119 @@ export const schemas = {
       }
     },
     "title": "HTTPValidationError",
+    "type": "object"
+  },
+  "ModelAvailability": {
+    "additionalProperties": false,
+    "properties": {
+      "available": {
+        "title": "Available",
+        "type": "boolean"
+      },
+      "canonical_id": {
+        "title": "Canonical Id",
+        "type": "string"
+      },
+      "profile": {
+        "$ref": "#/components/schemas/ModelProfileId"
+      },
+      "wire_id": {
+        "title": "Wire Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "profile",
+      "canonical_id",
+      "wire_id",
+      "available"
+    ],
+    "title": "ModelAvailability",
+    "type": "object"
+  },
+  "ModelList": {
+    "additionalProperties": false,
+    "properties": {
+      "catalog_status": {
+        "enum": [
+          "available",
+          "unavailable",
+          "unknown"
+        ],
+        "title": "Catalog Status",
+        "type": "string"
+      },
+      "models": {
+        "items": {
+          "$ref": "#/components/schemas/ModelAvailability"
+        },
+        "title": "Models",
+        "type": "array"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "catalog_status",
+      "models"
+    ],
+    "title": "ModelList",
+    "type": "object"
+  },
+  "ModelPolicyState": {
+    "additionalProperties": false,
+    "properties": {
+      "policy": {
+        "$ref": "#/components/schemas/EffectiveRolePolicy"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "version": {
+        "title": "Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "version",
+      "policy"
+    ],
+    "title": "ModelPolicyState",
+    "type": "object"
+  },
+  "ModelPolicyUpdate": {
+    "additionalProperties": false,
+    "description": "Not strict, so JSON strings become enums. Unknown fields and values are still refused.",
+    "properties": {
+      "default_profile": {
+        "$ref": "#/components/schemas/ModelProfileId"
+      },
+      "expected_version": {
+        "minimum": 0.0,
+        "title": "Expected Version",
+        "type": "integer"
+      },
+      "role_overrides": {
+        "additionalProperties": {
+          "$ref": "#/components/schemas/ModelProfileId"
+        },
+        "title": "Role Overrides",
+        "type": "object"
+      }
+    },
+    "required": [
+      "expected_version",
+      "default_profile",
+      "role_overrides"
+    ],
+    "title": "ModelPolicyUpdate",
     "type": "object"
   },
   "ModelProfileId": {
@@ -123,6 +274,108 @@ export const schemas = {
     ],
     "title": "ModelRole",
     "type": "string"
+  },
+  "ProviderStatus": {
+    "additionalProperties": false,
+    "description": "Source, authentication, catalog and qualification are independent facts, MP-04.",
+    "properties": {
+      "auth_status": {
+        "enum": [
+          "missing",
+          "configured",
+          "invalid",
+          "unavailable"
+        ],
+        "title": "Auth Status",
+        "type": "string"
+      },
+      "catalog_status": {
+        "enum": [
+          "available",
+          "unavailable",
+          "unknown"
+        ],
+        "title": "Catalog Status",
+        "type": "string"
+      },
+      "credential_id": {
+        "anyOf": [
+          {
+            "format": "uuid",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Credential Id"
+      },
+      "credential_version": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Credential Version"
+      },
+      "provider": {
+        "const": "openrouter",
+        "title": "Provider",
+        "type": "string"
+      },
+      "qualification_status": {
+        "const": "not_qualified",
+        "title": "Qualification Status",
+        "type": "string"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "settings_version": {
+        "title": "Settings Version",
+        "type": "integer"
+      },
+      "source": {
+        "enum": [
+          "none",
+          "app",
+          "environment"
+        ],
+        "title": "Source",
+        "type": "string"
+      },
+      "validated_at": {
+        "anyOf": [
+          {
+            "format": "date-time",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Validated At"
+      }
+    },
+    "required": [
+      "schema_version",
+      "provider",
+      "settings_version",
+      "source",
+      "auth_status",
+      "catalog_status",
+      "qualification_status",
+      "credential_id",
+      "credential_version",
+      "validated_at"
+    ],
+    "title": "ProviderStatus",
+    "type": "object"
   },
   "RoleBinding": {
     "additionalProperties": false,
@@ -198,6 +451,38 @@ export const schemas = {
       "payload"
     ],
     "title": "RunEvent",
+    "type": "object"
+  },
+  "RunIntentCheck": {
+    "additionalProperties": false,
+    "description": "Whether model-backed work could proceed. It creates no run and calls no model.",
+    "properties": {
+      "code": {
+        "enum": [
+          "ready",
+          "credentials_required",
+          "credential_invalid",
+          "credential_unavailable"
+        ],
+        "title": "Code",
+        "type": "string"
+      },
+      "ready": {
+        "title": "Ready",
+        "type": "boolean"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "ready",
+      "code"
+    ],
+    "title": "RunIntentCheck",
     "type": "object"
   },
   "RunStatus": {
@@ -427,6 +712,15 @@ export function parseBudgetCounters(value: unknown): BudgetCounters {
   return parseWith(schemas, "BudgetCounters", value) as BudgetCounters;
 }
 
+export interface CredentialDraft {
+  draft_key: string;
+  expected_version: number;
+}
+
+export function parseCredentialDraft(value: unknown): CredentialDraft {
+  return parseWith(schemas, "CredentialDraft", value) as CredentialDraft;
+}
+
 export interface EffectiveRolePolicy {
   bindings: RoleBinding[];
   role_policy_version: number;
@@ -446,12 +740,61 @@ export function parseErrorResponse(value: unknown): ErrorResponse {
   return parseWith(schemas, "ErrorResponse", value) as ErrorResponse;
 }
 
+export interface ExpectedVersion {
+  expected_version: number;
+}
+
+export function parseExpectedVersion(value: unknown): ExpectedVersion {
+  return parseWith(schemas, "ExpectedVersion", value) as ExpectedVersion;
+}
+
 export interface HTTPValidationError {
   detail?: ValidationError[];
 }
 
 export function parseHTTPValidationError(value: unknown): HTTPValidationError {
   return parseWith(schemas, "HTTPValidationError", value) as HTTPValidationError;
+}
+
+export interface ModelAvailability {
+  available: boolean;
+  canonical_id: string;
+  profile: ModelProfileId;
+  wire_id: string;
+}
+
+export function parseModelAvailability(value: unknown): ModelAvailability {
+  return parseWith(schemas, "ModelAvailability", value) as ModelAvailability;
+}
+
+export interface ModelList {
+  catalog_status: "available" | "unavailable" | "unknown";
+  models: ModelAvailability[];
+  schema_version: 1;
+}
+
+export function parseModelList(value: unknown): ModelList {
+  return parseWith(schemas, "ModelList", value) as ModelList;
+}
+
+export interface ModelPolicyState {
+  policy: EffectiveRolePolicy;
+  schema_version: 1;
+  version: number;
+}
+
+export function parseModelPolicyState(value: unknown): ModelPolicyState {
+  return parseWith(schemas, "ModelPolicyState", value) as ModelPolicyState;
+}
+
+export interface ModelPolicyUpdate {
+  default_profile: ModelProfileId;
+  expected_version: number;
+  role_overrides: Record<string, unknown>;
+}
+
+export function parseModelPolicyUpdate(value: unknown): ModelPolicyUpdate {
+  return parseWith(schemas, "ModelPolicyUpdate", value) as ModelPolicyUpdate;
 }
 
 export type ModelProfileId = "openrouter_deepseek_flash" | "openrouter_astra";
@@ -464,6 +807,23 @@ export type ModelRole = "coordinator" | "router" | "planner" | "executor" | "res
 
 export function parseModelRole(value: unknown): ModelRole {
   return parseWith(schemas, "ModelRole", value) as ModelRole;
+}
+
+export interface ProviderStatus {
+  auth_status: "missing" | "configured" | "invalid" | "unavailable";
+  catalog_status: "available" | "unavailable" | "unknown";
+  credential_id: string | null;
+  credential_version: number | null;
+  provider: "openrouter";
+  qualification_status: "not_qualified";
+  schema_version: 1;
+  settings_version: number;
+  source: "none" | "app" | "environment";
+  validated_at: string | null;
+}
+
+export function parseProviderStatus(value: unknown): ProviderStatus {
+  return parseWith(schemas, "ProviderStatus", value) as ProviderStatus;
 }
 
 export interface RoleBinding {
@@ -488,6 +848,16 @@ export interface RunEvent {
 
 export function parseRunEvent(value: unknown): RunEvent {
   return parseWith(schemas, "RunEvent", value) as RunEvent;
+}
+
+export interface RunIntentCheck {
+  code: "ready" | "credentials_required" | "credential_invalid" | "credential_unavailable";
+  ready: boolean;
+  schema_version: 1;
+}
+
+export function parseRunIntentCheck(value: unknown): RunIntentCheck {
+  return parseWith(schemas, "RunIntentCheck", value) as RunIntentCheck;
 }
 
 export type RunStatus = "queued" | "running" | "waiting_input" | "waiting_approval" | "paused" | "verifying" | "cancelling" | "succeeded" | "failed" | "cancelled";
@@ -565,8 +935,36 @@ export async function getHealth(options: ClientOptions): Promise<ServiceHealth> 
   return parseServiceHealth(await requestJson(options, "GET", `/v1/health`));
 }
 
+export async function getModels(options: ClientOptions): Promise<ModelList> {
+  return parseModelList(await requestJson(options, "GET", `/v1/models`));
+}
+
+export async function checkRunIntent(options: ClientOptions): Promise<RunIntentCheck> {
+  return parseRunIntentCheck(await requestJson(options, "POST", `/v1/runs/intent`));
+}
+
 export async function getSession(options: ClientOptions): Promise<SessionSummary> {
   return parseSessionSummary(await requestJson(options, "GET", `/v1/session`));
+}
+
+export async function putModelPolicy(options: ClientOptions, body: ModelPolicyUpdate): Promise<ModelPolicyState> {
+  return parseModelPolicyState(await requestJson(options, "PUT", `/v1/settings/model-policy`, body));
+}
+
+export async function getModelProviders(options: ClientOptions): Promise<ProviderStatus> {
+  return parseProviderStatus(await requestJson(options, "GET", `/v1/settings/model-providers`));
+}
+
+export async function putOpenRouterCredential(options: ClientOptions, body: CredentialDraft): Promise<ProviderStatus> {
+  return parseProviderStatus(await requestJson(options, "PUT", `/v1/settings/model-providers/openrouter/credential`, body));
+}
+
+export async function deleteOpenRouterCredential(options: ClientOptions, body: ExpectedVersion): Promise<ProviderStatus> {
+  return parseProviderStatus(await requestJson(options, "DELETE", `/v1/settings/model-providers/openrouter/credential`, body));
+}
+
+export async function validateOpenRouter(options: ClientOptions): Promise<ProviderStatus> {
+  return parseProviderStatus(await requestJson(options, "POST", `/v1/settings/model-providers/openrouter/validate`));
 }
 
 export async function getWorkspace(options: ClientOptions, workspace_id: string): Promise<WorkspaceSummary> {

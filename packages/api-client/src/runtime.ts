@@ -154,10 +154,16 @@ export interface ClientOptions {
   headers?: Record<string, string>;
 }
 
-export async function requestJson(options: ClientOptions, method: string, path: string): Promise<unknown> {
+export async function requestJson(
+  options: ClientOptions,
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<unknown> {
   const response = await options.fetch(`${options.baseUrl}${path}`, {
     method,
-    ...(options.headers === undefined ? {} : { headers: options.headers }),
+    headers: { ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...options.headers },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   if (!response.ok) {
     throw new ContractError(path, `request failed with status ${response.status}`);
