@@ -2,9 +2,9 @@
 
 **Inspected:** 2026-11-04. **Scope:** descriptive inventory; this file supplies no product requirements.
 
-Analyzed revision: 1515fc7c98b08d4117861bd651fcc8eb66357104
+Analyzed revision: 5587a9f80ed1fcbed06e60e7105b948b6625ff85
 
-This describes that revision, which includes the OhMyOrch delivery setup in [HARNESS-OHMYORCH-001](docs/engineering/work-items/HARNESS-OHMYORCH-001.md), US-1.1's inventory and five added cache ignore rules, and US-1.2's rule mapping checks, derived `assistant_adapter` status and forward ingestion runbook.
+This describes that revision, which includes the OhMyOrch delivery setup in [HARNESS-OHMYORCH-001](docs/engineering/work-items/HARNESS-OHMYORCH-001.md), US-1.1's inventory and five added cache ignore rules, US-1.2's rule mapping checks, derived `assistant_adapter` status and forward ingestion runbook, and US-1.3's locked toolchains and scaffold, plus the US-1.4 verification profiles and hook changes committed on top of it.
 
 ## System Summary
 
@@ -30,7 +30,7 @@ Observed on 2026-11-04, on this Mac. Presence is not qualification of an applica
 
 ## Evidence Paths
 
-- `scripts/verify.py` writes its local report to `.checks/harness/latest.json` (ignored).
+- `scripts/verify.py` writes its local report to `.checks/<profile>/latest.json` (ignored).
 - Reviewed summaries are under `docs/engineering/evidence/<work-item-id>/`.
 - Work records are under `docs/engineering/work-items/`.
 
@@ -51,7 +51,7 @@ The design artifacts include `PRD-Design-System.md`, the user-supplied light/dar
 
 There is no implemented Next.js application, FastAPI service, LangGraph worker, application migration/seed set or project Supabase stack in this workspace. No local model runtime is part of the selected design. Public OpenRouter catalog research does not establish authenticated live model qualification.
 
-No application lockfile/toolchain qualification or persistent database operation has been performed by this harness adaptation. The default `harness` profile is limited to the delivered development tooling. Future `fast`, `full`, `db` and `operations` profiles must report unavailable until implemented and tested.
+No application lockfile/toolchain qualification or persistent database operation has been performed by this harness adaptation. The `harness` profile is limited to the delivered development tooling. `fast` and `full` add the scaffold's static checks, tests and build. Future `db` and `operations` profiles must report unavailable until implemented and tested.
 
 ## Integration points
 
@@ -59,8 +59,8 @@ No application lockfile/toolchain qualification or persistent database operation
 - `.claude/agents/autobots-spec-ingestor.md` reads sources and returns a proposed backlog; its caller writes approved changes.
 - `scripts/specs.py` checks backlog structure, local source references, Gherkin, statuses and dependencies; it generates navigation from story bodies and promotes dependency-blocked stories whose dependencies are DONE. It cannot prove semantic source entailment.
 - The `ohmyorch` plugin, on a local OpenSpec-only branch, provides `/ohmyorch:deliver`; `.claude/rules/ohmyorch-delivery.md` holds the project's delivery rule.
-- `scripts/verify.py` runs the delivered deterministic harness checks and records current input fingerprints/results locally.
-- `.claude/hooks/dispatch.py` integrates selected events with bounded local checks. Script fixture tests and actual Claude event delivery have separate evidence.
+- `scripts/verify.py` runs the `harness`, `fast` and `full` profiles, with exit codes 0, 1 and 2, and records current input fingerprints/results locally. `fast` chooses Python and web steps from changed paths and records the rest as `not_run`.
+- `.claude/hooks/dispatch.py` integrates selected events with bounded local checks: a deadline, fail-closed errors, path validation, affected check domains and a `ruff` diagnostic. Script fixture tests and actual Claude event delivery have separate evidence.
 
 ## Upstream evidence and local constraints
 

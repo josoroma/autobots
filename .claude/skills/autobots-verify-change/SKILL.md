@@ -7,7 +7,7 @@ description: Run the implemented portable Autobots check profiles appropriate to
 
 Read `.claude/autobots.json`, the mapped contract, selected work record and harness verification contract. Inspect `verification.implemented_profiles` and the actual runner before choosing commands; configuration is not proof that an implementation exists.
 
-From the repository root use `python3.12 scripts/verify.py --profile <profile>`. Profiles are `harness`, `fast`, `full`, `db`, `operations`. At initial harness delivery only `harness` is implemented. An unavailable app/database/operations profile must fail as not implemented; never substitute harness success for it.
+From the repository root use `python3.12 scripts/verify.py --profile <profile>`. Profiles are `harness`, `fast`, `full`, `db`, `operations`. Exit codes: 0 passed, 1 a required check failed, 2 a prerequisite is unavailable or a check could not run. `harness`, `fast` and `full` are implemented. An unavailable database/operations profile must fail as not implemented; never substitute another profile for it. A `fast` step recorded `not_run` was outside the changed scope, and did not pass.
 
 - Match checks to acceptance and changed inputs, including untracked source, nonsecret config, locks, generated contracts and verifier code.
 - Use prepared environments. No implicit package downloads, Docker startup, persistent SQL mutation, real credentials or external inference in ordinary checks.

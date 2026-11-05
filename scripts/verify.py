@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
-"""Verify the delivered repository harness, never claim unimplemented app gates."""
+"""One local verification runner. It never installs, and it never claims unimplemented gates.
+
+Exit codes: 0 passed, 1 a required check failed, 2 a prerequisite is unavailable or a check could
+not run to a result. Passing `harness`, `fast` or `full` establishes neither H0, H1 nor product
+acceptance. `db` and `operations` are not implemented, and report that with exit code 2.
+"""
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import json
 import os
@@ -12,7 +19,18 @@ import subprocess
 import sys
 import time
 
-from harness_lib import adapter_status, config_errors, fingerprint, input_manifest, project_root, reduced_env
+from harness_lib import (adapter_status, changed_paths, check_domains, config_errors, fingerprint,
+                         input_manifest, project_root, reduced_env)
+from toolchain import (Step, Unavailable, check_steps, child_env, find_tools, missing_prepared_paths,
+                       run_step, snapshot, snapshot_differences)
+
+EXIT_PASSED, EXIT_FAILED, EXIT_UNAVAILABLE = 0, 1, 2
+IMPLEMENTED_PROFILES = ('harness', 'fast', 'full')
+PYTHON_STEPS = frozenset({'python_lock', 'python_env', 'ruff_check', 'ruff_format', 'mypy', 'pytest'})
+WEB_STEPS = frozenset({'node_lock', 'node_version', 'lint', 'format_check', 'typegen', 'typecheck'})
+OUTSIDE_SCOPE = 'outside the changed scope of this fast run'
+NOT_TESTED = ['Claude event delivery', 'Supabase', 'Docker', 'OpenRouter inference', 'complete H0/H1']
+APPLICATION_NOT_TESTED = ['generated contract drift, no contract exists yet', 'browser fixtures, none are configured']
 
 
 def utc() -> str:
@@ -38,74 +56,142 @@ def run_check(root: Path, name: str, argv: list[str]) -> dict:
             'exit_code': code, 'status': status, 'output': output}
 
 
-def main() -> int:
-    if sys.version_info < (3, 12):
-        print('Python 3.12+ is required; use the qualified python3.12 interpreter.', file=sys.stderr)
-        return 2
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--profile', required=True,
-                        choices=['harness', 'fast', 'full', 'db', 'operations'])
-    args = parser.parse_args()
-    root = project_root()
-    if args.profile != 'harness':
-        print(json.dumps({'profile': args.profile, 'status': 'not_implemented',
-                          'reason': 'Application toolchain/database checks are not yet implemented; '
-                                    'a passing harness profile does not substitute for them.'}))
-        return 2
-    directory = root / '.checks/harness'
+def harness_checks(root: Path) -> list[dict]:
+    problems = config_errors(root)
+    checks = [{'id': 'project_configuration', 'class': 'static', 'model_transport': 'none',
+               'status': 'passed' if not problems else 'failed', 'errors': problems},
+              run_check(root, 'backlog_validation', [sys.executable, 'scripts/specs.py', 'validate']),
+              run_check(root, 'harness_behavior_tests',
+                        [sys.executable, '-m', 'unittest', 'discover', '-s',
+                         'tests/harness', '-p', 'test_*.py', '-v'])]
+    test_count = re.search(r'Ran (\d+) tests?', checks[-1].get('output', ''))
+    checks[-1]['tests_executed'] = int(test_count.group(1)) if test_count else 0
+    if checks[-1]['tests_executed'] == 0:
+        if checks[-1]['status'] == 'passed':
+            checks[-1]['status'] = 'failed'
+        checks[-1]['output'] += '\nNo executed tests were reported; an empty suite is not a pass.'
+    return checks
+
+
+def selected_steps(profile: str, step_ids: Sequence[str], changed: Sequence[str] | None) -> set[str]:
+    """Which toolchain steps a profile runs. An unknown change set runs both application domains."""
+    if profile == 'full':
+        return set(step_ids)
+    domains = {'python', 'web'} if changed is None else {d for path in changed for d in check_domains(path)}
+    return set(step_ids) & ((PYTHON_STEPS if 'python' in domains else frozenset())
+                            | (WEB_STEPS if 'web' in domains else frozenset()))
+
+
+@dataclass(frozen=True)
+class ToolPlan:
+    steps: Sequence[Step] = ()
+    env: Mapping[str, str] = field(default_factory=dict)
+
+
+def tool_plan(root: Path, profile: str, changed: Sequence[str] | None) -> tuple[ToolPlan, list[dict]]:
+    """The toolchain steps to run and the ones left out. Needs tools only when a step needs them."""
+    known = {*PYTHON_STEPS, *WEB_STEPS, 'build'}
+    chosen = selected_steps(profile, sorted(known), changed)
+    left_out = [{'id': name, 'status': 'not_run', 'reason': OUTSIDE_SCOPE} for name in sorted(known - chosen)]
+    if not chosen:
+        return ToolPlan(), left_out
+    tools = find_tools(root)
+    missing = missing_prepared_paths(root, tools)
+    if missing:
+        raise Unavailable('not prepared, run scripts/toolchain.py bootstrap explicitly; missing: ' + ', '.join(missing))
+    steps = [step for step in check_steps(root, tools) if step.id in chosen]
+    return ToolPlan(steps, child_env(root, tools, verifying=True)), left_out
+
+
+def toolchain_checks(root: Path, profile: str, plan: Callable = tool_plan) -> list[dict]:
+    """Toolchain step records plus a guard that nothing was installed or rewritten."""
+    try:
+        before = snapshot(root)
+        selection, left_out = plan(root, profile, changed_paths(root))
+    except (Unavailable, ValueError, OSError) as error:
+        return [{'id': 'non_mutation_guard', 'status': 'error', 'model_transport': 'none',
+                 'output': f'prerequisite unavailable: {error}'}]
+    records = [{**run_step(step, selection.env), 'class': 'static_or_fixture', 'model_transport': 'none'}
+               for step in selection.steps]
+    differences = snapshot_differences(before, snapshot(root))
+    return [*left_out, *records, {'id': 'non_mutation_guard', 'class': 'static', 'model_transport': 'none',
+                                  'status': 'failed' if differences else 'passed',
+                                  'output': '\n'.join(differences)}]
+
+
+def exit_code_for(checks: Sequence[Mapping], stable: bool) -> int:
+    """A failed check outranks an unavailable one, so a known failure is never reported as missing tools."""
+    statuses = {check['status'] for check in checks}
+    if 'failed' in statuses or not stable:
+        return EXIT_FAILED
+    if 'error' in statuses:
+        return EXIT_UNAVAILABLE
+    return EXIT_PASSED
+
+
+def run_profile(root: Path, profile: str, *, base_checks: Callable[[Path], list[dict]] = harness_checks,
+                plan: Callable = tool_plan) -> int:
+    directory = root / '.checks' / profile
     directory.mkdir(parents=True, exist_ok=True)
-    lock = directory / 'verify.lock'
+    lock = root / '.checks/verify.lock'
     try:
         fd = os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     except FileExistsError:
         print('Another check owns verify.lock; inspect its recorded PID before manual stale-lock removal.',
               file=sys.stderr)
-        return 2
+        return EXIT_UNAVAILABLE
     try:
         with os.fdopen(fd, 'w') as handle:
             handle.write(str(os.getpid()))
         initial = fingerprint(root)
-        problems = config_errors(root)
-        checks = [{'id': 'project_configuration', 'class': 'static', 'model_transport': 'none',
-                   'status': 'passed' if not problems else 'failed', 'errors': problems}]
+        checks = base_checks(root)
         adapter = adapter_status(root)
-        checks.append(run_check(root, 'backlog_validation',
-                                [sys.executable, 'scripts/specs.py', 'validate']))
-        checks.append(run_check(root, 'harness_behavior_tests',
-                                [sys.executable, '-m', 'unittest', 'discover', '-s',
-                                 'tests/harness', '-p', 'test_*.py', '-v']))
-        test_count = re.search(r'Ran (\d+) tests?', checks[-1].get('output', ''))
-        checks[-1]['tests_executed'] = int(test_count.group(1)) if test_count else 0
-        if checks[-1]['tests_executed'] == 0:
-            checks[-1]['status'] = 'failed'
-            checks[-1]['output'] += '\nNo executed tests were reported; an empty suite is not a pass.'
+        if profile != 'harness':
+            checks.extend(toolchain_checks(root, profile, plan))
         final = fingerprint(root)
         stable = final == initial
-        passed = stable and all(check['status'] == 'passed' for check in checks)
+        code = exit_code_for(checks, stable)
+        status = {EXIT_PASSED: 'passed', EXIT_FAILED: 'failed', EXIT_UNAVAILABLE: 'error'}[code]
+        scope = ('Project configuration, backlog structure and deterministic harness fixtures only'
+                 if profile == 'harness' else
+                 'Harness checks plus local static checks, focused tests and, for full, the production build')
+        not_tested = (['application', *NOT_TESTED] if profile == 'harness' else [*APPLICATION_NOT_TESTED, *NOT_TESTED])
         report = {'schema_version': 'autobots.harness-result/v1', 'template': False,
-                  'profile': 'harness', 'status': 'passed' if passed else 'failed',
+                  'profile': profile, 'status': status,
                   'completed_at_utc': utc(), 'python_version': sys.version.split()[0],
                   'input_fingerprint': final, 'inputs_unchanged_during_check': stable,
                   'input_manifest': input_manifest(root), 'checks': checks,
-                  'assistant_adapter': adapter,
-                  'scope': 'Project configuration, backlog structure and deterministic harness fixtures only',
-                  'not_tested': ['Claude event delivery', 'application', 'Supabase',
-                                 'Docker', 'OpenRouter inference', 'complete H0/H1']}
+                  'assistant_adapter': adapter, 'scope': scope, 'not_tested': not_tested}
         temporary = directory / 'latest.tmp'
         temporary.write_text(json.dumps(report, indent=2) + '\n')
         temporary.replace(directory / 'latest.json')
-        print(json.dumps({'profile': 'harness', 'status': report['status'],
-                          'inputs_stable': stable, 'checks': [{k: c[k] for k in ('id', 'status')}
-                                                            for c in checks],
+        print(json.dumps({'profile': profile, 'status': status, 'inputs_stable': stable,
+                          'checks': [{k: c[k] for k in ('id', 'status')} for c in checks],
                           'assistant_adapter': {k: adapter[k] for k in ('state', 'reason')},
-                          'report': '.checks/harness/latest.json'}, indent=2))
-        if not passed:
+                          'report': f'.checks/{profile}/latest.json'}, indent=2))
+        if code != EXIT_PASSED:
             for check in checks:
-                if check['status'] != 'passed':
-                    print(check.get('output') or '\n'.join(check.get('errors', [])), file=sys.stderr)
-        return 0 if passed else 1
+                if check['status'] not in {'passed', 'not_run'}:
+                    detail = check.get('output') or '\n'.join(check.get('errors', []))
+                    print(f"{check['id']}: {detail}", file=sys.stderr)
+        return code
     finally:
         lock.unlink(missing_ok=True)
+
+
+def main() -> int:
+    if sys.version_info < (3, 12):
+        print('Python 3.12+ is required; use the qualified python3.12 interpreter.', file=sys.stderr)
+        return EXIT_UNAVAILABLE
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--profile', required=True, choices=[*IMPLEMENTED_PROFILES, 'db', 'operations'])
+    args = parser.parse_args()
+    if args.profile not in IMPLEMENTED_PROFILES:
+        print(json.dumps({'profile': args.profile, 'status': 'not_implemented',
+                          'reason': 'Database and operations checks are not yet implemented; '
+                                    'a passing harness, fast or full profile does not substitute for them.'}))
+        return EXIT_UNAVAILABLE
+    return run_profile(project_root(), args.profile)
 
 
 if __name__ == '__main__':

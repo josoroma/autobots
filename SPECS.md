@@ -71,9 +71,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-1.3 | H0 locked toolchains and minimal scaffolding | DONE | EPIC-1 |
 | US-1.3#1 | Resolve and lock the selected compatible toolchains. | DONE | US-1.3 |
 | US-1.3#2 | Create only the web/API/contract scaffolding needed for harness qualification. | DONE | US-1.3 |
-| US-1.4 | H0 portable verification and deterministic hook adapter | READY | EPIC-1 |
-| US-1.4#1 | Implement the portable profiles and evidence freshness rules. | TODO | US-1.4 |
-| US-1.4#2 | Implement and fixture-test the bounded event-to-check adapter. | TODO | US-1.4 |
+| US-1.4 | H0 portable verification and deterministic hook adapter | DONE | EPIC-1 |
+| US-1.4#1 | Implement the portable profiles and evidence freshness rules. | DONE | US-1.4 |
+| US-1.4#2 | Implement and fixture-test the bounded event-to-check adapter. | DONE | US-1.4 |
 | US-1.5 | H0 work records, independent review and evidence templates | READY | EPIC-1 |
 | US-1.5#1 | Define work-record, review, manifest and runbook templates. | TODO | US-1.5 |
 | US-1.5#2 | Define durable redacted evidence and ignored raw-artifact retention contracts. | TODO | US-1.5 |
@@ -875,7 +875,8 @@ Open Questions:
 
 ### US-1.4: H0 portable verification and deterministic hook adapter
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-1-4-h0-portable-verification-deterministic/`
 
 As a developer
 I want one local verification runner with a thin hook adapter
@@ -910,8 +911,8 @@ Dependencies:
 - US-1.3
 
 Tasks:
-- [ ] Implement the portable profiles and evidence freshness rules.
-- [ ] Implement and fixture-test the bounded event-to-check adapter.
+- [x] Implement the portable profiles and evidence freshness rules.
+- [x] Implement and fixture-test the bounded event-to-check adapter.
 
 Open Questions:
 - None.

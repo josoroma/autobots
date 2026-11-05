@@ -3,11 +3,14 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
@@ -190,6 +193,151 @@ class HookTests(unittest.TestCase):
             # Reviewed configuration still counts.
             (state / 'project.json').write_text('{"changed": true}')
             self.assertNotEqual(before, fingerprint(root))
+
+    def dispatch(self, raw: bytes, script: Path | None = None) -> subprocess.CompletedProcess:
+        return subprocess.run([sys.executable, str(script or ROOT / '.claude/hooks/dispatch.py')], input=raw,
+                              capture_output=True, timeout=15)
+
+    def fake_ruff(self, root: Path, body: str) -> Path:
+        ruff = root / 'services/agent/.venv/bin/ruff'
+        ruff.parent.mkdir(parents=True, exist_ok=True)
+        ruff.write_text('#!/bin/sh\n' + body + '\n')
+        ruff.chmod(0o755)
+        return ruff
+
+    def post_edit(self, root: Path, file_path: object) -> str:
+        response = hook.handle(root, {'hook_event_name': 'PostToolUse', 'tool_name': 'Edit',
+                                      'tool_input': {'file_path': file_path}})
+        return response['hookSpecificOutput']['additionalContext']
+
+    def test_unsupported_event_and_tool_block_without_echo(self):
+        for payload in ({'hook_event_name': 'Unknown-SECRET'},
+                        {'hook_event_name': 'PreToolUse', 'tool_name': 'SECRET', 'tool_input': {}},
+                        {'hook_event_name': 'PreToolUse', 'tool_name': 'Read', 'tool_input': 'SECRET'}):
+            with self.subTest(payload=payload):
+                result = self.dispatch(json.dumps(payload).encode())
+                self.assertEqual(result.returncode, 2)
+                self.assertEqual(result.stdout, b'')
+                self.assertNotIn(b'SECRET', result.stderr)
+                self.assertNotIn(b'Traceback', result.stderr)
+
+    def test_deadline_blocks_a_stalled_event(self):
+        env = {**os.environ, 'AUTOBOTS_HOOK_DEADLINE_SECONDS': '0.3'}
+        process = subprocess.Popen([sys.executable, str(ROOT / '.claude/hooks/dispatch.py')], env=env,
+                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            self.assertEqual(process.wait(timeout=10), 2)  # stdin stays open, so only the deadline ends it.
+            self.assertEqual(process.stdout.read(), b'')
+            self.assertNotIn(b'Traceback', process.stderr.read())
+        finally:
+            process.kill()
+            process.communicate()
+
+    def test_deadline_override_can_only_shorten(self):
+        for value, expected in (('0.5', 0.5), ('60', hook.DEADLINE_SECONDS), ('-1', hook.DEADLINE_SECONDS),
+                                ('nope', hook.DEADLINE_SECONDS)):
+            with self.subTest(value=value), mock.patch.dict(os.environ, {hook.DEADLINE_OVERRIDE: value}):
+                self.assertEqual(hook.deadline_seconds(), expected)
+
+    def test_missing_library_blocks_without_a_traceback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            script = Path(directory) / '.claude/hooks/dispatch.py'
+            script.parent.mkdir(parents=True)
+            shutil.copy2(ROOT / '.claude/hooks/dispatch.py', script)
+            result = self.dispatch(b'{"hook_event_name": "SessionStart"}', script)
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(result.stdout, b'')
+            self.assertNotIn(b'Traceback', result.stderr)
+
+    def test_missing_interpreter_is_a_configuration_error(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / '.claude').mkdir()
+            config = json.loads((ROOT / '.claude/autobots.json').read_text())
+            config['python_executable'] = '/nonexistent/python3.12'
+            (root / '.claude/autobots.json').write_text(json.dumps(config))
+            (root / '.claude/settings.json').write_text((ROOT / '.claude/settings.json').read_text())
+            self.assertTrue(any('qualified Python' in error for error in config_errors(root)))
+
+    def test_symlink_loop_and_unusable_paths_are_denied(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'loop').symlink_to(root / 'loop')
+            for raw in ('loop/file', 'bad\0name', 'x' * 5000, '', None, 7):
+                with self.subTest(raw=str(raw)[:20]):
+                    self.assertIsNotNone(hook.guard(root, 'Read', {'file_path': raw}))
+                    self.assertNotIn('Affected check domains', self.post_edit(root, raw))
+
+    def test_secret_names_are_checked_before_and_after_links(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'plain.txt').write_text('x')
+            (root / '.env').symlink_to(root / 'plain.txt')  # The name is secret, the target is not.
+            (root / 'real').mkdir()
+            (root / 'real/.env.local').write_text('x')
+            (root / 'innocent.txt').symlink_to(root / 'real/.env.local')  # The target is secret, the name is not.
+            self.assertIsNotNone(hook.guard(root, 'Read', {'file_path': '.env'}))
+            self.assertIsNotNone(hook.guard(root, 'Read', {'file_path': 'innocent.txt'}))
+            self.assertIsNone(hook.guard(root, 'Read', {'file_path': 'plain.txt'}))
+
+    def test_metacharacter_names_stay_data(self):
+        name = 'a b;touch pwned$(touch pwned2)`touch pwned3`\'"é.py'
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            agent = root / 'services/agent'
+            agent.mkdir(parents=True)
+            (agent / name).write_text('x = 1\n')
+            record = root / 'argv'
+            self.fake_ruff(root, f'for argument in "$@"; do printf "%s\\n" "$argument" >> "{record}"; done')
+            self.assertIsNone(hook.guard(root, 'Edit', {'file_path': f'services/agent/{name}'}))
+            self.assertIsNone(hook.guard(root, 'Bash', {'command': name}))
+            context = self.post_edit(root, f'services/agent/{name}')
+            self.assertIn('Affected check domains: python', context)
+            self.assertNotIn(name, context)
+            self.assertEqual(record.read_text().splitlines()[-2:], ['--', str(agent / name)])
+            for marker in ('pwned', 'pwned2', 'pwned3'):
+                for place in (root, agent):
+                    self.assertFalse((place / marker).exists())
+
+    def test_diagnostic_handles_missing_slow_and_failing_tools(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            agent = root / 'services/agent'
+            agent.mkdir(parents=True)
+            (agent / 'code.py').write_text('PRIVATE_VALUE = 1\n')
+            self.assertIn('unavailable', self.post_edit(root, 'services/agent/code.py'))
+            ruff = self.fake_ruff(root, 'echo PRIVATE_VALUE; exit 1')
+            context = self.post_edit(root, 'services/agent/code.py')
+            self.assertIn('ruff reported findings, exit 1', context)
+            self.assertNotIn('PRIVATE_VALUE', context)
+            self.fake_ruff(root, 'exec sleep 30')
+            with mock.patch.object(hook, 'DIAGNOSTIC_TIMEOUT', 0.3):
+                self.assertIn('timed out', self.post_edit(root, 'services/agent/code.py'))
+            ruff.write_text('#!/nonexistent/interpreter\n')
+            self.assertIn('could not start', self.post_edit(root, 'services/agent/code.py'))
+            ruff.write_text('#!/bin/sh\nexit 0\n')
+            self.assertTrue(self.post_edit(root, 'services/agent/code.py').startswith('Affected check domains'))
+
+    def test_edit_names_its_check_domains(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            for path, expected, profile in (('apps/web/app/page.tsx', 'web', 'fast'),
+                                            ('pnpm-lock.yaml', 'python, web', 'fast'),
+                                            ('docs/note.md', 'harness', 'harness')):
+                context = self.post_edit(root, path)
+                self.assertIn(f'Affected check domains: {expected}.', context)
+                self.assertIn(f'--profile {profile}', context)
+            self.assertNotIn('Affected check domains', self.post_edit(root, '/outside/file.py'))
+
+    def test_syntax_error_diagnostic_never_runs_the_tool(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            agent = root / 'services/agent'
+            agent.mkdir(parents=True)
+            (agent / 'bad.py').write_text('def (:\n')
+            self.fake_ruff(root, f'touch "{root}/ran"')
+            self.assertIn('syntax/read error', self.post_edit(root, 'services/agent/bad.py'))
+            self.assertFalse((root / 'ran').exists())
 
     def test_pending_app_profile_is_not_a_pass(self):
         result = subprocess.run([sys.executable, str(ROOT / 'scripts/verify.py'), '--profile', 'db'],

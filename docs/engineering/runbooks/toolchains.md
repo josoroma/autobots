@@ -4,7 +4,7 @@
 
 Prepares and checks the pinned Node/pnpm and Python 3.12/uv environments of this repository, on this Mac. Other platforms are unqualified. The target is the working tree the commands run from, or the tree named by `--project-root`. Every result covers that tree only.
 
-`scripts/toolchain.py check` is this story's verification command. It is not a `scripts/verify.py` profile, and `fast` and `full` still exit 2. `harness` neither needs nor covers these environments. No command here calls a model, starts a service or touches a database. Passing establishes neither H0, H1 nor product acceptance, and tool, stream, reasoning and real-route qualification stay with US-3.4.
+`scripts/toolchain.py check` is this story's verification command. The `fast` and `full` profiles of `scripts/verify.py` run these same steps; see [the harness runbook](development-harness.md). `harness` neither needs nor covers these environments. No command here calls a model, starts a service or touches a database. Passing establishes neither H0, H1 nor product acceptance, and tool, stream, reasoning and real-route qualification stay with US-3.4.
 
 ## Prerequisites
 

@@ -22,7 +22,7 @@ markers are preserved across refreshes.
 | 1 | US-1.1 | us-1-1-h0-repository-prerequisite-inventory | DONE | H0 repository and prerequisite inventory |
 | 2 | US-1.2 | us-1-2-h0-shared-instructions-development | DONE | H0 shared instructions and development assistant assets |
 | 3 | US-1.3 | us-1-3-h0-locked-toolchains-minimal | DONE | H0 locked toolchains and minimal scaffolding |
-| 4 | US-1.4 | us-1-4-h0-portable-verification-deterministic | READY | H0 portable verification and deterministic hook adapter |
+| 4 | US-1.4 | us-1-4-h0-portable-verification-deterministic | DONE | H0 portable verification and deterministic hook adapter |
 | 5 | US-1.5 | us-1-5-h0-work-records-independent | READY | H0 work records, independent review and evidence templates |
 | 6 | US-1.6 | us-1-6-h1-deliberate-fault-freshness | BLOCKED | H1 deliberate fault and freshness qualification |
 | 7 | US-1.7 | us-1-7-h1-disposable-database-compose | BLOCKED | H1 disposable database and Compose guards |
@@ -31,11 +31,11 @@ markers are preserved across refreshes.
 ## Next Action
 
 Action: select
-Story: US-1.4
-Change: us-1-4-h0-portable-verification-deterministic
+Story: US-1.5
+Change: us-1-5-h0-work-records-independent
 Owner: main-session
-Command: openspec new change us-1-4-h0-portable-verification-deterministic; set US-1.4 to IN PROGRESS with a Change: line
-Reason: US-1.4 is READY and has no OpenSpec change
+Command: openspec new change us-1-5-h0-work-records-independent; set US-1.5 to IN PROGRESS with a Change: line
+Reason: US-1.5 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

@@ -29,8 +29,8 @@
     }
   },
   "verification": {
-    "implemented_profiles": ["harness"],
-    "pending_profiles": ["fast", "full", "db", "operations"],
+    "implemented_profiles": ["harness", "fast", "full"],
+    "pending_profiles": ["db", "operations"],
     "report": ".checks/harness/latest.json"
   },
   "assistant": {

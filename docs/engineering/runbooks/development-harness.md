@@ -4,7 +4,7 @@
 
 Run from the Autobots workspace on this Mac with Python 3.12 or later. The hook interpreter is explicitly /opt/homebrew/bin/python3.12 (observed 3.12.16). If python3.12 is absent from PATH, use that absolute path. Plain python3 can resolve to macOS 3.9.6 in another process; unsupported versions fail clearly. Application dependency qualification remains separate; the pinned Node and Python environments have their own procedure in [the toolchains runbook](toolchains.md), and nothing here needs them. No package installation, API key, application model call, Docker or Supabase is needed for these commands; `jq` reads the report, and the forward procedure's one delegation step uses the developer assistant. Read the mapped sources in `.claude/autobots.json` and `CODEBASE.md` before changing the backlog.
 
-This runbook covers the implemented `harness` profile. `fast`, `full`, `db` and `operations` remain unimplemented and must return a nonzero unavailable result, not substitute a smaller passing suite. H0/H1 has additional pending requirements.
+This runbook covers the implemented `harness`, `fast` and `full` profiles. `db` and `operations` remain unimplemented and must return a nonzero unavailable result, not substitute a smaller passing suite. H0/H1 has additional pending requirements.
 
 ## Validate the backlog
 
@@ -37,6 +37,31 @@ python3.12 scripts/verify.py --profile db
 
 Expected today: exit code 2 with `not_implemented`. It must not start containers or touch a database. This is a checked limitation, not database acceptance.
 
+### Run the application profiles
+
+`fast` and `full` need the prepared environments from [the toolchains runbook](toolchains.md). They never install, download or start a service, and their children get no inherited credential.
+
+```sh
+python3.12 scripts/verify.py --profile fast
+python3.12 scripts/verify.py --profile full
+```
+
+| Profile | Runs |
+|---|---|
+| `harness` | Configuration, backlog validation and the deterministic harness tests |
+| `fast` | `harness`, plus the Python steps for `services/agent/`, the web steps for `apps/web/` and `packages/`, and both for shared or check-infrastructure paths such as locks, `contracts/` and `scripts/verify.py`. No build. Everything else is recorded `not_run`, so a documentation-only change needs no prepared environment |
+| `full` | `harness`, plus every step, including `next build` |
+
+| Exit | Report `status` | Meaning |
+|---|---|---|
+| 0 | `passed` | Every selected check passed and no input changed during the run |
+| 1 | `failed` | A required check failed, the non-mutation guard saw a change, or an input changed. This outranks exit 2 |
+| 2 | `error` | A prerequisite is unavailable, a check could not start or timed out, or another check holds `verify.lock` |
+
+Reports are `.checks/<profile>/latest.json`. Each binds to a fingerprint of the harness files plus application sources, manifests and locks, but not environments, caches or build output. Any change to those inputs makes every profile's report stale. The `Stop` hook wants a current `fast` or `full` report when uncommitted application or shared paths exist, and otherwise accepts any current report.
+
+Not run by any profile: generated contract drift, because no contract exists yet; browser fixtures, because none are configured; and `tests/toolchain`, whose copies bootstrap from registries.
+
 ## Inspect or use the assistant integration
 
 Project configuration is `.claude/settings.json`; the dispatcher is `.claude/hooks/dispatch.py`. The scripts use bounded stdin JSON and invoke no model. The observed Claude Code 2.1.314 is newer than the documented 2.1.295 minimum for blocking hook startup failures; version compatibility is not event-delivery proof.
@@ -44,6 +69,19 @@ Project configuration is `.claude/settings.json`; the dispatcher is `.claude/hoo
 In a separately qualified compatible assistant session, inspect the loaded project rules, skills, agents and hooks, then test actual event delivery on a disposable fixture. Keep the existing OpenRouter-only constraint; do not add provider credentials or assume product model IDs are supported by the CLI. Until that exercise is recorded, the adapter is **configured, event delivery unverified**. Use the portable runner directly in the meantime.
 
 Invoke `autobots-spec-ingest` for backlog ingestion; the read-only agent proposes content, and its caller writes and validates it. Use the plan/implementation/review/verification/runbook skills for an authorized bounded work item. Do not use ingestion as permission to start product development.
+
+### Hook dispatcher behavior
+
+These are fixture-tested script behaviors in `tests/harness/test_hooks.py`, not proof of event delivery.
+
+| Input | Behavior |
+|---|---|
+| Malformed or oversized JSON, an unsupported event or tool, or an internal error such as a missing `harness_lib` | Exit 2, empty stdout and one fixed stderr line. Input is never echoed |
+| No complete input within 9 seconds, below the configured 10-second timeout | Exit 2, the same way. `AUTOBOTS_HOOK_DEADLINE_SECONDS` can only shorten this |
+| An unusable `file_path`: missing, over 4096 bytes, containing NUL, or a symlink loop | `PreToolUse` denies; `PostToolUse` returns the generic diagnostic |
+| A secret name, before or after symlink resolution | `PreToolUse` denies |
+| A filename with spaces, Unicode or shell metacharacters | Treated as data, and passed only as one argument after `--` |
+| An edited Python file under `services/agent/` | `PostToolUse` names the affected domains, checks syntax and runs the prepared `ruff` for at most 3 seconds, reporting a finding, a missing tool or a timeout without echoing its output |
 
 ### Read the adapter status
 
