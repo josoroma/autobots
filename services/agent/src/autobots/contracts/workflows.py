@@ -93,6 +93,59 @@ class WorkflowList(BaseModel):
     workflows: list[WorkflowView]
 
 
+class BlockView(BaseModel):
+    model_config = VIEW
+
+    block: str
+    version: int
+    inputs: list[str]
+    outputs: list[str]
+
+
+class BlockCatalog(BaseModel):
+    model_config = VIEW
+
+    schema_version: Literal[1]
+    blocks: list[BlockView]
+
+
+class InstanceView(BaseModel):
+    model_config = VIEW
+
+    key: str
+    node_id: str
+    iteration: int | None
+    status: str
+    error_code: str | None
+
+
+class EmissionView(BaseModel):
+    model_config = VIEW
+
+    instance_key: str
+    port: str
+    sequence: int
+    value: str
+
+
+class ExecutionView(BaseModel):
+    """Read from saved rows, so looking at it can't start or repeat anything."""
+
+    model_config = VIEW
+
+    schema_version: Literal[1]
+    id: Identifier
+    workflow_id: Identifier
+    workflow_version: int
+    graph_hash: str
+    block_versions: dict[str, str]
+    run_id: Identifier
+    run_status: str
+    stop_reason: str | None
+    instances: list[InstanceView]
+    emissions: list[EmissionView]
+
+
 class ExecutionCreate(BaseModel):
     model_config = VIEW
 

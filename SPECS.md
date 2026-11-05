@@ -165,9 +165,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-6.2 | Workflow readiness, emissions and restart semantics | DONE | EPIC-6 |
 | US-6.2#1 | Implement the declared readiness and bounded iteration/join semantics. | DONE | US-6.2 |
 | US-6.2#2 | Run golden and restart fixtures for the supported subset. | DONE | US-6.2 |
-| US-6.3 | Workflow editor and execution monitor | READY | EPIC-6 |
-| US-6.3#1 | Build subset editing, validation and version selection UI. | TODO | US-6.3 |
-| US-6.3#2 | Expose authorized instance/emission monitoring and reconnect behavior. | TODO | US-6.3 |
+| US-6.3 | Workflow editor and execution monitor | DONE | EPIC-6 |
+| US-6.3#1 | Build subset editing, validation and version selection UI. | DONE | US-6.3 |
+| US-6.3#2 | Expose authorized instance/emission monitoring and reconnect behavior. | DONE | US-6.3 |
 | EPIC-7 | Routines and selected connectors | — | — |
 | US-7.1 | Explicit routines and deduplicated scheduled occurrences | READY | EPIC-7 |
 | US-7.1#1 | Implement versioned routines and occurrence admission. | TODO | US-7.1 |
@@ -2156,7 +2156,8 @@ Open Questions:
 
 ### US-6.3: Workflow editor and execution monitor
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-6-3-workflow-editor-execution-monitor/`
 
 As an automation builder
 I want an editor and monitor for the supported subset
@@ -2188,8 +2189,8 @@ Dependencies:
 - US-4.6
 
 Tasks:
-- [ ] Build subset editing, validation and version selection UI.
-- [ ] Expose authorized instance/emission monitoring and reconnect behavior.
+- [x] Build subset editing, validation and version selection UI.
+- [x] Expose authorized instance/emission monitoring and reconnect behavior.
 
 Open Questions:
 - None.

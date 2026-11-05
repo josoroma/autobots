@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends, Header, Request, status
 
 from autobots.api.errors import ApiError
 from autobots.api.security import current_user, require_internal
-from autobots.api.settings_routes import current_workspace, require_owner
+from autobots.api.settings_routes import current_workspace, provider_settings, require_owner
+from autobots.application.provider_settings import ProviderSettings
 from autobots.application.runs import IdempotencyConflict
 from autobots.application.workflows import (
     WorkflowRefused,
@@ -15,11 +16,16 @@ from autobots.application.workflows import (
     create_workflow,
     get_workflow,
     list_workflows,
+    needs_model,
     publish_version,
+    read_execution,
 )
 from autobots.contracts.workflows import (
+    BlockCatalog,
+    BlockView,
     ExecutionBinding,
     ExecutionCreate,
+    ExecutionView,
     WorkflowCreate,
     WorkflowErrorView,
     WorkflowGraph,
@@ -28,7 +34,7 @@ from autobots.contracts.workflows import (
     WorkflowValidation,
     WorkflowView,
 )
-from autobots.domain.workflows import GraphError, graph_hash, validate_graph
+from autobots.domain.workflows import BLOCKS, GraphError, graph_hash, validate_graph
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 Key = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)]
@@ -57,6 +63,39 @@ def _error(error: WorkflowRefused | IdempotencyConflict) -> ApiError:
         codes = ", ".join(sorted({item.code for item in error.errors}))
         return ApiError(422, error.code, f"That isn't valid: {codes}.")
     return ApiError(409, error.code, "That conflicts with what is saved. Reload and try again.")
+
+
+@router.get("/workflow-blocks", operation_id="listWorkflowBlocks", response_model=BlockCatalog)
+async def get_blocks(_: Member) -> BlockCatalog:
+    return BlockCatalog(
+        schema_version=1,
+        blocks=[
+            BlockView(
+                block=block,
+                version=version,
+                inputs=[f"{name}: {kind}" for name, kind in spec.inputs.items()],
+                outputs=[
+                    f"{name}: {'declared in config' if kind.startswith('config') else kind}"
+                    for name, kind in spec.outputs.items()
+                ],
+            )
+            for block, versions in BLOCKS.items()
+            for version, spec in versions.items()
+        ],
+    )
+
+
+@router.get(
+    "/workflow-executions/{execution_id}",
+    operation_id="getWorkflowExecution",
+    response_model=ExecutionView,
+)
+async def get_execution(execution_id: UUID, request: Request, workspace: Member) -> ExecutionView:
+    async with _pool(request).connection() as connection:
+        try:
+            return await read_execution(connection, workspace, execution_id)
+        except WorkflowRefused as error:
+            raise _error(error) from None
 
 
 @router.post(
@@ -153,8 +192,13 @@ async def post_execution(
     key: Key,
     workspace: Member,
     user: User,
+    settings: Annotated[ProviderSettings, Depends(provider_settings)],
 ) -> ExecutionBinding:
     async with _pool(request).connection() as connection:
+        if await needs_model(connection, workspace, workflow_id, body.version):
+            code = await settings.run_intent(workspace)
+            if code != "ready":
+                raise ApiError(409, code, "An agent step needs a usable OpenRouter key.")
         try:
             return await create_execution(
                 connection,

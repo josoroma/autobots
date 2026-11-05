@@ -6,11 +6,15 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from autobots.application.experts import create_session
+from autobots.application.run_projection import public_text
 from autobots.application.runs import admit_run, existing_receipt, request_hash, store_receipt
 from autobots.contracts.experts import SessionExpert
 from autobots.contracts.plans import InputDocument
 from autobots.contracts.workflows import (
+    EmissionView,
     ExecutionBinding,
+    ExecutionView,
+    InstanceView,
     WorkflowGraph,
     WorkflowVersionView,
     WorkflowView,
@@ -262,4 +266,80 @@ async def create_execution(
         workflow_version=version,
         graph_hash=digest,
         block_versions=blocks,
+    )
+
+
+async def needs_model(connection: Any, workspace_id: UUID, workflow_id: UUID, version: int) -> bool:
+    """A workflow with no agent step can run with no provider key."""
+    cursor = await connection.execute(
+        "select v.graph from public.workflow_versions v "
+        "join public.workflows w on w.id = v.workflow_id "
+        "where v.workflow_id = %s and v.version = %s and w.workspace_id = %s",
+        (workflow_id, version, workspace_id),
+    )
+    row = await cursor.fetchone()
+    return row is not None and any(node["block"] == "agent" for node in row[0]["nodes"])
+
+
+async def read_execution(connection: Any, workspace_id: UUID, execution_id: UUID) -> ExecutionView:
+    """Instances with no row yet are waiting. That comes from the graph, not from a stored guess."""
+    cursor = await connection.execute(
+        "select e.workflow_id, e.workflow_version, e.graph_hash, e.block_versions, e.run_id, "
+        "r.status, u.stop_reason, v.graph from public.workflow_executions e "
+        "join public.runs r on r.id = e.run_id "
+        "join public.workflow_versions v on v.workflow_id = e.workflow_id "
+        "and v.version = e.workflow_version "
+        "left join app_private.run_usage u on u.run_id = e.run_id "
+        "where e.id = %s and e.workspace_id = %s",
+        (execution_id, workspace_id),
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        raise WorkflowRefused("execution_not_found")
+    workflow_id, version, digest, blocks, run_id, run_status, stop_reason, graph = row
+    cursor = await connection.execute(
+        "select instance_key, node_id, iteration, status, error_code "
+        "from public.workflow_node_instances where execution_id = %s",
+        (execution_id,),
+    )
+    saved = await cursor.fetchall()
+    instances = [
+        InstanceView(
+            key=item[0], node_id=item[1], iteration=item[2], status=item[3], error_code=item[4]
+        )
+        for item in saved
+    ]
+    started = {item[1] for item in saved}
+    instances.extend(
+        InstanceView(
+            key=node["id"], node_id=node["id"], iteration=None, status="waiting", error_code=None
+        )
+        for node in graph["nodes"]
+        if node["id"] not in started
+    )
+    order = {node["id"]: index for index, node in enumerate(graph["nodes"])}
+    instances.sort(key=lambda item: (order[item.node_id], item.iteration or 0))
+    cursor = await connection.execute(
+        "select instance_key, port, sequence, value::text from public.workflow_emissions "
+        "where execution_id = %s order by created_at, instance_key, port, sequence",
+        (execution_id,),
+    )
+    emissions = [
+        EmissionView(
+            instance_key=item[0], port=item[1], sequence=item[2], value=public_text(item[3])
+        )
+        for item in await cursor.fetchall()
+    ]
+    return ExecutionView(
+        schema_version=1,
+        id=execution_id,
+        workflow_id=workflow_id,
+        workflow_version=version,
+        graph_hash=digest,
+        block_versions=blocks,
+        run_id=run_id,
+        run_status=run_status,
+        stop_reason=stop_reason,
+        instances=instances,
+        emissions=emissions,
     )

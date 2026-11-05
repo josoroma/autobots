@@ -373,6 +373,64 @@ export const schemas = {
     "title": "AssignmentView",
     "type": "object"
   },
+  "BlockCatalog": {
+    "additionalProperties": false,
+    "properties": {
+      "blocks": {
+        "items": {
+          "$ref": "#/components/schemas/BlockView"
+        },
+        "title": "Blocks",
+        "type": "array"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "blocks"
+    ],
+    "title": "BlockCatalog",
+    "type": "object"
+  },
+  "BlockView": {
+    "additionalProperties": false,
+    "properties": {
+      "block": {
+        "title": "Block",
+        "type": "string"
+      },
+      "inputs": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Inputs",
+        "type": "array"
+      },
+      "outputs": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Outputs",
+        "type": "array"
+      },
+      "version": {
+        "title": "Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "block",
+      "version",
+      "inputs",
+      "outputs"
+    ],
+    "title": "BlockView",
+    "type": "object"
+  },
   "BudgetCounters": {
     "additionalProperties": false,
     "properties": {
@@ -528,6 +586,35 @@ export const schemas = {
     "title": "EffectiveRolePolicy",
     "type": "object"
   },
+  "EmissionView": {
+    "additionalProperties": false,
+    "properties": {
+      "instance_key": {
+        "title": "Instance Key",
+        "type": "string"
+      },
+      "port": {
+        "title": "Port",
+        "type": "string"
+      },
+      "sequence": {
+        "title": "Sequence",
+        "type": "integer"
+      },
+      "value": {
+        "title": "Value",
+        "type": "string"
+      }
+    },
+    "required": [
+      "instance_key",
+      "port",
+      "sequence",
+      "value"
+    ],
+    "title": "EmissionView",
+    "type": "object"
+  },
   "ErrorResponse": {
     "additionalProperties": false,
     "properties": {
@@ -668,6 +755,91 @@ export const schemas = {
       "version"
     ],
     "title": "ExecutionCreate",
+    "type": "object"
+  },
+  "ExecutionView": {
+    "additionalProperties": false,
+    "description": "Read from saved rows, so looking at it can't start or repeat anything.",
+    "properties": {
+      "block_versions": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "title": "Block Versions",
+        "type": "object"
+      },
+      "emissions": {
+        "items": {
+          "$ref": "#/components/schemas/EmissionView"
+        },
+        "title": "Emissions",
+        "type": "array"
+      },
+      "graph_hash": {
+        "title": "Graph Hash",
+        "type": "string"
+      },
+      "id": {
+        "format": "uuid",
+        "title": "Id",
+        "type": "string"
+      },
+      "instances": {
+        "items": {
+          "$ref": "#/components/schemas/InstanceView"
+        },
+        "title": "Instances",
+        "type": "array"
+      },
+      "run_id": {
+        "format": "uuid",
+        "title": "Run Id",
+        "type": "string"
+      },
+      "run_status": {
+        "title": "Run Status",
+        "type": "string"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "stop_reason": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Stop Reason"
+      },
+      "workflow_id": {
+        "format": "uuid",
+        "title": "Workflow Id",
+        "type": "string"
+      },
+      "workflow_version": {
+        "title": "Workflow Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "id",
+      "workflow_id",
+      "workflow_version",
+      "graph_hash",
+      "block_versions",
+      "run_id",
+      "run_status",
+      "stop_reason",
+      "instances",
+      "emissions"
+    ],
+    "title": "ExecutionView",
     "type": "object"
   },
   "ExpectedVersion": {
@@ -916,6 +1088,54 @@ export const schemas = {
       "content"
     ],
     "title": "InputDocument",
+    "type": "object"
+  },
+  "InstanceView": {
+    "additionalProperties": false,
+    "properties": {
+      "error_code": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Error Code"
+      },
+      "iteration": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Iteration"
+      },
+      "key": {
+        "title": "Key",
+        "type": "string"
+      },
+      "node_id": {
+        "title": "Node Id",
+        "type": "string"
+      },
+      "status": {
+        "title": "Status",
+        "type": "string"
+      }
+    },
+    "required": [
+      "key",
+      "node_id",
+      "iteration",
+      "status",
+      "error_code"
+    ],
+    "title": "InstanceView",
     "type": "object"
   },
   "ModelAvailability": {
@@ -2648,6 +2868,26 @@ export function parseAssignmentView(value: unknown): AssignmentView {
   return parseWith(schemas, "AssignmentView", value) as AssignmentView;
 }
 
+export interface BlockCatalog {
+  blocks: BlockView[];
+  schema_version: 1;
+}
+
+export function parseBlockCatalog(value: unknown): BlockCatalog {
+  return parseWith(schemas, "BlockCatalog", value) as BlockCatalog;
+}
+
+export interface BlockView {
+  block: string;
+  inputs: string[];
+  outputs: string[];
+  version: number;
+}
+
+export function parseBlockView(value: unknown): BlockView {
+  return parseWith(schemas, "BlockView", value) as BlockView;
+}
+
 export interface BudgetCounters {
   limit_micro_usd: number;
   reserved_micro_usd: number;
@@ -2705,6 +2945,17 @@ export function parseEffectiveRolePolicy(value: unknown): EffectiveRolePolicy {
   return parseWith(schemas, "EffectiveRolePolicy", value) as EffectiveRolePolicy;
 }
 
+export interface EmissionView {
+  instance_key: string;
+  port: string;
+  sequence: number;
+  value: string;
+}
+
+export function parseEmissionView(value: unknown): EmissionView {
+  return parseWith(schemas, "EmissionView", value) as EmissionView;
+}
+
 export interface ErrorResponse {
   code: string;
   message: string;
@@ -2748,6 +2999,24 @@ export interface ExecutionCreate {
 
 export function parseExecutionCreate(value: unknown): ExecutionCreate {
   return parseWith(schemas, "ExecutionCreate", value) as ExecutionCreate;
+}
+
+export interface ExecutionView {
+  block_versions: Record<string, unknown>;
+  emissions: EmissionView[];
+  graph_hash: string;
+  id: string;
+  instances: InstanceView[];
+  run_id: string;
+  run_status: string;
+  schema_version: 1;
+  stop_reason: string | null;
+  workflow_id: string;
+  workflow_version: number;
+}
+
+export function parseExecutionView(value: unknown): ExecutionView {
+  return parseWith(schemas, "ExecutionView", value) as ExecutionView;
 }
 
 export interface ExpectedVersion {
@@ -2844,6 +3113,18 @@ export interface InputDocument {
 
 export function parseInputDocument(value: unknown): InputDocument {
   return parseWith(schemas, "InputDocument", value) as InputDocument;
+}
+
+export interface InstanceView {
+  error_code: string | null;
+  iteration: number | null;
+  key: string;
+  node_id: string;
+  status: string;
+}
+
+export function parseInstanceView(value: unknown): InstanceView {
+  return parseWith(schemas, "InstanceView", value) as InstanceView;
 }
 
 export interface ModelAvailability {
@@ -3444,6 +3725,14 @@ export async function deleteOpenRouterCredential(options: ClientOptions, body: E
 
 export async function validateOpenRouter(options: ClientOptions): Promise<ProviderStatus> {
   return parseProviderStatus(await requestJson(options, "POST", `/v1/settings/model-providers/openrouter/validate`));
+}
+
+export async function listWorkflowBlocks(options: ClientOptions): Promise<BlockCatalog> {
+  return parseBlockCatalog(await requestJson(options, "GET", `/v1/workflow-blocks`));
+}
+
+export async function getWorkflowExecution(options: ClientOptions, execution_id: string): Promise<ExecutionView> {
+  return parseExecutionView(await requestJson(options, "GET", `/v1/workflow-executions/${encodeURIComponent(execution_id)}`));
 }
 
 export async function listWorkflows(options: ClientOptions): Promise<WorkflowList> {

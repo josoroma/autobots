@@ -372,6 +372,64 @@
         "title": "AssignmentView",
         "type": "object"
       },
+      "BlockCatalog": {
+        "additionalProperties": false,
+        "properties": {
+          "blocks": {
+            "items": {
+              "$ref": "#/components/schemas/BlockView"
+            },
+            "title": "Blocks",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "blocks"
+        ],
+        "title": "BlockCatalog",
+        "type": "object"
+      },
+      "BlockView": {
+        "additionalProperties": false,
+        "properties": {
+          "block": {
+            "title": "Block",
+            "type": "string"
+          },
+          "inputs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Inputs",
+            "type": "array"
+          },
+          "outputs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Outputs",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "block",
+          "version",
+          "inputs",
+          "outputs"
+        ],
+        "title": "BlockView",
+        "type": "object"
+      },
       "BudgetCounters": {
         "additionalProperties": false,
         "properties": {
@@ -527,6 +585,35 @@
         "title": "EffectiveRolePolicy",
         "type": "object"
       },
+      "EmissionView": {
+        "additionalProperties": false,
+        "properties": {
+          "instance_key": {
+            "title": "Instance Key",
+            "type": "string"
+          },
+          "port": {
+            "title": "Port",
+            "type": "string"
+          },
+          "sequence": {
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instance_key",
+          "port",
+          "sequence",
+          "value"
+        ],
+        "title": "EmissionView",
+        "type": "object"
+      },
       "ErrorResponse": {
         "additionalProperties": false,
         "properties": {
@@ -667,6 +754,91 @@
           "version"
         ],
         "title": "ExecutionCreate",
+        "type": "object"
+      },
+      "ExecutionView": {
+        "additionalProperties": false,
+        "description": "Read from saved rows, so looking at it can't start or repeat anything.",
+        "properties": {
+          "block_versions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Block Versions",
+            "type": "object"
+          },
+          "emissions": {
+            "items": {
+              "$ref": "#/components/schemas/EmissionView"
+            },
+            "title": "Emissions",
+            "type": "array"
+          },
+          "graph_hash": {
+            "title": "Graph Hash",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "instances": {
+            "items": {
+              "$ref": "#/components/schemas/InstanceView"
+            },
+            "title": "Instances",
+            "type": "array"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "run_status": {
+            "title": "Run Status",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Reason"
+          },
+          "workflow_id": {
+            "format": "uuid",
+            "title": "Workflow Id",
+            "type": "string"
+          },
+          "workflow_version": {
+            "title": "Workflow Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "id",
+          "workflow_id",
+          "workflow_version",
+          "graph_hash",
+          "block_versions",
+          "run_id",
+          "run_status",
+          "stop_reason",
+          "instances",
+          "emissions"
+        ],
+        "title": "ExecutionView",
         "type": "object"
       },
       "ExpectedVersion": {
@@ -915,6 +1087,54 @@
           "content"
         ],
         "title": "InputDocument",
+        "type": "object"
+      },
+      "InstanceView": {
+        "additionalProperties": false,
+        "properties": {
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "iteration": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Iteration"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "node_id": {
+            "title": "Node Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "node_id",
+          "iteration",
+          "status",
+          "error_code"
+        ],
+        "title": "InstanceView",
         "type": "object"
       },
       "ModelAvailability": {
@@ -5130,6 +5350,174 @@
           }
         },
         "summary": "Validate Credential"
+      }
+    },
+    "/v1/workflow-blocks": {
+      "get": {
+        "operationId": "listWorkflowBlocks",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlockCatalog"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Blocks"
+      }
+    },
+    "/v1/workflow-executions/{execution_id}": {
+      "get": {
+        "operationId": "getWorkflowExecution",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "execution_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Execution Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Execution"
       }
     },
     "/v1/workflows": {
