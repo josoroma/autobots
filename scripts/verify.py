@@ -2,8 +2,8 @@
 """One local verification runner. It never installs, and it never claims unimplemented gates.
 
 Exit codes: 0 passed, 1 a required check failed, 2 a prerequisite is unavailable or a check could
-not run to a result. Passing `harness`, `fast` or `full` establishes neither H0, H1 nor product
-acceptance. `db` and `operations` are not implemented, and report that with exit code 2.
+not run to a result. Passing `harness`, `fast`, `full` or `db` establishes neither H0, H1 nor product
+acceptance. `operations` is not implemented, and reports that with exit code 2.
 """
 from __future__ import annotations
 
@@ -25,12 +25,15 @@ from toolchain import (LONG, Step, Unavailable, check_steps, child_env, find_too
                        run_step, snapshot, snapshot_differences)
 
 EXIT_PASSED, EXIT_FAILED, EXIT_UNAVAILABLE = 0, 1, 2
-IMPLEMENTED_PROFILES = ('harness', 'fast', 'full')
+IMPLEMENTED_PROFILES = ('harness', 'fast', 'full', 'db')
+# These report exit 2 for a missing prerequisite, which is not a failed check.
+SELF_REPORTING_STEPS = frozenset({'fault_qualification', 'disposable_qualification'})
 PYTHON_STEPS = frozenset({'python_lock', 'python_env', 'ruff_check', 'ruff_format', 'mypy', 'pytest'})
 WEB_STEPS = frozenset({'node_lock', 'node_version', 'lint', 'format_check', 'typegen', 'typecheck'})
 OUTSIDE_SCOPE = 'outside the changed scope of this fast run'
 NOT_TESTED = ['Claude event delivery', 'Supabase', 'Docker', 'OpenRouter inference', 'complete H0/H1']
 APPLICATION_NOT_TESTED = ['generated contract drift, no contract exists yet', 'browser fixtures, none are configured']
+DB_NOT_TESTED = ['the persistent database', 'the pinned self-hosted release', 'generated database type drift, no types exist yet']
 
 
 def utc() -> str:
@@ -90,6 +93,9 @@ class ToolPlan:
 
 def tool_plan(root: Path, profile: str, changed: Sequence[str] | None) -> tuple[ToolPlan, list[dict]]:
     """The toolchain steps to run and the ones left out. Needs tools only when a step needs them."""
+    if profile == 'db':
+        step = Step('disposable_qualification', (sys.executable, 'scripts/disposable_db.py', 'qualify'), root, LONG)
+        return ToolPlan([step], reduced_env() | ({'HOME': os.environ['HOME']} if 'HOME' in os.environ else {})), []
     known = {*PYTHON_STEPS, *WEB_STEPS, *FULL_ONLY_CHECKS}
     chosen = selected_steps(profile, sorted(known), changed)
     left_out = [{'id': name, 'status': 'not_run', 'reason': OUTSIDE_SCOPE} for name in sorted(known - chosen)]
@@ -114,6 +120,9 @@ def toolchain_checks(root: Path, profile: str, plan: Callable = tool_plan) -> li
                  'output': f'prerequisite unavailable: {error}'}]
     records = [{**run_step(step, selection.env), 'class': 'static_or_fixture', 'model_transport': 'none'}
                for step in selection.steps]
+    for record in records:
+        if record['id'] in SELF_REPORTING_STEPS and record['exit_code'] == EXIT_UNAVAILABLE:
+            record['status'] = 'error'
     differences = snapshot_differences(before, snapshot(root))
     return [*left_out, *records, {'id': 'non_mutation_guard', 'class': 'static', 'model_transport': 'none',
                                   'status': 'failed' if differences else 'passed',
@@ -153,10 +162,11 @@ def run_profile(root: Path, profile: str, *, base_checks: Callable[[Path], list[
         stable = final == initial
         code = exit_code_for(checks, stable)
         status = {EXIT_PASSED: 'passed', EXIT_FAILED: 'failed', EXIT_UNAVAILABLE: 'error'}[code]
-        scope = ('Project configuration, backlog structure and deterministic harness fixtures only'
-                 if profile == 'harness' else
-                 'Harness checks plus local static checks, focused tests and, for full, the production build')
-        not_tested = (['application', *NOT_TESTED] if profile == 'harness' else [*APPLICATION_NOT_TESTED, *NOT_TESTED])
+        scope = {'harness': 'Project configuration, backlog structure and deterministic harness fixtures only',
+                 'db': 'Harness checks plus synthetic migrations, seeds and authorization on a disposable target'
+                 }.get(profile, 'Harness checks plus local static checks, focused tests and, for full, the production build')
+        not_tested = {'harness': ['application', *NOT_TESTED], 'db': [*DB_NOT_TESTED, *NOT_TESTED]
+                      }.get(profile, [*APPLICATION_NOT_TESTED, *NOT_TESTED])
         report = {'schema_version': 'autobots.harness-result/v1', 'template': False,
                   'profile': profile, 'status': status,
                   'completed_at_utc': utc(), 'python_version': sys.version.split()[0],
@@ -185,12 +195,12 @@ def main() -> int:
         print('Python 3.12+ is required; use the qualified python3.12 interpreter.', file=sys.stderr)
         return EXIT_UNAVAILABLE
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--profile', required=True, choices=[*IMPLEMENTED_PROFILES, 'db', 'operations'])
+    parser.add_argument('--profile', required=True, choices=[*IMPLEMENTED_PROFILES, 'operations'])
     args = parser.parse_args()
     if args.profile not in IMPLEMENTED_PROFILES:
         print(json.dumps({'profile': args.profile, 'status': 'not_implemented',
-                          'reason': 'Database and operations checks are not yet implemented; '
-                                    'a passing harness, fast or full profile does not substitute for them.'}))
+                          'reason': 'Operations checks are not yet implemented; '
+                                    'a passing harness, fast, full or db profile does not substitute for them.'}))
         return EXIT_UNAVAILABLE
     return run_profile(project_root(), args.profile)
 

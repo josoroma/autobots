@@ -29,7 +29,7 @@ python3.12 scripts/specs.py validate
 python3.12 scripts/verify.py --profile harness
 ```
 
-Use the project skill `autobots-spec-ingest` to refresh the backlog. Its read-only agent proposes source-traceable stories; the caller persists them and regenerates navigation. Database and operations verification profiles return `not_implemented` until those checks exist.
+Use the project skill `autobots-spec-ingest` to refresh the backlog. Its read-only agent proposes source-traceable stories; the caller persists them and regenerates navigation. The operations verification profile returns `not_implemented` until those checks exist.
 
 Every H0/H1 and product work item follows a proportional **plan → implement → independent review → verify → runbook + evidence** workflow. Record review findings and their disposition, run the required checks against the final changes, and retain reproducible evidence and remaining limitations. Update and exercise the relevant runbook in the qualified disposable environment; if operational behavior is unchanged, record that fact rather than inventing a procedure. Small changes use concise records, not skipped stages. [SPECS.md](SPECS.md) and the [development harness contract](PRD-Development-Harness.md) define the detailed workflow.
 

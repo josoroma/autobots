@@ -51,7 +51,7 @@ The design artifacts include `PRD-Design-System.md`, the user-supplied light/dar
 
 There is no implemented Next.js application, FastAPI service, LangGraph worker, application migration/seed set or project Supabase stack in this workspace. No local model runtime is part of the selected design. Public OpenRouter catalog research does not establish authenticated live model qualification.
 
-No application lockfile/toolchain qualification or persistent database operation has been performed by this harness adaptation. The `harness` profile is limited to the delivered development tooling. `fast` and `full` add the scaffold's static checks, tests and build. Future `db` and `operations` profiles must report unavailable until implemented and tested.
+No application lockfile/toolchain qualification or persistent database operation has been performed by this harness adaptation. The `harness` profile is limited to the delivered development tooling. `fast` and `full` add the scaffold's static checks, tests and build. `db` runs synthetic fixtures on a disposable Docker target. Future `operations` must report unavailable until implemented and tested.
 
 ## Integration points
 
@@ -60,6 +60,7 @@ No application lockfile/toolchain qualification or persistent database operation
 - `scripts/specs.py` checks backlog structure, local source references, Gherkin, statuses and dependencies; it generates navigation from story bodies and promotes dependency-blocked stories whose dependencies are DONE. It cannot prove semantic source entailment.
 - The `ohmyorch` plugin, on a local OpenSpec-only branch, provides `/ohmyorch:deliver`; `.claude/rules/ohmyorch-delivery.md` holds the project's delivery rule.
 - `scripts/verify.py` runs the `harness`, `fast` and `full` profiles, with exit codes 0, 1 and 2, and records current input fingerprints/results locally. `fast` chooses Python and web steps from changed paths and records the rest as `not_run`.
+- `scripts/disposable_db.py` holds target-guarded `reset`, `cleanup` and `migrate` wrappers and the `db` profile's qualification, using `infra/disposable/compose.yaml` and synthetic SQL in `tests/db/`. No persistent stack or product migration exists.
 - `scripts/qualify_faults.py` runs the pinned tools on known-good and known-bad fixtures in `tests/faults/`, and `full` includes it. `services/agent/tests` has a fake OpenRouter transport; its tests make no real model call.
 - `scripts/evidence.py` validates DH-W01–06 completion evidence from the templates in `docs/engineering/templates/`, under the contract in `docs/engineering/evidence/README.md`. No real work item has been validated with it yet.
 - `.claude/hooks/dispatch.py` integrates selected events with bounded local checks: a deadline, fail-closed errors, path validation, affected check domains and a `ruff` diagnostic. Script fixture tests and actual Claude event delivery have separate evidence.

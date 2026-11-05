@@ -340,7 +340,7 @@ class HookTests(unittest.TestCase):
             self.assertFalse((root / 'ran').exists())
 
     def test_pending_app_profile_is_not_a_pass(self):
-        result = subprocess.run([sys.executable, str(ROOT / 'scripts/verify.py'), '--profile', 'db'],
+        result = subprocess.run([sys.executable, str(ROOT / 'scripts/verify.py'), '--profile', 'operations'],
                                 capture_output=True, text=True, timeout=5)
         self.assertEqual(result.returncode, 2)
         self.assertEqual(json.loads(result.stdout)['status'], 'not_implemented')

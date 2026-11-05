@@ -8,7 +8,7 @@ Build the selected Option B: native local Next.js + Python FastAPI/LangGraph/Dee
 - Choose one bounded authorized work item. Record its plan, actual implementation, independent review, verification and exercised runbook/evidence according to PRD-Development-Harness.md DH-W01–06. Small changes use short records. Review is not another user-permission ceremony. Exception, by the user's [Decision 0003](docs/engineering/decisions/0003-openspec-only-delivery.md): routine delivery through `/ohmyorch:deliver` follows the OpenSpec lifecycle in `.claude/rules/ohmyorch-delivery.md`, whose archived change is the record, with no independent review unless the user or a story's acceptance asks for one.
 - Writer agents own disjoint files. Reviewers inspect without repairing implementation. The coordinator validates handoffs and owns status changes. Neither ingestion nor a successful syntax check marks a story DONE.
 - Honor the user's current scope. Adapting this development harness does not authorize implementing the product, starting databases or performing paid model qualification.
-- Shared H0/H1 comes before feature work. The harness profile proves repository checks only, and `fast` and `full` add local static checks, focused tests and a build; unimplemented database/operations profiles must fail explicitly. Never report all H1 or product acceptance gates passed from synthetic fixtures.
+- Shared H0/H1 comes before feature work. The harness profile proves repository checks only, and `fast` and `full` add local static checks, focused tests and a build; `db` adds synthetic fixtures on a disposable target; the unimplemented `operations` profile must fail explicitly. Never report all H1 or product acceptance gates passed from synthetic fixtures.
 
 ## Commands
 
@@ -20,7 +20,7 @@ python3.12 scripts/specs.py render
 python3.12 scripts/verify.py --profile harness
 ```
 
-`render` changes only generated backlog navigation, not story intent/status/tasks. Use it after an authorized backlog edit, then validate. The harness verification runs local deterministic tests without model calls or package installs. `fast` adds the Python and web checks for what changed, and `full` runs all of them plus the production build, using prepared environments without installing. Exit codes: 0 passed, 1 a check failed, 2 a prerequisite is unavailable or a check could not run. Profiles `db` and `operations` are defined but unavailable until their tooling is implemented; no other profile substitutes for them.
+`render` changes only generated backlog navigation, not story intent/status/tasks. Use it after an authorized backlog edit, then validate. The harness verification runs local deterministic tests without model calls or package installs. `fast` adds the Python and web checks for what changed, and `full` runs all of them plus the production build, using prepared environments without installing. Exit codes: 0 passed, 1 a check failed, 2 a prerequisite is unavailable or a check could not run. `db` creates a marked disposable Docker target for synthetic migrations, seeds and authorization, then removes only that target. `operations` is defined but unavailable until its tooling is implemented; no other profile substitutes for it.
 
 ## Boundaries that matter
 

@@ -80,10 +80,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-1.6 | H1 deliberate fault and freshness qualification | DONE | EPIC-1 |
 | US-1.6#1 | Implement deliberate failure and correction fixtures. | DONE | US-1.6 |
 | US-1.6#2 | Qualify manifest validation and input-fingerprint invalidation. | DONE | US-1.6 |
-| US-1.7 | H1 disposable database and Compose guards | READY | EPIC-1 |
-| US-1.7#1 | Implement target-checked wrappers and isolated Compose fixtures. | TODO | US-1.7 |
-| US-1.7#2 | Run synthetic migration, seed, grant and Storage negative cases. | TODO | US-1.7 |
-| US-1.8 | H1 independent baseline review and exercised runbook | BLOCKED | EPIC-1 |
+| US-1.7 | H1 disposable database and Compose guards | DONE | EPIC-1 |
+| US-1.7#1 | Implement target-checked wrappers and isolated Compose fixtures. | DONE | US-1.7 |
+| US-1.7#2 | Run synthetic migration, seed, grant and Storage negative cases. | DONE | US-1.7 |
+| US-1.8 | H1 independent baseline review and exercised runbook | READY | EPIC-1 |
 | US-1.8#1 | Review and resolve baseline findings independently. | TODO | US-1.8 |
 | US-1.8#2 | Exercise the harness runbook and publish its versioned evidence. | TODO | US-1.8 |
 | EPIC-2 | Local application foundation | — | — |
@@ -1006,7 +1006,8 @@ Open Questions:
 
 ### US-1.7: H1 disposable database and Compose guards
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-1-7-h1-disposable-database-compose/`
 
 As a developer
 I want qualified disposable infrastructure checks
@@ -1041,15 +1042,15 @@ Dependencies:
 - US-1.5
 
 Tasks:
-- [ ] Implement target-checked wrappers and isolated Compose fixtures.
-- [ ] Run synthetic migration, seed, grant and Storage negative cases.
+- [x] Implement target-checked wrappers and isolated Compose fixtures.
+- [x] Run synthetic migration, seed, grant and Storage negative cases.
 
 Open Questions:
 - None.
 
 ### US-1.8: H1 independent baseline review and exercised runbook
 
-Status: BLOCKED
+Status: READY
 
 As an operator
 I want a reviewed portable baseline with reproducible evidence
