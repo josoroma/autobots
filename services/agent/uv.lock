@@ -119,6 +119,9 @@ dependencies = [
     { name = "langgraph-checkpoint-postgres" },
     { name = "openrouter" },
     { name = "psycopg", extra = ["binary"] },
+    { name = "psycopg-pool" },
+    { name = "pyjwt" },
+    { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
@@ -140,6 +143,9 @@ requires-dist = [
     { name = "langgraph-checkpoint-postgres", specifier = "==3.2.0" },
     { name = "openrouter", specifier = "==0.11.46" },
     { name = "psycopg", extras = ["binary"], specifier = "==3.3.8" },
+    { name = "psycopg-pool", specifier = "==3.3.3" },
+    { name = "pyjwt", specifier = "==2.15.1" },
+    { name = "uvicorn", specifier = "==0.54.0" },
 ]
 
 [package.metadata.requires-dev]

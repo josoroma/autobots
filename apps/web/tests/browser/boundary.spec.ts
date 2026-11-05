@@ -1,0 +1,178 @@
+import { expect, test } from "@playwright/test";
+
+const ORIGIN = process.env.AUTOBOTS_WEB_URL ?? "";
+const API = process.env.AUTOBOTS_API_URL ?? "";
+const UNAVAILABLE = process.env.AUTOBOTS_WEB_UNAVAILABLE_URL ?? "";
+const INTERNAL = process.env.AUTOBOTS_TEST_INTERNAL_TOKEN ?? "";
+const SESSION_A = process.env.AUTOBOTS_TEST_SESSION_A ?? "";
+const SESSION_B = process.env.AUTOBOTS_TEST_SESSION_B ?? "";
+const WORKSPACE_A = process.env.AUTOBOTS_TEST_WORKSPACE_A ?? "";
+const path = `/api/v1/workspaces/${WORKSPACE_A}`;
+
+function session(token: string): { Cookie: string } {
+  return { Cookie: `autobots.session=${token}` };
+}
+
+test("the arranged values are present", () => {
+  for (const value of [
+    ORIGIN,
+    API,
+    UNAVAILABLE,
+    INTERNAL,
+    SESSION_A,
+    SESSION_B,
+    WORKSPACE_A,
+  ]) {
+    expect(value).not.toBe("");
+  }
+});
+
+test("a member reaches its workspace through the BFF, with the generated contract's shape", async ({
+  request,
+}) => {
+  const reply = await request.get(path, { headers: session(SESSION_A) });
+  expect(reply.status()).toBe(200);
+  expect(await reply.json()).toEqual({ schema_version: 1, id: WORKSPACE_A });
+});
+
+test("another workspace's member is refused", async ({ request }) => {
+  const reply = await request.get(path, { headers: session(SESSION_B) });
+  expect(reply.status()).toBe(403);
+  expect((await reply.json()).code).toBe("forbidden");
+});
+
+test("no session and a forged session are refused", async ({ request }) => {
+  expect((await request.get(path)).status()).toBe(401);
+  const forged = await request.get(path, {
+    headers: session(`${SESSION_A.slice(0, -4)}AAAA`),
+  });
+  expect(forged.status()).toBe(401);
+});
+
+test("a forged origin or host is refused before the API", async ({
+  request,
+}) => {
+  const origin = await request.get(path, {
+    headers: { ...session(SESSION_A), Origin: "http://evil.example" },
+  });
+  expect(origin.status()).toBe(403);
+  const host = await request.get(path, {
+    headers: { ...session(SESSION_A), Host: "evil.example" },
+  });
+  expect(host.status()).toBe(403);
+  expect((await host.json()).code).toBe("forbidden_host");
+});
+
+test("a write needs the origin and CSRF token", async ({ request }) => {
+  const headers = { ...session(SESSION_A), Origin: ORIGIN };
+  const missing = await request.post(path, { headers });
+  expect(missing.status()).toBe(403);
+  expect((await missing.json()).code).toBe("missing_csrf");
+  const mismatched = await request.post(path, {
+    headers: {
+      ...headers,
+      Cookie: `${headers.Cookie}; autobots.csrf=one`,
+      "X-Autobots-CSRF": "two",
+    },
+  });
+  expect((await mismatched.json()).code).toBe("invalid_csrf");
+});
+
+test("a valid write reaches the API, which has no such route", async ({
+  request,
+}) => {
+  const token = await (await request.get("/api/csrf")).json();
+  const reply = await request.post(path, {
+    headers: {
+      Cookie: `autobots.session=${SESSION_A}; autobots.csrf=${token.token}`,
+      Origin: ORIGIN,
+      [token.header]: token.token,
+    },
+  });
+  expect(reply.status()).toBe(405);
+});
+
+test("a client's own internal header is dropped, and cannot replace a session", async ({
+  request,
+}) => {
+  const reply = await request.get(path, {
+    headers: { "X-Autobots-Internal": "client-value" },
+  });
+  expect(reply.status()).toBe(401);
+});
+
+test("the Python API refuses a request without the internal credential", async ({
+  request,
+}) => {
+  const url = `${API}/v1/workspaces/${WORKSPACE_A}`;
+  const bearer = { Authorization: `Bearer ${SESSION_A}` };
+  expect((await request.get(url, { headers: bearer })).status()).toBe(401);
+  expect(
+    (
+      await request.get(url, {
+        headers: { ...bearer, "X-Autobots-Internal": "forged" },
+      })
+    ).status(),
+  ).toBe(401);
+  const valid = await request.get(url, {
+    headers: { ...bearer, "X-Autobots-Internal": INTERNAL },
+  });
+  expect(valid.status()).toBe(200);
+  const health = await request.get(`${API}/v1/health`);
+  expect(health.status()).toBe(401);
+});
+
+test("the Python API refuses a forged host", async ({ request }) => {
+  const reply = await request.get(`${API}/v1/health`, {
+    headers: { Host: "evil.example", "X-Autobots-Internal": INTERNAL },
+  });
+  expect(reply.status()).toBe(400);
+});
+
+test("errors expose no credential or stack", async ({ request }) => {
+  for (const reply of [
+    await request.get(path),
+    await request.get(path, { headers: session(SESSION_B) }),
+  ]) {
+    const text = await reply.text();
+    expect(text).not.toContain(INTERNAL);
+    expect(text).not.toContain("Traceback");
+    expect(text).not.toContain("127.0.0.1");
+  }
+});
+
+test("no privileged value reaches the browser", async ({ page }) => {
+  const bodies: string[] = [];
+  page.on("response", async (response) => {
+    if (response.url().startsWith(ORIGIN)) {
+      bodies.push(await response.text().catch(() => ""));
+    }
+  });
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+  expect(bodies.length).toBeGreaterThan(1);
+  for (const body of bodies) {
+    expect(body).not.toContain(INTERNAL);
+    expect(body).not.toContain("AUTOBOTS_INTERNAL_TOKEN");
+  }
+  expect(
+    await page.evaluate(() =>
+      Object.keys(window).filter((name) => /autobots_/i.test(name)),
+    ),
+  ).toEqual([]);
+});
+
+test("an unavailable API is a visible, safe state", async ({ page }) => {
+  await page.goto(`${UNAVAILABLE}/`);
+  const status = page.getByRole("status");
+  await expect(status).toContainText("Python API: unavailable");
+  expect(await page.locator("body").innerText()).not.toContain("ECONNREFUSED");
+  const reply = await page.request.get(`${UNAVAILABLE}${path}`, {
+    headers: session(SESSION_A),
+  });
+  expect(reply.status()).toBe(503);
+  expect((await reply.json()).code).toBe("service_unavailable");
+  await page.screenshot({
+    path: `${process.env.AUTOBOTS_WEB_SCREENSHOTS ?? "test-results/screenshots"}/api-unavailable.png`,
+  });
+});

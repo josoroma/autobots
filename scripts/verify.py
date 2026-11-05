@@ -27,15 +27,16 @@ from toolchain import (LONG, Step, Unavailable, check_steps, child_env, find_too
 EXIT_PASSED, EXIT_FAILED, EXIT_UNAVAILABLE = 0, 1, 2
 IMPLEMENTED_PROFILES = ('harness', 'fast', 'full', 'db')
 # These report exit 2 for a missing prerequisite, which is not a failed check.
-SELF_REPORTING_STEPS = frozenset({'contract_drift', 'fault_qualification', 'disposable_qualification', 'supabase_stack_qualification',
+SELF_REPORTING_STEPS = frozenset({'contract_drift', 'browser_qualification', 'fault_qualification', 'disposable_qualification', 'supabase_stack_qualification',
                                   'app_db_qualification'})
 # DH-09.2 class and model transport by step. Evidence reads these, and a plan cannot override them.
 STEP_CLASSES = {'harness_behavior_tests': ('mock', 'none'), 'pytest': ('mock', 'mock'), 'api_client_tests': ('mock', 'none'),
+                'web_unit_tests': ('mock', 'none'), 'browser_qualification': ('local_runtime', 'none'),
                 'fault_qualification': ('mock', 'mock'), 'disposable_qualification': ('disposable', 'none'),
                 'supabase_stack_qualification': ('disposable', 'none'), 'app_db_qualification': ('disposable', 'none')}
 OUTSIDE_SCOPE = 'outside the changed scope of this fast run'
 NOT_TESTED = ['Claude event delivery', 'Supabase', 'Docker', 'OpenRouter inference', 'complete H0/H1']
-APPLICATION_NOT_TESTED = ['browser fixtures, none are configured']
+APPLICATION_NOT_TESTED: list[str] = []
 DB_NOT_TESTED = ['the persistent database',
                  'Claude event delivery', 'OpenRouter inference', 'complete H0/H1']
 
@@ -136,7 +137,9 @@ def tool_plan(root: Path, profile: str, changed: Sequence[str] | None) -> tuple[
     web_bin = root / 'apps/web/node_modules/.bin'
     contracts = (Step('contract_drift', (sys.executable, 'scripts/generate_contracts.py', 'check'), root),
                  Step('api_client_typecheck', (str(web_bin / 'tsc'), '-p', 'packages/api-client'), root),
-                 Step('api_client_tests', (str(Path(tools.node_dir) / 'node'), '--test', 'packages/api-client/tests/contract.test.ts'), root))
+                 Step('api_client_tests', (str(Path(tools.node_dir) / 'node'), '--test', 'packages/api-client/tests/contract.test.ts'), root),
+                 Step('web_unit_tests', (str(Path(tools.node_dir) / 'node'), '--test', 'apps/web/tests/unit/request-guard.test.ts'), root),
+                 Step('browser_qualification', (sys.executable, 'scripts/qualify_web.py'), root, LONG))
     steps = [step for step in (*check_steps(root, tools), *contracts, qualification, scope_tests) if step.id in chosen]
     return ToolPlan(steps, child_env(root, tools, verifying=True)), left_out
 
@@ -198,7 +201,7 @@ def run_profile(root: Path, profile: str, *, base_checks: Callable[[Path], list[
         status = {EXIT_PASSED: 'passed', EXIT_FAILED: 'failed', EXIT_UNAVAILABLE: 'error'}[code]
         scope = {'harness': 'Project configuration, backlog structure and deterministic harness fixtures only',
                  'db': 'Harness checks plus the pinned release and the application migrations and seeds, on disposable targets'
-                 }.get(profile, 'Harness checks plus local static checks, focused tests and, for full, the production build')
+                 }.get(profile, 'Harness checks plus local static checks, focused tests and, for full, the production build and browser suite')
         not_tested = {'harness': ['application', *NOT_TESTED], 'db': DB_NOT_TESTED
                       }.get(profile, [*APPLICATION_NOT_TESTED, *NOT_TESTED])
         report = {'schema_version': 'autobots.harness-result/v1', 'template': False,

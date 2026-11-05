@@ -66,6 +66,9 @@ def package_errors(data: dict) -> list[str]:
     errors = []
     for section in ('dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'):
         for name, spec in data.get(section, {}).items():
+            # A workspace package is pinned by living in this repository.
+            if name.startswith('@autobots/') and spec == 'workspace:*':
+                continue
             if RANGE_MARKERS.search(spec) or not re.fullmatch(r'\d+\.\d+\.\d+', spec):
                 errors.append(f'{name} has a range or tag: {spec}')
     return errors
@@ -192,7 +195,8 @@ class RunbookNamesPins(unittest.TestCase):
 
     def pins(self) -> dict[str, str]:
         web = json.loads((REPO_ROOT / 'apps/web/package.json').read_text())
-        return {**RUNTIME_PINS, **PYTHON_PINS, **PYTHON_TOOL_PINS, **web['dependencies'], **web['devDependencies']}
+        pins = {**RUNTIME_PINS, **PYTHON_PINS, **PYTHON_TOOL_PINS, **web['dependencies'], **web['devDependencies']}
+        return {name: pin for name, pin in pins.items() if not name.startswith('@autobots/')}
 
     def test_runbook_names_each_pin(self) -> None:
         missing = [f'{name} {pin}' for name, pin in self.pins().items()

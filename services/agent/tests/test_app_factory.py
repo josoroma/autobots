@@ -1,4 +1,4 @@
-"""The factory stays pure: no routes, no resources, no network and no credential."""
+"""The factory stays pure: no resources, no network and no credential."""
 
 import socket
 
@@ -15,12 +15,8 @@ def test_sockets_are_blocked() -> None:
         probe.connect(("127.0.0.1", 9))
 
 
-def test_openapi_has_no_paths() -> None:
-    assert create_app().openapi()["paths"] == {}
-
-
-def test_app_has_no_routes() -> None:
-    assert create_app().routes == []
+def test_the_schema_builds_without_any_connection() -> None:
+    assert set(create_app().openapi()["paths"]) == {"/v1/health", "/v1/workspaces/{workspace_id}"}
 
 
 def test_each_call_builds_a_new_app() -> None:

@@ -50,7 +50,7 @@ python3.12 scripts/verify.py --profile full
 |---|---|
 | `harness` | Configuration, backlog validation and the deterministic harness tests |
 | `fast` | `harness`, plus the Python steps for `services/agent/`, the web steps for `apps/web/` and `packages/`, and both for shared or check-infrastructure paths such as locks, `contracts/` and `scripts/verify.py`. No build. Everything else is recorded `not_run`, so a documentation-only change needs no prepared environment |
-| `full` | `harness`, plus every step, including `next build`, the offline toolchain scope tests and the fault qualification below |
+| `full` | `harness`, plus every step, including `next build`, the browser suite, the offline toolchain scope tests and the fault qualification below |
 
 | Exit | Report `status` | Meaning |
 |---|---|---|
@@ -60,7 +60,7 @@ python3.12 scripts/verify.py --profile full
 
 Reports are `.checks/<profile>/latest.json`. Each binds to a fingerprint of the harness files plus application sources, manifests and locks, but not environments, caches or build output. Links count by target name, and secret files, evidence output and build output never count. A change to those inputs makes every profile's report stale. `fast` chooses steps from what differs since the newest passing `fast` or `full` report, not from Git, so committing a change does not hide it, and with no passing report it runs both domains. The `Stop` hook likewise wants a current `fast` or `full` report for application or shared inputs, a current `db` report for database inputs, and otherwise any current report. A skipped test fails its profile.
 
-Not run by any profile: browser fixtures, because none are configured; and most of `tests/toolchain`, whose copies bootstrap from registries; `full` runs only its offline scope tests.
+Not run by any profile: most of `tests/toolchain`, whose copies bootstrap from registries; `full` runs only its offline scope tests.
 
 ## Disposable database qualification
 

@@ -55,6 +55,19 @@ export const schemas = {
     "title": "ErrorResponse",
     "type": "object"
   },
+  "HTTPValidationError": {
+    "properties": {
+      "detail": {
+        "items": {
+          "$ref": "#/components/schemas/ValidationError"
+        },
+        "title": "Detail",
+        "type": "array"
+      }
+    },
+    "title": "HTTPValidationError",
+    "type": "object"
+  },
   "RunEvent": {
     "additionalProperties": false,
     "description": "The sanitized public envelope from SP-011. Payloads are typed, so nothing raw can pass.",
@@ -204,6 +217,89 @@ export const schemas = {
     ],
     "title": "RunSummary",
     "type": "object"
+  },
+  "ServiceHealth": {
+    "additionalProperties": false,
+    "description": "Liveness only. Holds no address, version or secret.",
+    "properties": {
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "status": {
+        "const": "ok",
+        "title": "Status",
+        "type": "string"
+      }
+    },
+    "required": [
+      "schema_version",
+      "status"
+    ],
+    "title": "ServiceHealth",
+    "type": "object"
+  },
+  "ValidationError": {
+    "properties": {
+      "ctx": {
+        "title": "Context",
+        "type": "object"
+      },
+      "input": {
+        "title": "Input"
+      },
+      "loc": {
+        "items": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        },
+        "title": "Location",
+        "type": "array"
+      },
+      "msg": {
+        "title": "Message",
+        "type": "string"
+      },
+      "type": {
+        "title": "Error Type",
+        "type": "string"
+      }
+    },
+    "required": [
+      "loc",
+      "msg",
+      "type"
+    ],
+    "title": "ValidationError",
+    "type": "object"
+  },
+  "WorkspaceSummary": {
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "format": "uuid",
+        "title": "Id",
+        "type": "string"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "id"
+    ],
+    "title": "WorkspaceSummary",
+    "type": "object"
   }
 } as const;
 
@@ -224,6 +320,14 @@ export interface ErrorResponse {
 
 export function parseErrorResponse(value: unknown): ErrorResponse {
   return parseWith(schemas, "ErrorResponse", value) as ErrorResponse;
+}
+
+export interface HTTPValidationError {
+  detail?: ValidationError[];
+}
+
+export function parseHTTPValidationError(value: unknown): HTTPValidationError {
+  return parseWith(schemas, "HTTPValidationError", value) as HTTPValidationError;
 }
 
 export interface RunEvent {
@@ -268,4 +372,42 @@ export interface RunSummary {
 
 export function parseRunSummary(value: unknown): RunSummary {
   return parseWith(schemas, "RunSummary", value) as RunSummary;
+}
+
+export interface ServiceHealth {
+  schema_version: 1;
+  status: "ok";
+}
+
+export function parseServiceHealth(value: unknown): ServiceHealth {
+  return parseWith(schemas, "ServiceHealth", value) as ServiceHealth;
+}
+
+export interface ValidationError {
+  ctx?: Record<string, unknown>;
+  input?: unknown;
+  loc: string | number[];
+  msg: string;
+  type: string;
+}
+
+export function parseValidationError(value: unknown): ValidationError {
+  return parseWith(schemas, "ValidationError", value) as ValidationError;
+}
+
+export interface WorkspaceSummary {
+  id: string;
+  schema_version: 1;
+}
+
+export function parseWorkspaceSummary(value: unknown): WorkspaceSummary {
+  return parseWith(schemas, "WorkspaceSummary", value) as WorkspaceSummary;
+}
+
+export async function getHealth(options: ClientOptions): Promise<ServiceHealth> {
+  return parseServiceHealth(await requestJson(options, "GET", `/v1/health`));
+}
+
+export async function getWorkspace(options: ClientOptions, workspace_id: string): Promise<WorkspaceSummary> {
+  return parseWorkspaceSummary(await requestJson(options, "GET", `/v1/workspaces/${encodeURIComponent(workspace_id)}`));
 }

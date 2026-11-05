@@ -8,3 +8,5 @@ cacheDir: .cache/pnpm
 verifyDepsBeforeRun: error
 engineStrict: true
 strictPeerDependencies: true
+minimumReleaseAgeExclude:
+  - lucide-react@1.69.0

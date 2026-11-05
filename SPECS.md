@@ -93,17 +93,17 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-2.2 | Public contracts and generated cross-language types | DONE | EPIC-2 |
 | US-2.2#1 | Define public DTOs and adapters for the initial slice. | DONE | US-2.2 |
 | US-2.2#2 | Generate clients and shared validation/compatibility fixtures. | DONE | US-2.2 |
-| US-2.3 | Local identity, workspace grants and private schema isolation | BLOCKED | EPIC-2 |
+| US-2.3 | Local identity, workspace grants and private schema isolation | READY | EPIC-2 |
 | US-2.3#1 | Implement local owner/session and workspace authorization. | TODO | US-2.3 |
 | US-2.3#2 | Qualify grants, RLS and private Storage with nonprivileged identities. | TODO | US-2.3 |
 | US-2.4 | Application migrations and deterministic seeds | DONE | EPIC-2 |
 | US-2.4#1 | Create ordered application migration and seed wrappers. | DONE | US-2.4 |
 | US-2.4#2 | Verify fresh/upgrade replay, repeatability and generated public row types. | DONE | US-2.4 |
-| US-2.5 | Native FastAPI, Next.js BFF and Luma shell | READY | EPIC-2 |
-| US-2.5#1 | Implement native app factories and lifespan/configuration boundaries. | TODO | US-2.5 |
-| US-2.5#2 | Provide typed authenticated BFF-to-Python transport and safe errors. | TODO | US-2.5 |
-| US-2.5#3 | Wire shared shadcn Luma components/tokens and dark-default preference resolution before paint. | TODO | US-2.5 |
-| US-2.5#4 | Verify both appearance modes, accessible states and first-paint behavior with revision-bound browser/screenshots evidence. | TODO | US-2.5 |
+| US-2.5 | Native FastAPI, Next.js BFF and Luma shell | DONE | EPIC-2 |
+| US-2.5#1 | Implement native app factories and lifespan/configuration boundaries. | DONE | US-2.5 |
+| US-2.5#2 | Provide typed authenticated BFF-to-Python transport and safe errors. | DONE | US-2.5 |
+| US-2.5#3 | Wire shared shadcn Luma components/tokens and dark-default preference resolution before paint. | DONE | US-2.5 |
+| US-2.5#4 | Verify both appearance modes, accessible states and first-paint behavior with revision-bound browser/screenshots evidence. | DONE | US-2.5 |
 | US-2.6 | Two-profile OpenRouter factory and immutable role policy | READY | EPIC-2 |
 | US-2.6#1 | Implement the two canonical/wire mappings and versioned role resolution. | TODO | US-2.6 |
 | US-2.6#2 | Add mocked catalog, parameter and hidden-default negative tests. | TODO | US-2.6 |
@@ -1179,7 +1179,7 @@ Open Questions:
 
 ### US-2.3: Local identity, workspace grants and private schema isolation
 
-Status: BLOCKED
+Status: READY
 
 As a workspace owner
 I want local authenticated and scoped access
@@ -1259,7 +1259,8 @@ Open Questions:
 
 ### US-2.5: Native FastAPI, Next.js BFF and Luma shell
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-2-5-native-fastapi-next-js/`
 
 As a developer
 I want local API and presentation processes with clear ownership and the shared Luma interface
@@ -1313,10 +1314,10 @@ Dependencies:
 - US-2.2
 
 Tasks:
-- [ ] Implement native app factories and lifespan/configuration boundaries.
-- [ ] Provide typed authenticated BFF-to-Python transport and safe errors.
-- [ ] Wire shared shadcn Luma components/tokens and dark-default preference resolution before paint.
-- [ ] Verify both appearance modes, accessible states and first-paint behavior with revision-bound browser/screenshots evidence.
+- [x] Implement native app factories and lifespan/configuration boundaries.
+- [x] Provide typed authenticated BFF-to-Python transport and safe errors.
+- [x] Wire shared shadcn Luma components/tokens and dark-default preference resolution before paint.
+- [x] Verify both appearance modes, accessible states and first-paint behavior with revision-bound browser/screenshots evidence.
 
 Open Questions:
 - None.

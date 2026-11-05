@@ -31,3 +31,5 @@ supabase/.branches/
 .uv/
 .cache/
 next-env.d.ts
+test-results/
+playwright-report*

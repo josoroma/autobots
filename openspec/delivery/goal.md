@@ -7,7 +7,7 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-2.4 |
+| Target | US-2.5 |
 | Kind | story |
 | Focus | - |
 | Status | COMPLETE |
@@ -19,7 +19,7 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-2.4 | us-2-4-application-migrations-deterministic-seeds | DONE | Application migrations and deterministic seeds |
+| 1 | US-2.5 | us-2-5-native-fastapi-next-js | DONE | Native FastAPI, Next.js BFF and Luma shell |
 
 ## Next Action
 

@@ -38,6 +38,9 @@ The locks are the full record: `services/agent/uv.lock` and `pnpm-lock.yaml`. `p
 | `langgraph-checkpoint-postgres` | 3.2.0 |
 | `fastapi` | 0.162.0 |
 | `psycopg` | 3.3.8, with the `binary` extra |
+| `psycopg-pool` | 3.3.3 |
+| `pyjwt` | 2.15.1 |
+| `uvicorn` | 0.54.0 |
 | `langchain-mcp-adapters` | 0.3.2 |
 | `ruff` | 0.17.3 |
 | `mypy` | 2.4.1 |
@@ -47,6 +50,16 @@ The locks are the full record: `services/agent/uv.lock` and `pnpm-lock.yaml`. `p
 | Node package | Pin |
 |---|---|
 | `next` | 16.4.5 |
+| `@autobots/api-client` | workspace:* |
+| `class-variance-authority` | 0.7.1 |
+| `clsx` | 2.1.1 |
+| `lucide-react` | 1.69.0 |
+| `next-themes` | 0.4.6 |
+| `tailwind-merge` | 3.7.0 |
+| `@axe-core/playwright` | 4.14.0 |
+| `@playwright/test` | 1.64.1 |
+| `@tailwindcss/postcss` | 4.3.4 |
+| `tailwindcss` | 4.3.4 |
 | `react` | 19.3.1 |
 | `react-dom` | 19.3.1 |
 | `typescript` | 6.0.3 |
