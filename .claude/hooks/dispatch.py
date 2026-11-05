@@ -32,8 +32,10 @@ RUFF = Path('services/agent/.venv/bin/ruff')
 
 
 def is_secret(path: Path) -> bool:
-    return ((path.name == '.env' or path.name.startswith('.env.'))
-            and not path.name.endswith('.example')) or path.name == 'provider-master.key'
+    # Case-folded, because this machine's default filesystem is case-insensitive.
+    name = path.name.casefold()
+    return ((name == '.env' or name.startswith('.env.'))
+            and not name.endswith('.example')) or name == 'provider-master.key'
 
 
 def resolve_path(root: Path, raw: object) -> Path | None:
@@ -55,7 +57,7 @@ def guard(root: Path, tool: str, value: dict) -> str | None:
         if path is None:
             return 'A supported file tool needs a concrete, bounded and resolvable file_path.'
         # The link's own name counts too: `.env` pointing elsewhere is still treated as a secret.
-        if is_secret(Path(raw)) or is_secret(path) or ('Application Support/Autobots/secrets' in path.as_posix()):
+        if is_secret(Path(raw)) or is_secret(path) or ('application support/autobots/secrets' in path.as_posix().casefold()):
             return 'Secret files are outside ordinary coding-agent access; use the documented credential workflow.'
         if tool != 'Read' and not path.is_relative_to(root.resolve()):
             return 'Project edit would escape the workspace (including resolved symlinks).'
@@ -66,9 +68,10 @@ def guard(root: Path, tool: str, value: dict) -> str | None:
         # Deliberately narrow guard. Arbitrary shell/MCP behavior is not confined here.
         dangerous = [r'\bsupabase\s+db\s+reset\b',
                      r'\bdocker\s+(?:system|volume)\s+prune\b',
-                     r'\bdocker\s+(?:compose\b[^\n;&|]*|container\b[^\n;&|]*)\bdown\b[^\n;&|]*(?:--volumes|(?:^|\s)-[a-zA-Z]*v\b)',
-                     r'\b(?:cat|head|tail|less|more)\s+[^\n;&|]*\.env(?:\s|$)',
-                     r'provider-master\.key']
+                     r'\bdocker\s+volume\s+rm\b',
+                     r'\bdocker(?:-compose|\s+compose\b|\s+container\b)[^\n;&|]*\bdown\b[^\n;&|]*(?:--volumes|(?:^|\s)-[a-zA-Z]*v\b)',
+                     r'(?i)\b(?:cat|head|tail|less|more)\s+[^\n;&|]*\.env(?:\.(?!example\b)[\w.-]+)?["\x27]?(?=[\s;&|]|$)',
+                     r'(?i)provider-master\.key']
         if any(re.search(pattern, command) for pattern in dangerous):
             return 'This operation needs the explicit target-guarded maintenance/credential workflow; ordinary coding hooks cannot authorize it.'
     return None
@@ -98,7 +101,7 @@ def post_edit_diagnostic(root: Path, raw: object) -> str:
     if path is None or not path.is_relative_to(root.resolve()):
         return diagnostic
     domains = check_domains(path.relative_to(root.resolve()).as_posix())
-    profile = 'harness' if domains == {'harness'} else 'fast'
+    profile = {frozenset({'harness'}): 'harness', frozenset({'db'}): 'db'}.get(frozenset(domains), 'fast')
     diagnostic = (f"Affected check domains: {', '.join(sorted(domains))}. This invalidates earlier check evidence. "
                   f'Run python3.12 scripts/verify.py --profile {profile} when the bounded change is ready.')
     if path.suffix != '.py' or not path.is_file() or path.stat().st_size > 262144:
@@ -138,8 +141,8 @@ def handle(root: Path, payload: dict) -> dict:
         if payload.get('stop_hook_active') is True:
             return {'systemMessage': reason + ' No repeat completion block; report any remaining limitation honestly.'}
         if not passed:
-            return {'decision': 'block', 'reason': reason + ' Run python3.12 scripts/verify.py with the harness, fast or '
-                    'full profile the change needs, or explain the unavailable prerequisite. '
+            return {'decision': 'block', 'reason': reason + ' Run python3.12 scripts/verify.py with the harness, fast, '
+                    'full or db profile the change needs, or explain the unavailable prerequisite. '
                     'This hook does not certify application completion.'}
         return {}
     if event == 'SubagentStop':

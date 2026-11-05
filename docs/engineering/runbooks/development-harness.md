@@ -2,7 +2,7 @@
 
 ## Scope and prerequisites
 
-Run from the Autobots workspace on this Mac with Python 3.12 or later. The hook interpreter is explicitly /opt/homebrew/bin/python3.12 (observed 3.12.16). If python3.12 is absent from PATH, use that absolute path. Plain python3 can resolve to macOS 3.9.6 in another process; unsupported versions fail clearly. Application dependency qualification remains separate; the pinned Node and Python environments have their own procedure in [the toolchains runbook](toolchains.md), and nothing here needs them. No package installation, API key, application model call, Docker or Supabase is needed for these commands; `jq` reads the report, and the forward procedure's one delegation step uses the developer assistant. Read the mapped sources in `.claude/autobots.json` and `CODEBASE.md` before changing the backlog.
+Run from the Autobots workspace on this Mac with Python 3.12 or later. The hook interpreter is explicitly /opt/homebrew/bin/python3.12 (observed 3.12.16). If python3.12 is absent from PATH, use that absolute path. Plain python3 can resolve to macOS 3.9.6 in another process; unsupported versions fail clearly. Application dependency qualification remains separate; the pinned Node and Python environments have their own procedure in [the toolchains runbook](toolchains.md), and nothing here needs them. No package installation, API key or application model call is needed for these commands, and Docker is needed only for the `db` profile and its wrappers; `jq` reads the report, and the forward procedure's one delegation step uses the developer assistant. Read the mapped sources in `.claude/autobots.json` and `CODEBASE.md` before changing the backlog.
 
 This runbook covers the implemented `harness`, `fast`, `full` and `db` profiles. `operations` remains unimplemented and must return a nonzero unavailable result, not substitute a smaller passing suite. H0/H1 has additional pending requirements.
 
@@ -50,7 +50,7 @@ python3.12 scripts/verify.py --profile full
 |---|---|
 | `harness` | Configuration, backlog validation and the deterministic harness tests |
 | `fast` | `harness`, plus the Python steps for `services/agent/`, the web steps for `apps/web/` and `packages/`, and both for shared or check-infrastructure paths such as locks, `contracts/` and `scripts/verify.py`. No build. Everything else is recorded `not_run`, so a documentation-only change needs no prepared environment |
-| `full` | `harness`, plus every step, including `next build` and the fault qualification below |
+| `full` | `harness`, plus every step, including `next build`, the offline toolchain scope tests and the fault qualification below |
 
 | Exit | Report `status` | Meaning |
 |---|---|---|
@@ -58,9 +58,9 @@ python3.12 scripts/verify.py --profile full
 | 1 | `failed` | A required check failed, the non-mutation guard saw a change, or an input changed. This outranks exit 2 |
 | 2 | `error` | A prerequisite is unavailable, a check could not start or timed out, or another check holds `verify.lock` |
 
-Reports are `.checks/<profile>/latest.json`. Each binds to a fingerprint of the harness files plus application sources, manifests and locks, but not environments, caches or build output. Any change to those inputs makes every profile's report stale. The `Stop` hook wants a current `fast` or `full` report when uncommitted application or shared paths exist, and otherwise accepts any current report.
+Reports are `.checks/<profile>/latest.json`. Each binds to a fingerprint of the harness files plus application sources, manifests and locks, but not environments, caches or build output. Links count by target name, and secret files, evidence output and build output never count. A change to those inputs makes every profile's report stale. `fast` chooses steps from what differs since the newest passing `fast` or `full` report, not from Git, so committing a change does not hide it, and with no passing report it runs both domains. The `Stop` hook likewise wants a current `fast` or `full` report for application or shared inputs, a current `db` report for database inputs, and otherwise any current report. A skipped test fails its profile.
 
-Not run by any profile: generated contract drift, because no contract exists yet; browser fixtures, because none are configured; and `tests/toolchain`, whose copies bootstrap from registries.
+Not run by any profile: generated contract drift, because no contract exists yet; browser fixtures, because none are configured; and most of `tests/toolchain`, whose copies bootstrap from registries; `full` runs only its offline scope tests.
 
 ## Disposable database qualification
 
@@ -71,7 +71,7 @@ python3.12 scripts/verify.py --profile db
 jq -r '.status, .project, (.cases[] | "\(.status) \(.id)")' .checks/db/qualification.json
 ```
 
-Expected: exit 0. It creates a new `autobots-disposable-<id>` project on free loopback ports in 55400-55999 with generated secrets, runs the synthetic migrations, seeds, and role-based database and Storage cases in `tests/db/`, and removes only that project. Other Docker resources stay the same, and the report compares them. Secrets are in neither the report nor the output.
+Expected: exit 0. Trust the exit code and `.checks/db/latest.json`: if Docker is unreachable, exit 2 leaves any earlier `qualification.json` in place. It creates a new `autobots-disposable-<id>` project on free loopback ports in 55400-55999 with generated secrets, runs the synthetic migrations, seeds, role-based database and Storage cases, and stub-worker crash, duplicate and lease-expiry cases in `tests/db/`, and removes only that project. The report compares other containers' IDs and start and finish times, and volume names, before and after. It does not compare their data. Secrets are in neither the report nor the output.
 
 The wrappers refuse anything else before changing it:
 
@@ -80,7 +80,7 @@ python3.12 scripts/disposable_db.py reset --project autobots --db-port 54322
 python3.12 scripts/disposable_db.py cleanup --project autobots-disposable-x --volume autobots_db-data
 ```
 
-Expected: exit 1, `REFUSED before any change`, with no Docker call. A target passing those identity checks must also render to loopback-only, digest-pinned, labeled resources. `reset` needs the marker row written at creation, and `cleanup` needs the disposable labels on every resource. A connection variable such as `DATABASE_URL` naming another target is also refused.
+Expected: exit 1, `REFUSED before any change`, with no Docker call. A target passing those identity checks must also render to loopback-only, digest-pinned, labeled resources. `reset` needs the marker row written at creation, and `cleanup` needs the disposable labels on every resource. A connection variable such as `DATABASE_URL` naming a non-loopback host or a port outside the range is also refused.
 
 | Symptom | Recovery |
 |---|---|
@@ -106,11 +106,14 @@ For a work item that a story's acceptance or the user asks to record under DH-W0
 
 ```sh
 python3.12 scripts/evidence.py fingerprints
+python3.12 scripts/evidence.py record <work-item-id> --evidence-id <evidence-id> --plan <plan.json>
 python3.12 scripts/evidence.py validate <work-item-id>
 python3.12 scripts/evidence.py complete <work-item-id>
 ```
 
 Expected: `validate` exits 0 with `PASS` only when the record, manifest, summary, review, runbook and fingerprints are consistent and current. Otherwise it exits 1 with one `FAIL:` line per problem, and `complete` leaves the status unchanged. An unusable id exits 2. A hand-written `Status: COMPLETE` is not trusted: `validate` still fails it.
+
+`record` copies a manifest's checks from `.checks/<profile>/latest.json`, with their class and model transport, and refuses a report stale for the current source inputs or whose inputs changed during its run. It keeps failures and unrun checks, so `validate` still rejects them. `validate` re-reads each cited report, so a `passed` citing no run or a report that says otherwise fails; a run outside the verifier must be labeled `manual`, and its hashed artifact must still be available. A manual result itself stays the author's assertion, backed only by that artifact. Reports must still exist when `validate` runs. The runbook counts as exercised only through a passing check that says so and keeps an artifact. Files in `.checks` can still be edited by hand, so this is a guard against mistakes, not against forgery.
 
 A pass shows internally consistent, current evidence. It does not show that a recorded assertion was correct.
 
@@ -131,7 +134,7 @@ These are fixture-tested script behaviors in `tests/harness/test_hooks.py`, not 
 | Malformed or oversized JSON, an unsupported event or tool, or an internal error such as a missing `harness_lib` | Exit 2, empty stdout and one fixed stderr line. Input is never echoed |
 | No complete input within 9 seconds, below the configured 10-second timeout | Exit 2, the same way. `AUTOBOTS_HOOK_DEADLINE_SECONDS` can only shorten this |
 | An unusable `file_path`: missing, over 4096 bytes, containing NUL, or a symlink loop | `PreToolUse` denies; `PostToolUse` returns the generic diagnostic |
-| A secret name, before or after symlink resolution | `PreToolUse` denies |
+| A secret name in any case, before or after symlink resolution | `PreToolUse` denies. `Bash` commands are matched only by a narrow pattern list, and the `Grep` tool is outside the matcher, so this is a guardrail and no sandbox |
 | A filename with spaces, Unicode or shell metacharacters | Treated as data, and passed only as one argument after `--` |
 | An edited Python file under `services/agent/` | `PostToolUse` names the affected domains, checks syntax and runs the prepared `ruff` for at most 3 seconds, reporting a finding, a missing tool or a timeout without echoing its output |
 
@@ -345,6 +348,6 @@ Parser and hook tests use temporary directories and clean up their own fixtures.
 
 ## Evidence and exercise status
 
-A verified claim's last-exercised revision, date and result are recorded in the story's evidence, not in this runbook: see the [US-1.2 evidence summary](../evidence/US-1.2/summary.md), which also lists the steps exercised and those left unexercised. [HARNESS-ADAPT-001 evidence](../evidence/HARNESS-ADAPT-001/summary.md) is earlier evidence, for the initial harness adaptation, and is not current status.
+A verified claim's last-exercised revision, date and result are recorded in the story's evidence, not in this runbook: see the [US-1.8 Gate 0 summary](../evidence/US-1.8/summary.md) for this file's checks and recovery paths, and the [US-1.2 evidence summary](../evidence/US-1.2/summary.md) for the forward ingestion exercise, which also lists the steps exercised and those left unexercised. [HARNESS-ADAPT-001 evidence](../evidence/HARNESS-ADAPT-001/summary.md) is earlier evidence, for the initial harness adaptation, and is not current status.
 
 Raw logs live under ignored `.checks`; reviewed redacted summaries remain versioned. An evidence manifest binds the tested source and configuration fingerprints. These commands imply no real Supabase or OpenRouter result, and live assistant event delivery stays unexercised.

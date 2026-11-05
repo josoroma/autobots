@@ -34,7 +34,7 @@ class HookTests(unittest.TestCase):
     def test_secret_files_rejected_without_echo(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for name in ('.env', '.env.local', 'provider-master.key'):
+            for name in ('.env', '.env.local', 'provider-master.key', '.ENV', '.Env.Local'):
                 response = hook.handle(root, {'hook_event_name': 'PreToolUse',
                                              'tool_name': 'Read', 'tool_input': {'file_path': name}})
                 self.assertEqual(response['hookSpecificOutput']['permissionDecision'], 'deny')
@@ -55,6 +55,10 @@ class HookTests(unittest.TestCase):
             self.assertIsNotNone(hook.guard(root, 'Bash', {'command': 'supabase db reset'}))
             self.assertIsNotNone(hook.guard(root, 'Bash', {'command': 'docker compose down -v'}))
             self.assertIsNone(hook.guard(root, 'Bash', {'command': 'python3 scripts/specs.py validate'}))
+            for command in ('cat .env.local', 'cat .env;', 'CAT .ENV', 'cat ".env"', 'cat "$HOME/.env"', 'docker volume rm autobots_db-data',
+                            'docker-compose down -v', 'docker compose down --volumes'):
+                self.assertIsNotNone(hook.guard(root, 'Bash', {'command': command}), command)
+            self.assertIsNone(hook.guard(root, 'Bash', {'command': 'cat .env.example'}))
 
     def test_stop_blocks_once_and_never_claims_live_proof(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -323,7 +327,8 @@ class HookTests(unittest.TestCase):
             root = Path(directory).resolve()
             for path, expected, profile in (('apps/web/app/page.tsx', 'web', 'fast'),
                                             ('pnpm-lock.yaml', 'python, web', 'fast'),
-                                            ('docs/note.md', 'harness', 'harness')):
+                                            ('docs/note.md', 'harness', 'harness'),
+                                            ('tests/db/seeds/fixtures.sql', 'db', 'db')):
                 context = self.post_edit(root, path)
                 self.assertIn(f'Affected check domains: {expected}.', context)
                 self.assertIn(f'--profile {profile}', context)

@@ -15,9 +15,10 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
 import sys
 
-from harness_lib import project_root
+from harness_lib import fingerprint, project_root
 from toolchain import Step, Unavailable, child_env, find_tools, missing_prepared_paths, run_step
 
 FAULTS = Path('tests/faults')
@@ -59,7 +60,7 @@ def cases(root: Path) -> list[Case]:
         Case('python_type_good', 'python', None, (*mypy_check, python_good)),
         Case('python_type_bad', 'python', 'return-value', (*mypy_check, str(FAULTS / 'python/bad_type/sample.py'))),
         Case('python_behavior_good', 'python', None, (*pytest_run, str(FAULTS / 'python/good_behavior'))),
-        Case('python_behavior_bad', 'python', 'assert', (*pytest_run, str(FAULTS / 'python/bad_behavior'))),
+        Case('python_behavior_bad', 'python', 'test_sample.py::test_total', (*pytest_run, str(FAULTS / 'python/bad_behavior'))),
         Case('typescript_type_good', 'typescript', None, (*tsc, typescript_good)),
         Case('typescript_type_bad', 'typescript', 'TS2322', (*tsc, str(FAULTS / 'typescript/bad_type/sample.ts'))),
         Case('typescript_lint_good', 'typescript', None, (*eslint, typescript_good)),
@@ -85,7 +86,9 @@ def outcome(case: Case, record: Mapping) -> str | None:
     if record['exit_code'] is None:
         return 'did not run to a result'
     if case.marker is None:
-        return None if record['status'] == 'passed' else 'a good fixture failed'
+        if record['status'] != 'passed':
+            return 'a good fixture failed'
+        return 'a good fixture skipped its test' if re.search(r'\b\d+ (?:skipped|xfailed)\b', record['output']) else None
     if record['exit_code'] == 0:
         return 'a bad fixture passed, so its fault went undetected'
     if case.marker not in record['output']:
@@ -115,6 +118,8 @@ def main() -> int:
         print('ERROR: Python 3.12+ is required.', file=sys.stderr)
         return 2
     root = project_root()
+    # A run that cannot finish leaves no earlier result to be mistaken for this one.
+    (root / REPORT).unlink(missing_ok=True)
     try:
         tools = find_tools(root)
         missing = missing_prepared_paths(root, tools)
@@ -129,6 +134,7 @@ def main() -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({'schema_version': 'autobots.fault-qualification/v1',
                                 'completed_at_utc': datetime.now(timezone.utc).isoformat(),
+                                'input_fingerprint': fingerprint(root),
                                 'status': 'passed' if passed else 'failed', 'cases': results,
                                 'not_established': ['H1', 'product acceptance', 'live inference']}, indent=2) + '\n')
     return 0 if passed else 1

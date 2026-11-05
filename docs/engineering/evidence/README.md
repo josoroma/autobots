@@ -12,13 +12,13 @@ Never save credentials, `.env` contents, provider keys, user content or unredact
 
 `.checks/<work-item-id>/<evidence-id>/` holds large redacted logs and screenshots. It is Git-ignored and is never the sole proof.
 
-- **Reference:** `checks[].artifacts` names each file by `path` and `sha256`.
+- **Reference:** `checks[].artifacts` names each file by `path` and `sha256`. Every check also names its run in `source`: `report`, re-read from the verifier's report by `validate`, or `manual`, which must keep such an artifact.
 - **Retention:** keep raw artifacts through review and acceptance, and longer for an unresolved failure or release gate. The manifest's `raw_artifacts.retention` states the policy for that evidence.
-- **Availability:** `raw_artifacts.availability` is `not_created`, `available`, `deleted` or `unavailable`. Record a later deletion by changing it, and leave the hashes in place. When it is `available`, validation checks each file's hash.
+- **Availability:** `raw_artifacts.availability` is `not_created`, `available`, `deleted` or `unavailable`. Record a later deletion by changing it, and leave the hashes in place. When it is `available`, validation checks each file's hash. A manual check needs `available`, so evidence relying on one stops validating once its artifact is deleted, which is visible and deliberate.
 
 ## Classes
 
-`verification_class` is `static`, `mock`, `disposable`, `local_runtime` or `live`. `model_transport` is `none`, `mock` or `openrouter_live`. Only a `live` check may use `openrouter_live`, and a `live` check must use it, so a fake model cannot satisfy a live provider gate.
+The verifier assigns each step its class, and evidence copies it. `verification_class` is `static`, `mock`, `disposable`, `local_runtime` or `live`. `model_transport` is `none`, `mock` or `openrouter_live`. Only a `live` check may use `openrouter_live`, and a `live` check must use it, so a fake model cannot satisfy a live provider gate.
 
 ## Fingerprints
 

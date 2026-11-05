@@ -3,7 +3,9 @@
   "template": true,
   "work_item_id": "{{work_item_id}}",
   "evidence_id": "{{evidence_id}}",
-  "requirement_ids": ["{{requirement_id}}"],
+  "requirement_ids": [
+    "{{requirement_id}}"
+  ],
   "fingerprint": {
     "source_manifest_sha256": null,
     "nonsecret_config_sha256": null,
@@ -15,7 +17,14 @@
   "checks": [
     {
       "id": "{{check_id}}",
-      "requirement_ids": ["{{requirement_id}}"],
+      "source": {
+        "kind": "report",
+        "profile": "{{verify_profile}}",
+        "check": "{{check_id}}"
+      },
+      "requirement_ids": [
+        "{{requirement_id}}"
+      ],
       "verification_class": "static",
       "model_transport": "none",
       "command_argv": [],

@@ -80,16 +80,23 @@ class Completion(unittest.TestCase):
         check = data['checks'][0]
         check.update(id='check-1', requirement_ids=['SP-1'], target_ref='fixture', expected='exits 0', observed='exit 0',
                      status='passed', exit_code=0, command_argv=['tool'], started_at_utc='2026-11-05T00:00:00Z',
-                     finished_at_utc='2026-11-05T00:00:01Z')
+                     finished_at_utc='2026-11-05T00:00:01Z', source={'kind': 'manual'}, exercises_runbook=True,
+                     artifacts=[self.artifact()])
         data.update(template=False, work_item_id=ITEM, evidence_id=EVIDENCE, requirement_ids=['SP-1'],
                     fingerprint=evidence.fingerprints(self.root), tool_versions={'python': '3.12.16'})
         data['review'].update(author_id='author', reviewer_id='reviewer', outcome='approved',
                               reviewed_fingerprint=evidence.fingerprints(self.root)['source_manifest_sha256'])
         data['runbook'] = {'path': 'docs/engineering/runbooks/fixture.md', 'exercised_evidence_ids': [EVIDENCE],
                            'revision_sha256': hashlib.sha256(self.runbook.read_bytes()).hexdigest()}
-        data['raw_artifacts'] = {'local_root': f'.checks/{ITEM}/{EVIDENCE}/', 'availability': 'not_created',
+        data['raw_artifacts'] = {'local_root': f'.checks/{ITEM}/{EVIDENCE}/', 'availability': 'available',
                                  'retention': 'through acceptance'}
         return data
+
+    def artifact(self) -> dict:
+        log = self.root / f'.checks/{ITEM}/{EVIDENCE}/log.txt'
+        log.parent.mkdir(parents=True, exist_ok=True)
+        log.write_text('observed output\n')
+        return {'path': f'.checks/{ITEM}/{EVIDENCE}/log.txt', 'sha256': hashlib.sha256(log.read_bytes()).hexdigest()}
 
     def write_manifest(self, data: dict) -> None:
         self.manifest_path.write_text(json.dumps(data))
@@ -203,24 +210,25 @@ class Completion(unittest.TestCase):
         self.rejected('unknown verification', lambda d: d['checks'][0].update(verification_class='vibes'))
 
     def test_raw_artifacts_are_checked(self):
-        artifact = {'path': f'.checks/{ITEM}/{EVIDENCE}/log.txt', 'sha256': '0' * 64}
-        self.rejected('not_created contradicts', lambda d: d['checks'][0].update(artifacts=[artifact]))
-        self.rejected('is recorded available and is missing', lambda d: (
-            d['checks'][0].update(artifacts=[artifact]), d['raw_artifacts'].update(availability='available')))
-        self.rejected('needs a path', lambda d: (
-            d['checks'][0].update(artifacts=[{'path': '/etc/hosts', 'sha256': '0' * 64}]),
-            d['raw_artifacts'].update(availability='deleted')))
+        missing = {'path': f'.checks/{ITEM}/{EVIDENCE}/gone.txt', 'sha256': '0' * 64}
+        self.rejected('not_created contradicts', lambda d: d['raw_artifacts'].update(availability='not_created'))
+        self.rejected('is recorded available and is missing', lambda d: d['checks'][0].update(artifacts=[missing]))
+        self.rejected('needs a path', lambda d: d['checks'][0].update(artifacts=[{'path': '/etc/hosts', 'sha256': '0' * 64}]))
         self.rejected('retention', lambda d: d['raw_artifacts'].update(retention=None))
-        log = self.root / artifact['path']
-        log.parent.mkdir(parents=True)
-        log.write_text('x')
-        self.rejected('does not match its recorded hash', lambda d: (
-            d['checks'][0].update(artifacts=[artifact]), d['raw_artifacts'].update(availability='available')))
-        data = self.valid_manifest()
-        data['checks'][0]['artifacts'] = [artifact]
-        data['raw_artifacts']['availability'] = 'deleted'  # A recorded deletion keeps its hash and stays valid.
-        self.write_manifest(data)
-        self.assertEqual(self.errors(), [])
+        wrong = {'path': f'.checks/{ITEM}/{EVIDENCE}/log.txt', 'sha256': '0' * 64}
+        self.rejected('does not match its recorded hash', lambda d: d['checks'][0].update(artifacts=[wrong]))
+        self.rejected('needs its artifacts available', lambda d: d['raw_artifacts'].update(availability='deleted'))
+
+    def test_a_hand_written_result_is_not_evidence(self):
+        self.rejected('names no run', lambda d: d['checks'][0].pop('source'))
+        self.rejected('retains no artifact', lambda d: d['checks'][0].update(artifacts=[]))
+        self.rejected('no valid verifier report', lambda d: d['checks'][0].update(
+            source={'kind': 'report', 'profile': 'harness', 'check': 'tests'}))
+        self.rejected('no live run record', lambda d: d['checks'][0].update(
+            verification_class='live', model_transport='openrouter_live'))
+
+    def test_exercise_needs_a_passing_check_that_says_so(self):
+        self.rejected('no passing check with a retained artifact', lambda d: d['checks'][0].update(exercises_runbook=False))
 
     def test_recognizable_secrets_are_rejected(self):
         self.rejected('recognizable secret', lambda d: d['checks'][0].update(observed='sk-or-v1-abcdefghijkl'))
@@ -240,6 +248,82 @@ class Completion(unittest.TestCase):
         self.record.write_text(self.record.read_text().replace('Status: IN PROGRESS', 'Status: COMPLETE'))
         self.write_manifest({**self.valid_manifest(), 'template': True})
         self.assertEqual(evidence.main(['validate', ITEM, '--project-root', str(self.root)]), 1)
+
+    def plan(self) -> dict:
+        manual = {'id': 'exercise', 'requirement_ids': ['SP-1'], 'verification_class': 'disposable', 'model_transport': 'none',
+                  'command_argv': ['sh', 'exercise.sh'], 'target_ref': 'fixture', 'expected': 'exit 0', 'observed': 'exit 0',
+                  'status': 'passed', 'started_at_utc': 'a', 'finished_at_utc': 'b', 'exit_code': 0,
+                  'exercises_runbook': True, 'artifacts': [self.artifact()]}
+        return {'profiles': ['harness'], 'requirement_ids': ['SP-1'], 'default_requirements': ['SP-1'], 'requirements': {},
+                'runbook': 'docs/engineering/runbooks/fixture.md', 'retention': 'through acceptance', 'manual_checks': [manual],
+                'review': {'author_id': 'author', 'reviewer_id': 'reviewer', 'outcome': 'approved', 'findings': [],
+                           'reviewed_fingerprint': evidence.fingerprints(self.root)['source_manifest_sha256']}}
+
+    def write_report(self, checks: list[dict], **overrides: object) -> None:
+        directory = self.root / '.checks/harness'
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / 'latest.json').write_text(json.dumps({
+            'schema_version': evidence.REPORT_SCHEMA, 'template': False, 'profile': 'harness', 'status': 'passed',
+            'inputs_unchanged_during_check': True, 'input_manifest': evidence.input_manifest(self.root),
+            'python_version': '3.12.16', 'completed_at_utc': '2026-11-05T00:00:00Z', 'checks': checks, **overrides}))
+
+    def passed_record(self, **extra: object) -> dict:
+        return {'id': 'tests', 'class': 'mock', 'model_transport': 'none', 'status': 'passed', 'exit_code': 0,
+                'command_argv': ['tool'], 'started_at_utc': 'a', 'finished_at_utc': 'b', **extra}
+
+    def test_record_copies_checks_from_a_report_and_validate_accepts_it(self):
+        self.write_report([{'id': 'project_configuration', 'class': 'static', 'model_transport': 'none', 'status': 'passed'},
+                           self.passed_record(tests_executed=4, tests_skipped=0)])
+        self.assertEqual(evidence.record_manifest(self.root, ITEM, EVIDENCE, self.plan()), [])
+        self.assertEqual(self.errors(), [])
+        data = json.loads(self.manifest_path.read_text())
+        self.assertEqual(data['checks'][1]['observed'], 'status passed, exit 0, 4 tests executed, 0 skipped')
+        self.assertEqual(data['checks'][1]['verification_class'], 'mock')
+        self.assertEqual(data['checks'][0]['exit_code'], 0)
+        self.assertEqual(data['reports']['harness']['status'], 'passed')
+        self.assertEqual(data['runbook']['exercised_evidence_ids'], [EVIDENCE])
+
+    def test_record_without_an_exercise_does_not_claim_one(self):
+        self.write_report([self.passed_record()])
+        plan = self.plan()
+        plan['manual_checks'] = []
+        self.assertEqual(evidence.record_manifest(self.root, ITEM, EVIDENCE, plan), [])
+        self.assertTrue(any('was not exercised' in error for error in self.errors()))
+
+    def test_record_keeps_failures_and_unrun_checks_visible_to_validate(self):
+        self.write_report([self.passed_record(status='failed', exit_code=1), {'id': 'build', 'status': 'not_run'}], status='failed')
+        self.assertEqual(evidence.record_manifest(self.root, ITEM, EVIDENCE, self.plan()), [])
+        errors = self.errors()
+        self.assertTrue(any('harness.tests: failed' in error for error in errors), errors)
+        self.assertTrue(any('harness.build: was not_run' in error for error in errors), errors)
+
+    def test_record_refuses_a_stale_missing_or_unstable_report(self):
+        self.assertTrue(evidence.record_manifest(self.root, ITEM, EVIDENCE, self.plan()))
+        self.write_report([self.passed_record()], inputs_unchanged_during_check=False)
+        self.assertTrue(any('changed during' in p for p in evidence.record_manifest(self.root, ITEM, EVIDENCE, self.plan())))
+        self.write_report([self.passed_record()], template=True)
+        self.assertTrue(evidence.record_manifest(self.root, ITEM, EVIDENCE, self.plan()))
+        self.write_report([self.passed_record()])
+        (self.root / 'scripts/code.py').write_text('x = 2\n')
+        problems = evidence.record_manifest(self.root, ITEM, EVIDENCE, self.plan())
+        self.assertTrue(any('stale' in problem for problem in problems), problems)
+
+    def test_a_cited_report_is_rechecked_by_validate(self):
+        self.write_report([self.passed_record()])
+        self.assertEqual(evidence.record_manifest(self.root, ITEM, EVIDENCE, self.plan()), [])
+        self.assertEqual(self.errors(), [])
+        data = json.loads(self.manifest_path.read_text())
+        data['checks'][0]['verification_class'] = 'disposable'
+        self.write_manifest(data)
+        self.assertTrue(any('differs from the harness report' in error for error in self.errors()))
+        data['checks'][0]['verification_class'] = 'mock'
+        self.write_manifest(data)
+        self.write_report([self.passed_record(status='failed', exit_code=1)], status='failed')
+        self.assertTrue(any('differs from the harness report' in error for error in self.errors()))
+        self.write_report([self.passed_record()], status='failed')
+        self.assertTrue(any('report did not pass' in error for error in self.errors()), 'a manifest trimmed of a failing check')
+        (self.root / '.checks/harness/latest.json').unlink()
+        self.assertTrue(any('no valid verifier report' in error for error in self.errors()))
 
     def test_command_line_exit_codes(self):
         script = str(ROOT / 'scripts/evidence.py')

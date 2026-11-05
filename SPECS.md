@@ -83,14 +83,14 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-1.7 | H1 disposable database and Compose guards | DONE | EPIC-1 |
 | US-1.7#1 | Implement target-checked wrappers and isolated Compose fixtures. | DONE | US-1.7 |
 | US-1.7#2 | Run synthetic migration, seed, grant and Storage negative cases. | DONE | US-1.7 |
-| US-1.8 | H1 independent baseline review and exercised runbook | READY | EPIC-1 |
-| US-1.8#1 | Review and resolve baseline findings independently. | TODO | US-1.8 |
-| US-1.8#2 | Exercise the harness runbook and publish its versioned evidence. | TODO | US-1.8 |
+| US-1.8 | H1 independent baseline review and exercised runbook | DONE | EPIC-1 |
+| US-1.8#1 | Review and resolve baseline findings independently. | DONE | US-1.8 |
+| US-1.8#2 | Exercise the harness runbook and publish its versioned evidence. | DONE | US-1.8 |
 | EPIC-2 | Local application foundation | — | — |
-| US-2.1 | Pinned local Supabase service boundary | BLOCKED | EPIC-2 |
+| US-2.1 | Pinned local Supabase service boundary | READY | EPIC-2 |
 | US-2.1#1 | Prepare the pinned release/overlay and resolve image digests. | TODO | US-2.1 |
 | US-2.1#2 | Qualify ARM64, addresses, health and disabled extra AI/telemetry integrations. | TODO | US-2.1 |
-| US-2.2 | Public contracts and generated cross-language types | BLOCKED | EPIC-2 |
+| US-2.2 | Public contracts and generated cross-language types | READY | EPIC-2 |
 | US-2.2#1 | Define public DTOs and adapters for the initial slice. | TODO | US-2.2 |
 | US-2.2#2 | Generate clients and shared validation/compatibility fixtures. | TODO | US-2.2 |
 | US-2.3 | Local identity, workspace grants and private schema isolation | BLOCKED | EPIC-2 |
@@ -1050,7 +1050,8 @@ Open Questions:
 
 ### US-1.8: H1 independent baseline review and exercised runbook
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-1-8-h1-independent-baseline-review/`
 
 As an operator
 I want a reviewed portable baseline with reproducible evidence
@@ -1086,8 +1087,8 @@ Dependencies:
 - US-1.7
 
 Tasks:
-- [ ] Review and resolve baseline findings independently.
-- [ ] Exercise the harness runbook and publish its versioned evidence.
+- [x] Review and resolve baseline findings independently.
+- [x] Exercise the harness runbook and publish its versioned evidence.
 
 Open Questions:
 - None.
@@ -1098,7 +1099,7 @@ Phase reference: B0, preserved SP-020. All story completion also requires SP-003
 
 ### US-2.1: Pinned local Supabase service boundary
 
-Status: BLOCKED
+Status: READY
 
 As an operator
 I want a project-scoped local Supabase stack
@@ -1136,7 +1137,7 @@ Open Questions:
 
 ### US-2.2: Public contracts and generated cross-language types
 
-Status: BLOCKED
+Status: READY
 
 As a developer
 I want one typed public API contract

@@ -1,11 +1,11 @@
 """Local harness primitives; no package installation or model calls.
 
-External programs: `adapter_status` runs only `claude --version`, whose own network use is not
-known here, and `changed_paths` runs only read-only `git` queries.
+`adapter_status` is the only part that runs an external program, and it runs only
+`claude --version`. Whether that command itself reaches the network is not known here.
 """
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 import hashlib
 import json
 import os
@@ -44,14 +44,19 @@ APP_INPUT_DIRECTORIES = ('apps', 'services', 'packages', 'contracts', 'infra', '
 NON_INPUT_DIRECTORIES = frozenset({'__pycache__', '.venv', 'node_modules', '.next', '.pytest_cache',
                                    '.ruff_cache', '.mypy_cache'})
 # A change here can affect every check, so `fast` conservatively runs both application domains.
-SHARED_CHECK_FILES = frozenset({*APP_INPUT_FILES, 'scripts/toolchain.py', 'scripts/verify.py',
-                                'scripts/harness_lib.py', 'scripts/qualify_faults.py'})
+SHARED_CHECK_FILES = frozenset({*APP_INPUT_FILES, 'scripts/toolchain.py', 'scripts/qualify_faults.py'})
 SHARED_CHECK_PREFIXES = ('contracts/', 'tests/toolchain/', 'tests/faults/')
+RUNNER_FILES = frozenset({'scripts/verify.py', 'scripts/harness_lib.py'})
+DB_CHECK_FILES = frozenset({'scripts/disposable_db.py'})
+DB_CHECK_PREFIXES = ('infra/', 'tests/db/')
 HARNESS_CHECKS = frozenset({'project_configuration', 'backlog_validation', 'harness_behavior_tests'})
-FULL_ONLY_CHECKS = frozenset({'build', 'fault_qualification'})
+APPLICATION_PROFILES = ('fast', 'full')
+PYTHON_STEPS = frozenset({'python_lock', 'python_env', 'ruff_check', 'ruff_format', 'mypy', 'pytest'})
+WEB_STEPS = frozenset({'node_lock', 'node_version', 'lint', 'format_check', 'typegen', 'typecheck'})
+FULL_ONLY_CHECKS = frozenset({'build', 'fault_qualification', 'toolchain_scope_tests'})
+FULL_CHECKS = PYTHON_STEPS | WEB_STEPS | FULL_ONLY_CHECKS
 # Recorded by the verifier itself, so they have no command exit code.
 UNCOMMANDED_CHECKS = frozenset({'project_configuration', 'non_mutation_guard'})
-GIT_TIMEOUT_SECONDS = 2.0
 
 FENCE = re.compile(r'^ {0,3}(`{3,}|~{3,})(.*)$')
 INLINE_CODE = re.compile(r'(`+)(?!`)(.+?)(?<!`)\1(?!`)')
@@ -71,7 +76,9 @@ def input_files(base: Path) -> Iterator[Path]:
     """Files under `base`, without descending into environments, caches or build output."""
     for directory, children, files in os.walk(base):
         children[:] = [name for name in children if name not in NON_INPUT_DIRECTORIES]
-        yield from (Path(directory) / name for name in files)
+        # os.walk lists a link to a directory among the directories, and never enters it.
+        links = [name for name in children if os.path.islink(Path(directory) / name)]
+        yield from (Path(directory) / name for name in (*files, *links))
 
 
 def input_manifest(root: Path) -> dict[str, str]:
@@ -94,19 +101,26 @@ def input_manifest(root: Path) -> dict[str, str]:
     manifest = {}
     for path in sorted(paths):
         relative = path.relative_to(root)
-        if (not path.is_file() or path.is_symlink()
-                or NON_INPUT_DIRECTORIES.intersection(relative.parts)
-                or path.name == 'next-env.d.ts'
-                or relative.as_posix().startswith('docs/engineering/evidence/')
-                # OhMyOrch session state: rewritten on every delivery refresh and ignored by Git.
-                or relative.as_posix().startswith(('.claude/ohmyorch/runtime/', '.claude/ohmyorch/backups/'))
-                or path.name == 'approvals.local.json'
-                or path.name == 'settings.local.json'
-                or path.name.startswith('.env')
-                or path.suffix in {'.pyc', '.log', '.tsbuildinfo'}):
-            continue
-        manifest[relative.as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+        if not is_non_input(relative, path):
+            # A link is an input too, by its target's name and never by what it points at.
+            if path.is_symlink():
+                manifest[relative.as_posix()] = 'symlink:' + hashlib.sha256(os.readlink(path).encode()).hexdigest()
+            elif path.is_file():
+                manifest[relative.as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
     return manifest
+
+
+def is_non_input(relative: Path, path: Path) -> bool:
+    text = relative.as_posix()
+    # Evidence is excluded so a report does not fingerprint itself. The fixture is read by tests.
+    evidence = text.startswith('docs/engineering/evidence/') and 'forward-fixture' not in relative.parts
+    secret = (path.name.startswith('.env') and not path.name.endswith('.example')) or path.name == 'provider-master.key'
+    return (evidence or secret
+            or bool(NON_INPUT_DIRECTORIES.intersection(relative.parts))
+            or path.name in {'next-env.d.ts', 'approvals.local.json', 'settings.local.json'}
+            # OhMyOrch session state: rewritten on every delivery refresh and ignored by Git.
+            or text.startswith(('.claude/ohmyorch/runtime/', '.claude/ohmyorch/backups/'))
+            or path.suffix in {'.pyc', '.log', '.tsbuildinfo'})
 
 
 def fingerprint(root: Path) -> str:
@@ -120,26 +134,46 @@ def check_domains(relative: str) -> set[str]:
         return {'python'}
     if relative.startswith(('apps/web/', 'packages/')):
         return {'web'}
+    if relative in RUNNER_FILES:
+        return {'python', 'web', 'db'}
     if relative in SHARED_CHECK_FILES or relative.startswith(SHARED_CHECK_PREFIXES):
         return {'python', 'web'}
+    if relative in DB_CHECK_FILES or relative.startswith(DB_CHECK_PREFIXES):
+        return {'db'}
     return {'harness'}
 
 
-def changed_paths(root: Path) -> list[str] | None:
-    """Tracked changes and untracked non-ignored files, or None when Git cannot say."""
-    paths: set[str] = set()
-    for arguments in (('diff', '--no-renames', '--name-only', 'HEAD'),
-                      ('ls-files', '--others', '--exclude-standard')):
-        try:
-            result = subprocess.run(['git', '-C', str(root), *arguments, '-z'], env=reduced_env(),
-                                    stdin=subprocess.DEVNULL, capture_output=True,
-                                    timeout=GIT_TIMEOUT_SECONDS, check=False)
-        except (OSError, subprocess.TimeoutExpired):
-            return None
-        if result.returncode:
-            return None
-        paths.update(item for item in result.stdout.decode(errors='replace').split('\0') if item)
-    return sorted(paths)
+def read_report(root: Path, profile: str) -> dict | None:
+    try:
+        data = json.loads((root / '.checks' / profile / 'latest.json').read_text())
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def passing_manifest(root: Path, profiles: Iterable[str]) -> dict[str, str] | None:
+    """The input manifest of the newest passing report among these profiles, or None."""
+    reports = [report for profile in profiles if (report := read_report(root, profile)) is not None
+               and report.get('profile') == profile and report.get('status') == 'passed'
+               and report.get('template') is False and report.get('inputs_unchanged_during_check') is True
+               and isinstance(report.get('input_manifest'), dict)]
+    return max(reports, key=lambda report: str(report.get('completed_at_utc', '')))['input_manifest'] if reports else None
+
+
+def scope_paths(root: Path, profiles: Iterable[str] = APPLICATION_PROFILES) -> list[str] | None:
+    """Inputs that differ from the last passing report, or None when none exists. A clean Git tree proves nothing."""
+    base = passing_manifest(root, profiles)
+    if base is None:
+        return None
+    current = input_manifest(root)
+    return sorted(path for path in current.keys() | base.keys() if current.get(path) != base.get(path))
+
+
+def needs_profile(root: Path, profiles: Iterable[str], domains: set[str]) -> bool:
+    """Whether these domains hold inputs no passing report of these profiles has seen."""
+    changed = scope_paths(root, profiles)
+    paths = input_manifest(root) if changed is None else changed
+    return any(check_domains(path) & domains for path in paths)
 
 
 def report_state(root: Path, profile: str = 'harness') -> tuple[bool, str]:
@@ -163,9 +197,9 @@ def report_state(root: Path, profile: str = 'harness') -> tuple[bool, str]:
     # Only `fast` may leave steps out, and each one stays visible as `not_run`.
     allowed = {'passed', 'not_run'} if profile == 'fast' else {'passed'}
     required = set(HARNESS_CHECKS) if profile == 'harness' else {*HARNESS_CHECKS, 'non_mutation_guard'}
+    required |= {'full': FULL_CHECKS, 'db': {'disposable_qualification'}}.get(profile, frozenset())
     complete = ids == required if profile == 'harness' else required <= ids
-    if (not complete or (profile == 'full' and not FULL_ONLY_CHECKS <= ids)
-            or (profile == 'db' and 'disposable_qualification' not in ids)):
+    if not complete:
         return False, 'The report lacks the required successful checks.'
     if (any(check.get('status') not in allowed for check in checks)
             or any(check.get('status') != 'passed' for check in checks if check.get('id') in required)):
@@ -177,6 +211,8 @@ def report_state(root: Path, profile: str = 'harness') -> tuple[bool, str]:
         if check.get('id') == 'harness_behavior_tests' and (
                 type(check.get('tests_executed')) is not int or check['tests_executed'] < 1):
             return False, 'An empty or missing behavioral suite cannot pass.'
+        if check.get('tests_skipped'):
+            return False, 'A skipped test is not a passing test.'
     if (data.get('input_fingerprint') != fingerprint(root)
             or data.get('input_manifest') != input_manifest(root)):
         return False, f'Source/configuration inputs changed after the last {profile} check.'
@@ -184,17 +220,17 @@ def report_state(root: Path, profile: str = 'harness') -> tuple[bool, str]:
 
 
 def evidence_state(root: Path) -> tuple[bool, str]:
-    """Whether a current report covers the changed scope. An unknown scope counts as application code."""
-    changed = changed_paths(root)
-    application = changed is None or any(check_domains(path) - {'harness'} for path in changed)
-    profiles = ('fast', 'full') if application else ('harness', 'fast', 'full')
-    states = [report_state(root, profile) for profile in profiles]
-    current = next((state for state in states if state[0]), None)
-    if current:
-        return current
-    if application:
-        return False, 'Application or shared inputs changed, and no current fast or full report exists.'
-    return states[0]
+    """Whether current reports cover what changed since each profile last passed."""
+    groups = []
+    if needs_profile(root, APPLICATION_PROFILES, {'python', 'web'}):
+        groups.append(APPLICATION_PROFILES)
+    if needs_profile(root, ('db',), {'db'}):
+        groups.append(('db',))
+    for group in groups or [('harness', *APPLICATION_PROFILES, 'db')]:
+        states = [report_state(root, profile) for profile in group]
+        if not any(state[0] for state in states):
+            return False, f"Inputs changed since the last passing {' or '.join(group)} report, and none is current."
+    return True, 'Current reports cover the changed scope; live gates remain separate.'
 
 
 def config_errors(root: Path) -> list[str]:

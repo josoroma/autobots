@@ -26,16 +26,16 @@ markers are preserved across refreshes.
 | 5 | US-1.5 | us-1-5-h0-work-records-independent | DONE | H0 work records, independent review and evidence templates |
 | 6 | US-1.6 | us-1-6-h1-deliberate-fault-freshness | DONE | H1 deliberate fault and freshness qualification |
 | 7 | US-1.7 | us-1-7-h1-disposable-database-compose | DONE | H1 disposable database and Compose guards |
-| 8 | US-1.8 | us-1-8-h1-independent-baseline-review | READY | H1 independent baseline review and exercised runbook |
+| 8 | US-1.8 | us-1-8-h1-independent-baseline-review | IN PROGRESS | H1 independent baseline review and exercised runbook |
 
 ## Next Action
 
-Action: select
+Action: implement
 Story: US-1.8
 Change: us-1-8-h1-independent-baseline-review
 Owner: main-session
-Command: openspec new change us-1-8-h1-independent-baseline-review; set US-1.8 to IN PROGRESS with a Change: line
-Reason: US-1.8 is READY and has no OpenSpec change
+Command: /ohmyorch:opsx-apply us-1-8-h1-independent-baseline-review
+Reason: gate implementation: 3/6 tasks complete
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

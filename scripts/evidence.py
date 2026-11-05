@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Validate work-item completion evidence against DH-W01-06. Runs no check and calls no model.
 
+`record` copies a manifest's checks from verifier reports, refusing one that is stale for the current
+source inputs or whose inputs changed during its run. It records and does not judge: `validate`
+still decides, and re-checks each cited report and manual artifact, so a result citing no run cannot pass.
+
 Exit codes: 0 valid, 1 not complete, with every reason listed, 2 unusable request.
 A valid record shows that its evidence is internally consistent and current. It does not show that
 a recorded assertion was correct, so review and meaningful tests remain necessary.
@@ -13,11 +17,13 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import subprocess
 import sys
 
-from harness_lib import input_manifest, project_root
+from harness_lib import input_manifest, project_root, read_report
 
 SCHEMA = 'autobots.work-evidence/v1'
+REPORT_SCHEMA = 'autobots.harness-result/v1'
 CLASSES = {'static', 'mock', 'disposable', 'local_runtime', 'live'}
 TRANSPORTS = {'none', 'mock', 'openrouter_live'}
 STATUSES = {'passed', 'failed', 'error', 'skipped', 'not_run'}
@@ -42,10 +48,14 @@ def digest(items: Mapping[str, str]) -> str:
     return hashlib.sha256(json.dumps(items, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
 
+def source_inputs(manifest: Mapping[str, str]) -> dict[str, str]:
+    return {path: value for path, value in manifest.items()
+            if path not in RECORD_FILES and not path.startswith(RECORD_PREFIXES)}
+
+
 def fingerprints(root: Path) -> dict:
     manifest = input_manifest(root)
-    source = {path: value for path, value in manifest.items()
-              if path not in RECORD_FILES and not path.startswith(RECORD_PREFIXES)}
+    source = source_inputs(manifest)
     def chosen(*prefixes: str, names: frozenset[str] | set[str] = frozenset()) -> dict[str, str]:
         return {path: value for path, value in source.items() if path.startswith(prefixes) or path in names}
     return {'source_manifest_sha256': digest(source),
@@ -141,7 +151,7 @@ def relative_inside(root: Path, value: object, base: str) -> Path | None:
     return path if path.is_relative_to((root / base).resolve()) else None
 
 
-def runbook_errors(root: Path, runbook: object, evidence_id: object) -> list[str]:
+def runbook_errors(root: Path, runbook: object, evidence_id: object, checks: Sequence) -> list[str]:
     if not isinstance(runbook, dict):
         return ['runbook: missing.']
     path = relative_inside(root, runbook.get('path'), 'docs/engineering/runbooks')
@@ -156,6 +166,9 @@ def runbook_errors(root: Path, runbook: object, evidence_id: object) -> list[str
     exercised = runbook.get('exercised_evidence_ids')
     if not isinstance(exercised, list) or evidence_id not in exercised:
         errors.append('runbook: was not exercised by this evidence.')
+    elif not any(isinstance(check, dict) and check.get('exercises_runbook') is True and check.get('status') == 'passed'
+                 and check.get('artifacts') for check in checks):
+        errors.append('runbook: no passing check with a retained artifact records its exercise.')
     return errors
 
 
@@ -185,6 +198,58 @@ def raw_errors(root: Path, raw: object, checks: Sequence, work_item: str, eviden
                 errors.append(f'raw_artifacts: {name} is recorded available and is missing.')
             elif hashlib.sha256(path.read_bytes()).hexdigest() != artifact['sha256']:
                 errors.append(f'raw_artifacts: {name} does not match its recorded hash.')
+    return errors
+
+
+def report_problem(root: Path, report: object, profile: str) -> str | None:
+    """Why a verifier report cannot back evidence. A failed report may, since its failures stay visible."""
+    if not isinstance(report, dict) or report.get('schema_version') != REPORT_SCHEMA or report.get('template') is not False:
+        return f'{profile}: no valid verifier report.'
+    if report.get('profile') != profile or report.get('status') not in {'passed', 'failed', 'error'}:
+        return f'{profile}: the report names another profile or no result.'
+    if report.get('inputs_unchanged_during_check') is not True:
+        return f'{profile}: inputs changed during that run, so its checks saw something else.'
+    manifest = report.get('input_manifest')
+    if not isinstance(manifest, dict) or digest(source_inputs(manifest)) != fingerprints(root)['source_manifest_sha256']:
+        return f'{profile}: the report is stale for the current source inputs.'
+    return None
+
+
+def provenance_errors(root: Path, checks: Sequence, availability: object = None) -> list[str]:
+    """Each check must trace to a run: a matching passing report, or a labeled manual run with a verified artifact."""
+    errors = []
+    for check in checks:
+        if not isinstance(check, dict):
+            continue
+        label = f"check {check.get('id', '(unnamed)')}"
+        source = check.get('source')
+        kind = source.get('kind') if isinstance(source, dict) else None
+        if kind == 'manual':
+            if not check.get('artifacts'):
+                errors.append(f'{label}: a manual check retains no artifact of its run.')
+            elif availability != 'available':
+                errors.append(f'{label}: a manual check needs its artifacts available, so their hashes can be checked.')
+            if check.get('verification_class') == 'live':
+                errors.append(f'{label}: no live run record exists, so a manual check cannot claim one.')
+        elif kind == 'report':
+            profile = str(source.get('profile'))
+            report = read_report(root, profile)
+            problem = report_problem(root, report, profile)
+            if problem:
+                errors.append(f'{label}: {problem}')
+                continue
+            if report.get('status') != 'passed':
+                errors.append(f'{label}: the {profile} report did not pass.')
+            found = next((item for item in report.get('checks', []) if isinstance(item, dict)
+                          and item.get('id') == source.get('check')), None)
+            if found is None:
+                errors.append(f'{label}: is not in the {profile} report.')
+            elif (found.get('status') != check.get('status') or found.get('class') != check.get('verification_class')
+                  or found.get('model_transport') != check.get('model_transport')
+                  or (('exit_code' in found) and found.get('exit_code') != check.get('exit_code'))):
+                errors.append(f'{label}: differs from the {profile} report that it cites.')
+        else:
+            errors.append(f'{label}: names no run; a hand-written result is not evidence.')
     return errors
 
 
@@ -224,7 +289,9 @@ def manifest_errors(root: Path, work_item: str, evidence_id: str, manifest: obje
         if requirement not in covered:
             errors.append(f'coverage: no passing check covers {requirement}.')
     errors.extend(review_errors(manifest.get('review'), current['source_manifest_sha256']))
-    errors.extend(runbook_errors(root, manifest.get('runbook'), evidence_id))
+    errors.extend(runbook_errors(root, manifest.get('runbook'), evidence_id, checks))
+    raw = manifest.get('raw_artifacts')
+    errors.extend(provenance_errors(root, checks, raw.get('availability') if isinstance(raw, dict) else None))
     errors.extend(raw_errors(root, manifest.get('raw_artifacts'), checks, work_item, evidence_id))
     return errors
 
@@ -280,6 +347,73 @@ def completion_errors(root: Path, work_item: str) -> list[str]:
     return errors
 
 
+def report_check(profile: str, check: Mapping, report: Mapping, plan: Mapping) -> dict:
+    """One manifest check, copied from a captured verifier record. Class and transport come from the verifier."""
+    name = f"{profile}.{check['id']}"
+    status = check['status']
+    executed = status not in {'skipped', 'not_run'}
+    code = check.get('exit_code', 0 if status == 'passed' else 1) if executed else None
+    observed = None
+    if executed:
+        observed = f'status {status}, exit {code}'
+        if check.get('tests_executed') is not None:
+            observed += f", {check['tests_executed']} tests executed, {check.get('tests_skipped', 0)} skipped"
+    return {'id': name, 'source': {'kind': 'report', 'profile': profile, 'check': check['id']},
+            'requirement_ids': plan['requirements'].get(name, plan['default_requirements']),
+            'verification_class': check.get('class'), 'model_transport': check.get('model_transport'),
+            'command_argv': ([str(item) for item in check.get('command_argv') or check.get('argv') or []]
+                             or ['scripts/verify.py', '--profile', profile]) if executed else [],
+            'cwd': check.get('cwd', '.'),
+            'target_ref': plan.get('target', {}).get(name, f'{profile} profile, this repository'),
+            'expected': plan.get('expected', {}).get(name, 'the check passes'),
+            'observed': observed, 'status': status,
+            'started_at_utc': check.get('started_at_utc', report.get('completed_at_utc')) if executed else None,
+            'finished_at_utc': check.get('finished_at_utc', report.get('completed_at_utc')) if executed else None,
+            'exit_code': code, 'artifacts': []}
+
+
+def tool_versions(root: Path) -> dict:
+    """What actually runs, from the toolchain script. Absent when it cannot say, not hand-supplied."""
+    result = subprocess.run([sys.executable, str(Path(__file__).with_name('toolchain.py')), 'versions', '--project-root', str(root)],
+                            capture_output=True, text=True, timeout=60, check=False)
+    try:
+        return json.loads(result.stdout)['runtime'] if result.returncode == 0 else {}
+    except (ValueError, KeyError):
+        return {}
+
+
+def record_manifest(root: Path, work_item: str, evidence_id: str, plan: Mapping) -> list[str]:
+    """Write a manifest from verifier reports, or return why not. It records; `validate` still judges it."""
+    current = fingerprints(root)
+    checks, reports, python_version = [], {}, None
+    for profile in plan['profiles']:
+        report = read_report(root, profile)
+        problem = report_problem(root, report, profile)
+        if problem:
+            return [problem]
+        python_version = report.get('python_version')
+        reports[profile] = {key: report.get(key) for key in ('status', 'input_fingerprint', 'completed_at_utc',
+                                                             'assistant_adapter', 'not_tested', 'scope')}
+        checks.extend(report_check(profile, check, report, plan) for check in report.get('checks', []))
+    manual = [{**check, 'source': {'kind': 'manual'}} for check in plan.get('manual_checks', [])]
+    runbook = root / plan['runbook']
+    exercised = any(check.get('exercises_runbook') is True and check.get('status') == 'passed' for check in manual)
+    has_artifacts = any(check.get('artifacts') for check in manual)
+    manifest = {'schema_version': SCHEMA, 'template': False, 'work_item_id': work_item, 'evidence_id': evidence_id,
+                'requirement_ids': plan['requirement_ids'], 'fingerprint': current,
+                'tool_versions': {'report_python': python_version, **tool_versions(root)}, 'reports': reports,
+                'checks': [*checks, *manual], 'review': dict(plan['review']),
+                'runbook': {'path': plan['runbook'], 'exercised_evidence_ids': [evidence_id] if exercised else [],
+                            'revision_sha256': hashlib.sha256(runbook.read_bytes()).hexdigest()},
+                'raw_artifacts': {'local_root': f'.checks/{work_item}/{evidence_id}/',
+                                  'availability': 'available' if has_artifacts else 'not_created',
+                                  'retention': plan['retention']}}
+    path = root / 'docs/engineering/evidence' / work_item / f'{evidence_id}.json'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(manifest, indent=2) + '\n')
+    return []
+
+
 def mark_complete(root: Path, work_item: str) -> bool:
     record = root / 'docs/engineering/work-items' / f'{work_item}.md'
     content = record.read_text()
@@ -292,8 +426,10 @@ def mark_complete(root: Path, work_item: str) -> bool:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('verb', choices=('fingerprints', 'validate', 'complete'))
+    parser.add_argument('verb', choices=('fingerprints', 'validate', 'complete', 'record'))
     parser.add_argument('work_item', nargs='?')
+    parser.add_argument('--evidence-id')
+    parser.add_argument('--plan', type=Path, help='for record: JSON naming profiles, requirements, review and runbook')
     parser.add_argument('--project-root', type=Path, default=project_root())
     args = parser.parse_args(argv)
     root = args.project_root.resolve()
@@ -303,6 +439,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.work_item is None or not WORK_ITEM_ID.fullmatch(args.work_item):
         print('ERROR: a work item id is required, such as US-1.8.', file=sys.stderr)
         return 2
+    if args.verb == 'record':
+        if not args.evidence_id or not WORK_ITEM_ID.fullmatch(args.evidence_id) or args.plan is None:
+            print('ERROR: record needs --evidence-id and --plan.', file=sys.stderr)
+            return 2
+        problems = record_manifest(root, args.work_item, args.evidence_id, json.loads(args.plan.read_text()))
+        for problem in problems:
+            print(f'FAIL: {problem}')
+        return 1 if problems else 0
     errors = completion_errors(root, args.work_item)
     if errors:
         for error in errors:

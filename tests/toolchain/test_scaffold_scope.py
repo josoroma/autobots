@@ -39,6 +39,8 @@ ALLOWED_PATHS = {
     'services/agent/uv.lock',
 }
 FORBIDDEN_ROOTS = ('supabase', 'infra')
+# US-1.7's disposable fixtures. Product infrastructure stays out until its own story.
+ALLOWED_UNDER_FORBIDDEN = ('infra/disposable/',)
 # Importable names of the selected packages. The scaffold's source uses none of them yet.
 PRODUCT_IMPORTS = {'deepagents', 'langgraph', 'langchain', 'langchain_core', 'langchain_openrouter',
                    'langchain_mcp_adapters', 'openrouter', 'psycopg'}
@@ -53,7 +55,8 @@ def path_errors(paths: set[str]) -> list[str]:
     scaffold = {path for path in paths if path.startswith(SCAFFOLD_ROOTS)}
     errors = [f'unexpected scaffold path: {path}' for path in sorted(scaffold - ALLOWED_PATHS)]
     errors += [f'missing scaffold path: {path}' for path in sorted(ALLOWED_PATHS - scaffold)]
-    errors += [f'forbidden path: {path}' for path in sorted(paths) if path.split('/', 1)[0] in FORBIDDEN_ROOTS]
+    errors += [f'forbidden path: {path}' for path in sorted(paths)
+               if path.split('/', 1)[0] in FORBIDDEN_ROOTS and not path.startswith(ALLOWED_UNDER_FORBIDDEN)]
     return errors
 
 
@@ -109,7 +112,9 @@ class ScaffoldPaths(unittest.TestCase):
 
     def test_forbidden_roots_do_not_exist(self) -> None:
         for root in FORBIDDEN_ROOTS:
-            self.assertFalse((REPO_ROOT / root).exists(), root)
+            present = [path for path in git_paths(REPO_ROOT, 'ls-files', '-co', '--exclude-standard')
+                       if path.startswith(f'{root}/') and not path.startswith(ALLOWED_UNDER_FORBIDDEN)]
+            self.assertEqual(present, [], root)
 
     def test_placeholders_hold_no_generated_artifact(self) -> None:
         for directory, owner in (('packages/api-client', 'US-2.2'), ('packages/db-types', 'US-2.4'),

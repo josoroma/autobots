@@ -42,6 +42,7 @@ class FaultSet(unittest.TestCase):
         bad = qualify_faults.Case('b', 'state', 'MARKER', ())
         cases = [(good, {'exit_code': 0, 'status': 'passed', 'output': ''}, None),
                  (good, {'exit_code': 1, 'status': 'failed', 'output': ''}, 'a good fixture failed'),
+                 (good, {'exit_code': 0, 'status': 'passed', 'output': '1 skipped in 0.1s'}, 'skipped its test'),
                  (bad, {'exit_code': 1, 'status': 'failed', 'output': 'x MARKER'}, None),
                  (bad, {'exit_code': 0, 'status': 'passed', 'output': 'MARKER'}, 'a bad fixture passed'),
                  (bad, {'exit_code': 1, 'status': 'failed', 'output': 'crash'}, 'without the expected marker'),

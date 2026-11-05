@@ -29,13 +29,14 @@ import time
 from urllib import error as urlerror, request as urlrequest
 from urllib.parse import urlsplit
 
-from harness_lib import project_root, reduced_env
+from harness_lib import fingerprint, project_root, reduced_env
 
 PROJECT_PREFIX = 'autobots-disposable-'
 PROJECT = re.compile(r'autobots-disposable-[a-z0-9]{1,24}')
 PORT_RANGE = range(55400, 56000)
 # The proposed persistent gateway and direct database ports, LM-04, and this machine's CLI defaults.
 RESERVED_PORTS = frozenset({54321, 54322, 54323, 5432})
+LOOPBACK_HOSTS = frozenset({'127.0.0.1', 'localhost'})
 TARGET_LABEL = 'autobots.target'
 RUN_LABEL = 'autobots.run'
 COMPOSE = Path('infra/disposable/compose.yaml')
@@ -145,10 +146,11 @@ def environment_refusal(name: str, value: str) -> list[str]:
     if name in {'PGHOST', 'PGDATABASE'}:
         return [f'{name} is set, so this environment may name another target']
     try:
-        port = urlsplit(value).port
+        parts = urlsplit(value)
+        port, host = parts.port, parts.hostname
     except ValueError:
-        port = None
-    return [f'{name} points outside the disposable range'] if port not in PORT_RANGE else []
+        port, host = None, None
+    return [f'{name} points outside the disposable range'] if port not in PORT_RANGE or host not in LOOPBACK_HOSTS else []
 
 
 def require_identity(target: Target, env: Mapping[str, str]) -> None:
@@ -165,6 +167,8 @@ def rendered_refusals(rendered: Mapping, project: str) -> list[str]:
     for name, service in (rendered.get('services') or {}).items():
         if service.get('pull_policy') != 'never' or '@sha256:' not in str(service.get('image')):
             reasons.append(f'service {name} is not a digest-pinned local image')
+        if service.get('network_mode') or service.get('privileged') or service.get('pid'):
+            reasons.append(f'service {name} leaves the isolated project network')
         labels = service.get('labels') or {}
         if labels.get(TARGET_LABEL) != 'disposable' or labels.get(RUN_LABEL) != project:
             reasons.append(f'service {name} lacks the disposable labels')
@@ -304,13 +308,24 @@ def http(method: str, url: str, token: str | None, body: bytes | None = None,
 
 
 def other_resources(project: str) -> list[str]:
-    """Everything Docker runs that is not this project, with start times, to show it was not touched."""
-    result = run(['docker', 'ps', '-a', '--format', '{{.ID}} {{.Names}} {{.Status}} {{.Label "com.docker.compose.project"}}'], tool_env())
-    volumes = run(['docker', 'volume', 'ls', '--format', '{{.Name}} {{.Label "com.docker.compose.project"}}'], tool_env())
-    if result.returncode or volumes.returncode:
+    """Containers outside this project with their start and finish times, and its volumes by name.
+
+    A restart or a stop changes a container's line. Their data is not compared.
+    """
+    env = tool_env()
+    ids = run(['docker', 'ps', '-aq'], env)
+    volumes = run(['docker', 'volume', 'ls', '--format', '{{.Name}}'], env)
+    if ids.returncode or volumes.returncode:
         raise Unavailable('docker is not reachable')
-    kept = [re.sub(r'\b(?:Up|Exited).*?(?= \S*$)', '', line) for line in result.stdout.splitlines()]
-    return sorted([line for line in kept if project not in line] + [line for line in volumes.stdout.splitlines() if project not in line])
+    containers = ''
+    if ids.stdout.split():
+        inspected = run(['docker', 'inspect', '--format',
+                         '{{.Id}} {{.Name}} {{.State.StartedAt}} {{.State.FinishedAt}} {{index .Config.Labels "com.docker.compose.project"}}',
+                         *ids.stdout.split()], env)
+        if inspected.returncode:
+            raise Unavailable('docker could not inspect the containers')
+        containers = inspected.stdout
+    return sorted(line for line in (*containers.splitlines(), *volumes.stdout.splitlines()) if project not in line)
 
 
 class Cases:
@@ -338,7 +353,10 @@ def last_line(result: subprocess.CompletedProcess[str]) -> str:
 
 
 FINGERPRINT_QUERY = ("select md5(string_agg(t::text, ',' order by t::text)) from ("
-                     'select * from app.notes) t;')
+                     "select 'workspaces' as source, to_jsonb(w) as row from app.workspaces w "
+                     "union all select 'members', to_jsonb(m) from app.workspace_members m "
+                     "union all select 'notes', to_jsonb(n) from app.notes n "
+                     "union all select 'credentials', to_jsonb(c) from app_private.credentials c) t;")
 
 
 def identity_cases(cases: Cases) -> None:
@@ -362,10 +380,11 @@ def migration_cases(stack: Stack, cases: Cases, root: Path) -> None:
     cases.check('repeated apply', '0 applied, schema unchanged', f'{applied} applied, {schema} columns',
                 applied == 0 and error is None
                 and schema == rows(stack, "select count(*) from information_schema.columns where table_schema in ('app', 'app_private');"))
-    bad = apply_sql_file(stack, root / FIXTURES / 'bad_migration.sql')
-    remains = rows(stack, "select count(*) from information_schema.tables where table_name = 'partial_migration';")
-    cases.check('a failing migration rolls back', 'error, nothing remains', f'exit {bad.returncode}, {remains} table(s) remain',
-                bad.returncode != 0 and remains == '0')
+    bad_applied, bad_error = apply_migrations(stack, root / FIXTURES / 'bad_migrations')
+    remains = rows(stack, "select (select count(*) from information_schema.tables where table_name = 'partial_migration') "
+                          "+ (select count(*) from autobots_disposable.migrations where name like '0099%');")
+    cases.check('a failing migration rolls back', 'error, no table and no history row', f'{bad_applied} applied, {bad_error}, {remains} remain',
+                bad_applied == 0 and bool(bad_error) and remains == '0')
     stack.sql("update autobots_disposable.migrations set sha256 = 'edited' where name = '0001_workspaces.sql';")
     _, error = apply_migrations(stack, migrations)
     cases.check('an edited applied migration is refused', 'refused by checksum', str(error), bool(error and 'never edit' in error))
@@ -388,7 +407,7 @@ def seed_cases(stack: Stack, cases: Cases, root: Path) -> None:
     second = apply_sql_file(stack, seed)
     after = rows(stack, FINGERPRINT_QUERY)
     cases.check('a second seed run changes nothing', 'same rows', f'{before} then {after}',
-                first.returncode == 0 and second.returncode == 0 and before == after and bool(before))
+                first.returncode == 0 and second.returncode == 0 and before == after and len(before) == 32)
     stack.sql(f"update app.notes set body = 'edited by a user' where id = '{NOTE_A}';")
     apply_sql_file(stack, seed)
     edited = rows(stack, f"select body from app.notes where id = '{NOTE_A}';")
@@ -457,13 +476,59 @@ def storage_cases(stack: Stack, cases: Cases, root: Path) -> None:
     cases.check('a member can read its object', 'status 200 and the bytes', f'{status} {body[:20]}', status == 200 and body == 'fixture bytes')
     for label, token in (('anonymous', anon), ('another workspace', user_b), ('no token', None)):
         status, body = http('GET', read, token)
-        cases.check(f'{label} cannot read the object', 'denied', f'{status}', status >= 400 and 'fixture bytes' not in body)
+        cases.check(f'{label} cannot read the object', 'a 4xx refusal', f'{status}', denied_status(status) and 'fixture bytes' not in body)
     status, _ = http('POST', f'{base}/object/workspace-files/{WORKSPACE_A}/other.txt', user_b, b'x')
-    cases.check('another workspace cannot upload', 'denied', f'{status}', status >= 400)
+    cases.check('another workspace cannot upload', 'a 4xx refusal', f'{status}', denied_status(status))
     status, _ = http('POST', f'{base}/object/workspace-files/{WORKSPACE_A}/anon.txt', anon, b'x')
-    cases.check('anonymous cannot upload', 'denied', f'{status}', status >= 400)
+    cases.check('anonymous cannot upload', 'a 4xx refusal', f'{status}', denied_status(status))
     status, body = http('GET', f'{base}/object/public/{path}', None)
-    cases.check('a private bucket has no public read', 'denied', f'{status}', status >= 400 and 'fixture bytes' not in body)
+    cases.check('a private bucket has no public read', 'a 4xx refusal', f'{status}', denied_status(status) and 'fixture bytes' not in body)
+
+
+def denied_status(status: int) -> bool:
+    """A refusal, not a server error, which would prove nothing about authorization."""
+    return 400 <= status < 500
+
+
+def worker_cases(stack: Stack, cases: Cases, root: Path) -> None:
+    """DH-A09 on a stub: a crash, a duplicate delivery and an expired lease, in database time."""
+    created = apply_sql_file(stack, root / FIXTURES / 'worker_fixture.sql')
+    cases.check('stub worker fixture applies', 'exit 0', f'exit {created.returncode}', created.returncode == 0)
+    if created.returncode:
+        return
+    def call(statement: str) -> str:
+        return rows(stack, f'select worker_fixture.{statement};')
+    first = call("claim('worker-a', interval '1 second')")
+    second = call("claim('worker-b', interval '1 second')")
+    cases.check('a held lease cannot be claimed again', 'generation 1, then no claim', f'{first!r}, {second!r}', first == '1' and second == '')
+    alive = call("heartbeat(1, 1, interval '1 second')")
+    cases.check('the current owner can heartbeat', 'true', alive, alive == 't')
+    applied = call("apply_effect(1, 1, 'operation-1')")
+    duplicate = call("apply_effect(1, 1, 'operation-1')")
+    effects = rows(stack, "select count(*) from worker_fixture.effects where operation_id = 'operation-1';")
+    cases.check('a duplicate delivery repeats no effect', 'applied, duplicate, 1 effect', f'{applied}, {duplicate}, {effects}',
+                (applied, duplicate, effects) == ('applied', 'duplicate', '1'))
+    time.sleep(1.2)  # Worker A has crashed: it stops heartbeating, and its lease lapses on database time.
+    expired = call("heartbeat(1, 1, interval '1 second')")
+    late_unclaimed = call("apply_effect(1, 1, 'operation-unclaimed')")
+    complete_unclaimed = call('complete(1, 1)')
+    cases.check('an expired lease cannot act, even unclaimed', 'fenced, not completed', f'{late_unclaimed}, {complete_unclaimed}',
+                (late_unclaimed, complete_unclaimed) == ('fenced', 'f'))
+    claimed = call("claim('worker-b', interval '30 seconds')")
+    cases.check('an expired lease moves to a new generation', 'no heartbeat, generation 2', f'{expired}, {claimed}', expired == 'f' and claimed == '2')
+    late = call("apply_effect(1, 1, 'operation-2')")
+    late_complete = call('complete(1, 1)')
+    state = rows(stack, "select status || '|' || owner from worker_fixture.jobs where id = 1;")
+    cases.check('the crashed worker is fenced', 'fenced, not completed, still running under B', f'{late}, {late_complete}, {state}',
+                (late, late_complete, state) == ('fenced', 'f', 'running|worker-b'))
+    retried = call("apply_effect(1, 2, 'operation-1')")
+    effects = rows(stack, "select count(*) from worker_fixture.effects where operation_id = 'operation-1';")
+    done = call('complete(1, 2)')
+    again = call('complete(1, 2)')
+    cases.check('recovery does not repeat a known effect', 'duplicate, 1 effect, completes once', f'{retried}, {effects}, {done}, {again}',
+                (retried, effects, done, again) == ('duplicate', '1', 't', 'f'))
+    terminal = call("apply_effect(1, 2, 'operation-after-success')")
+    cases.check('a terminal job takes no new effect', 'fenced', terminal, terminal == 'fenced')
 
 
 def guard_cases_on_real_target(stack: Stack, cases: Cases) -> None:
@@ -498,7 +563,9 @@ def qualify(root: Path) -> int:
     require_identity(target, tool_env())
     if run(['docker', 'info', '--format', '{{.ServerVersion}}'], tool_env(), 30).returncode:
         raise Unavailable('the Docker engine is not reachable')
+    (root / REPORT).unlink(missing_ok=True)  # A run that cannot finish leaves no earlier result behind.
     require_rendered(stack)
+    cases.check('the real Compose file renders safely', 'no refusal', 'loopback, pinned, labeled and owned', True)
     before = other_resources(project)
     started_at = time.monotonic()
     try:
@@ -510,11 +577,17 @@ def qualify(root: Path) -> int:
         seed_cases(stack, cases, root)
         authorization_cases(stack, cases)
         storage_cases(stack, cases, root)
+        worker_cases(stack, cases, root)
         guard_cases_on_real_target(stack, cases)
     finally:
         remove_stack(stack)
-    leftovers = run(['docker', 'volume', 'ls', '--filter', f'label=com.docker.compose.project={project}', '--format', '{{.Name}}'], tool_env())
-    cases.check('cleanup removed the owned volumes', 'none left', leftovers.stdout.strip() or 'none', not leftovers.stdout.strip())
+    label = f'label=com.docker.compose.project={project}'
+    left_volumes = run(['docker', 'volume', 'ls', '--filter', label, '--format', '{{.Name}}'], tool_env())
+    left_containers = run(['docker', 'ps', '-a', '--filter', label, '--format', '{{.Names}}'], tool_env())
+    if left_volumes.returncode or left_containers.returncode:
+        raise Unavailable('docker could not list what cleanup left')
+    left = (left_volumes.stdout + left_containers.stdout).strip()
+    cases.check('cleanup removed the owned containers and volumes', 'none left', left or 'none', not left)
     after = other_resources(project)
     cases.check('other Docker resources are untouched', 'same containers and volumes', f'{len(before)} before, {len(after)} after', before == after)
     passed = all(record['status'] == 'passed' for record in cases.records)
@@ -523,6 +596,7 @@ def qualify(root: Path) -> int:
     path.write_text(json.dumps({'schema_version': 'autobots.disposable-qualification/v1',
                                 'completed_at_utc': datetime.now(timezone.utc).isoformat(),
                                 'duration_seconds': round(time.monotonic() - started_at, 1),
+                                'input_fingerprint': fingerprint(root),
                                 'status': 'passed' if passed else 'failed', 'target_class': 'disposable',
                                 'project': project, 'cases': cases.records,
                                 'not_established': ['H1', 'product acceptance', 'the persistent stack',

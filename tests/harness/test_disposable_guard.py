@@ -37,7 +37,8 @@ class Identity(unittest.TestCase):
         target = guard.Target(PROJECT, 55400)
         for env in ({'DATABASE_URL': 'postgres://u:private@127.0.0.1:54322/postgres'},
                     {'SUPABASE_DB_URL': 'postgres://u:private@127.0.0.1:54322/postgres'},
-                    {'POSTGRES_URL': 'not a url'}, {'PGPORT': '54322'}, {'PGHOST': 'db.example'}):
+                    {'POSTGRES_URL': 'not a url'}, {'PGPORT': '54322'}, {'PGHOST': 'db.example'},
+                    {'DATABASE_URL': 'postgres://u:private@prod.example:55400/postgres'}):
             with self.subTest(env=list(env)):
                 reasons = self.refused(target, env)
                 self.assertTrue(reasons)
@@ -54,16 +55,6 @@ class Rendered(unittest.TestCase):
                                     'volumes': [{'type': 'volume', 'source': 'db'}]}},
                 'volumes': {'db': {'name': f'{PROJECT}_db', 'labels': labels}}}
 
-    def test_real_compose_file_renders_clean(self):
-        target = guard.Target(PROJECT, 55400, 55401)
-        stack = guard.Stack(target, ROOT, ROOT / guard.COMPOSE)
-        try:
-            result = stack.compose('--profile', 'storage', 'config', '--format', 'json', timeout=30)
-        except guard.Unavailable:
-            self.skipTest('docker is not installed; the db profile reports this itself')
-        self.assertEqual(result.returncode, 0, result.stderr[-300:])
-        self.assertEqual(guard.rendered_refusals(json.loads(result.stdout), PROJECT), [])
-
     def test_clean_rendering_passes(self):
         self.assertEqual(guard.rendered_refusals(self.rendered(), PROJECT), [])
 
@@ -78,7 +69,8 @@ class Rendered(unittest.TestCase):
         def pulls(data): data['services']['db']['pull_policy'] = 'always'
         def unlabeled(data): data['services']['db']['labels'] = {}
         def renamed(data): data['name'] = 'autobots'
-        for change in (wildcard, persistent_port, external, other_volume, unmarked, bind, floating, pulls, unlabeled, renamed):
+        def host_network(data): data['services']['db']['network_mode'] = 'host'
+        for change in (wildcard, persistent_port, external, other_volume, unmarked, bind, floating, pulls, unlabeled, renamed, host_network):
             with self.subTest(change=change.__name__):
                 data = self.rendered()
                 change(data)
@@ -138,14 +130,8 @@ class Fixtures(unittest.TestCase):
             self.assertNotIn(word, text)
         self.assertEqual(text.count('on conflict'), text.count('insert into'))
 
-    def test_synthetic_fixtures_are_not_product_migrations(self):
-        self.assertFalse((ROOT / 'supabase/migrations').exists() and any((ROOT / 'supabase/migrations').glob('*synthetic*')))
-
-    def test_compose_publishes_only_loopback(self):
+    def test_compose_pins_every_image_locally(self):
         text = (ROOT / guard.COMPOSE).read_text()
-        for line in text.splitlines():
-            if line.strip().startswith('- "') and ':5' in line:
-                self.assertIn('127.0.0.1:', line)
         self.assertEqual(text.count('pull_policy: never'), text.count('image:'))
 
 

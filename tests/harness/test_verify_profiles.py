@@ -27,6 +27,13 @@ def python_step(root: Path, name: str, code: str, timeout: float = 20.0) -> Step
     return Step(name, (sys.executable, '-c', code), root, timeout)
 
 
+def passing_full_steps(root: Path) -> list[Step]:
+    # The scope tests are judged by unittest's summary, so their fixture prints one.
+    summary = "print('Ran 1 test in 0.1s'); print('OK')"
+    return [python_step(root, name, summary if name == 'toolchain_scope_tests' else 'pass')
+            for name in sorted(harness_lib.FULL_CHECKS)]
+
+
 class Profiles(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -102,6 +109,7 @@ class Profiles(unittest.TestCase):
                  ('docs/note.md', 'SPECS.md'): frozenset(),
                  ('pnpm-lock.yaml',): both,
                  ('scripts/verify.py',): both,
+                 ('tests/db/seeds/fixtures.sql',): frozenset(),
                  ('contracts/generated/a.json',): both}
         for changed, expected in cases.items():
             with self.subTest(changed=changed):
@@ -133,8 +141,11 @@ class Profiles(unittest.TestCase):
         self.run_steps('full', [python_step(self.root, 'build', 'pass')], left_out)
         self.assertFalse(harness_lib.report_state(self.root, 'full')[0])
         self.run_steps('full', [python_step(self.root, 'build', 'pass')])
-        self.assertFalse(harness_lib.report_state(self.root, 'full')[0], 'a full report without fault qualification')
-        self.run_steps('full', [python_step(self.root, 'build', 'pass'), python_step(self.root, 'fault_qualification', 'pass')])
+        self.assertFalse(harness_lib.report_state(self.root, 'full')[0], 'a full report without its other steps')
+        everything = passing_full_steps(self.root)
+        self.run_steps('full', everything[:-1])
+        self.assertFalse(harness_lib.report_state(self.root, 'full')[0], f'a full report without {everything[-1].id}')
+        self.run_steps('full', everything)
         self.assertTrue(harness_lib.report_state(self.root, 'full')[0])
 
     def test_application_inputs_invalidate_but_environments_do_not(self):
@@ -152,18 +163,119 @@ class Profiles(unittest.TestCase):
         (self.root / 'services/agent/code.py').write_text('x = 2\n')
         self.assertNotEqual(changed, harness_lib.fingerprint(self.root))
 
-    def test_stop_needs_fast_or_full_for_application_changes(self):
-        with mock.patch('sys.stdout'):
-            verify.run_profile(self.root, 'harness', base_checks=harness_records)
-        self.assertTrue(harness_lib.evidence_state(self.root)[0], 'a clean tree needs only harness')
-        (self.root / 'services/agent/code.py').write_text('x = 2\n')
+    def test_stop_needs_fast_or_full_for_unverified_application_inputs(self):
         with mock.patch('sys.stdout'):
             verify.run_profile(self.root, 'harness', base_checks=harness_records)
         passed, reason = harness_lib.evidence_state(self.root)
-        self.assertFalse(passed)
+        self.assertFalse(passed, 'no application report has ever seen this code')
         self.assertIn('fast or full', reason)
         self.assertEqual(self.run_steps('fast', [python_step(self.root, 'mypy', 'pass')]), 0)
         self.assertTrue(harness_lib.evidence_state(self.root)[0])
+        (self.root / 'services/agent/code.py').write_text('x = 2\n')
+        with mock.patch('sys.stdout'):
+            verify.run_profile(self.root, 'harness', base_checks=harness_records)
+        self.assertFalse(harness_lib.evidence_state(self.root)[0], 'harness cannot certify changed application code')
+        self.assertEqual(self.run_steps('fast', [python_step(self.root, 'mypy', 'pass')]), 0)
+        (self.root / 'docs/engineering').mkdir(parents=True)
+        (self.root / 'docs/engineering/note.md').write_text('x')
+        self.assertFalse(harness_lib.evidence_state(self.root)[0], 'the note is an unverified input of no report yet')
+        with mock.patch('sys.stdout'):
+            verify.run_profile(self.root, 'harness', base_checks=harness_records)
+        self.assertEqual(harness_lib.scope_paths(self.root), ['docs/engineering/note.md'])
+        self.assertTrue(harness_lib.evidence_state(self.root)[0], 'a documentation change needs only harness')
+
+    def test_stop_needs_db_for_database_inputs(self):
+        (self.root / 'tests/db').mkdir(parents=True)
+        (self.root / 'tests/db/seed.sql').write_text('select 1;')
+        self.assertEqual(self.run_steps('fast', []), 0)
+        passed, reason = harness_lib.evidence_state(self.root)
+        self.assertFalse(passed)
+        self.assertIn('db', reason)
+        everything = [python_step(self.root, 'disposable_qualification', 'pass')]
+        self.assertEqual(self.run_steps('db', everything), 0)
+        self.assertTrue(harness_lib.evidence_state(self.root)[0])
+
+    def test_a_committed_change_is_still_in_scope(self):
+        """A clean Git tree proves nothing: scope comes from what a passing report saw."""
+        self.assertIsNone(harness_lib.scope_paths(self.root), 'nothing has passed yet, so scope is unknown')
+        self.assertEqual(self.run_steps('fast', [python_step(self.root, 'mypy', 'pass')]), 0)
+        self.assertEqual(harness_lib.scope_paths(self.root), [])
+        (self.root / 'services/agent/code.py').write_text('broken\n')
+        git = ['git', '-C', str(self.root), '-c', 'user.name=t', '-c', 'user.email=t@invalid', '-c', 'commit.gpgsign=false']
+        subprocess.run([*git, 'commit', '-qam', 'broken'], check=True, capture_output=True)
+        self.assertEqual(harness_lib.scope_paths(self.root), ['services/agent/code.py'])
+        chosen = verify.selected_steps('fast', sorted(harness_lib.FULL_CHECKS), harness_lib.scope_paths(self.root))
+        self.assertEqual(chosen, set(verify.PYTHON_STEPS))
+
+    def test_a_failed_run_does_not_become_the_base_for_scope(self):
+        self.assertEqual(self.run_steps('fast', [python_step(self.root, 'mypy', 'pass')]), 0)
+        self.assertEqual(self.run_steps('fast', [python_step(self.root, 'mypy', 'raise SystemExit(1)')]), 1)
+        self.assertIsNone(harness_lib.scope_paths(self.root))
+
+    def test_skips_and_empty_suites_do_not_pass(self):
+        for output, status, executed, skipped in (('Ran 5 tests in 0.1s\n\nOK', None, 5, 0),
+                                                  ('Ran 5 tests in 0.1s\n\nOK (skipped=1)', 'failed', 4, 1),
+                                                  ('Ran 2 tests in 0.1s\n\nOK (expected failures=2)', 'failed', 0, 2),
+                                                  ('Ran 0 tests in 0.0s\n\nOK', 'failed', 0, 0),
+                                                  ('no summary', 'failed', 0, 0)):
+            with self.subTest(output=output):
+                result = verify.judge_unittest({'status': 'passed', 'output': output})
+                self.assertEqual((result.get('status'), result['tests_executed'], result['tests_skipped']),
+                                 (status, executed, skipped))
+        self.assertEqual(verify.judge_pytest({'status': 'passed', 'output': '3 passed, 1 skipped in 1s'})['status'], 'failed')
+        self.assertNotIn('status', verify.judge_pytest({'status': 'passed', 'output': '4 passed in 1s'}))
+
+    def test_a_skip_fails_each_wired_step(self):
+        skipping = "print('3 passed, 1 skipped in 1s')"
+        self.assertEqual(self.run_steps('fast', [python_step(self.root, 'pytest', skipping)]), 1)
+        self.assertEqual(self.statuses('fast')['pytest'], 'failed')
+        scope = "import sys; print('Ran 2 tests in 0.1s', file=sys.stderr); print('OK (skipped=1)', file=sys.stderr)"
+        self.assertEqual(self.run_steps('fast', [python_step(self.root, 'toolchain_scope_tests', scope)]), 1)
+        with mock.patch('verify.run_check', side_effect=lambda _root, name, _argv: {
+                'id': name, 'status': 'passed', 'exit_code': 0, 'output': 'Ran 3 tests in 0.1s\n\nOK (skipped=1)'}), \
+                mock.patch('verify.config_errors', return_value=[]):
+            checks = verify.harness_checks(self.root)
+        self.assertEqual({check['id']: check['status'] for check in checks}['harness_behavior_tests'], 'failed')
+
+    def test_the_newest_passing_report_is_the_base(self):
+        self.run_steps('full', passing_full_steps(self.root))
+        (self.root / 'services/agent/code.py').write_text('x = 2\n')
+        self.assertEqual(self.run_steps('fast', [python_step(self.root, 'mypy', 'pass')]), 0)
+        self.assertEqual(harness_lib.scope_paths(self.root), [], 'the newer fast report is the base')
+        report = self.report('full')
+        report['completed_at_utc'] = '2999-01-01T00:00:00+00:00'
+        (self.root / '.checks/full/latest.json').write_text(json.dumps(report))
+        self.assertEqual(harness_lib.scope_paths(self.root), ['services/agent/code.py'], 'now the full report is newer')
+
+    def test_a_report_with_a_skipped_suite_is_not_current(self):
+        self.run_steps('fast', [])
+        path = self.root / '.checks/fast/latest.json'
+        data = json.loads(path.read_text())
+        for check in data['checks']:
+            if check['id'] == 'harness_behavior_tests':
+                check['tests_skipped'] = 1
+        path.write_text(json.dumps(data))
+        self.assertFalse(harness_lib.report_state(self.root, 'fast')[0])
+
+    def test_steps_carry_their_class_and_transport(self):
+        self.assertEqual(verify.classify('pytest'), {'class': 'mock', 'model_transport': 'mock'})
+        self.assertEqual(verify.classify('disposable_qualification'), {'class': 'disposable', 'model_transport': 'none'})
+        self.assertEqual(verify.classify('lint'), {'class': 'static', 'model_transport': 'none'})
+
+    def test_links_and_example_files_are_inputs(self):
+        before = harness_lib.fingerprint(self.root)
+        (self.root / 'scripts').mkdir()
+        (self.root / 'scripts/link').symlink_to('/nonexistent/target')
+        linked = harness_lib.fingerprint(self.root)
+        self.assertNotEqual(before, linked)
+        (self.root / 'scripts/directory_link').symlink_to(self.root / 'services')
+        self.assertNotEqual(linked, harness_lib.fingerprint(self.root), 'a link to an existing directory')
+        linked = harness_lib.fingerprint(self.root)
+        (self.root / 'scripts/.env.example').write_text('A=\n')
+        example = harness_lib.fingerprint(self.root)
+        self.assertNotEqual(linked, example)
+        (self.root / 'scripts/.env.local').write_text('PRIVATE=1\n')
+        self.assertEqual(example, harness_lib.fingerprint(self.root))
 
     def test_held_lock_is_a_prerequisite_error(self):
         (self.root / '.checks').mkdir()
