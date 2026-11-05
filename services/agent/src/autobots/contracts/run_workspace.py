@@ -96,6 +96,14 @@ class AssignmentView(BaseModel):
     outcome: str | None
 
 
+class UnknownEffect(BaseModel):
+    model_config = VIEW
+
+    operation_id: str
+    tool_id: str
+    tool_version: int
+
+
 class RunWorkspace(BaseModel):
     model_config = VIEW
 
@@ -111,4 +119,5 @@ class RunWorkspace(BaseModel):
     expert: ExpertBinding | None
     assignments: list[AssignmentView]
     outstanding: OutstandingSummary
+    unknown_operations: list[UnknownEffect]
     cursor: int

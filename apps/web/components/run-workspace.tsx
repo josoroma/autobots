@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Card } from "@/components/ui/card";
+import { UnknownEffects } from "@/components/unknown-effects";
 
 // Reasons are kept apart from status, so "paused" and "failed" can say why.
 const STATUS_TEXT: Record<string, string> = {
@@ -41,6 +42,9 @@ function describe(event: RunEvent): string {
       ? `Run ${payload.current}`
       : `Run moved from ${payload.previous} to ${payload.current}`;
   }
+  if (payload.type === "effect.reconciled") {
+    return `An unknown effect was reconciled: ${payload.outcome.replaceAll("_", " ")}`;
+  }
   if (payload.type === "approval.requested") {
     return `Approval requested for ${payload.tool_id}`;
   }
@@ -60,6 +64,7 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
   const [connection, setConnection] = useState<Connection>("loading");
   const [unavailable, setUnavailable] = useState(false);
   const [gap, setGap] = useState(false);
+  const [refreshes, setRefreshes] = useState(0);
 
   useEffect(() => {
     let closed = false;
@@ -160,6 +165,23 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
       source?.close();
     };
   }, [runId]);
+
+  // After a page's own action, without waiting for the next event.
+  useEffect(() => {
+    if (refreshes === 0) return;
+    let active = true;
+    fetch(`/api/v1/runs/${encodeURIComponent(runId)}/workspace`, {
+      cache: "no-store",
+    })
+      .then(async (reply) => {
+        if (active && reply.ok)
+          setSnapshot(parseRunWorkspace(await reply.json()));
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [refreshes, runId]);
 
   if (unavailable) {
     return (
@@ -313,6 +335,18 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
           </>
         )}
       </Card>
+      {snapshot.unknown_operations.length === 0 ? null : (
+        <Card aria-labelledby="unknown-heading" className="space-y-2">
+          <h2 id="unknown-heading" className="text-lg font-medium">
+            Unknown outcomes
+          </h2>
+          <UnknownEffects
+            runId={runId}
+            operations={snapshot.unknown_operations}
+            onResolved={() => setRefreshes((count) => count + 1)}
+          />
+        </Card>
+      )}
       {snapshot.assignments.length === 0 ? null : (
         <Card aria-labelledby="assignments-heading" className="space-y-2">
           <h2 id="assignments-heading" className="text-lg font-medium">

@@ -445,6 +445,61 @@ export const schemas = {
     "title": "CriterionView",
     "type": "object"
   },
+  "EffectEvidence": {
+    "additionalProperties": false,
+    "description": "What the destination's own records show. This is a person's report, kept as evidence.",
+    "properties": {
+      "evidence": {
+        "maxLength": 2000,
+        "minLength": 1,
+        "title": "Evidence",
+        "type": "string"
+      },
+      "outcome": {
+        "enum": [
+          "delivered",
+          "not_delivered"
+        ],
+        "title": "Outcome",
+        "type": "string"
+      }
+    },
+    "required": [
+      "outcome",
+      "evidence"
+    ],
+    "title": "EffectEvidence",
+    "type": "object"
+  },
+  "EffectReconciled": {
+    "additionalProperties": false,
+    "properties": {
+      "operation_id": {
+        "title": "Operation Id",
+        "type": "string"
+      },
+      "outcome": {
+        "enum": [
+          "delivered",
+          "not_delivered"
+        ],
+        "title": "Outcome",
+        "type": "string"
+      },
+      "type": {
+        "const": "effect.reconciled",
+        "title": "Type",
+        "type": "string"
+      }
+    },
+    "required": [
+      "type",
+      "operation_id",
+      "outcome"
+    ],
+    "title": "EffectReconciled",
+    "type": "object"
+  },
   "EffectiveRolePolicy": {
     "additionalProperties": false,
     "properties": {
@@ -1341,6 +1396,9 @@ export const schemas = {
           },
           {
             "$ref": "#/components/schemas/ApprovalDecided"
+          },
+          {
+            "$ref": "#/components/schemas/EffectReconciled"
           }
         ],
         "title": "Payload"
@@ -1711,6 +1769,13 @@ export const schemas = {
         ],
         "title": "Stop Reason"
       },
+      "unknown_operations": {
+        "items": {
+          "$ref": "#/components/schemas/UnknownEffect"
+        },
+        "title": "Unknown Operations",
+        "type": "array"
+      },
       "usage": {
         "$ref": "#/components/schemas/UsageSummary"
       },
@@ -1738,6 +1803,7 @@ export const schemas = {
       "expert",
       "assignments",
       "outstanding",
+      "unknown_operations",
       "cursor"
     ],
     "title": "RunWorkspace",
@@ -1934,6 +2000,30 @@ export const schemas = {
       "evidence_summary"
     ],
     "title": "TaskView",
+    "type": "object"
+  },
+  "UnknownEffect": {
+    "additionalProperties": false,
+    "properties": {
+      "operation_id": {
+        "title": "Operation Id",
+        "type": "string"
+      },
+      "tool_id": {
+        "title": "Tool Id",
+        "type": "string"
+      },
+      "tool_version": {
+        "title": "Tool Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "operation_id",
+      "tool_id",
+      "tool_version"
+    ],
+    "title": "UnknownEffect",
     "type": "object"
   },
   "UsageSummary": {
@@ -2202,6 +2292,25 @@ export interface CriterionView {
 
 export function parseCriterionView(value: unknown): CriterionView {
   return parseWith(schemas, "CriterionView", value) as CriterionView;
+}
+
+export interface EffectEvidence {
+  evidence: string;
+  outcome: "delivered" | "not_delivered";
+}
+
+export function parseEffectEvidence(value: unknown): EffectEvidence {
+  return parseWith(schemas, "EffectEvidence", value) as EffectEvidence;
+}
+
+export interface EffectReconciled {
+  operation_id: string;
+  outcome: "delivered" | "not_delivered";
+  type: "effect.reconciled";
+}
+
+export function parseEffectReconciled(value: unknown): EffectReconciled {
+  return parseWith(schemas, "EffectReconciled", value) as EffectReconciled;
 }
 
 export interface EffectiveRolePolicy {
@@ -2506,7 +2615,7 @@ export function parseRunCommandResult(value: unknown): RunCommandResult {
 export interface RunEvent {
   causal_ids: string[];
   occurred_at: string;
-  payload: RunStatusChanged | ArtifactPublished | ArtifactMissing | ApprovalRequested | ApprovalDecided;
+  payload: RunStatusChanged | ArtifactPublished | ArtifactMissing | ApprovalRequested | ApprovalDecided | EffectReconciled;
   run_id: string;
   schema_version: 1;
   sequence: number;
@@ -2595,6 +2704,7 @@ export interface RunWorkspace {
   run: RunSummary;
   schema_version: 1;
   stop_reason: string | null;
+  unknown_operations: UnknownEffect[];
   usage: UsageSummary;
   verification: VerificationSummary | null;
 }
@@ -2661,6 +2771,16 @@ export interface TaskView {
 
 export function parseTaskView(value: unknown): TaskView {
   return parseWith(schemas, "TaskView", value) as TaskView;
+}
+
+export interface UnknownEffect {
+  operation_id: string;
+  tool_id: string;
+  tool_version: number;
+}
+
+export function parseUnknownEffect(value: unknown): UnknownEffect {
+  return parseWith(schemas, "UnknownEffect", value) as UnknownEffect;
 }
 
 export interface UsageSummary {
@@ -2755,6 +2875,10 @@ export async function listRunArtifacts(options: ClientOptions, run_id: string): 
 
 export async function cancelRun(options: ClientOptions, run_id: string, body: RunCommandRequest): Promise<RunCommandResult> {
   return parseRunCommandResult(await requestJson(options, "POST", `/v1/runs/${encodeURIComponent(run_id)}/cancel`, body));
+}
+
+export async function reconcileRunEffect(options: ClientOptions, run_id: string, operation_id: string, body: EffectEvidence): Promise<ReconciliationResult> {
+  return parseReconciliationResult(await requestJson(options, "POST", `/v1/runs/${encodeURIComponent(run_id)}/effects/${encodeURIComponent(operation_id)}/reconcile`, body));
 }
 
 export async function listRunEvents(options: ClientOptions, run_id: string): Promise<EventPage> {

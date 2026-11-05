@@ -11,8 +11,13 @@ from autobots.api.settings_routes import current_workspace, provider_settings, r
 from autobots.application.experts import ExpertRefused, resolve_binding
 from autobots.application.model_admission import ModelAdmission
 from autobots.application.provider_settings import ProviderSettings
+from autobots.application.reconciliation import (
+    ReconciliationRefused,
+    has_unresolvable_effect,
+    record_evidence,
+)
 from autobots.application.recovery import outstanding
-from autobots.application.run_projection import read_summary
+from autobots.application.run_projection import public_text, read_summary
 from autobots.application.runs import (
     IdempotencyConflict,
     LinkRefused,
@@ -25,6 +30,7 @@ from autobots.application.runs import (
     store_receipt,
 )
 from autobots.contracts.run_commands import (
+    EffectEvidence,
     ModelCallReconciliation,
     ReconciliationResult,
     RunAccepted,
@@ -233,11 +239,51 @@ async def post_resume(
     async with _pool(request).connection() as connection:
         await _require_run(connection, workspace, run_id)
         left = await outstanding(connection, run_id)
+        # A tool with a readback resolves itself on replay. Otherwise a person has to say.
+        blocked = await has_unresolvable_effect(connection, run_id)
     if left.uncertain_calls:
         raise ApiError(
             409, "uncertain_model_call", "A model call's outcome must be reconciled first."
         )
+    if blocked:
+        raise ApiError(409, "unknown_effect", "An effect's outcome must be reconciled first.")
     return await _command(request, run_id, workspace, user, RunCommand.RESUME, body, key)
+
+
+@router.post(
+    "/runs/{run_id}/effects/{operation_id}/reconcile",
+    operation_id="reconcileRunEffect",
+    response_model=ReconciliationResult,
+)
+async def post_effect_evidence(
+    run_id: UUID,
+    operation_id: str,
+    body: EffectEvidence,
+    request: Request,
+    key: Key,
+    user: User,
+    workspace: Annotated[UUID, Depends(require_owner)],
+) -> ReconciliationResult:
+    """An owner reports what the destination's own records show."""
+    async with _pool(request).connection() as connection:
+        await _require_run(connection, workspace, run_id)
+        try:
+            await record_evidence(
+                connection,
+                workspace_id=workspace,
+                run_id=run_id,
+                operation_id=operation_id,
+                actor_id=user,
+                idempotency_key=key,
+                outcome=body.outcome,
+                evidence=public_text(body.evidence, limit=2000),
+            )
+        except ReconciliationRefused as error:
+            status_code = 404 if error.code == "operation_not_found" else 409
+            raise ApiError(status_code, error.code, "That can't be recorded.") from None
+        except IdempotencyConflict as error:
+            raise as_api_error(error) from None
+    return ReconciliationResult(schema_version=1, reconciled_calls=1)
 
 
 @router.post(

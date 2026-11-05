@@ -50,6 +50,15 @@ class RunInputRequest(BaseModel):
     value: str = Field(min_length=1, max_length=20000)
 
 
+class EffectEvidence(BaseModel):
+    """What the destination's own records show. This is a person's report, kept as evidence."""
+
+    model_config = STRICT_CONTRACT
+
+    outcome: Literal["delivered", "not_delivered"]
+    evidence: str = Field(min_length=1, max_length=2000)
+
+
 class ModelCallReconciliation(BaseModel):
     """What the provider reported, from its own records. A charge is never invented."""
 

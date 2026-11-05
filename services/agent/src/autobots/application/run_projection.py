@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from autobots.application.artifacts import list_artifacts
 from autobots.application.plans import latest_plan, load_goal
+from autobots.application.reconciliation import unknown_operations
 from autobots.application.recovery import outstanding
 from autobots.application.runs import RunNotFound
 from autobots.contracts.adapters import run_from_row, run_summary_from_domain
@@ -21,6 +22,7 @@ from autobots.contracts.run_workspace import (
     PlanSummary,
     RunWorkspace,
     TaskView,
+    UnknownEffect,
     UsageSummary,
     VerificationSummary,
 )
@@ -232,6 +234,12 @@ async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> R
         verification=await _verification(connection, run_id),
         expert=await _expert(connection, run_id),
         assignments=await _assignments(connection, run_id),
+        unknown_operations=[
+            UnknownEffect(
+                operation_id=item.operation_id, tool_id=item.tool_id, tool_version=item.tool_version
+            )
+            for item in await unknown_operations(connection, run_id)
+        ],
         outstanding=OutstandingSummary(
             uncertain_calls=left.uncertain_calls,
             unknown_effects=left.unknown_effects,

@@ -71,6 +71,7 @@ PAUSE_FOR = frozenset(
         "assignment_paused",
         "assignment_lost",
         "parent_not_running",
+        "outcome_unknown",
     }
 )
 NOT_OURS = frozenset({"lease_lost", "run_not_running", "run_not_found", "approval_pending"})

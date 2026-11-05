@@ -444,6 +444,61 @@
         "title": "CriterionView",
         "type": "object"
       },
+      "EffectEvidence": {
+        "additionalProperties": false,
+        "description": "What the destination's own records show. This is a person's report, kept as evidence.",
+        "properties": {
+          "evidence": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Evidence",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "delivered",
+              "not_delivered"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome",
+          "evidence"
+        ],
+        "title": "EffectEvidence",
+        "type": "object"
+      },
+      "EffectReconciled": {
+        "additionalProperties": false,
+        "properties": {
+          "operation_id": {
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "delivered",
+              "not_delivered"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "type": {
+            "const": "effect.reconciled",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "operation_id",
+          "outcome"
+        ],
+        "title": "EffectReconciled",
+        "type": "object"
+      },
       "EffectiveRolePolicy": {
         "additionalProperties": false,
         "properties": {
@@ -1340,6 +1395,9 @@
               },
               {
                 "$ref": "#/components/schemas/ApprovalDecided"
+              },
+              {
+                "$ref": "#/components/schemas/EffectReconciled"
               }
             ],
             "title": "Payload"
@@ -1710,6 +1768,13 @@
             ],
             "title": "Stop Reason"
           },
+          "unknown_operations": {
+            "items": {
+              "$ref": "#/components/schemas/UnknownEffect"
+            },
+            "title": "Unknown Operations",
+            "type": "array"
+          },
           "usage": {
             "$ref": "#/components/schemas/UsageSummary"
           },
@@ -1737,6 +1802,7 @@
           "expert",
           "assignments",
           "outstanding",
+          "unknown_operations",
           "cursor"
         ],
         "title": "RunWorkspace",
@@ -1933,6 +1999,30 @@
           "evidence_summary"
         ],
         "title": "TaskView",
+        "type": "object"
+      },
+      "UnknownEffect": {
+        "additionalProperties": false,
+        "properties": {
+          "operation_id": {
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "tool_id": {
+            "title": "Tool Id",
+            "type": "string"
+          },
+          "tool_version": {
+            "title": "Tool Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "operation_id",
+          "tool_id",
+          "tool_version"
+        ],
+        "title": "UnknownEffect",
         "type": "object"
       },
       "UsageSummary": {
@@ -3233,6 +3323,126 @@
           }
         },
         "summary": "Post Cancel"
+      }
+    },
+    "/v1/runs/{run_id}/effects/{operation_id}/reconcile": {
+      "post": {
+        "description": "An owner reports what the destination's own records show.",
+        "operationId": "reconcileRunEffect",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "title": "Operation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EffectEvidence"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Effect Evidence"
       }
     },
     "/v1/runs/{run_id}/events": {

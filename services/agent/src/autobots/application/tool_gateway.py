@@ -16,6 +16,10 @@ from autobots.domain.runs import RunStatus
 from autobots.domain.tools import EFFECTFUL, OperationClass, ToolOutcome, path_granted
 
 
+class NotDelivered(Exception):
+    """A readback found the effect never reached the destination, so one new attempt is safe."""
+
+
 class ToolFailed(Exception):
     """The tool knows the effect did not happen. Anything else raised leaves the outcome unknown."""
 
@@ -244,8 +248,8 @@ class ToolGateway:
         # Committed before the effect starts, so a crash leaves a record that it may have happened.
         cursor = await connection.execute(
             "insert into app_private.tool_receipts (operation_id, run_id, workspace_id, tool_id, "
-            "tool_version, argument_hash, status, generation) "
-            "values (%s, %s, %s, %s, %s, %s, 'started', %s) "
+            "tool_version, argument_hash, status, generation, can_readback) "
+            "values (%s, %s, %s, %s, %s, %s, 'started', %s, %s) "
             "on conflict (operation_id) do nothing returning operation_id",
             (
                 operation_id,
@@ -255,6 +259,7 @@ class ToolGateway:
                 tool.version,
                 argument_hash,
                 scope.generation,
+                tool.reconcile is not None,
             ),
         )
         if await cursor.fetchone() is None:
@@ -283,6 +288,8 @@ class ToolGateway:
         if tool.reconcile is not None:
             try:
                 found = await tool.reconcile(parsed, context)
+            except NotDelivered:
+                return None
             except Exception:
                 found = None
             if found is not None:

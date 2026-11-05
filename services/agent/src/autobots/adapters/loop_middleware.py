@@ -38,7 +38,13 @@ INTERRUPTING = frozenset({"cancelling", "cancelled", "failed", "succeeded"})
 
 REPAIRABLE = PLAN_REJECTIONS | {"invalid_arguments", "route_not_granted", "scope_expansion_denied"}
 STOPPING = frozenset(
-    {"plan_revisions_limit", "assignment_paused", "assignment_lost", "approval_pending"}
+    {
+        "plan_revisions_limit",
+        "assignment_paused",
+        "assignment_lost",
+        "approval_pending",
+        "outcome_unknown",
+    }
 )
 _ADMITTED: ContextVar[bool] = ContextVar("autobots_model_call_admitted", default=False)
 REPAIR_NOTE = "Your last reply was cut off, so none of it was used. Reply again, more briefly."

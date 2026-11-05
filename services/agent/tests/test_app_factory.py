@@ -31,6 +31,7 @@ def test_the_schema_builds_without_any_connection() -> None:
         "/v1/runs/{run_id}",
         "/v1/runs/{run_id}/artifacts",
         "/v1/runs/{run_id}/cancel",
+        "/v1/runs/{run_id}/effects/{operation_id}/reconcile",
         "/v1/runs/{run_id}/events",
         "/v1/runs/{run_id}/input",
         "/v1/runs/{run_id}/model-calls/reconcile",

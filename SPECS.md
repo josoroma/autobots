@@ -155,9 +155,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-5.3 | Argument-bound approvals and durable decision wait | DONE | EPIC-5 |
 | US-5.3#1 | Implement approval persistence, validated decision commands and inbox. | DONE | US-5.3 |
 | US-5.3#2 | Exercise tampering, expiry, rejection and interrupted-node replay fixtures. | DONE | US-5.3 |
-| US-5.4 | Consequential-effect reconciliation using a mock destination | READY | EPIC-5 |
-| US-5.4#1 | Implement connector-independent reconciliation states and receipt handling. | TODO | US-5.4 |
-| US-5.4#2 | Test lost-response and duplicate-delivery behavior with a controlled sink. | TODO | US-5.4 |
+| US-5.4 | Consequential-effect reconciliation using a mock destination | DONE | EPIC-5 |
+| US-5.4#1 | Implement connector-independent reconciliation states and receipt handling. | DONE | US-5.4 |
+| US-5.4#2 | Test lost-response and duplicate-delivery behavior with a controlled sink. | DONE | US-5.4 |
 | EPIC-6 | Typed reusable workflows | — | — |
 | US-6.1 | Typed immutable workflow definition and validation | READY | EPIC-6 |
 | US-6.1#1 | Define typed workflow IR and version persistence. | TODO | US-6.1 |
@@ -2029,7 +2029,8 @@ Open Questions:
 
 ### US-5.4: Consequential-effect reconciliation using a mock destination
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-5-4-consequential-effect-reconciliation-using/`
 
 As an operator
 I want explicit external-effect outcomes and receipts
@@ -2062,8 +2063,8 @@ Dependencies:
 - US-4.4
 
 Tasks:
-- [ ] Implement connector-independent reconciliation states and receipt handling.
-- [ ] Test lost-response and duplicate-delivery behavior with a controlled sink.
+- [x] Implement connector-independent reconciliation states and receipt handling.
+- [x] Test lost-response and duplicate-delivery behavior with a controlled sink.
 
 Open Questions:
 - None.

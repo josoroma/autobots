@@ -77,6 +77,14 @@ class ApprovalDecided(BaseModel):
     decision: Literal["approved", "rejected", "expired"]
 
 
+class EffectReconciled(BaseModel):
+    model_config = STRICT_CONTRACT
+
+    type: Literal["effect.reconciled"]
+    operation_id: str
+    outcome: Literal["delivered", "not_delivered"]
+
+
 class RunEvent(BaseModel):
     """The sanitized public envelope from SP-011. Payloads are typed, so nothing raw can pass."""
 
@@ -88,7 +96,12 @@ class RunEvent(BaseModel):
     causal_ids: list[Identifier]
     occurred_at: UtcTimestamp
     payload: (
-        RunStatusChanged | ArtifactPublished | ArtifactMissing | ApprovalRequested | ApprovalDecided
+        RunStatusChanged
+        | ArtifactPublished
+        | ArtifactMissing
+        | ApprovalRequested
+        | ApprovalDecided
+        | EffectReconciled
     )
 
 
