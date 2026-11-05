@@ -35,6 +35,7 @@ class ToolScope:
     paths: tuple[str, ...] = ()
     root_run_id: UUID | None = None
     parent_run_id: UUID | None = None
+    instance: str | None = None
 
     @property
     def budget_run_id(self) -> UUID:
@@ -132,7 +133,9 @@ def _hash(arguments: BaseModel) -> str:
 
 
 def _operation_id(scope: ToolScope, tool: ToolDefinition, parsed: BaseModel) -> str:
-    identity = f"{scope.run_id}|{tool.tool_id}|{tool.version}|{_hash(parsed)}"
+    # Two foreach items can be equal and still be two pieces of work.
+    place = f"|{scope.instance}" if scope.instance else ""
+    identity = f"{scope.run_id}{place}|{tool.tool_id}|{tool.version}|{_hash(parsed)}"
     return hashlib.sha256(identity.encode()).hexdigest()
 
 
@@ -168,6 +171,21 @@ async def hold_lease(connection: Any, scope: ToolScope) -> None:
     )
     if await cursor.fetchone() is None:
         raise LeaseLost("this worker no longer owns the run")
+
+
+class NotRunning(Exception):
+    """The run stopped after this worker last looked, so nothing is admitted."""
+
+
+async def hold_running(connection: Any, scope: ToolScope) -> None:
+    """Inside the admission's transaction, so a cancel can't land between this and the receipt."""
+    await hold_lease(connection, scope)
+    cursor = await connection.execute(
+        "select status from public.runs where id = %s for share", (scope.run_id,)
+    )
+    row = await cursor.fetchone()
+    if row is None or row[0] != RunStatus.RUNNING.value:
+        raise NotRunning
 
 
 @dataclass(frozen=True)
@@ -252,7 +270,7 @@ class ToolGateway:
         # The lease is held for it, so a worker that stalled after its check can't admit anything.
         try:
             async with connection.transaction():
-                await hold_lease(connection, scope)
+                await hold_running(connection, scope)
                 cursor = await connection.execute(
                     "insert into app_private.tool_receipts (operation_id, run_id, workspace_id, "
                     "tool_id, tool_version, argument_hash, status, generation, can_readback) "
@@ -276,7 +294,7 @@ class ToolGateway:
                     return replayed
                 # A crash during this new attempt has to be classified like any other.
                 async with connection.transaction():
-                    await hold_lease(connection, scope)
+                    await hold_running(connection, scope)
                     # A ruling covered the last attempt. Its evidence stays, but this one is open.
                     cursor = await connection.execute(
                         "update app_private.tool_receipts set status = 'started', result = null, "
@@ -294,6 +312,8 @@ class ToolGateway:
                     return _denied("lease_lost")
         except LeaseLost:
             return _denied("lease_lost")
+        except NotRunning:
+            return _denied("run_not_running")
         return await self._attempt(context, tool, parsed, operation_id)
 
     async def _replay(
@@ -313,7 +333,9 @@ class ToolGateway:
             return None
         if tool.reconcile is not None:
             try:
-                found = await tool.reconcile(parsed, context)
+                found = await asyncio.wait_for(
+                    tool.reconcile(parsed, context), tool.timeout_seconds
+                )
             except NotDelivered:
                 return None
             except Exception:

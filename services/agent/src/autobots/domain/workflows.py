@@ -58,6 +58,37 @@ def _compatible(source: str, target: str) -> bool:
     return target == "json" or source == target
 
 
+TRANSFORM_OUTPUTS = {
+    "upper": "string",
+    "lower": "string",
+    "to_string": "string",
+    "length": "number",
+    "sum": "number",
+}
+# Pass their input through unchanged, so what follows can rely on its type.
+PASS_THROUGH = frozenset({"approval", "condition"})
+
+
+def _resolved_type(
+    nodes: Mapping[str, Mapping[str, Any]],
+    specs: Mapping[str, BlockSpec],
+    feeds: Mapping[str, tuple[str, str]],
+    name: str,
+    port: str,
+    seen: frozenset[str] = frozenset(),
+) -> str:
+    node = nodes[name]
+    passes_along = node["block"] in PASS_THROUGH or (
+        node["block"] == "transform" and node.get("config", {}).get("operation") == "identity"
+    )
+    if passes_along and name in feeds and name not in seen:
+        source, source_port = feeds[name]
+        return _resolved_type(nodes, specs, feeds, source, source_port, seen | {name})
+    if node["block"] == "transform":
+        return TRANSFORM_OUTPUTS.get(str(node.get("config", {}).get("operation")), "json")
+    return _output_type(node, port, specs[name])
+
+
 def _output_type(node: Mapping[str, Any], port: str, spec: BlockSpec) -> str:
     declared = spec.outputs[port]
     config = node.get("config", {})
@@ -185,6 +216,14 @@ def validate_graph(graph: Mapping[str, Any]) -> list[GraphError]:
         return errors
     linked: dict[tuple[str, str], int] = defaultdict(int)
     successors: dict[str, set[str]] = defaultdict(set)
+    feeds = {
+        link["target"]: (link["source"], link["source_port"])
+        for link in graph.get("links", [])
+        if link["target_port"] == "value"
+        and link["source"] in nodes
+        and link["target"] in nodes
+        and link["source_port"] in specs[link["source"]].outputs
+    }
     for link in graph.get("links", []):
         source, target = link["source"], link["target"]
         if source not in nodes or target not in nodes:
@@ -196,7 +235,7 @@ def validate_graph(graph: Mapping[str, Any]) -> list[GraphError]:
         if link["target_port"] not in specs[target].inputs:
             errors.append(GraphError("unknown_port", target, link["target_port"]))
             continue
-        kind = _output_type(nodes[source], link["source_port"], specs[source])
+        kind = _resolved_type(nodes, specs, feeds, source, link["source_port"])
         wanted = specs[target].inputs[link["target_port"]]
         if not _compatible(kind, wanted):
             errors.append(GraphError("link_type_mismatch", target, link["target_port"]))

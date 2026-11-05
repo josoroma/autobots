@@ -1235,8 +1235,15 @@
         "additionalProperties": false,
         "properties": {
           "active_version": {
-            "title": "Active Version",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Version"
           },
           "key": {
             "title": "Key",
@@ -1869,6 +1876,43 @@
         "title": "ReconciliationResult",
         "type": "object"
       },
+      "RegressionCase": {
+        "additionalProperties": false,
+        "description": "A query that must find the content once it's in place, and text it must not lose.",
+        "properties": {
+          "must_contain": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Must Contain",
+            "type": "string"
+          }
+        },
+        "required": [
+          "must_contain"
+        ],
+        "title": "RegressionCase",
+        "type": "object"
+      },
+      "RegressionRun": {
+        "additionalProperties": false,
+        "description": "The reviewer's own checks. A proposal's suggested cases aren't counted.",
+        "properties": {
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/RegressionCase"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Cases",
+            "type": "array"
+          }
+        },
+        "required": [
+          "cases"
+        ],
+        "title": "RegressionRun",
+        "type": "object"
+      },
       "RequiredArtifact": {
         "additionalProperties": false,
         "description": "A deterministic check of the bytes, decided at admission.",
@@ -2018,7 +2062,7 @@
             "type": "string"
           },
           "to_version": {
-            "minimum": 1.0,
+            "minimum": 0.0,
             "title": "To Version",
             "type": "integer"
           }
@@ -4375,6 +4419,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegressionRun"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {

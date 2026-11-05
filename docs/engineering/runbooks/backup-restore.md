@@ -56,7 +56,15 @@ The whole backup is checked first, with Docker untouched. Refused with exit 1 an
 
 ## Verify what came back
 
-`scripts/qualify_backup.py` asserts each of these on its restored instance:
+On your restored instance, this checks every fact in the manifest, and exits 1 on any mismatch:
+
+```sh
+services/agent/.venv/bin/python scripts/local_backup.py verify --backup "$BACKUP_DIR/<name>" --backup-key "$BACKUP_KEY" --key-dir "$KEY_DIR" --project "$RESTORED_PROJECT"
+```
+
+It covers counts, users, credentials, migrations, checkpoint threads, the provider key's fingerprint, the hold, anonymous reads and every artifact's hash. It can't test your sign-in, so also sign in on the restored instance yourself.
+
+`scripts/qualify_backup.py` additionally asserts each of these on its restored instance:
 
 - Owners sign in with their own passwords, and a wrong one is refused.
 - PostgREST shows each owner only their workspace.
@@ -66,7 +74,7 @@ The whole backup is checked first, with Docker untouched. Refused with exit 1 an
 
 ## The hold
 
-A restored instance starts with a row in `app_private.installation_holds`. While it's there, no job is claimed, the worker runs no routine or retention pass, admission answers `503 not_ready`, and Operations says `restore_hold`. So restoring can't replay a paid call or an external write, including with its restored OpenRouter key.
+A restore starts only the database, writes a row in `app_private.installation_holds`, then starts the rest, so the hold stays even if a later service fails. While it's there, no job is claimed, the worker runs no routine or retention pass, admission answers `503 not_ready`, and Operations says `restore_hold`. So restoring can't replay a paid call or an external write, including with its restored OpenRouter key.
 
 Queued runs and uncertain calls stay exactly as they were. The runtime role can't remove the hold. To release it, on a target you've identified, as the database owner:
 

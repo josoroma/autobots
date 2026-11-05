@@ -47,7 +47,10 @@ async def outstanding(connection: Any, run_id: UUID) -> Outstanding:
     )
     calls, unreported = await cursor.fetchone()
     cursor = await connection.execute(
-        "select count(*) from app_private.tool_receipts where run_id = %s and status = 'unknown'",
+        "with recursive tree as (select id from public.runs where id = %s union all "
+        "select r.id from public.runs r join tree t on r.parent_run_id = t.id) "
+        "select count(*) from app_private.tool_receipts "
+        "where run_id in (select id from tree) and status = 'unknown'",
         (run_id,),
     )
     return Outstanding(calls, (await cursor.fetchone())[0], unreported)

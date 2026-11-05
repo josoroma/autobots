@@ -24,6 +24,7 @@ import subprocess
 import sys
 import time
 from typing import IO
+from urllib import request as urlrequest
 
 from app_db import AppStack
 from disposable_db import PROJECT_PREFIX, Refused, Target, Unavailable, free_port, require_identity, tool_env
@@ -321,17 +322,66 @@ def restore(backup_dir: Path, backup_key: Path, project: str, gateway_port: int,
         loader.stdin.close()
         if loader.wait(120):
             raise Unavailable(f'loading the {logical} volume failed')
-    up = stack.compose('up', '-d', '--wait', '--wait-timeout', '240', timeout=300)
-    if up.returncode:
-        raise Unavailable('the isolated project did not become healthy')
-    # Before anything else can connect: no job, routine or retention pass until a person releases it.
+    # The database alone first, on ports nobody has yet, so the hold is in before any other service
+    # starts and stays in if one of them fails. No job, routine or retention pass until it's released.
+    if stack.compose('up', '-d', '--wait', '--wait-timeout', '180', '--no-deps', 'db', timeout=240).returncode:
+        raise Unavailable('the isolated database did not become healthy')
     held = stack.sql("insert into app_private.installation_holds (hold, detail) values ('restore', 'Restored from a backup. Inspect, then release.') on conflict do nothing;\n"
                      "create schema if not exists autobots_disposable;\n"
                      'create table if not exists autobots_disposable.marker (run_id text primary key);\n'
                      f"delete from autobots_disposable.marker;\ninsert into autobots_disposable.marker values ('{project}');\n")
     if held.returncode:
         raise Unavailable(f'the restore hold could not be set: {held.stderr.strip()[-200:]}')
+    if stack.compose('up', '-d', '--wait', '--wait-timeout', '240', timeout=300).returncode:
+        raise Unavailable('the isolated project did not become healthy. Its database is up, and held')
     return {'project': project, 'gateway_port': gateway_port, 'db_port': db_port, 'volumes': sorted(volumes.values()), 'held': True}
+
+
+def verify_restore(backup_dir: Path, backup_key: Path, key_dir: Path, project: str) -> list[dict]:
+    """Every fact the manifest records, read back from the restored instance. Only reads."""
+    key = read_key(backup_key)
+    manifest = load_manifest(backup_dir, key)
+    cases: list[dict] = []
+
+    def check(name: str, expected: object, observed: object) -> None:
+        cases.append({'id': name, 'expected': str(expected), 'observed': str(observed), 'passed': expected == observed})
+
+    facts = read_facts(project)
+    live = {name: facts.pop(name) for name in ('live_workers', 'live_leases')}
+    check('no worker or lease is live', {'live_workers': 0, 'live_leases': 0}, live)
+    recorded = manifest['facts']
+    for name in ('runs', 'events', 'tool_receipts', 'model_invocations', 'checkpoints', 'users', 'credentials', 'migrations'):
+        check(f'{name} match the manifest', recorded[name], facts[name])
+    key_threads = lambda rows: sorted((row['thread_id'], row['latest'], row['count']) for row in rows)  # noqa: E731
+    check('checkpoint threads end where the manifest says', key_threads(recorded['threads']), key_threads(facts['threads']))
+    kept = key_dir / 'provider-master.key'
+    check('the provider key is the one backed up', manifest['provider_key_sha256'], hashlib.sha256(kept.read_bytes()).hexdigest() if kept.is_file() else None)
+    database = db_container(project)
+
+    def sql(statement: str) -> subprocess.CompletedProcess[str]:
+        return docker('exec', database, 'psql', '-U', 'supabase_admin', '-d', 'postgres', '-X', '-q', '-A', '-t', '-c', statement)
+
+    check('the restore hold is in place', '1', sql('select count(*) from app_private.installation_holds;').stdout.strip())
+    anon = sql('begin; set local role anon; select count(*) from public.runs; rollback;')
+    check('an anonymous role reads no runs', True, anon.returncode != 0 or anon.stdout.strip() == '0')
+    plain = backup_dir / '.configuration.tmp'
+    descriptor = os.open(plain, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(descriptor, 'wb') as sink:
+            open_stream(backup_dir / manifest['components']['configuration']['file'], key, 'configuration', sink)
+        values = parse_env(plain.read_text())
+    finally:
+        plain.unlink(missing_ok=True)
+    port = lines(docker('ps', '--filter', f'{LABEL}{project}', '--filter', 'label=com.docker.compose.service=api-gw', '--format', '{{.Ports}}'))[0].split('->')[0].rsplit(':', 1)[-1]
+    service = values['SERVICE_ROLE_KEY']
+    for artifact in recorded['artifacts']:
+        path = sql(f"select object_path from public.artifacts where id = '{artifact['id']}';").stdout.strip()
+        address = f'http://127.0.0.1:{port}/storage/v1/object/workspace-artifacts/{path}'
+        reply = urlrequest.Request(address, headers={'apikey': service, 'Authorization': f'Bearer {service}'})
+        with urlrequest.urlopen(reply, timeout=30) as response:
+            digest = hashlib.sha256(response.read()).hexdigest()
+        check('an artifact reads back with its recorded hash', artifact['sha256'], digest)
+    return cases
 
 
 def main() -> int:
@@ -352,8 +402,17 @@ def main() -> int:
     back.add_argument('--project', required=True)
     back.add_argument('--gateway-port', type=int, default=0)
     back.add_argument('--db-port', type=int, default=0)
+    verify = commands.add_parser('verify')
+    verify.add_argument('--backup', type=Path, required=True)
+    verify.add_argument('--backup-key', type=Path, required=True)
+    verify.add_argument('--key-dir', type=Path, required=True)
+    verify.add_argument('--project', required=True)
     args = parser.parse_args()
     try:
+        if args.command == 'verify':
+            cases = verify_restore(args.backup, args.backup_key, args.key_dir, args.project)
+            print(json.dumps({'cases': cases}))
+            return 0 if all(case['passed'] for case in cases) else 1
         if args.command == 'keygen':
             if args.out.exists():
                 raise Refused('that key file already exists')

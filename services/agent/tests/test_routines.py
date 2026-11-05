@@ -1,10 +1,16 @@
 """Occurrence times, including daylight saving changes, with no database."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from autobots.domain.routines import TriggerInvalid, occurrences, validate_trigger
+from autobots.domain.routines import (
+    MAX_OCCURRENCES,
+    TriggerInvalid,
+    occurrences,
+    occurrences_dropped,
+    validate_trigger,
+)
 
 
 def utc(year: int, month: int, day: int, hour: int = 0, minute: int = 0) -> datetime:
@@ -83,3 +89,18 @@ def test_intervals_land_on_a_fixed_grid() -> None:
 def test_invalid_triggers(trigger: dict[str, object], timezone: str, code: str) -> None:
     with pytest.raises(TriggerInvalid, match=code):
         validate_trigger(trigger, timezone)
+
+
+def test_after_long_away_the_newest_occurrences_are_kept_and_the_rest_counted() -> None:
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    end = start + timedelta(hours=20)
+    trigger = {"kind": "interval", "minutes": 1}
+    found = occurrences(trigger, "UTC", start, end)
+    assert len(found) == MAX_OCCURRENCES
+    assert found[-1] == end
+    assert occurrences_dropped(trigger, start, end, len(found)) == 200
+
+
+def test_an_interval_too_long_to_compute_is_refused() -> None:
+    with pytest.raises(TriggerInvalid):
+        validate_trigger({"kind": "interval", "minutes": 10**10}, "UTC")

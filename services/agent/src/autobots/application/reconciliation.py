@@ -32,8 +32,10 @@ class UnknownOperation:
 
 async def unknown_operations(connection: Any, run_id: UUID) -> list[UnknownOperation]:
     cursor = await connection.execute(
+        "with recursive tree as (select id from public.runs where id = %s union all "
+        "select r.id from public.runs r join tree t on r.parent_run_id = t.id) "
         "select operation_id, tool_id, tool_version from app_private.tool_receipts "
-        "where run_id = %s and status = 'unknown' order by created_at",
+        "where run_id in (select id from tree) and status = 'unknown' order by created_at",
         (run_id,),
     )
     return [UnknownOperation(row[0], row[1], row[2]) for row in await cursor.fetchall()]
@@ -41,8 +43,10 @@ async def unknown_operations(connection: Any, run_id: UUID) -> list[UnknownOpera
 
 async def has_unresolvable_effect(connection: Any, run_id: UUID) -> bool:
     cursor = await connection.execute(
-        "select exists (select 1 from app_private.tool_receipts where run_id = %s "
-        "and status = 'unknown' and not can_readback)",
+        "with recursive tree as (select id from public.runs where id = %s union all "
+        "select r.id from public.runs r join tree t on r.parent_run_id = t.id) "
+        "select exists (select 1 from app_private.tool_receipts "
+        "where run_id in (select id from tree) and status = 'unknown' and not can_readback)",
         (run_id,),
     )
     return bool((await cursor.fetchone())[0])
@@ -67,10 +71,14 @@ async def record_evidence(
         existing = await existing_receipt(connection, scope, fingerprint)
         if existing is not None:
             return str(existing["status"])
+        # A parent's page lists its children's effects, so it can settle them too.
         cursor = await connection.execute(
+            "with recursive tree as (select id from public.runs where id = %s union all "
+            "select r.id from public.runs r join tree t on r.parent_run_id = t.id) "
             "select status from app_private.tool_receipts "
-            "where operation_id = %s and run_id = %s and workspace_id = %s for update",
-            (operation_id, run_id, workspace_id),
+            "where operation_id = %s and run_id in (select id from tree) and workspace_id = %s "
+            "for update",
+            (run_id, operation_id, workspace_id),
         )
         row = await cursor.fetchone()
         if row is None:

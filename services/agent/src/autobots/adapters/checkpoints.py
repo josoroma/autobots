@@ -18,6 +18,14 @@ DURABILITY = "sync"
 STALE_OWNER_SQLSTATE = "AB001"
 
 
+# What reads and writes saved state. A change in any of them can change what a replay does.
+QUALIFIED_STACK = (
+    "langgraph-checkpoint-postgres",
+    "langgraph-checkpoint",
+    "langgraph",
+    "deepagents",
+    "langchain-core",
+)
 ADAPTER_STATEMENTS = (
     BasePostgresSaver.SELECT_SQL,
     BasePostgresSaver.UPSERT_CHECKPOINT_BLOBS_SQL,
@@ -35,7 +43,8 @@ def identity_of(version: str, migrations: Sequence[str], statements: Sequence[st
 def adapter_identity() -> tuple[str, str]:
     """The installed adapter: its release, its migrations and the SQL this code relies on."""
     version = metadata.version("langgraph-checkpoint-postgres")
-    return version, identity_of(version, BasePostgresSaver.MIGRATIONS, ADAPTER_STATEMENTS)
+    stack = " ".join(f"{name}=={metadata.version(name)}" for name in QUALIFIED_STACK)
+    return version, identity_of(stack, BasePostgresSaver.MIGRATIONS, ADAPTER_STATEMENTS)
 
 
 async def adapter_qualified(connection: Any) -> bool:

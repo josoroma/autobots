@@ -1236,8 +1236,15 @@ export const schemas = {
     "additionalProperties": false,
     "properties": {
       "active_version": {
-        "title": "Active Version",
-        "type": "integer"
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Active Version"
       },
       "key": {
         "title": "Key",
@@ -1870,6 +1877,43 @@ export const schemas = {
     "title": "ReconciliationResult",
     "type": "object"
   },
+  "RegressionCase": {
+    "additionalProperties": false,
+    "description": "A query that must find the content once it's in place, and text it must not lose.",
+    "properties": {
+      "must_contain": {
+        "maxLength": 500,
+        "minLength": 1,
+        "title": "Must Contain",
+        "type": "string"
+      }
+    },
+    "required": [
+      "must_contain"
+    ],
+    "title": "RegressionCase",
+    "type": "object"
+  },
+  "RegressionRun": {
+    "additionalProperties": false,
+    "description": "The reviewer's own checks. A proposal's suggested cases aren't counted.",
+    "properties": {
+      "cases": {
+        "items": {
+          "$ref": "#/components/schemas/RegressionCase"
+        },
+        "maxItems": 20,
+        "minItems": 1,
+        "title": "Cases",
+        "type": "array"
+      }
+    },
+    "required": [
+      "cases"
+    ],
+    "title": "RegressionRun",
+    "type": "object"
+  },
   "RequiredArtifact": {
     "additionalProperties": false,
     "description": "A deterministic check of the bytes, decided at admission.",
@@ -2019,7 +2063,7 @@ export const schemas = {
         "type": "string"
       },
       "to_version": {
-        "minimum": 1.0,
+        "minimum": 0.0,
         "title": "To Version",
         "type": "integer"
       }
@@ -3912,7 +3956,7 @@ export function parseInstanceView(value: unknown): InstanceView {
 }
 
 export interface KnowledgeHead {
-  active_version: number;
+  active_version: number | null;
   key: string;
   kind: string;
   schema_version: 1;
@@ -4102,6 +4146,22 @@ export interface ReconciliationResult {
 
 export function parseReconciliationResult(value: unknown): ReconciliationResult {
   return parseWith(schemas, "ReconciliationResult", value) as ReconciliationResult;
+}
+
+export interface RegressionCase {
+  must_contain: string;
+}
+
+export function parseRegressionCase(value: unknown): RegressionCase {
+  return parseWith(schemas, "RegressionCase", value) as RegressionCase;
+}
+
+export interface RegressionRun {
+  cases: RegressionCase[];
+}
+
+export function parseRegressionRun(value: unknown): RegressionRun {
+  return parseWith(schemas, "RegressionRun", value) as RegressionRun;
 }
 
 export interface RequiredArtifact {
@@ -4638,8 +4698,8 @@ export async function decideImprovement(options: ClientOptions, candidate_id: st
   return parseCandidateList(await requestJson(options, "POST", `/v1/improvements/${encodeURIComponent(candidate_id)}/decision`, body));
 }
 
-export async function runImprovementRegression(options: ClientOptions, candidate_id: string): Promise<CandidateList> {
-  return parseCandidateList(await requestJson(options, "POST", `/v1/improvements/${encodeURIComponent(candidate_id)}/regression`));
+export async function runImprovementRegression(options: ClientOptions, candidate_id: string, body: RegressionRun): Promise<CandidateList> {
+  return parseCandidateList(await requestJson(options, "POST", `/v1/improvements/${encodeURIComponent(candidate_id)}/regression`, body));
 }
 
 export async function rollbackKnowledge(options: ClientOptions, body: RollbackRequest): Promise<KnowledgeHead> {

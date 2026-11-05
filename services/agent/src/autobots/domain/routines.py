@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 DEFAULT_TIMEZONE = "America/Costa_Rica"
 MAX_OCCURRENCES = 1000
+MAX_INTERVAL_MINUTES = 366 * 24 * 60
 
 
 class TriggerInvalid(ValueError):
@@ -21,7 +22,11 @@ def validate_trigger(trigger: Mapping[str, Any], timezone: str) -> None:
     kind = trigger.get("kind")
     if kind == "interval":
         minutes = trigger.get("minutes")
-        if not isinstance(minutes, int) or isinstance(minutes, bool) or minutes < 1:
+        if (
+            not isinstance(minutes, int)
+            or isinstance(minutes, bool)
+            or not 1 <= minutes <= MAX_INTERVAL_MINUTES
+        ):
             raise TriggerInvalid("interval_invalid")
     elif kind == "daily":
         try:
@@ -45,8 +50,11 @@ def occurrences(
         step = timedelta(minutes=trigger["minutes"])
         epoch = datetime(2000, 1, 1, tzinfo=UTC)
         count = (after - epoch) // step + 1
+        last_count = (until - epoch) // step
+        # After long enough away, the newest are what matter. `occurrences_dropped` counts the rest.
+        count = max(count, last_count - MAX_OCCURRENCES + 1)
         moment = epoch + count * step
-        while moment <= until and len(found) < MAX_OCCURRENCES:
+        while moment <= until:
             found.append(moment)
             moment += step
         return found
@@ -54,9 +62,21 @@ def occurrences(
     wall = time.fromisoformat(trigger["time"])
     day = after.astimezone(zone).date()
     last = until.astimezone(zone).date()
-    while day <= last and len(found) < MAX_OCCURRENCES:
+    day = max(day, last - timedelta(days=MAX_OCCURRENCES))
+    while day <= last:
         moment = datetime.combine(day, wall, tzinfo=zone).astimezone(UTC)
         if after < moment <= until:
             found.append(moment)
         day += timedelta(days=1)
     return found
+
+
+def occurrences_dropped(
+    trigger: Mapping[str, Any], after: datetime, until: datetime, listed: int
+) -> int:
+    """How many fell before the listed ones, so history can say so rather than go quiet."""
+    if trigger["kind"] == "interval":
+        step = timedelta(minutes=trigger["minutes"])
+        epoch = datetime(2000, 1, 1, tzinfo=UTC)
+        return max(0, (until - epoch) // step - (after - epoch) // step - listed)
+    return max(0, (until - after).days - listed)

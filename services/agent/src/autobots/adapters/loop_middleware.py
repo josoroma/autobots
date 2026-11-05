@@ -187,9 +187,13 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             raise LoopStopped(refusal)
         if self._scope.parent_run_id is not None:
             cursor = await self._connection.execute(
-                "select status from public.runs where id = %s", (self._scope.parent_run_id,)
+                "with recursive up as (select id, parent_run_id, status from public.runs "
+                "where id = %s union all select r.id, r.parent_run_id, r.status "
+                "from public.runs r join up u on r.id = u.parent_run_id) "
+                "select count(*) from up where status <> 'running'",
+                (self._scope.parent_run_id,),
             )
-            if (await cursor.fetchone())[0] != "running":
+            if (await cursor.fetchone())[0]:
                 raise LoopStopped("parent_not_running")
         remaining = self._limits.active_seconds - await active_seconds_used(
             self._connection, self._scope.budget_run_id
@@ -244,13 +248,13 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
         covered = previous.covers if previous else 0
         block = await state_block(self._connection, run_id, self._goal)
         recent = view[covered:]
-        lead = [HumanMessage(block), *([HumanMessage(summary_text(previous))] if previous else [])]
+        lead = [HumanMessage(block), *([AIMessage(summary_text(previous))] if previous else [])]
         if total_chars([*lead, *recent]) > policy.context_chars:
             cut = safe_split(view, policy.keep_recent)
             if cut > covered:
                 previous = await self._summarize(request, handler, view, previous, covered, cut)
                 recent = view[cut:]
-                lead = [HumanMessage(block), HumanMessage(summary_text(previous))]
+                lead = [HumanMessage(block), AIMessage(summary_text(previous))]
         return request.override(messages=[*lead, *recent])
 
     async def _summarize(
@@ -391,7 +395,10 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
 
     async def awrap_model_call(self, request: Any, handler: Callable[[Any], Awaitable[Any]]) -> Any:
         await self._guard()
-        request = await self._compacted(request, handler)
+        try:
+            request = await self._compacted(request, handler)
+        except LimitReached as reached:
+            raise LoopStopped(reached.code) from None
         current = request
         while True:
             response, complete = await self._with_slot(current, handler)

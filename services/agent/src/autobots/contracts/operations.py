@@ -37,11 +37,11 @@ class RetentionSettings(BaseModel):
 
     @model_validator(mode="after")
     def keys_outlive_content(self) -> "RetentionSettings":
-        if (
-            self.run_days is not None
-            and self.receipt_days is not None
-            and self.receipt_days < self.run_days
-        ):
+        if self.receipt_days is None:
+            return self
+        if self.run_days is None:
+            raise ValueError("receipt_days needs run_days: content kept for good keeps its keys")
+        if self.receipt_days < self.run_days:
             raise ValueError("receipt_days can't be shorter than run_days")
         return self
 

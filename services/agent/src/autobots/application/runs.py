@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 from autobots.contracts.plans import GoalSpec, InputDocument, RequiredArtifact
 from autobots.domain.execution import current_contract
-from autobots.domain.models import RolePolicy
+from autobots.domain.models import PROFILES, RolePolicy
 from autobots.domain.runs import (
     TERMINAL,
     Actor,
@@ -140,6 +140,13 @@ def _snapshot(policy: RolePolicy | None) -> str:
         {
             "version": policy.version,
             "bindings": {role.value: profile.value for role, profile in policy.bindings.items()},
+            "routes": {
+                profile.value: {
+                    "wire_id": PROFILES[profile].wire_id,
+                    "canonical_id": PROFILES[profile].canonical_id,
+                }
+                for profile in set(policy.bindings.values())
+            },
         },
         sort_keys=True,
     )
@@ -408,6 +415,12 @@ async def apply_command(
             await connection.execute(
                 "update public.approval_requests set status = 'withdrawn' "
                 "where run_id = %s and status = 'pending'",
+                (run_id,),
+            )
+            # Nothing is waiting on an answer any more, so nothing can stay open against it.
+            await connection.execute(
+                "update app_private.run_obligations set status = 'met', response = 'cancelled', "
+                "met_at = now() where run_id = %s and status = 'open'",
                 (run_id,),
             )
             await _cancel_children(connection, workspace_id, run_id)

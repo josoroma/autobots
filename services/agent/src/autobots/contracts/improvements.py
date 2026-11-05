@@ -72,7 +72,7 @@ class KnowledgeHead(BaseModel):
     schema_version: Literal[1]
     kind: str
     key: str
-    active_version: int
+    active_version: int | None
 
 
 class RollbackRequest(BaseModel):
@@ -80,4 +80,13 @@ class RollbackRequest(BaseModel):
 
     kind: Literal["memory", "skill"]
     key: str
-    to_version: int = Field(ge=1)
+    # 0 means no active version, to undo a first promotion.
+    to_version: int = Field(ge=0)
+
+
+class RegressionRun(BaseModel):
+    """The reviewer's own checks. A proposal's suggested cases aren't counted."""
+
+    model_config = VIEW
+
+    cases: list[RegressionCase] = Field(min_length=1, max_length=20)

@@ -125,8 +125,8 @@ async def retention(workspace_a: UUID, workspace_b: UUID, real_run: UUID) -> Non
         check('a run with an unresolved effect is refused', 'unresolved_effect 2 (unknown, started)', report.refused, report.refused.get('unresolved_effect') == 2)
         check('a child of an active run is refused', 'run_tree_active 1', report.refused, report.refused.get('run_tree_active') == 1)
         check('the source of an active continuation is refused', 'continuation_active 1', report.refused, report.refused.get('continuation_active') == 1)
-        check('a run with an open obligation is refused', 'open_obligation 1', report.refused, report.refused.get('open_obligation') == 1)
-        for name, run in (('unknown effect', unknown), ('started effect', started), ('active', active), ('child', child), ('continued', source), ('waiting', waiting), ('young', young)):
+        check('a finished run with a stale obligation still purges', 'not refused for it', report.refused, 'open_obligation' not in report.refused)
+        for name, run in (('unknown effect', unknown), ('started effect', started), ('active', active), ('child', child), ('continued', source), ('young', young)):
             remaining = await files(run)
             check(f'the {name} run keeps its files', '1', remaining, remaining == 1)
         direct = await value("select app_private.purge_run_content(%s, %s, now())", workspace_a, active)

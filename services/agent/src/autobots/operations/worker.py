@@ -24,10 +24,16 @@ from uuid import UUID
 import psycopg
 from pydantic import SecretStr
 
+from autobots.adapters.checkpoints import adapter_qualified
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.api.main import provider_context_from_environment
 from autobots.application.approvals import expire_due
 from autobots.application.goal_loop import UNBOUND, LoopConfig, process_next
+from autobots.application.operations import (
+    DEFAULT_MIN_FREE_BYTES,
+    disk_condition,
+    storage_condition,
+)
 from autobots.application.provider_settings import CatalogFetcher, ProviderSettings
 from autobots.application.retention import apply_all
 from autobots.application.routines import evaluate_routines
@@ -169,6 +175,17 @@ def install_signal_handlers(stop: asyncio.Event) -> None:
         loop.add_signal_handler(signal_number, stop.set)
 
 
+async def unattended_refusal(connection: Any, store: Any) -> str | None:
+    if not await adapter_qualified(connection):
+        return "adapter_unqualified"
+    storage = await storage_condition(store)
+    if storage.state != "ok":
+        return storage.code
+    minimum = int(os.environ.get("AUTOBOTS_MIN_FREE_BYTES", DEFAULT_MIN_FREE_BYTES))
+    disk = disk_condition(Path(os.environ.get("AUTOBOTS_CONFIG_ROOT") or "."), minimum)
+    return None if disk.state == "ok" else disk.code
+
+
 def maintenance_step(
     credential_check: Callable[[Any, UUID], Awaitable[str]],
     store: Any,
@@ -181,6 +198,11 @@ def maintenance_step(
         if await is_held(connection):
             return False
         await expire_due(connection)
+        refused = await unattended_refusal(connection, store)
+        if refused is not None:
+            # A routine is admission too, so it waits on the same readiness a person would.
+            log_event(logger, "worker.unattended_work_waiting", logging.WARNING, reason=refused)
+            return False
 
         async def check(workspace_id: UUID) -> str:
             return await credential_check(connection, workspace_id)

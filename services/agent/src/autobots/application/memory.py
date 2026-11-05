@@ -31,18 +31,25 @@ async def store_memory(
     title: str,
     content: str,
     source: dict[str, Any],
+    expert_id: UUID | None = None,
 ) -> UUID:
     memory_id = uuid4()
     await connection.execute(
-        "insert into public.memory_items (id, workspace_id, title, content, source, created_by) "
-        "values (%s, %s, %s, %s, %s, %s)",
-        (memory_id, workspace_id, title, content, json.dumps(source), actor_id),
+        "insert into public.memory_items (id, workspace_id, title, content, source, created_by, "
+        "expert_id) values (%s, %s, %s, %s, %s, %s, %s)",
+        (memory_id, workspace_id, title, content, json.dumps(source), actor_id, expert_id),
     )
     return memory_id
 
 
 async def search(
-    connection: Any, workspace_id: UUID, query: str, *, run_id: UUID | None = None
+    connection: Any,
+    workspace_id: UUID,
+    query: str,
+    *,
+    run_id: UUID | None = None,
+    expert_id: UUID | None = None,
+    for_run: bool = False,
 ) -> list[SearchHit]:
     """Lexical only. `websearch_to_tsquery` takes any text, so a query can't be malformed."""
     hits: list[SearchHit] = []
@@ -50,8 +57,9 @@ async def search(
         "select id, title, ts_headline('english', content, q, %s), source, created_at "
         "from public.memory_items, websearch_to_tsquery('english', %s) q "
         "where workspace_id = %s and search @@ q and retired_at is null "
+        "and (not %s or expert_id is null or expert_id = %s) "
         "order by ts_rank(search, q) desc limit %s",
-        (_HEADLINE, query, workspace_id, MAX_HITS),
+        (_HEADLINE, query, workspace_id, for_run, expert_id, MAX_HITS),
     )
     for row in await cursor.fetchall():
         hits.append(
@@ -91,7 +99,19 @@ async def search(
 
 
 async def _search_tool(arguments: SearchMemory, context: ToolContext) -> SearchResults:
-    hits = await search(context.connection, context.scope.workspace_id, arguments.query)
+    # A run reaches its own files only: its grant covers those, not every run's in the workspace.
+    cursor = await context.connection.execute(
+        "select expert_id from public.runs where id = %s", (context.scope.run_id,)
+    )
+    expert = await cursor.fetchone()
+    hits = await search(
+        context.connection,
+        context.scope.workspace_id,
+        arguments.query,
+        run_id=context.scope.run_id,
+        expert_id=expert[0] if expert else None,
+        for_run=True,
+    )
     return SearchResults(hits=hits)
 
 

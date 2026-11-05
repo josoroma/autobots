@@ -1,17 +1,23 @@
 """The compatibility rule, and the table it reads staying equal to what the loop really offers."""
 
+import json
 from typing import Any
 
-from autobots.adapters.checkpoints import adapter_identity
+import pytest
+
+from autobots.adapters.checkpoints import QUALIFIED_STACK, adapter_identity
 from autobots.application.assignments import Delegation
 from autobots.application.goal_loop import loop_registry
 from autobots.application.run_usage import RootLimits
+from autobots.application.runs import _snapshot
+from autobots.application.worker_inference import frozen_policy
 from autobots.domain.execution import (
     GRAPH_STATE_VERSION,
     TOOL_VERSIONS,
     current_contract,
     incompatibility,
 )
+from autobots.domain.models import UnknownModelProfile, resolve_role_policy
 
 
 def test_the_version_table_is_what_the_registry_offers() -> None:
@@ -54,3 +60,23 @@ def test_the_adapter_identity_names_the_pinned_release() -> None:
     assert version == "3.2.0"
     assert len(fingerprint) == 64
     assert adapter_identity() == (version, fingerprint)
+
+
+def test_a_snapshot_records_its_models_and_a_changed_mapping_stops_the_run() -> None:
+    snapshot = json.loads(_snapshot(resolve_role_policy()))
+    assert frozen_policy(snapshot).bindings
+    route = snapshot["routes"]["openrouter_deepseek_flash"]
+    assert route["wire_id"] == "deepseek/deepseek-v4.1-flash-1017"
+    route["wire_id"] = "deepseek/some-other-model"
+    with pytest.raises(UnknownModelProfile):
+        frozen_policy(snapshot)
+
+
+def test_a_snapshot_saved_before_routes_were_recorded_still_reads() -> None:
+    snapshot = json.loads(_snapshot(resolve_role_policy()))
+    del snapshot["routes"]
+    assert frozen_policy(snapshot).bindings
+
+
+def test_the_qualification_covers_the_framework_stack() -> None:
+    assert {"langgraph", "langgraph-checkpoint", "deepagents"} <= set(QUALIFIED_STACK)

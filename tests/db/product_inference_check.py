@@ -16,7 +16,9 @@ from autobots.application.artifacts import read_artifact
 from autobots.application.provider_settings import KeyCheck, ProviderSettings
 from autobots.application.runs import admit_run, apply_command
 from autobots.application.worker_leases import claim_run
+from autobots.application.workflows import create_execution, create_workflow, publish_version
 from autobots.contracts.plans import RequiredArtifact
+from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import Actor, RunCommand
 
@@ -31,6 +33,20 @@ async def admit(workspace: str, tag: str, profile: str) -> None:
                                    required_artifacts=(RequiredArtifact(name='report.md', must_contain=['Total: 42']),),
                                    policy=resolve_role_policy(run_profile=profile))
         print(accepted.run_id)
+
+
+async def workflow(workspace: str) -> None:
+    """A published workflow with no model step, to show the product worker runs workflows at all."""
+    graph = {
+        'nodes': [{'id': 'in', 'block': 'input', 'version': 1, 'config': {'type': 'string'}}, {'id': 'up', 'block': 'transform', 'version': 1, 'config': {'operation': 'upper'}}, {'id': 'out', 'block': 'output', 'version': 1, 'config': {}}],
+        'links': [{'source': 'in', 'source_port': 'value', 'target': 'up', 'target_port': 'value'}, {'source': 'up', 'source_port': 'value', 'target': 'out', 'target_port': 'value'}],
+    }
+    actor = uuid4()
+    async with await psycopg.AsyncConnection.connect(os.environ['AUTOBOTS_DATABASE_URL'], autocommit=True) as db:
+        flow = await create_workflow(db, workspace_id=UUID(workspace), actor_id=actor, idempotency_key=str(uuid4()), name=f'Worker {uuid4().hex[:6]}')
+        await publish_version(db, workspace_id=UUID(workspace), actor_id=actor, workflow_id=flow.id, idempotency_key=str(uuid4()), expected_version=0, graph=WorkflowGraph.model_validate(graph), source='user')
+        bound = await create_execution(db, workspace_id=UUID(workspace), actor_id=actor, workflow_id=flow.id, idempotency_key=str(uuid4()), version=1, inputs={'in': 'x'})
+        print(bound.run_id)
 
 
 async def save_key(workspace: str) -> None:
@@ -69,7 +85,7 @@ async def strand(workspace: str, run: str, state: str) -> None:
             await apply_command(db, workspace_id=UUID(workspace), run_id=UUID(run), command=RunCommand.VERIFY, actor=Actor.WORKER, expected_version=version, generation=lease.generation)
 
 
-COMMANDS = {'admit': admit, 'save-key': save_key, 'artifact': artifact, 'strand': strand}
+COMMANDS = {'workflow': workflow, 'admit': admit, 'save-key': save_key, 'artifact': artifact, 'strand': strand}
 
 if __name__ == '__main__':
     asyncio.run(COMMANDS[sys.argv[1]](*sys.argv[2:]))

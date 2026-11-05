@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 
 import psycopg
 from deepagents import create_deep_agent
+from langchain.agents.middleware import AgentMiddleware
 from langchain_core.messages import HumanMessage
 from langgraph.errors import GraphRecursionError
 
@@ -64,6 +65,7 @@ from autobots.application.worker_leases import (
 from autobots.contracts.plans import GoalSpec
 from autobots.domain.execution import INCOMPATIBLE, incompatibility
 from autobots.domain.runs import Actor, CommandRefused, RunCommand, RunStatus
+from autobots.domain.tools import DELEGATION_TOOL
 from autobots.operations.logs import forbid_remote_tracing
 
 # Waiting can resolve these: a person adds budget or a key, or reconciles an uncertain call.
@@ -161,6 +163,14 @@ def loop_registry(
     return registry
 
 
+class SummarizationOff(AgentMiddleware[Any, Any]):
+    """Takes the SDK summarizer's place. `LoopMiddleware` compacts, through admission."""
+
+    @property
+    def name(self) -> str:
+        return "SummarizationMiddleware"
+
+
 def build_stage(
     connection: Any,
     model: Any,
@@ -196,10 +206,28 @@ def build_stage(
                 summary_route=summary_route,
             ),
             GatewayMiddleware(gateway, connection, scope),
+            SummarizationOff(),
         ],
         subagents=[],
         checkpointer=saver,
     )
+
+
+async def _scope_guidance(connection: Any, run_id: UUID, goal: GoalSpec) -> str:
+    """What this run can reach: where it may write, and which Experts it may assign."""
+    lines = [f"You may read and write only under: {', '.join(goal.allowed_paths)}."]
+    if DELEGATION_TOOL in goal.allowed_tools:
+        cursor = await connection.execute(
+            "select e.id, e.name from public.runs r join public.sessions s on s.id = r.session_id "
+            "cross join lateral jsonb_array_elements(s.experts) pinned "
+            "join public.experts e on e.id = (pinned ->> 'expert_id')::uuid "
+            "where r.id = %s order by e.name",
+            (run_id,),
+        )
+        experts = [f"{row[1]} (expert_id {row[0]})" for row in await cursor.fetchall()]
+        if experts:
+            lines.append(f"With {DELEGATION_TOOL} you may assign work to: {', '.join(experts)}.")
+    return "\n".join(lines)
 
 
 def _opening(goal: GoalSpec) -> str:
@@ -268,7 +296,7 @@ async def run_goal(
                 saver,
                 scope,
                 config,
-                goal.instructions,
+                f"{goal.instructions}\n\n{await _scope_guidance(connection, lease.run_id, goal)}",
                 delegation,
                 goal,
                 await _summary_route(connection, lease, config),

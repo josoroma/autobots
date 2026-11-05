@@ -19,6 +19,7 @@ from autobots.contracts.improvements import (
     CandidateDecision,
     CandidateList,
     KnowledgeHead,
+    RegressionRun,
     RollbackRequest,
 )
 
@@ -53,10 +54,17 @@ async def get_candidates(
     operation_id="runImprovementRegression",
     response_model=CandidateList,
 )
-async def post_regression(candidate_id: UUID, request: Request, workspace: Owner) -> CandidateList:
+async def post_regression(
+    candidate_id: UUID, body: RegressionRun, request: Request, workspace: Owner
+) -> CandidateList:
     async with _pool(request).connection() as connection:
         try:
-            await run_regression(connection, workspace, candidate_id)
+            await run_regression(
+                connection,
+                workspace,
+                candidate_id,
+                [case.model_dump() for case in body.cases],
+            )
         except ImprovementRefused as error:
             raise _error(error) from None
         return CandidateList(

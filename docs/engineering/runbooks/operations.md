@@ -113,7 +113,7 @@ Set per workspace on the Operations page, or with `PUT /v1/operations/retention`
 | `run_days` past a run finishing | Checkpoints, working files, offloads, summaries, artifact bytes (the row reads `expired`) | Run record, goal text, events, evidence, every tool receipt |
 | `receipt_days` | Idempotency keys, so a retry past it is treated as new | Keys for active runs, and every tool receipt |
 
-`receipt_days` can't be shorter than `run_days`. A run is refused, and retried on the next pass, while its tree is active, a continuation of it is active, it has a `started` or `unknown` tool receipt, or an obligation is open. Purges are recorded in `app_private.retention_log`. If Storage is down, rows commit and bytes wait for the next pass.
+`receipt_days` needs `run_days` and can't be shorter than it. A key stays while its run is inside the window, or has an unresolved effect or call. A run is refused, and retried on the next pass, while its tree is active, a continuation of it is active, or it has a `started` or `unknown` tool receipt. Purges are recorded in `app_private.retention_log`. If Storage is down, rows commit and bytes wait for the next pass.
 
 A purged run has no explanation on its page yet: its artifacts just aren't listed.
 

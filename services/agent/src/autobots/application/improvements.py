@@ -27,6 +27,7 @@ AUTHORITY_CLAIMS = re.compile(
     r"|system prompt|you are now|override\b.{0,40}\b(policy|rule|budget|limit))",
     re.IGNORECASE,
 )
+NO_VERSION = 0
 
 
 class ImprovementRefused(Exception):
@@ -73,8 +74,16 @@ async def _evidence_problems(connection: Any, workspace_id: UUID, evidence: list
     return problems
 
 
-async def run_regression(connection: Any, workspace_id: UUID, candidate_id: UUID) -> dict[str, Any]:
-    """Deterministic checks of the proposal. Passing them doesn't promote anything."""
+async def run_regression(
+    connection: Any,
+    workspace_id: UUID,
+    candidate_id: UUID,
+    cases: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Deterministic checks of the proposal. Passing them doesn't promote anything.
+
+    The cases come from the person reviewing. A proposer writing its own would certify itself.
+    """
     async with connection.transaction():
         cursor = await connection.execute(
             "select content, evidence, regression_cases, status from "
@@ -88,16 +97,28 @@ async def run_regression(connection: Any, workspace_id: UUID, candidate_id: UUID
         if status not in {"proposed", "regression_failed"}:
             raise ImprovementRefused("candidate_not_open")
         failures = await _evidence_problems(connection, workspace_id, evidence)
+        cursor = await connection.execute(
+            "select source ->> 'run_id' from public.improvement_candidates where id = %s",
+            (candidate_id,),
+        )
+        proposed_by = (await cursor.fetchone())[0]
+        if proposed_by and any(str(item["id"]) == proposed_by for item in evidence):
+            failures.append("evidence_is_its_own_run")
         if AUTHORITY_CLAIMS.search(content):
             failures.append("claims_authority")
-        if not regression_cases:
+        reviewer_cases = cases or []
+        if not reviewer_cases:
             failures.append("regression_cases_required")
         failures.extend(
             f"case_failed:{case['must_contain'][:40]}"
-            for case in regression_cases
+            for case in reviewer_cases
             if case["must_contain"] not in content
         )
-        results = {"failures": failures, "cases": len(regression_cases)}
+        results = {
+            "failures": failures,
+            "cases": len(reviewer_cases),
+            "proposer_cases_ignored": len(regression_cases),
+        }
         await connection.execute(
             "update public.improvement_candidates set status = %s, regression_results = %s "
             "where id = %s",
@@ -203,8 +224,23 @@ async def decide(
 async def rollback(
     connection: Any, workspace_id: UUID, kind: str, key: str, to_version: int
 ) -> KnowledgeHead:
-    """Points back at an earlier version. Every version stays, and admitted work keeps its own."""
+    """Points back at an earlier version, or at none with 0, since a first promotion has nothing
+    before it. Every version stays, and admitted work keeps its own."""
     async with connection.transaction():
+        if to_version == NO_VERSION:
+            cursor = await connection.execute(
+                "update public.knowledge_heads set active_version = null, updated_at = now() "
+                "where workspace_id = %s and kind = %s and key = %s returning key",
+                (workspace_id, kind, key),
+            )
+            if await cursor.fetchone() is None:
+                raise ImprovementRefused("version_not_found")
+            await connection.execute(
+                "update public.memory_items set retired_at = now() "
+                "where workspace_id = %s and key = %s and retired_at is null",
+                (workspace_id, key),
+            )
+            return KnowledgeHead(schema_version=1, kind=kind, key=key, active_version=None)
         cursor = await connection.execute(
             "select content from public.knowledge_versions "
             "where workspace_id = %s and kind = %s and key = %s and version = %s",

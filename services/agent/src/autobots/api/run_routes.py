@@ -100,6 +100,12 @@ async def post_run(
         ).fetchone()
         binding = None
         if body.session_id is not None:
+            if (
+                body.expert_version is not None
+                and await request.app.state.membership.role_in(user_id, workspace_id) != "owner"
+            ):
+                # An earlier version could hold tools an owner has since removed.
+                raise ApiError(403, "owner_required", "Only an owner can choose an Expert version.")
             try:
                 binding = await resolve_binding(
                     connection,

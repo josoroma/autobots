@@ -20,7 +20,7 @@ from autobots.contracts.workflows import (
     WorkflowView,
 )
 from autobots.domain.models import RolePolicy, resolve_role_policy
-from autobots.domain.tools import DELEGATION_TOOL, LOOP_TOOL_GRANTS
+from autobots.domain.tools import DELEGATION_TOOL, LOOP_TOOL_GRANTS, PLAN_TOOLS
 from autobots.domain.workflows import (
     GraphError,
     block_versions,
@@ -30,6 +30,7 @@ from autobots.domain.workflows import (
 )
 
 # What a workflow's own blocks reach. Its approval step is the only consequential one here.
+DEFAULT_LIMIT_MICRO_USD = 1_000_000
 _WORKFLOW_TOOLS = {**LOOP_TOOL_GRANTS, DELEGATION_TOOL: 1, "workflow_approval": 1}
 
 
@@ -194,6 +195,8 @@ async def create_execution(
     inputs: dict[str, Any],
     documents: tuple[InputDocument, ...] = (),
     policy: RolePolicy | None = None,
+    limit_micro_usd: int = DEFAULT_LIMIT_MICRO_USD,
+    tools: list[str] | None = None,
 ) -> ExecutionBinding:
     """An execution always names one exact version and hash. Later versions don't reach it."""
     cursor = await connection.execute(
@@ -217,21 +220,41 @@ async def create_execution(
         run_id = UUID(existing["run_id"]) if existing else None
         if existing is None:
             session_id = await _agent_session(connection, workspace_id, actor_id, graph)
+            if policy is None:
+                cursor = await connection.execute(
+                    "select default_profile, role_overrides from app_private.model_policies "
+                    "where workspace_id = %s",
+                    (workspace_id,),
+                )
+                chosen = await cursor.fetchone()
+                policy = resolve_role_policy(
+                    workspace_default=chosen[0] if chosen else None,
+                    workspace_role_overrides=chosen[1] if chosen else None,
+                )
+            granted = (
+                _WORKFLOW_TOOLS
+                if tools is None
+                else {
+                    name: version
+                    for name, version in _WORKFLOW_TOOLS.items()
+                    if name in tools or name in PLAN_TOOLS or name == "workflow_approval"
+                }
+            )
             admitted = await admit_run(
                 connection,
                 workspace_id=workspace_id,
                 actor_id=actor_id,
                 idempotency_key=f"workflow:{execution_id}",
                 goal_text=f"Workflow {name}, version {version}",
-                limit_micro_usd=1_000_000,
-                policy=policy or resolve_role_policy(),
+                limit_micro_usd=limit_micro_usd,
+                policy=policy,
                 input_documents=documents,
                 binding=SimpleNamespace(
                     session_id=session_id,
                     expert_id=None,
                     version=None,
                     instructions="",
-                    tools=_WORKFLOW_TOOLS,
+                    tools=granted,
                 ),
             )
             run_id = admitted.run_id
@@ -310,13 +333,48 @@ async def read_execution(connection: Any, workspace_id: UUID, execution_id: UUID
         for item in saved
     ]
     started = {item[1] for item in saved}
+    cursor = await connection.execute(
+        "select e.current_instance, r.status, exists (select 1 from public.approval_requests a "
+        "where a.run_id = r.id and a.status = 'pending') from public.workflow_executions e "
+        "join public.runs r on r.id = e.run_id where e.id = %s",
+        (execution_id,),
+    )
+    current, run_status, approval_pending = await cursor.fetchone()
+    settled = {item[0] for item in saved}
+
+    def _unsaved_status(key: str) -> str:
+        if run_status in {"succeeded", "failed", "cancelled"}:
+            return "not_run"
+        if key != current:
+            return "waiting"
+        if run_status == "waiting_approval" or approval_pending:
+            return "waiting_approval"
+        return "running" if run_status == "running" else "stopped_here"
+
     instances.extend(
         InstanceView(
-            key=node["id"], node_id=node["id"], iteration=None, status="waiting", error_code=None
+            key=node["id"],
+            node_id=node["id"],
+            iteration=None,
+            status=_unsaved_status(node["id"]),
+            error_code=None,
         )
         for node in graph["nodes"]
-        if node["id"] not in started
+        if node["id"] not in started and node["id"] != current
     )
+    if current and current not in settled:
+        # An iteration is keyed apart from its node, so it's added by what's running.
+        node_id = current.split("#")[0]
+        iteration = int(current.split("#")[1]) if "#" in current else None
+        instances.append(
+            InstanceView(
+                key=current,
+                node_id=node_id,
+                iteration=iteration,
+                status=_unsaved_status(current),
+                error_code=None,
+            )
+        )
     order = {node["id"]: index for index, node in enumerate(graph["nodes"])}
     instances.sort(key=lambda item: (order[item.node_id], item.iteration or 0))
     cursor = await connection.execute(

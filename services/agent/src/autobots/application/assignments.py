@@ -195,6 +195,8 @@ def assign_tool(delegation: Delegation) -> ToolDefinition:
             raise ToolFailed("assignment_paused")
         if result.outcome == "lost" or result.code == "children_settling":
             raise ToolFailed("assignment_lost")
+        if result.outcome == "waiting":
+            raise ToolFailed("assignment_paused")
         return await _close(
             connection,
             assignment_id,

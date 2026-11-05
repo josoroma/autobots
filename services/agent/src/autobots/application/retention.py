@@ -10,6 +10,7 @@ from autobots.operations.logs import log_event
 
 logger = logging.getLogger("autobots.retention")
 _BATCH = 100
+_MAX_BATCHES = 20
 
 
 @dataclass(frozen=True)
@@ -52,6 +53,12 @@ async def write_policy(
     )
 
 
+async def _commit(connection: Any) -> None:
+    """The API's pooled connections aren't autocommit, and these steps have to be durable each."""
+    if not connection.autocommit:
+        await connection.commit()
+
+
 async def _remove_expired_objects(
     connection: Any, store: Any, workspace_id: UUID, report: RetentionReport
 ) -> None:
@@ -61,7 +68,9 @@ async def _remove_expired_objects(
         "and status = 'expired' and bytes_removed_at is null limit %s",
         (workspace_id, _BATCH),
     )
-    for artifact_id, path in await cursor.fetchall():
+    rows = await cursor.fetchall()
+    await _commit(connection)
+    for artifact_id, path in rows:
         if store is None:
             report.objects_pending += 1
             continue
@@ -74,6 +83,7 @@ async def _remove_expired_objects(
         await connection.execute(
             "update public.artifacts set bytes_removed_at = now() where id = %s", (artifact_id,)
         )
+        await _commit(connection)
         report.objects_removed += 1
 
 
@@ -86,25 +96,42 @@ async def apply_retention(
     moment = now or (await (await connection.execute("select now()")).fetchone())[0]
     if policy.run_days is not None:
         cutoff = moment - timedelta(days=policy.run_days)
-        cursor = await connection.execute(
-            "select id from public.runs where workspace_id = %s and content_purged_at is null "
-            "and status in ('succeeded', 'failed', 'cancelled') and updated_at < %s "
-            "order by updated_at limit %s",
-            (workspace_id, cutoff, _BATCH),
-        )
-        for (run_id,) in await cursor.fetchall():
-            result = await (
-                await connection.execute(
-                    "select app_private.purge_run_content(%s, %s, %s)",
-                    (workspace_id, run_id, cutoff),
-                )
-            ).fetchone()
-            outcome = result[0]
-            if outcome.get("purged"):
-                report.purged_runs += 1
-            else:
-                code = str(outcome.get("refused"))
-                report.refused[code] = report.refused.get(code, 0) + 1
+        # By position, not by repeating the query, so runs refused today can't crowd out the rest.
+        position: tuple[datetime, UUID] | None = None
+        for _ in range(_MAX_BATCHES):
+            cursor = await connection.execute(
+                "select id, updated_at from public.runs "
+                "where workspace_id = %s and content_purged_at is null "
+                "and status in ('succeeded', 'failed', 'cancelled') and updated_at < %s "
+                "and (%s::timestamptz is null or (updated_at, id) > (%s::timestamptz, %s::uuid)) "
+                "order by updated_at, id limit %s",
+                (
+                    workspace_id,
+                    cutoff,
+                    position[0] if position else None,
+                    position[0] if position else None,
+                    position[1] if position else None,
+                    _BATCH,
+                ),
+            )
+            rows = await cursor.fetchall()
+            if not rows:
+                break
+            for run_id, updated_at in rows:
+                position = (updated_at, run_id)
+                result = await (
+                    await connection.execute(
+                        "select app_private.purge_run_content(%s, %s, %s)",
+                        (workspace_id, run_id, cutoff),
+                    )
+                ).fetchone()
+                await _commit(connection)
+                outcome = result[0]
+                if outcome.get("purged"):
+                    report.purged_runs += 1
+                else:
+                    code = str(outcome.get("refused"))
+                    report.refused[code] = report.refused.get(code, 0) + 1
     await _remove_expired_objects(connection, store, workspace_id, report)
     if policy.receipt_days is not None:
         cutoff = moment - timedelta(days=policy.receipt_days)
@@ -114,6 +141,7 @@ async def apply_retention(
             )
         ).fetchone()
         report.keys_expired = int(row[0])
+        await _commit(connection)
     log_event(
         logger,
         "retention.applied",

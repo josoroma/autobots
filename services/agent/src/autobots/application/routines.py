@@ -4,6 +4,7 @@ Only a routine someone created and left enabled can start work. A saved key star
 occurrence takes its version's frozen configuration, so an edit can't reach a run already admitted.
 """
 
+import logging
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 from types import SimpleNamespace
@@ -12,16 +13,30 @@ from uuid import UUID, uuid4
 
 from autobots.application.experts import ExpertRefused, get_expert
 from autobots.application.improvements import active_skill_text
-from autobots.application.runs import admit_run, existing_receipt, request_hash, store_receipt
+from autobots.application.runs import (
+    IdempotencyConflict,
+    admit_run,
+    existing_receipt,
+    request_hash,
+    store_receipt,
+)
 from autobots.application.workflows import WorkflowRefused, create_execution
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.routines import OccurrenceView, RoutineConfig, RoutineView
 from autobots.domain.models import resolve_role_policy
-from autobots.domain.routines import TriggerInvalid, occurrences, validate_trigger
+from autobots.domain.routines import (
+    TriggerInvalid,
+    occurrences,
+    occurrences_dropped,
+    validate_trigger,
+)
 from autobots.domain.tools import EXPERT_TOOLS, PLAN_TOOLS
+from autobots.operations.logs import log_event
 
 # Says whether a workspace can make model calls now. It reports, and never starts anything.
 CredentialCheck = Callable[[UUID], Awaitable[str]]
+
+logger = logging.getLogger("autobots.routines")
 
 
 class RoutineRefused(Exception):
@@ -263,6 +278,8 @@ async def _admit(
             idempotency_key=key,
             version=config.target.version,
             inputs=config.inputs,
+            limit_micro_usd=config.limit_micro_usd,
+            tools=config.tools,
         )
         return binding.run_id
     expert = await _expert_config(connection, workspace_id, config)
@@ -308,6 +325,63 @@ async def _needs_model(config: RoutineConfig, connection: Any) -> bool:
     return any(node["block"] == "agent" for node in graph["nodes"])
 
 
+async def _evaluate_one(
+    connection: Any,
+    routine_id: UUID,
+    credential_check: CredentialCheck,
+    now: datetime | None,
+) -> int:
+    async with connection.transaction():
+        row = await (
+            await connection.execute(
+                "select workspace_id, latest_version, evaluated_until from public.routines "
+                "where id = %s and enabled for update skip locked",
+                (routine_id,),
+            )
+        ).fetchone()
+        if row is None:
+            return 0
+        workspace_id, version, until = row
+        # Read under the row's lock, so a slower worker can't carry an older time past a newer one.
+        cursor = await connection.execute("select clock_timestamp()")
+        moment_now = now or (await cursor.fetchone())[0]
+        if moment_now <= until:
+            return 0
+        cursor = await connection.execute(
+            "select config from public.routine_versions where routine_id = %s and version = %s",
+            (routine_id, version),
+        )
+        config = RoutineConfig.model_validate((await cursor.fetchone())[0])
+        due = occurrences(config.trigger, config.timezone, until, moment_now)
+        await connection.execute(
+            "update public.routines set evaluated_until = %s where id = %s",
+            (moment_now, routine_id),
+        )
+        if not due:
+            return 0
+        dropped = occurrences_dropped(config.trigger, until, moment_now, len(due))
+        for index, missed in enumerate(due[:-1]):
+            note = f", {dropped} earlier not listed" if dropped and not index else ""
+            reason = f"host_away{note}"
+            await _record(connection, routine_id, missed, version, "missed", reason)
+        latest = due[-1]
+        if await _has_active_run(connection, routine_id):
+            await _record(connection, routine_id, latest, version, "skipped_overlap", "run_active")
+            return 0
+        if await _needs_model(config, connection):
+            code = await credential_check(workspace_id)
+            if code != "ready":
+                await _record(connection, routine_id, latest, version, "blocked", code)
+                return 0
+        try:
+            run_id = await _admit(connection, workspace_id, routine_id, version, config, latest)
+        except (RoutineRefused, WorkflowRefused, IdempotencyConflict) as refused:
+            await _record(connection, routine_id, latest, version, "blocked", refused.code)
+            return 0
+        await _record(connection, routine_id, latest, version, "admitted", None, run_id)
+        return 1
+
+
 async def evaluate_routines(
     connection: Any, credential_check: CredentialCheck, now: datetime | None = None
 ) -> int:
@@ -316,52 +390,18 @@ async def evaluate_routines(
     After time away, everything but the latest due occurrence is recorded as missed, and only the
     latest catches up. While an earlier run is active, an occurrence is skipped, and says so.
     """
-    cursor = await connection.execute("select clock_timestamp()")
-    moment_now = now or (await cursor.fetchone())[0]
     cursor = await connection.execute("select id from public.routines where enabled")
     admitted = 0
     for (routine_id,) in await cursor.fetchall():
-        async with connection.transaction():
-            row = await (
-                await connection.execute(
-                    "select workspace_id, latest_version, evaluated_until from public.routines "
-                    "where id = %s and enabled for update skip locked",
-                    (routine_id,),
-                )
-            ).fetchone()
-            if row is None:
-                continue
-            workspace_id, version, until = row
-            cursor = await connection.execute(
-                "select config from public.routine_versions where routine_id = %s and version = %s",
-                (routine_id, version),
+        try:
+            admitted += await _evaluate_one(connection, routine_id, credential_check, now)
+        except Exception as error:
+            # Rolled back on its own. This one stays due, and every other routine still runs.
+            log_event(
+                logger,
+                "routine.evaluation_failed",
+                logging.ERROR,
+                routine=routine_id,
+                error=type(error).__name__,
             )
-            config = RoutineConfig.model_validate((await cursor.fetchone())[0])
-            due = occurrences(config.trigger, config.timezone, until, moment_now)
-            await connection.execute(
-                "update public.routines set evaluated_until = %s where id = %s",
-                (moment_now, routine_id),
-            )
-            if not due:
-                continue
-            for missed in due[:-1]:
-                await _record(connection, routine_id, missed, version, "missed", "host_away")
-            latest = due[-1]
-            if await _has_active_run(connection, routine_id):
-                await _record(
-                    connection, routine_id, latest, version, "skipped_overlap", "run_active"
-                )
-                continue
-            if await _needs_model(config, connection):
-                code = await credential_check(workspace_id)
-                if code != "ready":
-                    await _record(connection, routine_id, latest, version, "blocked", code)
-                    continue
-            try:
-                run_id = await _admit(connection, workspace_id, routine_id, version, config, latest)
-            except (RoutineRefused, WorkflowRefused) as refused:
-                await _record(connection, routine_id, latest, version, "blocked", refused.code)
-                continue
-            await _record(connection, routine_id, latest, version, "admitted", None, run_id)
-            admitted += 1
     return admitted

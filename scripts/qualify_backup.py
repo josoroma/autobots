@@ -177,6 +177,15 @@ def qualify(root: Path) -> int:
         if back.returncode:
             raise Unavailable(f'the restore failed: {back.stderr[-500:]}')
         result = json.loads(back.stdout.strip().splitlines()[-1])
+        verified = backup_tool(root, 'verify', '--backup', str(backup_dir), '--backup-key', str(backup_key), '--key-dir', str(key_dir), '--project', restored_project)
+        report = json.loads(verified.stdout.strip().splitlines()[-1]) if verified.stdout.strip() else {'cases': []}
+        failed = [case['id'] for case in report['cases'] if not case['passed']]
+        cases.check("the operator's own verify command passes on the restore", 'exit 0, all facts match', f"exit {verified.returncode}, {len(report['cases'])} facts, failed {failed or 'none'}", verified.returncode == 0 and report['cases'] and not failed)
+        other_keys = work / 'other-provider-keys'
+        other_keys.mkdir(mode=0o700)
+        (other_keys / 'provider-master.key').write_bytes(secrets.token_bytes(32))
+        mismatch = backup_tool(root, 'verify', '--backup', str(backup_dir), '--backup-key', str(backup_key), '--key-dir', str(other_keys), '--project', restored_project)
+        cases.check('and it fails on the wrong provider key', 'exit 1', mismatch.returncode, mismatch.returncode == 1)
         source_volumes = run(['docker', 'volume', 'ls', '--filter', f'label=com.docker.compose.project={project}', '--format', '{{.Name}}'], tool_env()).stdout.split()
         shared = set(source_volumes) & set(result['volumes'])
         cases.check('the restore has its own ports and volumes', 'different ports, no shared volume', f"{result['gateway_port']}/{result['db_port']} vs {gateway_port}/{db_port}, {len(shared)} shared", result['gateway_port'] != gateway_port and result['db_port'] != db_port and not shared)

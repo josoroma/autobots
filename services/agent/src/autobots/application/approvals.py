@@ -130,7 +130,17 @@ async def approval_gate(
             await _enter_wait(connection, workspace_id, run_id, generation, str(approval_id))
             return "approval_pending"
         if status == "approved":
-            return None if stored_scope == current_scope_hash else "approval_scope_changed"
+            if stored_scope != current_scope_hash:
+                return "approval_scope_changed"
+            if expired:
+                return "approval_expired"
+            # A failure nobody ruled on used this decision. A person's ruling grants one more try.
+            cursor = await connection.execute(
+                "select 1 from app_private.tool_receipts where operation_id = %s "
+                "and status = 'failed' and reconciled_at is null",
+                (operation_id,),
+            )
+            return None if await cursor.fetchone() is None else "approval_consumed"
         return "approval_rejected" if status == "rejected" else "approval_expired"
 
 

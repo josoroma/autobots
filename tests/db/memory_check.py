@@ -89,7 +89,7 @@ async def main() -> None:
         invocation = await value("select count(*) from app_private.model_invocations where run_id = %s and role = 'summarizer'", run)
         check('and went through admission like any other call', 'recorded', invocation, invocation >= 1)
         check('its citations are the stored results, worked out by code', 'the offload', stored[1], str(offload[0]) in stored[1])
-        human = ' '.join(str(item.content) for item in later if item.type == 'human')
+        human = ' '.join(str(item.content) for item in later if item.type in ('human', 'ai'))
         for label, needle in (('the goal', 'Find the quarterly figure'), ('the criteria', 'States the figure'), ('the permissions', 'Allowed tools:')):
             check(f'{label} stays in the view, outside the summary', 'present', needle in human, needle in human)
         check('the view cites what can be read again', 'the offload id', str(offload[0]) in human, str(offload[0]) in human)

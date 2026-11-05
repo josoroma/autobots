@@ -7,6 +7,7 @@ Emissions are insert-only, so a replay can't replace an output that was already 
 import asyncio
 import json
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
@@ -163,6 +164,8 @@ async def _run_block(
 ) -> list[tuple[str, int, Any]]:
     block, config = node["block"], node.get("config", {})
     value = step.inputs.get("value")
+    if step.iteration is not None:
+        scope = replace(scope, instance=step.key)
     if block == "input":
         return [("value", 0, inputs[step.node_id])]
     if block in {"output", "join"}:
@@ -242,6 +245,10 @@ async def _pass(
             await _commit(connection, scope, execution_id, step, step.decision, [])
             continue
         node = shape.nodes[step.node_id]
+        await connection.execute(
+            "update public.workflow_executions set current_instance = %s where id = %s",
+            (step.key, execution_id),
+        )
         try:
             outputs = await _run_block(gateway, connection, scope, node, step, inputs)
         except BlockFailed as failed:

@@ -193,6 +193,11 @@ def qualify(root: Path) -> int:
         cases.check('the route comes from each run, not the worker', 'same process, terra request and ledger', f'{status(terra)}, {sorted({call["model"] for call in calls})}, {ledger}, alive {worker.poll() is None}',
                     finished and worker.poll() is None and bool(calls) and {call['model'] for call in calls} == {TERRA_WIRE} and ledger == f'{TERRA}/{TERRA_WIRE}/succeeded/-/1/{TERRA_WORST}/100')
 
+        # A workflow reaches the same worker, in the same process.
+        flow = helper('workflow', workspace_a).strip().splitlines()[-1]
+        flow_done = settled(flow, 'succeeded', 60)
+        cases.check('the product worker runs a workflow to the end', 'succeeded', f'{status(flow)}, worker alive {worker.poll() is None}', flow_done and worker.poll() is None)
+
         # Rotation reaches the next attempt with no restart.
         save_key(workspace_a, KEY_TWO)
         rotated = admit(workspace_a, 'rotated')

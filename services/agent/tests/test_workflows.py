@@ -3,12 +3,14 @@
 import asyncio
 from types import SimpleNamespace
 from typing import Any
+from uuid import uuid4
 
 import pytest
 
 from autobots.application.run_projection import public_text
-from autobots.application.workflow_runner import _Stop, _tool
-from autobots.domain.workflow_execution import BlockFailed, GraphShape, unsettled_nodes
+from autobots.application.tool_gateway import ToolScope
+from autobots.application.workflow_runner import _run_block, _Stop, _tool
+from autobots.domain.workflow_execution import BlockFailed, GraphShape, Step, unsettled_nodes
 from autobots.domain.workflows import (
     MAX_FOREACH_ITEMS,
     _iteration_errors,
@@ -314,3 +316,61 @@ def test_a_stopped_agent_node_runs_again_instead_of_failing() -> None:
             asyncio.run(_tool(Stopped(code), None, None, "t", {}))  # type: ignore[arg-type]
     with pytest.raises(BlockFailed):
         asyncio.run(_tool(Stopped("tool_failed"), None, None, "t", {}))  # type: ignore[arg-type]
+
+
+def _chain(first: dict[str, Any], *rest: tuple[dict[str, Any], str, str]) -> dict[str, Any]:
+    nodes, links, previous, port = [first], [], first["id"], "value"
+    for item, in_port, out_port in rest:
+        nodes.append(item)
+        links.append(link(previous, port, item["id"], in_port))
+        previous, port = item["id"], out_port
+    nodes.append(node("out", "output"))
+    links.append(link(previous, port, "out", "value"))
+    return {"nodes": nodes, "links": links}
+
+
+def test_an_approval_can_guard_an_effect_and_keeps_its_inputs_type() -> None:
+    graph = _chain(
+        node("in", "input", type="string"),
+        (node("ok", "approval"), "value", "value"),
+        (node("save", "artifact", path="outputs/a.md"), "content", "artifact_id"),
+    )
+    assert validate_graph(graph) == []
+
+
+def test_to_string_can_feed_an_artifact() -> None:
+    graph = _chain(
+        node("in", "input", type="number"),
+        (node("text", "transform", operation="to_string"), "value", "value"),
+        (node("save", "artifact", path="outputs/a.md"), "content", "artifact_id"),
+    )
+    assert validate_graph(graph) == []
+
+
+def test_a_json_value_still_cant_reach_a_string_input_through_an_approval() -> None:
+    graph = _chain(
+        node("in", "input", type="json"),
+        (node("ok", "approval"), "value", "value"),
+        (node("save", "artifact", path="outputs/a.md"), "content", "artifact_id"),
+    )
+    assert [error.code for error in validate_graph(graph)] == ["link_type_mismatch"]
+
+
+def test_equal_foreach_items_are_separate_operations() -> None:
+    seen: list[Any] = []
+
+    class Recording:
+        async def execute(self, _: Any, scope: Any, name: str, arguments: Any) -> Any:
+            seen.append(scope.instance)
+            return SimpleNamespace(
+                code=None,
+                outcome=SimpleNamespace(value="succeeded"),
+                output={"outcome": "succeeded"},
+            )
+
+    scope = ToolScope(workspace_id=uuid4(), run_id=uuid4(), generation=1, tools={})
+    agent = node("a", "agent", expert_id=str(uuid4()))
+    for iteration in (0, 1):
+        step = Step(f"a#{iteration}", "a", iteration, "run", {"goal": "x"})
+        asyncio.run(_run_block(Recording(), None, scope, agent, step, {}))  # type: ignore[arg-type]
+    assert seen == ["a#0", "a#1"]

@@ -48,6 +48,7 @@ from autobots.application.provider_settings import (
 )
 from autobots.application.worker_leases import Lease
 from autobots.domain.models import (
+    PROFILES,
     ModelRole,
     RolePolicy,
     UnknownModelProfile,
@@ -108,6 +109,11 @@ def frozen_policy(snapshot: Mapping[str, Any] | None) -> RolePolicy:
     policy = {approved_role(role): approved_profile(bound) for role, bound in bindings.items()}
     if ROLE not in policy:
         raise UnknownModelProfile("this run has no binding for the role")
+    # A release that points a profile at another model mustn't move runs saved before it.
+    for name, route in ((snapshot or {}).get("routes") or {}).items():
+        current = PROFILES[approved_profile(name)]
+        if route != {"wire_id": current.wire_id, "canonical_id": current.canonical_id}:
+            raise UnknownModelProfile("this run was frozen on another model for that profile")
     return RolePolicy(int((snapshot or {}).get("version", 0)), policy)
 
 

@@ -10,6 +10,10 @@ const POLL_MS = 1000;
 const TERMINAL = new Set(["succeeded", "failed", "cancelled"]);
 const STATUS_TEXT: Record<string, string> = {
   waiting: "Waiting for its inputs",
+  running: "Running now",
+  waiting_approval: "Waiting for a person's approval",
+  stopped_here: "Stopped here. See the run for why",
+  not_run: "Didn't run",
   succeeded: "Succeeded",
   failed: "Failed",
   skipped: "Skipped, since its branch wasn't taken",

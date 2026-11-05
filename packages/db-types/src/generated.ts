@@ -70,7 +70,7 @@ export interface KnowledgeHeadsRow {
   workspace_id: string;
   kind: string;
   key: string;
-  active_version: number;
+  active_version: number | null;
   updated_at: string;
 }
 
@@ -97,6 +97,7 @@ export interface MemoryItemsRow {
   key: string | null;
   version: number | null;
   retired_at: string | null;
+  expert_id: string | null;
 }
 
 export interface ModelProfilesRow {
@@ -198,6 +199,7 @@ export interface WorkflowExecutionsRow {
   created_by: string;
   created_at: string;
   run_id: string | null;
+  current_instance: string | null;
 }
 
 export interface WorkflowNodeInstancesRow {
