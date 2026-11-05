@@ -49,6 +49,17 @@ export interface ExpertsRow {
   created_at: string;
 }
 
+export interface MemoryItemsRow {
+  id: string;
+  workspace_id: string;
+  title: string;
+  content: string;
+  source: unknown;
+  created_by: string;
+  created_at: string;
+  search: string | null;
+}
+
 export interface ModelProfilesRow {
   profile_id: string;
   canonical_id: string;

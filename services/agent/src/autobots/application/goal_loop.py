@@ -29,6 +29,8 @@ from autobots.adapters.tool_middleware import GatewayMiddleware, visible_tools
 from autobots.application.approvals import expire_due
 from autobots.application.artifacts import publish_tool, reconcile_run
 from autobots.application.assignments import Delegation, assign_tool
+from autobots.application.compaction import CompactionPolicy
+from autobots.application.memory import READ_OFFLOAD, SEARCH_MEMORY
 from autobots.application.plans import load_goal, plan_tools, plan_view
 from autobots.application.recovery import classify_interrupted, open_obligation, outstanding
 from autobots.application.run_usage import (
@@ -90,6 +92,7 @@ class LoopConfig:
     slot_wait_seconds: float = 30.0
     object_store: Any = None
     tools: tuple[ToolDefinition, ...] = ()
+    compaction: CompactionPolicy = CompactionPolicy()  # noqa: RUF009 - frozen, so sharing is safe.
     heartbeat_seconds: float = 20.0
     model_call_seconds: float = 120.0
     lease_seconds: float = DEFAULT_LEASE_SECONDS
@@ -116,7 +119,8 @@ def loop_registry(
     extra: tuple[ToolDefinition, ...] = (),
 ) -> ToolRegistry:
     registry = ToolRegistry()
-    for tool in (CALCULATE, READ_RUN_FILE, SAVE_ARTIFACT, *plan_tools(limits)):
+    tools = (CALCULATE, READ_RUN_FILE, SAVE_ARTIFACT, SEARCH_MEMORY, READ_OFFLOAD)
+    for tool in (*tools, *plan_tools(limits)):
         registry.register(tool)
     if object_store is not None:
         registry.register(publish_tool(object_store))
@@ -135,6 +139,8 @@ def build_stage(
     config: LoopConfig,
     instructions: str = "",
     delegation: Delegation | None = None,
+    goal: GoalSpec | None = None,
+    summary_route: ModelRoute | None = None,
 ) -> Any:
     """Explicit tools and middleware. Skills, memory, subagents and a backend stay unset here."""
     gateway = ToolGateway(
@@ -153,6 +159,9 @@ def build_stage(
                 sleep=config.sleep,
                 slot_wait_seconds=config.slot_wait_seconds,
                 model_call_seconds=config.model_call_seconds,
+                goal=goal,
+                compaction=config.compaction,
+                summary_route=summary_route,
             ),
             GatewayMiddleware(gateway, connection, scope),
         ],
@@ -220,7 +229,15 @@ async def run_goal(
     try:
         async with fenced_checkpointer(database_url, lease) as saver:
             agent = build_stage(
-                connection, model, saver, scope, config, goal.instructions, delegation
+                connection,
+                model,
+                saver,
+                scope,
+                config,
+                goal.instructions,
+                delegation,
+                goal,
+                await _summary_route(connection, lease, config),
             )
             state = await agent.aget_state(run_config)
             payload = None if state.next else {"messages": [HumanMessage(_opening(goal))]}
@@ -364,6 +381,18 @@ async def _obligation_holds(connection: Any, lease: Lease) -> bool:
         detail=detail,
     )
     return True
+
+
+async def _summary_route(connection: Any, lease: Lease, config: LoopConfig) -> ModelRoute | None:
+    """Compaction uses the run's frozen summarizer binding. A different one has no route here."""
+    cursor = await connection.execute(
+        "select policy_snapshot from public.runs where id = %s", (lease.run_id,)
+    )
+    snapshot = (await cursor.fetchone())[0]
+    bound = snapshot.get("bindings", {}).get("summarizer")
+    if bound != config.route.profile:
+        return None
+    return ModelRoute("summarizer", bound, config.route.wire_id, config.route.worst_case_micro_usd)
 
 
 async def _route_is_bound(connection: Any, lease: Lease, config: LoopConfig) -> bool:

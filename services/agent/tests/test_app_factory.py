@@ -21,6 +21,8 @@ def test_the_schema_builds_without_any_connection() -> None:
         "/v1/models",
         "/v1/approvals",
         "/v1/approvals/{approval_id}/decision",
+        "/v1/memory",
+        "/v1/memory/search",
         "/v1/routines",
         "/v1/routines/{routine_id}",
         "/v1/routines/{routine_id}/enabled",

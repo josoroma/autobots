@@ -69,7 +69,7 @@ async def main() -> None:
         files = await value('select count(*) from app_private.run_files where run_id = %s', new_run)
         reply = json.loads([m for m in model.seen[-1] if m.type == 'tool'][-1].content)
         check('new work on the later revision loses the tool, at the gateway', 'tool_not_granted, no file', (reply['code'], files), reply['code'] == 'tool_not_granted' and files == 0)
-        check('and the model is shown only its granted tools', 'calculate and the plan tools', sorted(model.bound[0]), sorted(model.bound[0]) == ['calculate', 'complete_task', 'propose_plan'])
+        check('and the model is shown only its granted tools', 'calculate and the plan tools', sorted(model.bound[0]), sorted(model.bound[0]) == ['calculate', 'complete_task', 'propose_plan', 'read_offload'])
         recorded = await (await db.execute('select session_id, expert_id, expert_version from public.runs where id = %s', (new_run,))).fetchone()
         check('the run records its Expert and revision', 'version 2', recorded[2], recorded == (session.id, expert.id, 2))
 

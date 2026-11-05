@@ -13,8 +13,14 @@ class OperationClass(StrEnum):
 
 # The plan tools come with any loop. An Expert chooses among the rest, and nothing here can reach
 # the host or the network.
-PLAN_TOOLS = {"propose_plan": 1, "complete_task": 1}
-EXPERT_TOOLS = {"calculate": 1, "read_run_file": 1, "save_artifact": 1, "publish_artifact": 1}
+PLAN_TOOLS = {"propose_plan": 1, "complete_task": 1, "read_offload": 1}
+EXPERT_TOOLS = {
+    "calculate": 1,
+    "read_run_file": 1,
+    "save_artifact": 1,
+    "publish_artifact": 1,
+    "search_memory": 1,
+}
 LOOP_TOOL_GRANTS = {**PLAN_TOOLS, **EXPERT_TOOLS}
 # Only a coordinator session's runs get this, and an Expert's own configuration can't name it.
 DELEGATION_TOOL = "assign_specialist"

@@ -61,7 +61,7 @@ async def main() -> None:
             calls(('complete_task', {'task_id': 'c', 'evidence': [{'kind': 'artifact', 'reference': 'outputs/b.md'}], 'summary': 'checked'})),
             say('all done')])
         check('a finished plan becomes a candidate, and the run moves to verifying', 'candidate, verifying', (result.outcome, result.run_status), result.outcome == 'candidate' and result.run_status == 'verifying')
-        check('the model is shown only its grants', 'five tools', sorted(model.bound[0]), sorted(model.bound[0]) == ['calculate', 'complete_task', 'propose_plan', 'read_run_file', 'save_artifact'])
+        check('the model is shown only its grants', 'seven tools', sorted(model.bound[0]), sorted(model.bound[0]) == ['calculate', 'complete_task', 'propose_plan', 'read_offload', 'read_run_file', 'save_artifact', 'search_memory'])
         goal = await load_goal(db, lease.run_id)
         check('the original request and criteria are kept', 'request and two criteria', (goal.original_request, goal.criteria), goal.original_request == 'Write the report' and list(goal.criteria.values()) == ['Has a summary', 'Has figures'])
         rows = await (await db.execute('select version, revision_reason, jsonb_array_length(tasks) from app_private.plan_versions where run_id = %s order by version', (lease.run_id,))).fetchall()

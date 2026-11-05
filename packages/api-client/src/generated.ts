@@ -1138,6 +1138,72 @@ export const schemas = {
     "title": "InstanceView",
     "type": "object"
   },
+  "MemoryCreate": {
+    "additionalProperties": false,
+    "properties": {
+      "content": {
+        "maxLength": 20000,
+        "minLength": 1,
+        "title": "Content",
+        "type": "string"
+      },
+      "title": {
+        "maxLength": 200,
+        "minLength": 1,
+        "title": "Title",
+        "type": "string"
+      }
+    },
+    "required": [
+      "title",
+      "content"
+    ],
+    "title": "MemoryCreate",
+    "type": "object"
+  },
+  "MemoryCreated": {
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "title": "Id",
+        "type": "string"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "id"
+    ],
+    "title": "MemoryCreated",
+    "type": "object"
+  },
+  "MemorySearchView": {
+    "additionalProperties": false,
+    "properties": {
+      "hits": {
+        "items": {
+          "$ref": "#/components/schemas/SearchHit"
+        },
+        "title": "Hits",
+        "type": "array"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "hits"
+    ],
+    "title": "MemorySearchView",
+    "type": "object"
+  },
   "ModelAvailability": {
     "additionalProperties": false,
     "properties": {
@@ -2372,6 +2438,40 @@ export const schemas = {
     "title": "RunWorkspace",
     "type": "object"
   },
+  "SearchHit": {
+    "additionalProperties": false,
+    "properties": {
+      "kind": {
+        "enum": [
+          "memory",
+          "evidence"
+        ],
+        "title": "Kind",
+        "type": "string"
+      },
+      "snippet": {
+        "title": "Snippet",
+        "type": "string"
+      },
+      "source": {
+        "additionalProperties": true,
+        "title": "Source",
+        "type": "object"
+      },
+      "title": {
+        "title": "Title",
+        "type": "string"
+      }
+    },
+    "required": [
+      "kind",
+      "title",
+      "snippet",
+      "source"
+    ],
+    "title": "SearchHit",
+    "type": "object"
+  },
   "ServiceHealth": {
     "additionalProperties": false,
     "description": "Liveness only. Holds no address, version or secret.",
@@ -3391,6 +3491,33 @@ export function parseInstanceView(value: unknown): InstanceView {
   return parseWith(schemas, "InstanceView", value) as InstanceView;
 }
 
+export interface MemoryCreate {
+  content: string;
+  title: string;
+}
+
+export function parseMemoryCreate(value: unknown): MemoryCreate {
+  return parseWith(schemas, "MemoryCreate", value) as MemoryCreate;
+}
+
+export interface MemoryCreated {
+  id: string;
+  schema_version: 1;
+}
+
+export function parseMemoryCreated(value: unknown): MemoryCreated {
+  return parseWith(schemas, "MemoryCreated", value) as MemoryCreated;
+}
+
+export interface MemorySearchView {
+  hits: SearchHit[];
+  schema_version: 1;
+}
+
+export function parseMemorySearchView(value: unknown): MemorySearchView {
+  return parseWith(schemas, "MemorySearchView", value) as MemorySearchView;
+}
+
 export interface ModelAvailability {
   available: boolean;
   canonical_id: string;
@@ -3750,6 +3877,17 @@ export function parseRunWorkspace(value: unknown): RunWorkspace {
   return parseWith(schemas, "RunWorkspace", value) as RunWorkspace;
 }
 
+export interface SearchHit {
+  kind: "memory" | "evidence";
+  snippet: string;
+  source: Record<string, unknown>;
+  title: string;
+}
+
+export function parseSearchHit(value: unknown): SearchHit {
+  return parseWith(schemas, "SearchHit", value) as SearchHit;
+}
+
 export interface ServiceHealth {
   schema_version: 1;
   status: "ok";
@@ -3991,6 +4129,14 @@ export async function addExpertVersion(options: ClientOptions, expert_id: string
 
 export async function getHealth(options: ClientOptions): Promise<ServiceHealth> {
   return parseServiceHealth(await requestJson(options, "GET", `/v1/health`));
+}
+
+export async function createMemory(options: ClientOptions, body: MemoryCreate): Promise<MemoryCreated> {
+  return parseMemoryCreated(await requestJson(options, "POST", `/v1/memory`, body));
+}
+
+export async function searchMemory(options: ClientOptions): Promise<MemorySearchView> {
+  return parseMemorySearchView(await requestJson(options, "GET", `/v1/memory/search`));
 }
 
 export async function getModels(options: ClientOptions): Promise<ModelList> {

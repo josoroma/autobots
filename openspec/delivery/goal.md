@@ -7,7 +7,7 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | EPIC-7 |
+| Target | EPIC-8 |
 | Kind | epic |
 | Focus | - |
 | Status | ACTIVE |
@@ -19,17 +19,17 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-7.1 | us-7-1-explicit-routines-deduplicated-scheduled | DONE | Explicit routines and deduplicated scheduled occurrences |
-| 2 | US-7.2 | us-7-2-select-qualify-first-consequential | NEEDS CLARIFICATION | Select and qualify the first consequential connector |
+| 1 | US-8.1 | us-8-1-scoped-memory-lexical-retrieval | DONE | Scoped memory, lexical retrieval and safe compaction |
+| 2 | US-8.2 | us-8-2-reviewed-memory-skill-promotion | READY | Reviewed memory and skill promotion with rollback |
 
 ## Next Action
 
-Action: escalate
-Story: US-7.2
-Change: us-7-2-select-qualify-first-consequential
-Owner: human
-Command: resolve US-7.2 in SPECS.md (a product decision is required)
-Reason: US-7.2 is NEEDS CLARIFICATION, not READY
+Action: select
+Story: US-8.2
+Change: us-8-2-reviewed-memory-skill-promotion
+Owner: main-session
+Command: openspec new change us-8-2-reviewed-memory-skill-promotion; set US-8.2 to IN PROGRESS with a Change: line
+Reason: US-8.2 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

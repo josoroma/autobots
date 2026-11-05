@@ -13,6 +13,7 @@ const TOOLS = [
   { id: "read_run_file", label: "Read run files" },
   { id: "save_artifact", label: "Save run files" },
   { id: "publish_artifact", label: "Publish artifacts" },
+  { id: "search_memory", label: "Search memory" },
 ];
 const PROFILES = [
   { id: "", label: "Workspace setting" },

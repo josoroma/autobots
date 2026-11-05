@@ -15,6 +15,18 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from pydantic import ConfigDict
 
+from autobots.application.compaction import (
+    CompactionPolicy,
+    StoredSummary,
+    latest_summary,
+    offload_large,
+    safe_split,
+    state_block,
+    store_summary,
+    summary_request,
+    summary_text,
+    total_chars,
+)
 from autobots.application.model_admission import (
     AdmissionRefused,
     AdmissionRequest,
@@ -32,6 +44,7 @@ from autobots.application.model_attempts import (
 from autobots.application.plans import PLAN_REJECTIONS
 from autobots.application.run_usage import LimitReached, RootLimits, active_seconds_used, consume
 from autobots.application.tool_gateway import ToolScope, ownership_refusal
+from autobots.contracts.plans import GoalSpec
 
 CHECK_SECONDS = 1.0
 INTERRUPTING = frozenset({"cancelling", "cancelled", "failed", "succeeded"})
@@ -123,6 +136,9 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         slot_wait_seconds: float = 30.0,
         model_call_seconds: float = 120.0,
+        goal: GoalSpec | None = None,
+        compaction: CompactionPolicy | None = None,
+        summary_route: ModelRoute | None = None,
     ) -> None:
         super().__init__()
         self._connection = connection
@@ -132,6 +148,9 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
         self._sleep = sleep
         self._slot_wait_seconds = slot_wait_seconds
         self._model_call_seconds = model_call_seconds
+        self._goal = goal
+        self._compaction = compaction or CompactionPolicy()
+        self._summary_route = summary_route
         self._lock = asyncio.Lock()
 
     async def _guard(self) -> float:
@@ -187,9 +206,63 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
         except LimitReached:
             raise LoopStopped(code) from None
 
+    async def _compacted(self, request: Any, handler: Any) -> Any:
+        """Only the model's view changes. Under budget, the request goes out as it came."""
+        run_id = self._scope.run_id
+        policy = self._compaction
+        view = await offload_large(self._connection, run_id, request.messages, policy)
+        if total_chars(view) <= policy.context_chars or self._goal is None:
+            return request.override(messages=view)
+        previous = await latest_summary(self._connection, run_id)
+        covered = previous.covers if previous else 0
+        block = await state_block(self._connection, run_id, self._goal)
+        recent = view[covered:]
+        lead = [HumanMessage(block), *([HumanMessage(summary_text(previous))] if previous else [])]
+        if total_chars([*lead, *recent]) > policy.context_chars:
+            cut = safe_split(view, policy.keep_recent)
+            if cut > covered:
+                previous = await self._summarize(request, handler, view, previous, covered, cut)
+                recent = view[cut:]
+                lead = [HumanMessage(block), HumanMessage(summary_text(previous))]
+        return request.override(messages=[*lead, *recent])
+
+    async def _summarize(
+        self,
+        request: Any,
+        handler: Any,
+        view: list[Any],
+        previous: StoredSummary | None,
+        covered: int,
+        cut: int,
+    ) -> StoredSummary:
+        """Under the run's frozen summarizer role, through admission like any other call."""
+        route = self._summary_route
+        if route is None:
+            raise LoopStopped("route_not_bound")
+        earlier = view[covered:cut]
+        asked = request.override(
+            messages=[HumanMessage(summary_request(earlier, previous))], tools=[]
+        )
+        remaining = await self._guard()
+        response, complete = await self._admitted_call(asked, handler, remaining, route)
+        if not complete:
+            raise LoopStopped("compaction_failed")
+        text = str(response.result[-1].content)
+        return await store_summary(
+            self._connection,
+            self._scope.run_id,
+            cut,
+            text,
+            earlier,
+            previous,
+            route.role,
+            route.profile,
+        )
+
     async def _admitted_call(
-        self, request: Any, handler: Any, remaining: float
+        self, request: Any, handler: Any, remaining: float, route: ModelRoute | None = None
     ) -> tuple[Any, bool]:
+        chosen = route or self._route
         run_id = self._scope.run_id
         budget = self._scope.budget_run_id
         limit: list[LimitReached] = []
@@ -242,11 +315,11 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             workspace_id=self._scope.workspace_id,
             root_run_id=budget,
             run_id=run_id,
-            role=self._route.role,
-            profile=self._route.profile,
-            wire_id=self._route.wire_id,
+            role=chosen.role,
+            profile=chosen.profile,
+            wire_id=chosen.wire_id,
             attempt=used + 1,
-            worst_case_micro_usd=self._route.worst_case_micro_usd,
+            worst_case_micro_usd=chosen.worst_case_micro_usd,
         )
         policy = RetryPolicy(
             deadline=datetime.now(UTC) + timedelta(seconds=remaining), sleep=self._sleep
@@ -272,6 +345,8 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
         return replies[-1], output.complete
 
     async def awrap_model_call(self, request: Any, handler: Callable[[Any], Awaitable[Any]]) -> Any:
+        await self._guard()
+        request = await self._compacted(request, handler)
         current = request
         waited = 0.0
         while True:

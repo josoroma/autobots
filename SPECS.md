@@ -176,10 +176,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-7.2#1 | Resolve the connector/service and operation scope decision. | TODO | US-7.2 |
 | US-7.2#2 | Implement and qualify only that selected connector under the existing effect contract. | TODO | US-7.2 |
 | EPIC-8 | Scoped memory and reviewed learning | — | — |
-| US-8.1 | Scoped memory, lexical retrieval and safe compaction | READY | EPIC-8 |
-| US-8.1#1 | Implement scoped store/artifact retrieval and explicit compaction policy. | TODO | US-8.1 |
-| US-8.1#2 | Test provenance, tool/result pairing and evidence retention across summaries. | TODO | US-8.1 |
-| US-8.2 | Reviewed memory and skill promotion with rollback | BLOCKED | EPIC-8 |
+| US-8.1 | Scoped memory, lexical retrieval and safe compaction | DONE | EPIC-8 |
+| US-8.1#1 | Implement scoped store/artifact retrieval and explicit compaction policy. | DONE | US-8.1 |
+| US-8.1#2 | Test provenance, tool/result pairing and evidence retention across summaries. | DONE | US-8.1 |
+| US-8.2 | Reviewed memory and skill promotion with rollback | READY | EPIC-8 |
 | US-8.2#1 | Implement candidate, review, regression and versioned promotion states. | TODO | US-8.2 |
 | US-8.2#2 | Demonstrate isolation and rollback on controlled fixtures. | TODO | US-8.2 |
 | EPIC-9 | Local operations and recovery | — | — |
@@ -2285,7 +2285,8 @@ Phase reference: B6, preserved SP-020. All story completion also requires SP-003
 
 ### US-8.1: Scoped memory, lexical retrieval and safe compaction
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-8-1-scoped-memory-lexical-retrieval/`
 
 As a user
 I want scoped retained evidence with bounded context
@@ -2317,15 +2318,15 @@ Dependencies:
 - US-3.3
 
 Tasks:
-- [ ] Implement scoped store/artifact retrieval and explicit compaction policy.
-- [ ] Test provenance, tool/result pairing and evidence retention across summaries.
+- [x] Implement scoped store/artifact retrieval and explicit compaction policy.
+- [x] Test provenance, tool/result pairing and evidence retention across summaries.
 
 Open Questions:
 - None.
 
 ### US-8.2: Reviewed memory and skill promotion with rollback
 
-Status: BLOCKED
+Status: READY
 
 As a specialist owner
 I want versioned improvement proposals
