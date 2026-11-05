@@ -9,6 +9,7 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
+from autobots.adapters.models.catalog import ModelUnavailable
 from autobots.adapters.models.factory import default_sdk_client
 from autobots.operations import route_qualification as rq
 
@@ -54,6 +55,7 @@ class Fake:
         choice = body.get("tool_choice")
         if body.get("response_format"):
             name = body["response_format"]["json_schema"]["name"]
+            content: dict[str, Any]
             if name == "Decision":
                 content = {"choice": "reject", "reason": "It is destructive."}
             else:
@@ -323,7 +325,7 @@ def test_a_catalog_drift_stops_the_run(tmp_path: Path) -> None:
     drifted = catalog()
     drifted["data"][0]["canonical_slug"] = "deepseek/another-model"
     fake = Fake()
-    with pytest.raises(rq.ModelUnavailable):
+    with pytest.raises(ModelUnavailable):
         run(tmp_path, fake, drifted)
     assert fake.bodies == []
 
