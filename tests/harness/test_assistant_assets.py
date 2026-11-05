@@ -651,15 +651,11 @@ class InstructionAssetTests(unittest.TestCase):
         self.assertEqual(config['documents']['codebase'], project['documents']['codebase'])
         self.assertEqual(config['documents']['product'], project['documents']['prd'])
 
-    def test_each_pending_profile_is_not_implemented(self):
-        profiles = json.loads((ROOT / '.claude/autobots.json').read_text())['verification']['pending_profiles']
-        self.assertTrue(profiles)
-        for profile in profiles:
-            with self.subTest(profile=profile):
-                result = subprocess.run([sys.executable, str(ROOT / 'scripts/verify.py'), '--profile', profile],
-                                        capture_output=True, text=True, timeout=10)
-                self.assertEqual(result.returncode, 2)
-                self.assertEqual(json.loads(result.stdout)['status'], 'not_implemented')
+    def test_configured_profiles_match_the_runner(self):
+        import verify
+        declared = json.loads((ROOT / '.claude/autobots.json').read_text())['verification']
+        self.assertEqual(tuple(declared['implemented_profiles']), verify.IMPLEMENTED_PROFILES)
+        self.assertEqual(declared['pending_profiles'], [])
 
 
 class IngestionAssetTests(unittest.TestCase):

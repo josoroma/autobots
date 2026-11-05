@@ -10,4 +10,4 @@ Version reviewed redacted summaries/manifests under `docs/engineering/evidence/<
 
 When delivering through `/ohmyorch:deliver`, follow [the OhMyOrch delivery rule](ohmyorch-delivery.md) instead of this DH-W procedure, by the user's decision. Everything else here applies to work outside that loop.
 
-`harness`, `fast`, `full` and `db` verification are implemented. Unimplemented `operations` must fail explicitly; passing an implemented profile cannot establish H1 or product acceptance. Honor current scope: harness adaptation alone does not authorize product construction.
+`harness`, `fast`, `full`, `db` and `operations` verification are implemented. `db` and `operations` use disposable targets only; passing any profile cannot establish H1 or product acceptance. Honor current scope: harness adaptation alone does not authorize product construction.

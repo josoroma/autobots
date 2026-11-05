@@ -17,6 +17,6 @@ Read `.claude/autobots.json`, the mapped deployment/contract and [DH-08](../../.
 
 Ordinary checks and hooks do not start Docker/services, reset databases, prune or remove volumes. Explicit authorized operations must use implemented target guards and the declared runbook; routine stop/start preserves data. No additional confirmation is needed for already authorized operations.
 
-Return topology/config changes and actual validation/recovery evidence. A rendered configuration is not a running deployment; unavailable `operations` checks remain pending.
+Return topology/config changes and actual validation/recovery evidence. A rendered configuration is not a running deployment, and a passing `operations` profile is disposable evidence, not proof about a persistent stack.
 
 Failure behavior: templates, skipped tests and missing tools never count as passing evidence. Report a failed or unavailable check as such; ordinary checks still do no persistent reset or volume removal.

@@ -58,6 +58,7 @@ WEB_STEPS = frozenset({'node_lock', 'node_version', 'lint', 'format_check', 'typ
 FULL_ONLY_CHECKS = frozenset({'build', 'fault_qualification', 'toolchain_scope_tests', 'browser_qualification'})
 FULL_CHECKS = PYTHON_STEPS | WEB_STEPS | FULL_ONLY_CHECKS
 DB_CHECKS = frozenset({'disposable_qualification', 'supabase_stack_qualification', 'app_db_qualification', 'identity_qualification'})
+OPERATIONS_CHECKS = frozenset({'operations_qualification', 'backup_qualification', 'upgrade_qualification'})
 # Recorded by the verifier itself, so they have no command exit code.
 UNCOMMANDED_CHECKS = frozenset({'project_configuration', 'non_mutation_guard'})
 
@@ -200,7 +201,7 @@ def report_state(root: Path, profile: str = 'harness') -> tuple[bool, str]:
     # Only `fast` may leave steps out, and each one stays visible as `not_run`.
     allowed = {'passed', 'not_run'} if profile == 'fast' else {'passed'}
     required = set(HARNESS_CHECKS) if profile == 'harness' else {*HARNESS_CHECKS, 'non_mutation_guard'}
-    required |= {'full': FULL_CHECKS, 'db': DB_CHECKS}.get(profile, frozenset())
+    required |= {'full': FULL_CHECKS, 'db': DB_CHECKS, 'operations': OPERATIONS_CHECKS}.get(profile, frozenset())
     complete = ids == required if profile == 'harness' else required <= ids
     if not complete:
         return False, 'The report lacks the required successful checks.'
@@ -219,7 +220,7 @@ def report_state(root: Path, profile: str = 'harness') -> tuple[bool, str]:
     if (data.get('input_fingerprint') != fingerprint(root)
             or data.get('input_manifest') != input_manifest(root)):
         return False, f'Source/configuration inputs changed after the last {profile} check.'
-    return True, f'Current {profile} checks passed; database, operations and live gates remain separate.'
+    return True, f'Current {profile} checks passed; other profiles and live gates remain separate.'
 
 
 def evidence_state(root: Path) -> tuple[bool, str]:
@@ -229,7 +230,7 @@ def evidence_state(root: Path) -> tuple[bool, str]:
         groups.append(APPLICATION_PROFILES)
     if needs_profile(root, ('db',), {'db'}):
         groups.append(('db',))
-    for group in groups or [('harness', *APPLICATION_PROFILES, 'db')]:
+    for group in groups or [('harness', *APPLICATION_PROFILES, 'db', 'operations')]:
         states = [report_state(root, profile) for profile in group]
         if not any(state[0] for state in states):
             return False, f"Inputs changed since the last passing {' or '.join(group)} report, and none is current."

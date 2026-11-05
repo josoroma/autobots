@@ -196,6 +196,44 @@ class Profiles(unittest.TestCase):
         self.assertEqual(self.run_steps('db', everything), 0)
         self.assertTrue(harness_lib.evidence_state(self.root)[0])
 
+    def test_operations_plan_is_the_three_qualifiers(self):
+        """The plan only: running it starts Docker, which this suite must not do."""
+        with mock.patch.dict(os.environ, {'HOME': '/home/fixture', 'OPENROUTER_API_KEY': 'planted'}):
+            plan, left_out = verify.tool_plan(self.root, 'operations', None)
+        self.assertEqual(left_out, [])
+        self.assertEqual({step.id: step.argv[1] for step in plan.steps},
+                         {'operations_qualification': 'scripts/qualify_operations.py',
+                          'backup_qualification': 'scripts/qualify_backup.py',
+                          'upgrade_qualification': 'scripts/qualify_upgrade.py'})
+        self.assertEqual({step.id for step in plan.steps}, harness_lib.OPERATIONS_CHECKS)
+        self.assertEqual(plan.env['HOME'], '/home/fixture')
+        self.assertNotIn('OPENROUTER_API_KEY', plan.env)
+
+    def test_operations_report_says_it_is_disposable_evidence(self):
+        steps = [python_step(self.root, name, 'pass') for name in sorted(harness_lib.OPERATIONS_CHECKS)]
+        self.assertEqual(self.run_steps('operations', steps), 0)
+        report = self.report('operations')
+        self.assertIn('Disposable evidence only, not H1 or product acceptance', report['scope'])
+        self.assertLessEqual({'H1', 'product acceptance', 'the persistent stack', 'resource use under load'},
+                             set(report['not_tested']))
+        classes = {check['class'] for check in report['checks'] if check['id'] in harness_lib.OPERATIONS_CHECKS}
+        self.assertEqual(classes, {'disposable'})
+        self.assertTrue(harness_lib.report_state(self.root, 'operations')[0])
+
+    def test_operations_needs_every_qualifier(self):
+        for missing in sorted(harness_lib.OPERATIONS_CHECKS):
+            with self.subTest(missing=missing):
+                steps = [python_step(self.root, name, 'pass') for name in sorted(harness_lib.OPERATIONS_CHECKS - {missing})]
+                self.assertEqual(self.run_steps('operations', steps), 0)
+                self.assertFalse(harness_lib.report_state(self.root, 'operations')[0])
+
+    def test_operations_distinguishes_a_missing_prerequisite_from_a_failure(self):
+        passing = [python_step(self.root, name, 'pass') for name in ('operations_qualification', 'backup_qualification')]
+        self.assertEqual(self.run_steps('operations', [*passing, python_step(self.root, 'upgrade_qualification', 'raise SystemExit(2)')]), 2)
+        self.assertEqual(self.statuses('operations')['upgrade_qualification'], 'error')
+        self.assertEqual(self.run_steps('operations', [*passing, python_step(self.root, 'upgrade_qualification', 'raise SystemExit(1)')]), 1)
+        self.assertEqual(self.statuses('operations')['upgrade_qualification'], 'failed')
+
     def test_a_committed_change_is_still_in_scope(self):
         """A clean Git tree proves nothing: scope comes from what a passing report saw."""
         self.assertIsNone(harness_lib.scope_paths(self.root), 'nothing has passed yet, so scope is unknown')

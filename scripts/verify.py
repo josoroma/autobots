@@ -2,8 +2,8 @@
 """One local verification runner. It never installs, and it never claims unimplemented gates.
 
 Exit codes: 0 passed, 1 a required check failed, 2 a prerequisite is unavailable or a check could
-not run to a result. Passing `harness`, `fast`, `full` or `db` establishes neither H0, H1 nor product
-acceptance. `operations` is not implemented, and reports that with exit code 2.
+not run to a result. Passing any profile establishes neither H0, H1 nor product acceptance. `operations`
+is disposable evidence: it exercises runbooks on throwaway Compose projects with a scripted model.
 """
 from __future__ import annotations
 
@@ -25,21 +25,27 @@ from toolchain import (LONG, Step, Unavailable, check_steps, child_env, find_too
                        run_step, snapshot, snapshot_differences)
 
 EXIT_PASSED, EXIT_FAILED, EXIT_UNAVAILABLE = 0, 1, 2
-IMPLEMENTED_PROFILES = ('harness', 'fast', 'full', 'db')
+IMPLEMENTED_PROFILES = ('harness', 'fast', 'full', 'db', 'operations')
 # These report exit 2 for a missing prerequisite, which is not a failed check.
 SELF_REPORTING_STEPS = frozenset({'contract_drift', 'browser_qualification', 'fault_qualification', 'disposable_qualification', 'supabase_stack_qualification',
-                                  'app_db_qualification', 'identity_qualification'})
+                                  'app_db_qualification', 'identity_qualification', 'operations_qualification', 'backup_qualification',
+                                  'upgrade_qualification'})
 # DH-09.2 class and model transport by step. Evidence reads these, and a plan cannot override them.
 STEP_CLASSES = {'harness_behavior_tests': ('mock', 'none'), 'pytest': ('mock', 'mock'), 'api_client_tests': ('mock', 'none'),
                 'web_unit_tests': ('mock', 'none'), 'browser_qualification': ('local_runtime', 'none'),
                 'fault_qualification': ('mock', 'mock'), 'disposable_qualification': ('disposable', 'none'),
                 'supabase_stack_qualification': ('disposable', 'none'), 'app_db_qualification': ('disposable', 'none'),
-                'identity_qualification': ('disposable', 'none')}
+                'identity_qualification': ('disposable', 'none'), 'operations_qualification': ('disposable', 'mock'),
+                'backup_qualification': ('disposable', 'mock'), 'upgrade_qualification': ('disposable', 'mock')}
 OUTSIDE_SCOPE = 'outside the changed scope of this fast run'
 NOT_TESTED = ['Claude event delivery', 'Supabase', 'Docker', 'OpenRouter inference', 'complete H0/H1']
 APPLICATION_NOT_TESTED: list[str] = []
 DB_NOT_TESTED = ['the persistent database',
                  'Claude event delivery', 'OpenRouter inference', 'complete H0/H1']
+# What the three qualifiers each record as not established, plus what this runner adds.
+OPERATIONS_NOT_TESTED = ['H1', 'product acceptance', 'the persistent stack', 'a real model call', 'a real credential',
+                         'a real image or framework version change', 'Mac sleep', 'resource use under load',
+                         'protection from losing this Mac', 'Claude event delivery', 'OpenRouter inference']
 
 
 def classify(step_id: str) -> dict[str, str]:
@@ -117,12 +123,18 @@ class ToolPlan:
 
 def tool_plan(root: Path, profile: str, changed: Sequence[str] | None) -> tuple[ToolPlan, list[dict]]:
     """The toolchain steps to run and the ones left out. Needs tools only when a step needs them."""
+    docker_env = reduced_env() | ({'HOME': os.environ['HOME']} if 'HOME' in os.environ else {})
     if profile == 'db':
         steps = [Step('disposable_qualification', (sys.executable, 'scripts/disposable_db.py', 'qualify'), root, LONG),
                  Step('supabase_stack_qualification', (sys.executable, 'scripts/supabase_stack.py', 'qualify'), root, LONG),
                  Step('app_db_qualification', (sys.executable, 'scripts/app_db.py', 'qualify'), root, LONG),
                  Step('identity_qualification', (sys.executable, 'scripts/qualify_identity.py'), root, LONG)]
-        return ToolPlan(steps, reduced_env() | ({'HOME': os.environ['HOME']} if 'HOME' in os.environ else {})), []
+        return ToolPlan(steps, docker_env), []
+    if profile == 'operations':
+        steps = [Step('operations_qualification', (sys.executable, 'scripts/qualify_operations.py'), root, LONG),
+                 Step('backup_qualification', (sys.executable, 'scripts/qualify_backup.py'), root, LONG),
+                 Step('upgrade_qualification', (sys.executable, 'scripts/qualify_upgrade.py'), root, LONG)]
+        return ToolPlan(steps, docker_env), []
     known = set(FULL_CHECKS)
     chosen = selected_steps(profile, sorted(known), changed)
     left_out = [{'id': name, 'status': 'not_run', 'reason': OUTSIDE_SCOPE} for name in sorted(known - chosen)]
@@ -203,9 +215,11 @@ def run_profile(root: Path, profile: str, *, base_checks: Callable[[Path], list[
         code = exit_code_for(checks, stable)
         status = {EXIT_PASSED: 'passed', EXIT_FAILED: 'failed', EXIT_UNAVAILABLE: 'error'}[code]
         scope = {'harness': 'Project configuration, backlog structure and deterministic harness fixtures only',
-                 'db': 'Harness checks plus the pinned release and the application migrations and seeds, on disposable targets'
+                 'db': 'Harness checks plus the pinned release and the application migrations and seeds, on disposable targets',
+                 'operations': 'Harness checks plus the operations, backup and upgrade runbooks, on disposable Compose projects with a '
+                               'scripted model. Disposable evidence only, not H1 or product acceptance'
                  }.get(profile, 'Harness checks plus local static checks, focused tests and, for full, the production build and browser suite')
-        not_tested = {'harness': ['application', *NOT_TESTED], 'db': DB_NOT_TESTED
+        not_tested = {'harness': ['application', *NOT_TESTED], 'db': DB_NOT_TESTED, 'operations': OPERATIONS_NOT_TESTED
                       }.get(profile, [*APPLICATION_NOT_TESTED, *NOT_TESTED])
         report = {'schema_version': 'autobots.harness-result/v1', 'template': False,
                   'profile': profile, 'status': status,
@@ -216,7 +230,7 @@ def run_profile(root: Path, profile: str, *, base_checks: Callable[[Path], list[
         temporary = directory / 'latest.tmp'
         temporary.write_text(json.dumps(report, indent=2) + '\n')
         temporary.replace(directory / 'latest.json')
-        print(json.dumps({'profile': profile, 'status': status, 'inputs_stable': stable,
+        print(json.dumps({'profile': profile, 'status': status, 'inputs_stable': stable, 'scope': scope,
                           'checks': [{k: c[k] for k in ('id', 'status')} for c in checks],
                           'assistant_adapter': {k: adapter[k] for k in ('state', 'reason')},
                           'report': f'.checks/{profile}/latest.json'}, indent=2))
@@ -235,13 +249,8 @@ def main() -> int:
         print('Python 3.12+ is required; use the qualified python3.12 interpreter.', file=sys.stderr)
         return EXIT_UNAVAILABLE
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--profile', required=True, choices=[*IMPLEMENTED_PROFILES, 'operations'])
+    parser.add_argument('--profile', required=True, choices=IMPLEMENTED_PROFILES)
     args = parser.parse_args()
-    if args.profile not in IMPLEMENTED_PROFILES:
-        print(json.dumps({'profile': args.profile, 'status': 'not_implemented',
-                          'reason': 'Operations checks are not yet implemented; '
-                                    'a passing harness, fast, full or db profile does not substitute for them.'}))
-        return EXIT_UNAVAILABLE
     return run_profile(project_root(), args.profile)
 
 

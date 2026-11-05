@@ -2,9 +2,9 @@
 
 ## Scope and prerequisites
 
-Run from the Autobots workspace on this Mac with Python 3.12 or later. The hook interpreter is explicitly /opt/homebrew/bin/python3.12 (observed 3.12.16). If python3.12 is absent from PATH, use that absolute path. Plain python3 can resolve to macOS 3.9.6 in another process; unsupported versions fail clearly. Application dependency qualification remains separate; the pinned Node and Python environments have their own procedure in [the toolchains runbook](toolchains.md), and nothing here needs them. No package installation, API key or application model call is needed for these commands, and Docker is needed only for the `db` profile and its wrappers; `jq` reads the report, and the forward procedure's one delegation step uses the developer assistant. Read the mapped sources in `.claude/autobots.json` and `CODEBASE.md` before changing the backlog.
+Run from the Autobots workspace on this Mac with Python 3.12 or later. The hook interpreter is explicitly /opt/homebrew/bin/python3.12 (observed 3.12.16). If python3.12 is absent from PATH, use that absolute path. Plain python3 can resolve to macOS 3.9.6 in another process; unsupported versions fail clearly. Application dependency qualification remains separate; the pinned Node and Python environments have their own procedure in [the toolchains runbook](toolchains.md), and nothing here needs them. No package installation, API key or application model call is needed for these commands, and Docker is needed only for the `db` and `operations` profiles and the `db` wrappers; `jq` reads the report, and the forward procedure's one delegation step uses the developer assistant. Read the mapped sources in `.claude/autobots.json` and `CODEBASE.md` before changing the backlog.
 
-This runbook covers the implemented `harness`, `fast`, `full` and `db` profiles. `operations` remains unimplemented and must return a nonzero unavailable result, not substitute a smaller passing suite. H0/H1 has additional pending requirements.
+This runbook covers the implemented `harness`, `fast`, `full`, `db` and `operations` profiles. H0/H1 has additional pending requirements.
 
 ## Validate the backlog
 
@@ -31,12 +31,6 @@ python3.12 scripts/verify.py --profile harness
 
 Expected: project configuration, backlog validation and nonempty behavioral tests pass with unchanged input fingerprints. Inspect `.checks/harness/latest.json` for actual commands, counts and output. Inputs edited during a check invalidate the result. The report excludes secret files and records no live model qualification.
 
-```sh
-python3.12 scripts/verify.py --profile operations
-```
-
-Expected today: exit code 2 with `not_implemented`. It must not start containers or touch a database. This is a checked limitation, not operations acceptance.
-
 ### Run the application profiles
 
 `fast` and `full` need the prepared environments from [the toolchains runbook](toolchains.md). They never install, download or start a service, and their children get no inherited credential.
@@ -58,9 +52,28 @@ python3.12 scripts/verify.py --profile full
 | 1 | `failed` | A required check failed, the non-mutation guard saw a change, or an input changed. This outranks exit 2 |
 | 2 | `error` | A prerequisite is unavailable, a check could not start or timed out, or another check holds `verify.lock` |
 
-Reports are `.checks/<profile>/latest.json`. Each binds to a fingerprint of the harness files plus application sources, manifests and locks, but not environments, caches or build output. Links count by target name, and secret files, evidence output and build output never count. A change to those inputs makes every profile's report stale. `fast` chooses steps from what differs since the newest passing `fast` or `full` report, not from Git, so committing a change does not hide it, and with no passing report it runs both domains. The `Stop` hook likewise wants a current `fast` or `full` report for application or shared inputs, a current `db` report for database inputs, and otherwise any current report. A skipped test fails its profile.
+Reports are `.checks/<profile>/latest.json`. Each binds to a fingerprint of the harness files plus application sources, manifests and locks, but not environments, caches or build output. Links count by target name, and secret files, evidence output and build output never count. A change to those inputs makes every profile's report stale. `fast` chooses steps from what differs since the newest passing `fast` or `full` report, not from Git, so committing a change does not hide it, and with no passing report it runs both domains. The `Stop` hook likewise wants a current `fast` or `full` report for application or shared inputs, a current `db` report for database inputs, and otherwise any current report. It never requires `operations`, which is run on purpose. A skipped test fails its profile.
 
 Not run by any profile: most of `tests/toolchain`, whose copies bootstrap from registries; `full` runs only its offline scope tests.
+
+## Disposable operations qualification
+
+Needs Docker, the pinned images already local and the prepared Python environment from [the toolchains runbook](toolchains.md). Nothing is pulled or installed; a missing prerequisite exits 2. Allow about five minutes, during which it holds `verify.lock` and needs its inputs unchanged. No other Docker stack may start or stop meanwhile, including another session's disposable one: each qualifier compares every container outside its own project, so overlapping stacks fail each other's runs.
+
+```sh
+python3.12 scripts/verify.py --profile operations
+jq -r '.scope, .not_tested[]' .checks/operations/latest.json
+```
+
+Expected: exit 0. It runs the harness checks, then the three qualifiers in turn, each on its own new `autobots-disposable-<id>` project that it removes afterwards:
+
+| Check | Exercises | Case report |
+|---|---|---|
+| `operations_qualification` | [the operations runbook](operations.md) | `.checks/operations/qualification.json` |
+| `backup_qualification` | [the backup and restore runbook](backup-restore.md) | `.checks/backup/qualification.json` |
+| `upgrade_qualification` | [the upgrade runbook](upgrade.md) | `.checks/upgrade/qualification.json` |
+
+This is disposable evidence with a scripted model and an arranged credential. It is not H1 or product acceptance, and it says nothing about a persistent stack. `not_tested` in the report lists what it leaves out, including resource use under load. Trust the exit code and `latest.json`: an exit 2 can leave an earlier `qualification.json` in place.
 
 ## Disposable database qualification
 

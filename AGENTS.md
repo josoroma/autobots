@@ -8,7 +8,7 @@ Build the selected Option B: native local Next.js + Python FastAPI/LangGraph/Dee
 - Choose one bounded authorized work item. Record its plan, actual implementation, independent review, verification and exercised runbook/evidence according to PRD-Development-Harness.md DH-W01–06. Small changes use short records. Review is not another user-permission ceremony. Exception, by the user's [Decision 0003](docs/engineering/decisions/0003-openspec-only-delivery.md): routine delivery through `/ohmyorch:deliver` follows the OpenSpec lifecycle in `.claude/rules/ohmyorch-delivery.md`, whose archived change is the record, with no independent review unless the user or a story's acceptance asks for one.
 - Writer agents own disjoint files. Reviewers inspect without repairing implementation. The coordinator validates handoffs and owns status changes. Neither ingestion nor a successful syntax check marks a story DONE.
 - Honor the user's current scope. Adapting this development harness does not authorize implementing the product, starting databases or performing paid model qualification.
-- Shared H0/H1 comes before feature work. The harness profile proves repository checks only, and `fast` and `full` add local static checks, focused tests and a build; `db` adds synthetic fixtures on a disposable target; the unimplemented `operations` profile must fail explicitly. Never report all H1 or product acceptance gates passed from synthetic fixtures.
+- Shared H0/H1 comes before feature work. The harness profile proves repository checks only, and `fast` and `full` add local static checks, focused tests and a build; `db` adds synthetic fixtures on a disposable target; `operations` exercises the operations, backup and upgrade runbooks on disposable projects with a scripted model. Never report all H1 or product acceptance gates passed from synthetic fixtures.
 
 ## Commands
 
@@ -20,7 +20,7 @@ python3.12 scripts/specs.py render
 python3.12 scripts/verify.py --profile harness
 ```
 
-`render` changes only generated backlog navigation, not story intent/status/tasks. Use it after an authorized backlog edit, then validate. The harness verification runs local deterministic tests without model calls or package installs. `fast` adds the Python and web checks for what changed, and `full` runs all of them plus the production build, using prepared environments without installing. Exit codes: 0 passed, 1 a check failed, 2 a prerequisite is unavailable or a check could not run. `db` creates a marked disposable Docker target for synthetic migrations, seeds and authorization, then removes only that target. `operations` is defined but unavailable until its tooling is implemented; no other profile substitutes for it.
+`render` changes only generated backlog navigation, not story intent/status/tasks. Use it after an authorized backlog edit, then validate. The harness verification runs local deterministic tests without model calls or package installs. `fast` adds the Python and web checks for what changed, and `full` runs all of them plus the production build, using prepared environments without installing. Exit codes: 0 passed, 1 a check failed, 2 a prerequisite is unavailable or a check could not run. `db` creates a marked disposable Docker target for synthetic migrations, seeds and authorization, then removes only that target. `operations` runs the operations, backup and upgrade qualifiers on new disposable Compose projects with a scripted model, then removes only those projects. Its pass is disposable evidence, not H1, product acceptance or proof about a persistent stack; no other profile substitutes for it.
 
 ## Boundaries that matter
 
@@ -37,14 +37,14 @@ Preserve reviewed redacted manifests/summaries under `docs/engineering/evidence/
 
 ## Rule checks and review
 
-Each row names the check and the review responsibility for one source of rules. A link shows who owns the rule, not that a check passes. A pending profile names a future check, so review is what applies to that layer until the profile exists.
+Each row names the check and the review responsibility for one source of rules. A link shows who owns the rule, not that a check passes.
 
 | Rule source | Check responsibility | Review responsibility |
 |---|---|---|
 | Opening paragraph | [`scripts/specs.py`](scripts/specs.py) for source traceability | [`autobots-review-change`](.claude/skills/autobots-review-change/SKILL.md) |
 | Work protocol | [`scripts/specs.py`](scripts/specs.py) and [DH-W01–06](PRD-Development-Harness.md#dh-091-work-item-evidence-contract) | [`autobots-reviewer`](.claude/agents/autobots-reviewer.md) |
-| Commands | [`scripts/verify.py`](scripts/verify.py), whose pending profiles exit 2, and [`scripts/specs.py`](scripts/specs.py) for render scope | [`autobots-verify-change`](.claude/skills/autobots-verify-change/SKILL.md) |
-| Boundaries that matter | `project_configuration` in [`scripts/verify.py`](scripts/verify.py), plus the pending profile that owns each layer | [`autobots-review-change`](.claude/skills/autobots-review-change/SKILL.md) |
+| Commands | [`scripts/verify.py`](scripts/verify.py) and [`scripts/specs.py`](scripts/specs.py) for render scope | [`autobots-verify-change`](.claude/skills/autobots-verify-change/SKILL.md) |
+| Boundaries that matter | `project_configuration` in [`scripts/verify.py`](scripts/verify.py), plus the profile that owns each layer | [`autobots-review-change`](.claude/skills/autobots-review-change/SKILL.md) |
 | Completion evidence | [`scripts/verify.py`](scripts/verify.py) and [DH-W04–06](PRD-Development-Harness.md#dh-091-work-item-evidence-contract) | [`autobots-reviewer`](.claude/agents/autobots-reviewer.md) |
 | `.claude/settings.json` | `project_configuration` in [`scripts/verify.py`](scripts/verify.py), because this file cannot carry links | [`autobots-review-change`](.claude/skills/autobots-review-change/SKILL.md) |
 | `CLAUDE.md` | It imports `AGENTS.md`. `project_configuration` in [`scripts/verify.py`](scripts/verify.py) checks the hook configuration that its hook sentence describes, not the sentence itself, because that check never reads `CLAUDE.md` | [`autobots-review-change`](.claude/skills/autobots-review-change/SKILL.md) |

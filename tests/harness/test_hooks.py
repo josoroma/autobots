@@ -344,11 +344,11 @@ class HookTests(unittest.TestCase):
             self.assertIn('syntax/read error', self.post_edit(root, 'services/agent/bad.py'))
             self.assertFalse((root / 'ran').exists())
 
-    def test_pending_app_profile_is_not_a_pass(self):
-        result = subprocess.run([sys.executable, str(ROOT / 'scripts/verify.py'), '--profile', 'operations'],
+    def test_unknown_profile_is_not_a_pass(self):
+        result = subprocess.run([sys.executable, str(ROOT / 'scripts/verify.py'), '--profile', 'nonexistent'],
                                 capture_output=True, text=True, timeout=5)
         self.assertEqual(result.returncode, 2)
-        self.assertEqual(json.loads(result.stdout)['status'], 'not_implemented')
+        self.assertEqual(result.stdout, '')
 
 
 if __name__ == '__main__':
