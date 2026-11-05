@@ -9,7 +9,11 @@ async function handle(
   context: Context,
 ): Promise<NextResponse> {
   const { path } = await context.params;
-  return forward(request, `/v1/${path.map(encodeURIComponent).join("/")}`);
+  // Queries like a replay cursor have to reach the API too.
+  return forward(
+    request,
+    `/v1/${path.map(encodeURIComponent).join("/")}${request.nextUrl.search}`,
+  );
 }
 
 export const GET = handle;

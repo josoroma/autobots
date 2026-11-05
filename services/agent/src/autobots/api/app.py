@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from psycopg_pool import AsyncConnectionPool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from autobots.api.approval_routes import router as approval_router
 from autobots.api.artifact_routes import router as artifact_router
 from autobots.api.errors import register_error_handlers
 from autobots.api.event_routes import router as event_router
@@ -69,6 +70,7 @@ def create_app(
     app.include_router(settings_router)
     app.include_router(run_router)
     app.include_router(artifact_router)
+    app.include_router(approval_router)
     app.include_router(event_router)
     app.include_router(expert_router)
     return app

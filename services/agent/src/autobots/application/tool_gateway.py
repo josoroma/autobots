@@ -10,6 +10,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ValidationError
 
+from autobots.application.approvals import approval_gate, scope_hash
 from autobots.application.runs import LeaseLost
 from autobots.domain.runs import RunStatus
 from autobots.domain.tools import EFFECTFUL, OperationClass, ToolOutcome, path_granted
@@ -123,6 +124,11 @@ def _hash(arguments: BaseModel) -> str:
     return hashlib.sha256(encoded.encode()).hexdigest()
 
 
+def _operation_id(scope: ToolScope, tool: ToolDefinition, parsed: BaseModel) -> str:
+    identity = f"{scope.run_id}|{tool.tool_id}|{tool.version}|{_hash(parsed)}"
+    return hashlib.sha256(identity.encode()).hexdigest()
+
+
 def _denied(code: str) -> ToolResult:
     return ToolResult(ToolOutcome.DENIED, code)
 
@@ -173,10 +179,6 @@ class ToolGateway:
             return _denied("tool_not_registered")
         if tool.operation_class is OperationClass.ARBITRARY_EXECUTION:
             return _denied("capability_disabled")
-        if tool.approval_required or (
-            tool.operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE
-        ):
-            return _denied("approval_required")
         try:
             parsed = tool.input_model.model_validate(arguments)
         except ValidationError:
@@ -186,6 +188,24 @@ class ToolGateway:
         refusal = await ownership_refusal(connection, scope)
         if refusal is not None:
             return _denied(refusal)
+        if tool.approval_required or (
+            tool.operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE
+        ):
+            code = await approval_gate(
+                connection,
+                workspace_id=scope.workspace_id,
+                run_id=scope.run_id,
+                generation=scope.generation,
+                operation_id=_operation_id(scope, tool, parsed),
+                tool_id=tool.tool_id,
+                tool_version=tool.version,
+                operation_class=tool.operation_class.value,
+                argument_hash=_hash(parsed),
+                arguments=tool.redact(parsed.model_dump(mode="json")),
+                current_scope_hash=scope_hash(scope.tools, scope.paths),
+            )
+            if code is not None:
+                return _denied(code)
         if tool.operation_class in EFFECTFUL:
             return await self._effect(connection, scope, tool, parsed)
         return await self._read(connection, scope, tool, parsed)
@@ -219,8 +239,7 @@ class ToolGateway:
         self, connection: Any, scope: ToolScope, tool: ToolDefinition, parsed: BaseModel
     ) -> ToolResult:
         argument_hash = _hash(parsed)
-        identity = f"{scope.run_id}|{tool.tool_id}|{tool.version}|{argument_hash}"
-        operation_id = hashlib.sha256(identity.encode()).hexdigest()
+        operation_id = _operation_id(scope, tool, parsed)
         context = ToolContext(connection, scope, operation_id)
         # Committed before the effect starts, so a crash leaves a record that it may have happened.
         cursor = await connection.execute(

@@ -58,8 +58,8 @@ _SELECT_RUN = (
 )
 
 
-def public_text(text: str) -> str:
-    return _SECRETS.sub("[redacted]", text)[:MAX_TEXT]
+def public_text(text: str, *, limit: int = MAX_TEXT) -> str:
+    return _SECRETS.sub("[redacted]", text)[:limit]
 
 
 def project_event(run_id: UUID, sequence: int, payload: Any, occurred_at: Any) -> RunEvent | None:

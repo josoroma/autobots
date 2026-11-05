@@ -21,17 +21,17 @@ markers are preserved across refreshes.
 |---|---|---|---|---|
 | 1 | US-5.1 | us-5-1-versioned-experts-direct-sessions | DONE | Versioned Experts, direct sessions and coordinator routing |
 | 2 | US-5.2 | us-5-2-scoped-synchronous-specialist-assignments | DONE | Scoped synchronous specialist assignments |
-| 3 | US-5.3 | us-5-3-argument-bound-approvals-durable | READY | Argument-bound approvals and durable decision wait |
-| 4 | US-5.4 | us-5-4-consequential-effect-reconciliation-using | BLOCKED | Consequential-effect reconciliation using a mock destination |
+| 3 | US-5.3 | us-5-3-argument-bound-approvals-durable | DONE | Argument-bound approvals and durable decision wait |
+| 4 | US-5.4 | us-5-4-consequential-effect-reconciliation-using | READY | Consequential-effect reconciliation using a mock destination |
 
 ## Next Action
 
 Action: select
-Story: US-5.3
-Change: us-5-3-argument-bound-approvals-durable
+Story: US-5.4
+Change: us-5-4-consequential-effect-reconciliation-using
 Owner: main-session
-Command: openspec new change us-5-3-argument-bound-approvals-durable; set US-5.3 to IN PROGRESS with a Change: line
-Reason: US-5.3 is READY and has no OpenSpec change
+Command: openspec new change us-5-4-consequential-effect-reconciliation-using; set US-5.4 to IN PROGRESS with a Change: line
+Reason: US-5.4 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

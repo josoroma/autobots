@@ -116,7 +116,7 @@ async def main() -> None:
         registry.register(counted('remote_write', operation_class=OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE))
         remote = await running(tools={'remote_write': 1})
         result = await gateway.execute(db, remote, 'remote_write', {})
-        check('a consequential write needs an approval that does not exist yet', 'approval_required, not called', (result.code, calls.count('remote_write')), result.code == 'approval_required' and calls.count('remote_write') == 0)
+        check('a consequential write needs an approval first', 'approval_pending, not called', (result.code, calls.count('remote_write')), result.code == 'approval_pending' and calls.count('remote_write') == 0)
         versioned = await running(tools={'calculate': 2})
         result = await gateway.execute(db, versioned, 'calculate', {'operation': 'sum', 'values': [1]})
         check('a version that does not exist is refused', 'tool_not_registered', result.code, result.code == 'tool_not_registered')

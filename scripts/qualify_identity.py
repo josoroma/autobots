@@ -153,8 +153,10 @@ def artifact_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port
     report = json.loads(result.stdout.strip().splitlines()[-1])
     for case in report['cases']:
         cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+    extra_env: dict[str, str] = {}
     for check_file, arguments, label in (('verification_check.py', [workspace_a], 'verification'),
-                                         ('assignment_check.py', [workspace_a, str(root / PYTHON)], 'assignment')):
+                                         ('assignment_check.py', [workspace_a, str(root / PYTHON)], 'assignment'),
+                                         ('approval_check.py', [workspace_a, workspace_b], 'approval')):
         checked = subprocess.run([str(root / PYTHON), str(root / 'tests/db' / check_file), *arguments],
                                  env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'AUTOBOTS_STORAGE_BASE': base, 'AUTOBOTS_STORAGE_SERVICE': stack.values['SERVICE_ROLE_KEY'],
                                       'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
@@ -162,7 +164,9 @@ def artifact_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port
         if checked.returncode:
             cases.check(f'the {label} check ran', 'exit 0', f'exit {checked.returncode}: {checked.stderr.strip()[-380:]}', False)
         if checked.stdout.strip():
-            for case in json.loads(checked.stdout.strip().splitlines()[-1])['cases']:
+            output = json.loads(checked.stdout.strip().splitlines()[-1])
+            extra_env.update(output.get('browser_env', {}))
+            for case in output['cases']:
                 cases.check(case['id'], case['expected'], case['observed'], case['passed'])
     # Arranged for the run workspace: text a model wrote, a raw framework event, and lost history.
     loop_run, gap_run = report.get('loop_run', ''), report.get('run_id', '')
@@ -173,7 +177,7 @@ def artifact_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port
         f"""'{{"type": "model.reasoning", "text": "PROTECTED-REASONING"}}', now() from public.runs where id = '{loop_run}';\n"""
         f"delete from public.run_events where run_id = '{gap_run}' and sequence < 3;\n")
     cases.check('the run workspace fixtures are arranged', 'exit 0', f'exit {arranged.returncode}: {arranged.stderr[-200:]}', arranged.returncode == 0)
-    return {'AUTOBOTS_TEST_LOOP_RUN': loop_run, 'AUTOBOTS_TEST_ARTIFACT_RUN': report.get('run_id', ''), 'AUTOBOTS_TEST_ARTIFACT_ID': report.get('artifact_id', ''),
+    return {**extra_env, 'AUTOBOTS_TEST_LOOP_RUN': loop_run, 'AUTOBOTS_TEST_ARTIFACT_RUN': report.get('run_id', ''), 'AUTOBOTS_TEST_ARTIFACT_ID': report.get('artifact_id', ''),
             'AUTOBOTS_TEST_ARTIFACT_TEXT': report.get('expected_text', ''), 'AUTOBOTS_TEST_ARTIFACT_GONE': report.get('gone_id', ''),
             'AUTOBOTS_TEST_ARTIFACT_TAMPERED': report.get('tampered_id', '')}
 
@@ -230,7 +234,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
                                      'AUTOBOTS_TEST_UPSTREAM_LOG': str(upstream_log), 'AUTOBOTS_TEST_CATALOG_DOWN': str(catalog_down),
                                      'AUTOBOTS_TEST_SERVICE_KEY': stack.values['SERVICE_ROLE_KEY'], 'AUTOBOTS_WEB_REPORT': str(report),
                                      'AUTOBOTS_WEB_OUTPUT': str(root / '.checks/identity/results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots)}
-        result = subprocess.run([str(playwright), 'test', 'experts', 'identity', 'settings', 'runs', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
+        result = subprocess.run([str(playwright), 'test', 'approvals', 'experts', 'identity', 'settings', 'runs', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
                                 env=browser_env)
         # The slice runs last, with a worker, so nothing above sees its jobs claimed.
         stack.runtime("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done';\n")

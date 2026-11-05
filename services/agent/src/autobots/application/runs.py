@@ -403,6 +403,11 @@ async def apply_command(
         )
         await _record_obligation(connection, run_id, command, detail, response)
         if command is RunCommand.CANCEL:
+            await connection.execute(
+                "update public.approval_requests set status = 'withdrawn' "
+                "where run_id = %s and status = 'pending'",
+                (run_id,),
+            )
             await _cancel_children(connection, workspace_id, run_id)
         job_status = _job_status(following)
         if following is RunStatus.CANCELLING and not (
@@ -432,6 +437,7 @@ async def apply_command(
 
 
 __all__ = [
+    "Actor",
     "CommandRefused",
     "IdempotencyConflict",
     "Inheritance",

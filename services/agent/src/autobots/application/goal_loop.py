@@ -26,6 +26,7 @@ from autobots.adapters.loop_middleware import (
     UnadmittedModelCall,
 )
 from autobots.adapters.tool_middleware import GatewayMiddleware, visible_tools
+from autobots.application.approvals import expire_due
 from autobots.application.artifacts import publish_tool, reconcile_run
 from autobots.application.assignments import Delegation, assign_tool
 from autobots.application.plans import load_goal, plan_tools, plan_view
@@ -38,7 +39,12 @@ from autobots.application.run_usage import (
     usage_view,
 )
 from autobots.application.runs import LeaseLost, VersionConflict, apply_command
-from autobots.application.tool_gateway import ToolGateway, ToolRegistry, ToolScope
+from autobots.application.tool_gateway import (
+    ToolDefinition,
+    ToolGateway,
+    ToolRegistry,
+    ToolScope,
+)
 from autobots.application.tools import CALCULATE, READ_RUN_FILE, SAVE_ARTIFACT
 from autobots.application.verification import verify_candidate
 from autobots.application.worker_leases import (
@@ -67,7 +73,7 @@ PAUSE_FOR = frozenset(
         "parent_not_running",
     }
 )
-NOT_OURS = frozenset({"lease_lost", "run_not_running", "run_not_found"})
+NOT_OURS = frozenset({"lease_lost", "run_not_running", "run_not_found", "approval_pending"})
 SYSTEM_PROMPT = (
     "Work only on the stated goal. First call propose_plan, covering every criterion. "
     "Use only the tools offered. Call complete_task with real evidence as tasks finish. "
@@ -82,6 +88,7 @@ class LoopConfig:
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
     slot_wait_seconds: float = 30.0
     object_store: Any = None
+    tools: tuple[ToolDefinition, ...] = ()
     heartbeat_seconds: float = 20.0
     model_call_seconds: float = 120.0
     lease_seconds: float = DEFAULT_LEASE_SECONDS
@@ -102,7 +109,10 @@ class LoopResult:
 
 
 def loop_registry(
-    limits: RootLimits, object_store: Any = None, delegation: Delegation | None = None
+    limits: RootLimits,
+    object_store: Any = None,
+    delegation: Delegation | None = None,
+    extra: tuple[ToolDefinition, ...] = (),
 ) -> ToolRegistry:
     registry = ToolRegistry()
     for tool in (CALCULATE, READ_RUN_FILE, SAVE_ARTIFACT, *plan_tools(limits)):
@@ -111,6 +121,8 @@ def loop_registry(
         registry.register(publish_tool(object_store))
     if delegation is not None:
         registry.register(assign_tool(delegation))
+    for tool in extra:
+        registry.register(tool)
     return registry
 
 
@@ -124,7 +136,9 @@ def build_stage(
     delegation: Delegation | None = None,
 ) -> Any:
     """Explicit tools and middleware. Skills, memory, subagents and a backend stay unset here."""
-    gateway = ToolGateway(loop_registry(config.limits, config.object_store, delegation))
+    gateway = ToolGateway(
+        loop_registry(config.limits, config.object_store, delegation, config.tools)
+    )
     return create_deep_agent(
         model=AdmittedModel(delegate=model),
         tools=visible_tools(gateway, scope),
@@ -234,6 +248,7 @@ async def process_next(
     config: LoopConfig,
 ) -> LoopResult | None:
     """Claims one eligible job and takes it as far as it can go in one pass."""
+    await expire_due(connection)
     lease = await claim_next(connection, worker_id=worker_id, lease_seconds=config.lease_seconds)
     if lease is None:
         return None
@@ -457,5 +472,13 @@ async def _finish(
             status = result.status
         except (LeaseLost, VersionConflict, CommandRefused):
             code = "lease_lost"
-    outcome = "candidate" if code is None else ("lost" if code in NOT_OURS else "stopped")
+    outcome = (
+        "candidate"
+        if code is None
+        else "waiting"
+        if code == "approval_pending"
+        else "lost"
+        if code in NOT_OURS
+        else "stopped"
+    )
     return await _result(connection, lease, goal, outcome, code, status)

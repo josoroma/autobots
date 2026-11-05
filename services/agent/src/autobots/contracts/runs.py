@@ -61,6 +61,22 @@ class ArtifactMissing(BaseModel):
     name: str
 
 
+class ApprovalRequested(BaseModel):
+    model_config = STRICT_CONTRACT
+
+    type: Literal["approval.requested"]
+    approval_id: Identifier
+    tool_id: str
+
+
+class ApprovalDecided(BaseModel):
+    model_config = STRICT_CONTRACT
+
+    type: Literal["approval.decided"]
+    approval_id: Identifier
+    decision: Literal["approved", "rejected", "expired"]
+
+
 class RunEvent(BaseModel):
     """The sanitized public envelope from SP-011. Payloads are typed, so nothing raw can pass."""
 
@@ -71,7 +87,9 @@ class RunEvent(BaseModel):
     sequence: Sequence
     causal_ids: list[Identifier]
     occurred_at: UtcTimestamp
-    payload: RunStatusChanged | ArtifactPublished | ArtifactMissing
+    payload: (
+        RunStatusChanged | ArtifactPublished | ArtifactMissing | ApprovalRequested | ApprovalDecided
+    )
 
 
 class ErrorResponse(BaseModel):

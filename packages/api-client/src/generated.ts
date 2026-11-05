@@ -2,6 +2,199 @@
 import { type ClientOptions, parseWith, requestJson } from './runtime.ts';
 
 export const schemas = {
+  "ApprovalDecided": {
+    "additionalProperties": false,
+    "properties": {
+      "approval_id": {
+        "format": "uuid",
+        "title": "Approval Id",
+        "type": "string"
+      },
+      "decision": {
+        "enum": [
+          "approved",
+          "rejected",
+          "expired"
+        ],
+        "title": "Decision",
+        "type": "string"
+      },
+      "type": {
+        "const": "approval.decided",
+        "title": "Type",
+        "type": "string"
+      }
+    },
+    "required": [
+      "type",
+      "approval_id",
+      "decision"
+    ],
+    "title": "ApprovalDecided",
+    "type": "object"
+  },
+  "ApprovalDecision": {
+    "additionalProperties": false,
+    "properties": {
+      "argument_hash": {
+        "maxLength": 64,
+        "minLength": 64,
+        "title": "Argument Hash",
+        "type": "string"
+      },
+      "decision": {
+        "enum": [
+          "approve",
+          "reject"
+        ],
+        "title": "Decision",
+        "type": "string"
+      }
+    },
+    "required": [
+      "decision",
+      "argument_hash"
+    ],
+    "title": "ApprovalDecision",
+    "type": "object"
+  },
+  "ApprovalList": {
+    "additionalProperties": false,
+    "properties": {
+      "approvals": {
+        "items": {
+          "$ref": "#/components/schemas/ApprovalView"
+        },
+        "title": "Approvals",
+        "type": "array"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "approvals"
+    ],
+    "title": "ApprovalList",
+    "type": "object"
+  },
+  "ApprovalRequested": {
+    "additionalProperties": false,
+    "properties": {
+      "approval_id": {
+        "format": "uuid",
+        "title": "Approval Id",
+        "type": "string"
+      },
+      "tool_id": {
+        "title": "Tool Id",
+        "type": "string"
+      },
+      "type": {
+        "const": "approval.requested",
+        "title": "Type",
+        "type": "string"
+      }
+    },
+    "required": [
+      "type",
+      "approval_id",
+      "tool_id"
+    ],
+    "title": "ApprovalRequested",
+    "type": "object"
+  },
+  "ApprovalResult": {
+    "additionalProperties": false,
+    "properties": {
+      "approval_id": {
+        "format": "uuid",
+        "title": "Approval Id",
+        "type": "string"
+      },
+      "replayed": {
+        "title": "Replayed",
+        "type": "boolean"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "status": {
+        "title": "Status",
+        "type": "string"
+      }
+    },
+    "required": [
+      "schema_version",
+      "approval_id",
+      "status",
+      "replayed"
+    ],
+    "title": "ApprovalResult",
+    "type": "object"
+  },
+  "ApprovalView": {
+    "additionalProperties": false,
+    "description": "What a reviewer decides on. The hash they saw comes back with the decision.",
+    "properties": {
+      "argument_hash": {
+        "title": "Argument Hash",
+        "type": "string"
+      },
+      "arguments": {
+        "title": "Arguments",
+        "type": "string"
+      },
+      "expires_at": {
+        "title": "Expires At",
+        "type": "string"
+      },
+      "id": {
+        "format": "uuid",
+        "title": "Id",
+        "type": "string"
+      },
+      "operation_class": {
+        "title": "Operation Class",
+        "type": "string"
+      },
+      "run_id": {
+        "format": "uuid",
+        "title": "Run Id",
+        "type": "string"
+      },
+      "status": {
+        "title": "Status",
+        "type": "string"
+      },
+      "tool_id": {
+        "title": "Tool Id",
+        "type": "string"
+      },
+      "tool_version": {
+        "title": "Tool Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "id",
+      "run_id",
+      "tool_id",
+      "tool_version",
+      "operation_class",
+      "argument_hash",
+      "arguments",
+      "status",
+      "expires_at"
+    ],
+    "title": "ApprovalView",
+    "type": "object"
+  },
   "ArtifactList": {
     "additionalProperties": false,
     "properties": {
@@ -1142,6 +1335,12 @@ export const schemas = {
           },
           {
             "$ref": "#/components/schemas/ArtifactMissing"
+          },
+          {
+            "$ref": "#/components/schemas/ApprovalRequested"
+          },
+          {
+            "$ref": "#/components/schemas/ApprovalDecided"
           }
         ],
         "title": "Payload"
@@ -1856,6 +2055,71 @@ export const schemas = {
   }
 } as const;
 
+export interface ApprovalDecided {
+  approval_id: string;
+  decision: "approved" | "rejected" | "expired";
+  type: "approval.decided";
+}
+
+export function parseApprovalDecided(value: unknown): ApprovalDecided {
+  return parseWith(schemas, "ApprovalDecided", value) as ApprovalDecided;
+}
+
+export interface ApprovalDecision {
+  argument_hash: string;
+  decision: "approve" | "reject";
+}
+
+export function parseApprovalDecision(value: unknown): ApprovalDecision {
+  return parseWith(schemas, "ApprovalDecision", value) as ApprovalDecision;
+}
+
+export interface ApprovalList {
+  approvals: ApprovalView[];
+  schema_version: 1;
+}
+
+export function parseApprovalList(value: unknown): ApprovalList {
+  return parseWith(schemas, "ApprovalList", value) as ApprovalList;
+}
+
+export interface ApprovalRequested {
+  approval_id: string;
+  tool_id: string;
+  type: "approval.requested";
+}
+
+export function parseApprovalRequested(value: unknown): ApprovalRequested {
+  return parseWith(schemas, "ApprovalRequested", value) as ApprovalRequested;
+}
+
+export interface ApprovalResult {
+  approval_id: string;
+  replayed: boolean;
+  schema_version: 1;
+  status: string;
+}
+
+export function parseApprovalResult(value: unknown): ApprovalResult {
+  return parseWith(schemas, "ApprovalResult", value) as ApprovalResult;
+}
+
+export interface ApprovalView {
+  argument_hash: string;
+  arguments: string;
+  expires_at: string;
+  id: string;
+  operation_class: string;
+  run_id: string;
+  status: string;
+  tool_id: string;
+  tool_version: number;
+}
+
+export function parseApprovalView(value: unknown): ApprovalView {
+  return parseWith(schemas, "ApprovalView", value) as ApprovalView;
+}
+
 export interface ArtifactList {
   artifacts: ArtifactSummary[];
   schema_version: 1;
@@ -2242,7 +2506,7 @@ export function parseRunCommandResult(value: unknown): RunCommandResult {
 export interface RunEvent {
   causal_ids: string[];
   occurred_at: string;
-  payload: RunStatusChanged | ArtifactPublished | ArtifactMissing;
+  payload: RunStatusChanged | ArtifactPublished | ArtifactMissing | ApprovalRequested | ApprovalDecided;
   run_id: string;
   schema_version: 1;
   sequence: number;
@@ -2439,6 +2703,14 @@ export interface WorkspaceSummary {
 
 export function parseWorkspaceSummary(value: unknown): WorkspaceSummary {
   return parseWith(schemas, "WorkspaceSummary", value) as WorkspaceSummary;
+}
+
+export async function listApprovals(options: ClientOptions): Promise<ApprovalList> {
+  return parseApprovalList(await requestJson(options, "GET", `/v1/approvals`));
+}
+
+export async function decideApproval(options: ClientOptions, approval_id: string, body: ApprovalDecision): Promise<ApprovalResult> {
+  return parseApprovalResult(await requestJson(options, "POST", `/v1/approvals/${encodeURIComponent(approval_id)}/decision`, body));
 }
 
 export async function listExperts(options: ClientOptions): Promise<ExpertList> {

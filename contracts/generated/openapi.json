@@ -1,6 +1,199 @@
 {
   "components": {
     "schemas": {
+      "ApprovalDecided": {
+        "additionalProperties": false,
+        "properties": {
+          "approval_id": {
+            "format": "uuid",
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "decision": {
+            "enum": [
+              "approved",
+              "rejected",
+              "expired"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "type": {
+            "const": "approval.decided",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "approval_id",
+          "decision"
+        ],
+        "title": "ApprovalDecided",
+        "type": "object"
+      },
+      "ApprovalDecision": {
+        "additionalProperties": false,
+        "properties": {
+          "argument_hash": {
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Argument Hash",
+            "type": "string"
+          },
+          "decision": {
+            "enum": [
+              "approve",
+              "reject"
+            ],
+            "title": "Decision",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision",
+          "argument_hash"
+        ],
+        "title": "ApprovalDecision",
+        "type": "object"
+      },
+      "ApprovalList": {
+        "additionalProperties": false,
+        "properties": {
+          "approvals": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalView"
+            },
+            "title": "Approvals",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "approvals"
+        ],
+        "title": "ApprovalList",
+        "type": "object"
+      },
+      "ApprovalRequested": {
+        "additionalProperties": false,
+        "properties": {
+          "approval_id": {
+            "format": "uuid",
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "tool_id": {
+            "title": "Tool Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "approval.requested",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "approval_id",
+          "tool_id"
+        ],
+        "title": "ApprovalRequested",
+        "type": "object"
+      },
+      "ApprovalResult": {
+        "additionalProperties": false,
+        "properties": {
+          "approval_id": {
+            "format": "uuid",
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "replayed": {
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "approval_id",
+          "status",
+          "replayed"
+        ],
+        "title": "ApprovalResult",
+        "type": "object"
+      },
+      "ApprovalView": {
+        "additionalProperties": false,
+        "description": "What a reviewer decides on. The hash they saw comes back with the decision.",
+        "properties": {
+          "argument_hash": {
+            "title": "Argument Hash",
+            "type": "string"
+          },
+          "arguments": {
+            "title": "Arguments",
+            "type": "string"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "operation_class": {
+            "title": "Operation Class",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tool_id": {
+            "title": "Tool Id",
+            "type": "string"
+          },
+          "tool_version": {
+            "title": "Tool Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "tool_id",
+          "tool_version",
+          "operation_class",
+          "argument_hash",
+          "arguments",
+          "status",
+          "expires_at"
+        ],
+        "title": "ApprovalView",
+        "type": "object"
+      },
       "ArtifactList": {
         "additionalProperties": false,
         "properties": {
@@ -1141,6 +1334,12 @@
               },
               {
                 "$ref": "#/components/schemas/ArtifactMissing"
+              },
+              {
+                "$ref": "#/components/schemas/ApprovalRequested"
+              },
+              {
+                "$ref": "#/components/schemas/ApprovalDecided"
               }
             ],
             "title": "Payload"
@@ -1861,6 +2060,212 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/v1/approvals": {
+      "get": {
+        "operationId": "listApprovals",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "pending",
+              "enum": [
+                "pending",
+                "approved",
+                "rejected",
+                "expired",
+                "withdrawn"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Approvals"
+      }
+    },
+    "/v1/approvals/{approval_id}/decision": {
+      "post": {
+        "operationId": "decideApproval",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "approval_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Approval Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApprovalDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Decision"
+      }
+    },
     "/v1/experts": {
       "get": {
         "operationId": "listExperts",

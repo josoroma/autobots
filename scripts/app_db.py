@@ -112,7 +112,7 @@ def seed(stack: AppStack, root: Path) -> subprocess.CompletedProcess[str]:
 def reset(stack: AppStack) -> None:
     require_marker(stack)
     result = stack.sql('drop schema if exists app_private cascade;\ndrop schema if exists agent_runtime cascade;\n'
-                       'drop table if exists public.artifacts, public.run_events, public.runs, public.sessions, public.expert_versions, public.experts, public.model_profiles, public.workspace_members, '
+                       'drop table if exists public.approval_requests, public.artifacts, public.run_events, public.runs, public.sessions, public.expert_versions, public.experts, public.model_profiles, public.workspace_members, '
                        'public.workspaces cascade;\ndrop function if exists public.is_workspace_member(uuid);\n'
                        'truncate autobots_disposable.migrations;\n')
     if result.returncode:

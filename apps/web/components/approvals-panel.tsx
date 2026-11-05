@@ -1,0 +1,153 @@
+"use client";
+
+import { parseApprovalList, type ApprovalView } from "@autobots/api-client";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { csrfFetch } from "@/lib/csrf-fetch";
+
+const MESSAGES: Record<string, string> = {
+  owner_required: "Only the workspace owner can decide.",
+  approval_expired: "This request expired, so it was not approved.",
+  approval_mismatch: "The request changed. Reload and review it again.",
+  approval_already_decided: "This request was already decided.",
+  approval_run_not_waiting:
+    "The run isn't waiting for this decision. Resume it first.",
+};
+
+export function ApprovalsPanel() {
+  const [approvals, setApprovals] = useState<readonly ApprovalView[] | null>(
+    null,
+  );
+  const [failed, setFailed] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const load = useCallback(async (): Promise<void> => {
+    const reply = await fetch("/api/v1/approvals", { cache: "no-store" }).catch(
+      () => null,
+    );
+    if (reply?.ok === true) {
+      setApprovals(parseApprovalList(await reply.json()).approvals);
+      setFailed(false);
+    } else {
+      setFailed(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/v1/approvals", { cache: "no-store" })
+      .then(async (reply) => {
+        if (!active) return;
+        if (reply.ok)
+          setApprovals(parseApprovalList(await reply.json()).approvals);
+        else setFailed(true);
+      })
+      .catch(() => {
+        if (active) setFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function decide(
+    approval: ApprovalView,
+    decision: "approve" | "reject",
+  ): Promise<void> {
+    setMessage(null);
+    const reply = await csrfFetch(
+      `/api/v1/approvals/${encodeURIComponent(approval.id)}/decision`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body: JSON.stringify({
+          decision,
+          argument_hash: approval.argument_hash,
+        }),
+      },
+    ).catch(() => null);
+    if (reply?.ok === true) {
+      setMessage(
+        decision === "approve"
+          ? "Approved. Only this exact request is released."
+          : "Rejected. The run can replan or fail, and this request won't run.",
+      );
+    } else {
+      const failure = (await reply?.json().catch(() => null)) as {
+        code?: string;
+      } | null;
+      setMessage(
+        MESSAGES[failure?.code ?? ""] ?? "That decision couldn't be saved.",
+      );
+    }
+    await load();
+  }
+
+  if (failed) {
+    return (
+      <p role="alert" className="text-sm">
+        Approvals could not be loaded. Sign in, then try again.
+      </p>
+    );
+  }
+  if (approvals === null) {
+    return (
+      <p role="status" className="text-sm">
+        Loading approvals.
+      </p>
+    );
+  }
+  return (
+    <>
+      {message === null ? null : (
+        <p role="status" data-message="decision" className="text-sm">
+          {message}
+        </p>
+      )}
+      {approvals.length === 0 ? (
+        <p className="text-sm">Nothing is waiting for a decision.</p>
+      ) : (
+        approvals.map((approval) => (
+          <Card
+            key={approval.id}
+            data-approval={approval.id}
+            className="space-y-2"
+          >
+            <h2 className="text-lg font-medium">
+              {approval.tool_id}, version {approval.tool_version}
+            </h2>
+            <p className="text-sm">
+              Effect: {approval.operation_class.replaceAll("_", " ")}
+            </p>
+            <pre className="bg-muted overflow-x-auto rounded-md p-3 text-sm">
+              {approval.arguments}
+            </pre>
+            <p className="text-muted-foreground text-sm">
+              Expires {new Date(approval.expires_at).toLocaleString()}.{" "}
+              <Link href={`/runs/${approval.run_id}`} className="underline">
+                Open the run
+              </Link>
+            </p>
+            <div className="flex gap-3">
+              <Button onClick={() => void decide(approval, "approve")}>
+                Approve
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => void decide(approval, "reject")}
+              >
+                Reject
+              </Button>
+            </div>
+          </Card>
+        ))
+      )}
+    </>
+  );
+}

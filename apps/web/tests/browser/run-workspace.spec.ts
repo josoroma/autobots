@@ -131,6 +131,12 @@ test("events arrive live and survive a dropped connection without duplicates", a
     );
   expect(sequences).toEqual(["1", "2", "3", "4"]);
 
+  const later = await (
+    await page.request.get(`/api/v1/runs/${id}/events?after=3`)
+  ).json();
+  expect(
+    later.events.map((event: { sequence: number }) => event.sequence),
+  ).toEqual([4]);
   await page.reload();
   await expect(page.locator("[data-sequence]")).toHaveCount(4);
   await expect(page.locator("[data-run-status]")).toHaveAttribute(

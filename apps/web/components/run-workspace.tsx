@@ -7,6 +7,7 @@ import {
   type RunEvent,
   type RunWorkspace,
 } from "@autobots/api-client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Card } from "@/components/ui/card";
@@ -39,6 +40,12 @@ function describe(event: RunEvent): string {
     return payload.previous === payload.current
       ? `Run ${payload.current}`
       : `Run moved from ${payload.previous} to ${payload.current}`;
+  }
+  if (payload.type === "approval.requested") {
+    return `Approval requested for ${payload.tool_id}`;
+  }
+  if (payload.type === "approval.decided") {
+    return `Approval ${payload.decision}`;
   }
   return payload.type === "artifact.published"
     ? `Artifact ${payload.name} published`
@@ -198,6 +205,13 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
             </span>
           )}
         </p>
+        {snapshot.run.status === "waiting_approval" ? (
+          <p className="text-sm">
+            <Link href="/approvals" className="font-medium underline">
+              Review it in Approvals
+            </Link>
+          </p>
+        ) : null}
         <p
           data-connection={connection}
           className="text-muted-foreground text-sm"

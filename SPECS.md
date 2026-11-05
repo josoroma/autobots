@@ -152,14 +152,14 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-5.2 | Scoped synchronous specialist assignments | DONE | EPIC-5 |
 | US-5.2#1 | Implement assignment records, namespaces and inherited budgets. | DONE | US-5.2 |
 | US-5.2#2 | Test duplicate delegation, denied expansion and parent cancellation. | DONE | US-5.2 |
-| US-5.3 | Argument-bound approvals and durable decision wait | READY | EPIC-5 |
-| US-5.3#1 | Implement approval persistence, validated decision commands and inbox. | TODO | US-5.3 |
-| US-5.3#2 | Exercise tampering, expiry, rejection and interrupted-node replay fixtures. | TODO | US-5.3 |
-| US-5.4 | Consequential-effect reconciliation using a mock destination | BLOCKED | EPIC-5 |
+| US-5.3 | Argument-bound approvals and durable decision wait | DONE | EPIC-5 |
+| US-5.3#1 | Implement approval persistence, validated decision commands and inbox. | DONE | US-5.3 |
+| US-5.3#2 | Exercise tampering, expiry, rejection and interrupted-node replay fixtures. | DONE | US-5.3 |
+| US-5.4 | Consequential-effect reconciliation using a mock destination | READY | EPIC-5 |
 | US-5.4#1 | Implement connector-independent reconciliation states and receipt handling. | TODO | US-5.4 |
 | US-5.4#2 | Test lost-response and duplicate-delivery behavior with a controlled sink. | TODO | US-5.4 |
 | EPIC-6 | Typed reusable workflows | — | — |
-| US-6.1 | Typed immutable workflow definition and validation | BLOCKED | EPIC-6 |
+| US-6.1 | Typed immutable workflow definition and validation | READY | EPIC-6 |
 | US-6.1#1 | Define typed workflow IR and version persistence. | TODO | US-6.1 |
 | US-6.1#2 | Add type, link, bounded-cycle and publication fixtures. | TODO | US-6.1 |
 | US-6.2 | Workflow readiness, emissions and restart semantics | BLOCKED | EPIC-6 |
@@ -1988,7 +1988,8 @@ Open Questions:
 
 ### US-5.3: Argument-bound approvals and durable decision wait
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-5-3-argument-bound-approvals-durable/`
 
 As a reviewer
 I want the exact proposed action before approval
@@ -2020,15 +2021,15 @@ Dependencies:
 - US-4.6
 
 Tasks:
-- [ ] Implement approval persistence, validated decision commands and inbox.
-- [ ] Exercise tampering, expiry, rejection and interrupted-node replay fixtures.
+- [x] Implement approval persistence, validated decision commands and inbox.
+- [x] Exercise tampering, expiry, rejection and interrupted-node replay fixtures.
 
 Open Questions:
 - None.
 
 ### US-5.4: Consequential-effect reconciliation using a mock destination
 
-Status: BLOCKED
+Status: READY
 
 As an operator
 I want explicit external-effect outcomes and receipts
@@ -2073,7 +2074,7 @@ Phase reference: B4, preserved SP-020. All story completion also requires SP-003
 
 ### US-6.1: Typed immutable workflow definition and validation
 
-Status: BLOCKED
+Status: READY
 
 As an automation builder
 I want a versioned workflow vocabulary
