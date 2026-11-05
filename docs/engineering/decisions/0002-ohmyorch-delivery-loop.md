@@ -4,7 +4,7 @@
 
 ## Decision
 
-Epic and story delivery runs through the real upstream `ohmyorch` plugin, pinned to the commit recorded in `.claude/autobots.json` and installed from the local checkout at local scope. A delivery target is authorized only when the user names it on `/ohmyorch:deliver`.
+Epic and story delivery runs through the real upstream `ohmyorch` plugin, pinned to the commit recorded in `.claude/autobots.json` and installed from the local checkout at local scope. A delivery target is authorized only when the user names it, on `/ohmyorch:deliver` or in a request. See "Delivery targets" below.
 
 The project-local harness is kept, not replaced. `scripts/specs.py`, `scripts/verify.py`, the project hooks and the read-only `autobots-spec-ingestor` keep their roles and run alongside the plugin.
 
@@ -35,13 +35,16 @@ The DH-W requirements are coordinator rules, not mechanical gates; independent r
 
 ## Decisions made while delivering US-1.1
 
-All by the user on 2026-11-04, and all recorded in the bridge rule.
+By the user on 2026-11-04, except where marked. The protected-path, unmet-Given and "any required item" decisions are also in the bridge rule, because they govern later stories. The others are recorded here.
 
 - **Protected paths:** `ohmyorch:implementer` cannot write `.claude/*`, `AGENTS.md`, `CLAUDE.md`, `README*`, `.gitignore`, `openspec/*`, the mapped PRD, `SPECS.md` or `CODEBASE.md`, yet US-1.2 and US-1.4 are largely about such files. When a plan names one, the implementer authors the content, the coordinator writes it verbatim, and the reviewer checks it as implementation. The upstream guard is unchanged.
 - **Unmet Given:** a conditional scenario whose Given does not hold is scored `UNVERIFIED`, never `PASS`, and may be archived only under the bridge rule's stated conditions. This is the one exception to "no `UNVERIFIED` row"; the scenario stays visibly unexercised.
 - **Local transcripts (US-1.1 only):** DH-03 says to ignore them, but no source names an in-repository location. They are recorded as not missing, with no rule added, and the inventory states the gap.
 - **Cache ignores (US-1.1):** DH-03 says to ignore caches with no in-use limit, so five categories with no rule (`.pytest_cache/`, `.ruff_cache/`, `.mypy_cache/`, `*.tsbuildinfo`, `.pnpm-store/`) are added in US-1.1 through the reopen route, not deferred to US-1.3. These five close the cache question for US-1.1. Other caches also have no rule and are not claimed as covered: a later story that introduces a tool adds that tool's ignores, and reviewers enforce that.
-- **Delivery targets:** the user named all epics on 2026-11-04, to be delivered one epic at a time until complete. This does not lift the boundaries above: US-3.4's paid qualification and US-7.2's choice of service remain the user's decisions, and the loop stops there.
+- **"Any required item":** a Given such as "required ignores are absent" holds if any required item is absent, and a decision that one item is not required removes only that item. Confirmed for all stories.
+- **Arranged preconditions, 2026-11-05:** the unmet-Given exception does not cover a scenario exercising behavior the story implements, when a disposable environment can arrange its precondition. It is arranged and scored from observation, stating that the condition was arranged. The bridge's "merely hard to run" clause remains the coordinator's wording, unconfirmed.
+- **Research payload files:** `research/qwen38-gguf-probe.json` and `research/qwen38-gguf-performance.json` hold model request and response payloads. They are historical experiment evidence, not DH-03 local transcripts, and stay tracked. Their message text has not been read.
+- **Delivery targets:** on 2026-11-04 the user asked to "loop delivery one epic by epic until complete all", which the coordinator reads as naming every epic; that reading is the coordinator's. This does not lift the boundaries above: US-3.4's paid qualification and US-7.2's choice of service remain the user's decisions, and the loop stops there.
 
 ## Limits and known risk
 

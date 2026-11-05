@@ -65,9 +65,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-1.1 | H0 repository and prerequisite inventory | DONE | EPIC-1 |
 | US-1.1#1 | Inspect repository state and local tool versions. | DONE | US-1.1 |
 | US-1.1#2 | Prepare only missing version-control and ignore configuration. | DONE | US-1.1 |
-| US-1.2 | H0 shared instructions and development assistant assets | READY | EPIC-1 |
-| US-1.2#1 | Complete shared instructions and project skills/rules/agents, including the read-only ingestor and paired writing workflow. | TODO | US-1.2 |
-| US-1.2#2 | Validate the local adaptation and record pinned provenance, syntax and optional adapter limitations. | TODO | US-1.2 |
+| US-1.2 | H0 shared instructions and development assistant assets | DONE | EPIC-1 |
+| US-1.2#1 | Complete shared instructions and project skills/rules/agents, including the read-only ingestor and paired writing workflow. | DONE | US-1.2 |
+| US-1.2#2 | Validate the local adaptation and record pinned provenance, syntax and optional adapter limitations. | DONE | US-1.2 |
 | US-1.3 | H0 locked toolchains and minimal scaffolding | READY | EPIC-1 |
 | US-1.3#1 | Resolve and lock the selected compatible toolchains. | TODO | US-1.3 |
 | US-1.3#2 | Create only the web/API/contract scaffolding needed for harness qualification. | TODO | US-1.3 |
@@ -781,7 +781,8 @@ Open Questions:
 
 ### US-1.2: H0 shared instructions and development assistant assets
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-1-2-h0-shared-instructions-development/`
 
 As a developer
 I want shared instructions and focused project-local assistant definitions
@@ -822,8 +823,8 @@ Dependencies:
 - US-1.1
 
 Tasks:
-- [ ] Complete shared instructions and project skills/rules/agents, including the read-only ingestor and paired writing workflow.
-- [ ] Validate the local adaptation and record pinned provenance, syntax and optional adapter limitations.
+- [x] Complete shared instructions and project skills/rules/agents, including the read-only ingestor and paired writing workflow.
+- [x] Validate the local adaptation and record pinned provenance, syntax and optional adapter limitations.
 
 Open Questions:
 - None.

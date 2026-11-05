@@ -5,6 +5,8 @@ description: Implement or review Autobots OpenRouter routing, role snapshots, cr
 
 # One application inference gateway
 
+Relevant paths: `services/agent/src/autobots/adapters/models/**/*`, `services/agent/src/autobots/application/**/*`, `services/agent/src/autobots/graphs/**/*`, `apps/web/app/api/settings/**/*` and `apps/web/src/app/api/settings/**/*`.
+
 Read `.claude/autobots.json`, the mapped providers/contract and selected story. The [provider PRD](../../../PRD-Model-Providers.md) owns exact profile IDs, precedence, endpoints, credential storage and acceptance gates; do not invent adapter defaults.
 
 - All 14 roles initially select `openrouter_deepseek_flash`; only explicit selection enables `openrouter_astra`. Preserve canonical snapshot and wire request IDs. No local inference, alternative provider, embedding service, hidden reviewer model or automatic fallback.
@@ -15,3 +17,5 @@ Read `.claude/autobots.json`, the mapped providers/contract and selected story. 
 - Default tests inject a fake transport and reject real network inference even if the shell contains a key. Live OpenRouter qualification requires an explicitly initiated bounded task and its own evidence.
 
 Return routing/security behavior, credential/error states, budget/replay implications and actual mocked versus live results. This concerns application inference; never reconfigure the developer's assistant credentials or assume these model IDs work in Claude Code.
+
+Failure behavior: templates, skipped tests and missing tools never count as passing evidence, and a fake transport result never qualifies live inference. Report a failed or unavailable check as such; there is no fallback to another model or provider.

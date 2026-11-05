@@ -16,3 +16,7 @@ The [provider PRD](../../PRD-Model-Providers.md) owns IDs, credentials, routing 
 - Honor configured key precedence; nonblank invalid higher-priority keys block fallback. Missing credentials block inference, not local UI/files/settings. Save & validate is metadata-only and cannot auto-run a draft.
 - Enforce fresh catalog mapping, supported parameters, required routing flags, budget reservations and concurrency. A correct response does not prove an ignored tool constraint was enforced.
 - Fake transports are the default test path even with a real key present. Live qualification is an explicit bounded task; developer assistant model configuration is separate and unchanged.
+
+## Check and review
+
+Check: the `full` profile of [`scripts/verify.py`](../../scripts/verify.py). Review: [`autobots-review-change`](../skills/autobots-review-change/SKILL.md).

@@ -16,3 +16,7 @@ The [local deployment PRD](../../PRD-Local-Mac-Deployment.md) owns topology. Use
 - Pin/qualify images on Apple Silicon, inspect health/resource limits and persistent mounts. Never print secret-expanded Compose configuration.
 - Studio AI stays disabled with empty `OPENAI_API_KEY`; no OpenRouter credentials in Studio or tool containers. No hosted tracing or implicit telemetry.
 - Distinct disposable projects/ports/volumes and ownership guards precede cleanup. Persistent startup, migration, restore/reset/prune are not ordinary verification or hook actions.
+
+## Check and review
+
+Check: the `operations` profile of [`scripts/verify.py`](../../scripts/verify.py). Review: [`autobots-review-change`](../skills/autobots-review-change/SKILL.md).

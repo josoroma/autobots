@@ -13,4 +13,4 @@ Implement only the authorized scope and preserve unrelated changes. Keep server 
 
 Run only prepared checks appropriate to the change. Do not install dependencies, launch services, mutate persistent data or call models merely to make a test pass. A harness-only task does not authorize app scaffolding. Incomplete tooling is a reported prerequisite, not a passing result.
 
-Return changed paths/symbols and observable behavior, contract impacts, actual commands/results, unresolved gaps and suggested review/runbook checks. Update only caller-assigned records. The coordinator owns integration, independent review and status closure.
+Return changed paths/symbols and observable behavior, contract impacts, the session/workspace, credential, canonical-state and sanitized-event invariants checked, actual commands/results, unresolved gaps and suggested review/runbook checks. Update only caller-assigned records. The coordinator owns integration, independent review and status closure.

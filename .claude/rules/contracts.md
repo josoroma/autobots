@@ -16,3 +16,7 @@ Read `autobots-contracts` and the mapped [Option B contract](../../docs/engineer
 - Generate offline into temporary output and compare normalized artifacts. No key/service/network requirement for schema generation; missing generators fail prerequisites.
 - Define compatibility and upgrade behavior. Shared validation fixtures cover both languages, unknown enums and private-field leakage; TypeScript types do not validate JSON.
 - Coordinate generator ownership. A contract edit invalidates affected consumer checks and review, not just the source file's lint result.
+
+## Check and review
+
+Check: the `fast` profile of [`scripts/verify.py`](../../scripts/verify.py). Review: [`autobots-review-change`](../skills/autobots-review-change/SKILL.md).

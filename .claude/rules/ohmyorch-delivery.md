@@ -4,6 +4,8 @@ Applies while coordinating `/ohmyorch:deliver` in this project. [Decision 0002](
 
 Bundled specialists are not guaranteed to see this file. Put the applicable requirements from it, and the story's IDs and paths, in each delegation prompt.
 
+Checks for this rule: [`scripts/verify.py`](../../scripts/verify.py), [`scripts/specs.py`](../../scripts/specs.py) and [`scripts/story_manifest.py`](../../scripts/story_manifest.py). Review: `ohmyorch:reviewer` for the verdict and [`autobots-reviewer`](../agents/autobots-reviewer.md) for the evidence review.
+
 ## Before starting a goal
 
 - `git -C research/upstream/OhMyOrch rev-parse HEAD` must equal `upstream.commit` in `.claude/autobots.json`.
@@ -30,7 +32,7 @@ The reviewer may write only `review.md` and the tester only `test-report.md`, an
 | When | Record |
 |---|---|
 | After `implementation-plan.md` exists, before `implement` | Open `docs/engineering/work-items/<US-id>.md` with the plan. The guard blocks most writes outside `openspec/` and `.claude/` until the plan exists |
-| After `implement`, before capture | Implementation section: changed paths, actual behavior, deviations. Finish the runbook entry here, or identify the existing verified procedure and its regression check (DH-W05). It must be final at capture: its text links to the story's evidence for exercise status, and does not record it |
+| After `implement`, before capture | Implementation section: changed paths, actual behavior, deviations. Finish the runbook entry here, or identify the existing verified procedure and its regression check (DH-W05). It must be final at capture: its text links to the story's evidence, which holds the last-exercised revision, date and result the Option B contract requires for a verified claim |
 | After `test` | Review section: reviewer identity, reviewed fingerprint, findings and dispositions. Evidence summary under `docs/engineering/evidence/<US-id>/`, recording which runbook steps were exercised and which remain untested, and distinguishing mocked, static, disposable and live results |
 | After `mark-done` | Links to verdicts at their archived path, written before the final verification |
 
@@ -68,7 +70,10 @@ The upstream completion gate is necessary but not sufficient. All of these must 
 
 - The evidence review has no unresolved blocking finding.
 - `test-report.md` covers every scenario and has no `UNVERIFIED` row, apart from the one exception below. Upstream's gate passes `UNVERIFIED` rows and `OpenSpec verify: not run`, and neither otherwise qualifies here.
-- **Unmet-Given exception, decided by the user on 2026-11-04:** a scenario whose Given is explicitly conditional, such as "Given X is absent", and does not hold today is scored `UNVERIFIED`, never `PASS`. Archive may proceed only if the row states the Given does not hold, re-run probes evidence that, and the evidence summary and work item name the scenario as unexercised. A scenario merely hard to run does not qualify. Nor does one exercising behavior the story implements, when a disposable environment could arrange its precondition. An "any required item is absent" Given holds if any such item is absent; a recorded decision that one item is not required only removes that item.
+- **Unmet-Given exception, decided by the user on 2026-11-04:** a scenario whose Given is explicitly conditional, such as "Given X is absent", and does not hold today is scored `UNVERIFIED`, never `PASS`. Archive may proceed only if the row states the Given does not hold, re-run probes evidence that, and the evidence summary and work item name the scenario as unexercised.
+  - **Confirmed by the user on 2026-11-04, for all stories:** an "any required item is absent" Given holds if any such item is absent, and a recorded decision that one item is not required only removes that item.
+  - **Confirmed by the user on 2026-11-05, for all stories:** the exception does not cover a scenario exercising behavior the story implements, when a disposable environment can arrange its precondition. Arrange it and score from what is observed, stating plainly that the condition was arranged, not naturally present.
+  - **Coordinator's wording, not put to the user:** a scenario merely hard to run does not qualify.
 - `python3.12 scripts/verify.py --profile harness` passes, reported as harness evidence only.
 - `python3.12 scripts/story_manifest.py compare <US-id>` passes, with its output recorded in the evidence. It fails on any change since capture, except records written after review and Git-ignored files. Never recapture to make it pass. Between this check and the story commit, change nothing but records and what the `archive` and `mark-done` steps themselves change.
 

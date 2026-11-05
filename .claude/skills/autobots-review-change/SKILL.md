@@ -5,6 +5,8 @@ description: Independently review an Autobots change against source requirements
 
 # Review independently
 
+Relevant paths: `docs/engineering/work-items/<id>.md`, `docs/engineering/evidence/<id>/` and `docs/engineering/runbooks/<id>.md`.
+
 Read `.claude/autobots.json`, the mapped contract, selected work item, source requirements and current evidence. Establish the reviewed source/config/lock/verifier fingerprint; a commit alone does not cover uncommitted files.
 
 Delegate to `autobots-reviewer` in a separate context with explicit changed paths, baseline/final content or diff, acceptance IDs and evidence locations. The reviewer has only Read, Grep and Glob. It returns findings; the caller persists the review record. Do not silently repair code while presenting the result as independent review.

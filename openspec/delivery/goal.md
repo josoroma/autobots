@@ -13,14 +13,14 @@ markers are preserved across refreshes.
 | Status | ACTIVE |
 | Reason | - |
 | Started | 2026-11-04 |
-| Updated | 2026-11-04 |
+| Updated | 2026-11-05 |
 
 ## Stories
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
 | 1 | US-1.1 | us-1-1-h0-repository-prerequisite-inventory | DONE | H0 repository and prerequisite inventory |
-| 2 | US-1.2 | us-1-2-h0-shared-instructions-development | READY | H0 shared instructions and development assistant assets |
+| 2 | US-1.2 | us-1-2-h0-shared-instructions-development | DONE | H0 shared instructions and development assistant assets |
 | 3 | US-1.3 | us-1-3-h0-locked-toolchains-minimal | READY | H0 locked toolchains and minimal scaffolding |
 | 4 | US-1.4 | us-1-4-h0-portable-verification-deterministic | BLOCKED | H0 portable verification and deterministic hook adapter |
 | 5 | US-1.5 | us-1-5-h0-work-records-independent | READY | H0 work records, independent review and evidence templates |
@@ -31,11 +31,11 @@ markers are preserved across refreshes.
 ## Next Action
 
 Action: select
-Story: US-1.2
-Change: us-1-2-h0-shared-instructions-development
+Story: US-1.3
+Change: us-1-3-h0-locked-toolchains-minimal
 Owner: ohmyorch:product-manager
-Command: openspec new change us-1-2-h0-shared-instructions-development; set US-1.2 to IN PROGRESS with a Change: line; /Users/josoroma/sites/autobots/research/upstream/OhMyOrch/plugins/ohmyorch/bin/ohmyorch --project-root /Users/josoroma/sites/autobots --session-id 547ae454-e2f5-4d90-8efa-f515e920089d status --change us-1-2-h0-shared-instructions-development
-Reason: US-1.2 is READY and has no OpenSpec change
+Command: openspec new change us-1-3-h0-locked-toolchains-minimal; set US-1.3 to IN PROGRESS with a Change: line; /Users/josoroma/sites/autobots/research/upstream/OhMyOrch/plugins/ohmyorch/bin/ohmyorch --project-root /Users/josoroma/sites/autobots --session-id 547ae454-e2f5-4d90-8efa-f515e920089d status --change us-1-3-h0-locked-toolchains-minimal
+Reason: US-1.3 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.
@@ -43,8 +43,5 @@ recomputes it from the repository on every call.
 ## Notes
 
 <!-- BEGIN AUTHORED: notes -->
-Carried from US-1.1, to do at US-1.2 `select`, with US-1.2's plan naming these paths and its reviewer covering them. Both files were in US-1.1's reviewed manifest.
-
-- `.claude/rules/ohmyorch-delivery.md`, unmet-Given bullet: separate the user-decided exception and the user-confirmed "any required item" reading from the coordinator's "disposable environment" sentence (F-12).
-- `docs/engineering/decisions/0002-ohmyorch-delivery-loop.md`: say which decisions are in the bridge rule, relate "only when named" to the user's naming every epic (F-11), and record the user's rulings on the "any required item" reading and on the two `research/` payload files.
+Done at US-1.2 `select`, carried from US-1.1: `.claude/rules/ohmyorch-delivery.md` and `docs/engineering/decisions/0002-ohmyorch-delivery-loop.md` were updated for F-11, F-12 and the user's two rulings. US-1.2's plan names these paths and its reviewer covers them.
 <!-- END AUTHORED: notes -->

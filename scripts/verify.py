@@ -12,7 +12,7 @@ import subprocess
 import sys
 import time
 
-from harness_lib import config_errors, fingerprint, input_manifest, project_root
+from harness_lib import adapter_status, config_errors, fingerprint, input_manifest, project_root, reduced_env
 
 
 def utc() -> str:
@@ -23,8 +23,7 @@ def run_check(root: Path, name: str, argv: list[str]) -> dict:
     start = utc()
     began = time.monotonic()
     # Tests receive no inherited API keys, credentials or assistant configuration.
-    env = {key: os.environ[key] for key in ('PATH', 'LANG', 'LC_ALL', 'TMPDIR')
-           if key in os.environ}
+    env = reduced_env()
     env.update(PYTHONDONTWRITEBYTECODE='1', PYTHONIOENCODING='utf-8')
     try:
         result = subprocess.run(argv, cwd=root, env=env, capture_output=True,
@@ -69,6 +68,7 @@ def main() -> int:
         problems = config_errors(root)
         checks = [{'id': 'project_configuration', 'class': 'static', 'model_transport': 'none',
                    'status': 'passed' if not problems else 'failed', 'errors': problems}]
+        adapter = adapter_status(root)
         checks.append(run_check(root, 'backlog_validation',
                                 [sys.executable, 'scripts/specs.py', 'validate']))
         checks.append(run_check(root, 'harness_behavior_tests',
@@ -87,6 +87,7 @@ def main() -> int:
                   'completed_at_utc': utc(), 'python_version': sys.version.split()[0],
                   'input_fingerprint': final, 'inputs_unchanged_during_check': stable,
                   'input_manifest': input_manifest(root), 'checks': checks,
+                  'assistant_adapter': adapter,
                   'scope': 'Project configuration, backlog structure and deterministic harness fixtures only',
                   'not_tested': ['Claude event delivery', 'application', 'Supabase',
                                  'Docker', 'OpenRouter inference', 'complete H0/H1']}
@@ -96,6 +97,7 @@ def main() -> int:
         print(json.dumps({'profile': 'harness', 'status': report['status'],
                           'inputs_stable': stable, 'checks': [{k: c[k] for k in ('id', 'status')}
                                                             for c in checks],
+                          'assistant_adapter': {k: adapter[k] for k in ('state', 'reason')},
                           'report': '.checks/harness/latest.json'}, indent=2))
         if not passed:
             for check in checks:

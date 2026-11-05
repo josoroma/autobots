@@ -13,3 +13,7 @@ Use [DH-06 Next.js standards](../../PRD-Development-Harness.md#nextjs-and-typesc
 - Only approved public Supabase URL/key is client-visible under RLS. OpenRouter credentials stay server-side.
 - Render sanitized durable events; handle reconnect/deduplication and explicit error/empty/loading states. Browser disconnect does not cancel a run.
 - Lint separately from Next.js 16 builds; generate route types before standalone type checks. Never suppress build type errors. Verify relevant accessible user flows once tooling exists.
+
+## Check and review
+
+Check: the `fast` and `full` profiles of [`scripts/verify.py`](../../scripts/verify.py). Review: [`autobots-review-change`](../skills/autobots-review-change/SKILL.md).

@@ -1,14 +1,55 @@
-"""Local harness primitives; no network, package installation or model calls."""
+"""Local harness primitives; no package installation or model calls.
+
+`adapter_status` is the only part that runs an external program, and it runs only
+`claude --version`. Whether that command itself reaches the network is not known here.
+"""
 from __future__ import annotations
 
+from collections.abc import Callable
 import hashlib
 import json
 import os
 from pathlib import Path
+import re
+import shutil
+import signal
+import subprocess
+from urllib.parse import unquote, urlsplit
+
+# Tests and the version probe receive no inherited API keys, credentials or assistant configuration.
+REDUCED_ENV_KEYS = ('PATH', 'LANG', 'LC_ALL', 'TMPDIR')
+
+ADAPTER_STATES = ('inactive', 'configured_unqualified')
+VERSION_TIMEOUT_SECONDS = 5.0
+ASSISTANT_QUALIFICATION = 'not_tested'
+DELIVERY_PLUGIN_QUALIFICATION = 'not_qualified_one_pretooluse_event_observed'
+
+# A rule or AGENTS.md row must link to one of these. Presence is checked here; whether the
+# link is apt for that rule is a review question.
+ALLOWED_LINK_PATHS = frozenset({
+    'scripts/verify.py',
+    'scripts/specs.py',
+    'scripts/story_manifest.py',
+    '.claude/skills/autobots-verify-change/SKILL.md',
+    '.claude/skills/autobots-review-change/SKILL.md',
+    '.claude/agents/autobots-reviewer.md',
+})
+ALLOWED_LINK_ANCHOR = ('PRD-Development-Harness.md', 'dh-091-work-item-evidence-contract')
+AGENTS_MAPPING_HEADING = 'Rule checks and review'
+AGENTS_REQUIRED_ROWS = ('Opening paragraph', '.claude/settings.json', 'CLAUDE.md')
+
+FENCE = re.compile(r'^ {0,3}(`{3,}|~{3,})(.*)$')
+INLINE_CODE = re.compile(r'(`+)(?!`)(.+?)(?<!`)\1(?!`)')
+LINK = re.compile(r'\[([^\]\n]*)\]\((<[^>\n]+>|[^\s)]+)[^)\n]*\)')
+VERSION = r'[0-9]{1,9}\.[0-9]{1,9}\.[0-9]{1,9}'
 
 
 def project_root() -> Path:
     return Path(__file__).resolve().parent.parent
+
+
+def reduced_env() -> dict[str, str]:
+    return {key: os.environ[key] for key in REDUCED_ENV_KEYS if key in os.environ}
 
 
 def input_manifest(root: Path) -> dict[str, str]:
@@ -94,6 +135,7 @@ def config_errors(root: Path) -> list[str]:
         return [f'Configuration unreadable: {type(exc).__name__}']
     if not isinstance(config, dict) or not isinstance(settings, dict):
         return ['Configuration must contain JSON objects.']
+    errors.extend(activation_errors(config))
     interpreter = config.get('python_executable')
     if (not isinstance(interpreter, str) or not Path(interpreter).is_absolute()
             or not Path(interpreter).is_file() or not os.access(interpreter, os.X_OK)):
@@ -172,4 +214,186 @@ def config_errors(root: Path) -> list[str]:
                     errors.append(f'{path.relative_to(root)}: missing description.')
             if '${CLAUDE_PLUGIN_ROOT}' in text or 'ohmyorch:contract' in text:
                 errors.append(f'{path.relative_to(root)}: unresolved upstream plugin dependency.')
+    errors.extend(rule_link_errors(root))
+    errors.extend(agents_mapping_errors(root))
     return errors
+
+
+def activation_errors(config: dict) -> list[str]:
+    """Refuse an activation claim. Allowlisted exactly, because a prefix would accept `not_tested_but_active`.
+
+    Recording real qualification later needs evidence and a deliberate change here.
+    """
+    errors = []
+    assistant = config.get('assistant')
+    assistant = assistant if isinstance(assistant, dict) else {}
+    upstream = config.get('upstream')
+    plugin = upstream.get('delivery_plugin') if isinstance(upstream, dict) else None
+    plugin = plugin if isinstance(plugin, dict) else {}
+    if assistant.get('event_delivery_qualification') != ASSISTANT_QUALIFICATION:
+        errors.append(f'assistant.event_delivery_qualification must stay {ASSISTANT_QUALIFICATION!r} without recorded qualification evidence.')
+    if plugin.get('event_delivery_qualification') != DELIVERY_PLUGIN_QUALIFICATION:
+        errors.append(f'upstream.delivery_plugin.event_delivery_qualification must stay {DELIVERY_PLUGIN_QUALIFICATION!r} without recorded qualification evidence.')
+    if assistant.get('model_configuration') != 'unchanged':
+        errors.append("assistant.model_configuration must stay 'unchanged'; harness setup does not change developer-client models.")
+    if parse_version(assistant.get('minimum_version_for_blocking_hook_failure')) is None:
+        errors.append('assistant.minimum_version_for_blocking_hook_failure must be a three-part numeric version.')
+    return errors
+
+
+def unfenced_lines(text: str) -> list[str]:
+    """Lines outside fenced code blocks."""
+    kept = []
+    opening = None
+    for line in text.splitlines():
+        match = FENCE.match(line)
+        if opening is not None:
+            if match and match[1][0] == opening[0] and len(match[1]) >= len(opening) and not match[2].strip():
+                opening = None
+        elif match:
+            opening = match[1]
+        else:
+            kept.append(line)
+    return kept
+
+
+def line_links(line: str) -> list[str]:
+    """Markdown link targets on one line, ignoring inline code spans. Link text in code still counts."""
+    return [match[2] for match in LINK.finditer(INLINE_CODE.sub('', line))]
+
+
+def is_allowed_target(target: str, base: Path, root: Path) -> bool:
+    """Whether a link resolves to an existing check or review target from `base`."""
+    parsed = urlsplit(target.removeprefix('<').removesuffix('>'))
+    raw = unquote(parsed.path)
+    if parsed.scheme or parsed.netloc or parsed.query or not raw or raw.startswith('/'):
+        return False
+    resolved = (base / raw).resolve()
+    if not resolved.is_relative_to(root.resolve()) or not resolved.is_file():
+        return False
+    relative = resolved.relative_to(root.resolve()).as_posix()
+    if relative == ALLOWED_LINK_ANCHOR[0]:
+        return unquote(parsed.fragment) == ALLOWED_LINK_ANCHOR[1]
+    return relative in ALLOWED_LINK_PATHS
+
+
+def rule_link_errors(root: Path) -> list[str]:
+    errors = []
+    for path in sorted((root / '.claude/rules').rglob('*.md')):
+        try:
+            lines = unfenced_lines(path.read_text())
+        except (OSError, ValueError):
+            errors.append(f'{path.relative_to(root)}: unreadable rule file.')
+            continue
+        if not any(is_allowed_target(target, path.parent, root)
+                   for line in lines for target in line_links(line)):
+            errors.append(f'{path.relative_to(root)}: no Markdown link to an allowed check or review target.')
+    return errors
+
+
+def agents_mapping_errors(root: Path) -> list[str]:
+    """Each rule-bearing AGENTS.md section needs a row linking to a check or review target."""
+    try:
+        lines = unfenced_lines((root / 'AGENTS.md').read_text())
+    except (OSError, ValueError):
+        return ['AGENTS.md: unreadable, so its rules cannot be mapped to checks and review.']
+    headings = [line[3:].strip() for line in lines if line.startswith('## ')]
+    if AGENTS_MAPPING_HEADING not in headings:
+        return [f'AGENTS.md: missing the "## {AGENTS_MAPPING_HEADING}" section.']
+    section = []
+    inside = False
+    for line in lines:
+        if line.startswith('## '):
+            inside = line[3:].strip() == AGENTS_MAPPING_HEADING
+        elif inside:
+            section.append(line)
+    table = [line.strip() for line in section if line.strip().startswith('|')]
+    errors = []
+    rows = {}
+    for line in table[2:]:  # The first two lines are the table's header and separator.
+        cells = line.strip('|').split('|')
+        label = LINK.sub(lambda match: match[1], cells[0]).replace('`', '').strip()
+        rows[label] = line
+        if not any(is_allowed_target(target, root, root) for target in line_links('|'.join(cells[1:]))):
+            errors.append(f'AGENTS.md: row "{label}" has no link to an allowed check or review target.')
+    required = [heading for heading in headings if heading != AGENTS_MAPPING_HEADING]
+    for label in [*required, *AGENTS_REQUIRED_ROWS]:
+        if label not in rows:
+            errors.append(f'AGENTS.md: no mapping row for "{label}".')
+    return errors
+
+
+def parse_version(value: object) -> tuple[int, ...] | None:
+    """A three-part numeric version, or None. Numeric, because 2.1.99 < 2.1.295 < 2.1.1000."""
+    if not isinstance(value, str) or re.fullmatch(VERSION, value) is None:
+        return None
+    return tuple(int(part) for part in value.split('.'))
+
+
+def probe_version(executable: str, root: Path, timeout: float) -> str | None:
+    """Run only `<executable> --version`. Failure, timeout and unparsable output all give None.
+
+    A new session lets a timeout kill the whole process group, because a child holding the
+    captured pipes open would otherwise outlive the timeout. The path is never recorded.
+    """
+    try:
+        process = subprocess.Popen([executable, '--version'], cwd=root, env=reduced_env(),
+                                   stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                   stderr=subprocess.DEVNULL, text=True, errors='replace',
+                                   start_new_session=True)
+    except OSError:
+        return None
+    try:
+        output, _ = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            process.kill()
+        try:
+            process.communicate(timeout=1)
+        except subprocess.TimeoutExpired:
+            pass  # A descendant left its group and holds the pipe; report unknown regardless.
+        return None
+    if process.returncode != 0:
+        return None
+    match = re.match(rf'\s*({VERSION})(?:\s|$)', output)
+    return match[1] if match else None
+
+
+def configured_minimum(root: Path) -> str | None:
+    try:
+        config = json.loads((root / '.claude/autobots.json').read_text())
+        minimum = config['assistant']['minimum_version_for_blocking_hook_failure']
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    return minimum if parse_version(minimum) is not None else None
+
+
+def adapter_status(root: Path, *, lookup: Callable[[str], str | None] = shutil.which,
+                   timeout: float = VERSION_TIMEOUT_SECONDS) -> dict:
+    """Derive the optional Claude adapter's state; the first matching condition wins.
+
+    Covers one observation: the CLI's presence and version, and the validity of this
+    repository's project configuration. It does not separate project hooks from plugin hooks,
+    does not establish effective settings across scopes, and does not check the developer
+    client's model route, so `configured_unqualified` must not be read as compatible.
+    The status never fails verification, because an unavailable adapter must not block the
+    portable runner. State values are never `active` or `qualified`.
+    """
+    minimum = configured_minimum(root)
+    status = {'state': 'inactive', 'reason': '', 'minimum_version': minimum, 'model_route': 'not_checked'}
+    executable = lookup('claude')
+    if executable is None:
+        return status | {'reason': 'unavailable'}
+    if minimum is None:
+        return status | {'reason': 'minimum_unknown'}
+    if config_errors(root):
+        return status | {'reason': 'configuration_invalid'}
+    observed = probe_version(executable, root, timeout)
+    if observed is None:
+        return status | {'reason': 'version_unknown'}
+    status['observed_version'] = observed
+    if parse_version(observed) < parse_version(minimum):
+        return status | {'reason': 'version_below_minimum'}
+    return status | {'state': 'configured_unqualified', 'reason': 'delivery_unverified'}

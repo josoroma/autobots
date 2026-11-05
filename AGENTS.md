@@ -34,3 +34,17 @@ python3.12 scripts/verify.py --profile harness
 ## Completion evidence
 
 Preserve reviewed redacted manifests/summaries under `docs/engineering/evidence/<work-item-id>/`; bulky raw results belong in ignored `.checks`. Bind results to source/config/lock/verifier fingerprints. Record expected and observed assertions, commands, exit codes, review findings and limitations. Mocked, static, disposable and live evidence are different. Templates, skipped tests and missing tools never count as passing implementation evidence.
+
+## Rule checks and review
+
+Each row names the check and the review responsibility for one source of rules. A link shows who owns the rule, not that a check passes. A pending profile names a future check, so review is what applies to that layer until the profile exists.
+
+| Rule source | Check responsibility | Review responsibility |
+|---|---|---|
+| Opening paragraph | [`scripts/specs.py`](scripts/specs.py) for source traceability | [`autobots-review-change`](.claude/skills/autobots-review-change/SKILL.md) |
+| Work protocol | [`scripts/specs.py`](scripts/specs.py), [`scripts/story_manifest.py`](scripts/story_manifest.py) and [DH-W01–06](PRD-Development-Harness.md#dh-091-work-item-evidence-contract) | [`autobots-reviewer`](.claude/agents/autobots-reviewer.md) |
+| Commands | [`scripts/verify.py`](scripts/verify.py), whose pending profiles exit 2, and [`scripts/specs.py`](scripts/specs.py) for render scope | [`autobots-verify-change`](.claude/skills/autobots-verify-change/SKILL.md) |
+| Boundaries that matter | `project_configuration` in [`scripts/verify.py`](scripts/verify.py), plus the pending profile that owns each layer | [`autobots-review-change`](.claude/skills/autobots-review-change/SKILL.md) |
+| Completion evidence | [`scripts/story_manifest.py`](scripts/story_manifest.py) and [DH-W04–06](PRD-Development-Harness.md#dh-091-work-item-evidence-contract) | [`autobots-reviewer`](.claude/agents/autobots-reviewer.md) |
+| `.claude/settings.json` | `project_configuration` in [`scripts/verify.py`](scripts/verify.py), because this file cannot carry links | [`autobots-review-change`](.claude/skills/autobots-review-change/SKILL.md) |
+| `CLAUDE.md` | It imports `AGENTS.md`. `project_configuration` in [`scripts/verify.py`](scripts/verify.py) checks the hook configuration that its hook sentence describes, not the sentence itself, because that check never reads `CLAUDE.md` | [`autobots-review-change`](.claude/skills/autobots-review-change/SKILL.md) |

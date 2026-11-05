@@ -2,9 +2,9 @@
 
 **Inspected:** 2026-11-04. **Scope:** descriptive inventory; this file supplies no product requirements.
 
-Analyzed revision: 34ae38f591dc2809d95819433bdceb2fb17b9e27
+Analyzed revision: 97149303f46b133bac57638d91113f8d06b55663
 
-This describes that revision, which includes the OhMyOrch delivery setup in [HARNESS-OHMYORCH-001](docs/engineering/work-items/HARNESS-OHMYORCH-001.md).
+This describes that revision, which includes the OhMyOrch delivery setup in [HARNESS-OHMYORCH-001](docs/engineering/work-items/HARNESS-OHMYORCH-001.md) and US-1.1's inventory and five added cache ignore rules.
 
 ## System Summary
 

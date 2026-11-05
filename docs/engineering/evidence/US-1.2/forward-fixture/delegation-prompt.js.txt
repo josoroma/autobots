@@ -1,0 +1,11 @@
+export const meta = {
+  name: 'forward-ingest',
+  description: 'Delegate the read-only spec ingestor against the disposable fixture copy',
+  phases: [{ title: 'Ingest', detail: 'autobots-spec-ingestor returns the proposed document' }],
+}
+phase('Ingest')
+return await agent(`You are the read-only autobots-spec-ingestor. Project root for this task: /Users/josoroma/sites/autobots/.checks/US-1.2/forward/run-1. Read AGENTS.md if present and .claude/autobots.json from that root, resolve its documents map, and read SPECS.md, CODEBASE.md and the mapped sources under that root only. Do not read the real repository's SPECS or PRDs.
+
+Explicit decisions: none. Existing identifiers: those in SPECS.md under that root. Bounded scope: add stories for requirements that have no story, and preserve the rest unchanged, including existing statuses, Change lines, dependencies and SP coverage.
+
+Return, as your final message and nothing before it: the complete proposed Markdown for that root's SPECS.md, then a line reading exactly INGESTION SUMMARY, then the summary your definition requires. Your tools are read-only, and you ran no validator. Say so.`, { label: 'ingestor', phase: 'Ingest', agentType: 'autobots-spec-ingestor' })

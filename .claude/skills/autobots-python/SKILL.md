@@ -14,3 +14,5 @@ Read `.claude/autobots.json`, the mapped contract, selected story and [Python st
 - Test behavior with injected clocks/transports. Once implemented, run Ruff lint and formatting separately, strict mypy for owned modules and focused pytest coverage; document narrow third-party typing exceptions.
 
 Return changed behavior/interfaces, lifecycle and cancellation implications, actual verification and unresolved gaps. Do not start services or call a provider to make an import test pass. Keep the DH-W work record current.
+
+Failure behavior: templates, skipped tests and missing tools never count as passing evidence. Report a failed or unavailable check as such; do not install a dependency to get past it.
