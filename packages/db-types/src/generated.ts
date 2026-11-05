@@ -29,6 +29,9 @@ export interface RunsRow {
   lease_generation: number;
   checkpoint_thread_id: string | null;
   goal_summary: string;
+  version: number;
+  goal_text: string;
+  policy_snapshot: unknown;
 }
 
 export interface WorkspaceMembersRow {

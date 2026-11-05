@@ -17,3 +17,4 @@ class RunRow(TypedDict):
     limit_micro_usd: int
     lease_generation: int
     checkpoint_thread_id: str | None
+    version: int

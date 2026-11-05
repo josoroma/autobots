@@ -19,6 +19,7 @@ def run_from_row(row: RunRow) -> Run:
         limit_micro_usd=row["limit_micro_usd"],
         lease_generation=row["lease_generation"],
         checkpoint_thread_id=row["checkpoint_thread_id"],
+        version=row["version"],
     )
 
 
@@ -26,6 +27,7 @@ def run_summary_from_domain(run: Run) -> RunSummary:
     """Names each public field, so a new domain field stays private by default."""
     return RunSummary(
         schema_version=1,
+        version=run.version,
         id=run.id,
         workspace_id=run.workspace_id,
         parent_run_id=run.parent_run_id,

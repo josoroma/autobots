@@ -7,7 +7,7 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | EPIC-3 |
+| Target | EPIC-4 |
 | Kind | epic |
 | Focus | - |
 | Status | ACTIVE |
@@ -19,19 +19,23 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-3.1 | us-3-1-server-credential-precedence-encrypted | DONE | Server credential precedence and encrypted app storage |
-| 2 | US-3.2 | us-3-2-settings-missing-key-use | DONE | Settings, missing-key use and explicit run intent |
-| 3 | US-3.3 | us-3-3-model-admission-spending-uncertain | DONE | Model admission, spending and uncertain invocation receipts |
-| 4 | US-3.4 | us-3-4-qualify-each-enabled-live | BLOCKED | Qualify each enabled live OpenRouter route |
+| 1 | US-4.1 | us-4-1-atomic-run-admission-canonical | DONE | Atomic run admission and canonical transition commands |
+| 2 | US-4.2 | us-4-2-fenced-worker-ownership-durable | READY | Fenced worker ownership and durable checkpoints |
+| 3 | US-4.3 | us-4-3-bounded-goal-planning-model | BLOCKED | Bounded goal planning and model/tool loop |
+| 4 | US-4.4 | us-4-4-versioned-tool-registry-operation | BLOCKED | Versioned tool registry and operation receipts |
+| 5 | US-4.5 | us-4-5-private-artifacts-staged-publication | BLOCKED | Private artifacts with staged publication and reconciliation |
+| 6 | US-4.6 | us-4-6-sanitized-event-replay-run | BLOCKED | Sanitized event replay and run workspace |
+| 7 | US-4.7 | us-4-7-pause-cancellation-interrupted-run | BLOCKED | Pause, cancellation and interrupted-run recovery |
+| 8 | US-4.8 | us-4-8-verify-first-durable-goal | BLOCKED | Verify the first durable goal-to-artifact slice |
 
 ## Next Action
 
-Action: escalate
-Story: US-3.4
-Change: us-3-4-qualify-each-enabled-live
-Owner: human
-Command: resolve US-3.4 in SPECS.md (a product decision is required)
-Reason: US-3.4 is BLOCKED, not READY
+Action: select
+Story: US-4.2
+Change: us-4-2-fenced-worker-ownership-durable
+Owner: main-session
+Command: openspec new change us-4-2-fenced-worker-ownership-durable; set US-4.2 to IN PROGRESS with a Change: line
+Reason: US-4.2 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

@@ -10,6 +10,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from autobots.api.errors import register_error_handlers
 from autobots.api.routes import router
+from autobots.api.run_routes import router as run_router
 from autobots.api.security import DenyAllMembership, MembershipStore
 from autobots.api.settings import Settings
 from autobots.api.settings_routes import router as settings_router
@@ -63,4 +64,5 @@ def create_app(
     register_error_handlers(app)
     app.include_router(router)
     app.include_router(settings_router)
+    app.include_router(run_router)
     return app

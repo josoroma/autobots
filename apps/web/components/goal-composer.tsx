@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { csrfFetch } from "@/lib/csrf-fetch";
 
 // The draft and choice survive setup in this tab only. Opening or restoring them never starts anything:
-// the one call below happens only when Run is pressed. No credential is ever kept here.
+// the one admission below happens only when Run is pressed. No credential is ever kept here.
 const DRAFT_KEY = "autobots.draft";
 const subscribe = () => () => undefined;
 
@@ -21,7 +21,7 @@ function storedDraft(): string {
 }
 
 type Outcome =
-  | "ready"
+  | "queued"
   | "credentials_required"
   | "credential_invalid"
   | "credential_unavailable"
@@ -44,15 +44,28 @@ export function GoalComposer() {
 
   async function run(): Promise<void> {
     setOutcome(null);
-    const reply = await csrfFetch("/api/runs/intent", { method: "POST" }).catch(
-      () => null,
-    );
+    // One key per press, so a retried request admits one run and each new press is a new intent.
+    const reply = await csrfFetch("/api/v1/runs", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": crypto.randomUUID(),
+      },
+      body: JSON.stringify({ goal_text: draft }),
+    }).catch(() => null);
     if (reply?.ok === true) {
-      const body = (await reply.json()) as { code: Outcome };
-      setOutcome(body.code);
-    } else {
-      setOutcome("error");
+      setOutcome("queued");
+      return;
     }
+    const failure = (await reply?.json().catch(() => null)) as {
+      code?: string;
+    } | null;
+    const known: Outcome[] = [
+      "credentials_required",
+      "credential_invalid",
+      "credential_unavailable",
+    ];
+    setOutcome(known.find((code) => code === failure?.code) ?? "error");
   }
 
   return (
@@ -91,8 +104,8 @@ export function GoalComposer() {
             </>
           ) : outcome === "credential_unavailable" ? (
             "Credential storage is unavailable, so model-backed work is blocked. Your draft is kept."
-          ) : outcome === "ready" ? (
-            "A key is configured. Starting runs is not available yet, so nothing was started."
+          ) : outcome === "queued" ? (
+            "Your goal is queued. No worker runs it yet, so no model has been called."
           ) : (
             "That could not be checked. Sign in, then try again. Your draft is kept."
           )}

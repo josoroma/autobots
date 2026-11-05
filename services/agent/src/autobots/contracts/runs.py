@@ -26,6 +26,7 @@ class RunSummary(BaseModel):
     model_config = STRICT_CONTRACT
 
     schema_version: Literal[1]
+    version: int = Field(ge=1)
     id: Identifier
     workspace_id: Identifier
     parent_run_id: Identifier | None

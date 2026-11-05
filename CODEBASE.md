@@ -4,11 +4,11 @@
 
 Analyzed revision: 5587a9f80ed1fcbed06e60e7105b948b6625ff85
 
-This describes that revision, which includes the OhMyOrch delivery setup in [HARNESS-OHMYORCH-001](docs/engineering/work-items/HARNESS-OHMYORCH-001.md), US-1.1's inventory and five added cache ignore rules, US-1.2's rule mapping checks, derived `assistant_adapter` status and forward ingestion runbook, and US-1.3's locked toolchains and scaffold, plus the US-1.4 verification profiles and hook changes committed on top of it.
+This describes that revision, which includes the OhMyOrch delivery setup in [HARNESS-OHMYORCH-001](docs/engineering/work-items/HARNESS-OHMYORCH-001.md), US-1.1's inventory and five added cache ignore rules, US-1.2's rule mapping checks, derived `assistant_adapter` status and forward ingestion runbook, and US-1.3's locked toolchains and scaffold, plus the US-1.4 verification profiles and hook changes committed on top of it. The bullets added by each later delivered story describe that story's working tree, not a re-analysis of the whole repository, so this revision line is older than they are.
 
 ## System Summary
 
-A documentation and development-harness repository. It holds product PRDs, a source-traceable backlog and local tooling to plan, deliver and verify work. No product application exists yet.
+A repository of product PRDs, a source-traceable backlog, local tooling to plan, deliver and verify work, and a partial product application: the web app, the API, SQL migrations and the model layer below. It has run admission, and nothing runs a run yet.
 
 ## Repository Map
 
@@ -66,6 +66,7 @@ No application lockfile/toolchain qualification or persistent database operation
 - `services/agent/src/autobots/domain/models.py` holds the two approved profiles and role precedence, and `adapters/models/` the catalog association check and the only factory that builds an inference client. Tests use a fake transport. No model has been called and no real catalog fetch exists yet.
 - `services/agent/src/autobots/application/credentials/` holds source precedence, AES-256-GCM sealing, master key handling and the encrypted store, and `apps/web/lib/credential-precedence.ts` the same precedence for Next.js. `application/provider_settings.py` and `api/settings_routes.py` expose the MP-05 routes, with a write-only form in `apps/web`. Validation has only been run against a fake upstream.
 - `application/model_admission.py` holds slot and spend reservation under a lock, in the private `app_private.model_invocations` ledger, and `application/model_attempts.py` failure classes and bounded retries. Nothing dispatches through them yet.
+- `application/runs.py` and `api/run_routes.py` admit runs atomically with idempotency receipts, and apply SP-010's commands with version and actor guards. A queued run has a job row, and no worker claims it yet.
 - `infra/supabase/` vendors the pinned self-hosted release with a local overlay; `scripts/supabase_stack.py` runs port preflight and disposable qualification. No persistent stack start exists.
 - `scripts/disposable_db.py` holds target-guarded `reset`, `cleanup` and `migrate` wrappers and the `db` profile's qualification, including a synthetic stub worker, using `infra/disposable/compose.yaml` and synthetic SQL in `tests/db/`. No persistent stack or product migration exists.
 - `scripts/qualify_faults.py` runs the pinned tools on known-good and known-bad fixtures in `tests/faults/`, and `full` includes it. `services/agent/tests` has a fake OpenRouter transport; its tests make no real model call.

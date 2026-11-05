@@ -51,7 +51,11 @@ export async function forward(
     Authorization: `Bearer ${session}`,
     "X-Autobots-Internal": config.internalToken,
   });
-  for (const name of ["content-type", "x-autobots-workspace"]) {
+  for (const name of [
+    "content-type",
+    "x-autobots-workspace",
+    "idempotency-key",
+  ]) {
     const value = request.headers.get(name);
     if (value !== null) {
       headers.set(name, value);

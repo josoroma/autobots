@@ -51,14 +51,14 @@ test("without a key, local work stays usable and a model call is credentials_req
   await page.getByRole("textbox", { name: "Goal" }).fill(DRAFT);
   const intents: string[] = [];
   page.on("request", (request) => {
-    if (request.url().includes("/runs/intent")) intents.push(request.method());
+    if (request.url().endsWith("/api/v1/runs")) intents.push(request.method());
   });
   await page.getByRole("button", { name: "Run" }).click();
   await expect(
     page.locator('[data-outcome="credentials_required"]'),
   ).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "Goal" })).toHaveValue(DRAFT);
   expect(intents).toEqual(["POST"]);
+  await expect(page.getByRole("textbox", { name: "Goal" })).toHaveValue(DRAFT);
   for (const path of ["/settings", "/settings/models", "/"]) {
     await page.goto(path);
     await expect(page.locator("main")).toBeVisible();
@@ -131,10 +131,6 @@ test("Save and validate encrypts, keeps statuses separate, returns to the draft 
   await expect(page.getByRole("textbox", { name: "Goal" })).toHaveValue(DRAFT);
   await page.waitForTimeout(300);
   expect(requests.filter((url) => url.includes("/runs/"))).toEqual([]);
-  await page.getByRole("button", { name: "Run" }).click();
-  await expect(page.locator('[data-outcome="ready"]')).toContainText(
-    "nothing was started",
-  );
 });
 
 test("a bad replacement keeps the prior key, and a stale write is a conflict with no secret", async ({

@@ -12,7 +12,16 @@ from pydantic import BaseModel, ValidationError
 from autobots.contracts.adapters import run_from_row, run_summary_from_domain
 from autobots.contracts.export import openapi_document
 from autobots.contracts.runs import ErrorResponse, RunEvent, RunSummary
-from autobots.domain.runs import NORMAL_EXITS, TERMINAL, RunStatus, can_transition
+from autobots.domain.runs import (
+    NORMAL_EXITS,
+    TERMINAL,
+    Actor,
+    CommandRefused,
+    RunCommand,
+    RunStatus,
+    can_transition,
+    next_status,
+)
 from autobots.persistence.rows import RunRow
 from conftest import SocketBlockedError
 
@@ -41,6 +50,7 @@ def row(**overrides: Any) -> RunRow:
         "limit_micro_usd": 7,
         "lease_generation": 3,
         "checkpoint_thread_id": "private-thread",
+        "version": 1,
     }
     data.update(overrides)  # type: ignore[typeddict-item]
     return data
@@ -74,6 +84,35 @@ def test_a_response_built_from_a_row_holds_no_private_field() -> None:
 def test_an_unknown_stored_status_does_not_reach_a_client() -> None:
     with pytest.raises(ValueError, match="not_a_status"):
         run_from_row(row(status="not_a_status"))
+
+
+@pytest.mark.parametrize(
+    ("current", "command", "actor"),
+    [
+        (RunStatus.VERIFYING, RunCommand.COMPLETE, Actor.USER),
+        (RunStatus.QUEUED, RunCommand.CLAIM, Actor.USER),
+        (RunStatus.PAUSED, RunCommand.PAUSE, Actor.WORKER),
+        (RunStatus.RUNNING, RunCommand.RESUME, Actor.USER),
+        (RunStatus.SUCCEEDED, RunCommand.RESUME, Actor.USER),
+        (RunStatus.FAILED, RunCommand.CANCEL, Actor.USER),
+        (RunStatus.RUNNING, RunCommand.CANCEL, Actor.WORKER),
+    ],
+)
+def test_commands_refuse_the_wrong_actor_or_state(
+    current: RunStatus, command: RunCommand, actor: Actor
+) -> None:
+    with pytest.raises(CommandRefused):
+        next_status(current, command, actor)
+
+
+def test_cancelling_twice_is_idempotent() -> None:
+    assert next_status(RunStatus.CANCELLING, RunCommand.CANCEL, Actor.USER) is None
+    assert next_status(RunStatus.CANCELLED, RunCommand.CANCEL, Actor.USER) is None
+    assert (
+        next_status(RunStatus.RUNNING, RunCommand.CANCEL, Actor.USER, has_active_work=True)
+        is RunStatus.CANCELLING
+    )
+    assert next_status(RunStatus.QUEUED, RunCommand.CANCEL, Actor.USER) is RunStatus.CANCELLED
 
 
 def test_terminal_runs_never_move() -> None:

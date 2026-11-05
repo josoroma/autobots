@@ -19,7 +19,13 @@ def test_the_schema_builds_without_any_connection() -> None:
     assert set(create_app().openapi()["paths"]) == {
         "/v1/health",
         "/v1/models",
+        "/v1/runs",
         "/v1/runs/intent",
+        "/v1/runs/{run_id}",
+        "/v1/runs/{run_id}/cancel",
+        "/v1/runs/{run_id}/input",
+        "/v1/runs/{run_id}/pause",
+        "/v1/runs/{run_id}/resume",
         "/v1/session",
         "/v1/settings/model-policy",
         "/v1/settings/model-providers",

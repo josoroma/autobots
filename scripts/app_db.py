@@ -303,6 +303,22 @@ def admission_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> 
                  stack.as_role('authenticated', USER_A, 'select * from app_private.model_invocations'), 'permission denied')
 
 
+def run_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
+    """Real concurrent admission and every transition, through the runtime role."""
+    url = f'postgresql://autobots_runtime:{stack.runtime_password}@127.0.0.1:{db_port}/postgres'
+    other = 'b0000000-0000-4000-8000-000000000002'
+    result = subprocess.run([str(root / 'services/agent/.venv/bin/python'), str(root / 'tests/db/run_admission_check.py'), WORKSPACE_A, other],
+                            env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
+                            capture_output=True, text=True, timeout=180, check=False)
+    if result.returncode:
+        cases.check('the run admission check ran', 'exit 0', f'exit {result.returncode}: {result.stderr.strip()[-500:]}', False)
+        return
+    for case in json.loads(result.stdout.strip().splitlines()[-1])['cases']:
+        cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+    cases.denied('authenticated cannot read the job table', stack.as_role('authenticated', USER_A, 'select * from app_private.run_jobs'), 'permission denied')
+    cases.denied('authenticated cannot read the policy snapshot', stack.as_role('authenticated', USER_A, 'select policy_snapshot from public.runs'), 'permission denied')
+
+
 def guard_cases(stack: AppStack, cases: Cases, root: Path) -> None:
     stack.sql("update autobots_disposable.marker set run_id = 'something-else';")
     try:
@@ -353,6 +369,7 @@ def qualify(root: Path, write_types: bool = False) -> int:
         framework_cases(stack, cases, root, db_port)
         credential_cases(stack, cases, root, db_port)
         admission_cases(stack, cases, root, db_port)
+        run_cases(stack, cases, root, db_port)
         guard_cases(stack, cases, root)
         type_cases(stack, cases, root, write_types)
         static_cases(cases, root)

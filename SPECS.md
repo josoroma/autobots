@@ -121,10 +121,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-3.4#1 | Run the per-route adapter corpus under the shared limits. | TODO | US-3.4 |
 | US-3.4#2 | Publish actual qualification and failure evidence without substituting another model. | TODO | US-3.4 |
 | EPIC-4 | Durable goal-to-artifact execution | — | — |
-| US-4.1 | Atomic run admission and canonical transition commands | READY | EPIC-4 |
-| US-4.1#1 | Implement typed admission and atomic transition/outbox commands. | TODO | US-4.1 |
-| US-4.1#2 | Test idempotency scope and valid/invalid/concurrent state changes. | TODO | US-4.1 |
-| US-4.2 | Fenced worker ownership and durable checkpoints | BLOCKED | EPIC-4 |
+| US-4.1 | Atomic run admission and canonical transition commands | DONE | EPIC-4 |
+| US-4.1#1 | Implement typed admission and atomic transition/outbox commands. | DONE | US-4.1 |
+| US-4.1#2 | Test idempotency scope and valid/invalid/concurrent state changes. | DONE | US-4.1 |
+| US-4.2 | Fenced worker ownership and durable checkpoints | READY | EPIC-4 |
 | US-4.2#1 | Implement lease/heartbeat/fencing and scoped direct checkpointer access. | TODO | US-4.2 |
 | US-4.2#2 | Inject stale-owner and process-death cases at domain/checkpoint boundaries. | TODO | US-4.2 |
 | US-4.3 | Bounded goal planning and model/tool loop | BLOCKED | EPIC-4 |
@@ -1555,7 +1555,8 @@ Phase reference: B1, preserved SP-020. All story completion also requires SP-003
 
 ### US-4.1: Atomic run admission and canonical transition commands
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-4-1-atomic-run-admission-canonical/`
 
 As a user
 I want a durable run with explicit legal transitions
@@ -1590,15 +1591,15 @@ Dependencies:
 - US-3.3
 
 Tasks:
-- [ ] Implement typed admission and atomic transition/outbox commands.
-- [ ] Test idempotency scope and valid/invalid/concurrent state changes.
+- [x] Implement typed admission and atomic transition/outbox commands.
+- [x] Test idempotency scope and valid/invalid/concurrent state changes.
 
 Open Questions:
 - None.
 
 ### US-4.2: Fenced worker ownership and durable checkpoints
 
-Status: BLOCKED
+Status: READY
 
 As an operator
 I want one current execution owner per run

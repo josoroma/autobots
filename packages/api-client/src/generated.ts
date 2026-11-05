@@ -404,6 +404,92 @@ export const schemas = {
     "title": "RoleBinding",
     "type": "object"
   },
+  "RunAccepted": {
+    "additionalProperties": false,
+    "description": "Not strict, since it is built from database values. It is validated as it is built.",
+    "properties": {
+      "replayed": {
+        "title": "Replayed",
+        "type": "boolean"
+      },
+      "run_id": {
+        "format": "uuid",
+        "title": "Run Id",
+        "type": "string"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "status": {
+        "$ref": "#/components/schemas/RunStatus"
+      },
+      "version": {
+        "title": "Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "run_id",
+      "version",
+      "status",
+      "replayed"
+    ],
+    "title": "RunAccepted",
+    "type": "object"
+  },
+  "RunCommandRequest": {
+    "additionalProperties": false,
+    "properties": {
+      "expected_version": {
+        "minimum": 1.0,
+        "title": "Expected Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "expected_version"
+    ],
+    "title": "RunCommandRequest",
+    "type": "object"
+  },
+  "RunCommandResult": {
+    "additionalProperties": false,
+    "properties": {
+      "changed": {
+        "title": "Changed",
+        "type": "boolean"
+      },
+      "run_id": {
+        "format": "uuid",
+        "title": "Run Id",
+        "type": "string"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "status": {
+        "$ref": "#/components/schemas/RunStatus"
+      },
+      "version": {
+        "title": "Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "run_id",
+      "version",
+      "status",
+      "changed"
+    ],
+    "title": "RunCommandResult",
+    "type": "object"
+  },
   "RunEvent": {
     "additionalProperties": false,
     "description": "The sanitized public envelope from SP-011. Payloads are typed, so nothing raw can pass.",
@@ -483,6 +569,29 @@ export const schemas = {
       "code"
     ],
     "title": "RunIntentCheck",
+    "type": "object"
+  },
+  "RunRequest": {
+    "additionalProperties": false,
+    "properties": {
+      "goal_text": {
+        "maxLength": 20000,
+        "minLength": 1,
+        "title": "Goal Text",
+        "type": "string"
+      },
+      "limit_micro_usd": {
+        "default": 1000000,
+        "maximum": 9007199254740991.0,
+        "minimum": 0.0,
+        "title": "Limit Micro Usd",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "goal_text"
+    ],
+    "title": "RunRequest",
     "type": "object"
   },
   "RunStatus": {
@@ -567,6 +676,11 @@ export const schemas = {
         "title": "Updated At",
         "type": "string"
       },
+      "version": {
+        "minimum": 1,
+        "title": "Version",
+        "type": "integer"
+      },
       "workspace_id": {
         "format": "uuid",
         "title": "Workspace Id",
@@ -575,6 +689,7 @@ export const schemas = {
     },
     "required": [
       "schema_version",
+      "version",
       "id",
       "workspace_id",
       "parent_run_id",
@@ -837,6 +952,38 @@ export function parseRoleBinding(value: unknown): RoleBinding {
   return parseWith(schemas, "RoleBinding", value) as RoleBinding;
 }
 
+export interface RunAccepted {
+  replayed: boolean;
+  run_id: string;
+  schema_version: 1;
+  status: RunStatus;
+  version: number;
+}
+
+export function parseRunAccepted(value: unknown): RunAccepted {
+  return parseWith(schemas, "RunAccepted", value) as RunAccepted;
+}
+
+export interface RunCommandRequest {
+  expected_version: number;
+}
+
+export function parseRunCommandRequest(value: unknown): RunCommandRequest {
+  return parseWith(schemas, "RunCommandRequest", value) as RunCommandRequest;
+}
+
+export interface RunCommandResult {
+  changed: boolean;
+  run_id: string;
+  schema_version: 1;
+  status: RunStatus;
+  version: number;
+}
+
+export function parseRunCommandResult(value: unknown): RunCommandResult {
+  return parseWith(schemas, "RunCommandResult", value) as RunCommandResult;
+}
+
 export interface RunEvent {
   causal_ids: string[];
   occurred_at: string;
@@ -858,6 +1005,15 @@ export interface RunIntentCheck {
 
 export function parseRunIntentCheck(value: unknown): RunIntentCheck {
   return parseWith(schemas, "RunIntentCheck", value) as RunIntentCheck;
+}
+
+export interface RunRequest {
+  goal_text: string;
+  limit_micro_usd?: number;
+}
+
+export function parseRunRequest(value: unknown): RunRequest {
+  return parseWith(schemas, "RunRequest", value) as RunRequest;
 }
 
 export type RunStatus = "queued" | "running" | "waiting_input" | "waiting_approval" | "paused" | "verifying" | "cancelling" | "succeeded" | "failed" | "cancelled";
@@ -884,6 +1040,7 @@ export interface RunSummary {
   schema_version: 1;
   status: RunStatus;
   updated_at: string;
+  version: number;
   workspace_id: string;
 }
 
@@ -939,8 +1096,32 @@ export async function getModels(options: ClientOptions): Promise<ModelList> {
   return parseModelList(await requestJson(options, "GET", `/v1/models`));
 }
 
+export async function admitRun(options: ClientOptions, body: RunRequest): Promise<RunAccepted> {
+  return parseRunAccepted(await requestJson(options, "POST", `/v1/runs`, body));
+}
+
 export async function checkRunIntent(options: ClientOptions): Promise<RunIntentCheck> {
   return parseRunIntentCheck(await requestJson(options, "POST", `/v1/runs/intent`));
+}
+
+export async function getRun(options: ClientOptions, run_id: string): Promise<RunSummary> {
+  return parseRunSummary(await requestJson(options, "GET", `/v1/runs/${encodeURIComponent(run_id)}`));
+}
+
+export async function cancelRun(options: ClientOptions, run_id: string, body: RunCommandRequest): Promise<RunCommandResult> {
+  return parseRunCommandResult(await requestJson(options, "POST", `/v1/runs/${encodeURIComponent(run_id)}/cancel`, body));
+}
+
+export async function submitRunInput(options: ClientOptions, run_id: string, body: RunCommandRequest): Promise<RunCommandResult> {
+  return parseRunCommandResult(await requestJson(options, "POST", `/v1/runs/${encodeURIComponent(run_id)}/input`, body));
+}
+
+export async function pauseRun(options: ClientOptions, run_id: string, body: RunCommandRequest): Promise<RunCommandResult> {
+  return parseRunCommandResult(await requestJson(options, "POST", `/v1/runs/${encodeURIComponent(run_id)}/pause`, body));
+}
+
+export async function resumeRun(options: ClientOptions, run_id: string, body: RunCommandRequest): Promise<RunCommandResult> {
+  return parseRunCommandResult(await requestJson(options, "POST", `/v1/runs/${encodeURIComponent(run_id)}/resume`, body));
 }
 
 export async function getSession(options: ClientOptions): Promise<SessionSummary> {
