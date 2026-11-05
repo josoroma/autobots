@@ -27,15 +27,16 @@ from toolchain import (LONG, Step, Unavailable, check_steps, child_env, find_too
 EXIT_PASSED, EXIT_FAILED, EXIT_UNAVAILABLE = 0, 1, 2
 IMPLEMENTED_PROFILES = ('harness', 'fast', 'full', 'db')
 # These report exit 2 for a missing prerequisite, which is not a failed check.
-SELF_REPORTING_STEPS = frozenset({'contract_drift', 'fault_qualification', 'disposable_qualification', 'supabase_stack_qualification'})
+SELF_REPORTING_STEPS = frozenset({'contract_drift', 'fault_qualification', 'disposable_qualification', 'supabase_stack_qualification',
+                                  'app_db_qualification'})
 # DH-09.2 class and model transport by step. Evidence reads these, and a plan cannot override them.
 STEP_CLASSES = {'harness_behavior_tests': ('mock', 'none'), 'pytest': ('mock', 'mock'), 'api_client_tests': ('mock', 'none'),
                 'fault_qualification': ('mock', 'mock'), 'disposable_qualification': ('disposable', 'none'),
-                'supabase_stack_qualification': ('disposable', 'none')}
+                'supabase_stack_qualification': ('disposable', 'none'), 'app_db_qualification': ('disposable', 'none')}
 OUTSIDE_SCOPE = 'outside the changed scope of this fast run'
 NOT_TESTED = ['Claude event delivery', 'Supabase', 'Docker', 'OpenRouter inference', 'complete H0/H1']
 APPLICATION_NOT_TESTED = ['browser fixtures, none are configured']
-DB_NOT_TESTED = ['the persistent database', 'generated database type drift, no types exist yet',
+DB_NOT_TESTED = ['the persistent database',
                  'Claude event delivery', 'OpenRouter inference', 'complete H0/H1']
 
 
@@ -116,7 +117,8 @@ def tool_plan(root: Path, profile: str, changed: Sequence[str] | None) -> tuple[
     """The toolchain steps to run and the ones left out. Needs tools only when a step needs them."""
     if profile == 'db':
         steps = [Step('disposable_qualification', (sys.executable, 'scripts/disposable_db.py', 'qualify'), root, LONG),
-                 Step('supabase_stack_qualification', (sys.executable, 'scripts/supabase_stack.py', 'qualify'), root, LONG)]
+                 Step('supabase_stack_qualification', (sys.executable, 'scripts/supabase_stack.py', 'qualify'), root, LONG),
+                 Step('app_db_qualification', (sys.executable, 'scripts/app_db.py', 'qualify'), root, LONG)]
         return ToolPlan(steps, reduced_env() | ({'HOME': os.environ['HOME']} if 'HOME' in os.environ else {})), []
     known = set(FULL_CHECKS)
     chosen = selected_steps(profile, sorted(known), changed)
@@ -195,7 +197,7 @@ def run_profile(root: Path, profile: str, *, base_checks: Callable[[Path], list[
         code = exit_code_for(checks, stable)
         status = {EXIT_PASSED: 'passed', EXIT_FAILED: 'failed', EXIT_UNAVAILABLE: 'error'}[code]
         scope = {'harness': 'Project configuration, backlog structure and deterministic harness fixtures only',
-                 'db': 'Harness checks plus synthetic migrations, seeds and authorization, and the pinned release, on disposable targets'
+                 'db': 'Harness checks plus the pinned release and the application migrations and seeds, on disposable targets'
                  }.get(profile, 'Harness checks plus local static checks, focused tests and, for full, the production build')
         not_tested = {'harness': ['application', *NOT_TESTED], 'db': DB_NOT_TESTED
                       }.get(profile, [*APPLICATION_NOT_TESTED, *NOT_TESTED])

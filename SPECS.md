@@ -96,9 +96,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-2.3 | Local identity, workspace grants and private schema isolation | BLOCKED | EPIC-2 |
 | US-2.3#1 | Implement local owner/session and workspace authorization. | TODO | US-2.3 |
 | US-2.3#2 | Qualify grants, RLS and private Storage with nonprivileged identities. | TODO | US-2.3 |
-| US-2.4 | Application migrations and deterministic seeds | READY | EPIC-2 |
-| US-2.4#1 | Create ordered application migration and seed wrappers. | TODO | US-2.4 |
-| US-2.4#2 | Verify fresh/upgrade replay, repeatability and generated public row types. | TODO | US-2.4 |
+| US-2.4 | Application migrations and deterministic seeds | DONE | EPIC-2 |
+| US-2.4#1 | Create ordered application migration and seed wrappers. | DONE | US-2.4 |
+| US-2.4#2 | Verify fresh/upgrade replay, repeatability and generated public row types. | DONE | US-2.4 |
 | US-2.5 | Native FastAPI, Next.js BFF and Luma shell | READY | EPIC-2 |
 | US-2.5#1 | Implement native app factories and lifespan/configuration boundaries. | TODO | US-2.5 |
 | US-2.5#2 | Provide typed authenticated BFF-to-Python transport and safe errors. | TODO | US-2.5 |
@@ -1219,7 +1219,8 @@ Open Questions:
 
 ### US-2.4: Application migrations and deterministic seeds
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-2-4-application-migrations-deterministic-seeds/`
 
 As an operator
 I want one guarded schema and seed history
@@ -1250,8 +1251,8 @@ Dependencies:
 - US-1.7
 
 Tasks:
-- [ ] Create ordered application migration and seed wrappers.
-- [ ] Verify fresh/upgrade replay, repeatability and generated public row types.
+- [x] Create ordered application migration and seed wrappers.
+- [x] Verify fresh/upgrade replay, repeatability and generated public row types.
 
 Open Questions:
 - None.

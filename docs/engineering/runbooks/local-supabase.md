@@ -35,6 +35,20 @@ It checks the merged Compose result, then actual listeners: both published ports
 | `every service is healthy` fails | Its stderr and the case's `observed` name the states. Nothing persistent is involved, and the project is removed anyway |
 | Upgrading the release | Vendor new files, regenerate `UPSTREAM.json`, re-resolve digests, and requalify. Never edit vendored files in place |
 
+## Migrations and seeds
+
+Application schema lives only in `supabase/migrations/`. Files are named `<14 digit timestamp>_<description>.sql` and never edited once applied. `supabase/seeds/reference.sql` holds reference rows, and repeats without overwriting a user's edit. `supabase/bootstrap/roles.sql` creates `autobots_migrator`, the only role that runs DDL, and `autobots_runtime`, which cannot.
+
+```sh
+python3.12 scripts/app_db.py qualify
+python3.12 scripts/app_db.py types
+jq -r '.status, (.cases[] | "\(.status) \(.id)")' .checks/app_db/qualification.json
+```
+
+Expected: `qualify` exits 0, after creating a new disposable database on the pinned image, proving replay, upgrade from the prior version, seeds, constraints, access and migration authority, and removing it. It fails if `packages/db-types/src/generated.ts` has drifted. After a migration change, `types` runs the same cycle and rewrites that file. Exit 2 means Docker or the pinned image is missing. `--profile db` runs `qualify`.
+
+**No persistent apply exists.** Applying to a persistent stack needs a target-identity and baseline check that belongs with whichever story first starts one. The framework's checkpoint tables are set up in `agent_runtime` by the migration identity during qualification only; a persistent path must do the same, and workers must never call its `setup()`.
+
 ## Removed from the release
 
 Realtime, Edge Functions and the Supavisor pooler are in the `removed` profile, per LM-03 and LM-04. Studio's and Storage's writable bind mounts became named volumes, so data never lands in the vendored directory.

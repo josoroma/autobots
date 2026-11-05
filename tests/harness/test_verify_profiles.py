@@ -109,6 +109,7 @@ class Profiles(unittest.TestCase):
                  ('docs/note.md', 'SPECS.md'): frozenset(),
                  ('pnpm-lock.yaml',): both,
                  ('scripts/verify.py',): both,
+                 ('packages/db-types/src/generated.ts',): frozenset(),
                  ('tests/db/seeds/fixtures.sql',): frozenset(),
                  ('contracts/generated/a.json',): both}
         for changed, expected in cases.items():
