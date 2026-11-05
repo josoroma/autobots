@@ -93,6 +93,7 @@ async def post_run(
                 idempotency_key=idempotency_key,
                 goal_text=body.goal_text,
                 limit_micro_usd=body.limit_micro_usd,
+                acceptance_criteria=tuple(body.acceptance_criteria),
                 policy=policy,
             )
         except IdempotencyConflict as error:

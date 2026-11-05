@@ -13,6 +13,7 @@ class RunRequest(BaseModel):
 
     goal_text: str = Field(min_length=1, max_length=20000)
     limit_micro_usd: MicroUsd = 1_000_000
+    acceptance_criteria: list[str] = Field(default_factory=list, max_length=20)
 
 
 class RunAccepted(BaseModel):

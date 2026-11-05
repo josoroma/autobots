@@ -127,19 +127,19 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-4.2 | Fenced worker ownership and durable checkpoints | DONE | EPIC-4 |
 | US-4.2#1 | Implement lease/heartbeat/fencing and scoped direct checkpointer access. | DONE | US-4.2 |
 | US-4.2#2 | Inject stale-owner and process-death cases at domain/checkpoint boundaries. | DONE | US-4.2 |
-| US-4.3 | Bounded goal planning and model/tool loop | READY | EPIC-4 |
-| US-4.3#1 | Compose the minimal explicitly configured Deep Agents stage and plan adapter. | TODO | US-4.3 |
-| US-4.3#2 | Exercise loop bounds and complete argument/result validation with fake models. | TODO | US-4.3 |
+| US-4.3 | Bounded goal planning and model/tool loop | DONE | EPIC-4 |
+| US-4.3#1 | Compose the minimal explicitly configured Deep Agents stage and plan adapter. | DONE | US-4.3 |
+| US-4.3#2 | Exercise loop bounds and complete argument/result validation with fake models. | DONE | US-4.3 |
 | US-4.4 | Versioned tool registry and operation receipts | DONE | EPIC-4 |
 | US-4.4#1 | Implement the narrow read/calculation/artifact tool contracts and central policy gateway. | DONE | US-4.4 |
 | US-4.4#2 | Test denied resources, hidden tools and receipt reuse. | DONE | US-4.4 |
 | US-4.5 | Private artifacts with staged publication and reconciliation | READY | EPIC-4 |
 | US-4.5#1 | Implement staged private uploads and authorized metadata/downloads. | TODO | US-4.5 |
 | US-4.5#2 | Test cross-workspace denial, interruption and hash reconciliation. | TODO | US-4.5 |
-| US-4.6 | Sanitized event replay and run workspace | BLOCKED | EPIC-4 |
+| US-4.6 | Sanitized event replay and run workspace | READY | EPIC-4 |
 | US-4.6#1 | Implement durable event projection, cursor transport and typed client. | TODO | US-4.6 |
 | US-4.6#2 | Build the run/plan/artifact inspector with accessible status states. | TODO | US-4.6 |
-| US-4.7 | Pause, cancellation and interrupted-run recovery | BLOCKED | EPIC-4 |
+| US-4.7 | Pause, cancellation and interrupted-run recovery | READY | EPIC-4 |
 | US-4.7#1 | Implement cancellation propagation and preserved pause/wait context. | TODO | US-4.7 |
 | US-4.7#2 | Run late-result, sleep, retry and competing completion/cancellation fixtures. | TODO | US-4.7 |
 | US-4.8 | Verify the first durable goal-to-artifact slice | BLOCKED | EPIC-4 |
@@ -1639,7 +1639,8 @@ Open Questions:
 
 ### US-4.3: Bounded goal planning and model/tool loop
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-4-3-bounded-goal-planning-model/`
 
 As a user
 I want a small agent loop driven by explicit success criteria
@@ -1673,8 +1674,8 @@ Dependencies:
 - US-3.3
 
 Tasks:
-- [ ] Compose the minimal explicitly configured Deep Agents stage and plan adapter.
-- [ ] Exercise loop bounds and complete argument/result validation with fake models.
+- [x] Compose the minimal explicitly configured Deep Agents stage and plan adapter.
+- [x] Exercise loop bounds and complete argument/result validation with fake models.
 
 Open Questions:
 - None.
@@ -1766,7 +1767,7 @@ Open Questions:
 
 ### US-4.6: Sanitized event replay and run workspace
 
-Status: BLOCKED
+Status: READY
 
 As a user
 I want an inspectable timeline that survives reconnects
@@ -1807,7 +1808,7 @@ Open Questions:
 
 ### US-4.7: Pause, cancellation and interrupted-run recovery
 
-Status: BLOCKED
+Status: READY
 
 As a user
 I want monotonic control of running or waiting work

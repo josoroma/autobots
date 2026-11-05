@@ -117,7 +117,7 @@ def _denied(code: str) -> ToolResult:
     return ToolResult(ToolOutcome.DENIED, code)
 
 
-async def _refusal(connection: Any, scope: ToolScope) -> str | None:
+async def ownership_refusal(connection: Any, scope: ToolScope) -> str | None:
     """Run status and ownership, read fresh by database time."""
     cursor = await connection.execute(
         "select r.status, j.status, j.generation, j.lease_expires_at > clock_timestamp() "
@@ -162,7 +162,7 @@ class ToolGateway:
             return _denied("invalid_arguments")
         if not all(path_granted(path, scope.paths) for path in tool.resources(parsed)):
             return _denied("resource_not_granted")
-        refusal = await _refusal(connection, scope)
+        refusal = await ownership_refusal(connection, scope)
         if refusal is not None:
             return _denied(refusal)
         if tool.operation_class in EFFECTFUL:
@@ -189,7 +189,7 @@ class ToolGateway:
                     return ToolResult(ToolOutcome.FAILED, "output_too_large")
                 return ToolResult(ToolOutcome.SUCCEEDED, output=visible)
             if attempt < tool.retries:
-                refusal = await _refusal(connection, scope)
+                refusal = await ownership_refusal(connection, scope)
                 if refusal is not None:
                     return _denied(refusal)
         return ToolResult(ToolOutcome.FAILED, code)
@@ -273,7 +273,7 @@ class ToolGateway:
             return ToolResult(ToolOutcome.UNKNOWN, "output_too_large", operation_id=operation_id)
         # The effect happened, so it is recorded whoever owns the run now.
         await _record(context, operation_id, "succeeded", visible)
-        refusal = await _refusal(context.connection, context.scope)
+        refusal = await ownership_refusal(context.connection, context.scope)
         if refusal is not None:
             return ToolResult(ToolOutcome.DENIED, refusal, operation_id=operation_id)
         return ToolResult(ToolOutcome.SUCCEEDED, output=visible, operation_id=operation_id)

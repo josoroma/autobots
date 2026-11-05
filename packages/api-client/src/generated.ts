@@ -574,6 +574,14 @@ export const schemas = {
   "RunRequest": {
     "additionalProperties": false,
     "properties": {
+      "acceptance_criteria": {
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 20,
+        "title": "Acceptance Criteria",
+        "type": "array"
+      },
       "goal_text": {
         "maxLength": 20000,
         "minLength": 1,
@@ -1008,6 +1016,7 @@ export function parseRunIntentCheck(value: unknown): RunIntentCheck {
 }
 
 export interface RunRequest {
+  acceptance_criteria?: string[];
   goal_text: string;
   limit_micro_usd?: number;
 }

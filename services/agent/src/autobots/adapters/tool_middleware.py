@@ -4,6 +4,7 @@ The SDK adds file, shell and subagent tools of its own. Hiding them from the mod
 this answers every tool call from the gateway, and the SDK's own tool bodies never run.
 """
 
+import asyncio
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -21,6 +22,8 @@ class GatewayMiddleware(AgentMiddleware[Any, Any]):
         self._gateway = gateway
         self._connection = connection
         self._scope = scope
+        # The SDK may run a reply's tool calls at once, and these share one connection.
+        self._lock = asyncio.Lock()
 
     async def awrap_model_call(self, request: Any, handler: Callable[[Any], Awaitable[Any]]) -> Any:
         """The model sees granted tools only, whatever the SDK attached."""
@@ -33,9 +36,10 @@ class GatewayMiddleware(AgentMiddleware[Any, Any]):
         self, request: Any, handler: Callable[[Any], Awaitable[Any]]
     ) -> ToolMessage:
         call = request.tool_call
-        result = await self._gateway.execute(
-            self._connection, self._scope, call["name"], call["args"]
-        )
+        async with self._lock:
+            result = await self._gateway.execute(
+                self._connection, self._scope, call["name"], call["args"]
+            )
         return ToolMessage(
             content=result.for_model(),
             tool_call_id=call["id"],

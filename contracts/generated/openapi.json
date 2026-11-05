@@ -573,6 +573,14 @@
       "RunRequest": {
         "additionalProperties": false,
         "properties": {
+          "acceptance_criteria": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Acceptance Criteria",
+            "type": "array"
+          },
           "goal_text": {
             "maxLength": 20000,
             "minLength": 1,

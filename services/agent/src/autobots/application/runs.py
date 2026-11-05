@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID, uuid4
 
+from autobots.contracts.plans import GoalSpec
 from autobots.domain.models import RolePolicy
 from autobots.domain.runs import (
     Actor,
@@ -14,6 +15,7 @@ from autobots.domain.runs import (
     RunStatus,
     next_status,
 )
+from autobots.domain.tools import LOOP_TOOL_GRANTS, RUN_FILE_GRANTS
 
 
 class IdempotencyConflict(Exception):
@@ -118,10 +120,15 @@ async def admit_run(
     goal_text: str,
     limit_micro_usd: int,
     policy: RolePolicy,
+    acceptance_criteria: tuple[str, ...] = (),
 ) -> AdmissionResult:
     """Run, job and first event commit together. A repeat returns the original result."""
     goal = goal_text.strip()
-    fingerprint = request_hash({"goal_text": goal, "limit_micro_usd": limit_micro_usd})
+    # With no stated criteria, the goal itself is the one thing to meet.
+    criteria = [text.strip() for text in acceptance_criteria if text.strip()] or [goal]
+    fingerprint = request_hash(
+        {"goal_text": goal, "limit_micro_usd": limit_micro_usd, "criteria": criteria}
+    )
     scope = (workspace_id, actor_id, "admit_run", str(workspace_id), idempotency_key)
     async with connection.transaction():
         existing = await _existing_receipt(connection, scope, fingerprint)
@@ -147,6 +154,17 @@ async def admit_run(
         await connection.execute(
             "insert into app_private.run_jobs (run_id, workspace_id) values (%s, %s)",
             (run_id, workspace_id),
+        )
+        spec = GoalSpec(
+            objective=goal,
+            original_request=goal_text,
+            criteria={f"c{index}": text for index, text in enumerate(criteria, start=1)},
+            allowed_tools=dict(LOOP_TOOL_GRANTS),
+            allowed_paths=list(RUN_FILE_GRANTS),
+        )
+        await connection.execute(
+            "insert into app_private.goal_specs (run_id, spec) values (%s, %s)",
+            (run_id, spec.model_dump_json()),
         )
         await _append_event(connection, run_id, 1, None, status)
         result = {"run_id": str(run_id), "version": 1, "status": status}

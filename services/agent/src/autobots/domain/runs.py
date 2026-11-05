@@ -70,6 +70,7 @@ class RunCommand(StrEnum):
     COMPLETE = "complete"
     FAIL = "fail"
     FINISH_CANCEL = "finish_cancel"
+    SUSPEND = "suspend"
 
 
 class CommandRefused(Exception):
@@ -90,6 +91,7 @@ COMMANDS: dict[RunCommand, tuple[Actor, RunStatus]] = {
     RunCommand.COMPLETE: (Actor.WORKER, RunStatus.SUCCEEDED),
     RunCommand.FAIL: (Actor.WORKER, RunStatus.FAILED),
     RunCommand.FINISH_CANCEL: (Actor.WORKER, RunStatus.CANCELLED),
+    RunCommand.SUSPEND: (Actor.WORKER, RunStatus.PAUSED),
 }
 # The states each command can start from, where the target alone doesn't say.
 COMMAND_SOURCES: dict[RunCommand, frozenset[RunStatus]] = {

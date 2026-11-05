@@ -11,6 +11,16 @@ class OperationClass(StrEnum):
     ARBITRARY_EXECUTION = "arbitrary_execution"
 
 
+# What a run may use unless admission narrows it. Nothing here can reach the host or the network.
+LOOP_TOOL_GRANTS = {
+    "calculate": 1,
+    "read_run_file": 1,
+    "save_artifact": 1,
+    "propose_plan": 1,
+    "complete_task": 1,
+}
+RUN_FILE_GRANTS = ("outputs",)
+
 # Only these leave an effect, so only these get an operation identity and a receipt.
 EFFECTFUL = frozenset(
     {OperationClass.REVERSIBLE_INTERNAL_WRITE, OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE}
