@@ -114,14 +114,14 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-3.2 | Settings, missing-key use and explicit run intent | DONE | EPIC-3 |
 | US-3.2#1 | Implement the exact safe provider API routes and write-only form. | DONE | US-3.2 |
 | US-3.2#2 | Test source/status separation, rotation/disconnect and draft restoration. | DONE | US-3.2 |
-| US-3.3 | Model admission, spending and uncertain invocation receipts | READY | EPIC-3 |
-| US-3.3#1 | Implement slot/cost admission and per-attempt receipts. | TODO | US-3.3 |
-| US-3.3#2 | Test concurrent reservations, UTC rollover, failure classes and cancellation ambiguity. | TODO | US-3.3 |
+| US-3.3 | Model admission, spending and uncertain invocation receipts | DONE | EPIC-3 |
+| US-3.3#1 | Implement slot/cost admission and per-attempt receipts. | DONE | US-3.3 |
+| US-3.3#2 | Test concurrent reservations, UTC rollover, failure classes and cancellation ambiguity. | DONE | US-3.3 |
 | US-3.4 | Qualify each enabled live OpenRouter route | BLOCKED | EPIC-3 |
 | US-3.4#1 | Run the per-route adapter corpus under the shared limits. | TODO | US-3.4 |
 | US-3.4#2 | Publish actual qualification and failure evidence without substituting another model. | TODO | US-3.4 |
 | EPIC-4 | Durable goal-to-artifact execution | — | — |
-| US-4.1 | Atomic run admission and canonical transition commands | BLOCKED | EPIC-4 |
+| US-4.1 | Atomic run admission and canonical transition commands | READY | EPIC-4 |
 | US-4.1#1 | Implement typed admission and atomic transition/outbox commands. | TODO | US-4.1 |
 | US-4.1#2 | Test idempotency scope and valid/invalid/concurrent state changes. | TODO | US-4.1 |
 | US-4.2 | Fenced worker ownership and durable checkpoints | BLOCKED | EPIC-4 |
@@ -1462,7 +1462,8 @@ Open Questions:
 
 ### US-3.3: Model admission, spending and uncertain invocation receipts
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-3-3-model-admission-spending-uncertain/`
 
 As a workspace owner
 I want bounded remote model attempts
@@ -1499,8 +1500,8 @@ Dependencies:
 - US-3.1
 
 Tasks:
-- [ ] Implement slot/cost admission and per-attempt receipts.
-- [ ] Test concurrent reservations, UTC rollover, failure classes and cancellation ambiguity.
+- [x] Implement slot/cost admission and per-attempt receipts.
+- [x] Test concurrent reservations, UTC rollover, failure classes and cancellation ambiguity.
 
 Open Questions:
 - None.
@@ -1554,7 +1555,7 @@ Phase reference: B1, preserved SP-020. All story completion also requires SP-003
 
 ### US-4.1: Atomic run admission and canonical transition commands
 
-Status: BLOCKED
+Status: READY
 
 As a user
 I want a durable run with explicit legal transitions

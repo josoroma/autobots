@@ -5,8 +5,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+import httpx
 import openrouter
 from langchain_openrouter import ChatOpenRouter
+from openrouter.utils import BackoffStrategy, RetryConfig
 from pydantic import SecretStr
 
 from autobots.adapters.models.catalog import (
@@ -92,7 +94,8 @@ def chat_model(
     client_factory: Callable[[str], Any] | None = None,
 ) -> ChatOpenRouter:
     """A client for one prepared attempt. Route, retries and fallbacks are fixed here."""
-    client = None if client_factory is None else client_factory(api_key.get_secret_value())
+    make_client = default_sdk_client if client_factory is None else client_factory
+    client = make_client(api_key.get_secret_value())
     return ChatOpenRouter(
         model=attempt.profile.wire_id,
         api_key=api_key,
@@ -104,5 +107,21 @@ def chat_model(
     )
 
 
-def default_sdk_client(api_key: str) -> openrouter.OpenRouter:
-    return openrouter.OpenRouter(api_key=api_key, server_url=OPENROUTER_BASE_URL)
+# The SDK otherwise retries 5XX and connection errors with backoff for up to an hour, and
+# `ChatOpenRouter(max_retries=0)` leaves that default in place. Application policy owns every retry.
+NO_SDK_RETRIES = RetryConfig("none", BackoffStrategy(1, 1, 1.0, 1), False)
+
+
+def default_sdk_client(
+    api_key: str,
+    *,
+    http: httpx.Client | None = None,
+    async_http: httpx.AsyncClient | None = None,
+) -> openrouter.OpenRouter:
+    return openrouter.OpenRouter(
+        api_key=api_key,
+        server_url=OPENROUTER_BASE_URL,
+        retry_config=NO_SDK_RETRIES,
+        client=http,
+        async_client=async_http,
+    )
