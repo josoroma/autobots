@@ -9,8 +9,11 @@ from autobots.domain.runs import RunStatus
 
 
 class RunRequest(BaseModel):
-    model_config = STRICT_CONTRACT
+    """Not strict, since a UUID arrives here as a JSON string."""
 
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    continues_run_id: Identifier | None = None
     goal_text: str = Field(min_length=1, max_length=20000)
     limit_micro_usd: MicroUsd = 1_000_000
     acceptance_criteria: list[str] = Field(default_factory=list, max_length=20)
@@ -32,6 +35,28 @@ class RunCommandRequest(BaseModel):
     model_config = STRICT_CONTRACT
 
     expected_version: int = Field(ge=1)
+
+
+class RunInputRequest(BaseModel):
+    model_config = STRICT_CONTRACT
+
+    expected_version: int = Field(ge=1)
+    value: str = Field(min_length=1, max_length=20000)
+
+
+class ModelCallReconciliation(BaseModel):
+    """What the provider reported, from its own records. A charge is never invented."""
+
+    model_config = STRICT_CONTRACT
+
+    charged_micro_usd: int = Field(ge=0)
+
+
+class ReconciliationResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal[1]
+    reconciled_calls: int
 
 
 class RunCommandResult(BaseModel):

@@ -370,6 +370,23 @@ def loop_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
     cases.denied('the runtime role cannot rewrite evidence', stack.runtime("delete from app_private.plan_evidence;\n"), 'permission denied')
 
 
+def recovery_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
+    """Cancellation from every state, resume, and a real stopped process for Mac sleep."""
+    url = f'postgresql://autobots_runtime:{stack.runtime_password}@127.0.0.1:{db_port}/postgres'
+    other = 'b0000000-0000-4000-8000-000000000002'
+    python = str(root / 'services/agent/.venv/bin/python')
+    result = subprocess.run([python, str(root / 'tests/db/recovery_check.py'), WORKSPACE_A, other, python],
+                            env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
+                            capture_output=True, text=True, timeout=240, check=False)
+    if result.returncode:
+        cases.check('the recovery check ran', 'exit 0', f'exit {result.returncode}: {result.stderr.strip()[-380:]}', False)
+        if not result.stdout.strip():
+            return
+    for case in json.loads(result.stdout.strip().splitlines()[-1])['cases']:
+        cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+    cases.denied('authenticated cannot read obligations', stack.as_role('authenticated', USER_A, 'select * from app_private.run_obligations'), 'permission denied')
+
+
 def guard_cases(stack: AppStack, cases: Cases, root: Path) -> None:
     stack.sql("update autobots_disposable.marker set run_id = 'something-else';")
     try:
@@ -424,6 +441,7 @@ def qualify(root: Path, write_types: bool = False) -> int:
         worker_cases(stack, cases, root, db_port)
         tool_cases(stack, cases, root, db_port)
         loop_cases(stack, cases, root, db_port)
+        recovery_cases(stack, cases, root, db_port)
         guard_cases(stack, cases, root)
         type_cases(stack, cases, root, write_types)
         static_cases(cases, root)

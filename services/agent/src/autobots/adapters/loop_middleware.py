@@ -133,8 +133,10 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
         run_id = self._scope.run_id
         limit: list[LimitReached] = []
         replies: list[Any] = []
+        last_ticket: list[Any] = []
 
-        async def dispatch(_: Any) -> ModelOutput:
+        async def dispatch(ticket: Any) -> ModelOutput:
+            last_ticket.append(ticket)
             try:
                 await consume(self._connection, run_id, "model_calls", self._limits.model_calls)
             except LimitReached as reached:
@@ -188,6 +190,14 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             if limit:
                 raise LoopStopped(limit[0].code) from None
             raise LoopStopped(failure.failure.value) from None
+        except ValueError:
+            # Recovery classified this call while it was out. Its charge is late evidence.
+            charged = _charged(replies[-1].result[-1]) if replies else None
+            if charged is not None and last_ticket:
+                await ModelAdmission(self._connection).reconcile(
+                    last_ticket[-1].invocation_id, charged
+                )
+            raise LoopStopped("lease_lost") from None
         return replies[-1], output.complete
 
     async def awrap_model_call(self, request: Any, handler: Callable[[Any], Awaitable[Any]]) -> Any:

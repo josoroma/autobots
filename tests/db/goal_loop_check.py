@@ -17,12 +17,14 @@ from goal_loop_script import DONE_A, PLAN, ROUTE, SAVE, TASK_A, TASK_B, Script, 
 
 from autobots.adapters.loop_middleware import AdmittedModel, ModelRoute, UnadmittedModelCall
 from autobots.application.goal_loop import LoopConfig, run_goal
+from autobots.application.model_admission import ModelAdmission
 from autobots.application.model_attempts import FailureClass, ProviderFailure
 from autobots.application.plans import latest_plan, load_goal
 from autobots.application.run_usage import RootLimits, consume, LimitReached, ensure_usage
-from autobots.application.runs import admit_run
+from autobots.application.runs import admit_run, apply_command
 from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy
+from autobots.domain.runs import Actor, RunCommand
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE, OTHER, PYTHON = UUID(sys.argv[1]), UUID(sys.argv[2]), sys.argv[3]
@@ -186,15 +188,19 @@ async def main() -> None:
         check('its job is still claimed by a dead owner', 'claimed', job, job[0] == 'claimed')
         leftover = await value("select count(*) from app_private.model_invocations where run_id = %s and status = 'dispatched'", admitted.run_id)
         check('its call stays open, since nobody knows how it ended', '1 dispatched', leftover, leftover == 1)
-        # Arranged: the lease is expired rather than waited for, and the open call is closed by hand,
-        # because reclaiming a dead worker's slot isn't built yet.
+        # Arranged: the lease is expired rather than waited for.
         await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where run_id = %s", (admitted.run_id,))
-        await db.execute("update app_private.model_invocations set status = 'failed_before_acceptance', finished_at = now() where run_id = %s and status = 'dispatched'", (admitted.run_id,))
         replacement = await claim_next(db, worker_id='replacement', lease_seconds=300)
+        usage_before = await value('select model_calls from app_private.run_usage where run_id = %s', admitted.run_id)
+        blocked, untouched = await go(replacement, [calls(PLAN)])
+        check('the open call is classified uncertain, and blocks another paid call', 'paused, no call', (blocked.code, blocked.run_status, len(untouched.seen)), blocked.code == 'uncertain_model_call' and blocked.run_status == 'paused' and len(untouched.seen) == 0)
+        invocation = await value("select id from app_private.model_invocations where run_id = %s and status = 'uncertain'", admitted.run_id)
+        await ModelAdmission(db).reconcile(invocation, 90)
+        await apply_command(db, workspace_id=OTHER, run_id=admitted.run_id, command=RunCommand.RESUME, actor=Actor.USER, expected_version=await value('select version from public.runs where id = %s', admitted.run_id))
+        replacement = await claim_next(db, worker_id='after-reconcile', lease_seconds=300)
         lease = replacement
-        usage_before = await value('select model_calls from app_private.run_usage where run_id = %s', lease.run_id)
         result, model = await go(replacement, [calls(DONE_A), calls(('complete_task', {'task_id': 'b', 'evidence': [{'kind': 'artifact', 'reference': 'outputs/a.md'}], 'summary': 's'})), say('done')])
-        check('a replacement continues from the checkpoint', 'candidate, generation 2', (result.outcome, replacement.generation), result.outcome == 'candidate' and replacement.generation == 2)
+        check('a replacement continues from the checkpoint after reconciliation', 'candidate, a new generation', (result.outcome, replacement.generation), result.outcome == 'candidate' and replacement.generation == 3)
         check('it does not start over', 'the prompt holds earlier tool results', sum(m.type == 'tool' for m in model.seen[0]), sum(m.type == 'tool' for m in model.seen[0]) == 2)
         check('usage carries across the restart', '3 before, 6 after', (usage_before, result.usage['model_calls']), usage_before == 3 and result.usage['model_calls'] == 6)
         files = await value('select count(*) from app_private.run_files where run_id = %s', lease.run_id)

@@ -48,6 +48,7 @@ export interface RunsRow {
   goal_text: string;
   policy_snapshot: unknown;
   event_sequence: number;
+  continues_run_id: string | null;
 }
 
 export interface WorkspaceMembersRow {

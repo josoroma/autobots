@@ -118,7 +118,10 @@ test("commands follow the table through the API, and terminal runs stay closed",
   expect((await stale.json()).code).toBe("version_conflict");
   const resumed = await post("resume", 2, "c3");
   expect((await resumed.json()).status).toBe("queued");
-  const invalid = await post("input", 3, "c4");
+  const invalid = await page.request.post(`/api/v1/runs/${id}/input`, {
+    headers: await write(page, "c4"),
+    data: { expected_version: 3, value: "an answer" },
+  });
   expect(invalid.status()).toBe(409);
   expect((await invalid.json()).code).toBe("transition_refused");
   const cancelled = await post("cancel", 3, "c5");
@@ -148,6 +151,69 @@ test("another workspace cannot see or command the run", async ({ browser }) => {
     data: { expected_version: 1 },
   });
   expect(pause.status()).toBe(404);
+});
+
+test("resume checks readiness, and a finished run takes a linked new run", async ({
+  page,
+}) => {
+  await signInWithKey(page);
+  const admitted = await page.request.post("/api/v1/runs", {
+    headers: await write(page, "api-key-5"),
+    data: { goal_text: "Readiness", limit_micro_usd: 1000 },
+  });
+  const { run_id: id } = await admitted.json();
+  const pause = await page.request.post(`/api/v1/runs/${id}/pause`, {
+    headers: await write(page, "r1"),
+    data: { expected_version: 1 },
+  });
+  expect((await pause.json()).status).toBe("paused");
+  await page.goto("/settings/models");
+  await expect(page.locator('[data-field="auth"]')).toBeVisible();
+  await page.getByRole("button", { name: "Disconnect" }).click();
+  await expect(page.locator('[data-field="source"]')).toHaveText("None");
+  const refused = await page.request.post(`/api/v1/runs/${id}/resume`, {
+    headers: await write(page, "r2"),
+    data: { expected_version: 2 },
+  });
+  expect(refused.status()).toBe(409);
+  expect((await refused.json()).code).toBe("credentials_required");
+  await signInWithKey(page);
+  const resumed = await page.request.post(`/api/v1/runs/${id}/resume`, {
+    headers: await write(page, "r3"),
+    data: { expected_version: 2 },
+  });
+  expect((await resumed.json()).status).toBe("queued");
+  const early = await page.request.post("/api/v1/runs", {
+    headers: await write(page, "api-key-6"),
+    data: {
+      goal_text: "Too early",
+      limit_micro_usd: 1000,
+      continues_run_id: id,
+    },
+  });
+  expect(early.status()).toBe(409);
+  expect((await early.json()).code).toBe("run_not_continuable");
+  await page.request.post(`/api/v1/runs/${id}/cancel`, {
+    headers: await write(page, "r4"),
+    data: { expected_version: 3 },
+  });
+  const linked = await page.request.post("/api/v1/runs", {
+    headers: await write(page, "api-key-7"),
+    data: {
+      goal_text: "Continue",
+      limit_micro_usd: 1000,
+      continues_run_id: id,
+    },
+  });
+  expect(linked.status()).toBe(202);
+  const reconcile = await page.request.post(
+    `/api/v1/runs/${id}/model-calls/reconcile`,
+    {
+      headers: await write(page, "r5"),
+      data: { charged_micro_usd: 5 },
+    },
+  );
+  expect((await reconcile.json()).reconciled_calls).toBe(0);
 });
 
 test("a workspace with no key cannot admit a run", async ({ page }) => {

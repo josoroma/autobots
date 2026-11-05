@@ -32,7 +32,7 @@ class Script(BaseChatModel):
         if isinstance(item, BaseException):
             raise item
         if callable(item):
-            item()
+            item = item()
         return ChatResult(generations=[ChatGeneration(message=item)])
 
 

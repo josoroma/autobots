@@ -351,6 +351,22 @@
         "title": "ModelAvailability",
         "type": "object"
       },
+      "ModelCallReconciliation": {
+        "additionalProperties": false,
+        "description": "What the provider reported, from its own records. A charge is never invented.",
+        "properties": {
+          "charged_micro_usd": {
+            "minimum": 0.0,
+            "title": "Charged Micro Usd",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "charged_micro_usd"
+        ],
+        "title": "ModelCallReconciliation",
+        "type": "object"
+      },
       "ModelList": {
         "additionalProperties": false,
         "properties": {
@@ -600,6 +616,26 @@
         "title": "ProviderStatus",
         "type": "object"
       },
+      "ReconciliationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "reconciled_calls": {
+            "title": "Reconciled Calls",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "reconciled_calls"
+        ],
+        "title": "ReconciliationResult",
+        "type": "object"
+      },
       "RoleBinding": {
         "additionalProperties": false,
         "properties": {
@@ -773,6 +809,28 @@
         "title": "RunEvent",
         "type": "object"
       },
+      "RunInputRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "value": {
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_version",
+          "value"
+        ],
+        "title": "RunInputRequest",
+        "type": "object"
+      },
       "RunIntentCheck": {
         "additionalProperties": false,
         "description": "Whether model-backed work could proceed. It creates no run and calls no model.",
@@ -807,6 +865,7 @@
       },
       "RunRequest": {
         "additionalProperties": false,
+        "description": "Not strict, since a UUID arrives here as a JSON string.",
         "properties": {
           "acceptance_criteria": {
             "items": {
@@ -815,6 +874,18 @@
             "maxItems": 20,
             "title": "Acceptance Criteria",
             "type": "array"
+          },
+          "continues_run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Continues Run Id"
           },
           "goal_text": {
             "maxLength": 20000,
@@ -1993,7 +2064,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RunCommandRequest"
+                "$ref": "#/components/schemas/RunInputRequest"
               }
             }
           },
@@ -2022,6 +2093,106 @@
           }
         },
         "summary": "Post Input"
+      }
+    },
+    "/v1/runs/{run_id}/model-calls/reconcile": {
+      "post": {
+        "description": "An owner records a charge seen in the provider's own account, for the oldest open call.",
+        "operationId": "reconcileRunModelCalls",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelCallReconciliation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Reconcile"
       }
     },
     "/v1/runs/{run_id}/pause": {
@@ -2136,6 +2307,7 @@
     },
     "/v1/runs/{run_id}/resume": {
       "post": {
+        "description": "Readiness is checked here, and again by the worker before anything is dispatched.",
         "operationId": "resumeRun",
         "parameters": [
           {

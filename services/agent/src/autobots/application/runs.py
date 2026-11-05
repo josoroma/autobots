@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 from autobots.contracts.plans import GoalSpec
 from autobots.domain.models import RolePolicy
 from autobots.domain.runs import (
+    TERMINAL,
     Actor,
     CommandRefused,
     RunCommand,
@@ -32,6 +33,12 @@ class LeaseLost(Exception):
     """This worker's generation isn't current any more, so it may write nothing."""
 
     code = "lease_lost"
+
+
+class LinkRefused(Exception):
+    """Only a terminal run in this workspace can be continued."""
+
+    code = "run_not_continuable"
 
 
 class RunNotFound(Exception):
@@ -130,13 +137,19 @@ async def admit_run(
     limit_micro_usd: int,
     policy: RolePolicy,
     acceptance_criteria: tuple[str, ...] = (),
+    continues_run_id: UUID | None = None,
 ) -> AdmissionResult:
     """Run, job and first event commit together. A repeat returns the original result."""
     goal = goal_text.strip()
     # With no stated criteria, the goal itself is the one thing to meet.
     criteria = [text.strip() for text in acceptance_criteria if text.strip()] or [goal]
     fingerprint = request_hash(
-        {"goal_text": goal, "limit_micro_usd": limit_micro_usd, "criteria": criteria}
+        {
+            "goal_text": goal,
+            "limit_micro_usd": limit_micro_usd,
+            "criteria": criteria,
+            "continues": str(continues_run_id),
+        }
     )
     scope = (workspace_id, actor_id, "admit_run", str(workspace_id), idempotency_key)
     async with connection.transaction():
@@ -145,11 +158,20 @@ async def admit_run(
             return AdmissionResult(
                 UUID(existing["run_id"]), existing["version"], existing["status"], True
             )
+        if continues_run_id is not None:
+            cursor = await connection.execute(
+                "select status from public.runs where id = %s and workspace_id = %s",
+                (continues_run_id, workspace_id),
+            )
+            previous = await cursor.fetchone()
+            if previous is None or RunStatus(previous[0]) not in TERMINAL:
+                raise LinkRefused("only a terminal run in this workspace can be continued")
         run_id = uuid4()
         status = RunStatus.QUEUED.value
         await connection.execute(
             "insert into public.runs (id, workspace_id, status, limit_micro_usd, goal_text, "
-            "goal_summary, version, policy_snapshot) values (%s, %s, %s, %s, %s, %s, 1, %s)",
+            "goal_summary, version, policy_snapshot, continues_run_id) "
+            "values (%s, %s, %s, %s, %s, %s, 1, %s, %s)",
             (
                 run_id,
                 workspace_id,
@@ -158,6 +180,7 @@ async def admit_run(
                 goal,
                 goal[:200],
                 _snapshot(policy),
+                continues_run_id,
             ),
         )
         await connection.execute(
@@ -211,6 +234,39 @@ async def record_transition(
     return new_version
 
 
+async def _has_unsettled_work(connection: Any, run_id: UUID) -> bool:
+    """SP-010: straight to cancelled only with no attempt or effect still open. A call already
+    classified uncertain stays recorded, and doesn't hold the run open."""
+    cursor = await connection.execute(
+        "select exists (select 1 from app_private.model_invocations where run_id = %s "
+        "and status in ('reserved', 'dispatched')) or exists (select 1 from "
+        "app_private.tool_receipts where run_id = %s and status = 'started')",
+        (run_id, run_id),
+    )
+    return bool((await cursor.fetchone())[0])
+
+
+async def _record_obligation(
+    connection: Any, run_id: UUID, command: RunCommand, detail: str, response: str | None
+) -> None:
+    """A wait outlives a pause, so a resume can't skip what it was waiting for."""
+    kinds = {RunCommand.REQUEST_INPUT: "input", RunCommand.REQUEST_APPROVAL: "approval"}
+    answers = {RunCommand.SUBMIT_INPUT: "input", RunCommand.DECIDE_APPROVAL: "approval"}
+    if command in kinds:
+        await connection.execute(
+            "insert into app_private.run_obligations (id, run_id, kind, detail) "
+            "values (%s, %s, %s, %s) "
+            "on conflict (run_id, kind) where status = 'open' do nothing",
+            (uuid4(), run_id, kinds[command], detail),
+        )
+    elif command in answers:
+        await connection.execute(
+            "update app_private.run_obligations set status = 'met', response = %s, met_at = now() "
+            "where run_id = %s and kind = %s and status = 'open'",
+            (response, run_id, answers[command]),
+        )
+
+
 def _require_owner(job: Any, generation: int | None) -> None:
     """Checked under the job's row lock, in the transaction that makes the change."""
     if generation is None or job is None:
@@ -231,6 +287,8 @@ async def apply_command(
     generation: int | None = None,
     actor_id: UUID | None = None,
     idempotency_key: str | None = None,
+    detail: str = "",
+    response: str | None = None,
 ) -> TransitionResult:
     """Ownership, version, actor and SP-010 are checked where the change is written.
 
@@ -262,7 +320,9 @@ async def apply_command(
         if row is None:
             raise RunNotFound("that run is not available")
         current, version = RunStatus(row[0]), row[1]
-        has_active_work = job is not None and job[0] == "claimed" and bool(job[2])
+        has_active_work = (job is not None and job[0] == "claimed" and bool(job[2])) or (
+            await _has_unsettled_work(connection, run_id)
+        )
         following = next_status(current, command, actor, has_active_work=has_active_work)
         if following is None:
             # Repeating a cancellation changes nothing, and is not a conflict.
@@ -272,6 +332,7 @@ async def apply_command(
         new_version = await record_transition(
             connection, run_id, current.value, following.value, version
         )
+        await _record_obligation(connection, run_id, command, detail, response)
         job_status = _job_status(following)
         if job_status is not None:
             await connection.execute(
@@ -289,6 +350,7 @@ __all__ = [
     "CommandRefused",
     "IdempotencyConflict",
     "LeaseLost",
+    "LinkRefused",
     "RunNotFound",
     "VersionConflict",
     "admit_run",

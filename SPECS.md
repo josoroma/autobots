@@ -139,10 +139,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-4.6 | Sanitized event replay and run workspace | DONE | EPIC-4 |
 | US-4.6#1 | Implement durable event projection, cursor transport and typed client. | DONE | US-4.6 |
 | US-4.6#2 | Build the run/plan/artifact inspector with accessible status states. | DONE | US-4.6 |
-| US-4.7 | Pause, cancellation and interrupted-run recovery | READY | EPIC-4 |
-| US-4.7#1 | Implement cancellation propagation and preserved pause/wait context. | TODO | US-4.7 |
-| US-4.7#2 | Run late-result, sleep, retry and competing completion/cancellation fixtures. | TODO | US-4.7 |
-| US-4.8 | Verify the first durable goal-to-artifact slice | BLOCKED | EPIC-4 |
+| US-4.7 | Pause, cancellation and interrupted-run recovery | DONE | EPIC-4 |
+| US-4.7#1 | Implement cancellation propagation and preserved pause/wait context. | DONE | US-4.7 |
+| US-4.7#2 | Run late-result, sleep, retry and competing completion/cancellation fixtures. | DONE | US-4.7 |
+| US-4.8 | Verify the first durable goal-to-artifact slice | READY | EPIC-4 |
 | US-4.8#1 | Exercise the bounded mock/local database/browser slice. | TODO | US-4.8 |
 | US-4.8#2 | Record independent review, recovery assertions and exercised user-flow runbook. | TODO | US-4.8 |
 | EPIC-5 | Experts, specialists and consequential effects | — | — |
@@ -152,7 +152,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-5.2 | Scoped synchronous specialist assignments | BLOCKED | EPIC-5 |
 | US-5.2#1 | Implement assignment records, namespaces and inherited budgets. | TODO | US-5.2 |
 | US-5.2#2 | Test duplicate delegation, denied expansion and parent cancellation. | TODO | US-5.2 |
-| US-5.3 | Argument-bound approvals and durable decision wait | BLOCKED | EPIC-5 |
+| US-5.3 | Argument-bound approvals and durable decision wait | READY | EPIC-5 |
 | US-5.3#1 | Implement approval persistence, validated decision commands and inbox. | TODO | US-5.3 |
 | US-5.3#2 | Exercise tampering, expiry, rejection and interrupted-node replay fixtures. | TODO | US-5.3 |
 | US-5.4 | Consequential-effect reconciliation using a mock destination | BLOCKED | EPIC-5 |
@@ -1810,7 +1810,8 @@ Open Questions:
 
 ### US-4.7: Pause, cancellation and interrupted-run recovery
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-4-7-pause-cancellation-interrupted-run/`
 
 As a user
 I want monotonic control of running or waiting work
@@ -1848,15 +1849,15 @@ Dependencies:
 - US-4.3
 
 Tasks:
-- [ ] Implement cancellation propagation and preserved pause/wait context.
-- [ ] Run late-result, sleep, retry and competing completion/cancellation fixtures.
+- [x] Implement cancellation propagation and preserved pause/wait context.
+- [x] Run late-result, sleep, retry and competing completion/cancellation fixtures.
 
 Open Questions:
 - None.
 
 ### US-4.8: Verify the first durable goal-to-artifact slice
 
-Status: BLOCKED
+Status: READY
 
 As a user
 I want evidence-backed completion of the initial personal-agent task
@@ -1984,7 +1985,7 @@ Open Questions:
 
 ### US-5.3: Argument-bound approvals and durable decision wait
 
-Status: BLOCKED
+Status: READY
 
 As a reviewer
 I want the exact proposed action before approval

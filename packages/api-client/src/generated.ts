@@ -352,6 +352,22 @@ export const schemas = {
     "title": "ModelAvailability",
     "type": "object"
   },
+  "ModelCallReconciliation": {
+    "additionalProperties": false,
+    "description": "What the provider reported, from its own records. A charge is never invented.",
+    "properties": {
+      "charged_micro_usd": {
+        "minimum": 0.0,
+        "title": "Charged Micro Usd",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "charged_micro_usd"
+    ],
+    "title": "ModelCallReconciliation",
+    "type": "object"
+  },
   "ModelList": {
     "additionalProperties": false,
     "properties": {
@@ -601,6 +617,26 @@ export const schemas = {
     "title": "ProviderStatus",
     "type": "object"
   },
+  "ReconciliationResult": {
+    "additionalProperties": false,
+    "properties": {
+      "reconciled_calls": {
+        "title": "Reconciled Calls",
+        "type": "integer"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "reconciled_calls"
+    ],
+    "title": "ReconciliationResult",
+    "type": "object"
+  },
   "RoleBinding": {
     "additionalProperties": false,
     "properties": {
@@ -774,6 +810,28 @@ export const schemas = {
     "title": "RunEvent",
     "type": "object"
   },
+  "RunInputRequest": {
+    "additionalProperties": false,
+    "properties": {
+      "expected_version": {
+        "minimum": 1.0,
+        "title": "Expected Version",
+        "type": "integer"
+      },
+      "value": {
+        "maxLength": 20000,
+        "minLength": 1,
+        "title": "Value",
+        "type": "string"
+      }
+    },
+    "required": [
+      "expected_version",
+      "value"
+    ],
+    "title": "RunInputRequest",
+    "type": "object"
+  },
   "RunIntentCheck": {
     "additionalProperties": false,
     "description": "Whether model-backed work could proceed. It creates no run and calls no model.",
@@ -808,6 +866,7 @@ export const schemas = {
   },
   "RunRequest": {
     "additionalProperties": false,
+    "description": "Not strict, since a UUID arrives here as a JSON string.",
     "properties": {
       "acceptance_criteria": {
         "items": {
@@ -816,6 +875,18 @@ export const schemas = {
         "maxItems": 20,
         "title": "Acceptance Criteria",
         "type": "array"
+      },
+      "continues_run_id": {
+        "anyOf": [
+          {
+            "format": "uuid",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Continues Run Id"
       },
       "goal_text": {
         "maxLength": 20000,
@@ -1346,6 +1417,14 @@ export function parseModelAvailability(value: unknown): ModelAvailability {
   return parseWith(schemas, "ModelAvailability", value) as ModelAvailability;
 }
 
+export interface ModelCallReconciliation {
+  charged_micro_usd: number;
+}
+
+export function parseModelCallReconciliation(value: unknown): ModelCallReconciliation {
+  return parseWith(schemas, "ModelCallReconciliation", value) as ModelCallReconciliation;
+}
+
 export interface ModelList {
   catalog_status: "available" | "unavailable" | "unknown";
   models: ModelAvailability[];
@@ -1415,6 +1494,15 @@ export function parseProviderStatus(value: unknown): ProviderStatus {
   return parseWith(schemas, "ProviderStatus", value) as ProviderStatus;
 }
 
+export interface ReconciliationResult {
+  reconciled_calls: number;
+  schema_version: 1;
+}
+
+export function parseReconciliationResult(value: unknown): ReconciliationResult {
+  return parseWith(schemas, "ReconciliationResult", value) as ReconciliationResult;
+}
+
 export interface RoleBinding {
   canonical_id: string;
   profile: ModelProfileId;
@@ -1471,6 +1559,15 @@ export function parseRunEvent(value: unknown): RunEvent {
   return parseWith(schemas, "RunEvent", value) as RunEvent;
 }
 
+export interface RunInputRequest {
+  expected_version: number;
+  value: string;
+}
+
+export function parseRunInputRequest(value: unknown): RunInputRequest {
+  return parseWith(schemas, "RunInputRequest", value) as RunInputRequest;
+}
+
 export interface RunIntentCheck {
   code: "ready" | "credentials_required" | "credential_invalid" | "credential_unavailable";
   ready: boolean;
@@ -1483,6 +1580,7 @@ export function parseRunIntentCheck(value: unknown): RunIntentCheck {
 
 export interface RunRequest {
   acceptance_criteria?: string[];
+  continues_run_id?: string | null;
   goal_text: string;
   limit_micro_usd?: number;
 }
@@ -1634,8 +1732,12 @@ export async function listRunEvents(options: ClientOptions, run_id: string): Pro
   return parseEventPage(await requestJson(options, "GET", `/v1/runs/${encodeURIComponent(run_id)}/events`));
 }
 
-export async function submitRunInput(options: ClientOptions, run_id: string, body: RunCommandRequest): Promise<RunCommandResult> {
+export async function submitRunInput(options: ClientOptions, run_id: string, body: RunInputRequest): Promise<RunCommandResult> {
   return parseRunCommandResult(await requestJson(options, "POST", `/v1/runs/${encodeURIComponent(run_id)}/input`, body));
+}
+
+export async function reconcileRunModelCalls(options: ClientOptions, run_id: string, body: ModelCallReconciliation): Promise<ReconciliationResult> {
+  return parseReconciliationResult(await requestJson(options, "POST", `/v1/runs/${encodeURIComponent(run_id)}/model-calls/reconcile`, body));
 }
 
 export async function pauseRun(options: ClientOptions, run_id: string, body: RunCommandRequest): Promise<RunCommandResult> {
