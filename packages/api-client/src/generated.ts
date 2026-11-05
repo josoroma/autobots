@@ -591,6 +591,71 @@ export const schemas = {
     "title": "EventPage",
     "type": "object"
   },
+  "ExecutionBinding": {
+    "additionalProperties": false,
+    "properties": {
+      "block_versions": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "title": "Block Versions",
+        "type": "object"
+      },
+      "graph_hash": {
+        "title": "Graph Hash",
+        "type": "string"
+      },
+      "id": {
+        "format": "uuid",
+        "title": "Id",
+        "type": "string"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "workflow_id": {
+        "format": "uuid",
+        "title": "Workflow Id",
+        "type": "string"
+      },
+      "workflow_version": {
+        "title": "Workflow Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "id",
+      "workflow_id",
+      "workflow_version",
+      "graph_hash",
+      "block_versions"
+    ],
+    "title": "ExecutionBinding",
+    "type": "object"
+  },
+  "ExecutionCreate": {
+    "additionalProperties": false,
+    "properties": {
+      "inputs": {
+        "additionalProperties": true,
+        "title": "Inputs",
+        "type": "object"
+      },
+      "version": {
+        "minimum": 1.0,
+        "title": "Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "version"
+    ],
+    "title": "ExecutionCreate",
+    "type": "object"
+  },
   "ExpectedVersion": {
     "additionalProperties": false,
     "properties": {
@@ -2122,6 +2187,309 @@ export const schemas = {
     "title": "VerificationSummary",
     "type": "object"
   },
+  "WorkflowCreate": {
+    "additionalProperties": false,
+    "properties": {
+      "name": {
+        "maxLength": 100,
+        "minLength": 1,
+        "title": "Name",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "title": "WorkflowCreate",
+    "type": "object"
+  },
+  "WorkflowErrorView": {
+    "additionalProperties": false,
+    "properties": {
+      "code": {
+        "title": "Code",
+        "type": "string"
+      },
+      "node": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Node"
+      },
+      "port": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Port"
+      }
+    },
+    "required": [
+      "code",
+      "node",
+      "port"
+    ],
+    "title": "WorkflowErrorView",
+    "type": "object"
+  },
+  "WorkflowGraph": {
+    "additionalProperties": false,
+    "properties": {
+      "links": {
+        "items": {
+          "$ref": "#/components/schemas/WorkflowLink"
+        },
+        "maxItems": 1000,
+        "title": "Links",
+        "type": "array"
+      },
+      "nodes": {
+        "items": {
+          "$ref": "#/components/schemas/WorkflowNode"
+        },
+        "maxItems": 200,
+        "title": "Nodes",
+        "type": "array"
+      }
+    },
+    "title": "WorkflowGraph",
+    "type": "object"
+  },
+  "WorkflowLink": {
+    "additionalProperties": false,
+    "properties": {
+      "source": {
+        "title": "Source",
+        "type": "string"
+      },
+      "source_port": {
+        "title": "Source Port",
+        "type": "string"
+      },
+      "target": {
+        "title": "Target",
+        "type": "string"
+      },
+      "target_port": {
+        "title": "Target Port",
+        "type": "string"
+      }
+    },
+    "required": [
+      "source",
+      "source_port",
+      "target",
+      "target_port"
+    ],
+    "title": "WorkflowLink",
+    "type": "object"
+  },
+  "WorkflowList": {
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "workflows": {
+        "items": {
+          "$ref": "#/components/schemas/WorkflowView"
+        },
+        "title": "Workflows",
+        "type": "array"
+      }
+    },
+    "required": [
+      "schema_version",
+      "workflows"
+    ],
+    "title": "WorkflowList",
+    "type": "object"
+  },
+  "WorkflowNode": {
+    "additionalProperties": false,
+    "properties": {
+      "block": {
+        "maxLength": 40,
+        "title": "Block",
+        "type": "string"
+      },
+      "config": {
+        "additionalProperties": true,
+        "title": "Config",
+        "type": "object"
+      },
+      "id": {
+        "pattern": "^[A-Za-z0-9_-]{1,60}$",
+        "title": "Id",
+        "type": "string"
+      },
+      "version": {
+        "title": "Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "id",
+      "block",
+      "version"
+    ],
+    "title": "WorkflowNode",
+    "type": "object"
+  },
+  "WorkflowPublish": {
+    "additionalProperties": false,
+    "properties": {
+      "expected_version": {
+        "minimum": 0.0,
+        "title": "Expected Version",
+        "type": "integer"
+      },
+      "graph": {
+        "$ref": "#/components/schemas/WorkflowGraph"
+      },
+      "source": {
+        "default": "user",
+        "enum": [
+          "user",
+          "model_proposal"
+        ],
+        "title": "Source",
+        "type": "string"
+      }
+    },
+    "required": [
+      "expected_version",
+      "graph"
+    ],
+    "title": "WorkflowPublish",
+    "type": "object"
+  },
+  "WorkflowValidation": {
+    "additionalProperties": false,
+    "properties": {
+      "errors": {
+        "items": {
+          "$ref": "#/components/schemas/WorkflowErrorView"
+        },
+        "title": "Errors",
+        "type": "array"
+      },
+      "graph_hash": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Graph Hash"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "valid": {
+        "title": "Valid",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "schema_version",
+      "valid",
+      "errors",
+      "graph_hash"
+    ],
+    "title": "WorkflowValidation",
+    "type": "object"
+  },
+  "WorkflowVersionView": {
+    "additionalProperties": false,
+    "properties": {
+      "block_versions": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "title": "Block Versions",
+        "type": "object"
+      },
+      "graph": {
+        "$ref": "#/components/schemas/WorkflowGraph"
+      },
+      "graph_hash": {
+        "title": "Graph Hash",
+        "type": "string"
+      },
+      "source": {
+        "title": "Source",
+        "type": "string"
+      },
+      "version": {
+        "title": "Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "version",
+      "graph_hash",
+      "source",
+      "graph",
+      "block_versions"
+    ],
+    "title": "WorkflowVersionView",
+    "type": "object"
+  },
+  "WorkflowView": {
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "format": "uuid",
+        "title": "Id",
+        "type": "string"
+      },
+      "latest_version": {
+        "title": "Latest Version",
+        "type": "integer"
+      },
+      "name": {
+        "title": "Name",
+        "type": "string"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "versions": {
+        "items": {
+          "$ref": "#/components/schemas/WorkflowVersionView"
+        },
+        "title": "Versions",
+        "type": "array"
+      }
+    },
+    "required": [
+      "schema_version",
+      "id",
+      "name",
+      "latest_version",
+      "versions"
+    ],
+    "title": "WorkflowView",
+    "type": "object"
+  },
   "WorkspaceSummary": {
     "additionalProperties": false,
     "properties": {
@@ -2342,6 +2710,28 @@ export interface EventPage {
 
 export function parseEventPage(value: unknown): EventPage {
   return parseWith(schemas, "EventPage", value) as EventPage;
+}
+
+export interface ExecutionBinding {
+  block_versions: Record<string, unknown>;
+  graph_hash: string;
+  id: string;
+  schema_version: 1;
+  workflow_id: string;
+  workflow_version: number;
+}
+
+export function parseExecutionBinding(value: unknown): ExecutionBinding {
+  return parseWith(schemas, "ExecutionBinding", value) as ExecutionBinding;
+}
+
+export interface ExecutionCreate {
+  inputs?: Record<string, unknown>;
+  version: number;
+}
+
+export function parseExecutionCreate(value: unknown): ExecutionCreate {
+  return parseWith(schemas, "ExecutionCreate", value) as ExecutionCreate;
 }
 
 export interface ExpectedVersion {
@@ -2816,6 +3206,109 @@ export function parseVerificationSummary(value: unknown): VerificationSummary {
   return parseWith(schemas, "VerificationSummary", value) as VerificationSummary;
 }
 
+export interface WorkflowCreate {
+  name: string;
+}
+
+export function parseWorkflowCreate(value: unknown): WorkflowCreate {
+  return parseWith(schemas, "WorkflowCreate", value) as WorkflowCreate;
+}
+
+export interface WorkflowErrorView {
+  code: string;
+  node: string | null;
+  port: string | null;
+}
+
+export function parseWorkflowErrorView(value: unknown): WorkflowErrorView {
+  return parseWith(schemas, "WorkflowErrorView", value) as WorkflowErrorView;
+}
+
+export interface WorkflowGraph {
+  links?: WorkflowLink[];
+  nodes?: WorkflowNode[];
+}
+
+export function parseWorkflowGraph(value: unknown): WorkflowGraph {
+  return parseWith(schemas, "WorkflowGraph", value) as WorkflowGraph;
+}
+
+export interface WorkflowLink {
+  source: string;
+  source_port: string;
+  target: string;
+  target_port: string;
+}
+
+export function parseWorkflowLink(value: unknown): WorkflowLink {
+  return parseWith(schemas, "WorkflowLink", value) as WorkflowLink;
+}
+
+export interface WorkflowList {
+  schema_version: 1;
+  workflows: WorkflowView[];
+}
+
+export function parseWorkflowList(value: unknown): WorkflowList {
+  return parseWith(schemas, "WorkflowList", value) as WorkflowList;
+}
+
+export interface WorkflowNode {
+  block: string;
+  config?: Record<string, unknown>;
+  id: string;
+  version: number;
+}
+
+export function parseWorkflowNode(value: unknown): WorkflowNode {
+  return parseWith(schemas, "WorkflowNode", value) as WorkflowNode;
+}
+
+export interface WorkflowPublish {
+  expected_version: number;
+  graph: WorkflowGraph;
+  source?: "user" | "model_proposal";
+}
+
+export function parseWorkflowPublish(value: unknown): WorkflowPublish {
+  return parseWith(schemas, "WorkflowPublish", value) as WorkflowPublish;
+}
+
+export interface WorkflowValidation {
+  errors: WorkflowErrorView[];
+  graph_hash: string | null;
+  schema_version: 1;
+  valid: boolean;
+}
+
+export function parseWorkflowValidation(value: unknown): WorkflowValidation {
+  return parseWith(schemas, "WorkflowValidation", value) as WorkflowValidation;
+}
+
+export interface WorkflowVersionView {
+  block_versions: Record<string, unknown>;
+  graph: WorkflowGraph;
+  graph_hash: string;
+  source: string;
+  version: number;
+}
+
+export function parseWorkflowVersionView(value: unknown): WorkflowVersionView {
+  return parseWith(schemas, "WorkflowVersionView", value) as WorkflowVersionView;
+}
+
+export interface WorkflowView {
+  id: string;
+  latest_version: number;
+  name: string;
+  schema_version: 1;
+  versions: WorkflowVersionView[];
+}
+
+export function parseWorkflowView(value: unknown): WorkflowView {
+  return parseWith(schemas, "WorkflowView", value) as WorkflowView;
+}
+
 export interface WorkspaceSummary {
   id: string;
   schema_version: 1;
@@ -2935,6 +3428,30 @@ export async function deleteOpenRouterCredential(options: ClientOptions, body: E
 
 export async function validateOpenRouter(options: ClientOptions): Promise<ProviderStatus> {
   return parseProviderStatus(await requestJson(options, "POST", `/v1/settings/model-providers/openrouter/validate`));
+}
+
+export async function listWorkflows(options: ClientOptions): Promise<WorkflowList> {
+  return parseWorkflowList(await requestJson(options, "GET", `/v1/workflows`));
+}
+
+export async function createWorkflow(options: ClientOptions, body: WorkflowCreate): Promise<WorkflowView> {
+  return parseWorkflowView(await requestJson(options, "POST", `/v1/workflows`, body));
+}
+
+export async function validateWorkflow(options: ClientOptions, body: WorkflowGraph): Promise<WorkflowValidation> {
+  return parseWorkflowValidation(await requestJson(options, "POST", `/v1/workflows/validate`, body));
+}
+
+export async function getWorkflow(options: ClientOptions, workflow_id: string): Promise<WorkflowView> {
+  return parseWorkflowView(await requestJson(options, "GET", `/v1/workflows/${encodeURIComponent(workflow_id)}`));
+}
+
+export async function createWorkflowExecution(options: ClientOptions, workflow_id: string, body: ExecutionCreate): Promise<ExecutionBinding> {
+  return parseExecutionBinding(await requestJson(options, "POST", `/v1/workflows/${encodeURIComponent(workflow_id)}/executions`, body));
+}
+
+export async function publishWorkflowVersion(options: ClientOptions, workflow_id: string, body: WorkflowPublish): Promise<WorkflowView> {
+  return parseWorkflowView(await requestJson(options, "POST", `/v1/workflows/${encodeURIComponent(workflow_id)}/versions`, body));
 }
 
 export async function getWorkspace(options: ClientOptions, workspace_id: string): Promise<WorkspaceSummary> {

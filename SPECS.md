@@ -159,10 +159,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-5.4#1 | Implement connector-independent reconciliation states and receipt handling. | DONE | US-5.4 |
 | US-5.4#2 | Test lost-response and duplicate-delivery behavior with a controlled sink. | DONE | US-5.4 |
 | EPIC-6 | Typed reusable workflows | — | — |
-| US-6.1 | Typed immutable workflow definition and validation | READY | EPIC-6 |
-| US-6.1#1 | Define typed workflow IR and version persistence. | TODO | US-6.1 |
-| US-6.1#2 | Add type, link, bounded-cycle and publication fixtures. | TODO | US-6.1 |
-| US-6.2 | Workflow readiness, emissions and restart semantics | BLOCKED | EPIC-6 |
+| US-6.1 | Typed immutable workflow definition and validation | DONE | EPIC-6 |
+| US-6.1#1 | Define typed workflow IR and version persistence. | DONE | US-6.1 |
+| US-6.1#2 | Add type, link, bounded-cycle and publication fixtures. | DONE | US-6.1 |
+| US-6.2 | Workflow readiness, emissions and restart semantics | READY | EPIC-6 |
 | US-6.2#1 | Implement the declared readiness and bounded iteration/join semantics. | TODO | US-6.2 |
 | US-6.2#2 | Run golden and restart fixtures for the supported subset. | TODO | US-6.2 |
 | US-6.3 | Workflow editor and execution monitor | BLOCKED | EPIC-6 |
@@ -2075,7 +2075,8 @@ Phase reference: B4, preserved SP-020. All story completion also requires SP-003
 
 ### US-6.1: Typed immutable workflow definition and validation
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-6-1-typed-immutable-workflow-definition/`
 
 As an automation builder
 I want a versioned workflow vocabulary
@@ -2105,15 +2106,15 @@ Dependencies:
 - US-5.3
 
 Tasks:
-- [ ] Define typed workflow IR and version persistence.
-- [ ] Add type, link, bounded-cycle and publication fixtures.
+- [x] Define typed workflow IR and version persistence.
+- [x] Add type, link, bounded-cycle and publication fixtures.
 
 Open Questions:
 - None.
 
 ### US-6.2: Workflow readiness, emissions and restart semantics
 
-Status: BLOCKED
+Status: READY
 
 As an automation builder
 I want predictable node execution

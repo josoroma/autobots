@@ -7,10 +7,10 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | EPIC-5 |
+| Target | EPIC-6 |
 | Kind | epic |
 | Focus | - |
-| Status | COMPLETE |
+| Status | ACTIVE |
 | Reason | - |
 | Started | 2026-11-05 |
 | Updated | 2026-11-05 |
@@ -19,19 +19,18 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-5.1 | us-5-1-versioned-experts-direct-sessions | DONE | Versioned Experts, direct sessions and coordinator routing |
-| 2 | US-5.2 | us-5-2-scoped-synchronous-specialist-assignments | DONE | Scoped synchronous specialist assignments |
-| 3 | US-5.3 | us-5-3-argument-bound-approvals-durable | DONE | Argument-bound approvals and durable decision wait |
-| 4 | US-5.4 | us-5-4-consequential-effect-reconciliation-using | DONE | Consequential-effect reconciliation using a mock destination |
+| 1 | US-6.1 | us-6-1-typed-immutable-workflow-definition | DONE | Typed immutable workflow definition and validation |
+| 2 | US-6.2 | us-6-2-workflow-readiness-emissions-restart | READY | Workflow readiness, emissions and restart semantics |
+| 3 | US-6.3 | us-6-3-workflow-editor-execution-monitor | BLOCKED | Workflow editor and execution monitor |
 
 ## Next Action
 
-Action: complete
-Story: -
-Change: -
+Action: select
+Story: US-6.2
+Change: us-6-2-workflow-readiness-emissions-restart
 Owner: main-session
-Command: none — every story in the goal is DONE
-Reason: all 4 story/stories are DONE
+Command: openspec new change us-6-2-workflow-readiness-emissions-restart; set US-6.2 to IN PROGRESS with a Change: line
+Reason: US-6.2 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

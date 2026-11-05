@@ -98,6 +98,37 @@ export interface SessionsRow {
   created_at: string;
 }
 
+export interface WorkflowExecutionsRow {
+  id: string;
+  workspace_id: string;
+  workflow_id: string;
+  workflow_version: number;
+  graph_hash: string;
+  block_versions: unknown;
+  inputs: unknown;
+  created_by: string;
+  created_at: string;
+}
+
+export interface WorkflowVersionsRow {
+  workflow_id: string;
+  version: number;
+  graph: unknown;
+  graph_hash: string;
+  block_versions: unknown;
+  source: string;
+  created_by: string;
+  created_at: string;
+}
+
+export interface WorkflowsRow {
+  id: string;
+  workspace_id: string;
+  name: string;
+  latest_version: number;
+  created_at: string;
+}
+
 export interface WorkspaceMembersRow {
   workspace_id: string;
   user_id: string;

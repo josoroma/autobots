@@ -18,6 +18,7 @@ from autobots.api.run_routes import router as run_router
 from autobots.api.security import DenyAllMembership, MembershipStore
 from autobots.api.settings import Settings
 from autobots.api.settings_routes import router as settings_router
+from autobots.api.workflow_routes import router as workflow_router
 
 
 class Pool(Protocol):
@@ -73,4 +74,5 @@ def create_app(
     app.include_router(approval_router)
     app.include_router(event_router)
     app.include_router(expert_router)
+    app.include_router(workflow_router)
     return app
