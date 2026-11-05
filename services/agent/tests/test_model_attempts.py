@@ -100,6 +100,11 @@ def run_call(ledger: Ledger, dispatch: Any, retry: RetryPolicy, **options: Any) 
         (500, FailureClass.PROVIDER_ERROR),
         (503, FailureClass.PROVIDER_ERROR),
         (400, FailureClass.OTHER),
+        (404, FailureClass.MODEL_UNAVAILABLE),
+        (200, FailureClass.UNCERTAIN_ACCEPTANCE),
+        (408, FailureClass.UNCERTAIN_ACCEPTANCE),
+        (504, FailureClass.UNCERTAIN_ACCEPTANCE),
+        (524, FailureClass.UNCERTAIN_ACCEPTANCE),
     ],
 )
 def test_status_classes(status: int, expected: FailureClass) -> None:
@@ -129,6 +134,16 @@ async def test_at_most_two_retries() -> None:
         await run_call(ledger, scripted(*failures), retry)
     assert len(ledger.requests) == MAX_RETRIES + 1
     assert len(waits) == MAX_RETRIES
+
+
+@pytest.mark.asyncio
+async def test_a_wait_past_the_cap_is_not_slept_through() -> None:
+    ledger, (retry, waits) = Ledger(), policy(deadline_seconds=900)
+    failure = ProviderFailure(FailureClass.RATE_LIMITED, retry_after=61.0)
+    with pytest.raises(ProviderFailure):
+        await run_call(ledger, scripted(failure, GOOD), retry)
+    assert waits == []
+    assert len(ledger.requests) == 1
 
 
 @pytest.mark.asyncio

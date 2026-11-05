@@ -29,7 +29,43 @@ Expected: `GET /v1/operations/local-status`, or the Operations page, says ready.
 
 ## What the worker does today
 
-`autobots.operations.worker` expires approvals, evaluates routines and applies retention. **It doesn't claim jobs**, because it has no model client until inference is qualified (US-3.4). Queued runs wait, and Operations says `no_inference_worker`. The goal loop itself has only run under a scripted model.
+`autobots.operations.worker` expires approvals, evaluates routines and applies retention. **By default it doesn't claim jobs**, because no live route is qualified yet (US-3.4). Queued runs wait, and Operations says `no_inference_worker`.
+
+## Turning on inference
+
+**This spends real money once a key exists: every queued run in every workspace with a key sends billed requests to OpenRouter.** No live route has been qualified. So far this path has run only over a fake transport, as described below. Don't turn it on for real work before US-3.4, except as that story's explicitly authorized, bounded qualification.
+
+Set the switch where the worker starts, alongside `AUTOBOTS_CONFIG_ROOT`, `AUTOBOTS_SUPABASE_URL`, `AUTOBOTS_SERVICE_ROLE_KEY` and, if the key file isn't in its default place, `AUTOBOTS_PROVIDER_MASTER_KEY_FILE`, all with the same values the API uses. Missing any of the required ones, the worker refuses to start.
+
+```sh
+AUTOBOTS_WORKER_INFERENCE=enabled services/agent/.venv/bin/python -m autobots.operations.worker 2>> "$LOG_DIR/worker.log"
+```
+
+Expected: the log's `worker.started` line says `claims_inference` is true, and Operations stops reporting `no_inference_worker`. Any other value of the switch means off. No setting chooses another endpoint or model. The HTTP client does honor the usual proxy variables, so a proxy set for this process carries its traffic.
+
+What each job does:
+
+- **Route:** the `executor` binding in the run's frozen `policy_snapshot` picks the profile, so one worker serves DeepSeek and Astra runs side by side. Changing a workspace default never reaches a run already admitted. A run with no approved binding pauses as `route_not_bound`.
+- **Before anything starts:** a job with no usable key or no fresh catalog pauses, with nothing reserved and no request sent. A cancel, or a candidate waiting for verification, still settles, because neither needs a model. A workflow still runs its deterministic blocks, and only its agent blocks stop.
+- **Each attempt:** it rechecks the catalog (no older than five minutes), reads the current key, records a stored key's version in `app_private.model_invocations.credential_version` (an environment key has none), and builds a client used once. A rotated key applies from the next attempt, with no restart.
+- **Spend:** each call asks for at most 512 output tokens and reserves the most the highest rates that can apply could charge for that plus 32,000 input tokens. That input figure is an estimate, because no tokenizer is pinned, so text with more than a token per character can pass it. The prices are read when the job is claimed, so a rise during a job is under-reserved until its next claim, though a price that disappears stops the next attempt. The reply's reported cost settles the attempt.
+- **Compaction:** it works only when a run's `summarizer` binding matches its `executor` binding. Otherwise a run long enough to need it pauses as `route_not_bound`.
+
+| Pause reason | Means | What to do |
+|---|---|---|
+| `credentials_required` | No effective key | Add a key, then `POST /v1/runs/{run_id}/resume`. Resume answers `409` until then. |
+| `invalid_credential` | OpenRouter answered `401`, or the configured key is unusable. Sent once, not retried, and the key is marked invalid | Replace or revalidate the key, then resume. Resume answers `409 credential_invalid` until then. |
+| `credential_unavailable` | The master key, the credential row or the configuration root can't be read, or the last key check couldn't reach OpenRouter | Restore access, revalidate the key, or replace it if its row is damaged. Never generate a new master key while encrypted rows exist. |
+| `model_unavailable` | The catalog is stale or unreadable, the mapping drifted, the model no longer offers tools or the output limit, or OpenRouter answered `404` | Read the catalog. Nothing substitutes another model. Resume once it's right, or start a new run on another model. |
+| `cost_unavailable` | The catalog gives no usable price | Same as above. |
+| `network_before_acceptance` | Two retries also couldn't open a connection, so nothing was sent | Check this Mac's network, then resume. |
+| `uncertain_acceptance` | A call timed out or dropped, or OpenRouter answered in a way the SDK couldn't parse. It may have been charged, so its reservation stays | Look up the charge in OpenRouter's records, reconcile it as in [Drain and stop](#drain-and-stop), then resume. Resume answers `409 uncertain_model_call` until then. |
+
+These don't pause: after two retries, `rate_limited` (`429`) and `provider_error` (other `5xx`) fail the run. A `Retry-After` is honored up to 60 seconds, and one longer than that, or past the run's time limit, ends the retries at once. Neither `402` nor a `401` is retried. To continue failed work, start a linked new run. A reply that the provider itself stopped, as `error` or `content_filter`, never runs and fails as `incomplete_output`.
+
+**Qualified by** `python3.12 scripts/qualify_worker_inference.py`, on its own disposable stack. It runs the real `worker.main`, SDK and adapter, with a fake HTTP transport and catalog passed from Python, arranged keys, and hostnames beyond loopback refused. It writes `.checks/worker-inference/qualification.json` and its logs under `.checks/worker-inference/logs`, and removes only its own `autobots-disposable-*` project. Other Docker stacks must stay still while it runs, because it compares every container outside its own project.
+
+It makes no paid call, and says nothing about a live route, real response shapes, real prices or real billing. Its fake replies don't exercise compaction, a workflow or child run through this worker, two workers at once, a lost lease, or Astra's mandatory reasoning within 512 output tokens, which belongs to US-3.4.
 
 ## Reading health
 
@@ -88,7 +124,7 @@ See [the backup and restore runbook](backup-restore.md).
 ## Failure symptoms
 
 - **`503 not_ready` with everything apparently up:** read the conditions. A disk below the minimum refuses admission on its own.
-- **Queued forever:** expected until an inference worker exists.
+- **Queued forever:** expected unless a worker is running with `AUTOBOTS_WORKER_INFERENCE=enabled`. See [Turning on inference](#turning-on-inference).
 - **A run paused after a restart:** read its reason. An uncertain call or unknown effect is waiting for a person, not stuck.
 
 ## Cleanup

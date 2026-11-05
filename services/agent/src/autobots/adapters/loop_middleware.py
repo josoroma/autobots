@@ -8,7 +8,9 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import UUID
 
+import httpx
 from langchain.agents.middleware.types import AgentMiddleware
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
@@ -47,6 +49,7 @@ from autobots.application.tool_gateway import ToolScope, ownership_refusal
 from autobots.contracts.plans import GoalSpec
 
 CHECK_SECONDS = 1.0
+INCOMPLETE_FINISHES = frozenset({"length", "error", "content_filter"})
 INTERRUPTING = frozenset({"cancelling", "cancelled", "failed", "succeeded"})
 
 REPAIRABLE = PLAN_REJECTIONS | {"invalid_arguments", "route_not_granted", "scope_expansion_denied"}
@@ -60,7 +63,13 @@ STOPPING = frozenset(
     }
 )
 _ADMITTED: ContextVar[bool] = ContextVar("autobots_model_call_admitted", default=False)
+_INVOCATION: ContextVar[UUID | None] = ContextVar("autobots_model_invocation", default=None)
 REPAIR_NOTE = "Your last reply was cut off, so none of it was used. Reply again, more briefly."
+
+
+def current_invocation() -> UUID | None:
+    """The ledger row of the attempt being dispatched, or None outside one."""
+    return _INVOCATION.get()
 
 
 class LoopStopped(Exception):
@@ -112,7 +121,12 @@ class ModelRoute:
 
 
 def _retry_after(error: Exception) -> float | None:
-    headers = getattr(getattr(error, "response", None), "headers", None) or {}
+    # The SDK's errors carry `headers`. Other clients' errors carry them on `response`.
+    headers = (
+        getattr(error, "headers", None)
+        or getattr(getattr(error, "response", None), "headers", None)
+        or {}
+    )
     try:
         seconds = float(str(headers.get("retry-after")))
     except ValueError:
@@ -123,6 +137,18 @@ def _retry_after(error: Exception) -> float | None:
 def _charged(message: AIMessage) -> int | None:
     cost = message.response_metadata.get("cost")
     return None if cost is None else round(float(cost) * 1_000_000)
+
+
+def _finished(message: AIMessage) -> bool:
+    """A reply cut off or stopped by the provider is never run, whatever it appears to hold."""
+    return message.response_metadata.get("finish_reason") not in INCOMPLETE_FINISHES
+
+
+def _failure_without_status(error: Exception) -> FailureClass:
+    """A connection that never opened carried nothing. Anything else may have been accepted."""
+    if isinstance(error, httpx.ConnectError | httpx.ConnectTimeout):
+        return FailureClass.NETWORK_BEFORE_ACCEPTANCE
+    return FailureClass.UNCERTAIN_ACCEPTANCE
 
 
 class LoopMiddleware(AgentMiddleware[Any, Any]):
@@ -243,8 +269,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
         asked = request.override(
             messages=[HumanMessage(summary_request(earlier, previous))], tools=[]
         )
-        remaining = await self._guard()
-        response, complete = await self._admitted_call(asked, handler, remaining, route)
+        response, complete = await self._with_slot(asked, handler, route)
         if not complete:
             raise LoopStopped("compaction_failed")
         text = str(response.result[-1].content)
@@ -285,6 +310,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
                 limit.append(reached)
                 raise ProviderFailure(FailureClass.OTHER) from None
             token = _ADMITTED.set(True)
+            invocation = _INVOCATION.set(ticket.invocation_id)
             try:
                 response = await self._bounded(handler, request, stopped)
             except ProviderFailure:
@@ -294,16 +320,17 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
                 failure = (
                     classify_status(status)
                     if isinstance(status, int)
-                    else FailureClass.UNCERTAIN_ACCEPTANCE
+                    else _failure_without_status(error)
                 )
                 raise ProviderFailure(failure, retry_after=_retry_after(error)) from None
             finally:
+                _INVOCATION.reset(invocation)
                 _ADMITTED.reset(token)
             message = response.result[-1]
             replies.append(response)
             return ModelOutput(
                 text=str(message.content),
-                complete=message.response_metadata.get("finish_reason") != "length",
+                complete=_finished(message),
                 charged_micro_usd=_charged(message),
             )
 
@@ -344,25 +371,34 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             raise LoopStopped("lease_lost") from None
         return replies[-1], output.complete
 
-    async def awrap_model_call(self, request: Any, handler: Callable[[Any], Awaitable[Any]]) -> Any:
-        await self._guard()
-        request = await self._compacted(request, handler)
-        current = request
+    async def _with_slot(
+        self, request: Any, handler: Any, route: ModelRoute | None = None
+    ) -> tuple[Any, bool]:
+        """One admitted call. A busy slot is waited out, and any other refusal stops the loop."""
         waited = 0.0
         while True:
             remaining = await self._guard()
             try:
-                response, complete = await self._admitted_call(current, handler, remaining)
+                return await self._admitted_call(request, handler, remaining, route)
             except NoInferenceSlot:
                 if waited >= self._slot_wait_seconds:
                     raise LoopStopped(NoInferenceSlot.code) from None
                 waited += 1.0
                 await self._sleep(1.0)
-                continue
             except AdmissionRefused as refused:
                 raise LoopStopped(refused.code) from None
+
+    async def awrap_model_call(self, request: Any, handler: Callable[[Any], Awaitable[Any]]) -> Any:
+        await self._guard()
+        request = await self._compacted(request, handler)
+        current = request
+        while True:
+            response, complete = await self._with_slot(current, handler)
             if complete:
                 return response
+            # Being cut off is worth one shorter try. A provider's own stop wouldn't change.
+            if response.result[-1].response_metadata.get("finish_reason") != "length":
+                raise LoopStopped(FailureClass.INCOMPLETE_OUTPUT.value)
             await self._repair(FailureClass.INCOMPLETE_OUTPUT.value)
             current = request.override(messages=[*request.messages, HumanMessage(REPAIR_NOTE)])
 

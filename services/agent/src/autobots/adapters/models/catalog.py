@@ -3,11 +3,18 @@
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from decimal import ROUND_CEILING, Decimal, InvalidOperation
 from typing import Any
 
+from autobots.application.model_admission import Pricing
 from autobots.domain.models import ModelProfile
 
 MAX_CATALOG_AGE = timedelta(minutes=5)
+# What one call reserves for its prompt, an estimate since no tokenizer is pinned. Compaction keeps
+# messages near 24K characters, and the system prompt and tool schemas add some. Mostly Latin text
+# stays under this, but text with more than a token per character can pass it, and nothing refuses
+# that. The reported cost settles each call either way.
+RESERVED_PROMPT_TOKENS = 32_000
 
 
 class ModelUnavailable(Exception):
@@ -21,6 +28,7 @@ class CatalogEntry:
     wire_id: str
     canonical_slug: str
     supported_parameters: frozenset[str]
+    pricing: Pricing | None = None
 
 
 @dataclass(frozen=True)
@@ -28,6 +36,51 @@ class CatalogSnapshot:
     revision: str
     retrieved_at: datetime
     entries: tuple[CatalogEntry, ...]
+
+
+def _scaled(value: object, factor: int) -> int | None:
+    """Rounded up, so a price never under-counts. Anything unreadable has no price at all."""
+    try:
+        number = Decimal(str(value))
+    except InvalidOperation:
+        return None
+    if not number.is_finite():
+        return None
+    return int((number * factor).to_integral_value(rounding=ROUND_CEILING))
+
+
+def _highest(rates: Sequence[Mapping[str, Any]], names: tuple[str, ...], factor: int) -> int | None:
+    """The most any listed rate could charge. A negative one has no bound, so it stays negative."""
+    found = [_scaled(rate[name], factor) for rate in rates for name in names if name in rate]
+    if not found or any(price is None for price in found):
+        return None
+    prices = [price for price in found if price is not None]
+    return min(prices) if min(prices) < 0 else max(prices)
+
+
+def _reachable(rate: object) -> bool:
+    """A rate that starts above the prompts this app sends can't be charged here."""
+    if not isinstance(rate, Mapping):
+        return False
+    start = rate.get("min_prompt_tokens")
+    return not isinstance(start, int) or start <= RESERVED_PROMPT_TOKENS
+
+
+def parse_pricing(item: Mapping[str, Any]) -> Pricing | None:
+    """USD per token in the catalog. An override, such as a weekend rate, counts if it can apply."""
+    pricing = item.get("pricing")
+    if not isinstance(pricing, Mapping):
+        return None
+    overrides = pricing.get("overrides")
+    rates = [pricing, *filter(_reachable, overrides if isinstance(overrides, list) else ())]
+    per_token = 1_000_000 * 1_000_000
+    prompt = _highest(rates, ("prompt", "input_cache_write"), per_token)
+    completion = _highest(rates, ("completion", "internal_reasoning"), per_token)
+    if prompt is None or completion is None:
+        return None
+    charged_per_request = any("request" in rate for rate in rates)
+    request = _highest(rates, ("request",), 1_000_000) if charged_per_request else 0
+    return None if request is None else Pricing(prompt, completion, request)
 
 
 def parse_catalog(
@@ -39,7 +92,7 @@ def parse_catalog(
         wire_id, slug = item.get("id"), item.get("canonical_slug")
         if isinstance(wire_id, str) and isinstance(slug, str):
             supported = frozenset(str(name) for name in item.get("supported_parameters") or ())
-            entries.append(CatalogEntry(wire_id, slug, supported))
+            entries.append(CatalogEntry(wire_id, slug, supported, parse_pricing(item)))
     return CatalogSnapshot(revision, retrieved_at, tuple(entries))
 
 

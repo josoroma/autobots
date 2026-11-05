@@ -71,6 +71,10 @@ PAUSE_FOR = frozenset(
         "budget_exceeded",
         "no_inference_slot",
         "cost_unavailable",
+        "credentials_required",
+        "credential_unavailable",
+        "model_unavailable",
+        "network_before_acceptance",
         "invalid_credential",
         "insufficient_credits",
         "partial_stream",
@@ -105,6 +109,14 @@ class LoopConfig:
     heartbeat_seconds: float = 20.0
     model_call_seconds: float = 120.0
     lease_seconds: float = DEFAULT_LEASE_SECONDS
+    # Why this job can't dispatch, known before it reserves anything. A cancel or a verification
+    # that needs no model still goes first, so it's checked with the route, not at claim.
+    refusal: str | None = None
+
+
+# Bound to no profile, so `run_goal` leaves the run for a person instead of guessing a model.
+UNBOUND = ModelRoute("executor", "", "", 0)
+JobBinder = Callable[[Any, Lease, LoopConfig], Awaitable[tuple[Callable[[], Any], LoopConfig]]]
 
 
 @dataclass(frozen=True)
@@ -238,6 +250,8 @@ async def run_goal(
         return await _finish(connection, lease, goal, "uncertain_model_call")
     if not await _route_is_bound(connection, lease, config):
         return await _finish(connection, lease, goal, "route_not_bound")
+    if config.refusal is not None:
+        return await _finish(connection, lease, goal, config.refusal)
     await begin_segment(connection, lease.run_id)
     code: str | None = None
     beating = asyncio.create_task(_keep_lease(database_url, lease, config))
@@ -282,14 +296,22 @@ async def process_next(
     worker_id: str,
     model_factory: Callable[[], Any],
     config: LoopConfig,
+    *,
+    bind: JobBinder | None = None,
 ) -> LoopResult | None:
-    """Claims one eligible job and takes it as far as it can go in one pass."""
+    """Claims one eligible job and takes it as far as it can go in one pass.
+
+    A worker that serves whatever comes passes `bind`, which replaces the model and route for the
+    job it just claimed. Without it, `run_goal` refuses any run that isn't bound to `config.route`.
+    """
     if await is_held(connection) or not await adapter_qualified(connection):
         return None
     await expire_due(connection)
     lease = await claim_next(connection, worker_id=worker_id, lease_seconds=config.lease_seconds)
     if lease is None:
         return None
+    if bind is not None:
+        model_factory, config = await bind(connection, lease, config)
     return await _drive(connection, database_url, lease, model_factory, config)
 
 

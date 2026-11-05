@@ -1,0 +1,259 @@
+"""What a worker needs to serve any admitted run: its frozen route, and a client per attempt.
+
+Nothing here outlives an attempt except references. The key is read inside each attempt, so a
+rotation reaches the next call without a restart, and no key or client can reach graph state.
+"""
+
+import logging
+from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime, timedelta
+from typing import Any
+from uuid import UUID
+
+import psycopg
+
+from autobots.adapters.loop_middleware import ModelRoute, current_invocation
+from autobots.adapters.models.catalog import (
+    RESERVED_PROMPT_TOKENS,
+    CatalogSnapshot,
+    ModelUnavailable,
+    parse_catalog,
+    validated_entry,
+)
+from autobots.adapters.models.factory import (
+    PreparedAttempt,
+    UnsupportedRequestOption,
+    chat_model,
+    prepare_attempt,
+)
+from autobots.application.credentials.crypto import CredentialDecryptionError
+from autobots.application.credentials.store import (
+    CredentialBlocked,
+    CredentialMissing,
+    CredentialReference,
+    CredentialStorageUnavailable,
+)
+from autobots.application.goal_loop import UNBOUND, LoopConfig
+from autobots.application.model_admission import (
+    CostUnavailable,
+    ModelAdmission,
+    worst_case_cost,
+)
+from autobots.application.model_attempts import FailureClass, ProviderFailure
+from autobots.application.provider_settings import (
+    CredentialRefused,
+    ProviderContext,
+    ProviderSettings,
+)
+from autobots.application.worker_leases import Lease
+from autobots.domain.models import (
+    ModelRole,
+    RolePolicy,
+    UnknownModelProfile,
+    approved_profile,
+    approved_role,
+)
+from autobots.operations.logs import log_event
+
+logger = logging.getLogger("autobots.worker")
+ROLE = ModelRole.EXECUTOR
+# MP-07's initial output limit, sent on every call so the reservation below stays an upper bound.
+MAX_OUTPUT_TOKENS = 512
+OPTIONS: Mapping[str, Any] = {"max_tokens": MAX_OUTPUT_TOKENS}
+# Sooner than MP-02's five minutes, so a slow call doesn't turn into an expired catalog.
+CATALOG_REFRESH = timedelta(minutes=4)
+INTENT_FAILURES = {
+    "credentials_required": FailureClass.CREDENTIALS_REQUIRED,
+    "credential_invalid": FailureClass.INVALID_CREDENTIAL,
+    "credential_unavailable": FailureClass.CREDENTIAL_UNAVAILABLE,
+}
+
+
+def _log_refusal(what: str, error: Exception) -> None:
+    """These all fail closed, and the type is what's safe to say about why."""
+    log_event(logger, "inference.refused", logging.WARNING, what=what, error=type(error).__name__)
+
+
+class CatalogCache:
+    """The last good catalog. A failed refresh keeps it until MP-02's own age check refuses it."""
+
+    def __init__(
+        self,
+        fetch: Callable[[], Awaitable[dict[str, Any] | None]],
+        now: Callable[[], datetime] = lambda: datetime.now(UTC),
+    ) -> None:
+        self._fetch = fetch
+        self._now = now
+        self._snapshot: CatalogSnapshot | None = None
+
+    async def current(self) -> CatalogSnapshot:
+        now = self._now()
+        if self._snapshot is None or now - self._snapshot.retrieved_at >= CATALOG_REFRESH:
+            try:
+                payload = await self._fetch()
+                if payload is not None:
+                    self._snapshot = parse_catalog(payload, retrieved_at=now, revision="live")
+            except (OSError, ValueError, TypeError, AttributeError) as error:
+                # Unreachable or malformed, which leaves whatever was last good to age out.
+                _log_refusal("catalog", error)
+        if self._snapshot is None:
+            raise ModelUnavailable("the model catalog could not be read")
+        return self._snapshot
+
+
+def frozen_policy(snapshot: Mapping[str, Any] | None) -> RolePolicy:
+    """Exactly what admission froze. Without an approved binding for this role, there's no route."""
+    bindings = (snapshot or {}).get("bindings") or {}
+    policy = {approved_role(role): approved_profile(bound) for role, bound in bindings.items()}
+    if ROLE not in policy:
+        raise UnknownModelProfile("this run has no binding for the role")
+    return RolePolicy(int((snapshot or {}).get("version", 0)), policy)
+
+
+def prepared(policy: RolePolicy, catalog: CatalogSnapshot) -> tuple[PreparedAttempt, int]:
+    """Fresh exact mapping, options and tools, and the most one call is reserved for."""
+    attempt = prepare_attempt(policy, ROLE, catalog, options=OPTIONS)
+    entry = validated_entry(attempt.profile, catalog, datetime.now(UTC))
+    if "tools" not in entry.supported_parameters:
+        raise UnsupportedRequestOption("this model's catalog entry does not support tools")
+    return attempt, worst_case_cost(entry.pricing, RESERVED_PROMPT_TOKENS, MAX_OUTPUT_TOKENS)
+
+
+class AttemptModel:
+    """What `AdmittedModel` delegates to. Each call opens its own client, used once."""
+
+    def __init__(
+        self,
+        source: "InferenceSource",
+        workspace_id: UUID,
+        policy: RolePolicy,
+        tools: Any = None,
+        tool_options: Mapping[str, Any] | None = None,
+    ) -> None:
+        self._source = source
+        self._workspace_id = workspace_id
+        self._policy = policy
+        self._tools = tools
+        self._tool_options = tool_options or {}
+
+    def bind_tools(self, tools: Any, **options: Any) -> "AttemptModel":
+        return AttemptModel(self._source, self._workspace_id, self._policy, tools, options)
+
+    async def ainvoke(self, messages: Any, stop: Any = None, **kwargs: Any) -> Any:
+        client, used = await self._source.open_attempt(self._workspace_id, self._policy)
+        target = client
+        if self._tools is not None:
+            target = client.bind_tools(self._tools, **self._tool_options)
+        try:
+            return await target.ainvoke(messages, stop=stop, **kwargs)
+        except Exception as error:
+            if getattr(error, "status_code", None) == 401:
+                await self._source.reject_key(self._workspace_id, used)
+            raise
+
+
+@dataclass(frozen=True)
+class InferenceSource:
+    """One per worker. `client_factory` is None in production, which means the real SDK client."""
+
+    database_url: str
+    context: ProviderContext
+    catalog: CatalogCache
+    client_factory: Callable[[str], Any] | None = None
+
+    async def open_attempt(
+        self, workspace_id: UUID, policy: RolePolicy
+    ) -> tuple[Any, CredentialReference]:
+        """Inside the attempt. Every refusal here is before sending, and classed as such."""
+        try:
+            attempt, _ = prepared(policy, await self.catalog.current())
+        except ModelUnavailable:
+            raise ProviderFailure(FailureClass.MODEL_UNAVAILABLE) from None
+        except CostUnavailable:
+            raise ProviderFailure(FailureClass.COST_UNAVAILABLE) from None
+        try:
+            async with await psycopg.AsyncConnection.connect(
+                self.database_url, autocommit=True
+            ) as connection:
+                settings = ProviderSettings(connection, self.context)
+                credential = await settings.credential_for_attempt(workspace_id)
+                invocation = current_invocation()
+                version = credential.reference.version
+                if invocation is not None and version is not None:
+                    await ModelAdmission(connection).record_credential(invocation, version)
+            client = chat_model(
+                attempt, credential.client_secret(), client_factory=self.client_factory
+            )
+        except CredentialRefused as refused:
+            raise ProviderFailure(INTENT_FAILURES[refused.code]) from None
+        except CredentialMissing:
+            raise ProviderFailure(FailureClass.CREDENTIALS_REQUIRED) from None
+        except CredentialBlocked:
+            raise ProviderFailure(FailureClass.INVALID_CREDENTIAL) from None
+        except (
+            CredentialStorageUnavailable,
+            CredentialDecryptionError,
+            psycopg.Error,
+            # An unreadable or malformed configuration file, or a client that wouldn't build.
+            OSError,
+            ValueError,
+        ) as error:
+            _log_refusal("credential", error)
+            raise ProviderFailure(FailureClass.CREDENTIAL_UNAVAILABLE) from None
+        return client, credential.reference
+
+    async def reject_key(self, workspace_id: UUID, used: CredentialReference) -> None:
+        """Best effort, so losing the database here can't hide the 401 it's reporting."""
+        try:
+            async with await psycopg.AsyncConnection.connect(
+                self.database_url, autocommit=True
+            ) as connection:
+                await ProviderSettings(connection, self.context).mark_invalid(workspace_id, used)
+        except (psycopg.Error, OSError, ValueError) as error:
+            _log_refusal("reject_key", error)
+
+    async def _refusal(
+        self, connection: Any, workspace_id: UUID, policy: RolePolicy
+    ) -> tuple[str | None, int]:
+        """Why this job shouldn't start, and otherwise the most one call could cost.
+
+        Everything a job's configuration can raise ends here. `bind` runs before the loop's own
+        gates, so an escape would keep a cancel or a finished candidate from ever settling.
+        """
+        try:
+            code = await ProviderSettings(connection, self.context).run_intent(workspace_id)
+        except (OSError, ValueError) as error:
+            _log_refusal("credential", error)
+            return FailureClass.CREDENTIAL_UNAVAILABLE.value, 0
+        if code != "ready":
+            return INTENT_FAILURES[code].value, 0
+        try:
+            return None, prepared(policy, await self.catalog.current())[1]
+        except ModelUnavailable:
+            return FailureClass.MODEL_UNAVAILABLE.value, 0
+        except CostUnavailable as refused:
+            return refused.code, 0
+
+    async def bind(
+        self, connection: Any, lease: Lease, config: LoopConfig
+    ) -> tuple[Callable[[], Any], LoopConfig]:
+        """The route comes from this run's frozen policy, never from the worker or the workspace."""
+        cursor = await connection.execute(
+            "select policy_snapshot from public.runs where id = %s", (lease.run_id,)
+        )
+        snapshot = (await cursor.fetchone())[0]
+        try:
+            policy = frozen_policy(snapshot)
+        except UnknownModelProfile:
+            return _no_model, replace(config, route=UNBOUND)
+        refusal, worst_case = await self._refusal(connection, lease.workspace_id, policy)
+        profile = policy.profile_for(ROLE)
+        route = ModelRoute(ROLE.value, profile.id.value, profile.wire_id, worst_case)
+        model = AttemptModel(self, lease.workspace_id, policy)
+        return lambda: model, replace(config, route=route, refusal=refusal)
+
+
+def _no_model() -> Any:
+    """Handed over with an unbound route, which `run_goal` stops before any model is called."""
+    return None

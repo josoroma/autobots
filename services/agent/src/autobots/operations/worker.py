@@ -1,9 +1,13 @@
 """The worker process: `python -m autobots.operations.worker`.
 
-`serve` owns liveness, drain and reconnection for whatever step it's given. The entry point here
-gives it maintenance only: no model client exists in this process until inference is qualified
-(US-3.4), so it never claims a job, and says so in its heartbeat. Local Operations reports queued
-work as waiting for an inference worker instead of showing it as moving.
+`serve` owns liveness, drain and reconnection for whatever step it's given. By default the entry
+point gives it maintenance only, so it never claims a job and says so in its heartbeat. Local
+Operations reports queued work as waiting for an inference worker instead of showing it as moving.
+
+`AUTOBOTS_WORKER_INFERENCE=enabled` adds the inference step, which sends real, billed OpenRouter
+requests for any queued run once a key exists. Nothing turns it on by default, because no live
+route is qualified yet (US-3.4). No environment value selects another endpoint, model or fake. The
+HTTP client does honor the usual proxy variables, as any client on this Mac would.
 """
 
 import asyncio
@@ -12,7 +16,8 @@ import os
 import secrets
 import signal
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -22,14 +27,17 @@ from pydantic import SecretStr
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.api.main import provider_context_from_environment
 from autobots.application.approvals import expire_due
-from autobots.application.provider_settings import ProviderSettings
+from autobots.application.goal_loop import UNBOUND, LoopConfig, process_next
+from autobots.application.provider_settings import CatalogFetcher, ProviderSettings
 from autobots.application.retention import apply_all
 from autobots.application.routines import evaluate_routines
+from autobots.application.worker_inference import CatalogCache, InferenceSource
 from autobots.application.worker_leases import is_held
 from autobots.operations.logs import configure_logging, forbid_remote_tracing, log_event
 
 logger = logging.getLogger("autobots.worker")
 Step = Callable[[Any], Awaitable[bool]]
+INFERENCE_SWITCH = "AUTOBOTS_WORKER_INFERENCE"
 
 
 @dataclass
@@ -204,7 +212,68 @@ def credential_check_from_environment() -> Callable[[Any, UUID], Awaitable[str]]
     return check
 
 
-async def main() -> None:
+def inference_step(config: WorkerConfig, source: InferenceSource, store: Any) -> Step:
+    """Claims through `process_next`, and each job's own policy picks its route."""
+    base = LoopConfig(route=UNBOUND, object_store=store)
+
+    async def step(connection: Any) -> bool:
+        result = await process_next(
+            connection, config.database_url, config.worker_id, _unbound, base, bind=source.bind
+        )
+        return result is not None
+
+    return step
+
+
+def _unbound() -> Any:
+    raise RuntimeError("the job's binder chooses its model")
+
+
+def both(first: Step, second: Step) -> Step:
+    """Each runs on every pass, so a long job only delays maintenance, up to the job's own limit.
+
+    A failing first step can't starve the second, since it may be stuck on one bad row forever.
+    Losing the database still reaches `serve`, which reconnects.
+    """
+
+    async def step(connection: Any) -> bool:
+        try:
+            worked = await first(connection)
+        except psycopg.OperationalError:
+            raise
+        except Exception as error:
+            log_event(logger, "worker.step_failed", logging.ERROR, error=type(error).__name__)
+            worked = False
+        return await second(connection) or worked
+
+    return step
+
+
+def inference_from_environment(
+    database_url: str,
+    store: Any,
+    client_factory: Callable[[str], Any] | None,
+    fetch_catalog: CatalogFetcher | None,
+) -> InferenceSource:
+    """Refuses to start half-configured, since a worker with no store can't verify any run."""
+    context = provider_context_from_environment()
+    if context is None or not Path(context.config_root).is_absolute():
+        raise SystemExit(f"{INFERENCE_SWITCH} needs an absolute AUTOBOTS_CONFIG_ROOT")
+    if store is None:
+        raise SystemExit(f"{INFERENCE_SWITCH} needs AUTOBOTS_SUPABASE_URL and the service key")
+    if fetch_catalog is not None:
+        context = replace(context, fetch_catalog=fetch_catalog)
+    return InferenceSource(
+        database_url, context, CatalogCache(context.fetch_catalog), client_factory
+    )
+
+
+async def main(
+    *,
+    client_factory: Callable[[str], Any] | None = None,
+    fetch_catalog: CatalogFetcher | None = None,
+) -> None:
+    """The arguments are for a check's fake transport. Only Python can pass them, not a setting."""
     forbid_remote_tracing(os.environ)
     configure_logging()
     url = os.environ.get("AUTOBOTS_DATABASE_URL", "")
@@ -220,9 +289,14 @@ async def main() -> None:
         database_url=url,
         drain_seconds=float(os.environ.get("AUTOBOTS_WORKER_DRAIN_SECONDS", "30")),
     )
+    step = maintenance_step(credential_check_from_environment(), store)
+    if os.environ.get(INFERENCE_SWITCH) == "enabled":
+        source = inference_from_environment(url, store, client_factory, fetch_catalog)
+        config = replace(config, claims_inference=True)
+        step = both(step, inference_step(config, source, store))
     stop = asyncio.Event()
     install_signal_handlers(stop)
-    await serve(config, maintenance_step(credential_check_from_environment(), store), stop)
+    await serve(config, step, stop)
 
 
 if __name__ == "__main__":

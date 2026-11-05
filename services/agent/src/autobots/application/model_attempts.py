@@ -10,9 +10,15 @@ from autobots.application.model_admission import AdmissionRequest, ModelAdmissio
 
 MAX_RETRIES = 2
 BACKOFF_SECONDS = (1.0, 2.0)
+# Longer isn't waited out. A worker runs one job at a time, and a cancel isn't seen while asleep.
+MAX_RETRY_WAIT_SECONDS = 60.0
 
 
 class FailureClass(StrEnum):
+    CREDENTIALS_REQUIRED = "credentials_required"
+    CREDENTIAL_UNAVAILABLE = "credential_unavailable"
+    MODEL_UNAVAILABLE = "model_unavailable"
+    COST_UNAVAILABLE = "cost_unavailable"
     INVALID_CREDENTIAL = "invalid_credential"
     INSUFFICIENT_CREDITS = "insufficient_credits"
     RATE_LIMITED = "rate_limited"
@@ -46,11 +52,18 @@ class ProviderFailure(Exception):
 
 
 def classify_status(status: int) -> FailureClass:
-    """MP-08's table. Anything unexplained is not retried."""
+    """MP-08's table. Anything unexplained is not retried, and only a refusal frees a reservation.
+
+    A success the SDK couldn't parse, or a timeout at the edge, may still have been charged.
+    """
+    if status < 400 or status in {408, 504, 524}:
+        return FailureClass.UNCERTAIN_ACCEPTANCE
     if status == 401:
         return FailureClass.INVALID_CREDENTIAL
     if status == 402:
         return FailureClass.INSUFFICIENT_CREDITS
+    if status == 404:
+        return FailureClass.MODEL_UNAVAILABLE
     if status == 429:
         return FailureClass.RATE_LIMITED
     return FailureClass.PROVIDER_ERROR if 500 <= status < 600 else FailureClass.OTHER
@@ -118,6 +131,7 @@ async def call_with_policy(
             allowed = failure.failure in RETRYABLE and retries < MAX_RETRIES
             if (
                 not allowed
+                or delay > MAX_RETRY_WAIT_SECONDS
                 or policy.now() + timedelta(seconds=delay) > policy.deadline
                 or is_cancelled()
             ):

@@ -43,7 +43,10 @@ class Pricing:
 
 def worst_case_cost(pricing: Pricing | None, input_tokens: int, max_output_tokens: int) -> int:
     """Rounded up, so a reservation never under-counts."""
-    if pricing is None or min(pricing.input_per_million, pricing.output_per_million) < 0:
+    if (
+        pricing is None
+        or min(pricing.input_per_million, pricing.output_per_million, pricing.per_request) < 0
+    ):
         raise CostUnavailable("this model's price is not known")
     usage = (
         input_tokens * pricing.input_per_million + max_output_tokens * pricing.output_per_million
@@ -184,6 +187,13 @@ class ModelAdmission:
         )
         if await cursor.fetchone() is None:
             raise ValueError("this attempt was closed before it was sent")
+
+    async def record_credential(self, invocation_id: UUID, version: int) -> None:
+        """MP-06's audit. The reference is known only once the attempt has resolved its key."""
+        await self._connection.execute(
+            "update app_private.model_invocations set credential_version = %s where id = %s",
+            (version, invocation_id),
+        )
 
     async def settle(
         self, invocation_id: UUID, charged_micro_usd: int, *, upstream_provider: str | None = None

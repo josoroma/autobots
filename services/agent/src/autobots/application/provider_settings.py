@@ -12,6 +12,7 @@ from uuid import UUID
 from pydantic import SecretStr
 
 from autobots.adapters.models.catalog import ModelUnavailable, parse_catalog, validated_entry
+from autobots.application.credentials.crypto import CredentialDecryptionError
 from autobots.application.credentials.precedence import (
     EnvironmentCandidate,
     looks_usable,
@@ -19,8 +20,11 @@ from autobots.application.credentials.precedence import (
 )
 from autobots.application.credentials.store import (
     CredentialMissing,
+    CredentialReference,
     CredentialStorageUnavailable,
     ProviderCredentialStore,
+    ResolvedCredential,
+    resolve_for_attempt,
 )
 from autobots.contracts.settings import ModelAvailability, ModelList, ProviderStatus
 from autobots.domain.models import PROFILES
@@ -46,6 +50,14 @@ class InvalidKey(Exception):
 
 class ValidationUnavailable(Exception):
     code = "validation_unavailable"
+
+
+class CredentialRefused(Exception):
+    """`run_intent` said no. `code` is its answer, and no key was read."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
 
 
 KeyValidator = Callable[[SecretStr], Awaitable[KeyCheck]]
@@ -125,7 +137,8 @@ class ProviderSettings:
                 credential_id, credential_version = reference.credential_id, reference.version
             except CredentialMissing:
                 auth_status = "missing"
-            except CredentialStorageUnavailable:
+            except (CredentialStorageUnavailable, CredentialDecryptionError):
+                # Still answers for a damaged row, since replacing it needs this version.
                 auth_status = "unavailable"
         return ProviderStatus(
             schema_version=1,
@@ -181,7 +194,10 @@ class ProviderSettings:
         if environment is not None:
             secret = SecretStr(environment.value)
         else:
-            secret = (await self._store.load_active(workspace_id)).client_secret()
+            try:
+                secret = (await self._store.load_active(workspace_id)).client_secret()
+            except CredentialDecryptionError:
+                raise CredentialStorageUnavailable("the stored key cannot be read") from None
         result = await self._context.validate_key(secret)
         status = {
             KeyCheck.VALID: "configured",
@@ -198,16 +214,41 @@ class ProviderSettings:
         if environment is not None:
             if not looks_usable(environment.value) or stored_status == "invalid":
                 return "credential_invalid"
-            return "ready"
+            return "credential_unavailable" if stored_status == "unavailable" else "ready"
         try:
             await self._store.load_active(workspace_id)
         except CredentialMissing:
             return "credentials_required"
-        except CredentialStorageUnavailable:
+        except (CredentialStorageUnavailable, CredentialDecryptionError):
             return "credential_unavailable"
         if stored_status == "invalid":
             return "credential_invalid"
         return "credential_unavailable" if stored_status == "unavailable" else "ready"
+
+    async def credential_for_attempt(self, workspace_id: UUID) -> ResolvedCredential:
+        """The same gate as `run_intent`, then the current key. Hold it only to build a client."""
+        code = await self.run_intent(workspace_id)
+        if code != "ready":
+            raise CredentialRefused(code)
+        return await resolve_for_attempt(self._store, workspace_id, self._environment_candidate())
+
+    async def mark_invalid(self, workspace_id: UUID, used: CredentialReference) -> None:
+        """MP-08, after a 401: no attempt or resume until the key is replaced or rechecked.
+
+        Only if that key is still the current one. A key replaced mid-call says nothing about its
+        successor.
+        """
+        environment = await self._effective_environment(workspace_id)
+        if environment is not None:
+            current = CredentialReference(environment.source, None, None)
+        else:
+            try:
+                current = (await self._store.load_active(workspace_id)).reference
+            except (CredentialMissing, CredentialStorageUnavailable, CredentialDecryptionError):
+                return
+        if current == used:
+            await self._settings_row(workspace_id)
+            await self._record(workspace_id, "invalid")
 
     async def models(self) -> ModelList:
         payload = await self._context.fetch_catalog()
