@@ -114,6 +114,7 @@ def _iteration_errors(
     errors: list[GraphError] = []
     in_region: set[str] = set()
     joins_seen: dict[str, set[str]] = {}
+    regions: dict[str, set[str]] = {}
     for name, node in nodes.items():
         if node["block"] != "foreach":
             continue
@@ -140,12 +141,18 @@ def _iteration_errors(
         if not found_join:
             errors.append(GraphError("foreach_without_join", name))
         in_region |= region
+        regions[name] = region
     # Iterations are collected by position, so two lists can't feed one join without losing items.
     errors.extend(
         GraphError("join_multiple_foreach", name)
         for name, sources in joins_seen.items()
         if len(sources) > 1
     )
+    # Iteration is counted from a join's first link, so an outside link could empty the result.
+    for join, sources in joins_seen.items():
+        allowed = {node for source in sources for node in (source, *regions.get(source, ()))}
+        if any(join in following and name not in allowed for name, following in successors.items()):
+            errors.append(GraphError("join_mixed_sources", join))
     errors.extend(
         GraphError("join_outside_foreach", name)
         for name, node in nodes.items()

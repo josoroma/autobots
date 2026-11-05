@@ -370,12 +370,13 @@ async def _record(
     context: ToolContext, operation_id: str, status: str, result: dict[str, Any] | None
 ) -> None:
     """Only moves a receipt forward. A success is recorded whoever owns the run now, as the effect
-    happened, unless a person already ruled. Anything else speaks only for the attempt on record."""
+    happened, even over a ruling that it hadn't: repeating it would be the worse mistake, and the
+    ruling's evidence stays. Anything else speaks only for the attempt on record."""
     values = (status, json.dumps(result) if result is not None else None, operation_id)
     if status == "succeeded":
         await context.connection.execute(
             "update app_private.tool_receipts set status = %s, result = %s, updated_at = now() "
-            "where operation_id = %s and status <> 'succeeded' and reconciled_at is null",
+            "where operation_id = %s and status <> 'succeeded'",
             values,
         )
         return

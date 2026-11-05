@@ -462,6 +462,26 @@ async def _result(
     )
 
 
+async def _cancel_stray_child(connection: Any, lease: Lease, child: UUID) -> str:
+    cursor = await connection.execute(
+        "select status, version from public.runs where id = %s", (child,)
+    )
+    status, version = await cursor.fetchone()
+    try:
+        result = await apply_command(
+            connection,
+            workspace_id=lease.workspace_id,
+            run_id=child,
+            command=RunCommand.CANCEL,
+            actor=Actor.USER,
+            expected_version=version,
+        )
+    except (CommandRefused, VersionConflict):
+        # It moved under us. The parent stays queued and looks again.
+        return str(status)
+    return str(result.status)
+
+
 async def _settle_children(connection: Any, lease: Lease) -> datetime | None:
     """A cancelled parent's children finish too, and their open assignments close.
 
@@ -477,6 +497,9 @@ async def _settle_children(connection: Any, lease: Lease) -> datetime | None:
     terminal = {RunStatus.CANCELLED.value, RunStatus.FAILED.value, RunStatus.SUCCEEDED.value}
     retry_at: datetime | None = None
     for assignment_id, child, status in await cursor.fetchall():
+        if status != RunStatus.CANCELLING.value and status not in terminal:
+            # Admitted as the cancel landed, so the cascade missed it. Nothing else would reach it.
+            status = await _cancel_stray_child(connection, lease, child)
         if status not in terminal:
             child_lease = await claim_run(connection, child, worker_id=lease.worker_id)
             settled = None
@@ -488,7 +511,8 @@ async def _settle_children(connection: Any, lease: Lease) -> datetime | None:
                 # Still owned, or it has children of its own to wait for.
                 expiry = await connection.execute(
                     "select greatest(available_at, coalesce(lease_expires_at, available_at), "
-                    "clock_timestamp()) from app_private.run_jobs where run_id = %s",
+                    "clock_timestamp() + interval '5 seconds') "
+                    "from app_private.run_jobs where run_id = %s",
                     (child,),
                 )
                 moment = (await expiry.fetchone())[0]

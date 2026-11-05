@@ -55,6 +55,7 @@ STOPPING = frozenset(
         "plan_revisions_limit",
         "assignment_paused",
         "assignment_lost",
+        "assignment_busy",
         "approval_pending",
         "outcome_unknown",
     }

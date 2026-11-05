@@ -226,6 +226,28 @@ async def main() -> None:
         invocation = await value("select id from app_private.model_invocations where run_id = %s and status = 'uncertain'", child)
         await ModelAdmission(db).reconcile(invocation, 80)
 
+        # A child admitted as the cancel landed, so the cascade missed it. Queued, and paused.
+        run = await admit()
+        await claim_run(db, run, worker_id='live-owner', lease_seconds=30)
+        snapshot = await value('select policy_snapshot from public.runs where id = %s', run)
+        binding = await resolve_binding(db, WORKSPACE, session.id, expert_id=helper.id)
+        version = await value('select version from public.runs where id = %s', run)
+        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
+        strays = []
+        for name in ('queued stray', 'paused stray'):
+            stray = (await admit_run(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), goal_text=name, limit_micro_usd=1_000_000, inherit=Inheritance(parent_run_id=run, root_run_id=run, snapshot=snapshot, tools={'calculate': 1}, paths=('outputs/stray',), instructions='', session_id=session.id, expert_id=binding.expert_id, version=binding.version))).run_id
+            await db.execute('insert into app_private.assignments (id, workspace_id, parent_run_id, child_run_id, root_run_id, operation_id, depth, expert_id, expert_version) values (%s, %s, %s, %s, %s, %s, 1, %s, %s)', (uuid4(), WORKSPACE, run, stray, run, str(uuid4()), binding.expert_id, binding.version))
+            strays.append(stray)
+        stray_version = await value('select version from public.runs where id = %s', strays[1])
+        await apply_command(db, workspace_id=WORKSPACE, run_id=strays[1], command=RunCommand.PAUSE, actor=Actor.USER, expected_version=stray_version)
+        before = await value('select status from public.runs where id = %s', run)
+        check('with a live owner the parent is cancelling', 'cancelling', before, before == 'cancelling')
+        await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where run_id = %s", (run,))
+        result = await process_next(db, URL, 'stray-settler', lambda: Script(items=[], seen=[], bound=[]), config)
+        states = [await value('select status from public.runs where id = %s', item) for item in (run, *strays)]
+        opened = await value("select count(*) from app_private.assignments where root_run_id = %s and status = 'open'", run)
+        check('children the cascade missed are still cancelled', 'all cancelled, none open', (states, opened, result.code if result else None), states == ['cancelled'] * 3 and opened == 0)
+
         # B4: the child reached a terminal state, and the parent died before writing that down.
         run = await admit()
         process = await asyncio.create_subprocess_exec(PYTHON, str(HERE / 'assignment_worker.py'), URL, str(helper.id), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)

@@ -56,7 +56,7 @@ class ReadOffload(BaseModel):
 
     offload_id: str = Field(min_length=36, max_length=36)
     offset: int = Field(default=0, ge=0)
-    limit: int = Field(default=3000, ge=1, le=4000)
+    limit: int = Field(default=4000, ge=1, le=4000)
 
 
 class OffloadContent(BaseModel):

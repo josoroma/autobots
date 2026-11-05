@@ -18,8 +18,9 @@ from goal_loop_script import ROUTE  # noqa: E402
 
 from autobots.application.approvals import ApprovalRefused, ARGUMENT_LIMIT, decide, exceeds_review_limit, list_approvals  # noqa: E402
 from autobots.application.compaction import CompactionPolicy, offload_large  # noqa: E402
-from autobots.application.goal_loop import LoopConfig, process_next  # noqa: E402
+from autobots.application.goal_loop import LoopConfig, _finish, process_next  # noqa: E402
 from autobots.application.memory import READ_OFFLOAD  # noqa: E402
+from autobots.application.plans import load_goal  # noqa: E402
 from autobots.application.reconciliation import record_evidence  # noqa: E402
 from autobots.application.runs import admit_run, apply_command  # noqa: E402
 from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolGateway, ToolRegistry, ToolScope, _record  # noqa: E402
@@ -138,7 +139,9 @@ async def main() -> None:
         await _record(ToolContext(db, scope_of(second, {}), operation_two), operation_two, 'unknown', None)
         await record_evidence(db, workspace_id=WORKSPACE, run_id=run, operation_id=operation_two, actor_id=ACTOR, idempotency_key=str(uuid4()), outcome='not_delivered', evidence='Checked the destination.')
         await _record(stale_context, operation_two, 'succeeded', {'late': True})
-        check("a late result can't overwrite a person's ruling", 'failed', (await receipt(operation_two))[0], (await receipt(operation_two))[0] == 'failed')
+        check("a real late success outranks a ruling that it didn't happen", 'succeeded, evidence kept', (await receipt(operation_two))[0], (await receipt(operation_two))[0] == 'succeeded' and await value('select evidence from app_private.tool_receipts where operation_id = %s', operation_two) is not None)
+        await _record(stale_context, operation_two, 'failed', None)
+        check("and a late failure can't undo it", 'succeeded', (await receipt(operation_two))[0], (await receipt(operation_two))[0] == 'succeeded')
         # The review's case: a person rules it wasn't delivered, and the fresh attempt delivers.
         ruled = await gateway.execute(db, scope_of(second, {'send_once': 1}), 'send_once', {'text': 'ruled'})
         await db.execute("update app_private.tool_receipts set status = 'unknown' where operation_id = %s", (ruled.operation_id,))
@@ -221,6 +224,20 @@ async def main() -> None:
         result = await process_next(db, URL, 'new-release', _no_model, LoopConfig(route=ROUTE))
         check('a paused incompatible run has what it left classified', 'paused, unknown', (await value('select status from public.runs where id = %s', run), (await receipt('b8-paused'))[0]), await value('select status from public.runs where id = %s', run) == 'paused' and (await receipt('b8-paused'))[0] == 'unknown')
 
+        # A worker that lost the run settles nothing, whatever stopped it.
+        run = await admit()
+        stale = await claim_next(db, worker_id='stale-finish')
+        await db.execute("insert into app_private.tool_receipts (operation_id, run_id, workspace_id, tool_id, tool_version, argument_hash, status, generation) values ('stale-open', %s, %s, 'send_once', 1, 'x', 'started', %s)", (run, WORKSPACE, stale.generation))
+        await expire(run)
+        owner = await claim_next(db, worker_id='current-owner')
+        version = await value('select version from public.runs where id = %s', run)
+        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
+        lost = await _finish(db, stale, await load_goal(db, run), 'budget_exceeded')
+        untouched = (await value('select status from public.runs where id = %s', run), (await receipt('stale-open'))[0])
+        check('a stale worker can not settle a cancelling run', 'lease_lost, cancelling, effect still started', (lost.code, untouched), lost.code == 'lease_lost' and untouched == ('cancelling', 'started'))
+        await _finish(db, owner, await load_goal(db, run), 'budget_exceeded')
+        check('the current owner can', 'cancelled, effect unknown', (await value('select status from public.runs where id = %s', run), (await receipt('stale-open'))[0]), await value('select status from public.runs where id = %s', run) == 'cancelled' and (await receipt('stale-open'))[0] == 'unknown')
+
         # B9: stored evidence reads back whole, in pages, through the tool a model calls.
         run = await admit()
         lease = await claim_next(db, worker_id='b9')
@@ -249,9 +266,9 @@ async def main() -> None:
         check('its hash matches what was stored', 'equal', hashlib.sha256(collected.encode()).hexdigest() == page.output['sha256'], hashlib.sha256(collected.encode()).hexdigest() == page.output['sha256'])
 
         # Finding 5: a long read can't resend every page.
-        replies = [ToolMessage(content='p' * 3_000, tool_call_id=f'many-{index}', name='read_offload') for index in range(5)]
+        replies = [ToolMessage(content='p' * 5_000, tool_call_id=f'many-{index}', name='read_offload') for index in range(5)]
         seen = await offload_large(db, run, replies, policy)
-        whole = [item.content == 'p' * 3_000 for item in seen]
+        whole = [item.content == 'p' * 5_000 for item in seen]
         check('only the latest pages stay in view', 'the last two', whole, whole == [False, False, False, True, True])
 
         # B10: the grant is deliberate.

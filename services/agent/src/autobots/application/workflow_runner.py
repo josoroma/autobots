@@ -22,6 +22,7 @@ from autobots.application.goal_loop import (
     loop_registry,
 )
 from autobots.application.plans import load_goal
+from autobots.application.recovery import classify_interrupted
 from autobots.application.run_usage import ensure_usage
 from autobots.application.runs import LeaseLost, VersionConflict, apply_command
 from autobots.application.tool_gateway import (
@@ -271,6 +272,7 @@ async def run_workflow(
     await ensure_usage(connection, lease.run_id)
     if validate_graph(graph):
         # Published under older rules. Some shapes lose data, so it fails rather than running.
+        await classify_interrupted(connection, lease.run_id, lease.generation)
         return await _finish(connection, lease, goal, "workflow_invalid")
     scope = ToolScope(
         lease.workspace_id,

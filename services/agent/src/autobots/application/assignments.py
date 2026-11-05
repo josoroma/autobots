@@ -94,6 +94,12 @@ async def _create(
     )
     async with connection.transaction():
         await hold_lease(connection, scope)
+        # Under the lease, so a cancel can't land between this and the child's admission unseen.
+        cursor = await connection.execute(
+            "select status from public.runs where id = %s for share", (scope.run_id,)
+        )
+        if (await cursor.fetchone())[0] != RunStatus.RUNNING.value:
+            raise ToolFailed("parent_not_running")
         cursor = await connection.execute(
             "select count(*) filter (where status = 'open'), count(*) "
             "from app_private.assignments where root_run_id = %s",
@@ -185,7 +191,6 @@ def assign_tool(delegation: Delegation) -> ToolDefinition:
             await _refuse_if_waiting(connection, child)
         lease = await _claim_child(connection, child, delegation)
         result = await delegation.drive(connection, lease)
-        # Paused first: a child paused directly reports `lost`, as its worker just let go.
         if result.run_status == RunStatus.PAUSED.value:
             raise ToolFailed("assignment_paused")
         if result.outcome == "lost" or result.code == "children_settling":
