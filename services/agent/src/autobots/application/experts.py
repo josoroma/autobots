@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID, uuid4
 
+from autobots.application.improvements import active_skill_text
 from autobots.application.runs import existing_receipt, request_hash, store_receipt
 from autobots.contracts.experts import (
     ExpertConfig,
@@ -269,11 +270,12 @@ async def resolve_binding(
     if found is None:
         raise ExpertRefused("expert_version_not_found")
     config = ExpertConfig.model_validate(found[0])
+    references = await active_skill_text(connection, workspace_id, config.skills)
     return RunBinding(
         session_id=session_id,
         expert_id=UUID(entry["expert_id"]),
         version=chosen,
-        instructions=config.instructions,
+        instructions=config.instructions + references,
         tools={
             **PLAN_TOOLS,
             **{tool: EXPERT_TOOLS[tool] for tool in config.tools},

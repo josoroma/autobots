@@ -10,7 +10,7 @@ markers are preserved across refreshes.
 | Target | EPIC-8 |
 | Kind | epic |
 | Focus | - |
-| Status | ACTIVE |
+| Status | COMPLETE |
 | Reason | - |
 | Started | 2026-11-05 |
 | Updated | 2026-11-05 |
@@ -20,16 +20,16 @@ markers are preserved across refreshes.
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
 | 1 | US-8.1 | us-8-1-scoped-memory-lexical-retrieval | DONE | Scoped memory, lexical retrieval and safe compaction |
-| 2 | US-8.2 | us-8-2-reviewed-memory-skill-promotion | READY | Reviewed memory and skill promotion with rollback |
+| 2 | US-8.2 | us-8-2-reviewed-memory-skill-promotion | DONE | Reviewed memory and skill promotion with rollback |
 
 ## Next Action
 
-Action: select
-Story: US-8.2
-Change: us-8-2-reviewed-memory-skill-promotion
+Action: complete
+Story: -
+Change: -
 Owner: main-session
-Command: openspec new change us-8-2-reviewed-memory-skill-promotion; set US-8.2 to IN PROGRESS with a Change: line
-Reason: US-8.2 is READY and has no OpenSpec change
+Command: none — every story in the goal is DONE
+Reason: all 2 story/stories are DONE
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

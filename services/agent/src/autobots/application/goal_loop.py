@@ -30,6 +30,7 @@ from autobots.application.approvals import expire_due
 from autobots.application.artifacts import publish_tool, reconcile_run
 from autobots.application.assignments import Delegation, assign_tool
 from autobots.application.compaction import CompactionPolicy
+from autobots.application.improvements import PROPOSE_IMPROVEMENT
 from autobots.application.memory import READ_OFFLOAD, SEARCH_MEMORY
 from autobots.application.plans import load_goal, plan_tools, plan_view
 from autobots.application.recovery import classify_interrupted, open_obligation, outstanding
@@ -119,7 +120,14 @@ def loop_registry(
     extra: tuple[ToolDefinition, ...] = (),
 ) -> ToolRegistry:
     registry = ToolRegistry()
-    tools = (CALCULATE, READ_RUN_FILE, SAVE_ARTIFACT, SEARCH_MEMORY, READ_OFFLOAD)
+    tools = (
+        CALCULATE,
+        READ_RUN_FILE,
+        SAVE_ARTIFACT,
+        SEARCH_MEMORY,
+        READ_OFFLOAD,
+        PROPOSE_IMPROVEMENT,
+    )
     for tool in (*tools, *plan_tools(limits)):
         registry.register(tool)
     if object_store is not None:

@@ -49,6 +49,41 @@ export interface ExpertsRow {
   created_at: string;
 }
 
+export interface ImprovementCandidatesRow {
+  id: string;
+  workspace_id: string;
+  kind: string;
+  key: string;
+  content: string;
+  evidence: unknown;
+  regression_cases: unknown;
+  source: unknown;
+  status: string;
+  regression_results: unknown | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
+export interface KnowledgeHeadsRow {
+  workspace_id: string;
+  kind: string;
+  key: string;
+  active_version: number;
+  updated_at: string;
+}
+
+export interface KnowledgeVersionsRow {
+  workspace_id: string;
+  kind: string;
+  key: string;
+  version: number;
+  content: string;
+  candidate_id: string;
+  provenance: unknown;
+  created_at: string;
+}
+
 export interface MemoryItemsRow {
   id: string;
   workspace_id: string;
@@ -58,6 +93,9 @@ export interface MemoryItemsRow {
   created_by: string;
   created_at: string;
   search: string | null;
+  key: string | null;
+  version: number | null;
+  retired_at: string | null;
 }
 
 export interface ModelProfilesRow {

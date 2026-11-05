@@ -11,6 +11,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from autobots.application.experts import ExpertRefused, get_expert
+from autobots.application.improvements import active_skill_text
 from autobots.application.runs import admit_run, existing_receipt, request_hash, store_receipt
 from autobots.application.workflows import WorkflowRefused, create_execution
 from autobots.contracts.experts import ExpertConfig
@@ -288,7 +289,8 @@ async def _admit(
             session_id=None,
             expert_id=config.target.id,
             version=config.target.version,
-            instructions=expert.instructions,
+            instructions=expert.instructions
+            + await active_skill_text(connection, workspace_id, expert.skills),
             tools={**PLAN_TOOLS, **{tool: EXPERT_TOOLS[tool] for tool in tools}},
         ),
     )

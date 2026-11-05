@@ -179,9 +179,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-8.1 | Scoped memory, lexical retrieval and safe compaction | DONE | EPIC-8 |
 | US-8.1#1 | Implement scoped store/artifact retrieval and explicit compaction policy. | DONE | US-8.1 |
 | US-8.1#2 | Test provenance, tool/result pairing and evidence retention across summaries. | DONE | US-8.1 |
-| US-8.2 | Reviewed memory and skill promotion with rollback | READY | EPIC-8 |
-| US-8.2#1 | Implement candidate, review, regression and versioned promotion states. | TODO | US-8.2 |
-| US-8.2#2 | Demonstrate isolation and rollback on controlled fixtures. | TODO | US-8.2 |
+| US-8.2 | Reviewed memory and skill promotion with rollback | DONE | EPIC-8 |
+| US-8.2#1 | Implement candidate, review, regression and versioned promotion states. | DONE | US-8.2 |
+| US-8.2#2 | Demonstrate isolation and rollback on controlled fixtures. | DONE | US-8.2 |
 | EPIC-9 | Local operations and recovery | — | — |
 | US-9.1 | Local startup, shutdown, health and operational logs | READY | EPIC-9 |
 | US-9.1#1 | Implement safe readiness/lifecycle/status interfaces and local telemetry. | TODO | US-9.1 |
@@ -2326,7 +2326,8 @@ Open Questions:
 
 ### US-8.2: Reviewed memory and skill promotion with rollback
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-8-2-reviewed-memory-skill-promotion/`
 
 As a specialist owner
 I want versioned improvement proposals
@@ -2356,8 +2357,8 @@ Dependencies:
 - US-5.1
 
 Tasks:
-- [ ] Implement candidate, review, regression and versioned promotion states.
-- [ ] Demonstrate isolation and rollback on controlled fixtures.
+- [x] Implement candidate, review, regression and versioned promotion states.
+- [x] Demonstrate isolation and rollback on controlled fixtures.
 
 Open Questions:
 - None.

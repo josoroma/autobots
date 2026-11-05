@@ -49,7 +49,8 @@ async def search(
     cursor = await connection.execute(
         "select id, title, ts_headline('english', content, q, %s), source, created_at "
         "from public.memory_items, websearch_to_tsquery('english', %s) q "
-        "where workspace_id = %s and search @@ q order by ts_rank(search, q) desc limit %s",
+        "where workspace_id = %s and search @@ q and retired_at is null "
+        "order by ts_rank(search, q) desc limit %s",
         (_HEADLINE, query, workspace_id, MAX_HITS),
     )
     for row in await cursor.fetchall():

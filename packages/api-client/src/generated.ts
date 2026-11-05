@@ -461,6 +461,95 @@ export const schemas = {
     "title": "BudgetCounters",
     "type": "object"
   },
+  "CandidateDecision": {
+    "additionalProperties": false,
+    "properties": {
+      "decision": {
+        "enum": [
+          "promote",
+          "reject"
+        ],
+        "title": "Decision",
+        "type": "string"
+      }
+    },
+    "required": [
+      "decision"
+    ],
+    "title": "CandidateDecision",
+    "type": "object"
+  },
+  "CandidateList": {
+    "additionalProperties": false,
+    "properties": {
+      "candidates": {
+        "items": {
+          "$ref": "#/components/schemas/CandidateView"
+        },
+        "title": "Candidates",
+        "type": "array"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "candidates"
+    ],
+    "title": "CandidateList",
+    "type": "object"
+  },
+  "CandidateView": {
+    "additionalProperties": false,
+    "properties": {
+      "content": {
+        "title": "Content",
+        "type": "string"
+      },
+      "id": {
+        "format": "uuid",
+        "title": "Id",
+        "type": "string"
+      },
+      "key": {
+        "title": "Key",
+        "type": "string"
+      },
+      "kind": {
+        "title": "Kind",
+        "type": "string"
+      },
+      "regression_results": {
+        "anyOf": [
+          {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Regression Results"
+      },
+      "status": {
+        "title": "Status",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "kind",
+      "key",
+      "content",
+      "status",
+      "regression_results"
+    ],
+    "title": "CandidateView",
+    "type": "object"
+  },
   "CredentialDraft": {
     "additionalProperties": false,
     "description": "Transient. It is validated and encrypted, and never returned, logged or echoed.",
@@ -1138,6 +1227,36 @@ export const schemas = {
     "title": "InstanceView",
     "type": "object"
   },
+  "KnowledgeHead": {
+    "additionalProperties": false,
+    "properties": {
+      "active_version": {
+        "title": "Active Version",
+        "type": "integer"
+      },
+      "key": {
+        "title": "Key",
+        "type": "string"
+      },
+      "kind": {
+        "title": "Kind",
+        "type": "string"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "kind",
+      "key",
+      "active_version"
+    ],
+    "title": "KnowledgeHead",
+    "type": "object"
+  },
   "MemoryCreate": {
     "additionalProperties": false,
     "properties": {
@@ -1641,6 +1760,35 @@ export const schemas = {
       "wire_id"
     ],
     "title": "RoleBinding",
+    "type": "object"
+  },
+  "RollbackRequest": {
+    "additionalProperties": false,
+    "properties": {
+      "key": {
+        "title": "Key",
+        "type": "string"
+      },
+      "kind": {
+        "enum": [
+          "memory",
+          "skill"
+        ],
+        "title": "Kind",
+        "type": "string"
+      },
+      "to_version": {
+        "minimum": 1.0,
+        "title": "To Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "kind",
+      "key",
+      "to_version"
+    ],
+    "title": "RollbackRequest",
     "type": "object"
   },
   "RouteOption": {
@@ -3262,6 +3410,36 @@ export function parseBudgetCounters(value: unknown): BudgetCounters {
   return parseWith(schemas, "BudgetCounters", value) as BudgetCounters;
 }
 
+export interface CandidateDecision {
+  decision: "promote" | "reject";
+}
+
+export function parseCandidateDecision(value: unknown): CandidateDecision {
+  return parseWith(schemas, "CandidateDecision", value) as CandidateDecision;
+}
+
+export interface CandidateList {
+  candidates: CandidateView[];
+  schema_version: 1;
+}
+
+export function parseCandidateList(value: unknown): CandidateList {
+  return parseWith(schemas, "CandidateList", value) as CandidateList;
+}
+
+export interface CandidateView {
+  content: string;
+  id: string;
+  key: string;
+  kind: string;
+  regression_results: Record<string, unknown> | null;
+  status: string;
+}
+
+export function parseCandidateView(value: unknown): CandidateView {
+  return parseWith(schemas, "CandidateView", value) as CandidateView;
+}
+
 export interface CredentialDraft {
   draft_key: string;
   expected_version: number;
@@ -3491,6 +3669,17 @@ export function parseInstanceView(value: unknown): InstanceView {
   return parseWith(schemas, "InstanceView", value) as InstanceView;
 }
 
+export interface KnowledgeHead {
+  active_version: number;
+  key: string;
+  kind: string;
+  schema_version: 1;
+}
+
+export function parseKnowledgeHead(value: unknown): KnowledgeHead {
+  return parseWith(schemas, "KnowledgeHead", value) as KnowledgeHead;
+}
+
 export interface MemoryCreate {
   content: string;
   title: string;
@@ -3655,6 +3844,16 @@ export interface RoleBinding {
 
 export function parseRoleBinding(value: unknown): RoleBinding {
   return parseWith(schemas, "RoleBinding", value) as RoleBinding;
+}
+
+export interface RollbackRequest {
+  key: string;
+  kind: "memory" | "skill";
+  to_version: number;
+}
+
+export function parseRollbackRequest(value: unknown): RollbackRequest {
+  return parseWith(schemas, "RollbackRequest", value) as RollbackRequest;
 }
 
 export interface RouteOption {
@@ -4129,6 +4328,22 @@ export async function addExpertVersion(options: ClientOptions, expert_id: string
 
 export async function getHealth(options: ClientOptions): Promise<ServiceHealth> {
   return parseServiceHealth(await requestJson(options, "GET", `/v1/health`));
+}
+
+export async function listImprovements(options: ClientOptions): Promise<CandidateList> {
+  return parseCandidateList(await requestJson(options, "GET", `/v1/improvements`));
+}
+
+export async function decideImprovement(options: ClientOptions, candidate_id: string, body: CandidateDecision): Promise<CandidateList> {
+  return parseCandidateList(await requestJson(options, "POST", `/v1/improvements/${encodeURIComponent(candidate_id)}/decision`, body));
+}
+
+export async function runImprovementRegression(options: ClientOptions, candidate_id: string): Promise<CandidateList> {
+  return parseCandidateList(await requestJson(options, "POST", `/v1/improvements/${encodeURIComponent(candidate_id)}/regression`));
+}
+
+export async function rollbackKnowledge(options: ClientOptions, body: RollbackRequest): Promise<KnowledgeHead> {
+  return parseKnowledgeHead(await requestJson(options, "POST", `/v1/knowledge/rollback`, body));
 }
 
 export async function createMemory(options: ClientOptions, body: MemoryCreate): Promise<MemoryCreated> {

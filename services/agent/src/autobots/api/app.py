@@ -13,6 +13,7 @@ from autobots.api.artifact_routes import router as artifact_router
 from autobots.api.errors import register_error_handlers
 from autobots.api.event_routes import router as event_router
 from autobots.api.expert_routes import router as expert_router
+from autobots.api.improvement_routes import router as improvement_router
 from autobots.api.memory_routes import router as memory_router
 from autobots.api.routes import router
 from autobots.api.routine_routes import router as routine_router
@@ -79,4 +80,5 @@ def create_app(
     app.include_router(workflow_router)
     app.include_router(routine_router)
     app.include_router(memory_router)
+    app.include_router(improvement_router)
     return app
