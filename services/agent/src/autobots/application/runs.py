@@ -26,6 +26,12 @@ class VersionConflict(Exception):
     code = "version_conflict"
 
 
+class LeaseLost(Exception):
+    """This worker's generation isn't current any more, so it may write nothing."""
+
+    code = "lease_lost"
+
+
 class RunNotFound(Exception):
     """Also for a run in another workspace, so existence is not revealed."""
 
@@ -165,6 +171,28 @@ class TransitionResult:
     changed: bool
 
 
+async def record_transition(
+    connection: Any, run_id: UUID, previous: str, following: str, version: int
+) -> int:
+    """The status, its version and its event, always together."""
+    new_version = version + 1
+    await connection.execute(
+        "update public.runs set status = %s, version = %s, updated_at = now() where id = %s",
+        (following, new_version, run_id),
+    )
+    await _append_event(connection, run_id, new_version, previous, following)
+    return new_version
+
+
+def _require_owner(job: Any, generation: int | None) -> None:
+    """Checked under the job's row lock, in the transaction that makes the change."""
+    if generation is None or job is None:
+        raise LeaseLost("this worker no longer owns the run")
+    status, current, live = job
+    if status != "claimed" or current != generation or not live:
+        raise LeaseLost("this worker no longer owns the run")
+
+
 async def apply_command(
     connection: Any,
     *,
@@ -173,11 +201,14 @@ async def apply_command(
     command: RunCommand,
     actor: Actor,
     expected_version: int,
-    has_active_work: bool = False,
+    generation: int | None = None,
     actor_id: UUID | None = None,
     idempotency_key: str | None = None,
 ) -> TransitionResult:
-    """Version, actor and SP-010 are checked inside the transaction that writes the change."""
+    """Ownership, version, actor and SP-010 are checked where the change is written.
+
+    Always the job's row, then the run's, the same order a claim uses, so the two can't deadlock.
+    """
     fingerprint = request_hash({"command": command.value, "expected_version": expected_version})
     scope = None
     if actor_id is not None and idempotency_key is not None:
@@ -188,6 +219,14 @@ async def apply_command(
             if existing is not None:
                 return TransitionResult(run_id, existing["version"], existing["status"], False)
         cursor = await connection.execute(
+            "select status, generation, lease_expires_at > clock_timestamp() "
+            "from app_private.run_jobs where run_id = %s and workspace_id = %s for update",
+            (run_id, workspace_id),
+        )
+        job = await cursor.fetchone()
+        if actor is Actor.WORKER:
+            _require_owner(job, generation)
+        cursor = await connection.execute(
             "select status, version from public.runs "
             "where id = %s and workspace_id = %s for update",
             (run_id, workspace_id),
@@ -196,18 +235,16 @@ async def apply_command(
         if row is None:
             raise RunNotFound("that run is not available")
         current, version = RunStatus(row[0]), row[1]
+        has_active_work = job is not None and job[0] == "claimed" and bool(job[2])
         following = next_status(current, command, actor, has_active_work=has_active_work)
         if following is None:
             # Repeating a cancellation changes nothing, and is not a conflict.
             return TransitionResult(run_id, version, current.value, False)
         if version != expected_version:
             raise VersionConflict("the run changed; reload it")
-        new_version = version + 1
-        await connection.execute(
-            "update public.runs set status = %s, version = %s, updated_at = now() where id = %s",
-            (following.value, new_version, run_id),
+        new_version = await record_transition(
+            connection, run_id, current.value, following.value, version
         )
-        await _append_event(connection, run_id, new_version, current.value, following.value)
         job_status = _job_status(following)
         if job_status is not None:
             await connection.execute(
@@ -224,8 +261,10 @@ async def apply_command(
 __all__ = [
     "CommandRefused",
     "IdempotencyConflict",
+    "LeaseLost",
     "RunNotFound",
     "VersionConflict",
     "admit_run",
     "apply_command",
+    "record_transition",
 ]

@@ -29,7 +29,15 @@ async def admit(key: str, goal: str = 'write the report', actor: UUID = ACTOR, w
         return await admit_run(connection, workspace_id=workspace, actor_id=actor, idempotency_key=key, goal_text=goal, limit_micro_usd=limit, policy=POLICY)
 
 
+async def hold_lease(connection, run_id):  # type: ignore[no-untyped-def]
+    """Arranged, with no worker: this file tests the table, and US-4.2's check tests real claims."""
+    await connection.execute("update app_private.run_jobs set status = 'claimed', generation = 1, lease_expires_at = now() + interval '1 hour' where run_id = %s", (run_id,))
+
+
 async def command(connection, run_id, name, version, actor=Actor.USER, **options):  # type: ignore[no-untyped-def]
+    if actor is Actor.WORKER:
+        await hold_lease(connection, run_id)
+        options['generation'] = 1
     return await apply_command(connection, workspace_id=WORKSPACE, run_id=run_id, command=name, actor=actor, expected_version=version, **options)
 
 
@@ -109,9 +117,10 @@ async def main() -> None:
         job = (await (await connection.execute('select status from app_private.run_jobs where run_id = %s', (target,))).fetchone())[0]
         check('a cancelled run has no claimable job', 'done', job, job == 'done')
         target = await in_status('running')
-        result = await command(connection, target, RunCommand.CANCEL, 1, has_active_work=True)
+        await hold_lease(connection, target)
+        result = await command(connection, target, RunCommand.CANCEL, 1)
         check('cancel with active work enters cancelling', 'cancelling', result.status, result.status == 'cancelling')
-        repeat = await command(connection, target, RunCommand.CANCEL, 2, has_active_work=True)
+        repeat = await command(connection, target, RunCommand.CANCEL, 2)
         check('repeating cancel changes nothing', 'unchanged', repeat.changed, not repeat.changed and repeat.status == 'cancelling')
         done = await command(connection, target, RunCommand.FINISH_CANCEL, 2, Actor.WORKER)
         check('settling finishes the cancellation', 'cancelled', done.status, done.status == 'cancelled')

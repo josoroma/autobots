@@ -247,7 +247,6 @@ def framework_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> 
     tables = rows(stack, "select string_agg(tablename, ',' order by tablename) from pg_tables where schemaname = 'agent_runtime';")
     cases.check('the migration identity can run framework setup', 'checkpoint tables in agent_runtime', tables,
                 grant.returncode == 0 and migrator.returncode == 0 and 'checkpoints' in tables)
-    stack.migrator('grant select, insert, update, delete on all tables in schema agent_runtime to autobots_runtime;\n')
     used = stack.runtime('select count(*) from agent_runtime.checkpoints;\n')
     cases.check('the runtime role can use those tables', 'exit 0', f'exit {used.returncode}', used.returncode == 0)
     denied = stack.runtime('create table agent_runtime.worker_owned (id int);\n')
@@ -319,6 +318,22 @@ def run_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
     cases.denied('authenticated cannot read the policy snapshot', stack.as_role('authenticated', USER_A, 'select policy_snapshot from public.runs'), 'permission denied')
 
 
+def worker_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
+    """Real competing claims, stale owners and a killed process, through the runtime role."""
+    url = f'postgresql://autobots_runtime:{stack.runtime_password}@127.0.0.1:{db_port}/postgres'
+    python = str(root / 'services/agent/.venv/bin/python')
+    result = subprocess.run([python, str(root / 'tests/db/worker_ownership_check.py'), WORKSPACE_A, python],
+                            env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
+                            capture_output=True, text=True, timeout=180, check=False)
+    if result.returncode:
+        cases.check('the worker ownership check ran', 'exit 0', f'exit {result.returncode}: {result.stderr.strip()[-700:]}', False)
+        return
+    for case in json.loads(result.stdout.strip().splitlines()[-1])['cases']:
+        cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+    cases.denied('authenticated cannot read checkpoints', stack.as_role('authenticated', USER_A, 'select * from agent_runtime.checkpoints'), 'permission denied')
+    cases.denied('the runtime role cannot delete checkpoints', stack.runtime('delete from agent_runtime.checkpoints;\n'), 'permission denied')
+
+
 def guard_cases(stack: AppStack, cases: Cases, root: Path) -> None:
     stack.sql("update autobots_disposable.marker set run_id = 'something-else';")
     try:
@@ -370,6 +385,7 @@ def qualify(root: Path, write_types: bool = False) -> int:
         credential_cases(stack, cases, root, db_port)
         admission_cases(stack, cases, root, db_port)
         run_cases(stack, cases, root, db_port)
+        worker_cases(stack, cases, root, db_port)
         guard_cases(stack, cases, root)
         type_cases(stack, cases, root, write_types)
         static_cases(cases, root)

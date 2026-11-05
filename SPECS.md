@@ -124,13 +124,13 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-4.1 | Atomic run admission and canonical transition commands | DONE | EPIC-4 |
 | US-4.1#1 | Implement typed admission and atomic transition/outbox commands. | DONE | US-4.1 |
 | US-4.1#2 | Test idempotency scope and valid/invalid/concurrent state changes. | DONE | US-4.1 |
-| US-4.2 | Fenced worker ownership and durable checkpoints | READY | EPIC-4 |
-| US-4.2#1 | Implement lease/heartbeat/fencing and scoped direct checkpointer access. | TODO | US-4.2 |
-| US-4.2#2 | Inject stale-owner and process-death cases at domain/checkpoint boundaries. | TODO | US-4.2 |
+| US-4.2 | Fenced worker ownership and durable checkpoints | DONE | EPIC-4 |
+| US-4.2#1 | Implement lease/heartbeat/fencing and scoped direct checkpointer access. | DONE | US-4.2 |
+| US-4.2#2 | Inject stale-owner and process-death cases at domain/checkpoint boundaries. | DONE | US-4.2 |
 | US-4.3 | Bounded goal planning and model/tool loop | BLOCKED | EPIC-4 |
 | US-4.3#1 | Compose the minimal explicitly configured Deep Agents stage and plan adapter. | TODO | US-4.3 |
 | US-4.3#2 | Exercise loop bounds and complete argument/result validation with fake models. | TODO | US-4.3 |
-| US-4.4 | Versioned tool registry and operation receipts | BLOCKED | EPIC-4 |
+| US-4.4 | Versioned tool registry and operation receipts | READY | EPIC-4 |
 | US-4.4#1 | Implement the narrow read/calculation/artifact tool contracts and central policy gateway. | TODO | US-4.4 |
 | US-4.4#2 | Test denied resources, hidden tools and receipt reuse. | TODO | US-4.4 |
 | US-4.5 | Private artifacts with staged publication and reconciliation | BLOCKED | EPIC-4 |
@@ -1599,7 +1599,8 @@ Open Questions:
 
 ### US-4.2: Fenced worker ownership and durable checkpoints
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-4-2-fenced-worker-ownership-durable/`
 
 As an operator
 I want one current execution owner per run
@@ -1630,8 +1631,8 @@ Dependencies:
 - US-2.4
 
 Tasks:
-- [ ] Implement lease/heartbeat/fencing and scoped direct checkpointer access.
-- [ ] Inject stale-owner and process-death cases at domain/checkpoint boundaries.
+- [x] Implement lease/heartbeat/fencing and scoped direct checkpointer access.
+- [x] Inject stale-owner and process-death cases at domain/checkpoint boundaries.
 
 Open Questions:
 - None.
@@ -1680,7 +1681,7 @@ Open Questions:
 
 ### US-4.4: Versioned tool registry and operation receipts
 
-Status: BLOCKED
+Status: READY
 
 As an operator
 I want one enforced tool boundary
