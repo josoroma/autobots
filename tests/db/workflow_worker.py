@@ -1,0 +1,36 @@
+"""A real worker process that dies after a chosen workflow instance has committed."""
+from __future__ import annotations
+
+import asyncio
+import os
+import signal
+import sys
+
+import psycopg
+from pydantic import SecretStr
+
+from autobots.adapters.loop_middleware import ModelRoute
+from autobots.adapters.object_storage import SupabaseObjectStore
+from autobots.application.goal_loop import LoopConfig
+from autobots.application.worker_leases import claim_next
+from autobots.application.workflow_runner import run_workflow
+
+URL, BASE, DIE_AFTER = sys.argv[1], sys.argv[2], sys.argv[3]
+ROUTE = ModelRoute('executor', 'openrouter_deepseek_flash', 'fixture/model', 1000)
+
+
+def die_after(step: object) -> None:
+    if getattr(step, 'key', '') == DIE_AFTER:
+        os.kill(os.getpid(), signal.SIGKILL)
+
+
+async def main() -> None:
+    store = SupabaseObjectStore(BASE, SecretStr(os.environ['AUTOBOTS_STORAGE_SERVICE']))
+    config = LoopConfig(route=ROUTE, object_store=store, lease_seconds=60)
+    async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
+        lease = await claim_next(db, worker_id='dying', lease_seconds=60)
+        assert lease is not None
+        await run_workflow(db, URL, lease, None, config, after_commit=die_after)
+
+
+asyncio.run(main())

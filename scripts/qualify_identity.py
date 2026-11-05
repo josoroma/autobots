@@ -157,12 +157,15 @@ def artifact_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port
     for check_file, arguments, label in (('verification_check.py', [workspace_a], 'verification'),
                                          ('assignment_check.py', [workspace_a, str(root / PYTHON)], 'assignment'),
                                          ('approval_check.py', [workspace_a, workspace_b], 'approval'),
-                                         ('effect_check.py', [workspace_a, workspace_b, str(root / PYTHON)], 'effect')):
+                                         ('effect_check.py', [workspace_a, workspace_b, str(root / PYTHON)], 'effect'),
+                                         ('workflow_run_check.py', [workspace_a, str(root / PYTHON)], 'workflow run')):
         checked = subprocess.run([str(root / PYTHON), str(root / 'tests/db' / check_file), *arguments],
                                  env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'AUTOBOTS_STORAGE_BASE': base, 'AUTOBOTS_STORAGE_SERVICE': stack.values['SERVICE_ROLE_KEY'],
                                       'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
                                  capture_output=True, text=True, errors='replace', timeout=240, check=False)
         if checked.returncode:
+            (root / '.checks/identity').mkdir(parents=True, exist_ok=True)
+            (root / f'.checks/identity/{check_file}.err').write_text(checked.stderr)
             cases.check(f'the {label} check ran', 'exit 0', f'exit {checked.returncode}: {checked.stderr.strip()[-380:]}', False)
         if checked.stdout.strip():
             output = json.loads(checked.stdout.strip().splitlines()[-1])

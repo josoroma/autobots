@@ -162,14 +162,14 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-6.1 | Typed immutable workflow definition and validation | DONE | EPIC-6 |
 | US-6.1#1 | Define typed workflow IR and version persistence. | DONE | US-6.1 |
 | US-6.1#2 | Add type, link, bounded-cycle and publication fixtures. | DONE | US-6.1 |
-| US-6.2 | Workflow readiness, emissions and restart semantics | READY | EPIC-6 |
-| US-6.2#1 | Implement the declared readiness and bounded iteration/join semantics. | TODO | US-6.2 |
-| US-6.2#2 | Run golden and restart fixtures for the supported subset. | TODO | US-6.2 |
-| US-6.3 | Workflow editor and execution monitor | BLOCKED | EPIC-6 |
+| US-6.2 | Workflow readiness, emissions and restart semantics | DONE | EPIC-6 |
+| US-6.2#1 | Implement the declared readiness and bounded iteration/join semantics. | DONE | US-6.2 |
+| US-6.2#2 | Run golden and restart fixtures for the supported subset. | DONE | US-6.2 |
+| US-6.3 | Workflow editor and execution monitor | READY | EPIC-6 |
 | US-6.3#1 | Build subset editing, validation and version selection UI. | TODO | US-6.3 |
 | US-6.3#2 | Expose authorized instance/emission monitoring and reconnect behavior. | TODO | US-6.3 |
 | EPIC-7 | Routines and selected connectors | — | — |
-| US-7.1 | Explicit routines and deduplicated scheduled occurrences | BLOCKED | EPIC-7 |
+| US-7.1 | Explicit routines and deduplicated scheduled occurrences | READY | EPIC-7 |
 | US-7.1#1 | Implement versioned routines and occurrence admission. | TODO | US-7.1 |
 | US-7.1#2 | Test duplicate, missed, overlap and timezone cases. | TODO | US-7.1 |
 | US-7.2 | Select and qualify the first consequential connector | NEEDS CLARIFICATION | EPIC-7 |
@@ -2114,7 +2114,8 @@ Open Questions:
 
 ### US-6.2: Workflow readiness, emissions and restart semantics
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-6-2-workflow-readiness-emissions-restart/`
 
 As an automation builder
 I want predictable node execution
@@ -2147,15 +2148,15 @@ Dependencies:
 - US-4.4
 
 Tasks:
-- [ ] Implement the declared readiness and bounded iteration/join semantics.
-- [ ] Run golden and restart fixtures for the supported subset.
+- [x] Implement the declared readiness and bounded iteration/join semantics.
+- [x] Run golden and restart fixtures for the supported subset.
 
 Open Questions:
 - None.
 
 ### US-6.3: Workflow editor and execution monitor
 
-Status: BLOCKED
+Status: READY
 
 As an automation builder
 I want an editor and monitor for the supported subset
@@ -2199,7 +2200,7 @@ Phase reference: B5, preserved SP-020. All story completion also requires SP-003
 
 ### US-7.1: Explicit routines and deduplicated scheduled occurrences
 
-Status: BLOCKED
+Status: READY
 
 As a specialist owner
 I want scoped local recurring work

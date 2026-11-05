@@ -610,6 +610,11 @@ export const schemas = {
         "title": "Id",
         "type": "string"
       },
+      "run_id": {
+        "format": "uuid",
+        "title": "Run Id",
+        "type": "string"
+      },
       "schema_version": {
         "const": 1,
         "title": "Schema Version",
@@ -628,6 +633,7 @@ export const schemas = {
     "required": [
       "schema_version",
       "id",
+      "run_id",
       "workflow_id",
       "workflow_version",
       "graph_hash",
@@ -639,6 +645,14 @@ export const schemas = {
   "ExecutionCreate": {
     "additionalProperties": false,
     "properties": {
+      "documents": {
+        "items": {
+          "$ref": "#/components/schemas/InputDocument"
+        },
+        "maxItems": 10,
+        "title": "Documents",
+        "type": "array"
+      },
       "inputs": {
         "additionalProperties": true,
         "title": "Inputs",
@@ -2716,6 +2730,7 @@ export interface ExecutionBinding {
   block_versions: Record<string, unknown>;
   graph_hash: string;
   id: string;
+  run_id: string;
   schema_version: 1;
   workflow_id: string;
   workflow_version: number;
@@ -2726,6 +2741,7 @@ export function parseExecutionBinding(value: unknown): ExecutionBinding {
 }
 
 export interface ExecutionCreate {
+  documents?: InputDocument[];
   inputs?: Record<string, unknown>;
   version: number;
 }

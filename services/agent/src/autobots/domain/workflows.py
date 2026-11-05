@@ -31,7 +31,7 @@ BLOCKS: Mapping[str, Mapping[int, BlockSpec]] = {
     "condition": {
         1: BlockSpec({"value": "json"}, {"true": "json", "false": "json"}, frozenset({"value"}))
     },
-    "foreach": {1: BlockSpec({"items": "list"}, {"item": "json"}, frozenset({"items"}))},
+    "foreach": {1: BlockSpec({"items": "list"}, {"item": "config_item"}, frozenset({"items"}))},
     "join": {
         1: BlockSpec(
             {"value": "json"}, {"items": "list"}, frozenset({"value"}), frozenset({"value"})
@@ -60,7 +60,10 @@ def _compatible(source: str, target: str) -> bool:
 
 def _output_type(node: Mapping[str, Any], port: str, spec: BlockSpec) -> str:
     declared = spec.outputs[port]
-    return str(node.get("config", {}).get("type", "json")) if declared == "config" else declared
+    config = node.get("config", {})
+    if declared == "config":
+        return str(config.get("type", "json"))
+    return str(config.get("item_type", "json")) if declared == "config_item" else declared
 
 
 def _config_errors(node: Mapping[str, Any]) -> list[GraphError]:
@@ -78,6 +81,8 @@ def _config_errors(node: Mapping[str, Any]) -> list[GraphError]:
             return [GraphError("foreach_bound_required", name)]
         if bound > MAX_FOREACH_ITEMS:
             return [GraphError("foreach_bound_too_large", name)]
+        if config.get("item_type", "json") not in INPUT_TYPES:
+            return [GraphError("foreach_item_type_invalid", name)]
     if block == "artifact" and not str(config.get("path", "")).startswith("outputs/"):
         return [GraphError("artifact_path_invalid", name)]
     if block == "agent" and not config.get("expert_id"):

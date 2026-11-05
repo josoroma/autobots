@@ -609,6 +609,11 @@
             "title": "Id",
             "type": "string"
           },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
           "schema_version": {
             "const": 1,
             "title": "Schema Version",
@@ -627,6 +632,7 @@
         "required": [
           "schema_version",
           "id",
+          "run_id",
           "workflow_id",
           "workflow_version",
           "graph_hash",
@@ -638,6 +644,14 @@
       "ExecutionCreate": {
         "additionalProperties": false,
         "properties": {
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/InputDocument"
+            },
+            "maxItems": 10,
+            "title": "Documents",
+            "type": "array"
+          },
           "inputs": {
             "additionalProperties": true,
             "title": "Inputs",

@@ -98,6 +98,15 @@ export interface SessionsRow {
   created_at: string;
 }
 
+export interface WorkflowEmissionsRow {
+  execution_id: string;
+  instance_key: string;
+  port: string;
+  sequence: number;
+  value: unknown;
+  created_at: string;
+}
+
 export interface WorkflowExecutionsRow {
   id: string;
   workspace_id: string;
@@ -108,6 +117,17 @@ export interface WorkflowExecutionsRow {
   inputs: unknown;
   created_by: string;
   created_at: string;
+  run_id: string | null;
+}
+
+export interface WorkflowNodeInstancesRow {
+  execution_id: string;
+  instance_key: string;
+  node_id: string;
+  iteration: number | null;
+  status: string;
+  error_code: string | null;
+  updated_at: string;
 }
 
 export interface WorkflowVersionsRow {

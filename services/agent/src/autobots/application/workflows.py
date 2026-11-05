@@ -1,16 +1,22 @@
 """Publishing immutable workflow versions, and binding executions to them exactly, PRD 7.3."""
 
 import json
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
 
-from autobots.application.runs import existing_receipt, request_hash, store_receipt
+from autobots.application.experts import create_session
+from autobots.application.runs import admit_run, existing_receipt, request_hash, store_receipt
+from autobots.contracts.experts import SessionExpert
+from autobots.contracts.plans import InputDocument
 from autobots.contracts.workflows import (
     ExecutionBinding,
     WorkflowGraph,
     WorkflowVersionView,
     WorkflowView,
 )
+from autobots.domain.models import RolePolicy, resolve_role_policy
+from autobots.domain.tools import DELEGATION_TOOL, LOOP_TOOL_GRANTS
 from autobots.domain.workflows import (
     GraphError,
     block_versions,
@@ -18,6 +24,9 @@ from autobots.domain.workflows import (
     input_errors,
     validate_graph,
 )
+
+# What a workflow's own blocks reach. Its approval step is the only consequential one here.
+_WORKFLOW_TOOLS = {**LOOP_TOOL_GRANTS, DELEGATION_TOOL: 1, "workflow_approval": 1}
 
 
 class WorkflowRefused(Exception):
@@ -150,6 +159,26 @@ async def publish_version(
     return await get_workflow(connection, workspace_id, workflow_id)
 
 
+async def _agent_session(
+    connection: Any, workspace_id: UUID, actor_id: UUID, graph: dict[str, Any]
+) -> UUID | None:
+    """An agent step can assign only the Experts its graph names."""
+    experts = sorted(
+        {node["config"]["expert_id"] for node in graph["nodes"] if node["block"] == "agent"}
+    )
+    if not experts:
+        return None
+    session = await create_session(
+        connection,
+        workspace_id=workspace_id,
+        actor_id=actor_id,
+        idempotency_key=str(uuid4()),
+        kind="coordinator",
+        experts=[SessionExpert(expert_id=UUID(expert)) for expert in experts],
+    )
+    return session.id
+
+
 async def create_execution(
     connection: Any,
     *,
@@ -159,10 +188,12 @@ async def create_execution(
     idempotency_key: str,
     version: int,
     inputs: dict[str, Any],
+    documents: tuple[InputDocument, ...] = (),
+    policy: RolePolicy | None = None,
 ) -> ExecutionBinding:
     """An execution always names one exact version and hash. Later versions don't reach it."""
     cursor = await connection.execute(
-        "select v.graph, v.graph_hash, v.block_versions from public.workflow_versions v "
+        "select v.graph, v.graph_hash, v.block_versions, w.name from public.workflow_versions v "
         "join public.workflows w on w.id = v.workflow_id "
         "where v.workflow_id = %s and v.version = %s and w.workspace_id = %s",
         (workflow_id, version, workspace_id),
@@ -170,7 +201,7 @@ async def create_execution(
     row = await cursor.fetchone()
     if row is None:
         raise WorkflowRefused("workflow_version_not_found")
-    graph, digest, blocks = row
+    graph, digest, blocks, name = row
     errors = input_errors(graph, inputs)
     if errors:
         raise WorkflowRefused("workflow_inputs_invalid", errors)
@@ -179,11 +210,31 @@ async def create_execution(
     async with connection.transaction():
         existing = await existing_receipt(connection, scope, fingerprint)
         execution_id = UUID(existing["execution_id"]) if existing else uuid4()
+        run_id = UUID(existing["run_id"]) if existing else None
         if existing is None:
+            session_id = await _agent_session(connection, workspace_id, actor_id, graph)
+            admitted = await admit_run(
+                connection,
+                workspace_id=workspace_id,
+                actor_id=actor_id,
+                idempotency_key=f"workflow:{execution_id}",
+                goal_text=f"Workflow {name}, version {version}",
+                limit_micro_usd=1_000_000,
+                policy=policy or resolve_role_policy(),
+                input_documents=documents,
+                binding=SimpleNamespace(
+                    session_id=session_id,
+                    expert_id=None,
+                    version=None,
+                    instructions="",
+                    tools=_WORKFLOW_TOOLS,
+                ),
+            )
+            run_id = admitted.run_id
             await connection.execute(
                 "insert into public.workflow_executions (id, workspace_id, workflow_id, "
-                "workflow_version, graph_hash, block_versions, inputs, created_by) "
-                "values (%s, %s, %s, %s, %s, %s, %s, %s)",
+                "workflow_version, graph_hash, block_versions, inputs, created_by, run_id) "
+                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     execution_id,
                     workspace_id,
@@ -193,12 +244,20 @@ async def create_execution(
                     json.dumps(blocks),
                     json.dumps(inputs),
                     actor_id,
+                    run_id,
                 ),
             )
-            await store_receipt(connection, scope, fingerprint, {"execution_id": str(execution_id)})
+            await store_receipt(
+                connection,
+                scope,
+                fingerprint,
+                {"execution_id": str(execution_id), "run_id": str(run_id)},
+            )
+    assert run_id is not None
     return ExecutionBinding(
         schema_version=1,
         id=execution_id,
+        run_id=run_id,
         workflow_id=workflow_id,
         workflow_version=version,
         graph_hash=digest,

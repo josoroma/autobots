@@ -193,10 +193,32 @@ def test_an_iteration_needs_its_join() -> None:
 
 def test_iterations_do_not_nest_yet() -> None:
     graph = loop()
+    graph["nodes"][1]["config"]["item_type"] = "list"
     graph["nodes"].append(node("inner", "foreach", max_items=2))
     graph["links"][1] = link("each", "item", "inner", "items")
     graph["links"].append(link("inner", "item", "up", "value"))
-    assert "link_type_mismatch" in codes(graph) or "nested_foreach" in codes(graph)
+    assert "nested_foreach" in codes(graph)
+
+
+def test_a_declared_item_type_is_checked_across_links() -> None:
+    graph = {
+        "nodes": [
+            node("in", "input", type="list"),
+            node("each", "foreach", max_items=2, item_type="number"),
+            node("save", "artifact", path="outputs/a.md"),
+            node("all", "join"),
+            node("out", "output"),
+        ],
+        "links": [
+            link("in", "value", "each", "items"),
+            link("each", "item", "save", "content"),
+            link("save", "artifact_id", "all", "value"),
+            link("all", "items", "out", "value"),
+        ],
+    }
+    assert codes(graph) == ["link_type_mismatch"]
+    graph["nodes"][1]["config"]["item_type"] = "string"
+    assert codes(graph) == []
 
 
 def test_a_join_needs_an_iteration() -> None:

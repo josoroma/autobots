@@ -4,6 +4,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from autobots.contracts.plans import InputDocument
 from autobots.contracts.primitives import Identifier
 
 VIEW = ConfigDict(extra="forbid", frozen=True)
@@ -97,6 +98,7 @@ class ExecutionCreate(BaseModel):
 
     version: int = Field(ge=1)
     inputs: dict[str, Any] = Field(default_factory=dict)
+    documents: list[InputDocument] = Field(default_factory=list, max_length=10)
 
 
 class ExecutionBinding(BaseModel):
@@ -104,6 +106,7 @@ class ExecutionBinding(BaseModel):
 
     schema_version: Literal[1]
     id: Identifier
+    run_id: Identifier
     workflow_id: Identifier
     workflow_version: int
     graph_hash: str

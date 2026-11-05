@@ -164,6 +164,7 @@ async def post_execution(
                 idempotency_key=key,
                 version=body.version,
                 inputs=body.inputs,
+                documents=tuple(body.documents),
             )
         except (WorkflowRefused, IdempotencyConflict) as error:
             raise _error(error) from None

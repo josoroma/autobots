@@ -263,6 +263,14 @@ async def _drive(
     model_factory: Callable[[], Any],
     config: LoopConfig,
 ) -> LoopResult:
+    cursor = await connection.execute(
+        "select 1 from public.workflow_executions where run_id = %s", (lease.run_id,)
+    )
+    if await cursor.fetchone() is not None:
+        # Imported here because the runner builds on this module's lifecycle.
+        from autobots.application.workflow_runner import run_workflow
+
+        return await run_workflow(connection, database_url, lease, model_factory(), config)
     if lease.run_status != RunStatus.VERIFYING.value:
         result = await run_goal(connection, database_url, lease, model_factory(), config)
         if result.outcome != "candidate":
