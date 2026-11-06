@@ -198,3 +198,13 @@ Some DeepSeek calls took far longer than the old 5-second timeout, up to 23.7s.
 **Not established:** quality. Verification checks that the file was published and holds the required line, not that its content is good. One goal, repeated, on one evening, so other goals may differ. Approvals, child runs, compaction, the 80% warning and budget refusals weren't exercised. No run needed more than 512 tokens on Terra, so this says nothing about 2,048. This doesn't establish H1, product acceptance or US-10.1.
 
 Held in all ten: no key in any durable row or log file, nothing of the project left behind, other Docker resources unchanged, no step failures, and the watchdog never fired.
+
+## The default path
+
+**Class: live, on a disposable stack.** Authorized by the user's "Yes, run one goal", after being told the expected cost. Run on 2026-11-06 UTC at 02:33, at `d4c1c22`, after [Decision 0006](../../decisions/0006-terra-is-the-default.md). Raw result: `.checks/trial-default-goal/result.json` (ignored, local).
+
+**No model was selected:** no `--profile`, and no saved workspace policy. Every call bound to `openrouter_terra` and `openai/gpt-6.1-terra`, so the default resolved as decided.
+
+**Outcome: `succeeded` after 16s.** 6 calls, no repairs and no failed receipt. Verification passed, and `report.md` was published. US$0.005993 in the ledger, matching key usage, which is now US$0.078998 in all. Each call reserved US$0.04256. No key in any durable row or log file, nothing left behind, other Docker resources unchanged.
+
+**Not established:** this is one run. It confirms the default path works, not that goals succeed reliably, and it doesn't establish quality, H1, product acceptance or US-10.1.
