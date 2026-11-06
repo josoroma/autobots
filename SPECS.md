@@ -291,10 +291,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-12.3#2 | Repeat Gate 0 and the harness runbook on that revision as US-11.12 did, including `qualify_worker_inference.py` by hand and the visual measurements on the final tree. | DONE | US-12.3 |
 | US-12.3#3 | Record a disposition for each finding, and publish evidence that `scripts/evidence.py` validates. | DONE | US-12.3 |
 | US-12.3#4 | Mark the hook behavior not qualified, and hand the fingerprint to US-12.4, US-12.5, US-12.6 and US-10.2. | DONE | US-12.3 |
-| US-12.4 | Measure the two-call workload | READY | EPIC-12 |
-| US-12.4#1 | Arrange two goals at once, which needs two claiming workers because one worker runs one step at a time, and rehearse that on a fake transport first. | TODO | US-12.4 |
-| US-12.4#2 | Run the workload once on Terra on a disposable stack, under the shared ledger, sampling the four resources. | TODO | US-12.4 |
-| US-12.4#3 | Record the result, spending and limits, and hand LM-A09's row to US-10.2's record. | TODO | US-12.4 |
+| US-12.4 | Measure the two-call workload | DONE | EPIC-12 |
+| US-12.4#1 | Arrange two goals at once, which needs two claiming workers because one worker runs one step at a time, and rehearse that on a fake transport first. | DONE | US-12.4 |
+| US-12.4#2 | Run the workload once on Terra on a disposable stack, under the shared ledger, sampling the four resources. | DONE | US-12.4 |
+| US-12.4#3 | Record the result, spending and limits, and hand LM-A09's row to US-10.2's record. | DONE | US-12.4 |
 | US-12.5 | Third real Mac sleep | READY | EPIC-12 |
 | US-12.5#1 | Have the owner follow the runbook on a disposable stack with a scripted model. | TODO | US-12.5 |
 | US-12.5#2 | Record the report's observations with the fingerprint, and hand the LC-31 and LM-A07 rows to US-10.2's record. | TODO | US-12.5 |
@@ -3904,7 +3904,8 @@ Open Questions:
 
 ### US-12.4: Measure the two-call workload
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-12-4-measure-two-call-workload/`
 
 As an operator
 I want local resources measured while two Terra goals run at once
@@ -3958,9 +3959,9 @@ Dependencies:
 - US-12.3
 
 Tasks:
-- [ ] Arrange two goals at once, which needs two claiming workers because one worker runs one step at a time, and rehearse that on a fake transport first.
-- [ ] Run the workload once on Terra on a disposable stack, under the shared ledger, sampling the four resources.
-- [ ] Record the result, spending and limits, and hand LM-A09's row to US-10.2's record.
+- [x] Arrange two goals at once, which needs two claiming workers because one worker runs one step at a time, and rehearse that on a fake transport first.
+- [x] Run the workload once on Terra on a disposable stack, under the shared ledger, sampling the four resources.
+- [x] Record the result, spending and limits, and hand LM-A09's row to US-10.2's record.
 
 Open Questions:
 - None.

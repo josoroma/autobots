@@ -1,0 +1,453 @@
+{
+ "schema_version": "autobots.two-call-workload/v1",
+ "started_at_utc": "2026-11-06T22:20:06.442597+00:00",
+ "input_fingerprint": "ef94d4135828859cb557c9de2ed4aea2583dc7e807a6e414c2c996c8a17aeb04",
+ "target_class": "disposable",
+ "model_transport": "live OpenRouter",
+ "limit_micro_usd_each": 100000,
+ "samples": [
+  {
+   "seconds": 0.0,
+   "api": {
+    "cpu_percent": 0.6,
+    "rss_kb": 154560,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 115664,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 11.2,
+    "rss_kb": 24432,
+    "tcp_connections": 0
+   },
+   "worker_2": {
+    "cpu_percent": 12.2,
+    "rss_kb": 30880,
+    "tcp_connections": 0
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 5.8,
+    "memory_mib": 790.6
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 22,
+   "database_kb": 13195,
+   "disk_used_kb": 400594720
+  },
+  {
+   "seconds": 5.0,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 159728,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 115936,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 3.2,
+    "rss_kb": 161632,
+    "tcp_connections": 6
+   },
+   "worker_2": {
+    "cpu_percent": 6.4,
+    "rss_kb": 161648,
+    "tcp_connections": 6
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 5.6,
+    "memory_mib": 802.4
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 22,
+   "database_kb": 13299,
+   "disk_used_kb": 400595312
+  },
+  {
+   "seconds": 10.2,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 160576,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 115968,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.4,
+    "rss_kb": 163184,
+    "tcp_connections": 6
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 163088,
+    "tcp_connections": 6
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 5.1,
+    "memory_mib": 806.7
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 22,
+   "database_kb": 13483,
+   "disk_used_kb": 400595660
+  },
+  {
+   "seconds": 15.3,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 161888,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 116000,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 165040,
+    "tcp_connections": 8
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 164800,
+    "tcp_connections": 8
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 10.8,
+    "memory_mib": 802.9
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 20,
+   "database_kb": 13659,
+   "disk_used_kb": 400614168
+  },
+  {
+   "seconds": 20.4,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 163728,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 116240,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 170048,
+    "tcp_connections": 7
+   },
+   "worker_2": {
+    "cpu_percent": 5.2,
+    "rss_kb": 170000,
+    "tcp_connections": 7
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 5.0,
+    "memory_mib": 803.6
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13675,
+   "disk_used_kb": 400618648
+  }
+ ],
+ "problems": [],
+ "not_established": [
+  "H1",
+  "product acceptance",
+  "a persistent stack",
+  "responsiveness under load",
+  "more than this one workload"
+ ],
+ "key_usage_before_usd": 0.881201735,
+ "runs": [
+  "d99629f0-56b4-45dc-ab18-98fb1b2679e6",
+  "c1ecf49e-1d15-43b8-bf38-5812ef9c07de"
+ ],
+ "workload_seconds": 23.4,
+ "calls": [
+  {
+   "run_id": "d99629f0-56b4-45dc-ab18-98fb1b2679e6",
+   "attempt": 1,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 1491,
+   "start": 1794003635.288448,
+   "end": 1794003638.541404
+  },
+  {
+   "run_id": "c1ecf49e-1d15-43b8-bf38-5812ef9c07de",
+   "attempt": 1,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 1561,
+   "start": 1794003635.288451,
+   "end": 1794003638.120907
+  },
+  {
+   "run_id": "c1ecf49e-1d15-43b8-bf38-5812ef9c07de",
+   "attempt": 2,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 2334,
+   "start": 1794003638.171885,
+   "end": 1794003642.548982
+  },
+  {
+   "run_id": "d99629f0-56b4-45dc-ab18-98fb1b2679e6",
+   "attempt": 2,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 2229,
+   "start": 1794003638.580474,
+   "end": 1794003641.99227
+  },
+  {
+   "run_id": "d99629f0-56b4-45dc-ab18-98fb1b2679e6",
+   "attempt": 3,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 754,
+   "start": 1794003642.016523,
+   "end": 1794003644.421689
+  },
+  {
+   "run_id": "c1ecf49e-1d15-43b8-bf38-5812ef9c07de",
+   "attempt": 3,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 746,
+   "start": 1794003642.59235,
+   "end": 1794003644.838009
+  },
+  {
+   "run_id": "d99629f0-56b4-45dc-ab18-98fb1b2679e6",
+   "attempt": 4,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 389,
+   "start": 1794003644.457677,
+   "end": 1794003647.096086
+  },
+  {
+   "run_id": "c1ecf49e-1d15-43b8-bf38-5812ef9c07de",
+   "attempt": 4,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 387,
+   "start": 1794003644.857023,
+   "end": 1794003646.355305
+  },
+  {
+   "run_id": "c1ecf49e-1d15-43b8-bf38-5812ef9c07de",
+   "attempt": 5,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 677,
+   "start": 1794003646.459594,
+   "end": 1794003649.041984
+  },
+  {
+   "run_id": "d99629f0-56b4-45dc-ab18-98fb1b2679e6",
+   "attempt": 5,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 725,
+   "start": 1794003647.1527,
+   "end": 1794003649.424961
+  },
+  {
+   "run_id": "c1ecf49e-1d15-43b8-bf38-5812ef9c07de",
+   "attempt": 6,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "stop",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 350,
+   "start": 1794003649.059945,
+   "end": 1794003650.56862
+  },
+  {
+   "run_id": "d99629f0-56b4-45dc-ab18-98fb1b2679e6",
+   "attempt": 6,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "stop",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 354,
+   "start": 1794003649.449663,
+   "end": 1794003651.937429
+  }
+ ],
+ "calls_overlap_seconds": 14.86,
+ "worker_of_each_run": [
+  {
+   "run_id": "c1ecf49e-1d15-43b8-bf38-5812ef9c07de",
+   "lease_owner": null,
+   "generation": 1,
+   "status": "done"
+  },
+  {
+   "run_id": "d99629f0-56b4-45dc-ab18-98fb1b2679e6",
+   "lease_owner": null,
+   "generation": 1,
+   "status": "done"
+  }
+ ],
+ "final_status": {
+  "d99629f0-56b4-45dc-ab18-98fb1b2679e6": "succeeded",
+  "c1ecf49e-1d15-43b8-bf38-5812ef9c07de": "succeeded"
+ },
+ "stop_reasons": [
+  {
+   "run_id": "d99629f0-56b4-45dc-ab18-98fb1b2679e6",
+   "stop_reason": null,
+   "model_calls": 6
+  },
+  {
+   "run_id": "c1ecf49e-1d15-43b8-bf38-5812ef9c07de",
+   "stop_reason": null,
+   "model_calls": 6
+  }
+ ],
+ "uncertain_causes": [],
+ "charged_micro_usd": {
+  "d99629f0-56b4-45dc-ab18-98fb1b2679e6": 5942,
+  "c1ecf49e-1d15-43b8-bf38-5812ef9c07de": 6055
+ },
+ "verifications": [
+  {
+   "run_id": "c1ecf49e-1d15-43b8-bf38-5812ef9c07de",
+   "passed": true,
+   "unmet": []
+  },
+  {
+   "run_id": "d99629f0-56b4-45dc-ab18-98fb1b2679e6",
+   "passed": true,
+   "unmet": []
+  }
+ ],
+ "step_failures_in_logs": 0,
+ "worker_1_exit": 0,
+ "worker_2_exit": 0,
+ "key_found": {
+  "durable_rows": 0,
+  "log_files": 0
+ },
+ "peaks": {
+  "api": {
+   "cpu_percent": 0.6,
+   "rss_kb": 163728,
+   "tcp_connections": 3
+  },
+  "ui": {
+   "cpu_percent": 0.0,
+   "rss_kb": 116240,
+   "tcp_connections": 1
+  },
+  "worker_1": {
+   "cpu_percent": 11.2,
+   "rss_kb": 170048,
+   "tcp_connections": 8
+  },
+  "worker_2": {
+   "cpu_percent": 12.2,
+   "rss_kb": 170000,
+   "tcp_connections": 8
+  },
+  "docker": {
+   "cpu_percent": 10.8,
+   "memory_mib": 806.7
+  },
+  "database_connections": 22
+ },
+ "disk_growth_kb": 23928,
+ "database_growth_kb": 480,
+ "left_behind": "none",
+ "other_docker_unchanged": true,
+ "shared_ledger_committed_micro_usd": 286801,
+ "key_usage_after_usd": 0.893198535,
+ "verdict": "stable"
+}

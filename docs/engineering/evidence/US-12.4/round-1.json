@@ -1,0 +1,4161 @@
+{
+ "schema_version": "autobots.two-call-workload/v1",
+ "started_at_utc": "2026-11-06T22:05:41.308472+00:00",
+ "input_fingerprint": "ef94d4135828859cb557c9de2ed4aea2583dc7e807a6e414c2c996c8a17aeb04",
+ "target_class": "disposable",
+ "model_transport": "live OpenRouter",
+ "limit_micro_usd_each": 250000,
+ "samples": [
+  {
+   "seconds": 0.0,
+   "api": {
+    "cpu_percent": 7.3,
+    "rss_kb": 154480,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 115184,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 24304,
+    "tcp_connections": 0
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 30656,
+    "tcp_connections": 0
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 20.3,
+    "memory_mib": 793.0
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 22,
+   "database_kb": 13219,
+   "disk_used_kb": 400596468
+  },
+  {
+   "seconds": 5.2,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 159568,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 115312,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 2.7,
+    "rss_kb": 158848,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.7,
+    "rss_kb": 161200,
+    "tcp_connections": 6
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 18.8,
+    "memory_mib": 790.3
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 20,
+   "database_kb": 13323,
+   "disk_used_kb": 400600368
+  },
+  {
+   "seconds": 10.4,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 160464,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 115344,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 159584,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 2.2,
+    "rss_kb": 164464,
+    "tcp_connections": 8
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 18.0,
+    "memory_mib": 794.9
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 20,
+   "database_kb": 13467,
+   "disk_used_kb": 400600916
+  },
+  {
+   "seconds": 15.6,
+   "api": {
+    "cpu_percent": 0.0,
+    "rss_kb": 162192,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 115376,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.6,
+    "rss_kb": 161056,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.7,
+    "rss_kb": 168768,
+    "tcp_connections": 7
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 4.3,
+    "memory_mib": 788.8
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400615912
+  },
+  {
+   "seconds": 20.8,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 163904,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 115520,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 161056,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 6.6,
+    "rss_kb": 170144,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 4.6,
+    "memory_mib": 794.0
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400620532
+  },
+  {
+   "seconds": 26.0,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 165520,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 115776,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.7,
+    "rss_kb": 161088,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 170144,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 4.8,
+    "memory_mib": 787.7
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400622408
+  },
+  {
+   "seconds": 31.2,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 168000,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 116032,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 161088,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 2.5,
+    "rss_kb": 170144,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 3.9,
+    "memory_mib": 793.9
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400622516
+  },
+  {
+   "seconds": 36.3,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 168816,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 9.6,
+    "rss_kb": 105712,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.4,
+    "rss_kb": 161088,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 170144,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 2.7,
+    "memory_mib": 790.8
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400624320
+  },
+  {
+   "seconds": 41.5,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 168848,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 105568,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 161088,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 1.7,
+    "rss_kb": 170144,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 3.5,
+    "memory_mib": 793.1
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400624556
+  },
+  {
+   "seconds": 46.7,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 168912,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 105760,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.1,
+    "rss_kb": 161088,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 170144,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 6.3,
+    "memory_mib": 794.0
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400626736
+  },
+  {
+   "seconds": 51.9,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 167408,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 96864,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 4.4,
+    "rss_kb": 133664,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 1.5,
+    "rss_kb": 139872,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 3.1,
+    "memory_mib": 798.9
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400626784
+  },
+  {
+   "seconds": 57.0,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 167776,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 97040,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.1,
+    "rss_kb": 133664,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 139872,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 1.7,
+    "memory_mib": 794.0
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400627000
+  },
+  {
+   "seconds": 62.3,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 168608,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 97360,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 4.8,
+    "rss_kb": 133664,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.4,
+    "rss_kb": 139872,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 3.1,
+    "memory_mib": 795.4
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400626980
+  },
+  {
+   "seconds": 67.4,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 169504,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 97520,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 133664,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 139872,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 1.9,
+    "memory_mib": 791.4
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400619384
+  },
+  {
+   "seconds": 72.6,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 170352,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 97696,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 1.9,
+    "rss_kb": 133664,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.1,
+    "rss_kb": 139872,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 3.5,
+    "memory_mib": 796.6
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400619968
+  },
+  {
+   "seconds": 77.9,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 171040,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 97872,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 129488,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 4.8,
+    "rss_kb": 133344,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 3.1,
+    "memory_mib": 795.2
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400619848
+  },
+  {
+   "seconds": 83.2,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 90896,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 88336,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.3,
+    "rss_kb": 117680,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 126368,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 2.5,
+    "memory_mib": 796.3
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400619536
+  },
+  {
+   "seconds": 88.3,
+   "api": {
+    "cpu_percent": 0.0,
+    "rss_kb": 94064,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 88352,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 117664,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 1.4,
+    "rss_kb": 124160,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 2.6,
+    "memory_mib": 727.9
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400621784
+  },
+  {
+   "seconds": 93.5,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 95728,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 88384,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.1,
+    "rss_kb": 117664,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124080,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 2.8,
+    "memory_mib": 729.8
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400621788
+  },
+  {
+   "seconds": 98.7,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 97280,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 87584,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 117664,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.7,
+    "rss_kb": 124080,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 3.7,
+    "memory_mib": 730.0
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400621936
+  },
+  {
+   "seconds": 103.8,
+   "api": {
+    "cpu_percent": 0.2,
+    "rss_kb": 98064,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 87584,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 117664,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124080,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 3.0,
+    "memory_mib": 730.7
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400622120
+  },
+  {
+   "seconds": 109.1,
+   "api": {
+    "cpu_percent": 0.2,
+    "rss_kb": 98112,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 87696,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 3.5,
+    "rss_kb": 117664,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.4,
+    "rss_kb": 124080,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 4.1,
+    "memory_mib": 731.4
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400622252
+  },
+  {
+   "seconds": 114.2,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 98896,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 87824,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 117664,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124080,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 4.4,
+    "memory_mib": 735.7
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400610164
+  },
+  {
+   "seconds": 119.4,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 98992,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 87088,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 1.5,
+    "rss_kb": 117680,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.3,
+    "rss_kb": 124080,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 6.4,
+    "memory_mib": 731.2
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400606164
+  },
+  {
+   "seconds": 124.6,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 99056,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 87296,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 117680,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 7.3,
+    "rss_kb": 124080,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 6.7,
+    "memory_mib": 732.0
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400606112
+  },
+  {
+   "seconds": 129.9,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 99152,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 87488,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.6,
+    "rss_kb": 117680,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124080,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 11.0,
+    "memory_mib": 733.2
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400608536
+  },
+  {
+   "seconds": 135.1,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 98688,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 87760,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 117680,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 2.7,
+    "rss_kb": 124080,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 10.7,
+    "memory_mib": 737.1
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400610160
+  },
+  {
+   "seconds": 140.2,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 98592,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86416,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.3,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124080,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 6.9,
+    "memory_mib": 733.5
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400610276
+  },
+  {
+   "seconds": 145.4,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 98576,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 85760,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 1.9,
+    "rss_kb": 124112,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 13.6,
+    "memory_mib": 738.1
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400610220
+  },
+  {
+   "seconds": 150.6,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 96416,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 85872,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.1,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124352,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 4.6,
+    "memory_mib": 733.6
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400612476
+  },
+  {
+   "seconds": 155.8,
+   "api": {
+    "cpu_percent": 0.2,
+    "rss_kb": 98144,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86032,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 7.9,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 1.1,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 17.4,
+    "memory_mib": 758.7
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400612548
+  },
+  {
+   "seconds": 160.9,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 98864,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86304,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.1,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 13.5,
+    "memory_mib": 735.6
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400612884
+  },
+  {
+   "seconds": 166.1,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 98880,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86432,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 3.3,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.4,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 14.1,
+    "memory_mib": 733.7
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400613116
+  },
+  {
+   "seconds": 171.2,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 98896,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 85808,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.2,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.1,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 8.2,
+    "memory_mib": 735.0
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400615024
+  },
+  {
+   "seconds": 176.5,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 98912,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 85920,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 1.9,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.2,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 18.5,
+    "memory_mib": 737.2
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400614896
+  },
+  {
+   "seconds": 181.6,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 98976,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86112,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.1,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 11.6,
+    "memory_mib": 739.7
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400615284
+  },
+  {
+   "seconds": 186.7,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 98976,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86352,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 1.9,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.1,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 10.5,
+    "memory_mib": 747.1
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400615524
+  },
+  {
+   "seconds": 191.8,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 99008,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86496,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 4.7,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 23.4,
+    "memory_mib": 749.2
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400619060
+  },
+  {
+   "seconds": 197.0,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 99040,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 85824,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 1.9,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 16.5,
+    "memory_mib": 731.0
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400619148
+  },
+  {
+   "seconds": 202.1,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 99088,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 85920,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 3.9,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 15.7,
+    "memory_mib": 736.8
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400618816
+  },
+  {
+   "seconds": 207.3,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 99104,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86112,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 1.5,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 8.7,
+    "memory_mib": 732.6
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400618992
+  },
+  {
+   "seconds": 212.4,
+   "api": {
+    "cpu_percent": 0.2,
+    "rss_kb": 99184,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86368,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 2.4,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 16.5,
+    "memory_mib": 737.9
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400619144
+  },
+  {
+   "seconds": 217.6,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 100048,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86528,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.6,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 15.3,
+    "memory_mib": 732.3
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400621216
+  },
+  {
+   "seconds": 222.9,
+   "api": {
+    "cpu_percent": 0.2,
+    "rss_kb": 101600,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 85856,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 1.0,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 10.2,
+    "memory_mib": 737.9
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400621420
+  },
+  {
+   "seconds": 228.0,
+   "api": {
+    "cpu_percent": 0.2,
+    "rss_kb": 101600,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 85984,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 7.2,
+    "memory_mib": 733.9
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400620648
+  },
+  {
+   "seconds": 233.2,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 101632,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86176,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.4,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 10.2,
+    "memory_mib": 737.5
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400620296
+  },
+  {
+   "seconds": 238.4,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 101632,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86480,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 1.8,
+    "memory_mib": 738.9
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400622444
+  },
+  {
+   "seconds": 243.6,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 101712,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86608,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 3.3,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.1,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 3.5,
+    "memory_mib": 739.6
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400622796
+  },
+  {
+   "seconds": 248.8,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 101728,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 85920,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 5.4,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 2.7,
+    "memory_mib": 736.1
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400623224
+  },
+  {
+   "seconds": 253.9,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 99664,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86000,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 2.9,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.1,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 4.3,
+    "memory_mib": 737.5
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400623400
+  },
+  {
+   "seconds": 259.1,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 99680,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86208,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 1.9,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 3.0,
+    "memory_mib": 736.9
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400625576
+  },
+  {
+   "seconds": 264.3,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 99712,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86464,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 2.2,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 3.5,
+    "memory_mib": 736.5
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400625288
+  },
+  {
+   "seconds": 269.5,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 100512,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86624,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 1.5,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 11.0,
+    "memory_mib": 738.8
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400625352
+  },
+  {
+   "seconds": 274.6,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 100544,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 85936,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 1.2,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 4.0,
+    "memory_mib": 739.7
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400625568
+  },
+  {
+   "seconds": 279.9,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 100560,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86048,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.6,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 8.4,
+    "memory_mib": 738.6
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13595,
+   "disk_used_kb": 400627808
+  },
+  {
+   "seconds": 285.1,
+   "api": {
+    "cpu_percent": 0.2,
+    "rss_kb": 101248,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86224,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.4,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 2.7,
+    "memory_mib": 737.4
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400627568
+  },
+  {
+   "seconds": 290.2,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 102944,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86496,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118288,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.3,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 4.0,
+    "memory_mib": 734.4
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400627776
+  },
+  {
+   "seconds": 295.4,
+   "api": {
+    "cpu_percent": 0.2,
+    "rss_kb": 102960,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86624,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.1,
+    "rss_kb": 118288,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 6.6,
+    "memory_mib": 736.7
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400627648
+  },
+  {
+   "seconds": 300.5,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 102992,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 85968,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118288,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.1,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 6.0,
+    "memory_mib": 734.8
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400615444
+  },
+  {
+   "seconds": 305.6,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 103824,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86080,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.3,
+    "rss_kb": 118288,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 3.1,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 3.7,
+    "memory_mib": 735.0
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400611580
+  },
+  {
+   "seconds": 310.7,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 103824,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86256,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118288,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.1,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 7.0,
+    "memory_mib": 735.8
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13595,
+   "disk_used_kb": 400611988
+  },
+  {
+   "seconds": 315.8,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 103680,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86512,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.2,
+    "rss_kb": 118288,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 2.8,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 6.2,
+    "memory_mib": 738.1
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400611056
+  },
+  {
+   "seconds": 321.0,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 103808,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86672,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 1.8,
+    "rss_kb": 118288,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.1,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 5.8,
+    "memory_mib": 735.3
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400612876
+  },
+  {
+   "seconds": 326.1,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 103840,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86864,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.1,
+    "rss_kb": 118288,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 4.5,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 4.9,
+    "memory_mib": 736.4
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400612900
+  },
+  {
+   "seconds": 331.3,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 103888,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 87024,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 7.3,
+    "rss_kb": 118288,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.1,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 10.4,
+    "memory_mib": 738.1
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400612988
+  },
+  {
+   "seconds": 336.5,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 103920,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 87216,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.1,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 1.6,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 10.0,
+    "memory_mib": 737.5
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400613172
+  },
+  {
+   "seconds": 341.7,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 105504,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 87360,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 3.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 12.0,
+    "memory_mib": 737.8
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400615400
+  },
+  {
+   "seconds": 347.0,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 106384,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 87392,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.4,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 9.8,
+    "memory_mib": 734.2
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400615484
+  },
+  {
+   "seconds": 352.1,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 106384,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86480,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 1.8,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 6.2,
+    "memory_mib": 736.6
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400615304
+  },
+  {
+   "seconds": 357.4,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 106400,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86480,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.3,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 6.7,
+    "memory_mib": 731.4
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400615496
+  },
+  {
+   "seconds": 362.4,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 106416,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86512,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.6,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 13.1,
+    "memory_mib": 740.7
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400617656
+  },
+  {
+   "seconds": 367.7,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 106416,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86624,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.1,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 4.5,
+    "memory_mib": 732.6
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13627,
+   "disk_used_kb": 400618760
+  },
+  {
+   "seconds": 372.8,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 106416,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86752,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.3,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 5.7,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 4.7,
+    "memory_mib": 741.6
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13627,
+   "disk_used_kb": 400619020
+  },
+  {
+   "seconds": 378.0,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 106416,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86080,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 6.0,
+    "memory_mib": 739.9
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13627,
+   "disk_used_kb": 400619132
+  },
+  {
+   "seconds": 383.2,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 106416,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86176,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.1,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 3.1,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 7.0,
+    "memory_mib": 741.1
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13627,
+   "disk_used_kb": 400620988
+  },
+  {
+   "seconds": 388.4,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 106432,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86336,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 6.7,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 5.8,
+    "memory_mib": 737.7
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13627,
+   "disk_used_kb": 400622100
+  },
+  {
+   "seconds": 393.6,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 106432,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86624,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.6,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 6.2,
+    "memory_mib": 742.0
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13627,
+   "disk_used_kb": 400622240
+  },
+  {
+   "seconds": 398.8,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 106432,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86784,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 2.7,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 3.4,
+    "memory_mib": 738.4
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13627,
+   "disk_used_kb": 400622436
+  },
+  {
+   "seconds": 404.0,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 106432,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86112,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.6,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 2.7,
+    "memory_mib": 743.5
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13627,
+   "disk_used_kb": 400624648
+  },
+  {
+   "seconds": 409.1,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 107136,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86208,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 1.1,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 2.9,
+    "memory_mib": 737.8
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13627,
+   "disk_used_kb": 400624672
+  },
+  {
+   "seconds": 414.3,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 107152,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86368,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.3,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 2.5,
+    "memory_mib": 742.6
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13627,
+   "disk_used_kb": 400624524
+  },
+  {
+   "seconds": 419.4,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 107168,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86656,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 1.2,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 4.2,
+    "memory_mib": 739.8
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13627,
+   "disk_used_kb": 400624640
+  },
+  {
+   "seconds": 424.6,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 107200,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86784,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.2,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 2.4,
+    "memory_mib": 741.3
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13627,
+   "disk_used_kb": 400626928
+  },
+  {
+   "seconds": 429.7,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 107200,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86112,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 1.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 2.7,
+    "rss_kb": 124672,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 4.3,
+    "memory_mib": 739.5
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400627344
+  },
+  {
+   "seconds": 434.8,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 107200,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86192,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.1,
+    "rss_kb": 124656,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 2.2,
+    "memory_mib": 741.2
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400628388
+  },
+  {
+   "seconds": 439.9,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 107200,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86352,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.3,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 5.3,
+    "rss_kb": 124656,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 5.6,
+    "memory_mib": 749.8
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400628456
+  },
+  {
+   "seconds": 445.1,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 107200,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86624,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.1,
+    "rss_kb": 124656,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 8.8,
+    "memory_mib": 746.7
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400630392
+  },
+  {
+   "seconds": 450.1,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 107200,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86768,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.4,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 4.3,
+    "rss_kb": 124656,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 8.8,
+    "memory_mib": 760.9
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400630476
+  },
+  {
+   "seconds": 455.2,
+   "api": {
+    "cpu_percent": 0.2,
+    "rss_kb": 107216,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86096,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.1,
+    "rss_kb": 124656,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 8.4,
+    "memory_mib": 746.6
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400630588
+  },
+  {
+   "seconds": 460.3,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 107216,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86192,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.9,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.2,
+    "rss_kb": 124656,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 12.7,
+    "memory_mib": 749.0
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400630688
+  },
+  {
+   "seconds": 465.4,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 107216,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86352,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.1,
+    "rss_kb": 124656,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 9.5,
+    "memory_mib": 747.2
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400630572
+  },
+  {
+   "seconds": 470.5,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 109584,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86656,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.7,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 5.2,
+    "rss_kb": 124656,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 10.2,
+    "memory_mib": 746.8
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400632872
+  },
+  {
+   "seconds": 475.8,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 109600,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86784,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124656,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 8.8,
+    "memory_mib": 746.6
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400631912
+  },
+  {
+   "seconds": 480.8,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 109616,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86112,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.3,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 2.3,
+    "rss_kb": 124656,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 15.7,
+    "memory_mib": 747.4
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400632180
+  },
+  {
+   "seconds": 486.1,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 109632,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86208,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124656,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 9.4,
+    "memory_mib": 747.2
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400621940
+  },
+  {
+   "seconds": 491.2,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 109632,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86368,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.2,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 1.3,
+    "rss_kb": 124656,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 12.6,
+    "memory_mib": 745.8
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400616116
+  },
+  {
+   "seconds": 496.3,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 109616,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86640,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124656,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 16.4,
+    "memory_mib": 748.4
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400615896
+  },
+  {
+   "seconds": 501.4,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 107552,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86848,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.2,
+    "rss_kb": 118400,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.9,
+    "rss_kb": 124704,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 19.1,
+    "memory_mib": 761.8
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400616140
+  },
+  {
+   "seconds": 506.6,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 106224,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86144,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 3.7,
+    "rss_kb": 118400,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124704,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 9.4,
+    "memory_mib": 747.9
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400616372
+  },
+  {
+   "seconds": 511.9,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 107840,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86256,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.1,
+    "rss_kb": 118400,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.4,
+    "rss_kb": 124704,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 19.9,
+    "memory_mib": 755.2
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400618552
+  },
+  {
+   "seconds": 516.9,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 107872,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86416,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 3.9,
+    "rss_kb": 118400,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124704,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 9.6,
+    "memory_mib": 757.5
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400618596
+  },
+  {
+   "seconds": 522.2,
+   "api": {
+    "cpu_percent": 0.3,
+    "rss_kb": 107872,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86720,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118400,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.1,
+    "rss_kb": 124704,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 12.8,
+    "memory_mib": 755.9
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400619760
+  },
+  {
+   "seconds": 527.3,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 107840,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86848,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 1.4,
+    "rss_kb": 118400,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 3.0,
+    "rss_kb": 124704,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 6.1,
+    "memory_mib": 756.8
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400619868
+  },
+  {
+   "seconds": 532.5,
+   "api": {
+    "cpu_percent": 0.2,
+    "rss_kb": 108640,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86176,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118400,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124704,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 12.1,
+    "memory_mib": 758.0
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400621688
+  },
+  {
+   "seconds": 537.6,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 108512,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86272,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 1.9,
+    "rss_kb": 118400,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 6.8,
+    "rss_kb": 124704,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 4.4,
+    "memory_mib": 752.7
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400621840
+  },
+  {
+   "seconds": 542.8,
+   "api": {
+    "cpu_percent": 0.3,
+    "rss_kb": 110144,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86432,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118400,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124704,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 3.2,
+    "memory_mib": 756.0
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400621996
+  },
+  {
+   "seconds": 548.0,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 110144,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86752,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.7,
+    "rss_kb": 118400,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 3.9,
+    "rss_kb": 124704,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 5.1,
+    "memory_mib": 752.6
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400621964
+  },
+  {
+   "seconds": 553.1,
+   "api": {
+    "cpu_percent": 0.2,
+    "rss_kb": 110176,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86880,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118400,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124704,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 3.3,
+    "memory_mib": 756.1
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400624172
+  },
+  {
+   "seconds": 558.2,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 110192,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86240,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.6,
+    "rss_kb": 118400,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 3.3,
+    "rss_kb": 124704,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 6.0,
+    "memory_mib": 755.3
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400624300
+  },
+  {
+   "seconds": 563.3,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 108720,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86304,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118400,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124704,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 4.9,
+    "memory_mib": 757.0
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400624312
+  },
+  {
+   "seconds": 568.6,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 103456,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86256,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.3,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 2.1,
+    "rss_kb": 124656,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 16.9,
+    "memory_mib": 757.3
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400624340
+  },
+  {
+   "seconds": 573.8,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 104672,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86704,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.9,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124656,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 10.7,
+    "memory_mib": 768.8
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400626624
+  },
+  {
+   "seconds": 578.9,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 106272,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 86848,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.1,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.6,
+    "rss_kb": 124656,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 7.8,
+    "memory_mib": 768.8
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400626644
+  },
+  {
+   "seconds": 584.0,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 107120,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 87008,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124656,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 16.0,
+    "memory_mib": 781.2
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400626868
+  },
+  {
+   "seconds": 589.2,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 108752,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 87168,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.1,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.5,
+    "rss_kb": 124656,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 5.4,
+    "memory_mib": 779.5
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13627,
+   "disk_used_kb": 400626656
+  },
+  {
+   "seconds": 594.4,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 109536,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 87344,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 4.8,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.0,
+    "rss_kb": 124656,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 8.2,
+    "memory_mib": 780.9
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13627,
+   "disk_used_kb": 400629864
+  },
+  {
+   "seconds": 599.7,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 166112,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 87552,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 118304,
+    "tcp_connections": 3
+   },
+   "worker_2": {
+    "cpu_percent": 0.1,
+    "rss_kb": 124656,
+    "tcp_connections": 3
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 6.2,
+    "memory_mib": 782.2
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 19,
+   "database_kb": 13627,
+   "disk_used_kb": 400630116
+  }
+ ],
+ "problems": [
+  "a run was left paused"
+ ],
+ "not_established": [
+  "H1",
+  "product acceptance",
+  "a persistent stack",
+  "responsiveness under load",
+  "more than this one workload"
+ ],
+ "key_usage_before_usd": 0.864570985,
+ "runs": [
+  "f0fe0852-a36a-4c4b-9ecb-c607ddce8be9",
+  "5e34d399-072c-4938-83c3-77e6c4a0bcdb"
+ ],
+ "workload_seconds": 604.8,
+ "calls": [
+  {
+   "run_id": "5e34d399-072c-4938-83c3-77e6c4a0bcdb",
+   "attempt": 1,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 1376,
+   "start": 1794002769.868055,
+   "end": 1794002772.471365
+  },
+  {
+   "run_id": "f0fe0852-a36a-4c4b-9ecb-c607ddce8be9",
+   "attempt": 1,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "uncertain",
+   "failure_class": "uncertain_acceptance",
+   "finish_reason": null,
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": null,
+   "start": 1794002769.868117,
+   "end": 1794002771.182611
+  },
+  {
+   "run_id": "5e34d399-072c-4938-83c3-77e6c4a0bcdb",
+   "attempt": 2,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 2244,
+   "start": 1794002772.51849,
+   "end": 1794002776.1275
+  },
+  {
+   "run_id": "5e34d399-072c-4938-83c3-77e6c4a0bcdb",
+   "attempt": 3,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 554,
+   "start": 1794002776.168706,
+   "end": 1794002777.911039
+  },
+  {
+   "run_id": "5e34d399-072c-4938-83c3-77e6c4a0bcdb",
+   "attempt": 4,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 854,
+   "start": 1794002778.015371,
+   "end": 1794002780.658313
+  },
+  {
+   "run_id": "5e34d399-072c-4938-83c3-77e6c4a0bcdb",
+   "attempt": 5,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "stop",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 387,
+   "start": 1794002780.705689,
+   "end": 1794002782.815329
+  }
+ ],
+ "calls_overlap_seconds": 1.31,
+ "worker_of_each_run": [
+  {
+   "run_id": "f0fe0852-a36a-4c4b-9ecb-c607ddce8be9",
+   "lease_owner": null,
+   "generation": 1,
+   "status": "done"
+  },
+  {
+   "run_id": "5e34d399-072c-4938-83c3-77e6c4a0bcdb",
+   "lease_owner": null,
+   "generation": 1,
+   "status": "done"
+  }
+ ],
+ "final_status": {
+  "f0fe0852-a36a-4c4b-9ecb-c607ddce8be9": "paused",
+  "5e34d399-072c-4938-83c3-77e6c4a0bcdb": "succeeded"
+ },
+ "charged_micro_usd": {
+  "f0fe0852-a36a-4c4b-9ecb-c607ddce8be9": null,
+  "5e34d399-072c-4938-83c3-77e6c4a0bcdb": 5415
+ },
+ "verifications": [
+  {
+   "run_id": "5e34d399-072c-4938-83c3-77e6c4a0bcdb",
+   "passed": true,
+   "unmet": []
+  }
+ ],
+ "step_failures_in_logs": 0,
+ "worker_1_exit": 0,
+ "worker_2_exit": 0,
+ "key_found": {
+  "durable_rows": 0,
+  "log_files": 0
+ },
+ "peaks": {
+  "api": {
+   "cpu_percent": 7.3,
+   "rss_kb": 171040,
+   "tcp_connections": 3
+  },
+  "ui": {
+   "cpu_percent": 9.6,
+   "rss_kb": 116032,
+   "tcp_connections": 1
+  },
+  "worker_1": {
+   "cpu_percent": 7.9,
+   "rss_kb": 161088,
+   "tcp_connections": 3
+  },
+  "worker_2": {
+   "cpu_percent": 7.3,
+   "rss_kb": 170144,
+   "tcp_connections": 8
+  },
+  "docker": {
+   "cpu_percent": 23.4,
+   "memory_mib": 798.9
+  },
+  "database_connections": 22
+ },
+ "disk_growth_kb": 33648,
+ "database_growth_kb": 408,
+ "left_behind": "none",
+ "other_docker_unchanged": true,
+ "shared_ledger_committed_micro_usd": 263589,
+ "key_usage_after_usd": 0.869986735,
+ "verdict": "failed"
+}
