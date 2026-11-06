@@ -270,6 +270,21 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
             if ran.returncode:
                 print(ran.stdout[-1500:], file=sys.stderr)
         stack.sql("delete from agent_runtime.route_qualifications;\ninsert into agent_runtime.route_qualifications select * from public.arranged_route_rows;\ndrop table public.arranged_route_rows;\n")
+        # A saved choice naming DeepSeek can't be made through the product now, so each is arranged.
+        saved_choices = (('a saved default naming DeepSeek', "default_profile = 'openrouter_deepseek_flash', role_overrides = '{}'"),
+                         ('a saved override on another role', "default_profile = 'openrouter_terra', role_overrides = '{\"coder\": \"openrouter_deepseek_flash\"}'"),
+                         ('a saved executor override', "default_profile = 'openrouter_terra', role_overrides = '{\"executor\": \"openrouter_deepseek_flash\"}'"))
+        for index, (title, setting) in enumerate(saved_choices, start=1):
+            report_path = root / f'.checks/identity/playwright-saved-choice-{index}.json'
+            report_path.unlink(missing_ok=True)
+            qualification_reports.append(report_path)
+            arranged = stack.runtime(f"update app_private.model_policies set version = version + 1, {setting} where workspace_id = '{workspace_a}';\n")
+            cases.check(f'the saved choice is arranged: {title}', 'exit 0', f'exit {arranged.returncode}', arranged.returncode == 0)
+            ran = subprocess.run([str(playwright), 'test', 'browser/saved-choice', '-g', title, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=120, check=False,
+                                 env={**browser_env, 'AUTOBOTS_WEB_REPORT': str(report_path)})
+            qualification_codes.append(ran.returncode)
+            if ran.returncode:
+                print(ran.stdout[-1500:], file=sys.stderr)
         # The slice runs last, with a worker, so nothing above sees its jobs claimed.
         stack.runtime("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done';\n")
         # Arranged: the settings suite changed the workspace default, and the fixture worker's route is the original.

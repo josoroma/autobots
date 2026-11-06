@@ -32,8 +32,10 @@ from autobots.contracts.settings import (
 )
 from autobots.domain.models import (
     DEFAULT_PROFILE,
+    ProfileNotOffered,
     UnknownModelProfile,
     approved_profile,
+    require_offered,
     resolve_role_policy,
 )
 
@@ -219,8 +221,11 @@ async def put_model_policy(
         resolve_role_policy(
             workspace_default=body.default_profile.value, workspace_role_overrides=overrides
         )
+        require_offered([body.default_profile, *body.role_overrides.values()])
     except UnknownModelProfile as error:
         raise ApiError(422, "unknown_model", "Choose an approved model and role.") from error
+    except ProfileNotOffered as refused:
+        raise ApiError(422, refused.code, str(refused)) from None
     pool: Any = request.app.state.pool
     if pool is None:
         raise ApiError(503, "service_unavailable", "Provider settings are unavailable.")

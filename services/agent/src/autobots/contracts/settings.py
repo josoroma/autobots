@@ -67,6 +67,8 @@ class ModelAvailability(BaseModel):
     canonical_id: str
     wire_id: str
     available: bool
+    # New work can choose it. An approved model that isn't offered stays listed, with its record.
+    offered: bool
 
 
 class ModelList(BaseModel):

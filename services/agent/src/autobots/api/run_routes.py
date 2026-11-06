@@ -42,7 +42,12 @@ from autobots.contracts.run_commands import (
     RunRequest,
 )
 from autobots.contracts.runs import RunSummary
-from autobots.domain.models import resolve_role_policy
+from autobots.domain.models import (
+    ProfileNotOffered,
+    is_offered,
+    require_offered,
+    resolve_role_policy,
+)
 from autobots.domain.runs import Actor, CommandRefused, RunCommand
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
@@ -129,6 +134,12 @@ async def post_run(
             workspace_default=row[0] if row else None,
             workspace_role_overrides=row[1] if row else None,
         )
+        try:
+            require_offered(policy.bindings.values())
+        except ProfileNotOffered as refused:
+            # Named in this request it's a bad request. Otherwise it's a saved choice to change.
+            named = body.run_profile is not None and not is_offered(body.run_profile)
+            raise ApiError(422 if named else 409, refused.code, str(refused)) from None
         try:
             result = await admit_run(
                 connection,

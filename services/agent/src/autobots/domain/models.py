@@ -1,6 +1,6 @@
 """The two approved model profiles and role policy, MP-01. Pure, with no framework imports."""
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
@@ -58,6 +58,28 @@ ROLE_POLICY_VERSION = 1
 
 class UnknownModelProfile(ValueError):
     """A profile or role outside the approved set. It is refused, never mapped to a default."""
+
+
+# Approved stays approved. This is what new work can choose, by Decision 0013. A run already
+# admitted keeps its frozen route, so this is checked where new work starts, not in the registry.
+OFFERED_FOR_NEW_RUNS = frozenset({ModelProfileId.TERRA})
+NOT_OFFERED_CODE = "model_not_offered"
+NOT_OFFERED_MESSAGE = "DeepSeek isn't offered for new runs until it's qualified."
+
+
+class ProfileNotOffered(Exception):
+    """A typed reason, and nothing starts. No other model is ever put in its place."""
+
+    code = NOT_OFFERED_CODE
+
+
+def is_offered(profile: "ModelProfileId") -> bool:
+    return profile in OFFERED_FOR_NEW_RUNS
+
+
+def require_offered(profiles: Iterable["ModelProfileId"]) -> None:
+    if any(not is_offered(profile) for profile in profiles):
+        raise ProfileNotOffered(NOT_OFFERED_MESSAGE)
 
 
 def approved_profile(value: object) -> ModelProfileId:

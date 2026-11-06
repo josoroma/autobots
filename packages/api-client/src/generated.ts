@@ -1670,6 +1670,10 @@ export const schemas = {
         "title": "Canonical Id",
         "type": "string"
       },
+      "offered": {
+        "title": "Offered",
+        "type": "boolean"
+      },
       "profile": {
         "$ref": "#/components/schemas/ModelProfileId"
       },
@@ -1682,7 +1686,8 @@ export const schemas = {
       "profile",
       "canonical_id",
       "wire_id",
-      "available"
+      "available",
+      "offered"
     ],
     "title": "ModelAvailability",
     "type": "object"
@@ -4848,6 +4853,7 @@ export function parseMemorySearchView(value: unknown): MemorySearchView {
 export interface ModelAvailability {
   available: boolean;
   canonical_id: string;
+  offered: boolean;
   profile: ModelProfileId;
   wire_id: string;
 }

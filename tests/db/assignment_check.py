@@ -15,6 +15,7 @@ from pydantic import SecretStr
 sys.path.insert(0, str(Path(__file__).parent))
 from goal_loop_script import ROUTE, Script, calls, say  # noqa: E402
 
+from autobots.adapters.loop_middleware import ModelRoute  # noqa: E402
 from autobots.adapters.object_storage import SupabaseObjectStore  # noqa: E402
 from autobots.application.experts import create_expert, create_session, resolve_binding  # noqa: E402
 from autobots.application.goal_loop import LoopConfig, _finish, process_next  # noqa: E402
@@ -150,6 +151,15 @@ async def main() -> None:
         row = await (await db.execute('select r.status, a.outcome from app_private.assignments a join public.runs r on r.id = a.child_run_id where a.parent_run_id = %s', (run,))).fetchone()
         stopped = await value('select u.stop_reason from app_private.run_usage u join public.runs r on r.id = u.run_id where r.parent_run_id = %s', run)
         check("a child past the root's active time stops", 'active_time_limit, failed, 3 calls', (stopped, row, len(model.seen)), stopped == 'active_time_limit' and row[0] == 'failed' and len(model.seen) == 3)
+
+        # US-12.1: a run admitted on DeepSeek before it stopped being offered keeps its route, and so do its children.
+        frozen = await admit_run(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), goal_text='Lead on a frozen route', limit_micro_usd=1_000_000, policy=resolve_role_policy(run_profile='openrouter_deepseek_flash'), binding=await resolve_binding(db, WORKSPACE, session.id, expert_id=lead.id))
+        held = await (await db.execute("update app_private.run_jobs set available_at = clock_timestamp() + interval '1 hour' where status = 'queued' and run_id <> %s returning run_id", (frozen.run_id,))).fetchall()
+        model = Script(items=[calls(PARENT_PLAN), calls(assign(helper)), calls(CHILD_PLAN), say('child stops'), say('parent stops')], seen=[], bound=[])
+        await process_next(db, URL, 'parent', lambda: model, LoopConfig(route=ModelRoute('executor', 'openrouter_deepseek_flash', 'fixture/model', 1000), object_store=store, sleep=lambda _: asyncio.sleep(0)))
+        await db.execute('update app_private.run_jobs set available_at = clock_timestamp() where run_id = any(%s)', ([row[0] for row in held],))
+        inherited = await value("select r.policy_snapshot -> 'bindings' ->> 'executor' from app_private.assignments a join public.runs r on r.id = a.child_run_id where a.parent_run_id = %s", frozen.run_id)
+        check('a child under a frozen DeepSeek policy is admitted on that route', 'openrouter_deepseek_flash', inherited, inherited == 'openrouter_deepseek_flash')
 
         # No slot is held while waiting on a child.
         seen_active: list[int] = []

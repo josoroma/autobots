@@ -93,11 +93,13 @@ export function RunDisclosure({
             onChange={(event) => onChoose(event.target.value)}
           >
             <option value={WORKSPACE_DEFAULT}>The workspace setting</option>
-            {models.models.map((model) => (
-              <option key={model.profile} value={model.profile}>
-                {model.canonical_id}
-              </option>
-            ))}
+            {models.models
+              .filter((model) => model.offered)
+              .map((model) => (
+                <option key={model.profile} value={model.profile}>
+                  {model.canonical_id}
+                </option>
+              ))}
           </Select>
         </div>
       )}

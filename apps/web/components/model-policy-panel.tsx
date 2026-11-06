@@ -142,6 +142,18 @@ export function ModelPolicyPanel() {
   if (models === null || state === null) {
     return <p className="text-muted-foreground text-sm">Loading models.</p>;
   }
+  // A saved choice that isn't offered stays visible, unselectable, so the page never shows another.
+  const listed = models.models;
+  const choices = (current: string | undefined) =>
+    listed.filter((model) => model.offered || model.profile === current);
+  const notOffered = new Set(
+    listed.filter((model) => !model.offered).map((model) => model.profile),
+  );
+  const savedChoiceNotOffered =
+    notOffered.has(defaultProfile as (typeof listed)[number]["profile"]) ||
+    Object.values(overrides).some((profile) =>
+      notOffered.has(profile as (typeof listed)[number]["profile"]),
+    );
   return (
     <Card aria-labelledby="policy-heading" className="space-y-4">
       <h2 id="policy-heading" className="text-lg font-medium">
@@ -154,10 +166,24 @@ export function ModelPolicyPanel() {
               {modelLabel(model.canonical_id, model.wire_id)}
             </span>
             {model.available ? "" : ". Not in the catalog right now."}
+            {model.offered
+              ? ""
+              : ". Approved, and not offered for new runs until it's qualified."}
           </li>
         ))}
       </ul>
       <RoleEffect state={state} />
+      {savedChoiceNotOffered ? (
+        <p
+          data-field="not-offered"
+          role="alert"
+          className="text-sm font-medium"
+        >
+          A saved choice here names a model that isn&apos;t offered for new
+          runs, so new runs are refused until you change it. Nothing replaces it
+          for you.
+        </p>
+      ) : null}
       <form onSubmit={(event) => void save(event)} className="space-y-3">
         <div className="space-y-1">
           <label htmlFor="workspace-default" className="text-sm font-medium">
@@ -168,8 +194,12 @@ export function ModelPolicyPanel() {
             value={defaultProfile}
             onChange={(event) => setDefaultProfile(event.target.value)}
           >
-            {models.models.map((model) => (
-              <option key={model.profile} value={model.profile}>
+            {choices(defaultProfile).map((model) => (
+              <option
+                key={model.profile}
+                value={model.profile}
+                disabled={!model.offered}
+              >
                 {model.canonical_id}
               </option>
             ))}
@@ -199,8 +229,12 @@ export function ModelPolicyPanel() {
                 }}
               >
                 <option value={WORKSPACE_DEFAULT}>Workspace default</option>
-                {models.models.map((model) => (
-                  <option key={model.profile} value={model.profile}>
+                {choices(overrides[binding.role]).map((model) => (
+                  <option
+                    key={model.profile}
+                    value={model.profile}
+                    disabled={!model.offered}
+                  >
                     {model.canonical_id}
                   </option>
                 ))}

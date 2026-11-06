@@ -69,9 +69,11 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
     setProblem(
       failure?.code === "credentials_required"
         ? "Model-backed work needs an OpenRouter key."
-        : reply?.status === 422
-          ? "That request isn't approved, so no run started. Your goal is kept."
-          : "That could not be started.",
+        : failure?.code === "model_not_offered"
+          ? "A saved model choice isn't offered for new runs until it's qualified, so no run started. Your goal is kept."
+          : reply?.status === 422
+            ? "That request isn't approved, so no run started. Your goal is kept."
+            : "That could not be started.",
     );
   }
 

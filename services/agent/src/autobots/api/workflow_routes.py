@@ -35,6 +35,7 @@ from autobots.contracts.workflows import (
     WorkflowValidation,
     WorkflowView,
 )
+from autobots.domain.models import NOT_OFFERED_CODE, NOT_OFFERED_MESSAGE
 from autobots.domain.workflows import BLOCKS, GraphError, graph_hash, validate_graph
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
@@ -63,6 +64,8 @@ def _error(error: WorkflowRefused | IdempotencyConflict) -> ApiError:
     if error.code in {"workflow_invalid", "workflow_inputs_invalid"}:
         codes = ", ".join(sorted({item.code for item in error.errors}))
         return ApiError(422, error.code, f"That isn't valid: {codes}.")
+    if error.code == NOT_OFFERED_CODE:
+        return ApiError(409, error.code, NOT_OFFERED_MESSAGE)
     return ApiError(409, error.code, "That conflicts with what is saved. Reload and try again.")
 
 

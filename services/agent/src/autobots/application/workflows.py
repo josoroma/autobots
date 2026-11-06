@@ -19,7 +19,12 @@ from autobots.contracts.workflows import (
     WorkflowVersionView,
     WorkflowView,
 )
-from autobots.domain.models import RolePolicy, resolve_role_policy
+from autobots.domain.models import (
+    ProfileNotOffered,
+    RolePolicy,
+    require_offered,
+    resolve_role_policy,
+)
 from autobots.domain.tools import DELEGATION_TOOL, LOOP_TOOL_GRANTS, PLAN_TOOLS
 from autobots.domain.workflows import (
     GraphError,
@@ -231,6 +236,10 @@ async def create_execution(
                     workspace_default=chosen[0] if chosen else None,
                     workspace_role_overrides=chosen[1] if chosen else None,
                 )
+                try:
+                    require_offered(policy.bindings.values())
+                except ProfileNotOffered as refused:
+                    raise WorkflowRefused(refused.code) from None
             granted = (
                 _WORKFLOW_TOOLS
                 if tools is None

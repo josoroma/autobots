@@ -1669,6 +1669,10 @@
             "title": "Canonical Id",
             "type": "string"
           },
+          "offered": {
+            "title": "Offered",
+            "type": "boolean"
+          },
           "profile": {
             "$ref": "#/components/schemas/ModelProfileId"
           },
@@ -1681,7 +1685,8 @@
           "profile",
           "canonical_id",
           "wire_id",
-          "available"
+          "available",
+          "offered"
         ],
         "title": "ModelAvailability",
         "type": "object"

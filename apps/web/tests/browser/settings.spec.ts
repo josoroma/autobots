@@ -294,7 +294,7 @@ test("the model policy is versioned, and refuses an unapproved value", async ({
     data: {
       expected_version: 0,
       default_profile: "openrouter_terra",
-      role_overrides: { coder: "openrouter_deepseek_flash" },
+      role_overrides: { coder: "openrouter_terra" },
     },
   });
   expect(saved.status()).toBe(200);
@@ -303,17 +303,53 @@ test("the model policy is versioned, and refuses an unapproved value", async ({
   const coder = state.policy.bindings.find(
     (binding: { role: string }) => binding.role === "coder",
   );
-  expect(coder.profile).toBe("openrouter_deepseek_flash");
-  expect(
-    state.policy.bindings.filter(
-      (binding: { profile: string }) => binding.profile === "openrouter_terra",
-    ),
-  ).toHaveLength(13);
+  expect(coder.profile).toBe("openrouter_terra");
+  // Named on a write, DeepSeek is refused with why, and nothing stored changes.
+  for (const data of [
+    {
+      expected_version: 1,
+      default_profile: "openrouter_deepseek_flash",
+      role_overrides: {},
+    },
+    {
+      expected_version: 1,
+      default_profile: "openrouter_terra",
+      role_overrides: { coder: "openrouter_deepseek_flash" },
+    },
+  ]) {
+    const notOffered = await page.request.put("/api/settings/model-policy", {
+      headers,
+      data,
+    });
+    expect(notOffered.status()).toBe(422);
+    const refusal = await notOffered.json();
+    expect(refusal.code).toBe("model_not_offered");
+    expect(refusal.message).toContain("isn't offered for new runs");
+  }
+  const kept = await (
+    await page.request.get("/api/settings/model-policy")
+  ).json();
+  expect(kept.version).toBe(1);
+  const namedRun = await page.request.post("/api/v1/runs", {
+    headers: { ...headers, "Idempotency-Key": `named-${Date.now()}` },
+    data: { goal_text: "names it", run_profile: "openrouter_deepseek_flash" },
+  });
+  expect(namedRun.status()).toBe(422);
+  expect((await namedRun.json()).code).toBe("model_not_offered");
+  const expert = await page.request.post("/api/v1/experts", {
+    headers: { ...headers, "Idempotency-Key": `expert-${Date.now()}` },
+    data: {
+      name: "Names DeepSeek",
+      config: { role_bindings: { executor: "openrouter_deepseek_flash" } },
+    },
+  });
+  expect(expert.status()).toBe(422);
+  expect((await expert.json()).code).toBe("model_not_offered");
   const stale = await page.request.put("/api/settings/model-policy", {
     headers,
     data: {
       expected_version: 0,
-      default_profile: "openrouter_deepseek_flash",
+      default_profile: "openrouter_terra",
       role_overrides: {},
     },
   });

@@ -274,11 +274,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-11.12#3 | Record a disposition for the 41 minors and open majors, and settle WORKER-INFERENCE-001's status. | DONE | US-11.12 |
 | US-11.12#4 | Mark Claude's crash and timeout hook behavior not qualified, and hand the record to US-10.2's assessment. | DONE | US-11.12 |
 | EPIC-12 | Release closure | — | — |
-| US-12.1 | Stop offering DeepSeek for new runs | READY | EPIC-12 |
-| US-12.1#1 | Refuse DeepSeek on the server for new runs and for writes to the workspace default, role overrides and Expert bindings, with regenerated clients if a public contract changes. | TODO | US-12.1 |
-| US-12.1#2 | Remove it from every picker, and say on Settings why it isn't offered. | TODO | US-12.1 |
-| US-12.1#3 | Update the tests that choose DeepSeek through the product path, and arrange the frozen-route cases on runs already admitted. | TODO | US-12.1 |
-| US-12.1#4 | Correct text that still says a person can choose it, including `README.md` and `.claude/rules/model-gateway.md`. | TODO | US-12.1 |
+| US-12.1 | Stop offering DeepSeek for new runs | DONE | EPIC-12 |
+| US-12.1#1 | Refuse DeepSeek on the server for new runs and for writes to the workspace default, role overrides and Expert bindings, with regenerated clients if a public contract changes. | DONE | US-12.1 |
+| US-12.1#2 | Remove it from every picker, and say on Settings why it isn't offered. | DONE | US-12.1 |
+| US-12.1#3 | Update the tests that choose DeepSeek through the product path, and arrange the frozen-route cases on runs already admitted. | DONE | US-12.1 |
+| US-12.1#4 | Correct text that still says a person can choose it, including `README.md` and `.claude/rules/model-gateway.md`. | DONE | US-12.1 |
 | US-12.2 | Close what a test can settle | READY | EPIC-12 |
 | US-12.2#1 | Add the LC-03, LC-04, LC-07 and LC-13 tests on a disposable stack, and fix what they find. | TODO | US-12.2 |
 | US-12.2#2 | Add the no-key file cases for LC-20, MP-A12 and LM-A06. | TODO | US-12.2 |
@@ -2938,7 +2938,6 @@ Open Questions:
 ### US-10.2: Release traceability and evidence-based completion
 
 Status: BLOCKED
-Change: `openspec/changes/us-10-2-release-traceability-evidence-based/`
 
 As a product owner
 I want a complete requirement-to-evidence record
@@ -3655,7 +3654,8 @@ Phase reference: B7, preserved SP-020. Scope and spending come from Decision 001
 
 ### US-12.1: Stop offering DeepSeek for new runs
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-12-1-stop-offering-deepseek-new/`
 
 As a workspace owner
 I want DeepSeek kept out of everything that starts new work until it's qualified
@@ -3719,10 +3719,10 @@ Dependencies:
 - US-11.9
 
 Tasks:
-- [ ] Refuse DeepSeek on the server for new runs and for writes to the workspace default, role overrides and Expert bindings, with regenerated clients if a public contract changes.
-- [ ] Remove it from every picker, and say on Settings why it isn't offered.
-- [ ] Update the tests that choose DeepSeek through the product path, and arrange the frozen-route cases on runs already admitted.
-- [ ] Correct text that still says a person can choose it, including `README.md` and `.claude/rules/model-gateway.md`.
+- [x] Refuse DeepSeek on the server for new runs and for writes to the workspace default, role overrides and Expert bindings, with regenerated clients if a public contract changes.
+- [x] Remove it from every picker, and say on Settings why it isn't offered.
+- [x] Update the tests that choose DeepSeek through the product path, and arrange the frozen-route cases on runs already admitted.
+- [x] Correct text that still says a person can choose it, including `README.md` and `.claude/rules/model-gateway.md`.
 
 Open Questions:
 - None.

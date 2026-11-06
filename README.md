@@ -33,7 +33,7 @@ Use the project skill `autobots-spec-ingest` to refresh the backlog. Its read-on
 
 Every H0/H1 and product work item follows a proportional **plan → implement → independent review → verify → runbook + evidence** workflow. Record review findings and their disposition, run the required checks against the final changes, and retain reproducible evidence and remaining limitations. Update and exercise the relevant runbook in the qualified disposable environment; if operational behavior is unchanged, record that fact rather than inventing a procedure. Small changes use concise records, not skipped stages. [SPECS.md](SPECS.md) and the [development harness contract](PRD-Development-Harness.md) define the detailed workflow.
 
-All **14 inference roles default to Terra**. Users may select DeepSeek for a run, workspace default or explicit role override:
+All **14 inference roles default to Terra**. DeepSeek stays approved and isn't offered for new runs until it's qualified, by [Decision 0013](docs/engineering/decisions/0013-release-closure.md):
 
 | Requested canonical snapshot | Verified OpenRouter API request ID |
 |---|---|

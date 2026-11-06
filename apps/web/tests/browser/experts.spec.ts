@@ -58,6 +58,11 @@ test("an owner saves revisions in the editor, and a session shows what it really
     page.getByRole("heading", { name: "Writer, version 1" }),
   ).toBeVisible();
 
+  await expect(
+    page
+      .getByLabel("Model for its work")
+      .locator('option[value="openrouter_deepseek_flash"]'),
+  ).toHaveCount(0);
   await page.getByLabel("Purpose").fill("Writes reports");
   await page.getByLabel("Instructions").fill("Be concise.");
   await page.getByLabel("Calculate").check();

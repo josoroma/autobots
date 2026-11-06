@@ -32,7 +32,7 @@ from autobots.contracts.settings import (
     ProviderStatus,
     RouteQualification,
 )
-from autobots.domain.models import PROFILES, ModelProfileId
+from autobots.domain.models import PROFILES, ModelProfileId, is_offered
 
 
 class KeyCheck(StrEnum):
@@ -275,6 +275,7 @@ class ProviderSettings:
                     canonical_id=profile.canonical_id,
                     wire_id=profile.wire_id,
                     available=available,
+                    offered=is_offered(profile.id),
                 )
             )
         status = "available" if payload is not None else "unavailable"

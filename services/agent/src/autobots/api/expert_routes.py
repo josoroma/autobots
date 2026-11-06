@@ -19,6 +19,7 @@ from autobots.application.experts import (
 )
 from autobots.application.runs import IdempotencyConflict
 from autobots.contracts.experts import (
+    ExpertConfig,
     ExpertCreate,
     ExpertList,
     ExpertRevision,
@@ -26,6 +27,7 @@ from autobots.contracts.experts import (
     SessionCreate,
     SessionView,
 )
+from autobots.domain.models import ProfileNotOffered, require_offered
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 Key = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)]
@@ -59,6 +61,13 @@ async def get_experts(request: Request, workspace: Member) -> ExpertList:
         return ExpertList(schema_version=1, experts=await list_experts(connection, workspace))
 
 
+def _bindings_offered(config: ExpertConfig) -> None:
+    try:
+        require_offered(config.role_bindings.values())
+    except ProfileNotOffered as refused:
+        raise ApiError(422, refused.code, str(refused)) from None
+
+
 @router.post(
     "/experts",
     operation_id="createExpert",
@@ -68,6 +77,7 @@ async def get_experts(request: Request, workspace: Member) -> ExpertList:
 async def post_expert(
     body: ExpertCreate, request: Request, key: Key, workspace: Owner, user: User
 ) -> ExpertView:
+    _bindings_offered(body.config)
     async with _pool(request).connection() as connection:
         try:
             return await create_expert(
@@ -100,6 +110,7 @@ async def read_expert(expert_id: UUID, request: Request, workspace: Member) -> E
 async def post_version(
     expert_id: UUID, body: ExpertRevision, request: Request, key: Key, workspace: Owner, user: User
 ) -> ExpertView:
+    _bindings_offered(body.config)
     async with _pool(request).connection() as connection:
         try:
             return await add_version(

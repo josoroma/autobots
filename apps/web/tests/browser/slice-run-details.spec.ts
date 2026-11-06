@@ -5,7 +5,6 @@ const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
 const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
 const TERRA = "openrouter_terra";
 const DEEPSEEK = "openrouter_deepseek_flash";
-const DEEPSEEK_CANONICAL = "deepseek/deepseek-v4.1-flash-20261017";
 const TERRA_CANONICAL = "openai/gpt-6.1-terra-20261026";
 const DATA =
   "selected instructions, conversation and context excerpts, retrieved material, tool outputs and required protocol metadata";
@@ -145,8 +144,13 @@ test("a person picks the other model for one run: it freezes, the default stays,
   ).json();
   expect(before.default_profile).toBe(TERRA);
   await page.goto("/");
-  await page.getByLabel("Model for this run").selectOption(DEEPSEEK);
-  await expectDisclosure(page, DEEPSEEK_CANONICAL);
+  await expect(
+    page
+      .getByLabel("Model for this run")
+      .locator(`option[value="${DEEPSEEK}"]`),
+  ).toHaveCount(0);
+  await page.getByLabel("Model for this run").selectOption(TERRA);
+  await expectDisclosure(page, TERRA_CANONICAL);
   await page
     .getByRole("textbox", { name: "Goal" })
     .fill("slice-only-claims one run");
@@ -159,7 +163,7 @@ test("a person picks the other model for one run: it freezes, the default stays,
   const map = page.locator('[data-field="role-map"]');
   await expect(map.locator("li")).toHaveCount(14);
   for (const item of await map.locator("li").all()) {
-    await expect(item).toContainText(DEEPSEEK_CANONICAL);
+    await expect(item).toContainText(TERRA_CANONICAL);
   }
   await expect(map).toContainText(
     "Only the executor's binding dispatches in this release",
@@ -277,7 +281,7 @@ test("an unapproved model is refused, no run starts, and the draft is kept", asy
   await page.getByRole("textbox", { name: "Goal" }).fill("");
 });
 
-test("reusing a key for another model is a conflict, not a replay of the first", async ({
+test("reusing a key with a model chosen is a conflict, not a replay of the first", async ({
   page,
 }) => {
   await signIn(page);
@@ -286,12 +290,12 @@ test("reusing a key for another model is a conflict, not a replay of the first",
   const key = `same-key-${Date.now()}`;
   const first = await page.request.post("/api/v1/runs", {
     headers: await write(page, key),
-    data: { goal_text: "slice-only-claims keyed", run_profile: TERRA },
+    data: { goal_text: "slice-only-claims keyed" },
   });
   expect(first.status()).toBe(202);
   const other = await page.request.post("/api/v1/runs", {
     headers: await write(page, key),
-    data: { goal_text: "slice-only-claims keyed", run_profile: DEEPSEEK },
+    data: { goal_text: "slice-only-claims keyed", run_profile: TERRA },
   });
   expect(other.status()).toBe(409);
   expect((await other.json()).code).toBe("idempotency_conflict");

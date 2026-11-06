@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 import json
 import os
 from pathlib import Path
@@ -23,7 +24,11 @@ from autobots.application.operations import REQUIRED_COLUMNS, database_condition
 from autobots.application.plans import load_goal  # noqa: E402
 from autobots.application.run_projection import read_inspector, read_summary, read_workspace  # noqa: E402
 from autobots.application.runs import LinkRefused, admit_run  # noqa: E402
-from autobots.application.workflows import create_execution, create_workflow, publish_version  # noqa: E402
+from autobots.application.experts import create_expert  # noqa: E402
+from autobots.application.routines import RoutineRefused, _admit as routine_admit  # noqa: E402, PLC2701
+from autobots.application.workflows import WorkflowRefused, create_execution, create_workflow, publish_version  # noqa: E402
+from autobots.contracts.experts import ExpertConfig  # noqa: E402
+from autobots.contracts.routines import RoutineConfig, RoutineTarget  # noqa: E402
 from autobots.contracts.workflows import WorkflowGraph  # noqa: E402
 from autobots.application.worker_leases import claim_run
 from autobots.domain.models import resolve_role_policy
@@ -199,6 +204,30 @@ async def main() -> None:
         model = Aware(items=[say('never')], seen=[], bound=[])
         result = await _drive(db, URL, await claim_run(db, tiered, worker_id='tiered'), lambda: model, LoopConfig(route=ModelRoute('executor', 'openrouter_terra', 'fixture/model', 1_000, 1_000_000, 1), sleep=lambda _: asyncio.sleep(0)))
         check('a request that could reach a higher tier is refused before sending', 'cost_unavailable, no call', (result.code, len(model.seen)), result.code == 'cost_unavailable' and not model.seen)
+
+        # US-12.1: a saved choice naming DeepSeek refuses new work, with no substitute and no rewrite.
+        chooser = uuid4()
+        await db.execute("insert into public.workspaces (id, name) values (%s, 'Saved DeepSeek')", (chooser,))
+        await db.execute("insert into app_private.model_policies (workspace_id, version, default_profile, role_overrides) values (%s, 1, 'openrouter_deepseek_flash', '{}')", (chooser,))
+        saved_flow = await create_workflow(db, workspace_id=chooser, actor_id=actor, idempotency_key=str(uuid4()), name=f'Saved {uuid4().hex[:6]}')
+        await publish_version(db, workspace_id=chooser, actor_id=actor, workflow_id=saved_flow.id, idempotency_key=str(uuid4()), expected_version=0, graph=WorkflowGraph.model_validate(graph), source='user')
+        try:
+            await create_execution(db, workspace_id=chooser, actor_id=actor, workflow_id=saved_flow.id, idempotency_key=str(uuid4()), version=1, inputs={'in': 'x'})
+            check("a workflow under a saved DeepSeek default is refused", 'model_not_offered', 'admitted', False)
+        except WorkflowRefused as refused:
+            check("a workflow under a saved DeepSeek default is refused", 'model_not_offered', refused.code, refused.code == 'model_not_offered')
+        started = (await (await db.execute('select count(*) from public.runs where workspace_id = %s', (chooser,))).fetchone())[0]
+        kept = (await (await db.execute('select default_profile, version from app_private.model_policies where workspace_id = %s', (chooser,))).fetchone())
+        check('no run started, and the saved choice stands', "0 runs, still DeepSeek at version 1", (started, kept), started == 0 and kept == ('openrouter_deepseek_flash', 1))
+        lover = await create_expert(db, workspace_id=WORKSPACE, actor_id=actor, idempotency_key=str(uuid4()), name=f'Saved binding {uuid4().hex[:6]}', config=ExpertConfig(tools=['calculate'], role_bindings={'executor': 'openrouter_deepseek_flash'}))
+        routine = RoutineConfig(target=RoutineTarget(kind='expert', id=lover.id, version=1), goal='Scheduled work', trigger={'kind': 'interval', 'minutes': 60}, limit_micro_usd=500)
+        before_runs = (await (await db.execute('select count(*) from public.runs where workspace_id = %s', (WORKSPACE,))).fetchone())[0]
+        try:
+            await routine_admit(db, WORKSPACE, uuid4(), 1, routine, datetime(2026, 1, 1, tzinfo=UTC))
+            check("an occurrence on a saved Expert binding is refused", 'model_not_offered', 'admitted', False)
+        except RoutineRefused as refused:
+            after_runs = (await (await db.execute('select count(*) from public.runs where workspace_id = %s', (WORKSPACE,))).fetchone())[0]
+            check("an occurrence on a saved Expert binding is refused", 'model_not_offered, no run', (refused.code, after_runs - before_runs), refused.code == 'model_not_offered' and after_runs == before_runs)
     print(json.dumps({'cases': cases}))
 
 

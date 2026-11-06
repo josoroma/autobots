@@ -20,7 +20,6 @@ const TOOLS = [
 ];
 const PROFILES = [
   { id: "", label: "Workspace setting" },
-  { id: "openrouter_deepseek_flash", label: "DeepSeek Flash" },
   { id: "openrouter_terra", label: "Terra" },
 ];
 
@@ -224,6 +223,13 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
                   {profile.label}
                 </option>
               ))}
+              {PROFILES.some(
+                (profile) => profile.id === draft.executor,
+              ) ? null : (
+                <option value={draft.executor} disabled>
+                  {draft.executor}: not offered for new runs until qualified
+                </option>
+              )}
             </Select>
           </div>
           <div className="flex gap-3">

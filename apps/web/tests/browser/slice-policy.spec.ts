@@ -96,7 +96,7 @@ async function cancel(page: Page, id: string): Promise<void> {
 const select = (page: Page, role: string) =>
   page.getByLabel(role, { exact: true });
 
-test("an owner saves a default: a new run freezes it, and an admitted run keeps its own", async ({
+test("an owner saves a default of what is offered, and DeepSeek is listed but not offered", async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -116,20 +116,31 @@ test("an owner saves a default: a new run freezes it, and an admitted run keeps 
   ).toContainText(
     "deepseek/deepseek-v4.1-flash-20261017 (requested as deepseek/deepseek-v4.1-flash-1017)",
   );
-  await page.getByLabel("Workspace default").selectOption(DEEPSEEK);
+  await expect(
+    page.locator(`[data-approved-model="${DEEPSEEK}"]`),
+  ).toContainText("not offered for new runs until it's qualified");
+  // Approved and listed, and not something new work can choose.
+  await expect(
+    page.getByLabel("Workspace default").locator(`option[value="${DEEPSEEK}"]`),
+  ).toHaveCount(0);
+  await expect(
+    select(page, "coder").locator(`option[value="${DEEPSEEK}"]`),
+  ).toHaveCount(0);
+  const version = (await storedPolicy(page)).version;
+  await page.getByLabel("Workspace default").selectOption(TERRA);
   await page.getByRole("button", { name: "Save policy" }).click();
   await expect(page.locator("[data-policy-message]")).toContainText("Saved.");
-  expect((await storedPolicy(page)).default_profile).toBe(DEEPSEEK);
+  expect((await storedPolicy(page)).version).toBe(version + 1);
 
   await page.goto("/");
   const after = await admit(page, "after-the-change");
-  expect(await frozenExecutor(page, after)).toBe(DEEPSEEK);
+  expect(await frozenExecutor(page, after)).toBe(TERRA);
   expect(await frozenExecutor(page, before)).toBe(TERRA);
   await cancel(page, after);
   await cancel(page, before);
 
   await page.goto("/settings/models");
-  await expect(page.getByLabel("Workspace default")).toHaveValue(DEEPSEEK);
+  await expect(page.getByLabel("Workspace default")).toHaveValue(TERRA);
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa"])
     .analyze();
@@ -137,7 +148,7 @@ test("an owner saves a default: a new run freezes it, and an admitted run keeps 
   await restore(page);
 });
 
-test("the screen says what a differing role does, including when only the executor was overridden", async ({
+test("the screen says only the executor dispatches, and a same-binding override reads as the same", async ({
   page,
 }) => {
   await signIn(page);
@@ -152,32 +163,14 @@ test("the screen says what a differing role does, including when only the execut
   );
   await expect(effect.locator('[data-role-effect="same"]')).toBeVisible();
 
-  await select(page, "coder").selectOption(DEEPSEEK);
+  // A role that differs needs a saved choice this screen can't make now: saved-choice.spec.ts.
+  await select(page, "coder").selectOption(TERRA);
   await page.getByRole("button", { name: "Save policy" }).click();
   await expect(page.locator("[data-policy-message]")).toContainText("Saved.");
-  await expect(effect.locator('[data-role-effect="differs"]')).toHaveText(
-    "These differ from the executor, so they don't take effect: coder.",
-  );
-  await expect(effect.locator('[data-role-effect="summarizer"]')).toHaveCount(
-    0,
-  );
-
-  // Only the executor overridden: every other role now differs from it, summarizer included.
-  await select(page, "coder").selectOption("");
-  await select(page, "executor").selectOption(DEEPSEEK);
-  await page.getByRole("button", { name: "Save policy" }).click();
-  await expect(effect.locator('[data-role-effect="differs"]')).toContainText(
-    "summarizer",
-  );
-  await expect(effect.locator('[data-role-effect="differs"]')).toContainText(
-    ": coordinator, router, planner, researcher, coder,",
-  );
-  await expect(effect.locator('[data-role-effect="summarizer"]')).toBeVisible();
-  await page.reload();
-  await expect(effect.locator('[data-role-effect="summarizer"]')).toBeVisible();
+  await expect(effect.locator('[data-role-effect="same"]')).toBeVisible();
   const stored = await storedPolicy(page);
   expect(stored.default_profile).toBe(TERRA);
-  expect(stored.role_overrides).toEqual({ executor: DEEPSEEK });
+  expect(stored.role_overrides).toEqual({ coder: TERRA });
   await restore(page);
 });
 
@@ -195,14 +188,14 @@ test("a stale save is refused with a reload message, and the stored policy is un
   const other = await context.newPage();
   await signIn(other);
   await other.goto("/settings/models");
-  await other.getByLabel("Workspace default").selectOption(DEEPSEEK);
+  await select(other, "coder").selectOption(TERRA);
   await other.getByRole("button", { name: "Save policy" }).click();
   await expect(other.locator("[data-policy-message]")).toContainText("Saved.");
   await context.close();
   const stored = await storedPolicy(page);
-  expect(stored.default_profile).toBe(DEEPSEEK);
+  expect(stored.role_overrides).toEqual({ coder: TERRA });
 
-  await select(page, "coder").selectOption(DEEPSEEK);
+  await select(page, "planner").selectOption(TERRA);
   await page.getByRole("button", { name: "Save policy" }).click();
   await expect(page.locator("[data-policy-message]")).toContainText(
     "Reload the page",

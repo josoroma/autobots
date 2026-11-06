@@ -23,7 +23,7 @@ from autobots.application.runs import (
 from autobots.application.workflows import WorkflowRefused, create_execution
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.routines import OccurrenceView, RoutineConfig, RoutineView
-from autobots.domain.models import resolve_role_policy
+from autobots.domain.models import ProfileNotOffered, require_offered, resolve_role_policy
 from autobots.domain.routines import (
     TriggerInvalid,
     occurrences,
@@ -290,6 +290,15 @@ async def _admit(
         (workspace_id,),
     )
     policy_row = await cursor.fetchone()
+    policy = resolve_role_policy(
+        run_role_overrides={r: p.value for r, p in expert.role_bindings.items()},
+        workspace_default=policy_row[0] if policy_row else None,
+        workspace_role_overrides=policy_row[1] if policy_row else None,
+    )
+    try:
+        require_offered(policy.bindings.values())
+    except ProfileNotOffered as refused:
+        raise RoutineRefused(refused.code) from None
     admitted = await admit_run(
         connection,
         workspace_id=workspace_id,
@@ -297,11 +306,7 @@ async def _admit(
         idempotency_key=key,
         goal_text=config.goal,
         limit_micro_usd=config.limit_micro_usd,
-        policy=resolve_role_policy(
-            run_role_overrides={r: p.value for r, p in expert.role_bindings.items()},
-            workspace_default=policy_row[0] if policy_row else None,
-            workspace_role_overrides=policy_row[1] if policy_row else None,
-        ),
+        policy=policy,
         binding=SimpleNamespace(
             session_id=None,
             expert_id=config.target.id,

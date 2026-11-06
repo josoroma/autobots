@@ -28,7 +28,8 @@ type Outcome =
   | "credential_invalid"
   | "credential_unavailable"
   | "model_refused"
-  | "error";
+  | "error"
+  | "model_not_offered";
 
 export function GoalComposer() {
   const restored = useSyncExternalStore(subscribe, storedDraft, () => "");
@@ -74,6 +75,10 @@ export function GoalComposer() {
     const failure = (await reply?.json().catch(() => null)) as {
       code?: string;
     } | null;
+    if (failure?.code === "model_not_offered") {
+      setOutcome("model_not_offered");
+      return;
+    }
     const known: Outcome[] = [
       "credentials_required",
       "credential_invalid",
@@ -118,6 +123,14 @@ export function GoalComposer() {
             </>
           ) : outcome === "credential_unavailable" ? (
             "Credential storage is unavailable, so model-backed work is blocked. Your draft is kept."
+          ) : outcome === "model_not_offered" ? (
+            <>
+              A saved model choice isn&apos;t offered for new runs until
+              it&apos;s qualified, so no run started. Your draft is kept.{" "}
+              <Link href="/settings/models" className="font-medium underline">
+                Change it in settings
+              </Link>
+            </>
           ) : outcome === "model_refused" ? (
             "That model or request isn't approved, so no run started. Your draft is kept."
           ) : outcome === "queued" ? (
