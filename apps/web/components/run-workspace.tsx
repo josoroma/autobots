@@ -10,6 +10,7 @@ import {
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { RunControls } from "@/components/run-controls";
 import { Card } from "@/components/ui/card";
 import { UnknownEffects } from "@/components/unknown-effects";
 
@@ -240,6 +241,16 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
         >
           {CONNECTION_TEXT[connection]}
         </p>
+        <RunControls
+          runId={runId}
+          status={snapshot.run.status}
+          version={snapshot.run.version}
+          openCalls={
+            snapshot.outstanding.uncertain_calls +
+            snapshot.outstanding.unreported_charges
+          }
+          onChanged={() => setRefreshes((count) => count + 1)}
+        />
       </Card>
       {snapshot.verification === null ? null : (
         <Card aria-labelledby="verification-heading" className="space-y-2">

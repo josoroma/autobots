@@ -12,6 +12,7 @@ import re
 import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,10 @@ READ = ('read_run_file', {'path': 'inputs/data.md'})
 PUBLISH = ('publish_artifact', {'path': 'outputs/report.md', 'version': 1})
 DONE = ('complete_task', {'task_id': 'report', 'evidence': [{'kind': 'artifact', 'reference': 'outputs/report.md'}], 'summary': 'Reported the total of the two counts.'})
 FINISHED = 'The report is ready.'
+# A second death, for a run page test, since the first marker is the slice's.
+DIED_AGAIN = MARKER.with_name(MARKER.name + '-again')
+# Long enough for a person's controls to meet a run that's really running.
+SLOW_SECONDS = 2.0
 
 
 def replies(messages: Any, name: str) -> list[dict[str, Any]]:
@@ -64,6 +69,9 @@ def next_step(goal: str, messages: Any) -> Any:
         if 'slice-complete' in goal and not MARKER.exists():
             MARKER.write_text('died')
             os.kill(os.getpid(), signal.SIGKILL)
+        if 'slice-uncertain' in goal and not DIED_AGAIN.exists():
+            DIED_AGAIN.write_text('died')
+            os.kill(os.getpid(), signal.SIGKILL)
         return PUBLISH
     if not replies(messages, 'complete_task'):
         return DONE
@@ -80,6 +88,8 @@ class GoalScript(BaseChatModel):
 
     def _generate(self, messages: Any, stop: Any = None, run_manager: Any = None, **_: Any) -> ChatResult:
         goal = ' '.join(str(message.content) for message in messages if message.type == 'human')
+        if 'slice-slow' in goal:
+            time.sleep(SLOW_SECONDS)
         step = next_step(goal, messages)
         metadata = {'finish_reason': 'stop', 'cost': 0.0001}
         if isinstance(step, str):

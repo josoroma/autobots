@@ -267,7 +267,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
                       'AUTOBOTS_STORAGE_BASE': base, 'AUTOBOTS_STORAGE_SERVICE': stack.values['SERVICE_ROLE_KEY'],
                       'AUTOBOTS_TEST_DIED_MARKER': str(config_root / 'worker-died')}
         processes.append(start([str(root / PYTHON), str(root / 'tests/web/fixture_worker.py')], worker_env, root))
-        slice_result = subprocess.run([str(playwright), 'test', 'slice', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=400, check=False,
+        slice_result = subprocess.run([str(playwright), 'test', 'slice', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=600, check=False,
                                       env={**browser_env, 'AUTOBOTS_WEB_REPORT': str(slice_report)})
         if slice_result.returncode:
             print(slice_result.stdout[-2500:], file=sys.stderr)

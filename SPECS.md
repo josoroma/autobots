@@ -226,10 +226,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-11.3#2 | Choose and record the install's project name, ports, env file and data location outside the repository. | DONE | US-11.3 |
 | US-11.3#3 | Stand up the stack and exercise the runbooks on it, correcting what they say about a persistent stack. | DONE | US-11.3 |
 | US-11.3#4 | Run a real goal under the shared cap, record actual cost, and leave the worker's inference switch off afterward. | DONE | US-11.3 |
-| US-11.4 | Run controls on the run page | READY | EPIC-11 |
-| US-11.4#1 | Add pause, cancel and resume to the run page, using the existing routes and the run's current version. | TODO | US-11.4 |
-| US-11.4#2 | Add owner-only model-call reconciliation, and show each refusal's reason. | TODO | US-11.4 |
-| US-11.4#3 | Cover the controls with browser tests on a disposable stack with a scripted model. | TODO | US-11.4 |
+| US-11.4 | Run controls on the run page | DONE | EPIC-11 |
+| US-11.4#1 | Add pause, cancel and resume to the run page, using the existing routes and the run's current version. | DONE | US-11.4 |
+| US-11.4#2 | Add owner-only model-call reconciliation, and show each refusal's reason. | DONE | US-11.4 |
+| US-11.4#3 | Cover the controls with browser tests on a disposable stack with a scripted model. | DONE | US-11.4 |
 | US-11.5 | Run list and inspector | READY | EPIC-11 |
 | US-11.5#1 | Add a workspace-scoped run list route and screen. | TODO | US-11.5 |
 | US-11.5#2 | Add a sanitized inspector read model and screen for model calls, tool operation attempts and checkpoints. | TODO | US-11.5 |
@@ -2996,7 +2996,8 @@ Open Questions:
 
 ### US-11.4: Run controls on the run page
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-11-4-run-controls-run-page/`
 
 As a user
 I want pause, cancel, resume and model-call reconciliation on the run page
@@ -3042,9 +3043,9 @@ Dependencies:
 - US-4.7
 
 Tasks:
-- [ ] Add pause, cancel and resume to the run page, using the existing routes and the run's current version.
-- [ ] Add owner-only model-call reconciliation, and show each refusal's reason.
-- [ ] Cover the controls with browser tests on a disposable stack with a scripted model.
+- [x] Add pause, cancel and resume to the run page, using the existing routes and the run's current version.
+- [x] Add owner-only model-call reconciliation, and show each refusal's reason.
+- [x] Cover the controls with browser tests on a disposable stack with a scripted model.
 
 Open Questions:
 - None.
