@@ -62,7 +62,7 @@ class FakeGithub:
 async def main() -> None:
     github = FakeGithub()
     registry = ToolRegistry()
-    registry.register(github_issue_tool(httpx.MockTransport(github), ENV))
+    registry.register(github_issue_tool(httpx.MockTransport(github), ENV, settle_seconds=()))
     gateway = ToolGateway(registry)
     granted = {TOOL_ID: EXPERT_TOOLS[TOOL_ID]}
 

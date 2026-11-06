@@ -81,7 +81,7 @@ AUTOBOTS_GITHUB_ISSUES_TOKEN=<a fine-grained token limited to that repository, w
 The token is read for each attempt and stored nowhere. Without both, a call fails as `connector_not_configured` and sends nothing.
 
 - **Refused by GitHub:** the call fails as `github_refused_<status>`, with that code on the receipt, and created nothing.
-- **Uncertain:** a lost reply or an unclear status records `unknown`. The connector looks for its marker in the newest 100 issues and only sends again if it isn't there, so an issue that hasn't appeared yet, or a repository busier than that, could be duplicated.
+- **Uncertain:** a lost reply or an unclear status records `unknown`. The connector looks for its marker in the newest 100 issues, for about 15 seconds because GitHub's list can lag a new issue, and only sends again if it never appears. An issue slower than that, or a repository busier than that, could be duplicated.
 
 Qualify it against a throwaway private repository. The script refuses a broad token or a public repository, writes one issue and closes it:
 

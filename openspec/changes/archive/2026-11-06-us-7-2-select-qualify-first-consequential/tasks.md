@@ -13,4 +13,6 @@
 ## 3. Live qualification (scenario: Enforce the selected connector contract)
 
 - [x] 3.1 Add `scripts/qualify_github_connector.py`, which refuses a broad token or a public repository, checked by `tests/test_github_issues.py`
-- [ ] 3.2 Run it against the owner's throwaway private repository, and record the result. Needs a token only the owner can create
+- [x] 3.2 Run it against the owner's throwaway private repository, and record the result. Needs a token only the owner can create
+- [x] 3.3 The first live run found GitHub's issue list lagging behind a create, which a lost reply could turn into a second issue. Make the readback wait a bounded time before it says not delivered, checked by `tests/test_github_issues.py` and the live run
+- [x] 3.4 Make the qualifier report a failed readback as a failed case with a saved report, not a traceback, checked by `tests/test_github_issues.py`

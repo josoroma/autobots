@@ -5,9 +5,10 @@ attempt and kept nowhere. GitHub has no idempotency key for this call, so each i
 with its operation ID, and an uncertain outcome is settled by reading the repository's issues back.
 """
 
+import asyncio
 import os
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import httpx
@@ -30,6 +31,11 @@ _REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 _REFUSED = frozenset({400, 401, 403, 404, 410, 422, 429})
 _REQUEST_SECONDS = 15.0
 _READBACK_ISSUES = 100
+# The issue list can lag a create: a live run read it at once and missed the new issue.
+# "Not delivered" lets the gateway send again, so it's only said after these waits. They stay well
+# inside the tool's timeout, and running out of that time records an unknown outcome, which never
+# sends again.
+READBACK_SETTLE_SECONDS = (1.0, 2.0, 4.0, 8.0)
 
 
 class UnclearReply(Exception):
@@ -47,6 +53,7 @@ def _output(issue: Mapping[str, Any]) -> CreateGithubIssueOutput:
 def github_issue_tool(
     transport: httpx.AsyncBaseTransport | None = None,
     environ: Mapping[str, str] = os.environ,
+    settle_seconds: Sequence[float] = READBACK_SETTLE_SECONDS,
 ) -> ToolDefinition:
     def target() -> tuple[str, str]:
         repository = environ.get(REPOSITORY_VARIABLE, "")
@@ -88,24 +95,26 @@ def github_issue_tool(
         return _output(reply.json())
 
     async def readback(_: CreateGithubIssueInput, context: ToolContext) -> CreateGithubIssueOutput:
-        """Reads the list, not search, which can lag behind what was just created."""
+        """Reads the list, which lags less than search, and gives a new issue time to appear."""
         repository, token = target()
         expected = marker(context.operation_id)
         async with client(token) as http:
-            reply = await http.get(
-                f"/repos/{repository}/issues",
-                params={
-                    "state": "all",
-                    "sort": "created",
-                    "direction": "desc",
-                    "per_page": _READBACK_ISSUES,
-                },
-            )
-        if reply.status_code != 200:
-            raise UnclearReply(reply.status_code)
-        for issue in reply.json():
-            if expected in (issue.get("body") or ""):
-                return _output(issue)
+            for wait in (0.0, *settle_seconds):
+                await asyncio.sleep(wait)
+                reply = await http.get(
+                    f"/repos/{repository}/issues",
+                    params={
+                        "state": "all",
+                        "sort": "created",
+                        "direction": "desc",
+                        "per_page": _READBACK_ISSUES,
+                    },
+                )
+                if reply.status_code != 200:
+                    raise UnclearReply(reply.status_code)
+                for issue in reply.json():
+                    if expected in (issue.get("body") or ""):
+                        return _output(issue)
         raise NotDelivered
 
     return ToolDefinition(

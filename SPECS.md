@@ -172,9 +172,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-7.1 | Explicit routines and deduplicated scheduled occurrences | DONE | EPIC-7 |
 | US-7.1#1 | Implement versioned routines and occurrence admission. | DONE | US-7.1 |
 | US-7.1#2 | Test duplicate, missed, overlap and timezone cases. | DONE | US-7.1 |
-| US-7.2 | Select and qualify the first consequential connector | IN PROGRESS | EPIC-7 |
-| US-7.2#1 | Resolve the connector/service and operation scope decision. | TODO | US-7.2 |
-| US-7.2#2 | Implement and qualify only that selected connector under the existing effect contract. | TODO | US-7.2 |
+| US-7.2 | Select and qualify the first consequential connector | DONE | EPIC-7 |
+| US-7.2#1 | Resolve the connector/service and operation scope decision. | DONE | US-7.2 |
+| US-7.2#2 | Implement and qualify only that selected connector under the existing effect contract. | DONE | US-7.2 |
 | EPIC-8 | Scoped memory and reviewed learning | — | — |
 | US-8.1 | Scoped memory, lexical retrieval and safe compaction | DONE | EPIC-8 |
 | US-8.1#1 | Implement scoped store/artifact retrieval and explicit compaction policy. | DONE | US-8.1 |
@@ -2238,8 +2238,8 @@ Open Questions:
 
 ### US-7.2: Select and qualify the first consequential connector
 
-Status: IN PROGRESS
-Change: `openspec/changes/us-7-2-select-qualify-first-consequential/`
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-7-2-select-qualify-first-consequential/`
 
 As a workspace owner
 I want a specifically selected connector with scoped operations
@@ -2271,8 +2271,8 @@ Dependencies:
 - US-5.4
 
 Tasks:
-- [ ] Resolve the connector/service and operation scope decision.
-- [ ] Implement and qualify only that selected connector under the existing effect contract.
+- [x] Resolve the connector/service and operation scope decision.
+- [x] Implement and qualify only that selected connector under the existing effect contract.
 
 Open Questions:
 - None.

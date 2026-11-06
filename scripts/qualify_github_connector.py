@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import sys
+import time
 from uuid import uuid4
 
 OUT = Path('.checks/github-connector')
@@ -64,8 +65,9 @@ async def qualify(repository: str, token: str) -> tuple[int, dict]:
             stored = (await http.get(f'/repos/{repository}/issues/{number}')).json()
             check('the issue carries its operation marker', 'the marker, in the body', marker(operation) in stored.get('body', ''), marker(operation) in stored.get('body', ''))
             assert tool.reconcile is not None
+            started = time.monotonic()
             found = await tool.reconcile(arguments, context)
-            check('a readback finds that same issue, as an uncertain outcome would need', str(number), found.number, found.number == number)
+            check('a readback finds that same issue, as an uncertain outcome would need', str(number), f'{found.number}, after {time.monotonic() - started:.1f} s', found.number == number)
             found_again = await tool.reconcile(arguments, context)
             check('and a repeated readback creates nothing', str(number), found_again.number, found_again.number == number)
             issues = (await http.get(f'/repos/{repository}/issues', params={'state': 'all', 'per_page': 100})).json()
@@ -83,6 +85,9 @@ async def qualify(repository: str, token: str) -> tuple[int, dict]:
                 check('a rejected credential creates nothing', 'github_refused_401', 'created', False)
             except Exception as error:
                 check('a rejected credential creates nothing', 'github_refused_401', error, str(error) == 'github_refused_401')
+        except Exception as error:
+            # Only the type: a report is saved, and a message could hold anything.
+            check('the qualification ran to its end', 'no error', type(error).__name__, False)
         finally:
             if number is not None:
                 closed = await http.patch(f'/repos/{repository}/issues/{number}', json={'state': 'closed', 'state_reason': 'not_planned'})

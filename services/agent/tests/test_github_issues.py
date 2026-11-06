@@ -13,6 +13,7 @@ import pytest
 from pydantic import ValidationError
 
 from autobots.adapters.github_issues import (
+    READBACK_SETTLE_SECONDS,
     REPOSITORY_VARIABLE,
     TOKEN_VARIABLE,
     UnclearReply,
@@ -62,8 +63,12 @@ def context(operation: str = OPERATION) -> ToolContext:
     return ToolContext(None, ToolScope(uuid4(), uuid4(), 1, {}), operation)
 
 
-def tool(handler: Any, environ: dict[str, str] | None = None) -> Any:
-    return github_issue_tool(httpx.MockTransport(handler), ENV if environ is None else environ)
+def tool(
+    handler: Any, environ: dict[str, str] | None = None, settle: tuple[float, ...] = ()
+) -> Any:
+    return github_issue_tool(
+        httpx.MockTransport(handler), ENV if environ is None else environ, settle
+    )
 
 
 def create(handler: Any, environ: dict[str, str] | None = None) -> Any:
@@ -197,6 +202,55 @@ def test_a_readback_copes_with_an_issue_with_no_body() -> None:
         read_back(github)
 
 
+class LaggingGithub(FakeGithub):
+    """Hides issues from the first reads, as the live list did right after a create."""
+
+    def __init__(self, hidden_reads: int) -> None:
+        super().__init__()
+        self.hidden_reads = hidden_reads
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        if request.method == "GET" and self.hidden_reads:
+            self.hidden_reads -= 1
+            self.requests.append(request)
+            return httpx.Response(200, json=[])
+        return super().__call__(request)
+
+
+def settled_read_back(github: FakeGithub, operation: str = OPERATION) -> Any:
+    reconcile = tool(github, settle=(0.0, 0.0)).reconcile
+    assert reconcile is not None
+    return asyncio.run(reconcile(ARGUMENTS, context(operation)))
+
+
+def test_a_readback_waits_for_a_list_that_lags_the_create() -> None:
+    github = LaggingGithub(hidden_reads=2)
+    created = create(github)
+    assert settled_read_back(github) == created
+    assert sum(request.method == "GET" for request in github.requests) == 3
+    assert sum(request.method == "POST" for request in github.requests) == 1
+
+
+def test_not_delivered_is_only_said_after_every_wait() -> None:
+    github = LaggingGithub(hidden_reads=3)
+    create(github)
+    with pytest.raises(NotDelivered):
+        settled_read_back(github)
+    assert sum(request.method == "GET" for request in github.requests) == 3
+
+
+def test_a_failed_read_during_the_waits_stays_uncertain() -> None:
+    github = FakeGithub(500)
+    with pytest.raises(UnclearReply):
+        settled_read_back(github)
+    assert sum(request.method == "GET" for request in github.requests) == 1
+
+
+def test_the_waits_fit_inside_the_tools_timeout() -> None:
+    """Running out of time records an unknown outcome, so the waits must usually finish first."""
+    assert sum(READBACK_SETTLE_SECONDS) < tool(FakeGithub()).timeout_seconds
+
+
 def test_a_failed_readback_says_nothing_about_delivery() -> None:
     with pytest.raises(UnclearReply):
         read_back(FakeGithub(500))
@@ -232,3 +286,40 @@ def test_the_live_qualifier_accepts_a_limited_token_on_a_private_repository(
     scopes: str | None,
 ) -> None:
     assert qualifier().unsafe_target(scopes, True) == ""
+
+
+def test_the_qualifier_reports_a_failed_readback_and_still_closes_the_issue(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The first live run ended in a traceback here, with no report."""
+    methods: list[str] = []
+
+    def github(request: httpx.Request) -> httpx.Response:
+        methods.append(request.method)
+        if request.method == "POST":
+            return httpx.Response(
+                201, json={"number": 1, "html_url": f"https://github.com/{REPOSITORY}/issues/1"}
+            )
+        if request.url.path.endswith("/issues"):
+            return httpx.Response(200, json=[])
+        if request.method == "PATCH":
+            return httpx.Response(200, json={})
+        if request.url.path.endswith("/issues/1"):
+            return httpx.Response(200, json={"body": marker("unused")})
+        return httpx.Response(200, json={"private": True})
+
+    real_client = httpx.AsyncClient
+
+    def faked(**options: Any) -> httpx.AsyncClient:
+        return real_client(**{**options, "transport": httpx.MockTransport(github)})
+
+    async def no_wait(_: float) -> None:
+        return None
+
+    monkeypatch.setattr(httpx, "AsyncClient", faked)
+    monkeypatch.setattr(asyncio, "sleep", no_wait)
+    code, report = asyncio.run(qualifier().qualify(REPOSITORY, TOKEN))
+    assert code == 1
+    assert report["failed"]
+    assert TOKEN not in json.dumps(report)
+    assert methods[-1] == "PATCH"
