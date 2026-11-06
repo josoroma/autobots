@@ -8,7 +8,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
-from release_scoring import percentile, safety_failures, score, summarize  # noqa: E402
+from release_scoring import docker_totals, mebibytes, percentile, process_totals, safety_failures, score, summarize, summarize_resources  # noqa: E402
 
 TASKS = json.loads((ROOT / 'tests/qualification/tasks.json').read_text())
 
@@ -127,6 +127,40 @@ class Summary(unittest.TestCase):
         self.assertEqual(percentile(list(range(1, 101)), 0.95), 95)
         self.assertEqual(percentile([3.0], 0.95), 3.0)
         self.assertIsNone(percentile([], 0.95))
+
+
+class Resources(unittest.TestCase):
+    def test_sizes_read_as_docker_prints_them(self) -> None:
+        self.assertEqual(mebibytes('98.5MiB'), 98.5)
+        self.assertEqual(mebibytes('1GiB'), 1024.0)
+        self.assertAlmostEqual(mebibytes('1MB'), 0.95367, places=4)
+        self.assertEqual(mebibytes('0B'), 0.0)
+        self.assertEqual(mebibytes('not a size'), 0.0)
+
+    def test_only_this_projects_containers_count(self) -> None:
+        mine = {'Name': 'autobots-disposable-abc-db-1', 'CPUPerc': '10.5%', 'MemUsage': '100MiB / 23GiB', 'BlockIO': '1MiB / 2MiB', 'NetIO': '3MiB / 4MiB'}
+        other = {'Name': 'someone-elses-db-1', 'CPUPerc': '90%', 'MemUsage': '9GiB / 23GiB', 'BlockIO': '9GiB / 9GiB', 'NetIO': '9GiB / 9GiB'}
+        totals = docker_totals([json.dumps(mine), json.dumps(other), 'not json'], 'autobots-disposable-abc')
+        self.assertEqual(totals, {'containers': 1, 'container_cpu_percent': 10.5, 'container_memory_mib': 100.0, 'container_disk_io_mib': 3.0, 'container_network_io_mib': 7.0})
+
+    def test_only_this_runs_processes_count(self) -> None:
+        self.assertEqual(process_totals(['100 5.0 2048', '100 1.5 1024', '200 90.0 999999', 'junk'], {100}), {'process_cpu_percent': 6.5, 'process_memory_mib': 3.0})
+
+    def test_a_failed_probe_is_counted_and_not_dropped(self) -> None:
+        summary = summarize_resources([{'connections': 4, 'ui_up': True}, {'connections': 8, 'ui_up': False}])
+        self.assertEqual(summary['samples'], 2)
+        self.assertEqual(summary['connections'], {'max': 8, 'mean': 6.0, 'min': 4})
+        self.assertEqual(summary['ui_probes_failed'], 1)
+
+    def test_no_samples_says_so_instead_of_claiming_anything(self) -> None:
+        self.assertEqual(summarize_resources([]), {'samples': 0})
+
+
+class Cap(unittest.TestCase):
+    def test_a_paid_run_needs_its_own_stated_cap(self) -> None:
+        source = (ROOT / 'scripts/qualify_release.py').read_text()
+        self.assertIn("'--authorized-micro-usd', type=int, required=True", source)
+        self.assertNotIn('AUTHORIZED_TOTAL_MICRO_USD', source)
 
 
 if __name__ == '__main__':

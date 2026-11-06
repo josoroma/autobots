@@ -193,10 +193,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-9.3#1 | Implement version checks and supported migration/forward-recovery paths. | DONE | US-9.3 |
 | US-9.3#2 | Exercise prior-fixture upgrade and resumed-checkpoint compatibility. | DONE | US-9.3 |
 | EPIC-10 | Product qualification and completion | — | — |
-| US-10.1 | Held-out task, policy and performance qualification | READY | EPIC-10 |
-| US-10.1#1 | Run the held-out behavioral and policy/recovery suites without tuning on held-out data. | TODO | US-10.1 |
-| US-10.1#2 | Publish per-category outcomes, resource measurements and actual latency/cost evidence. | TODO | US-10.1 |
-| US-10.2 | Release traceability and evidence-based completion | BLOCKED | EPIC-10 |
+| US-10.1 | Held-out task, policy and performance qualification | DONE | EPIC-10 |
+| US-10.1#1 | Run the held-out behavioral and policy/recovery suites without tuning on held-out data. | DONE | US-10.1 |
+| US-10.1#2 | Publish per-category outcomes, resource measurements and actual latency/cost evidence. | DONE | US-10.1 |
+| US-10.2 | Release traceability and evidence-based completion | READY | EPIC-10 |
 | US-10.2#1 | Review full source-to-story-to-evidence coverage and resolve blocking findings. | TODO | US-10.2 |
 | US-10.2#2 | Publish exercised operating/user procedures and truthful release limitations. | TODO | US-10.2 |
 
@@ -2503,7 +2503,8 @@ Phase reference: B7, preserved SP-020. All story completion also requires SP-003
 
 ### US-10.1: Held-out task, policy and performance qualification
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-10-1-held-out-task-policy/`
 
 As a product owner
 I want measured end-to-end outcomes
@@ -2542,15 +2543,15 @@ Dependencies:
 - US-9.3
 
 Tasks:
-- [ ] Run the held-out behavioral and policy/recovery suites without tuning on held-out data.
-- [ ] Publish per-category outcomes, resource measurements and actual latency/cost evidence.
+- [x] Run the held-out behavioral and policy/recovery suites without tuning on held-out data.
+- [x] Publish per-category outcomes, resource measurements and actual latency/cost evidence.
 
 Open Questions:
 - None.
 
 ### US-10.2: Release traceability and evidence-based completion
 
-Status: BLOCKED
+Status: READY
 
 As a product owner
 I want a complete requirement-to-evidence record

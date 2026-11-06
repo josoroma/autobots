@@ -114,3 +114,58 @@ def summarize(results: list[dict]) -> dict:
             'interventions': sum(item.get('interventions') or 0 for item in results),
             'goal_seconds_p95': percentile([item['seconds'] for item in results if item.get('seconds') is not None], 0.95),
             'charged_micro_usd': sum(item.get('charged') or 0 for item in results)}
+
+
+_SIZES = {'b': 1 / 2 ** 20, 'kb': 1000 / 2 ** 20, 'kib': 1 / 1024, 'mb': 1000 ** 2 / 2 ** 20, 'mib': 1.0, 'gb': 1000 ** 3 / 2 ** 20, 'gib': 1024.0, 'tb': 1000 ** 4 / 2 ** 20, 'tib': 1024.0 ** 2}
+
+
+def mebibytes(text: str) -> float:
+    """A size as `docker stats` prints it, such as 98.86MiB or 1.2GB."""
+    match = re.fullmatch(r'\s*([\d.]+)\s*([A-Za-z]+)\s*', text)
+    if not match or match[2].lower() not in _SIZES:
+        return 0.0
+    return float(match[1]) * _SIZES[match[2].lower()]
+
+
+def docker_totals(lines: list[str], project: str) -> dict:
+    """One sample's totals across the containers of this project, and no others."""
+    cpu = memory = disk = network = 0.0
+    containers = 0
+    for line in lines:
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if project not in row.get('Name', ''):
+            continue
+        containers += 1
+        cpu += float(str(row.get('CPUPerc', '0')).rstrip('%') or 0)
+        memory += mebibytes(str(row.get('MemUsage', '')).split('/')[0])
+        disk += sum(mebibytes(part) for part in str(row.get('BlockIO', '')).split('/'))
+        network += sum(mebibytes(part) for part in str(row.get('NetIO', '')).split('/'))
+    return {'containers': containers, 'container_cpu_percent': round(cpu, 1), 'container_memory_mib': round(memory, 1), 'container_disk_io_mib': round(disk, 1), 'container_network_io_mib': round(network, 1)}
+
+
+def process_totals(lines: list[str], groups: set[int]) -> dict:
+    """The API, worker and web processes, from `ps -o pgid=,pcpu=,rss=`, as each leads its own group."""
+    cpu = memory = 0.0
+    for line in lines:
+        fields = line.split()
+        if len(fields) == 3 and fields[0].isdigit() and int(fields[0]) in groups:
+            cpu += float(fields[1])
+            memory += float(fields[2]) / 1024
+    return {'process_cpu_percent': round(cpu, 1), 'process_memory_mib': round(memory, 1)}
+
+
+def summarize_resources(samples: list[dict]) -> dict:
+    """Peak and mean of each measure. An outage counts: a probe that failed is reported, not dropped."""
+    if not samples:
+        return {'samples': 0}
+    summary: dict = {'samples': len(samples)}
+    for key in sorted({key for sample in samples for key in sample}):
+        values = [sample[key] for sample in samples if key in sample]
+        if isinstance(values[0], bool):
+            summary[key.replace('_up', '_probes_failed')] = sum(1 for value in values if not value)
+        else:
+            summary[key] = {'max': max(values), 'mean': round(sum(values) / len(values), 1), 'min': min(values)}
+    return summary

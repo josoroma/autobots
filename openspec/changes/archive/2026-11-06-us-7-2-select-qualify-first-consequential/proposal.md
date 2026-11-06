@@ -1,6 +1,6 @@
 ## Why
 
-US-7.2 needs one specifically selected connector, so external automation is verified against an actual destination's contract. [Decision 0007](../../../docs/engineering/decisions/0007-first-connector-github-issues.md) selects creating an issue in one configured GitHub repository.
+US-7.2 needs one specifically selected connector, so external automation is verified against an actual destination's contract. [Decision 0007](../../../../docs/engineering/decisions/0007-first-connector-github-issues.md) selects creating an issue in one configured GitHub repository.
 
 ## What Changes
 

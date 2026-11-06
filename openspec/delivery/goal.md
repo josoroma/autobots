@@ -7,10 +7,10 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-7.2 |
-| Kind | story |
+| Target | EPIC-10 |
+| Kind | epic |
 | Focus | - |
-| Status | COMPLETE |
+| Status | ACTIVE |
 | Reason | - |
 | Started | 2026-11-06 |
 | Updated | 2026-11-06 |
@@ -19,16 +19,17 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-7.2 | us-7-2-select-qualify-first-consequential | DONE | Select and qualify the first consequential connector |
+| 1 | US-10.1 | us-10-1-held-out-task-policy | DONE | Held-out task, policy and performance qualification |
+| 2 | US-10.2 | us-10-2-release-traceability-evidence-based | READY | Release traceability and evidence-based completion |
 
 ## Next Action
 
-Action: complete
-Story: -
-Change: -
+Action: select
+Story: US-10.2
+Change: us-10-2-release-traceability-evidence-based
 Owner: main-session
-Command: none — every story in the goal is DONE
-Reason: all 1 story/stories are DONE
+Command: openspec new change us-10-2-release-traceability-evidence-based; set US-10.2 to IN PROGRESS with a Change: line
+Reason: US-10.2 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

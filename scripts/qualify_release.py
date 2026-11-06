@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """US-10.1: the protocol corpus, the held-out tasks and the local benchmark, on one disposable stack.
 
-This spends money. It refuses without --paid, and nothing in `verify.py` runs it. Goals run one at a time
-through the real API and worker with the application's default model, and only the GitHub connector's
-destination is fake. It refuses the next goal if the worst case could pass the authorized total, so the
-total can't be overrun by more than OpenRouter's own reporting. The stack is removed at the end. Exit 0
-the run finished, whatever it measured, 1 it stopped early, 2 a prerequisite is missing.
+This spends money. It refuses without --paid and a stated cap, and nothing in `verify.py` runs it. Goals
+run one at a time through the real API and worker with the application's default model, and only the
+GitHub connector's destination is fake. It refuses the next goal if the worst case could pass the cap, so
+the cap can't be overrun by more than OpenRouter's own reporting. Resources are sampled while goals run,
+and --ui adds the real web app and a browser timing of committed events. --trials 0 runs no goal, so it
+makes no model call, for trying the rest for free. The stack is removed at the end. Exit 0 the run
+finished, whatever it measured, 1 it stopped early, 2 a prerequisite is missing.
 """
 from __future__ import annotations
 
@@ -16,11 +18,14 @@ import json
 import os
 from pathlib import Path
 import secrets
+import shutil
 import signal
 import statistics
 import subprocess
 import tempfile
+import threading
 import time
+from urllib import error as urlerror, request as urlrequest
 
 from app_db import AppStack, apply_migrations, bootstrap, seed
 from disposable_db import PROJECT_PREFIX, Target, Unavailable, free_port, other_resources, remove_stack, require_identity, run, tool_env
@@ -28,11 +33,12 @@ from harness_lib import fingerprint, project_root
 from live_goal import HELPER, TRACING, rows
 from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner, password_token
 from qualify_operations import Ops, api_call, exited, wait
-from release_scoring import percentile, safety_failures, score, summarize
+from qualify_web import BROWSERS, free_port as any_port, start, stop, wait_until_up
+from release_scoring import docker_totals, percentile, process_totals, safety_failures, score, summarize, summarize_resources
 from supabase_stack import generated_values, require_images, require_rendered
+from toolchain import child_env, find_tools
 
-# The user's go-ahead: "Full run, up to US$5".
-AUTHORIZED_TOTAL_MICRO_USD = 5_000_000
+SAMPLE_SECONDS = 5
 # Each goal's own budget, so the worst case of the next goal is known before it starts.
 GOAL_LIMIT_MICRO_USD = 250_000
 GOAL_SECONDS = 300
@@ -51,6 +57,8 @@ def main() -> int:
     parser.add_argument('--tasks', default='tests/qualification/tasks.json')
     parser.add_argument('--trials', type=int, default=3)
     parser.add_argument('--protocol', action='store_true', help='also run the 100 protocol cases')
+    parser.add_argument('--authorized-micro-usd', type=int, required=True, help="the user's cap for this run, as each go-ahead covers only its own")
+    parser.add_argument('--ui', action='store_true', help='also run the web app and time events in a browser')
     parser.add_argument('--out', default='.checks/release')
     parser.add_argument('--already-spent-micro-usd', type=int, default=0, help='spend under the same authorization, from earlier runs')
     arguments = parser.parse_args()
@@ -97,7 +105,7 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
     report: dict = {'schema_version': 'autobots.release-qualification/v1', 'started_at_utc': datetime.now(timezone.utc).isoformat(), 'evidence_class': 'live, on a disposable stack',
                     'input_fingerprint': fingerprint(root), 'git_head': run(['git', 'rev-parse', 'HEAD'], tool_env()).stdout.strip(),
                     'corpus': arguments.tasks, 'corpus_sha256': hashlib.sha256(corpus).hexdigest(), 'tasks': len(tasks), 'trials': arguments.trials,
-                    'authorized_total_micro_usd': AUTHORIZED_TOTAL_MICRO_USD, 'load_average_at_start': os.getloadavg(),
+                    'authorized_total_micro_usd': arguments.authorized_micro_usd, 'load_average_at_start': os.getloadavg(),
                     'not_established': ['H1', 'product acceptance', 'real GitHub behavior', 'tasks chosen independently of the author']}
     (out / 'manifest.json').write_text(json.dumps(report, indent=2))
     report['key_usage_before_usd'] = float(helper('usage', str(key_file)))
@@ -105,12 +113,55 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
     results: list[dict] = []
     stopped = ''
     worker = None
+    web = None
+    web_url = ''
     code = 0
+    samples: list[dict] = []
+    sampling = threading.Event()
+
+    def probe(url: str) -> tuple[bool, float]:
+        began = time.perf_counter()
+        try:
+            with urlrequest.urlopen(url, timeout=4) as reply:
+                healthy = reply.status < 500
+        except urlerror.HTTPError as failure:
+            healthy = failure.code < 500
+        except OSError:
+            healthy = False
+        return healthy, round((time.perf_counter() - began) * 1000, 1)
+
+    def sample_resources() -> None:
+        with (out / 'resources.jsonl').open('a') as raw:
+            while not sampling.wait(SAMPLE_SECONDS):
+                stats = subprocess.run(['docker', 'stats', '--no-stream', '--format', '{{json .}}'], env=tool_env(), capture_output=True, text=True, timeout=30, check=False).stdout
+                processes = subprocess.run(['ps', '-A', '-o', 'pgid=,pcpu=,rss='], capture_output=True, text=True, timeout=10, check=False).stdout
+                groups = {process.pid for process in ops.processes if process.poll() is None} | ({web.pid} if web is not None and web.poll() is None else set())
+                sample = {**docker_totals(stats.splitlines(), project), **process_totals(processes.splitlines(), groups),
+                          'connections': int(ops.sql('select count(*) from pg_stat_activity where datname is not null;') or 0),
+                          'database_mib': round(int(ops.sql('select pg_database_size(current_database());') or 0) / 2 ** 20, 1),
+                          'host_free_gib': round(shutil.disk_usage(root).free / 2 ** 30, 2)}
+                sample['api_up'], sample['api_probe_ms'] = probe(f'http://127.0.0.1:{api_port}/v1/health')
+                if web_url:
+                    sample['ui_up'], sample['ui_probe_ms'] = probe(f'{web_url}/sign-in')
+                samples.append(sample)
+                raw.write(json.dumps(sample) + '\n')
+                raw.flush()
+
+    sampler = threading.Thread(target=sample_resources, daemon=True)
 
     def start_worker() -> subprocess.Popen:
         return ops.spawn('worker', [str(root / PYTHON), str(root / WORKER)], {**provider_env, 'AUTOBOTS_WORKER_INFERENCE': 'enabled', 'AUTOBOTS_TEST_SINK': str(sink)})
 
     try:
+        tools = find_tools(root)
+        web_dir = root / 'apps/web'
+        browser_env = {**child_env(root, tools, verifying=True), 'PLAYWRIGHT_BROWSERS_PATH': str(root / BROWSERS)}
+        if arguments.ui:
+            if not any((root / BROWSERS).glob('chromium-*')):
+                raise Unavailable(f'no browser under {BROWSERS}; install the pinned one deliberately')
+            built = subprocess.run([str(web_dir / 'node_modules/.bin/next'), 'build'], env=browser_env, cwd=web_dir, capture_output=True, text=True, errors='replace', timeout=300, check=False)
+            if built.returncode:
+                raise Unavailable(f'the web app did not build: {built.stdout[-300:]}')
         if stack.compose('up', '-d', '--wait', '--wait-timeout', '240', timeout=300).returncode:
             raise Unavailable('the stack did not start')
         bootstrap(stack, root)
@@ -123,6 +174,14 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
         ops.api(api_port, config_root)
         wait(lambda: api_call(api_port, ops.internal, token)[0] == 200, 40)
         helper('save', str(key_file), workspace)
+        if arguments.ui:
+            web_port = any_port()
+            web_url = f'http://127.0.0.1:{web_port}'
+            web = start([str(web_dir / 'node_modules/.bin/next'), 'start', '-H', '127.0.0.1', '-p', str(web_port)],
+                        {**browser_env, 'AUTOBOTS_INTERNAL_TOKEN': ops.internal, 'AUTOBOTS_API_URL': f'http://127.0.0.1:{api_port}', 'AUTOBOTS_ALLOWED_ORIGIN': web_url, 'NODE_ENV': 'production',
+                         'AUTOBOTS_SUPABASE_URL': ops.base, 'AUTOBOTS_SUPABASE_ANON_KEY': stack.values['ANON_KEY']}, web_dir)
+            wait_until_up(web_url, web)
+        sampler.start()
 
         def call(method: str, path: str, body: dict | None = None) -> tuple[int, str]:
             return api_call(api_port, ops.internal, token, method, path, json.dumps(body).encode() if body is not None else None, {'Idempotency-Key': secrets.token_hex(8)} if method == 'POST' else {})
@@ -147,7 +206,9 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
                     raise Unavailable(f'the API refused a goal: {code_} {reply[:200]}')
                 run_id = json.loads(reply)['run_id']
             approved = interventions = 0
-            killed_at = recovery = None
+            killed_at = recovery = reclaimed = None
+            killed_generation = 0
+            lease_left = 0.0
             while time.monotonic() - started < GOAL_SECONDS:
                 status = ops.sql(f"select status from public.runs where id = '{run_id}';")
                 usage = (rows(ops, f"select model_calls, stop_reason from app_private.run_usage where run_id = '{run_id}'") or [{}])[0]
@@ -166,7 +227,12 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
                     worker.wait(timeout=10)
                     killed_at = time.monotonic()
                     calls_then = usage.get('model_calls') or 0
+                    # Read after the kill, as no heartbeat can move the expiry from here on.
+                    lease = rows(ops, f"select generation, round(extract(epoch from lease_expires_at - now())::numeric, 1) as left_seconds from app_private.run_jobs where run_id = '{run_id}'")[0]
+                    killed_generation, lease_left = int(lease['generation']), float(lease['left_seconds'] or 0)
                     worker = start_worker()
+                if killed_at is not None and reclaimed is None and int((rows(ops, f"select generation from app_private.run_jobs where run_id = '{run_id}'") or [{}])[0].get('generation') or 0) > killed_generation:
+                    reclaimed = round(time.monotonic() - killed_at - lease_left, 1)
                 if killed_at is not None and recovery is None and (usage.get('model_calls') or 0) > calls_then:
                     recovery = round(time.monotonic() - killed_at, 1)
                 if status == 'paused':
@@ -196,7 +262,7 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
             charged = sum(call_.get('charged_micro_usd') or 0 for call_ in invocations)
             held = sum(call_.get('reserved_micro_usd') or 0 for call_ in invocations if call_.get('charged_micro_usd') is None)
             return {**observed, 'task': task['id'], 'trial': trial, 'category': task['category'], 'adversarial': bool(task.get('adversarial')), 'mode': mode, 'run_id': run_id,
-                    'seconds': round(time.monotonic() - started, 1), 'charged': charged, 'held': held, 'repairs': usage.get('repairs'), 'interventions': interventions, 'recovery_seconds': recovery,
+                    'seconds': round(time.monotonic() - started, 1), 'charged': charged, 'held': held, 'repairs': usage.get('repairs'), 'interventions': interventions, 'recovery_seconds': recovery, 'reclaim_after_lease_expiry_seconds': reclaimed,
                     'reasons': score(task, observed), 'safety': safety_failures(task, observed)}
 
         if arguments.protocol:
@@ -222,7 +288,7 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
         results_file = (out / 'results.jsonl').open('a')
         for trial in range(1, arguments.trials + 1):
             for task in tasks:
-                if spent + GOAL_LIMIT_MICRO_USD > AUTHORIZED_TOTAL_MICRO_USD:
+                if spent + GOAL_LIMIT_MICRO_USD > arguments.authorized_micro_usd:
                     stopped = f'the next goal could pass the authorized total, at {spent} micro-USD'
                     break
                 result = run_task(task, trial)
@@ -242,7 +308,7 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
         last = results[-1]['run_id'] if results else None
         bench: dict = {'load_average': os.getloadavg(), 'workload': 'one client, sequential requests over loopback, after the corpus, with the worker stopped'}
         reads: list[float] = []
-        for _ in range(200):
+        for _ in range(200 if last else 0):
             began = time.perf_counter()
             call('GET', f'/v1/runs/{last}')
             reads.append(time.perf_counter() - began)
@@ -262,15 +328,31 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
             if cancel_code < 300 and count >= 2:
                 events.append(time.perf_counter() - began)
         recoveries = [item['recovery_seconds'] for item in results if item.get('recovery_seconds') is not None]
-        bench.update({'api_read_p95_ms': round((percentile(reads, 0.95) or 0) * 1000, 1), 'api_read_median_ms': round(statistics.median(reads) * 1000, 1), 'api_reads': len(reads),
+        bench.update({'api_read_p95_ms': round((percentile(reads, 0.95) or 0) * 1000, 1), 'api_read_median_ms': round(statistics.median(reads) * 1000, 1) if reads else None, 'api_reads': len(reads),
                       'admission_p95_ms': round((percentile(admissions, 0.95) or 0) * 1000, 1), 'cancel_ack_p95_ms': round((percentile(cancels, 0.95) or 0) * 1000, 1),
                       'committed_event_readable_p95_ms': round((percentile(events, 0.95) or 0) * 1000, 1), 'events_measured': len(events),
                       'recoveries': len(recoveries), 'recovery_seconds_max': max(recoveries) if recoveries else None,
+                      'reclaim_after_lease_expiry_seconds': [item['reclaim_after_lease_expiry_seconds'] for item in results if item.get('reclaim_after_lease_expiry_seconds') is not None],
                       'restarted_goals_without_a_measured_recovery': sum(1 for item in results if item['mode'] == 'restart' and item.get('recovery_seconds') is None)})
         stats = subprocess.run(['docker', 'stats', '--no-stream', '--format', '{{.Name}} {{.MemUsage}}'], env=tool_env(), capture_output=True, text=True, timeout=60, check=False).stdout
         bench['container_memory'] = [line for line in stats.splitlines() if project in line]
+        if arguments.ui:
+            latency_file = out / 'ui-latency.json'
+            latency_file.unlink(missing_ok=True)
+            played = subprocess.run([str(web_dir / 'node_modules/.bin/playwright'), 'test', 'release-latency', '--config', 'playwright.config.ts'], cwd=web_dir, capture_output=True, text=True, errors='replace', timeout=300, check=False,
+                                    env={**browser_env, 'AUTOBOTS_WEB_URL': web_url, 'AUTOBOTS_TEST_OWNER_EMAIL': email, 'AUTOBOTS_TEST_OWNER_PASSWORD': password, 'AUTOBOTS_RELEASE_LATENCY_OUT': str(latency_file),
+                                         'AUTOBOTS_WEB_REPORT': str(out / 'playwright.json'), 'AUTOBOTS_WEB_OUTPUT': str(out / 'playwright-results')})
+            (logs / 'playwright.log').write_text(played.stdout[-4000:] + played.stderr[-4000:])
+            if played.returncode or not latency_file.exists():
+                stopped = f'the browser timing failed with {played.returncode}'
+            else:
+                timed = json.loads(latency_file.read_text())
+                shown = [item['shown_ms'] for item in timed]
+                bench.update({'ui_event_samples': len(timed), 'ui_event_p95_ms': round(percentile(shown, 0.95) or 0, 1), 'ui_event_median_ms': round(statistics.median(shown), 1), 'ui_event_max_ms': round(max(shown), 1),
+                              'ui_cancel_ack_p95_ms': round(percentile([item['ack_ms'] for item in timed], 0.95) or 0, 1)})
         report['benchmark'] = bench
-        report['summary'] = summarize(results)
+        report['resources'] = summarize_resources(samples)
+        report['summary'] = summarize(results) if results else None
         report['cost_per_goal_micro_usd'] = {'median': statistics.median(item['charged'] for item in results) if results else None, 'max': max((item['charged'] for item in results), default=None)}
         durable, logged = helper('leaks', str(key_file), str(logs)).split()
         report['key_found'] = {'durable_rows': int(durable), 'log_files': int(logged)}
@@ -281,6 +363,13 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
     finally:
         report['spent_micro_usd'] = spent
         report['stopped'] = stopped
+        sampling.set()
+        if sampler.is_alive():
+            sampler.join(40)
+        if 'resources' not in report and samples:
+            report['resources'] = summarize_resources(samples)
+        if web is not None:
+            stop(web)
         ops.stop_all()
         remove_stack(stack)
         subprocess.run(['rm', '-rf', str(config_root)], check=False)
@@ -297,7 +386,7 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
     if stopped:
         print(f'STOPPED: {stopped}')
         code = 1
-    print(json.dumps({key: report.get(key) for key in ('summary', 'protocol', 'benchmark', 'spent_micro_usd', 'key_usage_before_usd', 'key_usage_after_usd', 'key_found', 'left_behind', 'other_docker_unchanged')}, indent=1, default=str)[:6000])
+    print(json.dumps({key: report.get(key) for key in ('summary', 'protocol', 'benchmark', 'resources', 'spent_micro_usd', 'key_usage_before_usd', 'key_usage_after_usd', 'key_found', 'left_behind', 'other_docker_unchanged')}, indent=1, default=str)[:6000])
     return code
 
 
