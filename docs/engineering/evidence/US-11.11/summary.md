@@ -4,14 +4,16 @@
 
 Captured by `slice-visual.spec.ts`, which `scripts/qualify_identity.py` runs. [`revision.json`](revision.json) holds the revision and a hash of the screens' source. [`results.json`](results.json) holds every measurement, and [`zoom.json`](zoom.json) the zoom results. Screenshots are in [`screenshots/`](screenshots/), named `<surface>-<theme>.png`. Their content is arranged test data.
 
+Measured again on US-11.12's tree, after its review changed screens. `revision.json` records that base.
+
 ## Result
 
 | Measured, across 42 captures of 21 surfaces in dark and light | Lowest | Line | Findings |
 |---|---|---|---|
-| Text, 2,010 elements | 4.74:1 | 4.5:1 | None |
+| Text, 2,032 elements | 4.74:1 | 4.5:1 | None |
 | Input boundaries, 98 controls | 4.74:1 | 3:1 | None, after the correction below |
-| Focus indicators, 557 stops, by keyboard and on each surface's own controls | 14.5:1 | 3:1 | None, after the correction below |
-| A button under the pointer, 16 | 5.21:1 | 4.5:1 | None |
+| Focus indicators, 559 stops, by keyboard and on each surface's own controls | 14.5:1 | 3:1 | None, after the correction below |
+| A button under the pointer, 18 | 5.21:1 | 4.5:1 | None |
 | Axe, WCAG 2.1 A and AA | | | 0 violations |
 | Controls not from the shared components | | | 0 |
 

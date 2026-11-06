@@ -1,35 +1,35 @@
 # WORKER-INFERENCE-001 evidence summary
 
-**Scope:** the product worker's inference step, over a fake HTTP transport under the real SDK and adapter. Nothing live ran, so this establishes neither US-3.4, H1 nor product acceptance. [Work record](../../work-items/WORKER-INFERENCE-001.md) · [Runbook](../../runbooks/operations.md#turning-on-inference)
+**Scope:** the product worker's inference step, over a fake HTTP transport under the real SDK and adapter. Nothing live ran in these checks, so they establish neither H1 nor product acceptance. Live runs through this worker are in [LIVE-GOAL-1](../LIVE-GOAL-1/summary.md), [US-10.1](../US-10.1/summary.md) and US-11.3's verification. [Work record](../../work-items/WORKER-INFERENCE-001.md) · [Runbook](../../runbooks/operations.md#turning-on-inference)
 
-**No manifest yet, and the work item stays `IN PROGRESS`.** The user hasn't confirmed this belongs in scope, the third round of fixes below wasn't reviewed, and the blocker fixes on `delivery/blocker-fixes` will conflict in `application/goal_loop.py`. A manifest bound to today's fingerprint would go stale at that merge, so record it on the merged tree.
+**Status: complete as built, on mock and disposable evidence only.** The owner accepted it as built, including the failure behavior, in [Decision 0011](../../decisions/0011-review-dispositions.md). The results are bound by [US-11.12's manifest](../US-11.12/gate-0.json), under `manual.worker_inference`, and its review covered this path.
 
 ## Results
 
-All on one input fingerprint, `5c1d1a4956e21061973c9653db52fd930c6854824ea1e4440fdbb6a4e927935d`, on 2026-11-05, with no other stack up. Later edits touch only this record's documents.
-
 | Check | Class | Model transport | Result |
 |---|---|---|---|
-| `python3.12 scripts/qualify_worker_inference.py` | disposable | mock | exit 0, 34 of 34 cases, 101s |
-| `python3.12 scripts/verify.py --profile operations` | disposable | scripted model | exit 0 |
-| `python3.12 scripts/verify.py --profile db` | disposable | none | exit 0 |
-| `python3.12 scripts/verify.py --profile fast` | static and mock | fake | exit 0, including 394 tests under `services/agent/tests` |
+| `python3.12 scripts/qualify_worker_inference.py` | disposable | mock | exit 0, 45 of 45 cases, at US-11.12's fingerprint |
 
-## What the 34 cases observed
+The profiles run on the same tree are in [US-11.12's summary](../US-11.12/summary.md). `qualify_worker_inference.py` is in no verify profile, because it's Docker-heavy, so rerun it by hand after changing this path.
+
+## What the cases observed
 
 | Requirement | Observed |
 |---|---|
 | Off by default | With no switch, the entry point claims nothing, its heartbeat says so and Operations reports `no_inference_worker`. The switch without its configuration refuses to start |
 | Admission to verified artifact | A run admitted by `POST /v1/runs` reached `succeeded` with verification passed, and its bytes read back through the app's own path |
-| MP-01, frozen route | One process served DeepSeek and Astra runs side by side, each by its own snapshot |
+| MP-01, frozen route | One process served DeepSeek and Terra runs side by side, each by its own snapshot |
 | MP-02, request | Every request went to the OpenRouter URL with the bound wire ID, `require_parameters`, no fallbacks and `max_tokens` 512 |
 | MP-06, late credential | A rotated key reached the next run with no restart, with version 2 in the ledger. No key in checkpoints or process logs |
-| MP-07, spend | Reserved 33,024 and 345,600 micro-USD from the fake catalog's prices, and settled at the reported cost |
+| MP-07, spend | Reserved 33,024 and 34,560 micro-USD from the fake catalog's prices, and settled at the reported cost |
 | MP-08, missing key | Paused as `credentials_required` with no ledger row or request. Resume answered `409`, then finished once a key existed |
 | MP-08, 401 | One request, paused as `invalid_credential`, key marked invalid, resume `409 credential_invalid`, finished once replaced |
 | MP-08, 429 | Three requests with gaps of 3.0s for a 3s `Retry-After`, then failed as `rate_limited`, with reservations released |
 | MP-07 and MP-08, unparseable 200 | One request, paused as `uncertain_acceptance`, reservation kept, resume `409 uncertain_model_call` |
 | Refusal placement | With no key, a stranded cancel reached `cancelled` and a stranded candidate was judged, each with no request. Both strandings were arranged |
+| Compaction, added by US-11.12 | A long run summarized three times through the real SDK under `summarizer`, with no tools on those requests. Later calls saw the summary, and the run finished verified |
+| A child, added by US-11.12 | A child reached `succeeded` through this worker and SDK, and two runs' calls sit on the root's ledger. The arranged parent then stops with no evidence and fails, which is asserted |
+| A workflow, added since | A workflow with no model step ran to the end in the same process |
 | Unreadable configuration | A corrupt `.env` paused the run as `credential_unavailable` and no worker step failed. Arranged |
 
 `.checks/worker-inference/qualification.json` holds the raw cases. It is ignored and regenerated by rerunning the script.
@@ -40,7 +40,7 @@ All on one input fingerprint, `5c1d1a4956e21061973c9653db52fd930c6854824ea1e4440
 
 - **First pass:** two blocking findings, both fixed. A billed reply could be recorded as never accepted, releasing its reservation. `Retry-After` was never read from a real SDK error.
 - **Second pass:** nothing blocking. It noted checks that claimed more than they tested and some smaller gaps.
-- **Third round, not reviewed:**
+- **Third round, read in US-11.12's review as WI-4, not in these two passes:**
   - the settings API answering for a damaged key
   - a 60-second cap on `Retry-After`
   - removing an upstream-provider read that had no effect with the real SDK
@@ -55,14 +55,14 @@ All on one input fingerprint, `5c1d1a4956e21061973c9653db52fd930c6854824ea1e4440
   - An early qualifier run failed "other Docker resources untouched" because another session's stack ended during it. It passed once alone, and the check now names what changed.
   - Two `fast` runs failed: on `mypy` in the new test, fixed, and on `non_mutation_guard`, because another session edited a shared file mid-run.
   - One qualifier expectation was wrong: it looked for a stop reason where an arranged run has none, and now reads the verdict.
-- **Not exercised:** any live OpenRouter behavior, real response shapes, real prices at the qualifier level, compaction, a workflow or child run through this worker, two workers at once, a lost lease, the network pause end to end, and a persistent stack. Whether real replies always carry the SDK's required `system_fingerprint` is unknown: if some don't, each such call would pause as uncertain after being paid for, so US-3.4 should test that first.
+- **Not exercised:** any live OpenRouter behavior, real response shapes, real prices at the qualifier level, two workers at once, a lost lease, the network pause end to end, and a persistent stack. Whether real replies always carry the SDK's required `system_fingerprint` is unknown: if some don't, each such call would pause as uncertain after being paid for, so the live records named above are where to look.
 - **Known and left as they are:**
-  - A price rise during a job stays under-reserved until its next claim.
-  - The 32,000-token prompt bound is an estimate.
+  - A price rise during a job now refuses the call before sending, a request over the assumed 32,000 tokens reserves for its bytes, and one that could reach a higher long-prompt tier, such as Terra's at 272,000, is refused. All came from US-11.12.
+  - A summary cut off at 512 output tokens stops the run as `compaction_failed`, rather than losing context. Nothing here shows how often a real model would reach that.
   - The ledger records the upstream provider as `unknown`.
   - Compaction needs matching `summarizer` and `executor` bindings.
   - Two narrow `mark_invalid` races fail closed.
-- **Open decision:** whether `rate_limited` and `provider_error` should fail or pause a run.
+- **Decided:** `rate_limited` and `provider_error` fail a run, by [Decision 0011](../../decisions/0011-review-dispositions.md).
 
 ## Raw artifacts
 

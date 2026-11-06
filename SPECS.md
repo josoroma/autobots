@@ -209,7 +209,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-10.1 | Held-out task, policy and performance qualification | DONE | EPIC-10 |
 | US-10.1#1 | Run the held-out behavioral and policy/recovery suites without tuning on held-out data. | DONE | US-10.1 |
 | US-10.1#2 | Publish per-category outcomes, resource measurements and actual latency/cost evidence. | DONE | US-10.1 |
-| US-10.2 | Release traceability and evidence-based completion | BLOCKED | EPIC-10 |
+| US-10.2 | Release traceability and evidence-based completion | READY | EPIC-10 |
 | US-10.2#1 | Review full source-to-story-to-evidence coverage and resolve blocking findings. | TODO | US-10.2 |
 | US-10.2#2 | Publish exercised operating/user procedures and truthful release limitations. | TODO | US-10.2 |
 | EPIC-11 | Installable release readiness | — | — |
@@ -258,11 +258,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-11.11#1 | Add the shared form components and move every form to them. | DONE | US-11.11 |
 | US-11.11#2 | Capture both-theme screenshots, measured contrast and axe across all named surfaces. | DONE | US-11.11 |
 | US-11.11#3 | Check keyboard use, zoom and reduced motion, and confirm appearance changes issue no model or task request. | DONE | US-11.11 |
-| US-11.12 | Final independent review and Gate 0 | IN PROGRESS | EPIC-11 |
-| US-11.12#1 | Bind the final revision's fingerprint and run one independent review of it. | TODO | US-11.12 |
-| US-11.12#2 | Repeat Gate 0 and the harness runbook on that revision, and publish validated evidence. | TODO | US-11.12 |
-| US-11.12#3 | Record a disposition for the 41 minors and open majors, and settle WORKER-INFERENCE-001's status. | TODO | US-11.12 |
-| US-11.12#4 | Mark Claude's crash and timeout hook behavior not qualified, and hand the record to US-10.2's assessment. | TODO | US-11.12 |
+| US-11.12 | Final independent review and Gate 0 | DONE | EPIC-11 |
+| US-11.12#1 | Bind the final revision's fingerprint and run one independent review of it. | DONE | US-11.12 |
+| US-11.12#2 | Repeat Gate 0 and the harness runbook on that revision, and publish validated evidence. | DONE | US-11.12 |
+| US-11.12#3 | Record a disposition for the 41 minors and open majors, and settle WORKER-INFERENCE-001's status. | DONE | US-11.12 |
+| US-11.12#4 | Mark Claude's crash and timeout hook behavior not qualified, and hand the record to US-10.2's assessment. | DONE | US-11.12 |
 
 ## Dependency Diagram
 
@@ -2772,7 +2772,7 @@ Open Questions:
 
 ### US-10.2: Release traceability and evidence-based completion
 
-Status: BLOCKED
+Status: READY
 
 As a product owner
 I want a complete requirement-to-evidence record
@@ -3407,8 +3407,8 @@ Open Questions:
 
 ### US-11.12: Final independent review and Gate 0
 
-Status: IN PROGRESS
-Change: `openspec/changes/us-11-12-final-independent-review-gate/`
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-11-12-final-independent-review-gate/`
 
 As an owner
 I want one independent review of the final code that repeats Gate 0 and settles open findings
@@ -3470,10 +3470,10 @@ Dependencies:
 - US-11.11
 
 Tasks:
-- [ ] Bind the final revision's fingerprint and run one independent review of it.
-- [ ] Repeat Gate 0 and the harness runbook on that revision, and publish validated evidence.
-- [ ] Record a disposition for the 41 minors and open majors, and settle WORKER-INFERENCE-001's status.
-- [ ] Mark Claude's crash and timeout hook behavior not qualified, and hand the record to US-10.2's assessment.
+- [x] Bind the final revision's fingerprint and run one independent review of it.
+- [x] Repeat Gate 0 and the harness runbook on that revision, and publish validated evidence.
+- [x] Record a disposition for the 41 minors and open majors, and settle WORKER-INFERENCE-001's status.
+- [x] Mark Claude's crash and timeout hook behavior not qualified, and hand the record to US-10.2's assessment.
 
 Open Questions:
 - None.

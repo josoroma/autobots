@@ -31,7 +31,16 @@ REQUIRED_RELATIONS = (
     "agent_runtime.adapter_qualifications",
     "agent_runtime.route_qualifications",
 )
+# A migration can add only columns, which a relation check can't see. The newest code relies on.
+REQUIRED_COLUMNS = (
+    ("public.approval_requests", "policy_reason"),
+    ("public.approval_requests", "resource_target"),
+    ("app_private.tool_receipts", "failure_code"),
+    ("app_private.model_invocations", "finish_reason"),
+    ("app_private.model_invocations", "charge_source"),
+)
 RESTORES_SHOWN = 5
+RESTORE_FIELDS = {"at", "result", "checks_passed", "checks_total"}
 DELAYED_SHOWN = 10
 CATALOG_CHECK_SECONDS = 3.0
 # Admission stops on these. A missing worker only means a job waits.
@@ -68,6 +77,13 @@ async def database_conditions(pool: Any) -> tuple[Condition, Condition, Conditio
                 (list(REQUIRED_RELATIONS),),
             )
             row = await cursor.fetchone()
+            cursor = await connection.execute(
+                "select count(*) from unnest(%s::text[], %s::text[]) c(rel, col) where not exists "
+                "(select 1 from pg_attribute a where a.attrelid = to_regclass(c.rel) "
+                "and a.attname = c.col and not a.attisdropped)",
+                ([item[0] for item in REQUIRED_COLUMNS], [item[1] for item in REQUIRED_COLUMNS]),
+            )
+            missing_columns = int((await cursor.fetchone())[0])
             held = False
             qualified = False
             if int(row[0]) == 0:
@@ -85,7 +101,7 @@ async def database_conditions(pool: Any) -> tuple[Condition, Condition, Conditio
             Condition("hold", "unavailable", "hold_unknown"),
             Condition("adapter", "unavailable", "adapter_unknown"),
         )
-    missing = int(row[0])
+    missing = int(row[0]) + missing_columns
     return (
         Condition("database", "ok", "database_ready"),
         Condition("schema", "ok", "schema_ready")
@@ -141,13 +157,15 @@ def restore_history(directory: str, limit: int = RESTORES_SHOWN) -> list[dict[st
     for path in Path(directory).glob("*/restores.jsonl") if directory else ():
         try:
             lines = path.read_text().splitlines()
-        except OSError:
+        except (OSError, UnicodeDecodeError):
             continue
         for line in lines:
             try:
-                found.append(json.loads(line))
+                item = json.loads(line)
             except ValueError:
                 continue
+            if isinstance(item, dict) and set(item) == RESTORE_FIELDS:
+                found.append(item)
     return sorted(found, key=lambda item: str(item.get("at")), reverse=True)[:limit]
 
 

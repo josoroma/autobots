@@ -28,17 +28,18 @@ class UnknownOperation:
     operation_id: str
     tool_id: str
     tool_version: int
+    generation: int
 
 
 async def unknown_operations(connection: Any, run_id: UUID) -> list[UnknownOperation]:
     cursor = await connection.execute(
         "with recursive tree as (select id from public.runs where id = %s union all "
         "select r.id from public.runs r join tree t on r.parent_run_id = t.id) "
-        "select operation_id, tool_id, tool_version from app_private.tool_receipts "
+        "select operation_id, tool_id, tool_version, generation from app_private.tool_receipts "
         "where run_id in (select id from tree) and status = 'unknown' order by created_at",
         (run_id,),
     )
-    return [UnknownOperation(row[0], row[1], row[2]) for row in await cursor.fetchall()]
+    return [UnknownOperation(row[0], row[1], row[2], row[3]) for row in await cursor.fetchall()]
 
 
 async def has_unresolvable_effect(connection: Any, run_id: UUID) -> bool:
@@ -62,6 +63,7 @@ async def record_evidence(
     idempotency_key: str,
     outcome: str,
     evidence: str,
+    generation: int | None = None,
 ) -> str:
     """Delivered closes the operation with no retry. Not delivered allows one fresh attempt."""
     scope = (workspace_id, actor_id, "reconcile_effect", operation_id, idempotency_key)
@@ -75,7 +77,7 @@ async def record_evidence(
         cursor = await connection.execute(
             "with recursive tree as (select id from public.runs where id = %s union all "
             "select r.id from public.runs r join tree t on r.parent_run_id = t.id) "
-            "select status from app_private.tool_receipts "
+            "select status, generation from app_private.tool_receipts "
             "where operation_id = %s and run_id in (select id from tree) and workspace_id = %s "
             "for update",
             (run_id, operation_id, workspace_id),
@@ -85,6 +87,8 @@ async def record_evidence(
             raise ReconciliationRefused("operation_not_found")
         if row[0] != "unknown":
             raise ReconciliationRefused("operation_not_unknown")
+        if generation is not None and row[1] != generation:
+            raise ReconciliationRefused("operation_attempt_changed")
         result = {"reconciled": "operator"} if outcome == "delivered" else None
         await connection.execute(
             "update app_private.tool_receipts set status = %s, result = %s, evidence = %s, "

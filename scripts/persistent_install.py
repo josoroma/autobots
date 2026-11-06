@@ -42,6 +42,7 @@ OWNER_EMAIL = 'owner@autobots.invalid'
 TEN_YEARS = 86400 * 3650
 GOAL_SECONDS = 1000
 ACTIVE = {'queued', 'running', 'verifying', 'cancelling'}
+TERMINAL = {'succeeded', 'failed', 'cancelled'}
 SCHEMA = """create schema autobots_install;
 create table autobots_install.identity (install_id text primary key, project text not null, created_at timestamptz not null default now());
 create table autobots_install.migrations (name text primary key, sha256 text not null, applied_at timestamptz not null default now());
@@ -94,10 +95,11 @@ def read_record(directory: Path) -> Record:
 class InstallStack(AppStack):
     """The vendored release and overlay, without the disposable marking."""
 
-    def compose(self, *arguments: str, timeout: float = 300.0, stdin: str | None = None) -> subprocess.CompletedProcess[str]:
+    def compose(self, *arguments: str, timeout: float = 300.0, stdin: str | None = None,
+                extra_env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
         files = [item for path in PERSISTENT_FILES for item in ('-f', str(self.root / path))]
         return run(['docker', 'compose', '-p', self.target.project, '--project-directory', str(self.root / UPSTREAM), *files, *arguments],
-                   self.env(), timeout, stdin)
+                   {**self.env(), **(extra_env or {})}, timeout, stdin)
 
     def env(self) -> dict[str, str]:
         return {**tool_env(), **self.values}
@@ -144,7 +146,7 @@ def identity_refusals(stack: AppStack, record: Record, requested: str, expected_
     wanted_label = 'disposable' if restored_copy or expected_class == 'disposable' else ''
     if facts['label'] != wanted_label:
         reasons.append(f"{requested} is labelled {facts['label'] or 'unmarked'}, and this path expects {wanted_label or 'unmarked'}")
-    if not restored_copy and f'127.0.0.1:{record.db_port}' not in facts['port']:
+    if not restored_copy and facts['port'].split() != [f'127.0.0.1:{record.db_port}']:
         reasons.append(f"{requested} publishes its database at {facts['port']}, not the recorded 127.0.0.1:{record.db_port}")
     row = stack.sql('select install_id, project from autobots_install.identity;')
     if row.returncode or row.stdout.strip() != f'{record.install_id}|{record.project}':
@@ -222,6 +224,8 @@ def first_setup(stack: AppStack, root: Path, record: Record, requested: str, exp
     wanted = 'disposable' if expected_class == 'disposable' else ''
     if not facts or facts['label'] != wanted:
         raise Refused(f'{requested} is not running as a {expected_class} target')
+    if facts['port'].split() != [f'127.0.0.1:{record.db_port}']:
+        raise Refused(f"{requested} publishes its database at {facts['port']}, not the recorded 127.0.0.1:{record.db_port}")
     present = stack.sql("select to_regclass('autobots_install.identity'), to_regclass('public.runs');")
     if present.returncode or present.stdout.strip() != '|':
         raise Refused(f'{requested} already holds an identity or application tables, so setup never runs on it')
@@ -244,6 +248,12 @@ def guarded_apply(stack: AppStack, root: Path, record: Record, requested: str, e
     recorded = dict(line.split('|') for line in listing.stdout.splitlines() if line)
     files = sorted(folder.glob('*.sql'))
     # All of it is checked first, so a refusal leaves the database exactly as it was.
+    missing = sorted(set(recorded) - {path.name for path in files} - {STORAGE_ROW})
+    if missing:
+        raise Refused(f'{missing[0]} was applied and is not in this checkout, so this is an older revision')
+    storage_digest = hashlib.sha256((root / STORAGE_SQL).read_bytes()).hexdigest()
+    if STORAGE_ROW in recorded and recorded[STORAGE_ROW] != storage_digest:
+        raise Refused(f'{STORAGE_ROW} changed after it was applied; never edit an applied file')
     for path in files:
         if not MIGRATION_NAME.fullmatch(path.name):
             raise Refused(f'{path.name} is not named <14 digit timestamp>_<description>.sql')
@@ -262,8 +272,7 @@ def guarded_apply(stack: AppStack, root: Path, record: Record, requested: str, e
     if seeded.returncode:
         raise Unavailable(f'the reference seed failed: {seeded.stderr.strip()[-200:]}')
     if STORAGE_ROW not in recorded:
-        digest = hashlib.sha256((root / STORAGE_SQL).read_bytes()).hexdigest()
-        policy = stack.sql(f"begin;\n{(root / STORAGE_SQL).read_text()}\ninsert into autobots_install.migrations (name, sha256) values ('{STORAGE_ROW}', '{digest}');\ncommit;\n")
+        policy = stack.sql(f"begin;\n{(root / STORAGE_SQL).read_text()}\ninsert into autobots_install.migrations (name, sha256) values ('{STORAGE_ROW}', '{storage_digest}');\ncommit;\n")
         if policy.returncode:
             raise Unavailable(f'the Storage policies failed: {policy.stderr.strip()[-200:]}')
     return {'status': 'applied', 'project': requested, 'applied': applied, 'already_applied': len([name for name in recorded if name != STORAGE_ROW])}
@@ -297,6 +306,15 @@ def http_json(method: str, url: str, headers: Mapping[str, str], body: Mapping |
         return failure.code, failure.read().decode(errors='replace')
 
 
+def refuse_other_work(found: str) -> None:
+    """The worker claims whatever is queued, in any workspace, so anything else would spend unseen."""
+    if found == '0':
+        return
+    if not found.isdigit():
+        raise Refused('Could not read what else is queued, so nothing was sent')
+    raise Refused(f'{found} other queued jobs or enabled routines would run on this paid worker. Settle them first. Nothing was sent')
+
+
 def goal(root: Path, record: Record, requested: str, key_file: Path, limit: int, ledger_path: Path, goal_text: str, required: list[dict]) -> int:
     """Reserve, admit through the install's API, run a worker with the switch on for this goal only, settle."""
     ledger, entry = reserve_goal(ledger_path, limit)
@@ -325,7 +343,24 @@ def goal(root: Path, record: Record, requested: str, key_file: Path, limit: int,
     charged: int | None = None
     worker = None
     run_id = ''
+    final = ''
+
+    def stop_worker() -> None:
+        if worker is not None and worker.poll() is None:
+            worker.send_signal(signal.SIGTERM)
+            try:
+                report['worker_exit'] = worker.wait(60)
+            except subprocess.TimeoutExpired:
+                worker.kill()
+                report['worker_exit'] = 'killed after 60 seconds'
+
+    def write_report() -> None:
+        out = record.directory / 'reports' / f'goal-{datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")}.json'
+        private_write(out, json.dumps(report, indent=2))
+        print(json.dumps(report, indent=2))
+
     try:
+        refuse_other_work(sql("select (select count(*) from app_private.run_jobs where status in ('queued', 'claimed')) + (select count(*) from public.routines where enabled);"))
         report['key_usage_before_usd'] = float(helper('usage', str(key_file)))
         base = application['AUTOBOTS_SUPABASE_URL']
         code, reply = http_json('POST', f'{base}/auth/v1/token?grant_type=password', {'apikey': application['AUTOBOTS_SUPABASE_ANON_KEY'], 'Content-Type': 'application/json'},
@@ -336,6 +371,11 @@ def goal(root: Path, record: Record, requested: str, key_file: Path, limit: int,
         workspace = sql("select workspace_id from public.workspace_members where role = 'owner' limit 1;")
         if sql(f"select count(*) from app_private.provider_credentials where workspace_id = '{workspace}' and status = 'active';") == '0':
             helper('save', str(key_file), workspace)
+        started_at = sql('select clock_timestamp();')
+        if not started_at:
+            # Every spend check below filters on this, so without it the watchdog could never fire.
+            raise Unavailable('could not read the database clock, so nothing was sent')
+        spent_since = f"select coalesce(sum(coalesce(charged_micro_usd, reserved_micro_usd)), 0) from app_private.model_invocations where created_at >= '{started_at}';"
         headers = {'X-Autobots-Internal': application['AUTOBOTS_INTERNAL_TOKEN'], 'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
         api = f'http://127.0.0.1:{record.api_port}'
         code, reply = http_json('POST', f'{api}/v1/runs', {**headers, 'Idempotency-Key': secrets.token_hex(8)}, {'goal_text': goal_text, 'limit_micro_usd': limit, 'required_artifacts': required})
@@ -349,7 +389,7 @@ def goal(root: Path, record: Record, requested: str, key_file: Path, limit: int,
         worker = subprocess.Popen([str(root / PYTHON), '-m', 'autobots.operations.worker'], env={**env, 'AUTOBOTS_WORKER_INFERENCE': 'enabled'}, cwd=root,
                                   stdin=subprocess.DEVNULL, stdout=handle, stderr=handle, start_new_session=True)
         started = time.monotonic()
-        timeline, last, final = [], '', ''
+        timeline, last = [], ''
         while time.monotonic() - started < GOAL_SECONDS:
             final = sql(f"select status from public.runs where id = '{run_id}';")
             if final != last:
@@ -358,7 +398,7 @@ def goal(root: Path, record: Record, requested: str, key_file: Path, limit: int,
                 last = final
             if final and final not in ACTIVE:
                 break
-            committed = sql(f"select coalesce(sum(coalesce(charged_micro_usd, reserved_micro_usd)), 0) from app_private.model_invocations where root_run_id = '{run_id}';")
+            committed = sql(spent_since)
             if committed and int(committed) > limit:
                 report['watchdog_fired'] = True
                 worker.send_signal(signal.SIGKILL)
@@ -367,40 +407,64 @@ def goal(root: Path, record: Record, requested: str, key_file: Path, limit: int,
                 report['worker_exited_early'] = worker.returncode
                 break
             time.sleep(3)
+        # Stopped before anything is read, since it can still dispatch while it drains.
+        stop_worker()
+        final = sql(f"select status from public.runs where id = '{run_id}';")
         report['timeline'], report['status'] = timeline, final
         report['stop_reason'] = sql(f"select coalesce(stop_reason, 'none') from app_private.run_usage where run_id = '{run_id}';")
         report['verification'] = sql(f"select passed::text || ' ' || unmet::text from app_private.run_verifications where run_id = '{run_id}' order by created_at desc limit 1;")
         report['published'] = sql(f"select coalesce(string_agg(name || ' ' || sha256 || ' ' || size_bytes, ', '), 'none') from public.artifacts where run_id = '{run_id}' and status = 'published';")
-        report['calls'] = sql(f"select count(*) from app_private.model_invocations where root_run_id = '{run_id}';")
+        report['calls'] = sql(f"select count(*) from app_private.model_invocations where created_at >= '{started_at}';")
         report['route'] = sql(f"select coalesce(string_agg(distinct profile || ' ' || wire_id, ', '), 'none') from app_private.model_invocations where root_run_id = '{run_id}';")
-        spent = sql(f"select coalesce(sum(coalesce(charged_micro_usd, reserved_micro_usd)), 0) from app_private.model_invocations where root_run_id = '{run_id}';")
-        unsettled = sql(f"select count(*) from app_private.model_invocations where root_run_id = '{run_id}' and charged_micro_usd is null;")
-        report['committed_micro_usd'] = int(spent or 0)
+        spent = sql(spent_since)
+        unsettled = sql(f"select count(*) from app_private.model_invocations where created_at >= '{started_at}' and charged_micro_usd is null;")
+        if spent:
+            report['committed_micro_usd'] = int(spent)
+        else:
+            report['after_run_check_failed'] = 'the spend could not be read'
         report['calls_without_a_reported_charge'] = int(unsettled or 0)
         charged = int(spent) if spent else None
+    except Refused:
+        ledger.settle(entry, 0, 'not_started')  # type: ignore[attr-defined]
+        raise
     finally:
-        if worker is not None and worker.poll() is None:
-            worker.send_signal(signal.SIGTERM)
-            try:
-                report['worker_exit'] = worker.wait(60)
-            except subprocess.TimeoutExpired:
-                worker.kill()
-                report['worker_exit'] = 'killed after 60 seconds'
-        # With no run admitted nothing was sent. With a run and no total, the whole budget stays held.
-        if run_id:
-            ledger.settle(entry, charged, 'settled' if charged is not None else 'uncertain')  # type: ignore[attr-defined]
-        else:
-            ledger.settle(entry, 0, 'not_started')  # type: ignore[attr-defined]
+        stop_worker()
+        if entry.get('state') == 'reserved':  # type: ignore[attr-defined]
+            # A run that isn't finished can spend again on resume, so its whole budget stays held.
+            if not run_id:
+                ledger.settle(entry, 0, 'not_started')  # type: ignore[attr-defined]
+            elif final in TERMINAL and charged is not None:
+                ledger.settle(entry, charged, 'settled')  # type: ignore[attr-defined]
+            else:
+                ledger.settle(entry, None, 'run_not_finished')  # type: ignore[attr-defined]
         report['shared_ledger_committed_micro_usd'] = ledger.committed()  # type: ignore[attr-defined]
-        report['workers_claiming_inference_afterward'] = sql("select count(*) from app_private.worker_heartbeats where claims_inference and state <> 'stopped' and beat_at > now() - interval '60 seconds';")
-    time.sleep(60)  # OpenRouter's figure can lag, so this checks the ledger and doesn't replace it.
-    report['key_usage_after_usd'] = float(helper('usage', str(key_file)))
-    durable, logged = helper('leaks', str(key_file), str(record.directory / 'logs')).split()
-    report['key_found'] = {'durable_rows': int(durable), 'log_files': int(logged)}
-    out = record.directory / 'reports' / f'goal-{datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")}.json'
-    private_write(out, json.dumps(report, indent=2))
-    print(json.dumps(report, indent=2))
-    return 0 if report.get('status') == 'succeeded' else 1
+        try:
+            report['workers_claiming_inference_afterward'] = sql("select count(*) from app_private.worker_heartbeats where claims_inference and state <> 'stopped' and beat_at > now() - interval '60 seconds';")
+        except (Unavailable, subprocess.SubprocessError, OSError) as problem:
+            report['after_run_check_failed'] = type(problem).__name__
+        write_report_needed = bool(run_id)
+        # A failure on the way out still leaves what was seen and spent.
+        failure = sys.exc_info()[0]
+        if write_report_needed and failure is not None:
+            report['failed_with'] = failure.__name__
+            absent = [name for name in ('status', 'timeline', 'committed_micro_usd', 'calls') if name not in report]
+            report['not_checked'] = ['key usage after the run', 'the key in stored rows or logs', *absent]
+            try:
+                write_report()
+            except OSError as problem:
+                print(f'the report could not be written: {type(problem).__name__}', file=sys.stderr)
+    if write_report_needed:
+        time.sleep(60)  # OpenRouter's figure can lag, so this checks the ledger and doesn't replace it.
+        try:
+            report['key_usage_after_usd'] = float(helper('usage', str(key_file)))
+            durable, logged = helper('leaks', str(key_file), str(record.directory / 'logs')).split()
+            report['key_found'] = {'durable_rows': int(durable), 'log_files': int(logged)}
+        except (Unavailable, ValueError, subprocess.SubprocessError, OSError) as problem:
+            report['after_run_check_failed'] = str(problem) if isinstance(problem, Unavailable) else type(problem).__name__
+    write_report()
+    found = report.get('key_found')
+    leaked = isinstance(found, dict) and any(found.values())
+    return 0 if report.get('status') == 'succeeded' and 'after_run_check_failed' not in report and not leaked else 1
 
 
 def main(argv: Sequence[str] | None = None) -> int:

@@ -198,7 +198,8 @@ class Profiles(unittest.TestCase):
 
     def test_operations_plan_is_the_three_qualifiers(self):
         """The plan only: running it starts Docker, which this suite must not do."""
-        with mock.patch.dict(os.environ, {'HOME': '/home/fixture', 'OPENROUTER_API_KEY': 'planted'}):
+        with mock.patch.dict(os.environ, {'HOME': '/home/fixture', 'OPENROUTER_API_KEY': 'planted'}), \
+             mock.patch('verify.find_tools'), mock.patch('verify.missing_prepared_paths', return_value=[]):
             plan, left_out = verify.tool_plan(self.root, 'operations', None)
         self.assertEqual(left_out, [])
         self.assertEqual({step.id: step.argv[1] for step in plan.steps},
@@ -208,6 +209,11 @@ class Profiles(unittest.TestCase):
         self.assertEqual({step.id for step in plan.steps}, harness_lib.OPERATIONS_CHECKS)
         self.assertEqual(plan.env['HOME'], '/home/fixture')
         self.assertNotIn('OPENROUTER_API_KEY', plan.env)
+
+    def test_db_and_operations_on_an_unprepared_tree_are_unavailable(self):
+        for profile in ('db', 'operations'):
+            with self.subTest(profile=profile), self.assertRaises(Unavailable):
+                verify.tool_plan(self.root, profile, None)
 
     def test_operations_report_says_it_is_disposable_evidence(self):
         steps = [python_step(self.root, name, 'pass') for name in sorted(harness_lib.OPERATIONS_CHECKS)]

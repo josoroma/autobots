@@ -1,7 +1,9 @@
 # WORKER-INFERENCE-001 — Inference step in the product worker
 
-Status: IN PROGRESS
-Evidence: none recorded yet
+Status: COMPLETE, as built, on mock and disposable evidence only
+Evidence: [US-11.12's manifest](../evidence/US-11.12/gate-0.json), `manual.worker_inference`
+
+**Settled by US-11.12.** The owner accepted it as built, including its failure behavior, in [Decision 0011](../decisions/0011-review-dispositions.md). Live runs through this worker are in [LIVE-GOAL-1](../evidence/LIVE-GOAL-1/summary.md), [US-10.1](../evidence/US-10.1/summary.md) and US-11.3's verification, each with its own results. Details of the first version below are history, and [the summary](../evidence/WORKER-INFERENCE-001/summary.md) has the current numbers.
 
 ## Plan
 
@@ -15,7 +17,7 @@ DH-W01.
 
 ## Implementation
 
-DH-W02. Uncommitted on `delivery/epic-1`, because the request didn't ask for a commit.
+DH-W02. First committed in `965df5e`, and changed again by US-11.12.
 
 - **Revision and changed paths:** `application/worker_inference.py` is new. Changed: `operations/worker.py`, `application/goal_loop.py`, `application/model_attempts.py`, `application/model_admission.py`, `application/provider_settings.py`, `adapters/loop_middleware.py`, `adapters/models/catalog.py`, all under `services/agent/src/autobots/`. Tests: `services/agent/tests/test_worker_inference.py`, `test_model_attempts.py`. Check: `scripts/qualify_worker_inference.py`, `tests/db/product_inference_worker.py`, `tests/db/product_inference_check.py`. Docs: [the operations runbook](../runbooks/operations.md) and `CODEBASE.md`.
 - **Actual behavior:** off by default, in which case the worker still claims nothing. With the switch on, `InferenceSource.bind` replaces the model and route for each claimed job. A job with no usable key or catalog pauses with nothing reserved, after the cancel, obligation and route gates. Each attempt rechecks the catalog and price, reads the current key, records a stored key's version and builds one client. Reservations use the highest catalog rate that can apply, for 32,000 input and 512 output tokens.
@@ -27,16 +29,16 @@ DH-W02. Uncommitted on `delivery/epic-1`, because the request didn't ask for a c
 DH-W03.
 
 - **Author and reviewer:** the implementing session; `autobots-reviewer`, in a separate read-only context, over two passes.
-- **Reviewed fingerprint:** not bound yet. The final changes after the second pass are listed in [the summary](../evidence/WORKER-INFERENCE-001/summary.md) and weren't reviewed. Bind a fingerprint and review them on the tree after the blocker fixes merge.
+- **Reviewed fingerprint:** US-11.12's, in its [manifest](../evidence/US-11.12/gate-0.json). Its review read this path again, and its findings WI-1 to WI-7 are dispositioned in [its summary](../evidence/US-11.12/summary.md).
 - **Findings and dispositions:** two blocking findings, both fixed: a billed reply recorded as never accepted, and `Retry-After` never read from a real SDK error. The second pass found nothing blocking. Non-blocking findings fixed: credential and configuration failures that escaped, the Astra over-reservation, `mark_invalid` ignoring which key got the 401, pricing edge cases, the uncapped `Retry-After`, the settings API failing on a damaged key, and the checks and docs that claimed too much. Left as they are: two narrow `mark_invalid` races that fail closed and clear with a revalidate, and the decision below.
-- **Open decision for the user:** whether `rate_limited` and `provider_error` should fail a run after their retries, or pause it. The sources don't decide. They fail today, `tests/db/goal_loop_check.py` asserts that for `provider_error`, and the reviewer recommends pausing on `rate_limited` at least.
+- **Decided by the owner:** `rate_limited` and `provider_error` fail a run after their retries, and a person starts a linked new run ([Decision 0011](../decisions/0011-review-dispositions.md)). They fail today, `tests/db/goal_loop_check.py` asserts that for `provider_error`, and the earlier reviewer had recommended pausing on `rate_limited` at least.
 
 ## Verification
 
-DH-W04. [Summary](../evidence/WORKER-INFERENCE-001/summary.md). No manifest yet, for the reason it gives.
+DH-W04. [Summary](../evidence/WORKER-INFERENCE-001/summary.md), bound by [US-11.12's manifest](../evidence/US-11.12/gate-0.json).
 
 - **Classes and model transport:** mock (fake HTTP transport under the real SDK and adapter) and disposable. Nothing live.
-- **Failures, errors, skips and limits:** in the summary. Not exercised: any live OpenRouter behavior, real response shapes or prices, compaction, workflows or children through this worker, two workers at once, a lost lease, and a persistent stack.
+- **Failures, errors, skips and limits:** in the summary. Not exercised through this worker: any live OpenRouter behavior, real response shapes or prices, two workers at once, a lost lease, and a persistent stack.
 
 ## Runbook
 
@@ -44,4 +46,4 @@ DH-W05.
 
 - **Procedure:** [Turning on inference](../runbooks/operations.md#turning-on-inference).
 - **Last exercised:** by `scripts/qualify_worker_inference.py` on a disposable stack. See the summary for its date and result.
-- **Untested steps:** the same command against a real key and live OpenRouter, which needs US-3.4's authorization.
+- **Untested steps:** none here against a real key. The live runs named above used it under their own authorization.

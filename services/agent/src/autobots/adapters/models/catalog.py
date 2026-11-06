@@ -59,7 +59,11 @@ def _highest(rates: Sequence[Mapping[str, Any]], names: tuple[str, ...], factor:
 
 
 def _reachable(rate: object) -> bool:
-    """A rate that starts above the prompts this app sends can't be charged here."""
+    """A rate that starts above the assumed prompt isn't in the worst case.
+
+    `Pricing.tier_from_tokens` keeps where the first such rate starts, and a request that could
+    reach it is refused before sending, as nothing was reserved at that rate.
+    """
     if not isinstance(rate, Mapping):
         return False
     start = rate.get("min_prompt_tokens")
@@ -80,7 +84,15 @@ def parse_pricing(item: Mapping[str, Any]) -> Pricing | None:
         return None
     charged_per_request = any("request" in rate for rate in rates)
     request = _highest(rates, ("request",), 1_000_000) if charged_per_request else 0
-    return None if request is None else Pricing(prompt, completion, request)
+    if request is None:
+        return None
+    tiers = [
+        rate["min_prompt_tokens"]
+        for rate in (overrides if isinstance(overrides, list) else ())
+        if isinstance(rate, Mapping) and isinstance(rate.get("min_prompt_tokens"), int)
+    ]
+    above = [start for start in tiers if start > RESERVED_PROMPT_TOKENS]
+    return Pricing(prompt, completion, request, min(above) if above else None)
 
 
 def parse_catalog(

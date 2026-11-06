@@ -16,4 +16,4 @@ Use [DH-06 Next.js standards](../../PRD-Development-Harness.md#nextjs-and-typesc
 
 ## Check and review
 
-Check: the `fast` and `full` profiles of [`scripts/verify.py`](../../scripts/verify.py). Review: [`autobots-review-change`](../skills/autobots-review-change/SKILL.md).
+Check: the `db` profile for screens, as most browser suites run there, and the `fast` and `full` profiles of [`scripts/verify.py`](../../scripts/verify.py). Review: [`autobots-review-change`](../skills/autobots-review-change/SKILL.md).

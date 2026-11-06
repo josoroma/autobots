@@ -6,11 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
 
-type Operation = { operation_id: string; tool_id: string };
+type Operation = {
+  operation_id: string;
+  tool_id: string;
+  generation: number;
+};
 
 const REFUSALS: Record<string, string> = {
   owner_required: "Only the workspace owner can record this.",
   operation_not_unknown: "This was already resolved.",
+  operation_attempt_changed:
+    "This operation has been tried again since this page loaded. Reload, then check the destination again.",
 };
 
 export function UnknownEffects({
@@ -25,7 +31,11 @@ export function UnknownEffects({
   const [evidence, setEvidence] = useState("");
   const [message, setMessage] = useState<string | null>(null);
 
-  async function record(operationId: string, outcome: string): Promise<void> {
+  async function record(
+    operationId: string,
+    generation: number,
+    outcome: string,
+  ): Promise<void> {
     setMessage(null);
     const reply = await csrfFetch(
       `/api/v1/runs/${encodeURIComponent(runId)}/effects/${encodeURIComponent(operationId)}/reconcile`,
@@ -35,7 +45,7 @@ export function UnknownEffects({
           "Content-Type": "application/json",
           "Idempotency-Key": crypto.randomUUID(),
         },
-        body: JSON.stringify({ outcome, evidence }),
+        body: JSON.stringify({ outcome, evidence, generation }),
       },
     ).catch(() => null);
     if (reply?.ok === true) {
@@ -74,7 +84,13 @@ export function UnknownEffects({
               <Button
                 variant="secondary"
                 disabled={evidence.trim() === ""}
-                onClick={() => void record(operation.operation_id, "delivered")}
+                onClick={() =>
+                  void record(
+                    operation.operation_id,
+                    operation.generation,
+                    "delivered",
+                  )
+                }
               >
                 It happened
               </Button>
@@ -82,7 +98,11 @@ export function UnknownEffects({
                 variant="secondary"
                 disabled={evidence.trim() === ""}
                 onClick={() =>
-                  void record(operation.operation_id, "not_delivered")
+                  void record(
+                    operation.operation_id,
+                    operation.generation,
+                    "not_delivered",
+                  )
                 }
               >
                 It did not happen

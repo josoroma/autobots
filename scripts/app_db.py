@@ -52,8 +52,10 @@ class AppStack(SupabaseStack):
 
     def as_login(self, role: str, password: str, statements: str) -> subprocess.CompletedProcess[str]:
         """Connect as a real login role over TCP inside the container, so its privileges are what is tested."""
-        return self.compose('exec', '-T', '-e', f'PGPASSWORD={password}', 'db', 'psql', '-h', 'localhost', '-U', role,
-                            '-d', 'postgres', '-X', '-q', '-A', '-t', '-v', 'ON_ERROR_STOP=1', stdin=statements)
+        # By name only, so the password stays in this process's environment and out of the process list.
+        return self.compose('exec', '-T', '-e', 'PGPASSWORD', 'db', 'psql', '-h', 'localhost', '-U', role,
+                            '-d', 'postgres', '-X', '-q', '-A', '-t', '-v', 'ON_ERROR_STOP=1', stdin=statements,
+                            extra_env={'PGPASSWORD': password})
 
     def migrator(self, statements: str) -> subprocess.CompletedProcess[str]:
         return self.as_login('autobots_migrator', self.migrator_password, statements)
@@ -164,7 +166,7 @@ def migration_cases(stack: AppStack, cases: Cases, root: Path) -> None:
     prior = rows(stack, f"select limit_micro_usd from public.runs where id = '{RUN_A}';")
     applied_next, error = apply_migrations(stack, directory)
     upgraded = rows(stack, f"select limit_micro_usd || '|' || goal_summary from public.runs where id = '{RUN_A}';")
-    cases.check('upgrade from the prior version keeps data', 'row kept, default added', f'prior {prior}, then {upgraded}, {applied_next} applied',
+    cases.check('upgrade from the prior version keeps data', 'the row is unchanged by the newest migration', f'prior {prior}, then {upgraded}, {applied_next} applied',
                 fixture.returncode == 0 and applied_next == 1 and error is None and upgraded == '1000|')
 
 

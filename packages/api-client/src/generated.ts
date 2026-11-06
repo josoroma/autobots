@@ -725,6 +725,10 @@ export const schemas = {
         "title": "Evidence",
         "type": "string"
       },
+      "generation": {
+        "title": "Generation",
+        "type": "integer"
+      },
       "outcome": {
         "enum": [
           "delivered",
@@ -736,7 +740,8 @@ export const schemas = {
     },
     "required": [
       "outcome",
-      "evidence"
+      "evidence",
+      "generation"
     ],
     "title": "EffectEvidence",
     "type": "object"
@@ -1710,6 +1715,10 @@ export const schemas = {
         "title": "Canonical Id",
         "type": "string"
       },
+      "charge_source_unknown": {
+        "title": "Charge Source Unknown",
+        "type": "boolean"
+      },
       "created_at": {
         "format": "date-time",
         "pattern": "^.+(Z|[+-]00:00)$",
@@ -1758,6 +1767,10 @@ export const schemas = {
         ],
         "title": "Input Tokens"
       },
+      "outcome_unknown": {
+        "title": "Outcome Unknown",
+        "type": "boolean"
+      },
       "output_tokens": {
         "anyOf": [
           {
@@ -1788,6 +1801,10 @@ export const schemas = {
           }
         ],
         "title": "Reasoning Tokens"
+      },
+      "reconciled": {
+        "title": "Reconciled",
+        "type": "boolean"
       },
       "reported_micro_usd": {
         "anyOf": [
@@ -1838,6 +1855,9 @@ export const schemas = {
       "reasoning_tokens",
       "reported_micro_usd",
       "estimated_micro_usd",
+      "reconciled",
+      "outcome_unknown",
+      "charge_source_unknown",
       "finish_reason",
       "failure_class",
       "created_at"
@@ -3265,10 +3285,17 @@ export const schemas = {
         "title": "Expert Version"
       },
       "goal_text": {
-        "maxLength": 20000,
-        "minLength": 1,
-        "title": "Goal Text",
-        "type": "string"
+        "anyOf": [
+          {
+            "maxLength": 20000,
+            "minLength": 1,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Goal Text"
       },
       "input_documents": {
         "items": {
@@ -3316,9 +3343,6 @@ export const schemas = {
         "title": "Session Id"
       }
     },
-    "required": [
-      "goal_text"
-    ],
     "title": "RunRequest",
     "type": "object"
   },
@@ -3449,6 +3473,10 @@ export const schemas = {
       "budgets": {
         "$ref": "#/components/schemas/RunBudgets"
       },
+      "can_continue": {
+        "title": "Can Continue",
+        "type": "boolean"
+      },
       "criteria": {
         "items": {
           "$ref": "#/components/schemas/CriterionView"
@@ -3557,7 +3585,8 @@ export const schemas = {
       "unknown_operations",
       "cursor",
       "role_map",
-      "budgets"
+      "budgets",
+      "can_continue"
     ],
     "title": "RunWorkspace",
     "type": "object"
@@ -3841,6 +3870,10 @@ export const schemas = {
   "UnknownEffect": {
     "additionalProperties": false,
     "properties": {
+      "generation": {
+        "title": "Generation",
+        "type": "integer"
+      },
       "operation_id": {
         "title": "Operation Id",
         "type": "string"
@@ -3857,7 +3890,8 @@ export const schemas = {
     "required": [
       "operation_id",
       "tool_id",
-      "tool_version"
+      "tool_version",
+      "generation"
     ],
     "title": "UnknownEffect",
     "type": "object"
@@ -4520,6 +4554,7 @@ export function parseDelayedOccurrence(value: unknown): DelayedOccurrence {
 
 export interface EffectEvidence {
   evidence: string;
+  generation: number;
   outcome: "delivered" | "not_delivered";
 }
 
@@ -4832,16 +4867,19 @@ export function parseModelCallReconciliation(value: unknown): ModelCallReconcili
 export interface ModelCallView {
   attempt: number;
   canonical_id: string;
+  charge_source_unknown: boolean;
   created_at: string;
   estimated_micro_usd: number;
   failure_class: string | null;
   finish_reason: string | null;
   id: string;
   input_tokens: number | null;
+  outcome_unknown: boolean;
   output_tokens: number | null;
   profile: string;
   provider: "openrouter";
   reasoning_tokens: number | null;
+  reconciled: boolean;
   reported_micro_usd: number | null;
   role: string;
   run_id: string;
@@ -5271,7 +5309,7 @@ export interface RunRequest {
   continues_run_id?: string | null;
   expert_id?: string | null;
   expert_version?: number | null;
-  goal_text: string;
+  goal_text?: string | null;
   input_documents?: InputDocument[];
   limit_micro_usd?: number;
   required_artifacts?: RequiredArtifact[];
@@ -5319,6 +5357,7 @@ export interface RunWorkspace {
   artifacts: ArtifactSummary[];
   assignments: AssignmentView[];
   budgets: RunBudgets;
+  can_continue: boolean;
   criteria: CriterionView[];
   cursor: number;
   expert: ExpertBinding | null;
@@ -5423,6 +5462,7 @@ export function parseToolAttemptView(value: unknown): ToolAttemptView {
 }
 
 export interface UnknownEffect {
+  generation: number;
   operation_id: string;
   tool_id: string;
   tool_version: number;

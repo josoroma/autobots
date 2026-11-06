@@ -149,6 +149,21 @@ test("a graph is validated, published, run and monitored, and the monitor only r
     "live",
     { timeout: 10_000 },
   );
+  // A reply that isn't what was asked for doesn't stop polling or read as live.
+  await page.route("**/api/v1/workflow-executions/**", (route) =>
+    route.fulfill({ status: 200, body: "<html>not it</html>" }),
+  );
+  await expect(page.locator("[data-connection]")).toHaveAttribute(
+    "data-connection",
+    "reconnecting",
+    { timeout: 10_000 },
+  );
+  await page.unroute("**/api/v1/workflow-executions/**");
+  await expect(page.locator("[data-connection]")).toHaveAttribute(
+    "data-connection",
+    "live",
+    { timeout: 10_000 },
+  );
   await page.reload();
   await expect(page.locator('[data-emission="up#0.value.0"]')).toContainText(
     "A",

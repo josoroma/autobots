@@ -276,3 +276,95 @@ test("an unapproved model is refused, no run starts, and the draft is kept", asy
   expect(await listed()).toBe(before);
   await page.getByRole("textbox", { name: "Goal" }).fill("");
 });
+
+test("reusing a key for another model is a conflict, not a replay of the first", async ({
+  page,
+}) => {
+  await signIn(page);
+  await ensureKey(page);
+  await page.goto("/");
+  const key = `same-key-${Date.now()}`;
+  const first = await page.request.post("/api/v1/runs", {
+    headers: await write(page, key),
+    data: { goal_text: "slice-only-claims keyed", run_profile: TERRA },
+  });
+  expect(first.status()).toBe(202);
+  const other = await page.request.post("/api/v1/runs", {
+    headers: await write(page, key),
+    data: { goal_text: "slice-only-claims keyed", run_profile: DEEPSEEK },
+  });
+  expect(other.status()).toBe(409);
+  expect((await other.json()).code).toBe("idempotency_conflict");
+});
+
+test("a finished run can be continued in a new linked run, with the disclosure, and stays as it was", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await signIn(page);
+  await ensureKey(page);
+  await page.goto("/");
+  const reply = await page.request.post("/api/v1/runs", {
+    headers: await write(page, `continue-${Date.now()}`),
+    data: { goal_text: "slice-only-claims to continue" },
+  });
+  const id = (await reply.json()).run_id;
+  await page.goto(`/runs/${id}`);
+  await expect(page.locator("[data-run-status]")).toHaveAttribute(
+    "data-run-status",
+    "failed",
+    { timeout: 60_000 },
+  );
+  const before = await (await page.request.get(`/api/v1/runs/${id}`)).json();
+  await page.getByRole("button", { name: "Continue in a new run" }).click();
+  await expect(page.locator("[data-continue-run]")).toContainText(
+    "it can repeat what this run did",
+  );
+  await expect(page.locator('[data-disclosure="budget"]')).toContainText(
+    "US$1.00",
+  );
+  // The API commits, and the reply is lost on the way back.
+  let firstKey = "";
+  await page.route("**/api/v1/runs", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    firstKey = route.request().headers()["idempotency-key"] ?? "";
+    await route.fetch();
+    return route.fulfill({ status: 503, body: "{}" });
+  });
+  await page
+    .locator("[data-continue-run]")
+    .getByRole("button", { name: "Run" })
+    .click();
+  await expect(page.locator("[data-continue-run]")).toContainText(
+    "it may have started",
+  );
+  await page.unroute("**/api/v1/runs");
+  const sent = page.waitForRequest(
+    (request) =>
+      request.method() === "POST" && request.url().endsWith("/api/v1/runs"),
+  );
+  await page
+    .locator("[data-continue-run]")
+    .getByRole("button", { name: "Run" })
+    .click();
+  // The server repeats what it stored, as the page's copy is cut and redacted.
+  const body = (await sent).postDataJSON();
+  expect(body.continues_run_id).toBe(id);
+  expect(body.goal_text).toBeUndefined();
+  // The same key, so pressing again started nothing new, and the page says so.
+  expect((await sent).headers()["idempotency-key"]).toBe(firstKey);
+  await expect(page.locator("[data-continue-run]")).toContainText(
+    "It had already started",
+  );
+  const link = page.getByRole("link", { name: "Open the run" });
+  await expect(link).toBeVisible();
+  const href = await link.getAttribute("href");
+  expect(href).not.toContain(id);
+  const after = await (await page.request.get(`/api/v1/runs/${id}`)).json();
+  expect(after.status).toBe("failed");
+  expect(after.version).toBe(before.version);
+  await page.goto(href ?? "");
+  await expect(
+    page.getByText("slice-only-claims to continue").first(),
+  ).toBeVisible();
+});

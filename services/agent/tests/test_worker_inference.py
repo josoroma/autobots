@@ -304,7 +304,7 @@ class ScriptedKeys:
         self.keys = keys
         self.rejected = rejected
 
-    async def open_attempt(self, workspace_id: Any, policy: Any) -> Any:
+    async def open_attempt(self, workspace_id: Any, policy: Any, **_kwargs: Any) -> Any:
         try:
             attempt, _ = prepared(policy, await self.catalog.current())
         except ModelUnavailable:
@@ -499,12 +499,12 @@ def test_the_worst_case_is_an_upper_bound_at_the_stated_limits() -> None:
 
 def test_the_real_catalog_prices_both_profiles_within_a_runs_default_cap() -> None:
     """Terra's cache-write rate is its highest input rate. Its long-prompt override starts far above
-    what this app sends, so it doesn't count."""
+    what's reserved for, so it doesn't count, and a request that could reach it isn't sent."""
     path = Path(__file__).parents[3] / "research/openrouter-model-catalog-2026-11-05.json"
     matches = {item["id"]: item for item in json.loads(path.read_text())["matches"]}
     prices = {wire: parse_pricing(matches[wire]) for wire in (DEEPSEEK_WIRE_ID, TERRA_WIRE_ID)}
     assert prices[DEEPSEEK_WIRE_ID] == Pricing(300_000, 1_200_000)
-    assert prices[TERRA_WIRE_ID] == Pricing(1_250_000, 5_000_000)
+    assert prices[TERRA_WIRE_ID] == Pricing(1_250_000, 5_000_000, tier_from_tokens=272_000)
     worst = {
         wire: worst_case_cost(price, RESERVED_PROMPT_TOKENS, MAX_OUTPUT_TOKENS)
         for wire, price in prices.items()
@@ -516,7 +516,9 @@ def test_an_override_this_app_can_reach_still_counts() -> None:
     near = {"min_prompt_tokens": RESERVED_PROMPT_TOKENS, "prompt": "0.5", "completion": "0.5"}
     far = {"min_prompt_tokens": RESERVED_PROMPT_TOKENS + 1, "prompt": "9", "completion": "9"}
     pricing = {"prompt": "0.1", "completion": "0.1", "overrides": [near, far]}
-    assert parse_pricing({"pricing": pricing}) == Pricing(500_000_000_000, 500_000_000_000)
+    assert parse_pricing({"pricing": pricing}) == Pricing(
+        500_000_000_000, 500_000_000_000, tier_from_tokens=RESERVED_PROMPT_TOKENS + 1
+    )
 
 
 def test_a_per_request_price_counts_wherever_it_is_listed() -> None:

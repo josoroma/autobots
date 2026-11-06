@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
+import psycopg
+
 from autobots.operations.logs import log_event
 
 logger = logging.getLogger("autobots.retention")
@@ -162,4 +164,9 @@ async def apply_all(connection: Any, store: Any) -> None:
         "where run_days is not null or receipt_days is not null"
     )
     for (workspace_id,) in await cursor.fetchall():
-        await apply_retention(connection, store, workspace_id)
+        try:
+            await apply_retention(connection, store, workspace_id)
+        except psycopg.OperationalError:
+            raise
+        except Exception as error:
+            log_event(logger, "retention.failed", logging.WARNING, error=type(error).__name__)

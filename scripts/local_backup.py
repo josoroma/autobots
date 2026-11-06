@@ -202,10 +202,13 @@ def backup(project: str, env_file: Path, out: Path, backup_key: Path, key_dir: P
     # A hash of a random 256-bit key reveals nothing and lets a restore match the right key.
     manifest['provider_key_sha256'] = hashlib.sha256(master_key.read_bytes()).hexdigest()
 
-    stopped = docker('stop', '-t', '30', *containers, timeout=240)
-    if stopped.returncode:
-        raise Unavailable('the project could not be stopped, so no consistent backup was taken')
     try:
+        try:
+            stopped = docker('stop', '-t', '30', *containers, timeout=240)
+        except subprocess.TimeoutExpired:
+            raise Unavailable('stopping the project timed out, so no consistent backup was taken') from None
+        if stopped.returncode:
+            raise Unavailable('the project could not be stopped, so no consistent backup was taken')
         for logical, name in sorted(volumes.items()):
             component = f'volume:{logical}'
             capture = subprocess.Popen(['docker', 'run', '--rm', '-i', '--pull=never', '--network', 'none', '--user', 'root', '--entrypoint', 'tar',
@@ -283,6 +286,14 @@ def record_restore(backup_dir: Path, result: str, passed: int | None = None, tot
     descriptor = os.open(backup_dir / 'restores.jsonl', os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
     with os.fdopen(descriptor, 'a') as handle:
         handle.write(json.dumps(entry) + '\n')
+
+
+def recorded(backup_dir: Path, result: str, passed: int | None = None, total: int | None = None) -> None:
+    """The result is already out by now, so a failed write is reported and costs nothing else."""
+    try:
+        record_restore(backup_dir, result, passed, total)
+    except OSError as problem:
+        print(f'WARNING: Operations will not show this restore: {type(problem).__name__}', file=sys.stderr)
 
 
 def restored_values(values: dict[str, str], gateway_port: int, db_port: int) -> dict[str, str]:
@@ -419,8 +430,8 @@ def main() -> int:
         if args.command == 'verify':
             cases = verify_restore(args.backup, args.backup_key, args.key_dir, args.project)
             passed = sum(1 for case in cases if case['passed'])
-            record_restore(args.backup, 'passed' if passed == len(cases) else 'failed', passed, len(cases))
             print(json.dumps({'cases': cases}))
+            recorded(args.backup, 'passed' if passed == len(cases) else 'failed', passed, len(cases))
             return 0 if all(case['passed'] for case in cases) else 1
         if args.command == 'keygen':
             if args.out.exists():
@@ -437,8 +448,8 @@ def main() -> int:
             gateway = args.gateway_port or free_port()
             database = args.db_port or free_port([gateway])
             restored = restore(args.backup, args.backup_key, args.project, gateway, database)
-            record_restore(args.backup, 'not_verified')
             print(json.dumps(restored))
+            recorded(args.backup, 'not_verified')
         return 0
     except Refused as refusal:
         print(f'REFUSED before any change: {refusal}', file=sys.stderr)

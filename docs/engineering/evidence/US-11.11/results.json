@@ -529,7 +529,7 @@
       "surface": "run",
       "theme": "dark",
       "screenshot": "run-dark.png",
-      "text_checked": 53,
+      "text_checked": 54,
       "lowest_text_ratio": 6.94,
       "text_failures": [],
       "boundaries": [],
@@ -582,21 +582,29 @@
           "ratio": 18.97
         },
         {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
           "element": "A",
           "outline_width": "2px",
           "ratio": 17.18
         }
       ],
       "focus_failures": [],
-      "hover": null,
+      "hover": {
+        "sample": "Continue in a new run",
+        "ratio": 14.88
+      },
       "axe_violations": []
     },
     {
       "surface": "inspector",
       "theme": "dark",
       "screenshot": "inspector-dark.png",
-      "text_checked": 103,
-      "lowest_text_ratio": 8.11,
+      "text_checked": 105,
+      "lowest_text_ratio": 6.94,
       "text_failures": [],
       "boundaries": [],
       "boundary_failures": [],
@@ -661,7 +669,7 @@
       "surface": "experts",
       "theme": "dark",
       "screenshot": "experts-dark.png",
-      "text_checked": 44,
+      "text_checked": 48,
       "lowest_text_ratio": 6.94,
       "text_failures": [],
       "boundaries": [
@@ -716,7 +724,7 @@
           "ratio": 17.18
         },
         {
-          "element": "INPUT#route-1df4bab9-2742-43cb-bbf6-eb877b1f308a",
+          "element": "INPUT#route-cfb5cebf-0567-451c-b6b4-a6656bd0ff26",
           "outline_width": "2px",
           "ratio": 17.18
         },
@@ -726,7 +734,7 @@
           "ratio": 17.18
         },
         {
-          "element": "INPUT#route-441fec71-fe62-4fda-ba59-44e9b6caa6de",
+          "element": "INPUT#route-380d6eb2-51ad-4c56-90f1-8798c53d2a8e",
           "outline_width": "2px",
           "ratio": 17.18
         },
@@ -736,7 +744,7 @@
           "ratio": 17.18
         },
         {
-          "element": "INPUT#route-1495216a-1434-41c0-82e7-eb8794e15db2",
+          "element": "INPUT#route-89ca90bb-8a90-458e-8098-5913785f10ce",
           "outline_width": "2px",
           "ratio": 17.18
         },
@@ -746,7 +754,7 @@
           "ratio": 17.18
         },
         {
-          "element": "INPUT#route-08f569a6-838f-452b-9a5c-7c0c45c1565d",
+          "element": "INPUT#route-84ba04d6-3546-43fc-a2d0-3c33d387e5cb",
           "outline_width": "2px",
           "ratio": 17.18
         },
@@ -756,7 +764,7 @@
           "ratio": 17.18
         },
         {
-          "element": "INPUT#route-67d2472c-06b8-4bb7-bcd5-1779f5e145dc",
+          "element": "INPUT#route-db362a84-7bf3-4d24-ba28-27d341e991a9",
           "outline_width": "2px",
           "ratio": 17.18
         },
@@ -766,7 +774,7 @@
           "ratio": 17.18
         },
         {
-          "element": "INPUT#route-99e5fac4-99db-4c66-b067-c9e11c8e80ee",
+          "element": "INPUT#route-64bc13ec-7981-4b90-bc29-cf1007434e20",
           "outline_width": "2px",
           "ratio": 17.18
         },
@@ -1001,7 +1009,7 @@
       "surface": "workflows",
       "theme": "dark",
       "screenshot": "workflows-dark.png",
-      "text_checked": 52,
+      "text_checked": 56,
       "lowest_text_ratio": 6.94,
       "text_failures": [],
       "boundaries": [
@@ -2584,7 +2592,7 @@
       "surface": "run",
       "theme": "light",
       "screenshot": "run-light.png",
-      "text_checked": 53,
+      "text_checked": 54,
       "lowest_text_ratio": 4.74,
       "text_failures": [],
       "boundaries": [],
@@ -2637,21 +2645,29 @@
           "ratio": 19.8
         },
         {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
           "element": "A",
           "outline_width": "2px",
           "ratio": 19.8
         }
       ],
       "focus_failures": [],
-      "hover": null,
+      "hover": {
+        "sample": "Continue in a new run",
+        "ratio": 16.43
+      },
       "axe_violations": []
     },
     {
       "surface": "inspector",
       "theme": "light",
       "screenshot": "inspector-light.png",
-      "text_checked": 103,
-      "lowest_text_ratio": 6.28,
+      "text_checked": 105,
+      "lowest_text_ratio": 4.74,
       "text_failures": [],
       "boundaries": [],
       "boundary_failures": [],
@@ -2716,7 +2732,7 @@
       "surface": "experts",
       "theme": "light",
       "screenshot": "experts-light.png",
-      "text_checked": 44,
+      "text_checked": 48,
       "lowest_text_ratio": 4.74,
       "text_failures": [],
       "boundaries": [
@@ -2771,7 +2787,7 @@
           "ratio": 18.97
         },
         {
-          "element": "INPUT#route-1df4bab9-2742-43cb-bbf6-eb877b1f308a",
+          "element": "INPUT#route-cfb5cebf-0567-451c-b6b4-a6656bd0ff26",
           "outline_width": "2px",
           "ratio": 19.8
         },
@@ -2781,7 +2797,7 @@
           "ratio": 19.8
         },
         {
-          "element": "INPUT#route-441fec71-fe62-4fda-ba59-44e9b6caa6de",
+          "element": "INPUT#route-380d6eb2-51ad-4c56-90f1-8798c53d2a8e",
           "outline_width": "2px",
           "ratio": 19.8
         },
@@ -2791,7 +2807,7 @@
           "ratio": 19.8
         },
         {
-          "element": "INPUT#route-1495216a-1434-41c0-82e7-eb8794e15db2",
+          "element": "INPUT#route-89ca90bb-8a90-458e-8098-5913785f10ce",
           "outline_width": "2px",
           "ratio": 19.8
         },
@@ -2801,7 +2817,7 @@
           "ratio": 19.8
         },
         {
-          "element": "INPUT#route-08f569a6-838f-452b-9a5c-7c0c45c1565d",
+          "element": "INPUT#route-84ba04d6-3546-43fc-a2d0-3c33d387e5cb",
           "outline_width": "2px",
           "ratio": 19.8
         },
@@ -2811,7 +2827,7 @@
           "ratio": 19.8
         },
         {
-          "element": "INPUT#route-67d2472c-06b8-4bb7-bcd5-1779f5e145dc",
+          "element": "INPUT#route-db362a84-7bf3-4d24-ba28-27d341e991a9",
           "outline_width": "2px",
           "ratio": 19.8
         },
@@ -2821,7 +2837,7 @@
           "ratio": 19.8
         },
         {
-          "element": "INPUT#route-99e5fac4-99db-4c66-b067-c9e11c8e80ee",
+          "element": "INPUT#route-64bc13ec-7981-4b90-bc29-cf1007434e20",
           "outline_width": "2px",
           "ratio": 19.8
         },
@@ -3056,7 +3072,7 @@
       "surface": "workflows",
       "theme": "light",
       "screenshot": "workflows-light.png",
-      "text_checked": 52,
+      "text_checked": 56,
       "lowest_text_ratio": 4.74,
       "text_failures": [],
       "boundaries": [

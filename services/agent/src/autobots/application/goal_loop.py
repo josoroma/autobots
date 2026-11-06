@@ -5,7 +5,7 @@ import json
 import logging
 import os
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -458,26 +458,52 @@ async def _keep_lease(
     wake = clock or WakeClock()
     look = min(WAKE_LOOK_SECONDS, config.heartbeat_seconds)
     since_beat = 0.0
-    async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as connection:
-        while True:
+    undiscounted = 0.0
+    failures = 0
+    while True:
+        try:
+            async with await psycopg.AsyncConnection.connect(
+                database_url, autocommit=True
+            ) as connection:
+                while True:
+                    await asyncio.sleep(look)
+                    since_beat += look
+                    slept = wake.check()
+                    if slept:
+                        log_event(logger, "worker.woke", seconds=round(slept, 1))
+                        undiscounted += slept
+                    if since_beat >= config.heartbeat_seconds or wake.just_woke():
+                        since_beat = 0.0
+                        try:
+                            await heartbeat(connection, lease, lease_seconds=config.lease_seconds)
+                        except LeaseLost:
+                            if not wake.just_woke():
+                                return
+                            try:
+                                await revive_lease(
+                                    connection, lease, lease_seconds=config.lease_seconds
+                                )
+                            except LeaseLost:
+                                return
+                            log_event(logger, "worker.lease_revived", generation=lease.generation)
+                    # After the beat, so a discount that keeps failing can't lose the lease.
+                    if undiscounted:
+                        await discount_sleep(connection, lease, undiscounted)
+                        undiscounted = 0.0
+                    failures = 0
+        except Exception as error:
+            # A sleep can drop this connection, among other things.
+            failures += 1
+            if failures == 1 or failures % 30 == 0:
+                log_event(
+                    logger,
+                    "worker.keeper_reconnecting",
+                    error=type(error).__name__,
+                    failures=failures,
+                )
             await asyncio.sleep(look)
-            since_beat += look
-            slept = wake.check()
-            if slept:
-                log_event(logger, "worker.woke", seconds=round(slept, 1))
-                await discount_sleep(connection, lease.run_id, slept)
-            if since_beat < config.heartbeat_seconds and not wake.just_woke():
-                continue
-            since_beat = 0.0
-            try:
-                await heartbeat(connection, lease, lease_seconds=config.lease_seconds)
-            except LeaseLost:
-                if not wake.just_woke():
-                    return
-                try:
-                    await revive_lease(connection, lease, lease_seconds=config.lease_seconds)
-                except LeaseLost:
-                    return
+            # An outage used up lease time with no beat, so the first look after it beats.
+            since_beat = config.heartbeat_seconds
 
 
 async def _run_status(connection: Any, lease: Lease) -> str:
@@ -519,7 +545,7 @@ async def _summary_route(connection: Any, lease: Lease, config: LoopConfig) -> M
     bound = snapshot.get("bindings", {}).get("summarizer")
     if bound != config.route.profile:
         return None
-    return ModelRoute("summarizer", bound, config.route.wire_id, config.route.worst_case_micro_usd)
+    return replace(config.route, role="summarizer", profile=bound)
 
 
 async def _route_is_bound(connection: Any, lease: Lease, config: LoopConfig) -> bool:
@@ -609,10 +635,11 @@ async def _settle_children(connection: Any, lease: Lease) -> datetime | None:
                 moment = (await expiry.fetchone())[0]
                 retry_at = moment if retry_at is None else max(retry_at, moment)
                 continue
+        cursor = await connection.execute("select status from public.runs where id = %s", (child,))
         await connection.execute(
-            "update app_private.assignments set status = 'finished', outcome = 'cancelled', "
+            "update app_private.assignments set status = 'finished', outcome = %s, "
             "finished_at = now() where id = %s",
-            (assignment_id,),
+            ((await cursor.fetchone())[0], assignment_id),
         )
     return retry_at
 

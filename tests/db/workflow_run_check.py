@@ -158,6 +158,20 @@ async def main() -> None:
         rows = await value('select count(*) from public.workflow_node_instances where execution_id = %s', execution.id)
         check('a stale worker commits nothing', 'lost, 0 instances', (result.outcome, rows), result.outcome == 'lost' and rows == 0)
 
+        # _commit's own fence, with a scope whose generation has moved on.
+        from autobots.application.tool_gateway import LeaseLost, ToolScope  # noqa: PLC0415
+        from autobots.application.workflow_runner import _commit  # noqa: PLC0415
+        from autobots.domain.workflow_execution import Step  # noqa: PLC0415
+        stale_scope = ToolScope(WORKSPACE, execution.run_id, lease.generation, {})
+        step = Step('up', 'up', None, 'run', {})
+        try:
+            await _commit(db, stale_scope, execution.id, step, 'succeeded', [('value', 0, 'x')])
+            fenced = 'committed'
+        except LeaseLost:
+            fenced = 'refused'
+        counts = await (await db.execute('select (select count(*) from public.workflow_node_instances where execution_id = %s), (select count(*) from public.workflow_emissions where execution_id = %s)', (execution.id, execution.id))).fetchone()
+        check("_commit refuses a stale generation and writes nothing", 'refused, no instance or emission', (fenced, counts), fenced == 'refused' and counts == (0, 0))
+
         # An approval step waits with nothing after it, and replays on the decision.
         execution = await start('Gate', GATED, {'in': 'please'})
         result = await advance()
@@ -190,12 +204,21 @@ async def main() -> None:
         children = await value('select count(*) from app_private.assignments where parent_run_id = %s', execution.run_id)
         check('an agent step runs one assignment, and its honest failure fails the step', 'ask failed, 1 child, 1 model call', (found.get('ask'), children, len(model.seen)), found.get('ask') == 'failed' and children == 1 and len(model.seen) == 1)
 
-        # A cancel stops between instances.
+        # A workflow's own limit stops its agent step before any call.
+        execution = await start('Agent no money', agent_graph, {'in': 'Work it out'})
+        await db.execute('update public.runs set limit_micro_usd = 0 where id = %s', (execution.run_id,))
+        model = Script(items=[say('never')], seen=[], bound=[])
+        await advance(model)
+        found = await statuses(execution)
+        reason = await value("select coalesce(u.stop_reason, '-') from app_private.assignments a join app_private.run_usage u on u.run_id = a.child_run_id where a.parent_run_id = %s", execution.run_id)
+        check("a workflow's limit stops its agent step with no model call", 'no instance settled, budget_exceeded, 0 model calls', (found.get('ask'), reason, len(model.seen)), found.get('ask') is None and reason == 'budget_exceeded' and not model.seen)
+
+        # A cancel before any worker claims it. The stop between instances is its own case below.
         execution = await start('Cancelled', LOOP, {'in': ['a', 'b']})
         version = await value('select version from public.runs where id = %s', execution.run_id)
         await apply_command(db, workspace_id=WORKSPACE, run_id=execution.run_id, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
         idle = await advance()
-        check('a cancelled execution does not run', 'nothing to do, no instances', (idle, await statuses(execution)), idle is None and await statuses(execution) == {})
+        check('an execution cancelled while queued does not run', 'nothing to do, no instances', (idle, await statuses(execution)), idle is None and await statuses(execution) == {})
         # B5: a worker dies after VERIFY commits, and a cancel lands after the last node commits.
         no_tools = {'nodes': [node('in', 'input', type='string'), node('out', 'output')], 'links': [link('in', 'value', 'out', 'value')]}
         execution = await start('settle-verifying', no_tools, {'in': 'x'})

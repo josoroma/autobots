@@ -13,10 +13,12 @@ from pydantic import SecretStr
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.api.main import provider_context_from_environment
 from autobots.application.artifacts import read_artifact
+from autobots.application.experts import create_expert, create_session, resolve_binding
 from autobots.application.provider_settings import KeyCheck, ProviderSettings
 from autobots.application.runs import admit_run, apply_command
 from autobots.application.worker_leases import claim_run
 from autobots.application.workflows import create_execution, create_workflow, publish_version
+from autobots.contracts.experts import ExpertConfig, SessionExpert
 from autobots.contracts.plans import RequiredArtifact
 from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.models import resolve_role_policy
@@ -47,6 +49,21 @@ async def workflow(workspace: str) -> None:
         await publish_version(db, workspace_id=UUID(workspace), actor_id=actor, workflow_id=flow.id, idempotency_key=str(uuid4()), expected_version=0, graph=WorkflowGraph.model_validate(graph), source='user')
         bound = await create_execution(db, workspace_id=UUID(workspace), actor_id=actor, workflow_id=flow.id, idempotency_key=str(uuid4()), version=1, inputs={'in': 'x'})
         print(bound.run_id)
+
+
+async def admit_lead(workspace: str) -> None:
+    """A run that can delegate, naming its Expert in the goal for the fake provider to read."""
+    tools = ['calculate', 'save_artifact', 'publish_artifact']
+    place, actor = UUID(workspace), uuid4()
+    async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
+        lead = await create_expert(db, workspace_id=place, actor_id=actor, idempotency_key=str(uuid4()), name='Worker lead', config=ExpertConfig(tools=tools))
+        helper = await create_expert(db, workspace_id=place, actor_id=actor, idempotency_key=str(uuid4()), name='Worker helper', config=ExpertConfig(tools=tools, instructions='Help.'))
+        session = await create_session(db, workspace_id=place, actor_id=actor, idempotency_key=str(uuid4()), kind='coordinator', experts=[SessionExpert(expert_id=item.id) for item in (lead, helper)])
+        binding = await resolve_binding(db, place, session.id, expert_id=lead.id)
+        accepted = await admit_run(db, workspace_id=place, actor_id=actor, idempotency_key=str(uuid4()),
+                                   goal_text=f'Lead the work [parent] expert={helper.id}', limit_micro_usd=1_000_000,
+                                   policy=resolve_role_policy(), binding=binding)
+        print(accepted.run_id)
 
 
 async def save_key(workspace: str) -> None:
@@ -85,7 +102,7 @@ async def strand(workspace: str, run: str, state: str) -> None:
             await apply_command(db, workspace_id=UUID(workspace), run_id=UUID(run), command=RunCommand.VERIFY, actor=Actor.WORKER, expected_version=version, generation=lease.generation)
 
 
-COMMANDS = {'workflow': workflow, 'admit': admit, 'save-key': save_key, 'artifact': artifact, 'strand': strand}
+COMMANDS = {'workflow': workflow, 'admit': admit, 'admit-lead': admit_lead, 'save-key': save_key, 'artifact': artifact, 'strand': strand}
 
 if __name__ == '__main__':
     asyncio.run(COMMANDS[sys.argv[1]](*sys.argv[2:]))

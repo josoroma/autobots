@@ -44,7 +44,8 @@ python3.12 scripts/verify.py --profile full
 |---|---|
 | `harness` | Configuration, backlog validation and the deterministic harness tests |
 | `fast` | `harness`, plus the Python steps for `services/agent/`, the web steps for `apps/web/` and `packages/`, and both for shared or check-infrastructure paths such as locks, `contracts/` and `scripts/verify.py`. No build. Everything else is recorded `not_run`, so a documentation-only change needs no prepared environment |
-| `full` | `harness`, plus every step, including `next build`, the browser suite, the offline toolchain scope tests and the fault qualification below |
+| `db` | `harness`, plus disposable Docker checks: the pinned release, migrations and seeds, the guarded persistent apply's refusals, and **19 of the 23 browser spec files** through `qualify_identity.py`, with a scripted worker. It needs the prepared Python, Node and browser. So a screen change isn't covered until `db` runs, whatever `fast` or `full` say |
+| `full` | `harness`, plus every step, including `next build`, the shell and appearance browser specs (`qualify_web.py`, 2 of the 23 spec files), the offline toolchain scope tests and the fault qualification below |
 
 | Exit | Report `status` | Meaning |
 |---|---|---|
@@ -77,7 +78,7 @@ This is disposable evidence with a scripted model and an arranged credential. It
 
 ## Disposable database qualification
 
-Needs Docker with the two images pinned in `infra/disposable/compose.yaml` already local. Nothing is pulled; a missing image exits 2.
+Needs Docker, the images pinned in `infra/disposable/compose.yaml` and the Supabase release already local, and the prepared Python, Node and browser environments for the suites `db` also runs. Nothing is pulled or installed, and anything missing exits 2.
 
 ```sh
 python3.12 scripts/verify.py --profile db
@@ -404,6 +405,6 @@ Parser and hook tests use temporary directories and clean up their own fixtures.
 
 ## Evidence and exercise status
 
-A verified claim's last-exercised revision, date and result are recorded in the story's evidence, not in this runbook: see the [US-1.8 Gate 0 summary](../evidence/US-1.8/summary.md) for this file's checks and recovery paths, and the [US-1.2 evidence summary](../evidence/US-1.2/summary.md) for the forward ingestion exercise, which also lists the steps exercised and those left unexercised. [HARNESS-ADAPT-001 evidence](../evidence/HARNESS-ADAPT-001/summary.md) is earlier evidence, for the initial harness adaptation, and is not current status.
+A verified claim's last-exercised revision, date and result are recorded in the story's evidence, not in this runbook: see the [US-11.12 Gate 0 summary](../evidence/US-11.12/summary.md) for this file's checks and recovery paths, and the [US-1.2 evidence summary](../evidence/US-1.2/summary.md) for the forward ingestion exercise, which also lists the steps exercised and those left unexercised. [HARNESS-ADAPT-001 evidence](../evidence/HARNESS-ADAPT-001/summary.md) is earlier evidence, for the initial harness adaptation, and is not current status.
 
 Raw logs live under ignored `.checks`; reviewed redacted summaries remain versioned. An evidence manifest binds the tested source and configuration fingerprints. These commands imply no real Supabase or OpenRouter result, and live assistant event delivery stays unexercised.

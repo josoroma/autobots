@@ -40,7 +40,7 @@ test("an unknown effect is visible, blocks resume, and only an owner can resolve
     `/api/v1/runs/${RUN}/effects/${OPERATION}/reconcile`,
     {
       headers: await write(other, "foreign"),
-      data: { outcome: "delivered", evidence: "x" },
+      data: { outcome: "delivered", evidence: "x", generation: 1 },
     },
   );
   expect(foreign.status()).toBe(404);
@@ -50,7 +50,7 @@ test("an unknown effect is visible, blocks resume, and only an owner can resolve
     `/api/v1/runs/${RUN}/effects/${OPERATION}/reconcile`,
     {
       headers: await write(member, "member"),
-      data: { outcome: "delivered", evidence: "x" },
+      data: { outcome: "delivered", evidence: "x", generation: 1 },
     },
   );
   expect(denied.status()).toBe(403);
@@ -93,7 +93,7 @@ test("an unknown effect is visible, blocks resume, and only an owner can resolve
     `/api/v1/runs/${RUN}/effects/${OPERATION}/reconcile`,
     {
       headers: await write(page, "again"),
-      data: { outcome: "not_delivered", evidence: "changed" },
+      data: { outcome: "not_delivered", evidence: "changed", generation: 1 },
     },
   );
   expect(again.status()).toBe(409);

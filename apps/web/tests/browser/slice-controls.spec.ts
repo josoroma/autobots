@@ -240,4 +240,24 @@ test("resume is refused with its reason until an uncertain call is reconciled, a
   });
   expect(await apiStatus(page, id)).toBe("succeeded");
   await expectNoControls(page);
+
+  // E-2: the audit screen doesn't call that call a success, or the owner's figure a report.
+  await page.goto(`/runs/${id}/inspector`);
+  const entered = page.locator('[data-cost="entered"]');
+  await expect(entered).toContainText("Charge entered by the owner");
+  await expect(entered).toContainText("US$0.00025");
+  await expect(
+    page.locator("[data-call]").filter({ has: entered }),
+  ).toContainText("outcome unknown");
+
+  // E-6: a stale tab is told nothing was recorded.
+  await page.goto(`/runs/${id}`);
+  const stale = await page.request.post(
+    `/api/v1/runs/${id}/model-calls/reconcile`,
+    {
+      headers: await write(page, `stale-${id}`),
+      data: { charged_micro_usd: 5 },
+    },
+  );
+  expect((await stale.json()).reconciled_calls).toBe(0);
 });

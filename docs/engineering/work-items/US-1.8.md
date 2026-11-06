@@ -3,6 +3,8 @@
 Status: COMPLETE
 Evidence: gate-0
 
+**Superseded.** Its approval was at `b94727d`, and later source changes voided it. [US-11.12](US-11.12.md) repeats Gate 0.
+
 ## Plan
 
 - **Source:** [US-1.8](../../../SPECS.md#us-18-h1-independent-baseline-review-and-exercised-runbook), SP-002, SP-003, SP-021, H1.3, DH-A01–16.

@@ -84,7 +84,7 @@ Queued runs and uncertain calls stay exactly as they were. The runtime role can'
 docker compose -p "$RESTORED_PROJECT" exec -T db psql -U supabase_admin -d postgres -c "delete from app_private.installation_holds;"
 ```
 
-Before releasing, cancel or review what's pending, because workers will take queued jobs afterwards. Uncertain calls still wait for a person: see [the operations runbook](operations.md).
+Before releasing, cancel or review what's pending, because workers will take queued jobs afterwards, and enabled routines catch up at once and can use the restored key. Uncertain calls still wait for a person: see [the operations runbook](operations.md).
 
 ## Failure symptoms
 

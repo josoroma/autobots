@@ -48,7 +48,7 @@ What each job does:
 - **Route:** the `executor` binding in the run's frozen `policy_snapshot` picks the profile, so one worker serves DeepSeek and Terra runs side by side. Changing a workspace default never reaches a run already admitted. A run with no approved binding pauses as `route_not_bound`.
 - **Before anything starts:** a job with no usable key or no fresh catalog pauses, with nothing reserved and no request sent. A cancel, or a candidate waiting for verification, still settles, because neither needs a model. A workflow still runs its deterministic blocks, and only its agent blocks stop.
 - **Each attempt:** it rechecks the catalog (no older than five minutes), reads the current key, records a stored key's version in `app_private.model_invocations.credential_version` (an environment key has none), and builds a client used once. A rotated key applies from the next attempt, with no restart.
-- **Spend:** each call asks for at most 512 output tokens and reserves the most the highest rates that can apply could charge for that plus 32,000 input tokens. That input figure is an estimate, because no tokenizer is pinned, so text with more than a token per character can pass it. The prices are read when the job is claimed, so a rise during a job is under-reserved until its next claim, though a price that disappears stops the next attempt. The reply's reported cost settles the attempt.
+- **Spend:** each call asks for at most 512 output tokens and reserves the most the highest rates that can apply could charge for that plus 32,000 input tokens. A request larger than that reserves for its bytes as well. That input figure is an estimate, because no tokenizer is pinned, so text with more than a token per character can pass it. The prices are read when the job is claimed, so a rise during a job is under-reserved until its next claim, though a price that disappears stops the next attempt. The reply's reported cost settles the attempt.
 - **Compaction:** it works only when a run's `summarizer` binding matches its `executor` binding. Otherwise a run long enough to need it pauses as `route_not_bound`.
 
 | Pause reason | Means | What to do |
@@ -57,11 +57,11 @@ What each job does:
 | `invalid_credential` | OpenRouter answered `401`, or the configured key is unusable. Sent once, not retried, and the key is marked invalid | Replace or revalidate the key, then resume. Resume answers `409 credential_invalid` until then. |
 | `credential_unavailable` | The master key, the credential row or the configuration root can't be read, or the last key check couldn't reach OpenRouter | Restore access, revalidate the key, or replace it if its row is damaged. Never generate a new master key while encrypted rows exist. |
 | `model_unavailable` | The catalog is stale or unreadable, the mapping drifted, the model no longer offers tools or the output limit, or OpenRouter answered `404` | Read the catalog. Nothing substitutes another model. Resume once it's right, or start a new run on another model. |
-| `cost_unavailable` | The catalog gives no usable price | Same as above. |
+| `cost_unavailable` | The catalog gives no usable price, a fresh price is above what was reserved, or the request is long enough to reach a higher long-prompt rate that nothing was reserved at, such as Terra's from 272,000 tokens | For the first two, the same as above. For the last, resuming only pauses again, because the context doesn't shrink: cancel the run and use **Continue in a new run**. |
 | `network_before_acceptance` | Two retries also couldn't open a connection, so nothing was sent | Check this Mac's network, then resume. |
 | `uncertain_acceptance` | A call timed out or dropped, or OpenRouter answered in a way the SDK couldn't parse. It may have been charged, so its reservation stays | Look up the charge in OpenRouter's records, reconcile it as in [Drain and stop](#drain-and-stop), then resume. Resume answers `409 uncertain_model_call` until then. |
 
-These don't pause: after two retries, `rate_limited` (`429`) and `provider_error` (other `5xx`) fail the run. A `Retry-After` is honored up to 60 seconds, and one longer than that, or past the run's time limit, ends the retries at once. Neither `402` nor a `401` is retried. To continue failed work, start a linked new run. A reply that the provider itself stopped, as `error` or `content_filter`, never runs and fails as `incomplete_output`.
+These don't pause: after two retries, `rate_limited` (`429`) and `provider_error` (other `5xx`) fail the run. To go on, a person uses **Continue in a new run** on the failed run, which links a new run that can repeat work with no recorded result. A `Retry-After` is honored up to 60 seconds, and one longer than that, or past the run's time limit, ends the retries at once. Neither `402` nor a `401` is retried. To continue failed work, use **Continue in a new run** on its page. Its steps are new, so it can repeat what the earlier run did, and anything consequential waits for a new approval. A reply that the provider itself stopped, as `error` or `content_filter`, never runs and fails as `incomplete_output`.
 
 **Qualified by** `python3.12 scripts/qualify_worker_inference.py`, on its own disposable stack. It runs the real `worker.main`, SDK and adapter, with a fake HTTP transport and catalog passed from Python, arranged keys, and hostnames beyond loopback refused. It writes `.checks/worker-inference/qualification.json` and its logs under `.checks/worker-inference/logs`, and removes only its own `autobots-disposable-*` project. Other Docker stacks must stay still while it runs, because it compares every container outside its own project.
 
@@ -116,7 +116,7 @@ The page also shows delayed routine occurrences, OpenRouter's availability from 
 
 With the database down the page still answers, with `scope: installation` and no workspace counts. Only an owner sees it while the database is up.
 
-Logs are JSON lines on stderr, kept in `$LOG_DIR` on this Mac. Secret shapes are replaced with `[redacted]` and identifiers are cut to eight characters. An exception logs its type, never its message. uvicorn's own start and stop lines are plain text. API and worker bootstrap turn inherited LangSmith and OTLP settings off, and Operations reports it.
+Logs are JSON lines on stderr, kept in `$LOG_DIR` on this Mac. Secret shapes are replaced with `[redacted]` and identifiers are cut to eight characters. An exception logs its type, never its message, and uvicorn's own lines go through the same format, apart from access lines, which aren't logged. API and worker bootstrap turn inherited LangSmith and OTLP settings off, and Operations reports it.
 
 ## Drain and stop
 
@@ -130,6 +130,8 @@ docker compose -p "$PROJECT" stop
 ```
 
 Expected: the worker logs `worker.stopped`, and its heartbeat ends at `stopped`. With a step still running it first goes to `draining` and logs `worker.draining`. On the install no step was running, so only `worker.stopped` appeared. A step finishes if it can within `AUTOBOTS_WORKER_DRAIN_SECONDS` (default 30). uvicorn exits with status -15 after `Application shutdown complete`, which is its normal clean stop.
+
+A step that's still running can send further paid calls during the drain, as a stop only prevents new claims.
 
 **If the drain runs out:** the worker logs `worker.drain_cut_short` and exits. The job's lease expires, and Operations shows `leases_expired`. A model call in flight at that moment may have been charged, so the run pauses with `uncertain_model_call` instead of retrying. Look up the charge in OpenRouter's own records, then reconcile it and resume:
 
@@ -157,7 +159,7 @@ See [the backup and restore runbook](backup-restore.md).
 
 ## Mac sleep
 
-A worker that wakes takes back a lease that ran out with nobody claiming it, and doesn't count the time asleep as active. A call whose connection dropped pauses the run as `uncertain_acceptance`, as above. See [the sleep runbook](mac-sleep.md), which is the only way to exercise this: `SIGSTOP` doesn't separate the two clocks, so it never counts as a sleep.
+A worker that wakes takes back a lease that ran out with nobody claiming it, and doesn't count the time asleep as active. A call whose connection dropped should pause the run as `uncertain_acceptance`, as above, though that path hasn't been exercised under a real sleep. See [the sleep runbook](mac-sleep.md), which is the only way to exercise this: `SIGSTOP` doesn't separate the two clocks, so it never counts as a sleep.
 
 ## Failure symptoms
 

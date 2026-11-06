@@ -15,8 +15,10 @@ from langchain.agents.middleware.types import AgentMiddleware
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
+from langchain_core.utils.function_calling import convert_to_openai_tool
 from pydantic import ConfigDict
 
+from autobots.adapters.models.catalog import RESERVED_PROMPT_TOKENS
 from autobots.application.compaction import (
     CompactionPolicy,
     StoredSummary,
@@ -64,6 +66,8 @@ STOPPING = frozenset(
         "assignment_busy",
         "approval_pending",
         "outcome_unknown",
+        # N-15: its result is unknown, so nothing should build on it.
+        "output_too_large",
     }
 )
 _ADMITTED: ContextVar[bool] = ContextVar("autobots_model_call_admitted", default=False)
@@ -122,6 +126,50 @@ class ModelRoute:
     profile: str
     wire_id: str
     worst_case_micro_usd: int
+    # For a request larger than the worst case already assumes. Zero where no price is known.
+    input_per_million_micro_usd: int = 0
+    # Where a higher rate starts, past the size assumed. Nothing is reserved at that rate.
+    tier_from_tokens: int | None = None
+
+
+def request_bytes(request: Any) -> int:
+    """An upper bound on the prompt's tokens, at about one per byte, as no tokenizer is pinned.
+
+    It counts what compaction doesn't: the system prompt and the tools' schemas.
+    """
+    total = 0
+    for message in [getattr(request, "system_message", None), *getattr(request, "messages", ())]:
+        if message is not None:
+            calls = getattr(message, "tool_calls", None) or []
+            total += len(
+                json.dumps([message.content, calls], default=str, ensure_ascii=False).encode()
+            )
+    return total + len(
+        json.dumps(
+            getattr(request, "tools", None) or [], default=_tool_text, ensure_ascii=False
+        ).encode()
+    )
+
+
+def _tool_text(tool: Any) -> Any:
+    try:
+        return convert_to_openai_tool(tool)
+    except (TypeError, ValueError, AttributeError):
+        return str(tool)
+
+
+def reservation_for(route: ModelRoute, prompt_bytes: int) -> int:
+    """The route's worst case, plus whatever this request has beyond the tokens that assumes."""
+    excess = max(prompt_bytes - RESERVED_PROMPT_TOKENS, 0)
+    return (
+        route.worst_case_micro_usd
+        + (excess * route.input_per_million_micro_usd + 999_999) // 1_000_000
+    )
+
+
+def past_known_price(route: ModelRoute, prompt_bytes: int) -> bool:
+    """A token takes at least a byte, so a request this short can't reach the tier."""
+    return route.tier_from_tokens is not None and prompt_bytes >= route.tier_from_tokens
 
 
 def _retry_after(error: Exception) -> float | None:
@@ -368,6 +416,9 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             "select model_calls from app_private.run_usage where run_id = %s", (budget,)
         )
         used = (await cursor.fetchone())[0]
+        prompt_bytes = request_bytes(request)
+        if past_known_price(chosen, prompt_bytes):
+            raise LoopStopped(FailureClass.COST_UNAVAILABLE.value)
         admission_request = AdmissionRequest(
             workspace_id=self._scope.workspace_id,
             root_run_id=budget,
@@ -376,7 +427,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             profile=chosen.profile,
             wire_id=chosen.wire_id,
             attempt=used + 1,
-            worst_case_micro_usd=chosen.worst_case_micro_usd,
+            worst_case_micro_usd=reservation_for(chosen, prompt_bytes),
         )
         policy = RetryPolicy(
             deadline=datetime.now(UTC) + timedelta(seconds=remaining), sleep=self._sleep
@@ -396,7 +447,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             charged = _charged(replies[-1].result[-1]) if replies else None
             if charged is not None and last_ticket:
                 await ModelAdmission(self._connection).reconcile(
-                    last_ticket[-1].invocation_id, charged
+                    last_ticket[-1].invocation_id, charged, source="provider"
                 )
             raise LoopStopped("lease_lost") from None
         # Settled by now, so this can't change what the call cost or whether it counted.

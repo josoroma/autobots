@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import re
 import os
 import socket
 import time
@@ -39,6 +40,7 @@ def guarded_getaddrinfo(host: Any, *args: Any, **kwargs: Any) -> Any:
 socket.getaddrinfo = guarded_getaddrinfo
 
 from autobots.adapters.models.factory import default_sdk_client  # noqa: E402
+from autobots.application.compaction import SUMMARY_MARKER  # noqa: E402
 from autobots.domain.models import PROFILES, ModelProfileId  # noqa: E402
 from autobots.operations.reasoning_trial import continuation_result  # noqa: E402
 from autobots.operations.worker import main  # noqa: E402
@@ -53,6 +55,18 @@ STEPS = (('propose_plan', {'tasks': [TASK]}),
          ('save_artifact', {'path': 'outputs/report.md', 'content': CONTENT}),
          ('publish_artifact', {'path': 'outputs/report.md', 'version': 1}),
          ('complete_task', {'task_id': 'report', 'evidence': EVIDENCE, 'summary': 'Wrote and published the report.'}))
+# Long enough in tool arguments to pass the compaction budget, which counts them.
+LONG = 'x' * 6_000
+COMPACT_STEPS = (STEPS[0], *(('save_artifact', {'path': f'outputs/part-{n}.md', 'content': LONG}) for n in range(6)), STEPS[1], STEPS[2], STEPS[3])
+SUMMARY = 'ARRANGED-SUMMARY: six parts were saved.'
+PART = {'id': 'k', 'title': 'Part', 'criteria': ['c1'], 'expected_evidence': 'a file'}
+PART_EVIDENCE = [{'kind': 'artifact', 'reference': 'outputs/child-1/part.md'}]
+CHILD_STEPS = (('propose_plan', {'tasks': [PART]}),
+               ('save_artifact', {'path': 'outputs/child-1/part.md', 'content': 'part'}),
+               ('publish_artifact', {'path': 'outputs/child-1/part.md', 'version': 1}),
+               ('complete_task', {'task_id': 'k', 'evidence': PART_EVIDENCE, 'summary': 'done part'}))
+PARENT_PLAN = ('propose_plan', {'tasks': [{'id': 'p', 'title': 'Delegate', 'criteria': ['c1'], 'expected_evidence': 'a result'}]})
+POSITION: dict[str, int] = {}
 PRICES = {ModelProfileId.DEEPSEEK_FLASH: ('0.000001', '0.000002'), ModelProfileId.TERRA: ('0.000001', '0.000005')}
 
 
@@ -74,10 +88,37 @@ def next_reply(messages: list[dict[str, Any]]) -> dict[str, Any]:
     return {'finish_reason': 'stop', 'message': {'role': 'assistant', 'content': 'The report is ready.'}}
 
 
+def tool_call(name: str, arguments: dict[str, Any], number: int) -> dict[str, Any]:
+    call = {'id': f'call-{number}', 'type': 'function', 'function': {'name': name, 'arguments': json.dumps(arguments)}}
+    return {'finish_reason': 'tool_calls', 'message': {'role': 'assistant', 'content': None, 'tool_calls': [call]}}
+
+
+def script_for(name: str, steps: tuple[tuple[str, dict[str, Any]], ...], final: str) -> dict[str, Any]:
+    """Compaction takes earlier replies out of the model's view, so the position lives here."""
+    number = POSITION.get(name, 0)
+    POSITION[name] = number + 1
+    if number < len(steps):
+        return tool_call(*steps[number], number + 1000 * len(name))
+    return {'finish_reason': 'stop', 'message': {'role': 'assistant', 'content': final}}
+
+
+def text_of(messages: list[dict[str, Any]]) -> str:
+    return '\n'.join(str(message.get('content') or '') for message in messages)
+
+
 def handle(request: httpx.Request) -> httpx.Response:
     body = json.loads(request.content)
     key = request.headers.get('authorization', '').removeprefix('Bearer ')
     goal = next((str(message['content']) for message in body['messages'] if message['role'] == 'user'), '')
+    everything = text_of(body['messages'])
+    if '[compact]' in everything and SUMMARY_MARKER not in goal:
+        goal = 'Write the report [compact]'
+    if SUMMARY_MARKER in goal:
+        goal = 'Summary of [compact-summary]'
+    elif '[child-part]' in everything and '[parent]' not in goal:
+        goal = 'Do the part [child-part]'
+    if '[parent]' in everything and '[child-part]' not in goal:
+        goal = 'Lead [parent]'
     record({'url': str(request.url), 'goal': goal.splitlines()[0], 'model': body.get('model'), 'models': body.get('models'),
             'provider': body.get('provider'), 'max_tokens': body.get('max_tokens'), 'key': fingerprint(key), 'at': time.monotonic(),
             'tools': sorted(item['function']['name'] for item in body.get('tools') or [])})
@@ -90,6 +131,17 @@ def handle(request: httpx.Request) -> httpx.Response:
         return httpx.Response(429, json={'error': {'code': 429, 'message': 'arranged'}}, headers={'Retry-After': str(RETRY_AFTER)})
     usage = {'prompt_tokens': 5, 'completion_tokens': 7, 'total_tokens': 12, 'cost': 0.0001, 'completion_tokens_details': {'reasoning_tokens': 3}}
     choice = {'index': 0, **next_reply(body['messages'])}
+    if '[compact-summary]' in goal:
+        choice = {'index': 0, 'finish_reason': 'stop', 'message': {'role': 'assistant', 'content': SUMMARY}}
+    elif '[compact]' in goal:
+        record({'goal': goal, 'saw_summary': SUMMARY in everything})
+        choice = {'index': 0, **script_for('compact', COMPACT_STEPS, 'The report is ready.')}
+    elif '[child-part]' in goal:
+        choice = {'index': 0, **script_for('child', CHILD_STEPS, 'The part is done.')}
+    elif '[parent]' in goal:
+        expert = re.search(r'expert=([0-9a-f-]{36})', everything)
+        assign = ('assign_specialist', {'expert_id': expert.group(1) if expert else '', 'goal': 'Do the part [child-part]'})
+        choice = {'index': 0, **script_for('parent', (PARENT_PLAN, assign), 'The part came back.')}
     if '[reasoning]' in goal:
         for returned in RETURNED.values():
             comparison = continuation_result(returned, body['messages'])

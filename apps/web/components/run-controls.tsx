@@ -1,6 +1,9 @@
 "use client";
 
-import { parseRunSummary } from "@autobots/api-client";
+import {
+  parseReconciliationResult,
+  parseRunSummary,
+} from "@autobots/api-client";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -92,6 +95,12 @@ export function RunControls({
       setRefusal("Enter the charge in US dollars, such as 0.0012.");
       return;
     }
+    if (dollars > 0 && Math.round(dollars * MICRO_USD) === 0) {
+      setRefusal(
+        "That's under a millionth of a dollar, which can't be recorded. Enter 0 if there was no charge.",
+      );
+      return;
+    }
     setBusy(true);
     const reply = await csrfFetch(`${base}/model-calls/reconcile`, {
       method: "POST",
@@ -105,8 +114,15 @@ export function RunControls({
     }).catch(() => null);
     setBusy(false);
     if (reply?.ok === true) {
-      setCharge("");
-      setNote("The charge is recorded against the oldest open call.");
+      const result = parseReconciliationResult(await reply.json());
+      if (result.reconciled_calls === 0) {
+        setRefusal(
+          "Nothing was recorded, as no call is waiting for a charge now. Your entry wasn't used.",
+        );
+      } else {
+        setCharge("");
+        setNote("The charge is recorded against the oldest open call.");
+      }
     } else {
       setRefusal(await refusalOf(reply));
     }

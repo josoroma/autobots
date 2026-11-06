@@ -77,6 +77,9 @@ export function RunInspectorView({ runId }: { runId: string }) {
         <h2 id="calls-heading" className="text-lg font-medium">
           Model calls
         </h2>
+        <p className="text-sm text-muted-foreground">
+          This run and any child runs, since they share its budget.
+        </p>
         {view.model_calls.length === 0 ? (
           <p className="text-sm">No model calls.</p>
         ) : (
@@ -85,7 +88,11 @@ export function RunInspectorView({ runId }: { runId: string }) {
               <li key={call.id} data-call={call.status} className="break-words">
                 <p className="font-medium">
                   {call.role}, attempt {call.attempt}:{" "}
-                  {call.status.replaceAll("_", " ")}
+                  {call.outcome_unknown
+                    ? "outcome unknown"
+                    : call.charge_source_unknown
+                      ? "reconciled"
+                      : call.status.replaceAll("_", " ")}
                 </p>
                 <p>
                   Provider {call.provider}. Upstream{" "}
@@ -101,12 +108,29 @@ export function RunInspectorView({ runId }: { runId: string }) {
                   {tokens(call.output_tokens)} out, of which{" "}
                   {tokens(call.reasoning_tokens)} reasoning.
                 </p>
-                <p data-cost="reported">
-                  Reported charge:{" "}
-                  {call.reported_micro_usd === null
-                    ? "none"
-                    : dollars(call.reported_micro_usd)}
-                </p>
+                {call.reconciled ? (
+                  <p data-cost="entered">
+                    Charge entered by the owner, from the provider&apos;s
+                    records:{" "}
+                    {call.reported_micro_usd === null
+                      ? "none"
+                      : dollars(call.reported_micro_usd)}
+                  </p>
+                ) : call.charge_source_unknown ? (
+                  <p data-cost="unattributed">
+                    Charge reconciled, source not recorded:{" "}
+                    {call.reported_micro_usd === null
+                      ? "none"
+                      : dollars(call.reported_micro_usd)}
+                  </p>
+                ) : (
+                  <p data-cost="reported">
+                    Reported charge:{" "}
+                    {call.reported_micro_usd === null
+                      ? "none"
+                      : dollars(call.reported_micro_usd)}
+                  </p>
+                )}
                 <p data-cost="estimated">
                   Estimated worst case, not a charge:{" "}
                   {dollars(call.estimated_micro_usd)}
@@ -125,6 +149,9 @@ export function RunInspectorView({ runId }: { runId: string }) {
         <h2 id="tools-heading" className="text-lg font-medium">
           Tool operation attempts
         </h2>
+        <p className="text-sm text-muted-foreground">
+          This run only. A child run shows its own.
+        </p>
         {view.tool_attempts.length === 0 ? (
           <p className="text-sm">No tool operations.</p>
         ) : (

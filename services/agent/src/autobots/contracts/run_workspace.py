@@ -105,6 +105,8 @@ class UnknownEffect(BaseModel):
     operation_id: str
     tool_id: str
     tool_version: int
+    # Returned with a verdict, so one based on an earlier attempt can't settle a later one.
+    generation: int
 
 
 class RunBudgets(BaseModel):
@@ -146,6 +148,8 @@ class RunWorkspace(BaseModel):
     cursor: int
     role_map: list[FrozenBinding]
     budgets: RunBudgets
+    # A goal run of its own that has finished. A child or a workflow's run isn't one.
+    can_continue: bool
 
 
 class RunListItem(BaseModel):
@@ -189,6 +193,12 @@ class ModelCallView(BaseModel):
     # What the provider reported, and the most this call could have cost. Never added together.
     reported_micro_usd: int | None
     estimated_micro_usd: int
+    # The owner entered this charge. A late report from the provider doesn't count.
+    reconciled: bool
+    # The call was lost, so an owner's charge is all that's known of it.
+    outcome_unknown: bool
+    # Reconciled before the source was recorded, so nothing is claimed either way.
+    charge_source_unknown: bool
     finish_reason: str | None
     failure_class: str | None
     created_at: UtcTimestamp

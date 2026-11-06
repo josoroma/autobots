@@ -268,3 +268,42 @@ test.afterAll(async ({ browser }) => {
   await page.getByRole("button", { name: "Disconnect" }).click();
   await expect(page.locator('[data-field="source"]')).toHaveText("None");
 });
+
+test("a member can't pin an earlier Expert version through a session, and an owner can", async ({
+  browser,
+}) => {
+  const owner = await (await browser.newContext()).newPage();
+  await signIn(owner, EMAIL_A, PASSWORD_A);
+  const stamp = Date.now();
+  const expert = await (
+    await owner.request.post("/api/v1/experts", {
+      headers: await write(owner, `pin-expert-${stamp}`),
+      data: { name: `Pinned ${stamp}`, config: {} },
+    })
+  ).json();
+  const member = await (await browser.newContext()).newPage();
+  await signIn(member, EMAIL_C, PASSWORD_C);
+  const workspace = process.env.AUTOBOTS_TEST_WORKSPACE_A ?? "";
+  const refused = await member.request.post("/api/v1/sessions", {
+    headers: {
+      ...(await write(member, `pin-member-${stamp}`)),
+      "X-Autobots-Workspace": workspace,
+    },
+    data: { kind: "direct", experts: [{ expert_id: expert.id, version: 1 }] },
+  });
+  expect(refused.status()).toBe(403);
+  expect((await refused.json()).code).toBe("owner_required");
+  const unpinned = await member.request.post("/api/v1/sessions", {
+    headers: {
+      ...(await write(member, `pin-latest-${stamp}`)),
+      "X-Autobots-Workspace": workspace,
+    },
+    data: { kind: "direct", experts: [{ expert_id: expert.id }] },
+  });
+  expect(unpinned.status()).toBe(201);
+  const pinned = await owner.request.post("/api/v1/sessions", {
+    headers: await write(owner, `pin-owner-${stamp}`),
+    data: { kind: "direct", experts: [{ expert_id: expert.id, version: 1 }] },
+  });
+  expect(pinned.status()).toBe(201);
+});

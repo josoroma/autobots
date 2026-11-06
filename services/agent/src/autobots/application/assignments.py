@@ -52,10 +52,16 @@ def narrowed_tools(
         if tool in parent and tool not in PLAN_TOOLS and tool != DELEGATION_TOOL
     }
     if requested is not None:
-        if any(tool not in available for tool in requested):
+        named = [tool for tool in requested if tool != DELEGATION_TOOL]
+        if any(tool not in available for tool in named):
             raise ToolFailed("scope_expansion_denied")
-        available = {tool: available[tool] for tool in requested}
-    if DELEGATION_TOOL in parent and depth < levels:
+        available = {tool: available[tool] for tool in named}
+    # N-4: a narrowed request that doesn't name delegation doesn't get it.
+    wants_delegation = requested is None or DELEGATION_TOOL in requested
+    can_delegate = DELEGATION_TOOL in parent and depth < levels
+    if requested is not None and DELEGATION_TOOL in requested and not can_delegate:
+        raise ToolFailed("scope_expansion_denied")
+    if can_delegate and wants_delegation:
         available[DELEGATION_TOOL] = parent[DELEGATION_TOOL]
     return {**PLAN_TOOLS, **available}
 

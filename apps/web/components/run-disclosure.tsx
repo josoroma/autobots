@@ -123,6 +123,14 @@ export function RunDisclosure({
               ))}
             </ul>
           </details>
+          {bindings.find((binding) => binding.role === "summarizer")
+            ?.profile !== executor.profile ? (
+            <p data-disclosure="summarizer">
+              The summarizer differs from the executor, so this run would pause
+              with route_not_bound if it needs compaction, and resuming
+              wouldn&apos;t clear that.
+            </p>
+          ) : null}
         </>
       )}
       <p data-disclosure="budget">

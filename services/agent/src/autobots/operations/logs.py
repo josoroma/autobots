@@ -68,6 +68,15 @@ def configure_logging(stream: TextIO | None = None) -> None:
     root = logging.getLogger()
     root.handlers[:] = [handler]
     root.setLevel(logging.INFO)
+    # uvicorn's own handlers would print a traceback whole, with whatever its message holds.
+    for name in ("uvicorn", "uvicorn.error"):
+        server = logging.getLogger(name)
+        server.handlers[:] = []
+        server.propagate = True
+    # An access line holds a whole run ID in its path, so it isn't logged at all.
+    access = logging.getLogger("uvicorn.access")
+    access.handlers[:] = []
+    access.propagate = False
     # httpx logs each request URL at info, which is a provider or Storage address and path.
     logging.getLogger("httpx").setLevel(logging.WARNING)
 

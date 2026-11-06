@@ -724,6 +724,10 @@
             "title": "Evidence",
             "type": "string"
           },
+          "generation": {
+            "title": "Generation",
+            "type": "integer"
+          },
           "outcome": {
             "enum": [
               "delivered",
@@ -735,7 +739,8 @@
         },
         "required": [
           "outcome",
-          "evidence"
+          "evidence",
+          "generation"
         ],
         "title": "EffectEvidence",
         "type": "object"
@@ -1709,6 +1714,10 @@
             "title": "Canonical Id",
             "type": "string"
           },
+          "charge_source_unknown": {
+            "title": "Charge Source Unknown",
+            "type": "boolean"
+          },
           "created_at": {
             "format": "date-time",
             "pattern": "^.+(Z|[+-]00:00)$",
@@ -1757,6 +1766,10 @@
             ],
             "title": "Input Tokens"
           },
+          "outcome_unknown": {
+            "title": "Outcome Unknown",
+            "type": "boolean"
+          },
           "output_tokens": {
             "anyOf": [
               {
@@ -1787,6 +1800,10 @@
               }
             ],
             "title": "Reasoning Tokens"
+          },
+          "reconciled": {
+            "title": "Reconciled",
+            "type": "boolean"
           },
           "reported_micro_usd": {
             "anyOf": [
@@ -1837,6 +1854,9 @@
           "reasoning_tokens",
           "reported_micro_usd",
           "estimated_micro_usd",
+          "reconciled",
+          "outcome_unknown",
+          "charge_source_unknown",
           "finish_reason",
           "failure_class",
           "created_at"
@@ -3264,10 +3284,17 @@
             "title": "Expert Version"
           },
           "goal_text": {
-            "maxLength": 20000,
-            "minLength": 1,
-            "title": "Goal Text",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal Text"
           },
           "input_documents": {
             "items": {
@@ -3315,9 +3342,6 @@
             "title": "Session Id"
           }
         },
-        "required": [
-          "goal_text"
-        ],
         "title": "RunRequest",
         "type": "object"
       },
@@ -3448,6 +3472,10 @@
           "budgets": {
             "$ref": "#/components/schemas/RunBudgets"
           },
+          "can_continue": {
+            "title": "Can Continue",
+            "type": "boolean"
+          },
           "criteria": {
             "items": {
               "$ref": "#/components/schemas/CriterionView"
@@ -3556,7 +3584,8 @@
           "unknown_operations",
           "cursor",
           "role_map",
-          "budgets"
+          "budgets",
+          "can_continue"
         ],
         "title": "RunWorkspace",
         "type": "object"
@@ -3840,6 +3869,10 @@
       "UnknownEffect": {
         "additionalProperties": false,
         "properties": {
+          "generation": {
+            "title": "Generation",
+            "type": "integer"
+          },
           "operation_id": {
             "title": "Operation Id",
             "type": "string"
@@ -3856,7 +3889,8 @@
         "required": [
           "operation_id",
           "tool_id",
-          "tool_version"
+          "tool_version",
+          "generation"
         ],
         "title": "UnknownEffect",
         "type": "object"

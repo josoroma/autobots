@@ -10,6 +10,7 @@ import {
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { ContinueRun } from "@/components/continue-run";
 import { RunControls } from "@/components/run-controls";
 import { Card } from "@/components/ui/card";
 import { UnknownEffects } from "@/components/unknown-effects";
@@ -249,6 +250,7 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
         >
           {CONNECTION_TEXT[connection]}
         </p>
+        {snapshot.can_continue ? <ContinueRun runId={runId} /> : null}
         <RunControls
           runId={runId}
           status={snapshot.run.status}
@@ -428,6 +430,16 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
               binding dispatches in this release, and other roles that differ
               from it don&apos;t take effect.
             </p>
+            {snapshot.role_map.find((binding) => binding.role === "summarizer")
+              ?.profile !==
+            snapshot.role_map.find((binding) => binding.role === "executor")
+              ?.profile ? (
+              <p data-role-map="summarizer">
+                The summarizer differs here, so this run pauses with
+                route_not_bound if it needs compaction, and resuming won&apos;t
+                clear that.
+              </p>
+            ) : null}
             <ul className="space-y-1">
               {snapshot.role_map.map((binding) => (
                 <li key={binding.role} className="break-words">
@@ -457,7 +469,9 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
             Reported so far: US$
             {snapshot.run.budget.spent_micro_usd / 1_000_000}. Held as an
             estimate for calls not settled: US$
-            {snapshot.run.budget.reserved_micro_usd / 1_000_000}.
+            {snapshot.run.budget.reserved_micro_usd / 1_000_000}. The
+            workspace&apos;s per-run and daily limits apply too, and the lowest
+            one stops the run.
           </p>
         </div>
       </Card>

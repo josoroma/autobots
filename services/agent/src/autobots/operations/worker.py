@@ -5,8 +5,8 @@ point gives it maintenance only, so it never claims a job and says so in its hea
 Operations reports queued work as waiting for an inference worker instead of showing it as moving.
 
 `AUTOBOTS_WORKER_INFERENCE=enabled` adds the inference step, which sends real, billed OpenRouter
-requests for any queued run once a key exists. Nothing turns it on by default, because no live
-route is qualified yet (US-3.4). No environment value selects another endpoint, model or fake. The
+requests for any queued run once a key exists. Nothing turns it on by default, because it spends
+real money. No environment value selects another endpoint, model or fake. The
 HTTP client does honor the usual proxy variables, as any client on this Mac would.
 """
 
@@ -86,7 +86,7 @@ async def _beat(config: WorkerConfig, status: _Status) -> None:
                             await status.changed.wait()
                     except TimeoutError:
                         pass
-        except psycopg.OperationalError as error:
+        except Exception as error:
             log_event(logger, "worker.heartbeat_lost", logging.WARNING, error=type(error).__name__)
             await asyncio.sleep(min(config.beat_seconds, 2.0))
 
@@ -239,11 +239,16 @@ def credential_check_from_environment() -> Callable[[Any, UUID], Awaitable[str]]
     return check
 
 
-def inference_step(config: WorkerConfig, source: InferenceSource, store: Any) -> Step:
+def inference_step(
+    config: WorkerConfig, source: InferenceSource, store: Any, stop: asyncio.Event | None = None
+) -> Step:
     """Claims through `process_next`, and each job's own policy picks its route."""
     base = LoopConfig(route=UNBOUND, object_store=store)
 
     async def step(connection: Any) -> bool:
+        # A stop can land during the maintenance before this, and a paid job shouldn't start then.
+        if stop is not None and stop.is_set():
+            return False
         result = await process_next(
             connection, config.database_url, config.worker_id, _unbound, base, bind=source.bind
         )
@@ -316,12 +321,12 @@ async def main(
         database_url=url,
         drain_seconds=float(os.environ.get("AUTOBOTS_WORKER_DRAIN_SECONDS", "30")),
     )
+    stop = asyncio.Event()
     step = maintenance_step(credential_check_from_environment(), store)
     if os.environ.get(INFERENCE_SWITCH) == "enabled":
         source = inference_from_environment(url, store, client_factory, fetch_catalog)
         config = replace(config, claims_inference=True)
-        step = both(step, inference_step(config, source, store))
-    stop = asyncio.Event()
+        step = both(step, inference_step(config, source, store, stop))
     install_signal_handlers(stop)
     await serve(config, step, stop)
 

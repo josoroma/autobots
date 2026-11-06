@@ -51,6 +51,8 @@ class Pricing:
     input_per_million: int
     output_per_million: int
     per_request: int = 0
+    # Where a higher rate starts, past the prompt size these rates assume.
+    tier_from_tokens: int | None = None
 
 
 def worst_case_cost(pricing: Pricing | None, input_tokens: int, max_output_tokens: int) -> int:
@@ -273,13 +275,16 @@ class ModelAdmission:
         await self.mark_uncertain(invocation_id, "cancelled_after_dispatch")
         return "uncertain"
 
-    async def reconcile(self, invocation_id: UUID, charged_micro_usd: int) -> None:
+    async def reconcile(
+        self, invocation_id: UUID, charged_micro_usd: int, source: str = "owner"
+    ) -> None:
         """Resolve an uncertain attempt from a reported charge. A charge is never invented."""
         cursor = await self._connection.execute(
             "update app_private.model_invocations set "
             "charged_micro_usd = %s, status = 'succeeded', "
-            "reconciled_at = now() where id = %s and status = 'uncertain' returning id",
-            (charged_micro_usd, invocation_id),
+            "reconciled_at = now(), charge_source = %s "
+            "where id = %s and status = 'uncertain' returning id",
+            (charged_micro_usd, source, invocation_id),
         )
         if await cursor.fetchone() is None:
             raise ValueError("this attempt is not awaiting reconciliation")

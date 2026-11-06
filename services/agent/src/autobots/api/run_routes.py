@@ -62,7 +62,11 @@ def as_api_error(error: Exception) -> ApiError:
     if isinstance(error, VersionConflict):
         return ApiError(409, error.code, "The run changed. Reload and try again.")
     if isinstance(error, LinkRefused):
-        return ApiError(409, error.code, "Only a finished run can be continued.")
+        return ApiError(
+            409,
+            error.code,
+            "Only a finished goal run of its own, in this workspace, can be continued.",
+        )
     if isinstance(error, RunNotFound):
         return ApiError(404, error.code, "That run is not available.")
     if isinstance(error, CommandRefused):
@@ -87,6 +91,8 @@ async def post_run(
     workspace_id: Annotated[UUID, Depends(current_workspace)],
     user_id: Annotated[UUID, Depends(current_user)],
 ) -> RunAccepted:
+    if body.session_id is None and (body.expert_id is not None or body.expert_version is not None):
+        raise ApiError(422, "session_required", "An Expert is chosen through a session.")
     code = await settings.run_intent(workspace_id)
     if code != "ready":
         raise ApiError(409, code, "Model-backed work needs a usable OpenRouter key.")
@@ -137,6 +143,7 @@ async def post_run(
                 binding=binding,
                 input_documents=tuple(body.input_documents),
                 policy=policy,
+                run_profile=body.run_profile.value if body.run_profile else None,
             )
         except (IdempotencyConflict, LinkRefused) as error:
             raise as_api_error(error) from None
@@ -292,6 +299,7 @@ async def post_effect_evidence(
                 idempotency_key=key,
                 outcome=body.outcome,
                 evidence=public_text(body.evidence, limit=2000),
+                generation=body.generation,
             )
         except ReconciliationRefused as error:
             status_code = 404 if error.code == "operation_not_found" else 409

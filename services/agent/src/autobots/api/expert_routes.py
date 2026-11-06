@@ -124,6 +124,12 @@ async def post_version(
 async def post_session(
     body: SessionCreate, request: Request, key: Key, workspace: Member, user: User
 ) -> SessionView:
+    if (
+        any(item.version is not None for item in body.experts)
+        and await request.app.state.membership.role_in(user, workspace) != "owner"
+    ):
+        # An earlier version could hold tools an owner has since removed, Decision 0011.
+        raise ApiError(403, "owner_required", "Only an owner can choose an Expert version.")
     async with _pool(request).connection() as connection:
         try:
             return await create_session(

@@ -34,8 +34,8 @@ SELF_REPORTING_STEPS = frozenset({'contract_drift', 'browser_qualification', 'fa
 STEP_CLASSES = {'harness_behavior_tests': ('mock', 'none'), 'pytest': ('mock', 'mock'), 'api_client_tests': ('mock', 'none'),
                 'web_unit_tests': ('mock', 'none'), 'browser_qualification': ('local_runtime', 'none'),
                 'fault_qualification': ('mock', 'mock'), 'disposable_qualification': ('disposable', 'none'),
-                'supabase_stack_qualification': ('disposable', 'none'), 'app_db_qualification': ('disposable', 'none'),
-                'identity_qualification': ('disposable', 'none'), 'persistent_apply_qualification': ('disposable', 'none'),
+                'supabase_stack_qualification': ('disposable', 'none'), 'app_db_qualification': ('disposable', 'mock'),
+                'identity_qualification': ('disposable', 'mock'), 'persistent_apply_qualification': ('disposable', 'none'),
                 'operations_qualification': ('disposable', 'mock'),
                 'backup_qualification': ('disposable', 'mock'), 'upgrade_qualification': ('disposable', 'mock')}
 OUTSIDE_SCOPE = 'outside the changed scope of this fast run'
@@ -125,6 +125,10 @@ class ToolPlan:
 def tool_plan(root: Path, profile: str, changed: Sequence[str] | None) -> tuple[ToolPlan, list[dict]]:
     """The toolchain steps to run and the ones left out. Needs tools only when a step needs them."""
     docker_env = reduced_env() | ({'HOME': os.environ['HOME']} if 'HOME' in os.environ else {})
+    if profile in ('db', 'operations'):
+        missing = missing_prepared_paths(root, find_tools(root))
+        if missing:
+            raise Unavailable('not prepared, run scripts/toolchain.py bootstrap explicitly; missing: ' + ', '.join(missing))
     if profile == 'db':
         steps = [Step('disposable_qualification', (sys.executable, 'scripts/disposable_db.py', 'qualify'), root, LONG),
                  Step('supabase_stack_qualification', (sys.executable, 'scripts/supabase_stack.py', 'qualify'), root, LONG),
@@ -220,7 +224,7 @@ def run_profile(root: Path, profile: str, *, base_checks: Callable[[Path], list[
                  'db': 'Harness checks plus the pinned release and the application migrations and seeds, on disposable targets',
                  'operations': 'Harness checks plus the operations, backup and upgrade runbooks, on disposable Compose projects with a '
                                'scripted model. Disposable evidence only, not H1 or product acceptance'
-                 }.get(profile, 'Harness checks plus local static checks, focused tests and, for full, the production build and browser suite')
+                 }.get(profile, 'Harness checks plus local static checks, focused tests and, for full, the production build and the shell and appearance browser specs')
         not_tested = {'harness': ['application', *NOT_TESTED], 'db': DB_NOT_TESTED, 'operations': OPERATIONS_NOT_TESTED
                       }.get(profile, [*APPLICATION_NOT_TESTED, *NOT_TESTED])
         report = {'schema_version': 'autobots.harness-result/v1', 'template': False,

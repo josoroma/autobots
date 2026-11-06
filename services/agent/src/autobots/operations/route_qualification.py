@@ -10,13 +10,15 @@ that fails or isn't supported stays recorded as such.
 
 import argparse
 import asyncio
+import fcntl
 import json
 import logging
 import math
 import os
 import sys
 import time
-from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -134,24 +136,40 @@ class Ledger:
             os.fsync(handle.fileno())
         temporary.replace(self.path)
 
+    @contextmanager
+    def _locked(self) -> Iterator[None]:
+        """Reads the file again under a lock, so a second process's spend is counted, not lost."""
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with self.path.with_suffix(".lock").open("w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            if self.path.exists():
+                self.entries = json.loads(self.path.read_text())["entries"]
+            yield
+
     def reserve(self, label: str, worst_case: int) -> dict[str, Any]:
-        if self.committed() + worst_case > self.cap:
-            raise CapReached(label)
-        entry = {
-            "label": label,
-            "worst_case": worst_case,
-            "reported": None,
-            "state": "reserved",
-            "at": datetime.now(UTC).isoformat(),
-        }
-        self.entries.append(entry)
-        self._save()
-        return entry
+        with self._locked():
+            if self.committed() + worst_case > self.cap:
+                raise CapReached(label)
+            entry = {
+                "label": label,
+                "worst_case": worst_case,
+                "reported": None,
+                "state": "reserved",
+                "at": datetime.now(UTC).isoformat(),
+            }
+            self.entries.append(entry)
+            self._save()
+            return entry
 
     def settle(self, entry: dict[str, Any], reported: int | None, state: str) -> None:
+        with self._locked():
+            for held in self.entries:
+                if held["label"] == entry["label"] and held["at"] == entry["at"]:
+                    held["reported"] = reported
+                    held["state"] = state
+            self._save()
         entry["reported"] = reported
         entry["state"] = state
-        self._save()
 
 
 class Weather(BaseModel):

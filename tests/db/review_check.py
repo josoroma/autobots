@@ -1,0 +1,209 @@
+"""US-11.12's review findings, against a real database: what a child shows, and how its parent records it."""
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+from pathlib import Path
+import sys
+from typing import Any
+from uuid import UUID, uuid4
+
+import psycopg
+
+sys.path.insert(0, str(Path(__file__).parent))
+from goal_loop_script import Script, calls, say  # noqa: E402
+
+from autobots.adapters import loop_middleware  # noqa: E402
+from autobots.adapters.loop_middleware import ModelRoute  # noqa: E402
+from autobots.application.compaction import SUMMARY_MARKER, CompactionPolicy  # noqa: E402
+from autobots.application.goal_loop import LoopConfig, _drive, _settle_children  # noqa: E402, PLC2701
+from autobots.application.model_admission import ModelAdmission  # noqa: E402
+from autobots.application.operations import REQUIRED_COLUMNS, database_conditions  # noqa: E402
+from autobots.application.plans import load_goal  # noqa: E402
+from autobots.application.run_projection import read_inspector, read_summary, read_workspace  # noqa: E402
+from autobots.application.runs import LinkRefused, admit_run  # noqa: E402
+from autobots.application.workflows import create_execution, create_workflow, publish_version  # noqa: E402
+from autobots.contracts.workflows import WorkflowGraph  # noqa: E402
+from autobots.application.worker_leases import claim_run
+from autobots.domain.models import resolve_role_policy
+
+URL = os.environ['AUTOBOTS_DATABASE_URL']
+WORKSPACE = UUID(sys.argv[1])
+cases: list[dict] = []
+
+
+class Aware(Script):
+    """Answers a summary request itself, so the working script only holds the work."""
+
+    def _generate(self, messages: Any, stop: Any = None, run_manager: Any = None, **options: Any) -> Any:
+        if SUMMARY_MARKER in str(messages[-1].content):
+            self.items.insert(0, say('arranged summary'))
+        return super()._generate(messages, stop, run_manager, **options)
+
+
+class OnePool:
+    """`database_conditions` takes a pool, and this is the real database behind one."""
+
+    def __init__(self, connection: Any) -> None:
+        self._connection = connection
+
+    def connection(self) -> Any:
+        connection = self._connection
+
+        class Held:
+            async def __aenter__(self) -> Any:
+                return connection
+
+            async def __aexit__(self, *_: Any) -> None:
+                return None
+
+        return Held()
+
+
+def check(name: str, expected: str, observed: object, passed: bool) -> None:
+    cases.append({'id': name, 'expected': expected, 'observed': str(observed)[:300], 'passed': bool(passed)})
+
+
+async def main() -> None:
+    async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
+        async def admitted(text: str, limit: int = 1000) -> UUID:
+            accepted = await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text=text, limit_micro_usd=limit, policy=resolve_role_policy())
+            return accepted.run_id
+
+        parent, child = await admitted('Parent'), await admitted('Child')
+        await db.execute('update public.runs set root_run_id = %s, parent_run_id = %s where id = %s', (parent, parent, child))
+        # N-9: a call a child made shows on the child, though the root holds the budget.
+        invocation = uuid4()
+        await db.execute("insert into app_private.model_invocations (id, workspace_id, root_run_id, run_id, role, profile, wire_id, attempt, spend_day, reserved_micro_usd, charged_micro_usd, status) "
+                         "values (%s, %s, %s, %s, 'executor', 'openrouter_terra', 'fixture/model', 1, current_date, 100, 25, 'succeeded')", (invocation, WORKSPACE, parent, child))
+        summary = await read_summary(db, WORKSPACE, child)
+        check("a child's spend is its own, not 0", '25', summary.budget.spent_micro_usd, summary.budget.spent_micro_usd == 25)
+        root = await read_summary(db, WORKSPACE, parent)
+        check("the root still counts it, once", '25', root.budget.spent_micro_usd, root.budget.spent_micro_usd == 25)
+
+        # N-2: settling a finished child records how it really ended.
+        expert = uuid4()
+        await db.execute("insert into public.experts (id, workspace_id, name, latest_version) values (%s, %s, %s, 1)", (expert, WORKSPACE, f'Review {expert}'))
+        await db.execute("insert into public.expert_versions (expert_id, version, config, created_by) values (%s, 1, '{}', %s)", (expert, uuid4()))
+        await db.execute("update public.runs set status = 'succeeded' where id = %s", (child,))
+        assignment = uuid4()
+        await db.execute("insert into app_private.assignments (id, workspace_id, parent_run_id, child_run_id, root_run_id, operation_id, depth, expert_id, expert_version) values (%s, %s, %s, %s, %s, %s, 1, %s, 1)",
+                         (assignment, WORKSPACE, parent, child, parent, f'review-{assignment}', expert))
+        lease = await claim_run(db, parent, worker_id='review')
+        await _settle_children(db, lease)
+        outcome = (await (await db.execute('select outcome from app_private.assignments where id = %s', (assignment,))).fetchone())[0]
+        check('a child that succeeded is recorded as having succeeded', 'succeeded', outcome, outcome == 'succeeded')
+
+        # R2-3: who supplied a reconciled charge, and whether the outcome was ever in doubt.
+        async def uncertain(failure: str) -> tuple[UUID, UUID]:
+            run = await admitted('Reconciled')
+            call = uuid4()
+            await db.execute("insert into app_private.model_invocations (id, workspace_id, root_run_id, run_id, role, profile, wire_id, attempt, spend_day, reserved_micro_usd, status, failure_class) "
+                             "values (%s, %s, %s, %s, 'executor', 'openrouter_terra', 'fixture/model', 1, current_date, 100, 'uncertain', %s)", (call, WORKSPACE, run, run, failure))
+            return run, call
+
+        async def shown(run: UUID) -> Any:
+            return (await read_inspector(db, WORKSPACE, run)).model_calls[0]
+
+        run, call = await uncertain('worker_lost')
+        await ModelAdmission(db).reconcile(call, 30)
+        seen = await shown(run)
+        check("an owner's charge on a lost call is theirs, and the outcome is unknown", 'entered by the owner, outcome unknown', (seen.reconciled, seen.outcome_unknown), seen.reconciled and seen.outcome_unknown)
+        run, call = await uncertain('worker_lost')
+        await ModelAdmission(db).reconcile(call, 30, source='provider')
+        seen = await shown(run)
+        check("a provider's late report isn't called the owner's", 'not entered, outcome known', (seen.reconciled, seen.outcome_unknown, seen.status), not seen.reconciled and not seen.outcome_unknown and seen.status == 'succeeded')
+        run, call = await uncertain('worker_lost')
+        await ModelAdmission(db).reconcile(call, 30)
+        await db.execute('update app_private.model_invocations set charge_source = null where id = %s', (call,))
+        seen = await shown(run)
+        check('a row from before the source was recorded claims neither', 'not the owner, outcome not claimed, source unknown', (seen.reconciled, seen.outcome_unknown, seen.charge_source_unknown), not seen.reconciled and not seen.outcome_unknown and seen.charge_source_unknown)
+        run, call = await uncertain('charge_not_reported')
+        await ModelAdmission(db).reconcile(call, 30)
+        seen = await shown(run)
+        check('a call that worked, with only its charge missing, has a known outcome', 'entered by the owner, outcome known', (seen.reconciled, seen.outcome_unknown), seen.reconciled and not seen.outcome_unknown)
+
+        # R2-2, R2-10: continuing repeats the stored goal whole, and only for a goal run of its own.
+        long_goal = 'Keep every word of this goal. ' * 40
+        ended = await admitted(long_goal)
+        await db.execute("update public.runs set status = 'failed' where id = %s", (ended,))
+        view = await read_workspace(db, WORKSPACE, ended)
+        check('the page has only a cut copy of a long goal', 'at most 500 characters', len(view.objective or ''), 0 < len(view.objective or '') <= 500 < len(long_goal))
+        check('a finished goal run can continue', 'true', view.can_continue, view.can_continue)
+        linked = await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text=None, limit_micro_usd=1_000, policy=resolve_role_policy(), continues_run_id=ended)
+        spec = await load_goal(db, linked.run_id)
+        link = (await (await db.execute('select continues_run_id from public.runs where id = %s', (linked.run_id,))).fetchone())[0]
+        check('a continued run gets the whole stored goal, and the link', 'the same goal, linked', (len(spec.original_request), link == ended), spec.original_request == long_goal and link == ended)
+        check('a finished child offers no continuing', 'false', (await read_workspace(db, WORKSPACE, child)).can_continue, not (await read_workspace(db, WORKSPACE, child)).can_continue)
+        try:
+            await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text=None, limit_micro_usd=1_000, policy=resolve_role_policy(), continues_run_id=child)
+            check("a child's goal can't be repeated on a budget of its own", 'refused', 'admitted', False)
+        except LinkRefused as refusal:
+            check("a child's goal can't be repeated on a budget of its own", 'refused', str(refusal)[:60], True)
+
+        # R2-10: a workflow's run has no goal of its own to repeat.
+        graph = {'nodes': [{'id': 'in', 'block': 'input', 'version': 1, 'config': {'type': 'string'}}, {'id': 'out', 'block': 'output', 'version': 1, 'config': {}}],
+                 'links': [{'source': 'in', 'source_port': 'value', 'target': 'out', 'target_port': 'value'}]}
+        actor = uuid4()
+        flow = await create_workflow(db, workspace_id=WORKSPACE, actor_id=actor, idempotency_key=str(uuid4()), name=f'Review {uuid4().hex[:6]}')
+        await publish_version(db, workspace_id=WORKSPACE, actor_id=actor, workflow_id=flow.id, idempotency_key=str(uuid4()), expected_version=0, graph=WorkflowGraph.model_validate(graph), source='user')
+        execution = await create_execution(db, workspace_id=WORKSPACE, actor_id=actor, workflow_id=flow.id, idempotency_key=str(uuid4()), version=1, inputs={'in': 'x'})
+        await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where run_id = %s", (execution.run_id,))
+        await db.execute("update public.runs set status = 'failed' where id = %s", (execution.run_id,))
+        offers = (await read_workspace(db, WORKSPACE, execution.run_id)).can_continue
+        check("a finished workflow's run offers no continuing", 'false', offers, not offers)
+        try:
+            await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text=None, limit_micro_usd=1_000, policy=resolve_role_policy(), continues_run_id=execution.run_id)
+            check("a workflow's stored text can't be repeated as a goal", 'refused', 'admitted', False)
+        except LinkRefused as refusal:
+            check("a workflow's stored text can't be repeated as a goal", 'refused', str(refusal)[:60], True)
+
+        # N-8: a child shows what it froze, not what its Expert says today.
+        await db.execute("insert into public.expert_versions (expert_id, version, config, created_by) values (%s, 2, %s, %s)", (expert, json.dumps({'role_bindings': {'executor': 'openrouter_deepseek_flash'}}), uuid4()))
+        await db.execute("update public.runs set expert_id = %s, expert_version = 2, policy_snapshot = jsonb_set(policy_snapshot, '{bindings,executor}', '\"openrouter_terra\"') where id = %s", (expert, child))
+        binding = (await read_workspace(db, WORKSPACE, child)).expert
+        shown_route = binding.role_bindings.get('executor') if binding else None
+        check("a child's Expert card shows the model it froze", 'openrouter_terra, though the Expert names another', shown_route, shown_route == 'openrouter_terra')
+
+        # E-4, on real catalogs: a column that isn't there reads as behind, and the real ones don't.
+        conditions = await database_conditions(OnePool(db))
+        check('the columns a migration added are all present', 'no schema_behind', [item.code for item in conditions], 'schema_behind' not in [item.code for item in conditions])
+        from autobots.application import operations  # noqa: PLC0415
+        operations.REQUIRED_COLUMNS = (*REQUIRED_COLUMNS, ('public.runs', 'no_such_column'))
+        conditions = await database_conditions(OnePool(db))
+        operations.REQUIRED_COLUMNS = REQUIRED_COLUMNS
+        check('a column-only migration not applied reads as behind', 'schema_behind', [item.code for item in conditions], 'schema_behind' in [item.code for item in conditions])
+
+        # WI-2, R2-1: the real call sites reserve past the worst case, for work and for a summary.
+        big = await admitted('Reserve for the real request', 1_000_000)
+        worst = 1_000
+        route = ModelRoute('executor', 'openrouter_terra', 'fixture/model', worst, 1_000_000)
+        assumed = loop_middleware.RESERVED_PROMPT_TOKENS
+        loop_middleware.RESERVED_PROMPT_TOKENS = 1
+        try:
+            calc = ('calculate', {'operation': 'sum', 'values': [1, 2]})
+            model = Aware(items=[calls(calc), calls(calc), calls(calc), calls(calc), calls(calc), say('done')], seen=[], bound=[])
+            config = LoopConfig(route=route, compaction=CompactionPolicy(context_chars=200, large_tool_chars=1000, keep_recent=2), sleep=lambda _: asyncio.sleep(0))
+            # This exact run, so the jobs of the suites around it stay as they are.
+            ran = await _drive(db, URL, await claim_run(db, big, worker_id='reserving'), lambda: model, config)
+        finally:
+            loop_middleware.RESERVED_PROMPT_TOKENS = assumed
+        rows = await (await db.execute('select role, min(reserved_micro_usd) from app_private.model_invocations where run_id = %s group by role', (big,))).fetchall()
+        found = dict(rows)
+        check('a call larger than assumed reserves past the worst case', f'over {worst}', (found.get('executor'), ran.code, ran.run_status), (found.get('executor') or 0) > worst)
+        check('and so does a summary', f'over {worst}', found.get('summarizer'), (found.get('summarizer') or 0) > worst)
+
+        # R3-2: a request that could reach a rate nothing was reserved at isn't sent.
+        tiered = await admitted('Past the tier', 1_000_000)
+        model = Aware(items=[say('never')], seen=[], bound=[])
+        result = await _drive(db, URL, await claim_run(db, tiered, worker_id='tiered'), lambda: model, LoopConfig(route=ModelRoute('executor', 'openrouter_terra', 'fixture/model', 1_000, 1_000_000, 1), sleep=lambda _: asyncio.sleep(0)))
+        check('a request that could reach a higher tier is refused before sending', 'cost_unavailable, no call', (result.code, len(model.seen)), result.code == 'cost_unavailable' and not model.seen)
+    print(json.dumps({'cases': cases}))
+
+
+try:
+    asyncio.run(main())
+except Exception:
+    print(json.dumps({'cases': cases}))
+    raise

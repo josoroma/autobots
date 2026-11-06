@@ -27,7 +27,7 @@ from app_db import AppStack, apply_migrations, bootstrap, seed
 from disposable_db import (PROJECT_PREFIX, Cases, Refused, Target, Unavailable, free_port, other_resources,
                            remove_stack, require_identity, rows, run, tool_env)
 from harness_lib import fingerprint, project_root
-from qualify_web import BROWSERS, start, stop, summarize, wait_until_up
+from qualify_web import BROWSERS, run_problems, start, stop, summarize, wait_until_up
 from supabase_stack import generated_values, require_images, require_rendered
 from toolchain import child_env, find_tools
 
@@ -162,7 +162,8 @@ def artifact_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port
                                          ('blocker_check.py', [workspace_a], 'blocker'),
                                          ('major_check.py', [workspace_a, workspace_b], 'major'),
                                          ('connector_check.py', [workspace_a], 'connector'),
-                                         ('wake_check.py', [workspace_a], 'wake')):
+                                         ('wake_check.py', [workspace_a], 'wake'),
+                                         ('review_check.py', [workspace_a], 'review')):
         checked = subprocess.run([str(root / PYTHON), str(root / 'tests/db' / check_file), *arguments],
                                  env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'AUTOBOTS_STORAGE_BASE': base, 'AUTOBOTS_STORAGE_SERVICE': stack.values['SERVICE_ROLE_KEY'],
                                       'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
@@ -258,12 +259,14 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
         processes[0] = start([str(root / PYTHON), str(root / 'tests/web/fixture_upstream_api.py'), str(api_port)], api_env, root)
         wait_until_up(f'{api_url}/v1/health', processes[0])
         qualification_reports = [root / '.checks/identity/playwright-qualification-1.json', root / '.checks/identity/playwright-qualification-2.json']
+        qualification_codes = []
         for report_path, title in zip(qualification_reports, ('after an API restart', 'a route with no record')):
             report_path.unlink(missing_ok=True)
             if title == 'a route with no record':
                 stack.sql("create table public.arranged_route_rows as select * from agent_runtime.route_qualifications;\ndelete from agent_runtime.route_qualifications where profile = 'openrouter_terra';\n")
             ran = subprocess.run([str(playwright), 'test', 'browser/qualification', '-g', title, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=120, check=False,
                                  env={**browser_env, 'AUTOBOTS_WEB_REPORT': str(report_path)})
+            qualification_codes.append(ran.returncode)
             if ran.returncode:
                 print(ran.stdout[-1500:], file=sys.stderr)
         stack.sql("delete from agent_runtime.route_qualifications;\ninsert into agent_runtime.route_qualifications select * from public.arranged_route_rows;\ndrop table public.arranged_route_rows;\n")
@@ -301,6 +304,11 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
             cases.check('the qualification suite produced a report', 'a report', 'none', False)
     for case in found:
         cases.check(f"browser: {case['id']}", 'passed', case['status'], case['status'] == 'passed')
+    runs = [('main suite', report, result.returncode), ('slice suite', slice_report, slice_result.returncode),
+            *((f'qualification suite {index + 1}', path, code) for index, (path, code) in enumerate(zip(qualification_reports, qualification_codes)))]
+    for label, path, code in runs:
+        problems = run_problems(path, code)
+        cases.check(f'the {label} ran to a clean exit', 'exit 0, with tests', ', '.join(problems) or 'exit 0', not problems)
     calls = sorted(set(upstream_log.read_text().splitlines()))
     cases.check('only key metadata and the catalog reached the fake upstream', 'GET /key and GET /models only', ', '.join(calls),
                 calls == ['GET /api/v1/key', 'GET /api/v1/models'])
@@ -323,7 +331,7 @@ def qualify(root: Path) -> int:
     (root / REPORT).unlink(missing_ok=True)
     rendered = require_rendered(stack)
     require_images(rendered)
-    cases = Cases()
+    cases = Cases(model_transport='mock')
     before = other_resources(project)
     started_at = time.monotonic()
     base = f'http://127.0.0.1:{gateway_port}'

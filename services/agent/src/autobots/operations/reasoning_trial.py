@@ -289,7 +289,10 @@ async def key_usage(
         return None
     if reply.status_code != httpx.codes.OK:
         return None
-    data = reply.json().get("data") or {}
+    try:
+        data = reply.json().get("data") or {}
+    except (ValueError, AttributeError):
+        return None
     return {name: data.get(name) for name in ("usage", "limit", "limit_remaining")}
 
 
@@ -303,10 +306,22 @@ async def run_all(
 ) -> list[TrialResult]:
     results = []
     for profile_id in profiles:
+        profile = PROFILES[profile_id]
         for number in range(1, trials + 1):
-            results.append(
-                await run_trial(PROFILES[profile_id], number, key, payload, ledger, make_http)
-            )
+            try:
+                results.append(await run_trial(profile, number, key, payload, ledger, make_http))
+            except (Refused, ModelUnavailable, UnsupportedRequestOption) as refusal:
+                # This route is refused, and the others' results still get reported.
+                results.append(
+                    TrialResult(
+                        profile.id,
+                        profile.wire_id,
+                        profile.canonical_id,
+                        number,
+                        "not_run",
+                        type(refusal).__name__,
+                    )
+                )
     return results
 
 

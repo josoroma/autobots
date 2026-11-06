@@ -152,13 +152,28 @@ def _snapshot(policy: RolePolicy | None) -> str:
     )
 
 
+async def _goal_to_repeat(connection: Any, workspace_id: UUID, run_id: UUID | None) -> str:
+    """Whole, from what was stored, as anything shown on a page is cut and redacted."""
+    cursor = await connection.execute(
+        "select g.spec ->> 'original_request' from public.runs r "
+        "join app_private.goal_specs g on g.run_id = r.id "
+        "where r.id = %s and r.workspace_id = %s and r.parent_run_id is null and not exists "
+        "(select 1 from public.workflow_executions e where e.run_id = r.id)",
+        (run_id, workspace_id),
+    )
+    row = await cursor.fetchone()
+    if row is None or not row[0]:
+        raise LinkRefused("only a goal run of its own, in this workspace, can repeat its goal")
+    return str(row[0])
+
+
 async def admit_run(
     connection: Any,
     *,
     workspace_id: UUID,
     actor_id: UUID,
     idempotency_key: str,
-    goal_text: str,
+    goal_text: str | None,
     limit_micro_usd: int,
     policy: RolePolicy | None = None,
     acceptance_criteria: tuple[str, ...] = (),
@@ -167,10 +182,13 @@ async def admit_run(
     input_documents: tuple[InputDocument, ...] = (),
     binding: Any = None,
     inherit: Inheritance | None = None,
+    run_profile: str | None = None,
 ) -> AdmissionResult:
     """Run, job and first event commit together. A repeat returns the original result."""
     if inherit is not None:
         binding = inherit
+    if goal_text is None:
+        goal_text = await _goal_to_repeat(connection, workspace_id, continues_run_id)
     goal = goal_text.strip()
     # With no stated criteria, the goal itself is the one thing to meet.
     criteria = [text.strip() for text in acceptance_criteria if text.strip()] or [goal]
@@ -183,6 +201,8 @@ async def admit_run(
             "required": [item.model_dump() for item in required_artifacts],
             "expert": [str(binding.expert_id), binding.version] if binding else None,
             "documents": [item.model_dump() for item in input_documents],
+            # Only when chosen, so a receipt from before this field still matches.
+            **({"run_profile": run_profile} if run_profile else {}),
         }
     )
     scope = (workspace_id, actor_id, "admit_run", str(workspace_id), idempotency_key)

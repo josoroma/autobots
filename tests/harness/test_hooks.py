@@ -35,11 +35,22 @@ class HookTests(unittest.TestCase):
     def test_secret_files_rejected_without_echo(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for name in ('.env', '.env.local', 'provider-master.key', '.ENV', '.Env.Local'):
+            for name in ('.env', '.env.local', 'provider-master.key', '.ENV', '.Env.Local', 'stack.env', 'app.env', 'owner.env',
+                         'master.key', 'Master.Key', 'backup.key'):
                 response = hook.handle(root, {'hook_event_name': 'PreToolUse',
                                              'tool_name': 'Read', 'tool_input': {'file_path': name}})
                 self.assertEqual(response['hookSpecificOutput']['permissionDecision'], 'deny')
             self.assertEqual(hook.guard(root, 'Read', {'file_path': '.env.example'}), None)
+            # The real install's whole folder, by any tool this guard sees.
+            self.assertIsNotNone(hook.guard(root, 'Read', {'file_path': str(Path.home() / '.local/share/autobots-install/record.json')}))
+            for command in ('cat ~/.local/share/autobots-install/backup-key/x', 'cat backup.key', 'cat master.key',
+                            'sed -n p backup.key', 'awk 1 master.key', 'xargs cat master.key',
+                            'head other/autobots-install/app.env'):
+                self.assertIsNotNone(hook.guard(root, 'Bash', {'command': command}), command)
+            self.assertIsNone(hook.guard(root, 'Bash', {'command': 'docker ps --filter name=autobots-install'}))
+            # Naming a key isn't reading it.
+            self.assertIsNone(hook.guard(root, 'Bash', {'command': 'grep -n master.key scripts/local_backup.py'}))
+            self.assertIsNone(hook.guard(root, 'Bash', {'command': 'git log -S backup.key'}))
 
     def test_symlink_edit_escape_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as outside:

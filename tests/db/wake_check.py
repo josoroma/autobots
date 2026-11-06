@@ -15,8 +15,9 @@ import psycopg
 
 from autobots.application.goal_loop import LoopConfig, _keep_lease  # noqa: PLC2701
 from autobots.adapters.loop_middleware import ModelRoute
-from autobots.application.run_usage import active_seconds_used, begin_segment
+from autobots.application.run_usage import active_seconds_used, begin_segment, discount_sleep
 from autobots.application.runs import LeaseLost, admit_run
+from autobots.application import goal_loop  # noqa: E402
 from autobots.application.worker_leases import WakeClock, claim_run, heartbeat, revive_lease
 from autobots.domain.models import resolve_role_policy
 
@@ -109,6 +110,75 @@ async def main() -> None:
         used = await active_seconds_used(db, run)
         check('the time asleep comes off the active time', 'under 60 of 600 seconds', round(used, 1), used < 60)
         keeper.cancel()
+
+        # A sleep can drop the keeper's connection, and it comes back and goes on.
+        run = await admitted(db)
+        lease = await claim_run(db, run, worker_id='waking')
+        keeper = asyncio.create_task(_keep_lease(URL, lease, CONFIG, ArrangedClock()))
+        await asyncio.sleep(0.3)
+        await db.execute("select pg_terminate_backend(pid) from pg_stat_activity where usename = current_user and pid <> pg_backend_pid()")
+        await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() + interval '5 seconds' where run_id = %s", (run,))
+        await asyncio.sleep(1.5)
+        left = (await (await db.execute('select extract(epoch from lease_expires_at - clock_timestamp()) from app_private.run_jobs where run_id = %s', (run,))).fetchone())[0]
+        check('a dropped connection leaves the keeper running, and still beating', 'alive, the lease back near 60 seconds', (keeper.done(), round(float(left))), not keeper.done() and float(left) > 30)
+        keeper.cancel()
+
+        # More than has passed comes off as no more than has passed.
+        run = await admitted(db)
+        lease = await claim_run(db, run, worker_id='capped')
+        await db.execute('insert into app_private.run_usage (run_id) values (%s) on conflict do nothing', (run,))
+        await begin_segment(db, run)
+        await asyncio.sleep(0.05)
+        started = (await (await db.execute('select segment_started_at from app_private.run_usage where run_id = %s', (run,))).fetchone())[0]
+        await discount_sleep(db, lease, 100_000)
+        moved, ahead = await (await db.execute('select segment_started_at > %s, segment_started_at > clock_timestamp() from app_private.run_usage where run_id = %s', (started, run))).fetchone()
+        check('a discount is capped at the time that has passed', 'the segment moved, and never into the future', (moved, ahead), moved is True and ahead is False)
+
+        # With a long beat, only the beat forced after reconnecting can renew the lease in time.
+        run = await admitted(db)
+        lease = await claim_run(db, run, worker_id='forced')
+        keeper = asyncio.create_task(_keep_lease(URL, lease, LoopConfig(route=ROUTE, heartbeat_seconds=3, lease_seconds=60), ArrangedClock()))
+        await asyncio.sleep(0.3)
+        await db.execute("select pg_terminate_backend(pid) from pg_stat_activity where usename = current_user and pid <> pg_backend_pid()")
+        await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() + interval '20 seconds' where run_id = %s", (run,))
+        await asyncio.sleep(5.5)
+        left = (await (await db.execute('select extract(epoch from lease_expires_at - clock_timestamp()) from app_private.run_jobs where run_id = %s', (run,))).fetchone())[0]
+        check('the first look after reconnecting beats, without waiting for the next beat', 'near 60 seconds by 5.8s, before the next regular beat at about 7s', round(float(left)), float(left) > 40 and not keeper.done())
+        keeper.cancel()
+
+        # Any other failure reconnects too, and the keeper goes on.
+        run = await admitted(db)
+        lease = await claim_run(db, run, worker_id='unusual')
+        real, raised = goal_loop.heartbeat, []
+
+        async def raises_once(*args: object, **options: object) -> object:
+            if not raised:
+                raised.append(True)
+                raise RuntimeError('arranged')
+            return await real(*args, **options)
+
+        goal_loop.heartbeat = raises_once
+        try:
+            keeper = asyncio.create_task(_keep_lease(URL, lease, CONFIG, ArrangedClock()))
+            await asyncio.sleep(0.4)
+            await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() + interval '5 seconds' where run_id = %s", (run,))
+            await asyncio.sleep(1.5)
+            left = (await (await db.execute('select extract(epoch from lease_expires_at - clock_timestamp()) from app_private.run_jobs where run_id = %s', (run,))).fetchone())[0]
+            check('an unexpected error leaves the keeper running, and still beating', 'alive, the lease back near 60 seconds', (keeper.done(), round(float(left))), raised and not keeper.done() and float(left) > 40)
+            keeper.cancel()
+        finally:
+            goal_loop.heartbeat = real
+
+        # A worker that lost the run can't move the new owner's clock.
+        run = await admitted(db)
+        lost = await claim_run(db, run, worker_id='lost')
+        await expire(db, run)
+        await claim_run(db, run, worker_id='new')
+        await begin_segment(db, run)
+        before = await active_seconds_used(db, run)
+        await discount_sleep(db, lost, 500)
+        after = await active_seconds_used(db, run)
+        check('a lost worker can\'t discount the new owner\'s time', 'unchanged', (round(before, 1), round(after, 1)), after >= before)
 
         # No gap between the clocks, as with SIGSTOP or a hung process: nothing changes.
         run = await admitted(db)

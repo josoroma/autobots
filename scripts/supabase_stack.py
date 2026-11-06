@@ -103,10 +103,11 @@ def example_defaults(root: Path) -> dict[str, str]:
 class SupabaseStack(Stack):
     values: dict[str, str] = field(default_factory=dict)
 
-    def compose(self, *arguments: str, timeout: float = 300.0, stdin: str | None = None) -> subprocess.CompletedProcess[str]:
+    def compose(self, *arguments: str, timeout: float = 300.0, stdin: str | None = None,
+                extra_env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
         files = [item for path in COMPOSE_FILES for item in ('-f', str(self.root / path))]
         return run(['docker', 'compose', '-p', self.target.project, '--project-directory', str(self.root / UPSTREAM),
-                    *files, *arguments], self.env(), timeout, stdin)
+                    *files, *arguments], {**self.env(), **(extra_env or {})}, timeout, stdin)
 
     def env(self) -> dict[str, str]:
         return {**tool_env(), **example_defaults(self.root), **self.values, 'AUTOBOTS_DISPOSABLE_PROJECT': self.target.project}

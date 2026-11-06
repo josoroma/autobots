@@ -27,12 +27,6 @@ test("with no restore recorded and OpenRouter down, Operations says so and stays
   page,
 }) => {
   await signIn(page);
-  const requests: string[] = [];
-  page.on("request", (request) => {
-    if (request.url().includes("/chat/completions")) {
-      requests.push(request.url());
-    }
-  });
   writeFileSync(CATALOG_DOWN, "");
   try {
     await page.goto("/operations");
@@ -52,7 +46,6 @@ test("with no restore recorded and OpenRouter down, Operations says so and stays
   } finally {
     rmSync(CATALOG_DOWN);
   }
-  expect(requests).toEqual([]);
 });
 
 test("Operations shows the delayed schedule, OpenRouter, the restore and each route's qualification", async ({

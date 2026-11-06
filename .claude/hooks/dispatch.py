@@ -38,8 +38,9 @@ RUFF = Path('services/agent/.venv/bin/ruff')
 def is_secret(path: Path) -> bool:
     # Case-folded, because this machine's default filesystem is case-insensitive.
     name = path.name.casefold()
-    return ((name == '.env' or name.startswith('.env.'))
-            and not name.endswith('.example')) or name == 'provider-master.key'
+    if name in {'stack.env', 'app.env', 'owner.env', 'master.key', 'provider-master.key', 'backup.key'}:
+        return True
+    return (name == '.env' or name.startswith('.env.')) and not name.endswith('.example')
 
 
 def resolve_path(root: Path, raw: object) -> Path | None:
@@ -99,7 +100,9 @@ def guard(root: Path, tool: str, value: dict) -> str | None:
         if path is None:
             return 'A supported file tool needs a concrete, bounded and resolvable file_path.'
         # The link's own name counts too: `.env` pointing elsewhere is still treated as a secret.
-        if is_secret(Path(raw)) or is_secret(path) or ('application support/autobots/secrets' in path.as_posix().casefold()):
+        # The install's whole record is private, wherever `--install-dir` isn't pointed elsewhere.
+        if (is_secret(Path(raw)) or is_secret(path) or 'application support/autobots/secrets' in path.as_posix().casefold()
+                or '.local/share/autobots-install/' in path.as_posix().casefold()):
             return 'Secret files are outside ordinary coding-agent access; use the documented credential workflow.'
         if tool != 'Read' and not path.is_relative_to(root.resolve()):
             return 'Project edit would escape the workspace (including resolved symlinks).'
@@ -113,7 +116,10 @@ def guard(root: Path, tool: str, value: dict) -> str | None:
                      r'\bdocker\s+volume\s+rm\b',
                      r'\bdocker(?:-compose|\s+compose\b|\s+container\b)[^\n;&|]*\bdown\b[^\n;&|]*(?:--volumes|(?:^|\s)-[a-zA-Z]*v\b)',
                      r'(?i)\b(?:cat|head|tail|less|more)\s+[^\n;&|]*\.env(?:\.(?!example\b)[\w.-]+)?["\x27]?(?=[\s;&|]|$)',
-                     r'(?i)provider-master\.key']
+                     r'(?i)provider-master\.key',
+                     r'(?i)\b(?:cat|head|tail|less|more|cp|mv|scp|rsync|tar|base64|xxd|od|strings|bat|dd|open|sed|awk|nl|sort|xargs)\b[^\n;&|]*\b(?:master|backup)\.key\b',
+                     r'(?i)\.local/share/autobots-install/',
+                     r'(?i)\bautobots-install/[^\s;&|]*(?:stack|app|owner)\.env']
         if any(re.search(pattern, command) for pattern in dangerous):
             return 'This operation needs the explicit target-guarded maintenance/credential workflow; ordinary coding hooks cannot authorize it.'
     return None

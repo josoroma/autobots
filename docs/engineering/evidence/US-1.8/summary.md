@@ -2,6 +2,8 @@
 
 The Gate 0 report for the portable baseline, on top of revision `b94727d`, 2026-11-05. Manifest: [gate-0.json](gate-0.json). Raw reports are in ignored `.checks`, and the results here stand without them.
 
+**Void since.** Later source changes voided this approval, so this describes `b94727d` only. [US-11.12](../US-11.12/summary.md) repeats Gate 0.
+
 **Result:** every portable gate below has passing evidence at its stated level, except that DH-A03's Claude part and all real event delivery remain unqualified. This does not establish product acceptance, the persistent stack, or live inference.
 
 ## Gate 0 by DH-A gate

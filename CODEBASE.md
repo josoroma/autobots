@@ -1,10 +1,10 @@
 # Autobots codebase context
 
-**Inspected:** 2026-11-04. **Scope:** descriptive inventory; this file supplies no product requirements.
+**Inspected:** 2026-11-04, kept current through 2026-11-06. **Scope:** descriptive inventory; this file supplies no product requirements.
 
-Analyzed revision: 5587a9f80ed1fcbed06e60e7105b948b6625ff85
+Analyzed revision: 5012235bd79e47dd9775c3d4acae816ec2884904
 
-This describes that revision, which includes the OhMyOrch delivery setup in [HARNESS-OHMYORCH-001](docs/engineering/work-items/HARNESS-OHMYORCH-001.md), US-1.1's inventory and five added cache ignore rules, US-1.2's rule mapping checks, derived `assistant_adapter` status and forward ingestion runbook, and US-1.3's locked toolchains and scaffold, plus the US-1.4 verification profiles and hook changes committed on top of it. The bullets added by each later delivered story describe that story's working tree, not a re-analysis of the whole repository, so this revision line is older than they are.
+The inventory was taken at `5587a9f`, and each delivered story keeps it current, through US-11.12's fixes on top of the revision above. It includes the OhMyOrch delivery setup in [HARNESS-OHMYORCH-001](docs/engineering/work-items/HARNESS-OHMYORCH-001.md), US-1.1's inventory and five added cache ignore rules, US-1.2's rule mapping checks, derived `assistant_adapter` status and forward ingestion runbook, and US-1.3's locked toolchains and scaffold, plus the US-1.4 verification profiles and hook changes committed on top of it. The bullets added by each later delivered story describe that story's working tree, not a re-analysis of the whole repository, so this revision line is older than they are.
 
 ## System Summary
 
@@ -93,7 +93,9 @@ This harness adaptation itself performed no application lockfile/toolchain quali
 - Approval requests store the policy's reason and the resource target, written by the gateway from the tool's definition, and the inbox says when an older request has neither.
 - Local status also reports delayed routine occurrences, OpenRouter's catalog availability, restore history from `restores.jsonl` beside each backup, and each route's qualification.
 - `components/run-disclosure.tsx` shows MP-07's disclosure on every run-creation screen, with a per-run model choice where one applies. The run workspace shows its frozen role map and budgets, and the inspector shows reported and estimated costs apart, errors and evidence links.
+- Admission reserves from an upper bound on the real request, including the system prompt and tool schemas, for work and summaries alike. A fresh catalog price above that reservation, or a request that could reach a higher long-prompt tier, is refused before sending. `_keep_lease` reconnects after a dropped connection, and its discount for time asleep is fenced by generation.
 - `WakeClock` in `application/worker_leases.py` sees a real Mac sleep from a process's two clocks, and `goal_loop._keep_lease` then revives a lease nobody claimed and leaves the time asleep out of active time. `scripts/qualify_mac_sleep.py` observes a real sleep, following `docs/engineering/runbooks/mac-sleep.md`.
+- US-11.12's review added: `components/continue-run.tsx`, the linked new run after a failure, and notes in the inspector and budget text on what each list and limit covers. Effect rulings carry the receipt's generation and a stale one is refused.
 - Form controls come from `components/ui/field.tsx`, which a harness test enforces. `slice-visual.spec.ts` captures every surface in both themes, and its results are in `docs/engineering/evidence/US-11.11/`.
 - `components/run-controls.tsx` puts pause, resume, cancel and owner-only reconciliation of a model call's charge on the run page, over the existing routes, and shows each refusal's reason.
 - `agent_runtime.route_qualifications` holds each route's live result with its date, configuration and limits, added by migration. `ProviderSettings.route_qualifications` reads it into the provider status, and a route with no record for its own canonical model reads as not qualified.
@@ -102,7 +104,7 @@ This harness adaptation itself performed no application lockfile/toolchain quali
 - `scripts/disposable_db.py` holds target-guarded `reset`, `cleanup` and `migrate` wrappers and the `db` profile's qualification, including a synthetic stub worker, using `infra/disposable/compose.yaml` and synthetic SQL in `tests/db/`.
 - `scripts/qualify_faults.py` runs the pinned tools on known-good and known-bad fixtures in `tests/faults/`, and `full` includes it. `services/agent/tests` has a fake OpenRouter transport; its tests make no real model call.
 - `scripts/evidence.py` validates DH-W01–06 completion evidence from the templates in `docs/engineering/templates/`, under the contract in `docs/engineering/evidence/README.md`. US-1.8's Gate 0 record is the first work item validated with it.
-- `.claude/hooks/dispatch.py` integrates selected events with bounded local checks: a deadline, fail-closed errors, path validation, affected check domains and a `ruff` diagnostic. An event's `cwd` selects its root only among worktrees Git has registered under `.claude/worktrees/`, otherwise the root is the dispatcher's own checkout. If Git fails there, file edits are denied and `Stop` blocks once per turn, while `Bash` carries on. Script fixture tests and actual Claude event delivery have separate evidence.
+- `.claude/hooks/dispatch.py` integrates selected events with bounded local checks: a deadline, fail-closed errors, path validation, affected check domains and a `ruff` diagnostic. An event's `cwd` selects its root only among worktrees Git has registered under `.claude/worktrees/`, otherwise the root is the dispatcher's own checkout. If Git fails there, file edits are denied and `Stop` blocks once per turn, while `Bash` carries on. Script fixture tests have their own evidence, and actual Claude event delivery isn't qualified, by [Decision 0012](docs/engineering/decisions/0012-unqualified-hooks-in-h1.md).
 
 ## Upstream evidence and local constraints
 

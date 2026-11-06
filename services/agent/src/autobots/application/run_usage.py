@@ -67,26 +67,34 @@ async def begin_segment(connection: Any, run_id: UUID) -> None:
 async def end_segment(connection: Any, run_id: UUID) -> None:
     await connection.execute(
         "update app_private.run_usage set active_seconds = active_seconds + "
-        "extract(epoch from clock_timestamp() - segment_started_at), segment_started_at = null "
+        "greatest(extract(epoch from clock_timestamp() - segment_started_at), 0), "
+        "segment_started_at = null "
         "where run_id = %s and segment_started_at is not null",
         (run_id,),
     )
 
 
-async def discount_sleep(connection: Any, run_id: UUID, seconds: float) -> None:
-    """A Mac asleep isn't a run working, so an open segment doesn't count that time."""
+async def discount_sleep(connection: Any, lease: Any, seconds: float) -> None:
+    """A Mac asleep isn't a run working, so an open segment doesn't count that time.
+
+    Only for the worker that still owns the run, so a lost one can't move a new owner's clock, and
+    never past now. A connection lost just after this commits applies it twice, which at worst
+    leaves that segment's active time uncounted. The money limits don't depend on it.
+    """
     await connection.execute(
         "update app_private.run_usage "
-        "set segment_started_at = segment_started_at + make_interval(secs => %s) "
-        "where run_id = %s and segment_started_at is not null",
-        (seconds, run_id),
+        "set segment_started_at = least(segment_started_at + make_interval(secs => %s), "
+        "clock_timestamp()) "
+        "where run_id = %s and segment_started_at is not null and exists "
+        "(select 1 from app_private.run_jobs j where j.run_id = %s and j.generation = %s)",
+        (seconds, lease.run_id, lease.run_id, lease.generation),
     )
 
 
 async def active_seconds_used(connection: Any, run_id: UUID) -> float:
     cursor = await connection.execute(
-        "select active_seconds + coalesce(extract(epoch from clock_timestamp() - "
-        "segment_started_at), 0) from app_private.run_usage where run_id = %s",
+        "select active_seconds + greatest(coalesce(extract(epoch from clock_timestamp() - "
+        "segment_started_at), 0), 0) from app_private.run_usage where run_id = %s",
         (run_id,),
     )
     row = await cursor.fetchone()

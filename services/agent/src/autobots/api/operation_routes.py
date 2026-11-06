@@ -72,6 +72,17 @@ async def require_ready(request: Request) -> None:
         raise ApiError(503, "not_ready", "Local services aren't ready, so nothing was started.")
 
 
+def _restore_records(directory: str) -> list[RestoreRecord]:
+    """A line of the right shape with a bad value is skipped too, so the page still answers."""
+    records = []
+    for item in restore_history(directory):
+        try:
+            records.append(RestoreRecord.model_validate(item))
+        except ValueError:
+            continue
+    return records
+
+
 @router.get("/operations/local-status", operation_id="getLocalStatus", response_model=LocalStatus)
 async def get_local_status(
     request: Request,
@@ -128,10 +139,7 @@ async def get_local_status(
             getattr(getattr(request.app.state, "provider_context", None), "fetch_catalog", None)
         ),  # type: ignore[arg-type]
         delayed_schedules=delayed,
-        restores=[
-            RestoreRecord.model_validate(item)
-            for item in restore_history(os.environ.get("AUTOBOTS_BACKUP_DIR", ""))
-        ],
+        restores=_restore_records(os.environ.get("AUTOBOTS_BACKUP_DIR", "")),
         route_qualifications=qualifications,
     )
 

@@ -167,7 +167,7 @@ def runbook_errors(root: Path, runbook: object, evidence_id: object, checks: Seq
     if not isinstance(exercised, list) or evidence_id not in exercised:
         errors.append('runbook: was not exercised by this evidence.')
     elif not any(isinstance(check, dict) and check.get('exercises_runbook') is True and check.get('status') == 'passed'
-                 and check.get('artifacts') for check in checks):
+                 and check.get('artifacts') and (check.get('source') or {}).get('kind') == 'manual' for check in checks):
         errors.append('runbook: no passing check with a retained artifact records its exercise.')
     return errors
 

@@ -71,10 +71,10 @@ _NAMES = (
 _SELECT_RUN = (
     "select r.id, r.workspace_id, r.parent_run_id, r.status, r.created_at, r.updated_at, "
     "(select coalesce(sum(coalesce(i.charged_micro_usd, 0)), 0)::bigint "
-    "from app_private.model_invocations i where i.root_run_id = r.id), "
+    "from app_private.model_invocations i where i.root_run_id = r.id or i.run_id = r.id), "
     "(select coalesce(sum(i.reserved_micro_usd) filter (where i.status in "
     "('reserved', 'dispatched', 'uncertain') and i.reconciled_at is null), 0)::bigint "
-    "from app_private.model_invocations i where i.root_run_id = r.id), "
+    "from app_private.model_invocations i where i.root_run_id = r.id or i.run_id = r.id), "
     "r.limit_micro_usd, r.lease_generation, r.checkpoint_thread_id, r.version, r.event_sequence "
     "from public.runs r where r.id = %s and r.workspace_id = %s"
 )
@@ -199,7 +199,8 @@ async def _assignments(connection: Any, run_id: UUID) -> list[AssignmentView]:
 
 async def _expert(connection: Any, run_id: UUID) -> ExpertBinding | None:
     cursor = await connection.execute(
-        "select e.name, r.expert_version, g.spec -> 'allowed_tools', v.config -> 'role_bindings' "
+        "select e.name, r.expert_version, g.spec -> 'allowed_tools', v.config -> 'role_bindings', "
+        "r.policy_snapshot -> 'bindings' "
         "from public.runs r join public.experts e on e.id = r.expert_id "
         "join app_private.goal_specs g on g.run_id = r.id "
         "join public.expert_versions v on v.expert_id = r.expert_id "
@@ -213,7 +214,10 @@ async def _expert(connection: Any, run_id: UUID) -> ExpertBinding | None:
         name=row[0],
         version=row[1],
         tools=sorted(tool for tool in row[2] if tool not in PLAN_TOOLS),
-        role_bindings=row[3] or {},
+        # What this run froze for the roles the Expert names. A child inherits its parent's.
+        role_bindings={
+            role: (row[4] or {}).get(role, profile) for role, profile in (row[3] or {}).items()
+        },
     )
 
 
@@ -261,9 +265,18 @@ async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> R
     tokens = await cursor.fetchone()
     artifacts = await list_artifacts(connection, workspace_id, run_id)
     left = await outstanding(connection, run_id)
+    cursor = await connection.execute(
+        "select exists (select 1 from public.workflow_executions where run_id = %s)", (run_id,)
+    )
+    is_workflow = (await cursor.fetchone())[0]
     return RunWorkspace(
         schema_version=1,
         run=summary,
+        can_continue=(
+            summary.status in ("succeeded", "failed", "cancelled")
+            and summary.parent_run_id is None
+            and not is_workflow
+        ),
         objective=objective,
         criteria=criteria,
         plan=await _plan_summary(connection, run_id),
@@ -282,7 +295,10 @@ async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> R
         assignments=await _assignments(connection, run_id),
         unknown_operations=[
             UnknownEffect(
-                operation_id=item.operation_id, tool_id=item.tool_id, tool_version=item.tool_version
+                operation_id=item.operation_id,
+                tool_id=item.tool_id,
+                tool_version=item.tool_version,
+                generation=item.generation,
             )
             for item in await unknown_operations(connection, run_id)
         ],
@@ -377,7 +393,9 @@ async def read_inspector(connection: Any, workspace_id: UUID, run_id: UUID) -> R
     cursor = await connection.execute(
         "select id, run_id, role, attempt, status, profile, wire_id, upstream_provider, "
         "input_tokens, output_tokens, reasoning_tokens, charged_micro_usd, reserved_micro_usd, "
-        "finish_reason, failure_class, created_at "
+        "finish_reason, failure_class, created_at, "
+        "charge_source is not distinct from 'owner', "
+        "reconciled_at is not null and charge_source is null "
         "from app_private.model_invocations where run_id = %s or root_run_id = %s "
         "order by created_at, attempt",
         (run_id, run_id),
@@ -402,6 +420,10 @@ async def read_inspector(connection: Any, workspace_id: UUID, run_id: UUID) -> R
             finish_reason=item[13],
             failure_class=item[14],
             created_at=item[15],
+            reconciled=item[16],
+            # The call worked and only its charge was missing, so its outcome was never in doubt.
+            outcome_unknown=item[16] and item[14] != "charge_not_reported",
+            charge_source_unknown=item[17],
         )
         for item in await cursor.fetchall()
     ]

@@ -335,12 +335,13 @@ def other_resources(project: str) -> list[str]:
 
 
 class Cases:
-    def __init__(self) -> None:
+    def __init__(self, model_transport: str = 'none') -> None:
         self.records: list[dict] = []
+        self.model_transport = model_transport
 
     def check(self, case_id: str, expected: str, observed: str, passed: bool) -> None:
         print(f"{'PASS' if passed else 'FAIL'}: {case_id}: {observed[:140]}")
-        self.records.append({'id': case_id, 'class': 'disposable', 'model_transport': 'none', 'expected': expected,
+        self.records.append({'id': case_id, 'class': 'disposable', 'model_transport': self.model_transport, 'expected': expected,
                              'observed': observed[:400], 'status': 'passed' if passed else 'failed'})
 
     def denied(self, case_id: str, result: subprocess.CompletedProcess[str], marker: str) -> None:

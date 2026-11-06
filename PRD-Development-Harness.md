@@ -1,6 +1,6 @@
 # PRD — Option B development harness and engineering standards
 
-**Decision date:** 2026-11-04. **Status:** Requirements finalized; the project-local specification-ingestion harness is now partially implemented. Complete H0/H1, application tooling, database fixtures and actual Claude event delivery remain unqualified. See [current codebase](CODEBASE.md) and [adaptation evidence](docs/engineering/evidence/HARNESS-ADAPT-001/summary.md).
+**Decision date:** 2026-11-04. **Status:** Requirements finalized, and the harness, application tooling and database fixtures are implemented. [US-11.12's Gate 0](docs/engineering/evidence/US-11.12/summary.md) records what they show. Actual Claude event delivery stays unqualified, and US-10.2 assesses H1. See [current codebase](CODEBASE.md) and [adaptation evidence](docs/engineering/evidence/HARNESS-ADAPT-001/summary.md).
 
 This is **Gate 0**, the first work for [Option B: Next.js + LangGraph/Deep Agents](PRD-LangChain-Deep-Agents.md). [SPECS.md](SPECS.md) supplies the ordered implementation work items and their stable IDs. Complete H0 and H1 below before feature implementation, product migrations or production worker logic. Minimal scaffolding and disposable fixtures needed to qualify the harness are allowed during these stages. The [deployment contract](PRD-Local-Mac-Deployment.md) and [provider contract](PRD-Model-Providers.md) remain authoritative.
 
@@ -28,7 +28,7 @@ The user explicitly selected an adapted [OhMyOrch spec-ingestor workflow](docs/e
 | H0.4 | Implement the portable runner, deterministic hook adapter, fixtures and evidence/manifest validation | Direct runner works with Claude unavailable; stale hashes, missing review/runbook evidence, skipped prerequisites and failures are distinct |
 | H1.1 | Activate the portable baseline and prove it catches deliberate faults; qualify a Claude adapter only when compatible | Known-good fixtures pass; known-bad lint/type/contract/hook fixtures fail; optional assistant delivery recorded separately; no paid calls |
 | H1.2 | Qualify disposable database/Compose checks and guarded migration/seed wrappers | Test target isolated from persistent data; replay, seed repeatability and negative authorization fixtures pass |
-| H1.3 | Independently review the harness, exercise its runbook and publish the redacted baseline evidence | DH-A01–16 pass for the portable baseline; DH-W01–06 records are complete; unsupported Claude integration is explicitly inactive, never reported as enabled |
+| H1.3 | Independently review the harness, exercise its runbook and publish the redacted baseline evidence | DH-A01–16 pass for the portable baseline, with DH-A03 stated as partial where [Decision 0012](docs/engineering/decisions/0012-unqualified-hooks-in-h1.md) applies; DH-W01–06 records are complete; an unqualified Claude integration is either explicitly inactive, or in use as a guardrail and reported as configured and not qualified, never as enabled or qualified ([Decision 0012](docs/engineering/decisions/0012-unqualified-hooks-in-h1.md)) |
 | Next | Start Option B's local foundation, then its durable vertical slice | Each SPECS work item uses DH-W01–06; add actual feature-specific evidence as functionality arrives |
 
 H1 may use a disposable minimal web/API shell, stub worker and synthetic SQL migration. It does not require a completed product or real model execution. Separate **configuration validation**, **script behavior** and **actual assistant event delivery** in evidence. Synthetic hook stdin alone cannot prove Claude loaded the project settings. A missing optional Claude adapter must not block use of the tested portable runner; a missing required check does block Gate 0.
@@ -289,7 +289,7 @@ Use a short work-item Markdown record with **Plan**, **Implemented**, **Review**
 |---|---|
 | DH-A01 | Shared instructions, all required rules/skills/agents and valid project settings exist; links and scope match the implementation layout |
 | DH-A02 | Portable runner operates without Claude/model credentials; required failures and missing prerequisites return failure |
-| DH-A03 | Hook adapter accepts valid fixtures and rejects malicious/malformed inputs; pre-tool crash/timeout behavior and Stop recursion handling are qualified for any enabled Claude integration |
+| DH-A03 | Hook adapter accepts valid fixtures and rejects malicious/malformed inputs; pre-tool crash/timeout behavior and Stop recursion handling are qualified for any Claude integration claimed as qualified. Hooks in use as guardrails without that are reported as not qualified, and this gate stays partial ([Decision 0012](docs/engineering/decisions/0012-unqualified-hooks-in-h1.md)) |
 | DH-A04 | Deliberate TypeScript, Python and generated-contract faults fail; corrections pass; tool versions and locks recorded |
 | DH-A05 | Good/bad state-transition, reducer and public-event fixtures detect invalid transitions and private-data leakage |
 | DH-A06 | Disposable migrations replay and upgrade correctly; seeds run twice consistently; persistent target reset is refused |

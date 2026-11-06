@@ -25,7 +25,7 @@ AUTHORITY_CLAIMS = re.compile(
     r"|(grant|give|enable|allow|add)\b.{0,40}\b(tool|tools|permission|permissions|access|shell)\b"
     r"|(use|switch to|change to)\b.{0,40}\b(model|gpt|claude|gemini|provider)\b"
     r"|system prompt|you are now|override\b.{0,40}\b(policy|rule|budget|limit))",
-    re.IGNORECASE,
+    re.IGNORECASE | re.DOTALL,
 )
 NO_VERSION = 0
 
@@ -244,7 +244,7 @@ async def rollback(
     connection: Any, workspace_id: UUID, kind: str, key: str, to_version: int
 ) -> KnowledgeHead:
     """Points back at an earlier version, or at none with 0, since a first promotion has nothing
-    before it. Every version stays, and admitted work keeps its own."""
+    before it. Every version stays. Admitted work keeps its pinned skill, and reads memory live."""
     async with connection.transaction():
         if to_version == NO_VERSION:
             cursor = await connection.execute(

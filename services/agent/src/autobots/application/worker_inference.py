@@ -135,18 +135,24 @@ class AttemptModel:
         policy: RolePolicy,
         tools: Any = None,
         tool_options: Mapping[str, Any] | None = None,
+        reserved_micro_usd: int | None = None,
     ) -> None:
         self._source = source
         self._workspace_id = workspace_id
         self._policy = policy
+        self._reserved = reserved_micro_usd
         self._tools = tools
         self._tool_options = tool_options or {}
 
     def bind_tools(self, tools: Any, **options: Any) -> "AttemptModel":
-        return AttemptModel(self._source, self._workspace_id, self._policy, tools, options)
+        return AttemptModel(
+            self._source, self._workspace_id, self._policy, tools, options, self._reserved
+        )
 
     async def ainvoke(self, messages: Any, stop: Any = None, **kwargs: Any) -> Any:
-        client, used = await self._source.open_attempt(self._workspace_id, self._policy)
+        client, used = await self._source.open_attempt(
+            self._workspace_id, self._policy, reserved_micro_usd=self._reserved
+        )
         target = client
         if self._tools is not None:
             target = client.bind_tools(self._tools, **self._tool_options)
@@ -168,11 +174,14 @@ class InferenceSource:
     client_factory: Callable[[str], Any] | None = None
 
     async def open_attempt(
-        self, workspace_id: UUID, policy: RolePolicy
+        self, workspace_id: UUID, policy: RolePolicy, reserved_micro_usd: int | None = None
     ) -> tuple[Any, CredentialReference]:
         """Inside the attempt. Every refusal here is before sending, and classed as such."""
         try:
-            attempt, _ = prepared(policy, await self.catalog.current())
+            attempt, fresh_worst = prepared(policy, await self.catalog.current())
+            if reserved_micro_usd is not None and fresh_worst > reserved_micro_usd:
+                # The price rose during this job, so its reservation no longer covers a call.
+                raise CostUnavailable("this call would cost more than was reserved")
         except ModelUnavailable:
             raise ProviderFailure(FailureClass.MODEL_UNAVAILABLE) from None
         except CostUnavailable:
@@ -240,6 +249,16 @@ class InferenceSource:
         except CostUnavailable as refused:
             return refused.code, 0
 
+    async def _input_rate(self, profile: Any) -> tuple[int, int | None]:
+        """Zero where no price can be read, which `_refusal` has already stopped. And any tier."""
+        try:
+            entry = validated_entry(profile, await self.catalog.current(), datetime.now(UTC))
+        except ModelUnavailable:
+            return 0, None
+        if entry.pricing is None:
+            return 0, None
+        return entry.pricing.input_per_million, entry.pricing.tier_from_tokens
+
     async def bind(
         self, connection: Any, lease: Lease, config: LoopConfig
     ) -> tuple[Callable[[], Any], LoopConfig]:
@@ -254,8 +273,9 @@ class InferenceSource:
             return _no_model, replace(config, route=UNBOUND)
         refusal, worst_case = await self._refusal(connection, lease.workspace_id, policy)
         profile = policy.profile_for(ROLE)
-        route = ModelRoute(ROLE.value, profile.id.value, profile.wire_id, worst_case)
-        model = AttemptModel(self, lease.workspace_id, policy)
+        rate, tier = await self._input_rate(profile)
+        route = ModelRoute(ROLE.value, profile.id.value, profile.wire_id, worst_case, rate, tier)
+        model = AttemptModel(self, lease.workspace_id, policy, reserved_micro_usd=worst_case)
         return lambda: model, replace(config, route=route, refusal=refusal)
 
 

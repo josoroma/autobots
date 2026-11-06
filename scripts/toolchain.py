@@ -264,12 +264,16 @@ def entry_names(directory: Path, pattern: str = '*') -> list[str]:
     return sorted(path.name for path in directory.glob(pattern)) if directory.is_dir() else []
 
 
+# The delivery plugin's hook rewrites this record on its own schedule. No check writes it.
+DELIVERY_RECORD = 'openspec/delivery/goal.md'
+
+
 def snapshot(root: Path) -> dict:
     """What verification must not change. Names, not contents, so bytecode and builds do not trip it."""
-    changed = (git_paths(root, 'diff', '--no-renames', '--name-only', 'HEAD')
-               + git_paths(root, 'ls-files', '--others', '--exclude-standard'))
+    changed = {*git_paths(root, 'diff', '--no-renames', '--name-only', 'HEAD'),
+               *git_paths(root, 'ls-files', '--others', '--exclude-standard')} - {DELIVERY_RECORD}
     return {'guarded': {path.as_posix(): file_hash(root / path) for path in GUARDED_FILES},
-            'changed': {path: digest(root / path) for path in sorted(set(changed))},
+            'changed': {path: digest(root / path) for path in sorted(changed)},
             'dist_info': entry_names(root / SITE_PACKAGES, '*.dist-info'),
             'pnpm_entries': entry_names(root / PNPM_VIRTUAL_STORE)}
 

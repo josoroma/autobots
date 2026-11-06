@@ -106,6 +106,18 @@ def summarize(path: Path) -> tuple[list[dict], dict]:
     return cases, data.get('stats', {})
 
 
+def run_problems(path: Path, returncode: int) -> list[str]:
+    """Why a browser run doesn't count, though every case it reported may have passed."""
+    problems = [f'exit {returncode}'] if returncode else []
+    if not path.exists():
+        return [*problems, 'no report']
+    if json.loads(path.read_text()).get('errors'):
+        problems.append('errors outside any test')
+    if not summarize(path)[0]:
+        problems.append('no tests ran')
+    return problems
+
+
 def qualify(root: Path, retain: Path | None) -> int:
     (root / REPORT).unlink(missing_ok=True)
     tools = find_tools(root)

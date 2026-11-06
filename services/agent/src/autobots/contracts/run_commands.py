@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from autobots.contracts.plans import InputDocument, RequiredArtifact
 from autobots.contracts.primitives import STRICT_CONTRACT, Identifier, MicroUsd
@@ -19,13 +19,20 @@ class RunRequest(BaseModel):
     session_id: Identifier | None = None
     expert_id: Identifier | None = None
     expert_version: int | None = Field(default=None, ge=1)
-    goal_text: str = Field(min_length=1, max_length=20000)
+    # Left out, a continued run repeats the earlier run's stored goal. Otherwise required.
+    goal_text: str | None = Field(default=None, min_length=1, max_length=20000)
     limit_micro_usd: MicroUsd = 1_000_000
     # One approved model for this run alone. An unknown value is refused, and no run starts.
     run_profile: ModelProfileId | None = None
     acceptance_criteria: list[str] = Field(default_factory=list, max_length=20)
     required_artifacts: list[RequiredArtifact] = Field(default_factory=list, max_length=20)
     input_documents: list[InputDocument] = Field(default_factory=list, max_length=10)
+
+    @model_validator(mode="after")
+    def _has_a_goal(self) -> "RunRequest":
+        if self.goal_text is None and self.continues_run_id is None:
+            raise ValueError("goal_text is required unless continuing a run")
+        return self
 
 
 class RunAccepted(BaseModel):
@@ -60,6 +67,7 @@ class EffectEvidence(BaseModel):
 
     outcome: Literal["delivered", "not_delivered"]
     evidence: str = Field(min_length=1, max_length=2000)
+    generation: int
 
 
 class ModelCallReconciliation(BaseModel):

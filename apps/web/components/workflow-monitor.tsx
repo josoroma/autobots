@@ -42,11 +42,18 @@ export function WorkflowMonitor({ executionId }: { executionId: string }) {
         setState("unavailable");
         return;
       } else {
-        const next = parseExecutionView(await reply.json());
+        const next = await reply
+          .json()
+          .then(parseExecutionView)
+          .catch(() => null);
         if (!active) return;
-        setView(next);
-        setState("live");
-        if (TERMINAL.has(next.run_status)) return;
+        if (next === null) {
+          setState("reconnecting");
+        } else {
+          setView(next);
+          setState("live");
+          if (TERMINAL.has(next.run_status)) return;
+        }
       }
       timer = setTimeout(() => void load(), POLL_MS);
     };

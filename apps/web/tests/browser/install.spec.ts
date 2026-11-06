@@ -18,7 +18,9 @@ async function signIn(page: Page, password: string = PASSWORD): Promise<void> {
 
 test("a wrong password is refused on the install", async ({ page }) => {
   await signIn(page, "not-the-owners-password");
-  await expect(page.getByText(/Signed in, with access to/)).toHaveCount(0);
+  await expect(page.getByRole("alert")).toBeVisible();
+  await page.goto("/");
+  await expect(page.locator('[data-session="signed-in"]')).toHaveCount(0);
 });
 
 test("the owner signs in, and the finished run and its artifact bytes are there", async ({

@@ -10,7 +10,7 @@
 
 Stated plainly, because the sources still ask for more:
 
-- **No independent review.** The same session writes, verifies and archives a story, so its verification can share its author's blind spots. In the two stories run under the previous process, independent review caught real defects before archive. `PRD-Development-Harness.md` DH-W03 and `AGENTS.md` still describe independent review. This decision overrides them for routine delivery; those sources were not rewritten.
+- **No independent review.** The same session writes, verifies and archives a story, so its verification can share its author's blind spots. In the two stories run under the previous process, independent review caught real defects before archive. `PRD-Development-Harness.md` DH-W03 and `AGENTS.md` still describe independent review. This decision overrides them for routine delivery; those sources were not rewritten then, and [Decision 0009](0009-release-scope-from-blocking-findings.md#requirements-revised) has since revised DH-W03.
 - **No per-story DH-W records or fingerprint binding.** A story's record is its archived OpenSpec change and its commit. Nothing mechanical detects a change made after verification.
 - **A recorded `VERIFIED` is not invalidated if code changes afterwards.** The skills instruct re-verifying, and nothing enforces it.
 - **Story acceptance is unchanged.** US-1.5 (work records, independent review and evidence templates) and US-1.8 (independent baseline review, exercised runbook) still require what they say, and they are delivered as written. H1 cannot be claimed without them.

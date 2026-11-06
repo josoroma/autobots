@@ -108,7 +108,7 @@ async def main() -> None:
 
         result, model, run = await go([calls(PARENT_PLAN), calls(assign(helper, tools=['read_run_file'])), say('parent stops')])
         reply = tool_replies(model, 'assign_specialist')[-1]
-        check('asking for more than the parent holds is refused', 'scope_expansion_denied, no child', (reply['code'], await value('select count(*) from app_private.assignments where parent_run_id = %s', run)), reply['code'] == 'scope_expansion_denied')
+        check('asking for more than the parent holds is refused', 'scope_expansion_denied, no child', (reply['code'], await value('select count(*) from app_private.assignments where parent_run_id = %s', run)), reply['code'] == 'scope_expansion_denied' and await value('select count(*) from app_private.assignments where parent_run_id = %s', run) == 0)
         result, model, run = await go([calls(PARENT_PLAN), calls(assign(outside)), say('parent stops')])
         reply = tool_replies(model, 'assign_specialist')[-1]
         check('an Expert outside the session is refused', 'route_not_granted', reply['code'], reply['code'] == 'route_not_granted')
@@ -130,6 +130,26 @@ async def main() -> None:
         roots = await value('select count(distinct root_run_id) from app_private.model_invocations where root_run_id = %s', run)
         children = await (await db.execute('select count(*) from app_private.model_invocations i join public.runs r on r.id = i.run_id where i.root_run_id = %s and r.parent_run_id = %s', (run, run))).fetchone()
         check('the child\'s calls are reserved on the root', 'on the root ledger', (roots, children[0]), roots == 1 and children[0] >= 1)
+
+        # A child stops on the root's money and time, through the same refusals as the root.
+        def on_root(sql: str) -> Any:
+            def apply() -> Any:
+                with psycopg.connect(URL, autocommit=True) as sync:
+                    root = sync.execute("select id from public.runs where parent_run_id is null order by created_at desc limit 1").fetchone()[0]
+                    sync.execute(sql, (root,))
+                return calls(CHILD_PLAN)
+            return apply
+
+        result, model, run = await go([calls(PARENT_PLAN), calls(assign(helper)), on_root('update public.runs set limit_micro_usd = 0 where id = %s'), say('never'), say('never')])
+        row = await (await db.execute('select r.status, a.outcome from app_private.assignments a join public.runs r on r.id = a.child_run_id where a.parent_run_id = %s', (run,))).fetchone()
+        stopped = await value('select u.stop_reason from app_private.run_usage u join public.runs r on r.id = u.run_id where r.parent_run_id = %s', run)
+        check('a child past the money stops, and no further call goes out', 'budget_exceeded, paused for more budget, 3 calls', (stopped, row, len(model.seen)), stopped == 'budget_exceeded' and row[0] == 'paused' and len(model.seen) == 3)
+        reserved = await value("select count(*) from app_private.model_invocations where root_run_id = %s", run)
+        check('nothing was reserved for the refused call', '3 on the ledger', reserved, reserved == 3)
+        result, model, run = await go([calls(PARENT_PLAN), calls(assign(helper)), on_root('update app_private.run_usage set active_seconds = 1000 where run_id = %s'), say('never'), say('never')], LoopConfig(route=ROUTE, object_store=store, limits=RootLimits(active_seconds=100)))
+        row = await (await db.execute('select r.status, a.outcome from app_private.assignments a join public.runs r on r.id = a.child_run_id where a.parent_run_id = %s', (run,))).fetchone()
+        stopped = await value('select u.stop_reason from app_private.run_usage u join public.runs r on r.id = u.run_id where r.parent_run_id = %s', run)
+        check("a child past the root's active time stops", 'active_time_limit, failed, 3 calls', (stopped, row, len(model.seen)), stopped == 'active_time_limit' and row[0] == 'failed' and len(model.seen) == 3)
 
         # No slot is held while waiting on a child.
         seen_active: list[int] = []
@@ -222,7 +242,7 @@ async def main() -> None:
         states = [await value('select status from public.runs where id = %s', item) for item in (run, child, grandchild)]
         opened = await value("select count(*) from app_private.assignments where root_run_id = %s and status = 'open'", run)
         check('then every level settles', 'all cancelled, none open', (states, opened), states == ['cancelled'] * 3 and opened == 0)
-        check('a grandchild owner that lost the run settles nothing', 'its lease is gone', grand_lease.generation < await value('select generation from app_private.run_jobs where run_id = %s', grandchild), grand_lease.generation < await value('select generation from app_private.run_jobs where run_id = %s', grandchild))
+        check('a grandchild owner that lost the run no longer holds it', 'its lease is gone', grand_lease.generation < await value('select generation from app_private.run_jobs where run_id = %s', grandchild), grand_lease.generation < await value('select generation from app_private.run_jobs where run_id = %s', grandchild))
         invocation = await value("select id from app_private.model_invocations where run_id = %s and status = 'uncertain'", child)
         await ModelAdmission(db).reconcile(invocation, 80)
 

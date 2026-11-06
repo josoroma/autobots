@@ -10,8 +10,8 @@ markers are preserved across refreshes.
 | Target | EPIC-11 |
 | Kind | epic |
 | Focus | - |
-| Status | ACTIVE |
-| Reason | - |
+| Status | BLOCKED |
+| Reason | no progress: next action 'implement' for US-11.12 unchanged across 4 stop attempts |
 | Started | 2026-11-06 |
 | Updated | 2026-11-06 |
 
@@ -30,16 +30,16 @@ markers are preserved across refreshes.
 | 9 | US-11.9 | us-11-9-run-creation-disclosure-role | DONE | Run creation disclosure, role map and run details |
 | 10 | US-11.10 | us-11-10-real-mac-sleep-proof | DONE | Real Mac sleep proof |
 | 11 | US-11.11 | us-11-11-design-system-migration-final | DONE | Design system migration and final visual evidence |
-| 12 | US-11.12 | us-11-12-final-independent-review-gate | READY | Final independent review and Gate 0 |
+| 12 | US-11.12 | us-11-12-final-independent-review-gate | IN PROGRESS | Final independent review and Gate 0 |
 
 ## Next Action
 
-Action: select
+Action: implement
 Story: US-11.12
 Change: us-11-12-final-independent-review-gate
 Owner: main-session
-Command: openspec new change us-11-12-final-independent-review-gate; set US-11.12 to IN PROGRESS with a Change: line
-Reason: US-11.12 is READY and has no OpenSpec change
+Command: /ohmyorch:opsx-apply us-11-12-final-independent-review-gate
+Reason: gate implementation: 0/5 tasks complete
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

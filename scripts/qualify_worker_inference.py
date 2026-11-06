@@ -217,6 +217,30 @@ def qualify(root: Path) -> int:
         flow_done = settled(flow, 'succeeded', 60)
         cases.check('the product worker runs a workflow to the end', 'succeeded', f'{status(flow)}, worker alive {worker.poll() is None}', flow_done and worker.poll() is None)
 
+        # A long run compacts through the real SDK, under its summarizer role. WI-5.
+        compacted = admit(workspace_a, 'compact')
+        finished = settled(compacted, 'succeeded', 120)
+        asked = sent('compact-summary')
+        roles = ops.sql(f"select coalesce(string_agg(distinct role || '/' || status, ' '), 'none') from app_private.model_invocations where run_id = '{compacted}' and role = 'summarizer';")
+        stored = ops.sql(f"select count(*) from app_private.run_summaries where run_id = '{compacted}';")
+        cases.check('a long run summarizes through the real SDK and finishes', 'succeeded, a summarizer call with no tools, a stored summary',
+                    f'{status(compacted)}, {stop_reason(compacted)}, {len(asked)} asked, {[call["tools"] for call in asked]}, {roles}, {stored} stored',
+                    finished and bool(asked) and all(not call['tools'] for call in asked) and roles == 'summarizer/succeeded' and int(stored) >= 1)
+        after = [line for line in sent('compact') if 'saw_summary' in line]
+        cases.check('the summary is in the view of the calls that follow', 'seen', f'{sum(line["saw_summary"] for line in after)} of {len(after)}', any(line['saw_summary'] for line in after))
+        passed, content = verified_report(workspace_a, compacted) if finished else ('', '')
+        cases.check('and its result still verifies', 'verified, Total: 42', f'{passed}', passed == 'true' and 'Total: 42' in content)
+
+        # A child through the same worker and SDK, on its parent's ledger. WI-5.
+        lead = helper('admit-lead', workspace_a).strip().splitlines()[-1]
+        settled_child = wait(lambda: ops.sql(f"select count(*) from app_private.assignments where parent_run_id = '{lead}' and status = 'finished';") == '1', 90)
+        parent_failed = settled(lead, 'failed', 60)
+        row = ops.sql(f"select r.status || '/' || a.outcome from app_private.assignments a join public.runs r on r.id = a.child_run_id where a.parent_run_id = '{lead}';")
+        billed = ops.sql(f"select count(distinct run_id) || '/' || count(*) from app_private.model_invocations where root_run_id = '{lead}';")
+        cases.check('a child runs through the product worker and bills its root', 'succeeded, 2 runs on the root ledger', f'{row}, {billed}',
+                    settled_child and row == 'succeeded/succeeded' and billed.startswith('2/'))
+        cases.check('its parent, which stops with no evidence of its own, fails', 'failed', status(lead), parent_failed)
+
         # Rotation reaches the next attempt with no restart.
         save_key(workspace_a, KEY_TWO)
         rotated = admit(workspace_a, 'rotated')

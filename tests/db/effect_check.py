@@ -127,6 +127,11 @@ async def main() -> dict[str, str]:
         check('resume is blocked with no way to resolve it alone', 'blocked', await has_unresolvable_effect(db, run), await has_unresolvable_effect(db, run))
         view = await read_workspace(db, WORKSPACE, run)
         check('the uncertainty stays visible', 'send_blind listed', view.unknown_operations[0].tool_id, view.unknown_operations[0].tool_id == 'send_blind')
+        try:
+            await record_evidence(db, operation_id=operation, actor_id=ACTOR, idempotency_key=str(uuid4()), outcome='not_delivered', evidence='x', workspace_id=WORKSPACE, run_id=run, generation=view.unknown_operations[0].generation + 1)
+            check('a ruling on an attempt that has since changed is refused', 'operation_attempt_changed', 'recorded', False)
+        except ReconciliationRefused as error:
+            check('a ruling on an attempt that has since changed is refused', 'operation_attempt_changed', error.code, error.code == 'operation_attempt_changed')
         for label, options, code in (('another workspace', {'workspace_id': OTHER, 'run_id': run}, 'operation_not_found'), ('another run', {'workspace_id': WORKSPACE, 'run_id': uuid4()}, 'operation_not_found')):
             try:
                 await record_evidence(db, operation_id=operation, actor_id=ACTOR, idempotency_key=str(uuid4()), outcome='delivered', evidence='x', **options)
