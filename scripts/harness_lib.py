@@ -42,7 +42,11 @@ AGENTS_REQUIRED_ROWS = ('Opening paragraph', '.claude/settings.json', 'CLAUDE.md
 APP_INPUT_FILES = ('package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.node-version')
 APP_INPUT_DIRECTORIES = ('apps', 'services', 'packages', 'contracts', 'infra', 'supabase', 'tests/toolchain', 'tests/faults', 'tests/db', 'tests/web')
 NON_INPUT_DIRECTORIES = frozenset({'__pycache__', '.venv', 'node_modules', '.next', '.pytest_cache',
-                                   '.ruff_cache', '.mypy_cache'})
+                                   '.ruff_cache', '.mypy_cache', '.uv', '.corepack', '.pnpm-store', '.cache'})
+# Excluded by place, not by name, because the same name elsewhere could be a real input. A worktree
+# is another checkout with its own reports, so nothing in it is an input of the one containing it.
+# OhMyOrch session state is rewritten on every delivery refresh and ignored by Git.
+NON_INPUT_TREES = ('.claude/worktrees', '.claude/ohmyorch/runtime', '.claude/ohmyorch/backups')
 # A change here can affect every check, so `fast` conservatively runs both application domains.
 SHARED_CHECK_FILES = frozenset({*APP_INPUT_FILES, 'scripts/toolchain.py', 'scripts/qualify_faults.py',
                                 'scripts/generate_contracts.py', 'scripts/qualify_web.py'})
@@ -76,10 +80,15 @@ def reduced_env() -> dict[str, str]:
     return {key: os.environ[key] for key in REDUCED_ENV_KEYS if key in os.environ}
 
 
-def input_files(base: Path) -> Iterator[Path]:
-    """Files under `base`, without descending into environments, caches or build output."""
+def in_non_input_tree(relative: Path) -> bool:
+    return any(relative.is_relative_to(tree) for tree in NON_INPUT_TREES)
+
+
+def input_files(root: Path, base: Path) -> Iterator[Path]:
+    """Files under `base`, without descending into environments, caches, build output or other checkouts."""
     for directory, children, files in os.walk(base):
-        children[:] = [name for name in children if name not in NON_INPUT_DIRECTORIES]
+        children[:] = [name for name in children if name not in NON_INPUT_DIRECTORIES
+                       and not in_non_input_tree(Path(directory, name).relative_to(root))]
         # os.walk lists a link to a directory among the directories, and never enters it.
         links = [name for name in children if os.path.islink(Path(directory) / name)]
         yield from (Path(directory) / name for name in (*files, *links))
@@ -101,7 +110,7 @@ def input_manifest(root: Path) -> dict[str, str]:
     except (OSError, ValueError, AttributeError):
         pass  # Configuration validation reports malformed maps; never read outside root.
     for directory in ('.claude', 'scripts', 'tests/harness', 'docs/engineering', *APP_INPUT_DIRECTORIES):
-        paths.update(input_files(root / directory))
+        paths.update(input_files(root, root / directory))
     manifest = {}
     for path in sorted(paths):
         relative = path.relative_to(root)
@@ -122,8 +131,7 @@ def is_non_input(relative: Path, path: Path) -> bool:
     return (evidence or secret
             or bool(NON_INPUT_DIRECTORIES.intersection(relative.parts))
             or path.name in {'next-env.d.ts', 'approvals.local.json', 'settings.local.json'}
-            # OhMyOrch session state: rewritten on every delivery refresh and ignored by Git.
-            or text.startswith(('.claude/ohmyorch/runtime/', '.claude/ohmyorch/backups/'))
+            or in_non_input_tree(relative)
             or path.suffix in {'.pyc', '.log', '.tsbuildinfo'})
 
 

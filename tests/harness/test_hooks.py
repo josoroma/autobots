@@ -198,6 +198,67 @@ class HookTests(unittest.TestCase):
             (state / 'project.json').write_text('{"changed": true}')
             self.assertNotEqual(before, fingerprint(root))
 
+    def write_files(self, root: Path, names: tuple[str, ...]) -> None:
+        for name in names:
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(name)
+
+    def test_a_worktree_is_not_an_input_of_the_checkout_containing_it(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_files(root, ('.claude/rules/real.md',))
+            before = fingerprint(root)
+            # A copy of real inputs, and the tool state a bootstrap leaves there.
+            worktree = '.claude/worktrees/other/'
+            self.write_files(root, tuple(worktree + name for name in
+                                         ('scripts/harness_lib.py', '.claude/rules/real.md', 'SPECS.md', '.uv/cache/x')))
+            self.assertEqual(before, fingerprint(root))
+            (root / worktree / 'SPECS.md').write_text('changed')
+            self.assertEqual(before, fingerprint(root))
+            self.assertEqual(sorted(input_manifest(root)), ['.claude/rules/real.md'])
+            # A real `.claude` input still counts.
+            (root / '.claude/rules/real.md').write_text('changed')
+            self.assertNotEqual(before, fingerprint(root))
+
+    def test_a_worktree_is_excluded_by_its_place_and_not_by_its_name(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            near_misses = ('.claude/worktrees-notes/x.md', '.claude/rules/worktrees/x.md', 'scripts/worktrees/x.py')
+            self.write_files(root, near_misses)
+            self.assertEqual(sorted(input_manifest(root)), sorted(near_misses))
+
+    def test_worktree_contents_are_never_walked_and_a_link_there_is_not_an_input(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            self.write_files(root, ('.claude/rules/real.md', '.claude/worktrees/other/scripts/x.py'))
+            walked, walk = [], os.walk
+
+            def spy(top, *args, **kwargs):
+                for entry in walk(top, *args, **kwargs):
+                    walked.append(Path(entry[0]))
+                    yield entry
+
+            with mock.patch('os.walk', spy):
+                input_manifest(root)
+            self.assertIn(root / '.claude/rules', walked)
+            self.assertFalse([path for path in walked if path.is_relative_to(root / '.claude/worktrees')])
+            shutil.rmtree(root / '.claude/worktrees')
+            (root / '.claude/worktrees').symlink_to(root / '.claude/rules', target_is_directory=True)
+            self.assertEqual(sorted(input_manifest(root)), ['.claude/rules/real.md'])
+
+    def test_tool_written_directories_are_not_inputs_at_any_depth(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_files(root, ('services/agent/code.py',))
+            before = fingerprint(root)
+            self.write_files(root, ('services/agent/.uv/cache/x', 'apps/web/.cache/pnpm/x',
+                                    'packages/client/.pnpm-store/x', '.claude/.corepack/x'))
+            self.assertEqual(before, fingerprint(root))
+            # Only the exact names: a similar name is still source.
+            self.write_files(root, ('services/agent/cache/x.py',))
+            self.assertNotEqual(before, fingerprint(root))
+
     def dispatch(self, raw: bytes, script: Path | None = None) -> subprocess.CompletedProcess:
         return subprocess.run([sys.executable, str(script or ROOT / '.claude/hooks/dispatch.py')], input=raw,
                               capture_output=True, timeout=15)
