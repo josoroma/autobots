@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import os
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -42,6 +43,7 @@ from autobots.application.recovery import classify_interrupted, open_obligation,
 from autobots.application.run_usage import (
     RootLimits,
     begin_segment,
+    discount_sleep,
     end_segment,
     ensure_usage,
     usage_view,
@@ -58,16 +60,18 @@ from autobots.application.verification import verify_candidate
 from autobots.application.worker_leases import (
     DEFAULT_LEASE_SECONDS,
     Lease,
+    WakeClock,
     claim_next,
     claim_run,
     heartbeat,
     is_held,
+    revive_lease,
 )
 from autobots.contracts.plans import GoalSpec
 from autobots.domain.execution import INCOMPATIBLE, incompatibility
 from autobots.domain.runs import Actor, CommandRefused, RunCommand, RunStatus
 from autobots.domain.tools import DELEGATION_TOOL
-from autobots.operations.logs import forbid_remote_tracing
+from autobots.operations.logs import forbid_remote_tracing, log_event
 
 # Waiting can resolve these: a person adds budget or a key, or reconciles an uncertain call.
 PAUSE_FOR = frozenset(
@@ -119,6 +123,8 @@ class LoopConfig:
     refusal: str | None = None
 
 
+logger = logging.getLogger("autobots.worker")
+WAKE_LOOK_SECONDS = 1.0
 # Bound to no profile, so `run_goal` leaves the run for a person instead of guessing a model.
 UNBOUND = ModelRoute("executor", "", "", 0)
 JobBinder = Callable[[Any, Lease, LoopConfig], Awaitable[tuple[Callable[[], Any], LoopConfig]]]
@@ -441,15 +447,37 @@ async def _settle_candidate(
     return await _result(connection, lease, goal, outcome, code, result.status)
 
 
-async def _keep_lease(database_url: str, lease: Lease, config: LoopConfig) -> None:
-    """On its own connection, since the loop's may be mid-transaction or waiting on a model."""
+async def _keep_lease(
+    database_url: str, lease: Lease, config: LoopConfig, clock: WakeClock | None = None
+) -> None:
+    """On its own connection, since the loop's may be mid-transaction or waiting on a model.
+
+    It looks every second for a Mac having slept, as a lease runs out during any sleep longer than
+    it. Right after one, it beats every look too, because Docker's clock can jump again later.
+    """
+    wake = clock or WakeClock()
+    look = min(WAKE_LOOK_SECONDS, config.heartbeat_seconds)
+    since_beat = 0.0
     async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as connection:
         while True:
-            await asyncio.sleep(config.heartbeat_seconds)
+            await asyncio.sleep(look)
+            since_beat += look
+            slept = wake.check()
+            if slept:
+                log_event(logger, "worker.woke", seconds=round(slept, 1))
+                await discount_sleep(connection, lease.run_id, slept)
+            if since_beat < config.heartbeat_seconds and not wake.just_woke():
+                continue
+            since_beat = 0.0
             try:
                 await heartbeat(connection, lease, lease_seconds=config.lease_seconds)
             except LeaseLost:
-                return
+                if not wake.just_woke():
+                    return
+                try:
+                    await revive_lease(connection, lease, lease_seconds=config.lease_seconds)
+                except LeaseLost:
+                    return
 
 
 async def _run_status(connection: Any, lease: Lease) -> str:

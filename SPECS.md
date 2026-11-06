@@ -250,10 +250,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-11.9#1 | Add the MP-07 disclosure to every run-creation screen. | DONE | US-11.9 |
 | US-11.9#2 | Add a per-run model choice, the complete role map and budgets to the run workspace. | DONE | US-11.9 |
 | US-11.9#3 | Add reported and estimated costs, errors and evidence links to the inspector, and cover all four scenarios in browser tests. | DONE | US-11.9 |
-| US-11.10 | Real Mac sleep proof | BLOCKED | EPIC-11 |
-| US-11.10#1 | Write the sleep procedure, with what to observe before and after. | TODO | US-11.10 |
-| US-11.10#2 | Have the owner run it on a disposable stack with a scripted model, and record the observations. | TODO | US-11.10 |
-| US-11.10#3 | Only if the result requires it, build wake handling and have the owner repeat the test. | TODO | US-11.10 |
+| US-11.10 | Real Mac sleep proof | DONE | EPIC-11 |
+| US-11.10#1 | Write the sleep procedure, with what to observe before and after. | DONE | US-11.10 |
+| US-11.10#2 | Have the owner run it on a disposable stack with a scripted model, and record the observations. | DONE | US-11.10 |
+| US-11.10#3 | Only if the result requires it, build wake handling and have the owner repeat the test. | DONE | US-11.10 |
 | US-11.11 | Design system migration and final visual evidence | BLOCKED | EPIC-11 |
 | US-11.11#1 | Add the shared form components and move every form to them. | TODO | US-11.11 |
 | US-11.11#2 | Capture both-theme screenshots, measured contrast and axe across all named surfaces. | TODO | US-11.11 |
@@ -475,8 +475,6 @@ flowchart TD
   US_11_6 -.-> US_11_9
   US_4_7 -.-> US_11_10
   US_9_1 -.-> US_11_10
-  EXT_US_11_10_1["External: The owner must be present to sleep this Mac during a run, following the written procedure."]
-  EXT_US_11_10_1 -.-> US_11_10
   US_2_5 -.-> US_11_11
   US_11_1 -.-> US_11_11
   US_11_4 -.-> US_11_11
@@ -3301,7 +3299,8 @@ Open Questions:
 
 ### US-11.10: Real Mac sleep proof
 
-Status: BLOCKED
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-11-10-real-mac-sleep-proof/`
 
 As an owner
 I want this Mac put to sleep during a run, following a written procedure
@@ -3339,12 +3338,11 @@ Scenario: Prove a fix under real sleep
 Dependencies:
 - US-4.7
 - US-9.1
-- External: The owner must be present to sleep this Mac during a run, following the written procedure.
 
 Tasks:
-- [ ] Write the sleep procedure, with what to observe before and after.
-- [ ] Have the owner run it on a disposable stack with a scripted model, and record the observations.
-- [ ] Only if the result requires it, build wake handling and have the owner repeat the test.
+- [x] Write the sleep procedure, with what to observe before and after.
+- [x] Have the owner run it on a disposable stack with a scripted model, and record the observations.
+- [x] Only if the result requires it, build wake handling and have the owner repeat the test.
 
 Open Questions:
 - None.

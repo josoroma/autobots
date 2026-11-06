@@ -73,6 +73,16 @@ async def end_segment(connection: Any, run_id: UUID) -> None:
     )
 
 
+async def discount_sleep(connection: Any, run_id: UUID, seconds: float) -> None:
+    """A Mac asleep isn't a run working, so an open segment doesn't count that time."""
+    await connection.execute(
+        "update app_private.run_usage "
+        "set segment_started_at = segment_started_at + make_interval(secs => %s) "
+        "where run_id = %s and segment_started_at is not null",
+        (seconds, run_id),
+    )
+
+
 async def active_seconds_used(connection: Any, run_id: UUID) -> float:
     cursor = await connection.execute(
         "select active_seconds + coalesce(extract(epoch from clock_timestamp() - "

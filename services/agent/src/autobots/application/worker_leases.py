@@ -1,5 +1,7 @@
 """Job ownership by database time and a rising generation, SP-012."""
 
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -8,6 +10,41 @@ from autobots.application.runs import LeaseLost, record_transition
 from autobots.domain.runs import RunStatus
 
 DEFAULT_LEASE_SECONDS = 60.0
+# Over this between the two clocks is a sleep, and not a busy Mac.
+SLEEP_GAP_SECONDS = 20.0
+# Long enough for Docker's VM to correct its clock, which it did late in the first real sleep.
+WAKE_WINDOW_SECONDS = 300.0
+
+
+class WakeClock:
+    """A monotonic clock stops while a Mac sleeps, and the wall clock doesn't, US-11.10.
+
+    So this sees a real sleep, in this process. SIGSTOP or a hung worker stops neither clock apart.
+    """
+
+    def __init__(
+        self,
+        wall: Callable[[], float] = time.time,
+        mono: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self._wall = wall
+        self._mono = mono
+        self._last_wall = wall()
+        self._last_mono = mono()
+        self._woke_at: float | None = None
+
+    def check(self) -> float:
+        """The seconds asleep since the last check, or 0 if this wasn't a sleep."""
+        wall, mono = self._wall(), self._mono()
+        gap = (wall - self._last_wall) - (mono - self._last_mono)
+        self._last_wall, self._last_mono = wall, mono
+        if gap <= SLEEP_GAP_SECONDS:
+            return 0.0
+        self._woke_at = mono
+        return gap
+
+    def just_woke(self) -> bool:
+        return self._woke_at is not None and self._mono() - self._woke_at < WAKE_WINDOW_SECONDS
 
 
 @dataclass(frozen=True)
@@ -81,6 +118,25 @@ async def claim_run(
     connection: Any, run_id: UUID, *, worker_id: str, lease_seconds: float = DEFAULT_LEASE_SECONDS
 ) -> Lease | None:
     return await _claim(connection, "j.run_id = %s", (run_id,), worker_id, lease_seconds)
+
+
+async def revive_lease(
+    connection: Any, lease: Lease, *, lease_seconds: float = DEFAULT_LEASE_SECONDS
+) -> None:
+    """After a real sleep only: its own worker takes back a lease that ran out while nobody ran.
+
+    Anyone who claimed it raised the generation, so this fails for them and fencing is unchanged. A
+    reply that came back through the sleep is then used, instead of being paid for a second time.
+    """
+    cursor = await connection.execute(
+        "update app_private.run_jobs "
+        "set lease_expires_at = clock_timestamp() + make_interval(secs => %s) "
+        "where run_id = %s and generation = %s and status = 'claimed' and lease_owner = %s "
+        "returning run_id",
+        (lease_seconds, lease.run_id, lease.generation, lease.worker_id),
+    )
+    if await cursor.fetchone() is None:
+        raise LeaseLost("this worker no longer owns the run")
 
 
 async def heartbeat(

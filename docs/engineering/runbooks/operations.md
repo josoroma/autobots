@@ -2,7 +2,7 @@
 
 Starting, draining, stopping and reading the health of the local stack, and applying retention.
 
-**Last exercised:** on the real install on 2026-11-06, [as US-11.3 records](../../../openspec/changes/archive/2026-11-06-us-11-3-guarded-persistent-install-exercised/verification.md), with a real goal, a drain, a stop and a start. Its project is `autobots-install`, on `127.0.0.1:55321` and `127.0.0.1:55322`, because `54321` and `54322` belong to another project, with its files in `~/.local/share/autobots-install`. `python3.12 scripts/qualify_operations.py` still runs this procedure on a disposable project with a scripted model, including what the real install didn't: a run cut short by a drain, and retention.
+**Last exercised:** on the real install on 2026-11-06, [as US-11.3 records](../../../openspec/changes/archive/2026-11-06-us-11-3-guarded-persistent-install-exercised/verification.md), with a real goal, a drain, a stop and a start. Its project is `autobots-install`, on `127.0.0.1:55321` and `127.0.0.1:55322`, because `54321` and `54322` belong to another project, with its files in `~/.local/share/autobots-install`. `python3.12 scripts/qualify_operations.py` still runs this procedure on a disposable project with a scripted model, including what the real install didn't: a run cut short by a drain, and retention. Real sleep is exercised on a disposable stack, by [its own runbook](mac-sleep.md).
 
 ## Prerequisites and target
 
@@ -154,6 +154,10 @@ A purged run has no explanation on its page yet: its artifacts just aren't liste
 ## Backup and restore
 
 See [the backup and restore runbook](backup-restore.md).
+
+## Mac sleep
+
+A worker that wakes takes back a lease that ran out with nobody claiming it, and doesn't count the time asleep as active. A call whose connection dropped pauses the run as `uncertain_acceptance`, as above. See [the sleep runbook](mac-sleep.md), which is the only way to exercise this: `SIGSTOP` doesn't separate the two clocks, so it never counts as a sleep.
 
 ## Failure symptoms
 
