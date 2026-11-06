@@ -151,7 +151,7 @@ def attempt(root: Path, key_file: Path, limit: int, profile: str | None = None) 
                                           f"tool_names, invalid_tool_calls, reserved_micro_usd, charged_micro_usd, upstream_provider, "
                                           f"round(extract(epoch from finished_at - created_at)::numeric, 1) as seconds, char_length(accumulated_output) as partial_chars "
                                           f"from app_private.model_invocations where root_run_id = '{run_id}' order by created_at")
-        report['receipts'] = rows(ops, f"select tool_id, status, created_at from app_private.tool_receipts where run_id = '{run_id}' order by created_at")
+        report['receipts'] = rows(ops, f"select tool_id, status, failure_code, failure_detail, created_at from app_private.tool_receipts where run_id = '{run_id}' order by created_at")
         report['verifications'] = rows(ops, f"select passed, unmet, created_at from app_private.run_verifications where run_id = '{run_id}' order by created_at")
         report['files'] = rows(ops, f"select path, version, char_length(content) as chars, sha256, content from app_private.run_files where run_id = '{run_id}' order by created_at")
         report['events'] = rows(ops, f"select sequence, occurred_at, payload from public.run_events where run_id = '{run_id}' order by sequence")

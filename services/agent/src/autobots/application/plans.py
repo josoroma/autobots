@@ -1,6 +1,7 @@
 """The model proposes, and deterministic logic commits, SP-011 and PRD 8.1."""
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -37,9 +38,10 @@ PLAN_REJECTIONS = frozenset(
 
 
 class PlanRejected(Exception):
-    def __init__(self, code: str) -> None:
+    def __init__(self, code: str, detail: str | None = None) -> None:
         super().__init__(code)
         self.code = code
+        self.detail = detail
 
 
 def _has_cycle(tasks: list[PlanTask]) -> bool:
@@ -71,9 +73,9 @@ def validate_proposal(
         raise PlanRejected("plan_cycle")
     for task in proposal.tasks:
         if any(criterion not in goal.criteria for criterion in task.criteria):
-            raise PlanRejected("plan_out_of_scope")
+            raise PlanRejected("plan_out_of_scope", "criterion")
         if any(tool not in goal.allowed_tools for tool in task.tools):
-            raise PlanRejected("plan_out_of_scope")
+            raise PlanRejected("plan_out_of_scope", "tool")
     covered = {criterion for task in proposal.tasks for criterion in task.criteria}
     if covered != set(goal.criteria):
         raise PlanRejected("plan_uncovered_criteria")
@@ -148,6 +150,17 @@ async def plan_view(connection: Any, run_id: UUID, goal: GoalSpec) -> PlanView:
     )
 
 
+def reference_shape(reference: str) -> str:
+    """What a cited reference looks like, for diagnosis. Its form, never the model's text."""
+    if reference.startswith(("outputs/", "inputs/")):
+        return "run_path"
+    if re.fullmatch(r"[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", reference):
+        return "uuid"
+    if re.fullmatch(r"[0-9a-fA-F]{64}", reference):
+        return "sha256"
+    return "other_path" if "/" in reference else "bare_name"
+
+
 async def _evidence_exists(connection: Any, run_id: UUID, kind: str, reference: str) -> bool:
     if kind == "artifact":
         sql = "select 1 from app_private.run_files where run_id = %s and path = %s limit 1"
@@ -169,7 +182,7 @@ def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
         try:
             validate_proposal(goal, arguments, plan[1] if plan else None, done)
         except PlanRejected as rejected:
-            raise ToolFailed(rejected.code) from None
+            raise ToolFailed(rejected.code, detail=rejected.detail) from None
         version = plan[0] + 1 if plan else 1
         try:
             async with context.connection.transaction():
@@ -218,7 +231,8 @@ def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
             raise ToolFailed("task_dependencies_open")
         for item in arguments.evidence:
             if not await _evidence_exists(context.connection, run_id, item.kind, item.reference):
-                raise ToolFailed("evidence_invalid")
+                detail = f"{item.kind}:{reference_shape(item.reference)}"
+                raise ToolFailed("evidence_invalid", detail=detail)
         async with context.connection.transaction():
             await hold_lease(context.connection, context.scope)
             await context.connection.execute(

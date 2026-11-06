@@ -3,7 +3,7 @@
 import pytest
 
 from autobots.application.goal_loop import _opening
-from autobots.application.plans import PlanRejected, validate_proposal
+from autobots.application.plans import PlanRejected, reference_shape, validate_proposal
 from autobots.contracts.plans import GoalSpec, PlanProposal, PlanTask, RequiredArtifact
 
 GOAL = GoalSpec(
@@ -113,3 +113,28 @@ def test_the_opening_says_a_goal_is_delivered_by_publishing() -> None:
 
 def test_the_opening_names_no_tool_the_run_cannot_call() -> None:
     assert "publish" not in _opening(GOAL).lower()
+
+
+@pytest.mark.parametrize(
+    ("reference", "shape"),
+    [
+        ("outputs/report.md", "run_path"),
+        ("inputs/brief.md", "run_path"),
+        ("report.md", "bare_name"),
+        ("anything a model wrote", "bare_name"),
+        ("elsewhere/report.md", "other_path"),
+        ("93380e77-e7a2-4a70-8d56-e103849a190f", "uuid"),
+        ("6049275d483e43c3d2161a6e8f2fe6567568b1c454ba0801f4b76661a5b80a52", "sha256"),
+    ],
+)
+def test_a_reference_is_recorded_by_its_form_and_never_its_text(reference: str, shape: str) -> None:
+    assert reference_shape(reference) == shape
+
+
+def test_a_rejection_says_which_part_widened_scope() -> None:
+    with pytest.raises(PlanRejected) as criterion:
+        validate_proposal(GOAL, proposal(task("a", criteria=["c1", "c2", "c3"])), None, frozenset())
+    assert criterion.value.detail == "criterion"
+    with pytest.raises(PlanRejected) as tool:
+        validate_proposal(GOAL, proposal(task("a", tools=["send_email"])), None, frozenset())
+    assert tool.value.detail == "tool"

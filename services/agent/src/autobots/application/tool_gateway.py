@@ -21,7 +21,15 @@ class NotDelivered(Exception):
 
 
 class ToolFailed(Exception):
-    """The tool knows the effect did not happen. Anything else raised leaves the outcome unknown."""
+    """The tool knows the effect did not happen. Anything else raised leaves the outcome unknown.
+
+    `detail` is for diagnosis only: a category the tool chose, never text the model wrote. It's
+    stored on the receipt and doesn't reach the model.
+    """
+
+    def __init__(self, *args: object, detail: str | None = None) -> None:
+        super().__init__(*args)
+        self.detail = detail
 
 
 @dataclass(frozen=True)
@@ -298,7 +306,8 @@ class ToolGateway:
                     # A ruling covered the last attempt. Its evidence stays, but this one is open.
                     cursor = await connection.execute(
                         "update app_private.tool_receipts set status = 'started', result = null, "
-                        "generation = %s, reconciled_at = null, updated_at = now() "
+                        "failure_code = null, failure_detail = null, generation = %s, "
+                        "reconciled_at = null, updated_at = now() "
                         "where operation_id = %s and status <> 'succeeded' "
                         "returning operation_id",
                         (scope.generation, operation_id),
@@ -359,10 +368,9 @@ class ToolGateway:
         try:
             output = await asyncio.wait_for(tool.handler(parsed, context), tool.timeout_seconds)
         except ToolFailed as error:
-            await _record(context, operation_id, "failed", None)
-            return ToolResult(
-                ToolOutcome.FAILED, str(error) or "tool_failed", operation_id=operation_id
-            )
+            code = str(error) or "tool_failed"
+            await _record(context, operation_id, "failed", None, code, error.detail)
+            return ToolResult(ToolOutcome.FAILED, code, operation_id=operation_id)
         except LeaseLost:
             # The write's transaction refused it, so nothing happened.
             await _record(context, operation_id, "failed", None)
@@ -389,21 +397,34 @@ def _visible(tool: ToolDefinition, output: BaseModel) -> tuple[dict[str, Any], b
 
 
 async def _record(
-    context: ToolContext, operation_id: str, status: str, result: dict[str, Any] | None
+    context: ToolContext,
+    operation_id: str,
+    status: str,
+    result: dict[str, Any] | None,
+    failure_code: str | None = None,
+    failure_detail: str | None = None,
 ) -> None:
     """Only moves a receipt forward. A success is recorded whoever owns the run now, as the effect
     happened, even over a ruling that it hadn't: repeating it would be the worse mistake, and the
     ruling's evidence stays. Anything else speaks only for the attempt on record."""
-    values = (status, json.dumps(result) if result is not None else None, operation_id)
+    values = (
+        status,
+        json.dumps(result) if result is not None else None,
+        failure_code,
+        failure_detail,
+        operation_id,
+    )
     if status == "succeeded":
         await context.connection.execute(
-            "update app_private.tool_receipts set status = %s, result = %s, updated_at = now() "
+            "update app_private.tool_receipts set status = %s, result = %s, failure_code = %s, "
+            "failure_detail = %s, updated_at = now() "
             "where operation_id = %s and status <> 'succeeded'",
             values,
         )
         return
     await context.connection.execute(
-        "update app_private.tool_receipts set status = %s, result = %s, updated_at = now() "
+        "update app_private.tool_receipts set status = %s, result = %s, failure_code = %s, "
+        "failure_detail = %s, updated_at = now() "
         "where operation_id = %s and status = 'started' and generation <= %s",
         (*values, context.scope.generation),
     )

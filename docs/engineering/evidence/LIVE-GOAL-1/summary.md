@@ -123,3 +123,34 @@ Held in all four runs: no key in any durable row or log file, nothing of the pro
 **Total:** US$0.006234 in the ledger, matching key usage. Across all live goals in this record, US$0.015124.
 
 Held: no key in any durable row or log file, nothing of the project left behind, other Docker resources unchanged, and the watchdog never fired. The report is 88 words and ends in the required line, but no check has scored it, and this doesn't establish H1 or product acceptance.
+
+## The first goal to succeed
+
+**Class: live, on a disposable stack.** Authorized by the user's "Yes, record the reasons", after being told one cheap run would follow, under the same US$0.25 limit. Run on 2026-11-06 UTC at 00:38, on Terra, at the 512-token limit and the 130-second timeout. Raw result: `.checks/trial-reasons/terra-reasons.json` (ignored, local).
+
+**Outcome: `succeeded` after 23s.** The run planned, saved, published and verified, with `passed: true` and nothing unmet. `report.md` was published and meets its `must_contain` check. It took 7 calls and 6 dispatches, and the ledger shows US$0.006132, matching key usage. The largest output was 159 tokens. Same limits held as above.
+
+**This isn't a fix taking effect.** Since the failed run above, the only changes record failures. Neither changes what the model is told, so the same setup has now gone 1 of 2, and the difference is the model's own variation.
+
+**The run spent its one repair anyway.** Call 3's `complete_task` failed with `evidence_invalid`, and call 4's succeeded. A second failure of that kind would have stopped it, as it did the run before.
+
+| Call | Tool | Result |
+|---|---|---|
+| 1 | `propose_plan` | succeeded |
+| 2 | `save_artifact` | succeeded |
+| 3 | `complete_task` | **`evidence_invalid`, form `artifact:run_path`** |
+| 4 | `complete_task` | succeeded |
+| 5 | `publish_artifact` | succeeded |
+| 6 | `complete_task` | succeeded |
+| 7 | none | final reply |
+
+**What the new record shows.** `tool_receipts` now keeps `failure_code` and `failure_detail`: a code and a category, never what the model wrote.
+
+- **It disproves an earlier guess.** The failure came before publishing, so a published artifact's identifier wasn't the cause here.
+- **What it narrows:** the model cited an artifact with a reference starting `outputs/` or `inputs/` that matched no saved path. The exact text isn't recorded by design, so why it didn't match is still unknown. A version suffix on the path is one possibility, not an observation.
+- **Unrelated gap:** a model is never shown an `operation_id`, the only form `receipt` evidence accepts, so it can't cite a receipt correctly. This run didn't hit that.
+- **Not recorded:** refusals that leave no receipt, such as `invalid_arguments`.
+
+**Not established:** that goals succeed reliably, as this is one run of one goal on one model. DeepSeek hasn't completed a goal. The report's quality wasn't scored. Compaction, approvals, child runs and budget refusals weren't exercised. This doesn't establish H1, product acceptance or US-10.1.
+
+**Total across all live goals in this record:** US$0.021256.

@@ -24,7 +24,7 @@ Stated plainly, because the sources still ask for more:
 ## What this doesn't establish
 
 - **Why the 2,048-token replies were wrong:** only one literal value was tried.
-- **That a real goal works:** no goal has succeeded on either model, as [the live goal record](../evidence/LIVE-GOAL-1/summary.md) shows.
+- **That a real goal works:** no goal had succeeded on either model when this was decided, as [the live goal record](../evidence/LIVE-GOAL-1/summary.md) shows.
 - **The evidence's other limits**, which stay open and aren't settled here:
   - Whether the provider stopped on a cancelled call, and what it charged.
   - The upstream provider, unrecorded on every call.

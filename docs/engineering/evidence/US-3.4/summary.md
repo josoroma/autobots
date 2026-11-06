@@ -137,5 +137,5 @@ What happened when the limit was tried on a real goal is in [the live goal recor
 
 Two tests guard this in `services/agent/tests/test_route_qualification.py`: application code can't start asking for strict output, and an approved profile can't lack a route to qualify. Both were confirmed failing on a temporary break.
 
-**Still open, and not settled by this story:** whether the provider stopped on a cancelled call and what it charged, the upstream provider, concurrent admission on a live route (MP-A09), and real fragmentation of DeepSeek's streamed tool arguments, covered only by the fake transport. No real goal has succeeded on either model. Three trials per fixture on one day. This doesn't establish H1, product acceptance or task quality, which stays with US-10.1.
+**Still open, and not settled by this story:** whether the provider stopped on a cancelled call and what it charged, the upstream provider, concurrent admission on a live route (MP-A09), and real fragmentation of DeepSeek's streamed tool arguments, covered only by the fake transport. When this story was delivered, no real goal had succeeded on either model; [the live goal record](../LIVE-GOAL-1/summary.md) has what happened since. Three trials per fixture on one day. This doesn't establish H1, product acceptance or task quality, which stays with US-10.1.
 
