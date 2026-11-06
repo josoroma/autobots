@@ -159,7 +159,7 @@ These gates are implementation requirements, not completed tests:
 | MP-A05 | Canonical drift, missing IDs and batch/moving substitutions fail before any paid request. |
 | MP-A06 | Tools, strict schemas, SSE, cancellations, truncation and tool-result continuation pass on each enabled route; arithmetic and negative task fixtures remain separate quality gates. |
 | MP-A07 | Named tool selection uses a two-tool counterexample with conflicting prompt preference; a single matching call cannot prove enforcement. Unsupported selectors fail honestly. |
-| MP-A08 | All model calls use the approved OpenRouter boundary; no local inference/embedding endpoint or model fallback exists. Child/reviewer/summary assignments match the snapshotted map, with all 14 defaults resolving to Terra. |
+| MP-A08 | All model calls use the approved OpenRouter boundary; no local inference/embedding endpoint or model fallback exists. All 14 defaults resolve to Terra and freeze in the snapshotted map. In this release a run dispatches through one route, its `executor` binding, and a summarizer that differs pauses it with `route_not_bound` ([Decision 0009](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md)). |
 | MP-A09 | Concurrent admission, retry, child execution and UTC rollover cannot bypass reservations/caps; ambiguous billing stays explicit. |
 | MP-A10 | Restart/replay retains references and receipts without secrets/client serialization; rotation versions remain auditable. |
 | MP-A11 | Browser/network/log/checkpoint/export inspection finds no stored raw keys; workspace/CSRF/version attacks fail; master-key loss never creates plaintext storage. |

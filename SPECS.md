@@ -56,6 +56,19 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 - [EPIC-10: Product qualification and completion](#epic-10-product-qualification-and-completion)
   - [US-10.1: Held-out task, policy and performance qualification](#us-101-held-out-task-policy-and-performance-qualification)
   - [US-10.2: Release traceability and evidence-based completion](#us-102-release-traceability-and-evidence-based-completion)
+- [EPIC-11: Installable release readiness](#epic-11-installable-release-readiness)
+  - [US-11.1: Truthful qualification status](#us-111-truthful-qualification-status)
+  - [US-11.2: Reasoning continuation check](#us-112-reasoning-continuation-check)
+  - [US-11.3: Guarded persistent install, exercised](#us-113-guarded-persistent-install-exercised)
+  - [US-11.4: Run controls on the run page](#us-114-run-controls-on-the-run-page)
+  - [US-11.5: Run list and inspector](#us-115-run-list-and-inspector)
+  - [US-11.6: Model and role choice in Settings](#us-116-model-and-role-choice-in-settings)
+  - [US-11.7: Approval reason and target](#us-117-approval-reason-and-target)
+  - [US-11.8: Operations completeness](#us-118-operations-completeness)
+  - [US-11.9: Run creation disclosure, role map and run details](#us-119-run-creation-disclosure-role-map-and-run-details)
+  - [US-11.10: Real Mac sleep proof](#us-1110-real-mac-sleep-proof)
+  - [US-11.11: Design system migration and final visual evidence](#us-1111-design-system-migration-and-final-visual-evidence)
+  - [US-11.12: Final independent review and Gate 0](#us-1112-final-independent-review-and-gate-0)
 
 ## Work Item Status
 
@@ -196,9 +209,60 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-10.1 | Held-out task, policy and performance qualification | DONE | EPIC-10 |
 | US-10.1#1 | Run the held-out behavioral and policy/recovery suites without tuning on held-out data. | DONE | US-10.1 |
 | US-10.1#2 | Publish per-category outcomes, resource measurements and actual latency/cost evidence. | DONE | US-10.1 |
-| US-10.2 | Release traceability and evidence-based completion | READY | EPIC-10 |
+| US-10.2 | Release traceability and evidence-based completion | BLOCKED | EPIC-10 |
 | US-10.2#1 | Review full source-to-story-to-evidence coverage and resolve blocking findings. | TODO | US-10.2 |
 | US-10.2#2 | Publish exercised operating/user procedures and truthful release limitations. | TODO | US-10.2 |
+| EPIC-11 | Installable release readiness | — | — |
+| US-11.1 | Truthful qualification status | READY | EPIC-11 |
+| US-11.1#1 | Add the per-route qualification record and widen the qualification status contract, with regenerated clients. | TODO | US-11.1 |
+| US-11.1#2 | Record each route's current result from the US-3.4 evidence, with its date, configuration and limits. | TODO | US-11.1 |
+| US-11.1#3 | Show the record in Settings, and correct the goal composer's message and the tests that pin the old text. | TODO | US-11.1 |
+| US-11.2 | Reasoning continuation check | READY | EPIC-11 |
+| US-11.2#1 | Add the deterministic check on the application's continuation path, using a fake transport. | TODO | US-11.2 |
+| US-11.2#2 | Run the capped trial on each enabled route, and record actual cost against the shared cap. | TODO | US-11.2 |
+| US-11.2#3 | Report any loss to the owner, without changing LC-23's text. | TODO | US-11.2 |
+| US-11.3 | Guarded persistent install, exercised | BLOCKED | EPIC-11 |
+| US-11.3#1 | Build the guarded persistent migration apply, with its refusals tested on a disposable target. | TODO | US-11.3 |
+| US-11.3#2 | Choose and record the install's project name, ports, env file and data location outside the repository. | TODO | US-11.3 |
+| US-11.3#3 | Stand up the stack and exercise the runbooks on it, correcting what they say about a persistent stack. | TODO | US-11.3 |
+| US-11.3#4 | Run a real goal under the shared cap, record actual cost, and leave the worker's inference switch off afterward. | TODO | US-11.3 |
+| US-11.4 | Run controls on the run page | READY | EPIC-11 |
+| US-11.4#1 | Add pause, cancel and resume to the run page, using the existing routes and the run's current version. | TODO | US-11.4 |
+| US-11.4#2 | Add owner-only model-call reconciliation, and show each refusal's reason. | TODO | US-11.4 |
+| US-11.4#3 | Cover the controls with browser tests on a disposable stack with a scripted model. | TODO | US-11.4 |
+| US-11.5 | Run list and inspector | READY | EPIC-11 |
+| US-11.5#1 | Add a workspace-scoped run list route and screen. | TODO | US-11.5 |
+| US-11.5#2 | Add a sanitized inspector read model and screen for model calls, tool operation attempts and checkpoints. | TODO | US-11.5 |
+| US-11.5#3 | Cover isolation and the absence of private fields on a disposable stack. | TODO | US-11.5 |
+| US-11.6 | Model and role choice in Settings | READY | EPIC-11 |
+| US-11.6#1 | Add a read of the current policy and its version, as only the write route exists. | TODO | US-11.6 |
+| US-11.6#2 | Add the approved model list, workspace default and role policy to Settings. | TODO | US-11.6 |
+| US-11.6#3 | State the effect of role overrides on the screen, and assert that text in a browser test. | TODO | US-11.6 |
+| US-11.7 | Approval reason and target | READY | EPIC-11 |
+| US-11.7#1 | Persist the policy's reason and the resource target with the approval request. | TODO | US-11.7 |
+| US-11.7#2 | Return both in the approval view, and show them in the inbox. | TODO | US-11.7 |
+| US-11.7#3 | Cover both scenarios in a browser test. | TODO | US-11.7 |
+| US-11.8 | Operations completeness | BLOCKED | EPIC-11 |
+| US-11.8#1 | Record each restore and its verification result where Operations can read it. | TODO | US-11.8 |
+| US-11.8#2 | Add delayed schedules, OpenRouter availability, restore history and qualification evidence to the status contract and screen. | TODO | US-11.8 |
+| US-11.8#3 | Cover both scenarios in a browser test on a disposable stack. | TODO | US-11.8 |
+| US-11.9 | Run creation disclosure, role map and run details | BLOCKED | EPIC-11 |
+| US-11.9#1 | Add the MP-07 disclosure to every run-creation screen. | TODO | US-11.9 |
+| US-11.9#2 | Add a per-run model choice, the complete role map and budgets to the run workspace. | TODO | US-11.9 |
+| US-11.9#3 | Add reported and estimated costs, errors and evidence links to the inspector, and cover all four scenarios in browser tests. | TODO | US-11.9 |
+| US-11.10 | Real Mac sleep proof | BLOCKED | EPIC-11 |
+| US-11.10#1 | Write the sleep procedure, with what to observe before and after. | TODO | US-11.10 |
+| US-11.10#2 | Have the owner run it on a disposable stack with a scripted model, and record the observations. | TODO | US-11.10 |
+| US-11.10#3 | Only if the result requires it, build wake handling and have the owner repeat the test. | TODO | US-11.10 |
+| US-11.11 | Design system migration and final visual evidence | BLOCKED | EPIC-11 |
+| US-11.11#1 | Add the shared form components and move every form to them. | TODO | US-11.11 |
+| US-11.11#2 | Capture both-theme screenshots, measured contrast and axe across all named surfaces. | TODO | US-11.11 |
+| US-11.11#3 | Check keyboard use, zoom and reduced motion, and confirm appearance changes issue no model or task request. | TODO | US-11.11 |
+| US-11.12 | Final independent review and Gate 0 | BLOCKED | EPIC-11 |
+| US-11.12#1 | Bind the final revision's fingerprint and run one independent review of it. | TODO | US-11.12 |
+| US-11.12#2 | Repeat Gate 0 and the harness runbook on that revision, and publish validated evidence. | TODO | US-11.12 |
+| US-11.12#3 | Record a disposition for the 41 minors and open majors, and settle WORKER-INFERENCE-001's status. | TODO | US-11.12 |
+| US-11.12#4 | Mark Claude's crash and timeout hook behavior not qualified, and hand the record to US-10.2's assessment. | TODO | US-11.12 |
 
 ## Dependency Diagram
 
@@ -265,6 +329,20 @@ flowchart TD
   subgraph EPIC_10["EPIC-10: Product qualification and completion"]
     US_10_1["US-10.1: Held-out task, policy and performance qualification"]
     US_10_2["US-10.2: Release traceability and evidence-based completion"]
+  end
+  subgraph EPIC_11["EPIC-11: Installable release readiness"]
+    US_11_1["US-11.1: Truthful qualification status"]
+    US_11_2["US-11.2: Reasoning continuation check"]
+    US_11_3["US-11.3: Guarded persistent install, exercised"]
+    US_11_4["US-11.4: Run controls on the run page"]
+    US_11_5["US-11.5: Run list and inspector"]
+    US_11_6["US-11.6: Model and role choice in Settings"]
+    US_11_7["US-11.7: Approval reason and target"]
+    US_11_8["US-11.8: Operations completeness"]
+    US_11_9["US-11.9: Run creation disclosure, role map and run details"]
+    US_11_10["US-11.10: Real Mac sleep proof"]
+    US_11_11["US-11.11: Design system migration and final visual evidence"]
+    US_11_12["US-11.12: Final independent review and Gate 0"]
   end
   US_1_1 -.-> US_1_2
   US_1_1 -.-> US_1_3
@@ -367,6 +445,57 @@ flowchart TD
   US_9_3 -.-> US_10_1
   US_10_1 -.-> US_10_2
   US_7_2 -.-> US_10_2
+  US_11_12 -.-> US_10_2
+  US_3_2 -.-> US_11_1
+  US_3_4 -.-> US_11_1
+  US_2_6 -.-> US_11_2
+  US_3_4 -.-> US_11_2
+  US_2_1 -.-> US_11_3
+  US_2_4 -.-> US_11_3
+  US_9_1 -.-> US_11_3
+  US_9_2 -.-> US_11_3
+  US_9_3 -.-> US_11_3
+  US_11_2 -.-> US_11_3
+  US_3_3 -.-> US_11_4
+  US_4_6 -.-> US_11_4
+  US_4_7 -.-> US_11_4
+  US_3_3 -.-> US_11_5
+  US_4_2 -.-> US_11_5
+  US_4_4 -.-> US_11_5
+  US_4_6 -.-> US_11_5
+  US_2_6 -.-> US_11_6
+  US_3_2 -.-> US_11_6
+  US_5_3 -.-> US_11_7
+  US_7_1 -.-> US_11_8
+  US_9_1 -.-> US_11_8
+  US_9_2 -.-> US_11_8
+  US_11_1 -.-> US_11_8
+  US_3_3 -.-> US_11_9
+  US_11_5 -.-> US_11_9
+  US_11_6 -.-> US_11_9
+  US_4_7 -.-> US_11_10
+  US_9_1 -.-> US_11_10
+  EXT_US_11_10_1["External: The owner must be present to sleep this Mac during a run, following the written procedure."]
+  EXT_US_11_10_1 -.-> US_11_10
+  US_2_5 -.-> US_11_11
+  US_11_1 -.-> US_11_11
+  US_11_4 -.-> US_11_11
+  US_11_5 -.-> US_11_11
+  US_11_6 -.-> US_11_11
+  US_11_7 -.-> US_11_11
+  US_11_8 -.-> US_11_11
+  US_11_9 -.-> US_11_11
+  US_11_1 -.-> US_11_12
+  US_11_2 -.-> US_11_12
+  US_11_3 -.-> US_11_12
+  US_11_4 -.-> US_11_12
+  US_11_5 -.-> US_11_12
+  US_11_6 -.-> US_11_12
+  US_11_7 -.-> US_11_12
+  US_11_8 -.-> US_11_12
+  US_11_9 -.-> US_11_12
+  US_11_10 -.-> US_11_12
+  US_11_11 -.-> US_11_12
 ```
 
 ```mermaid
@@ -640,6 +769,100 @@ flowchart TD
     US_10_2 --> T_10_2_1
     T_10_2_2["US-10.2#2: Publish exercised operating/user procedures and truthful release limitations."]
     US_10_2 --> T_10_2_2
+  end
+```
+
+```mermaid
+flowchart TD
+  subgraph EPIC_11["EPIC-11 tasks"]
+    US_11_1["US-11.1: Truthful qualification status"]
+    T_11_1_1["US-11.1#1: Add the per-route qualification record and widen the qualification status contract, with regenerated clients."]
+    US_11_1 --> T_11_1_1
+    T_11_1_2["US-11.1#2: Record each route&#x27;s current result from the US-3.4 evidence, with its date, configuration and limits."]
+    US_11_1 --> T_11_1_2
+    T_11_1_3["US-11.1#3: Show the record in Settings, and correct the goal composer&#x27;s message and the tests that pin the old text."]
+    US_11_1 --> T_11_1_3
+    US_11_2["US-11.2: Reasoning continuation check"]
+    T_11_2_1["US-11.2#1: Add the deterministic check on the application&#x27;s continuation path, using a fake transport."]
+    US_11_2 --> T_11_2_1
+    T_11_2_2["US-11.2#2: Run the capped trial on each enabled route, and record actual cost against the shared cap."]
+    US_11_2 --> T_11_2_2
+    T_11_2_3["US-11.2#3: Report any loss to the owner, without changing LC-23&#x27;s text."]
+    US_11_2 --> T_11_2_3
+    US_11_3["US-11.3: Guarded persistent install, exercised"]
+    T_11_3_1["US-11.3#1: Build the guarded persistent migration apply, with its refusals tested on a disposable target."]
+    US_11_3 --> T_11_3_1
+    T_11_3_2["US-11.3#2: Choose and record the install&#x27;s project name, ports, env file and data location outside the repository."]
+    US_11_3 --> T_11_3_2
+    T_11_3_3["US-11.3#3: Stand up the stack and exercise the runbooks on it, correcting what they say about a persistent stack."]
+    US_11_3 --> T_11_3_3
+    T_11_3_4["US-11.3#4: Run a real goal under the shared cap, record actual cost, and leave the worker&#x27;s inference switch off afterward."]
+    US_11_3 --> T_11_3_4
+    US_11_4["US-11.4: Run controls on the run page"]
+    T_11_4_1["US-11.4#1: Add pause, cancel and resume to the run page, using the existing routes and the run&#x27;s current version."]
+    US_11_4 --> T_11_4_1
+    T_11_4_2["US-11.4#2: Add owner-only model-call reconciliation, and show each refusal&#x27;s reason."]
+    US_11_4 --> T_11_4_2
+    T_11_4_3["US-11.4#3: Cover the controls with browser tests on a disposable stack with a scripted model."]
+    US_11_4 --> T_11_4_3
+    US_11_5["US-11.5: Run list and inspector"]
+    T_11_5_1["US-11.5#1: Add a workspace-scoped run list route and screen."]
+    US_11_5 --> T_11_5_1
+    T_11_5_2["US-11.5#2: Add a sanitized inspector read model and screen for model calls, tool operation attempts and checkpoints."]
+    US_11_5 --> T_11_5_2
+    T_11_5_3["US-11.5#3: Cover isolation and the absence of private fields on a disposable stack."]
+    US_11_5 --> T_11_5_3
+    US_11_6["US-11.6: Model and role choice in Settings"]
+    T_11_6_1["US-11.6#1: Add a read of the current policy and its version, as only the write route exists."]
+    US_11_6 --> T_11_6_1
+    T_11_6_2["US-11.6#2: Add the approved model list, workspace default and role policy to Settings."]
+    US_11_6 --> T_11_6_2
+    T_11_6_3["US-11.6#3: State the effect of role overrides on the screen, and assert that text in a browser test."]
+    US_11_6 --> T_11_6_3
+    US_11_7["US-11.7: Approval reason and target"]
+    T_11_7_1["US-11.7#1: Persist the policy&#x27;s reason and the resource target with the approval request."]
+    US_11_7 --> T_11_7_1
+    T_11_7_2["US-11.7#2: Return both in the approval view, and show them in the inbox."]
+    US_11_7 --> T_11_7_2
+    T_11_7_3["US-11.7#3: Cover both scenarios in a browser test."]
+    US_11_7 --> T_11_7_3
+    US_11_8["US-11.8: Operations completeness"]
+    T_11_8_1["US-11.8#1: Record each restore and its verification result where Operations can read it."]
+    US_11_8 --> T_11_8_1
+    T_11_8_2["US-11.8#2: Add delayed schedules, OpenRouter availability, restore history and qualification evidence to the status contract and screen."]
+    US_11_8 --> T_11_8_2
+    T_11_8_3["US-11.8#3: Cover both scenarios in a browser test on a disposable stack."]
+    US_11_8 --> T_11_8_3
+    US_11_9["US-11.9: Run creation disclosure, role map and run details"]
+    T_11_9_1["US-11.9#1: Add the MP-07 disclosure to every run-creation screen."]
+    US_11_9 --> T_11_9_1
+    T_11_9_2["US-11.9#2: Add a per-run model choice, the complete role map and budgets to the run workspace."]
+    US_11_9 --> T_11_9_2
+    T_11_9_3["US-11.9#3: Add reported and estimated costs, errors and evidence links to the inspector, and cover all four scenarios in browser tests."]
+    US_11_9 --> T_11_9_3
+    US_11_10["US-11.10: Real Mac sleep proof"]
+    T_11_10_1["US-11.10#1: Write the sleep procedure, with what to observe before and after."]
+    US_11_10 --> T_11_10_1
+    T_11_10_2["US-11.10#2: Have the owner run it on a disposable stack with a scripted model, and record the observations."]
+    US_11_10 --> T_11_10_2
+    T_11_10_3["US-11.10#3: Only if the result requires it, build wake handling and have the owner repeat the test."]
+    US_11_10 --> T_11_10_3
+    US_11_11["US-11.11: Design system migration and final visual evidence"]
+    T_11_11_1["US-11.11#1: Add the shared form components and move every form to them."]
+    US_11_11 --> T_11_11_1
+    T_11_11_2["US-11.11#2: Capture both-theme screenshots, measured contrast and axe across all named surfaces."]
+    US_11_11 --> T_11_11_2
+    T_11_11_3["US-11.11#3: Check keyboard use, zoom and reduced motion, and confirm appearance changes issue no model or task request."]
+    US_11_11 --> T_11_11_3
+    US_11_12["US-11.12: Final independent review and Gate 0"]
+    T_11_12_1["US-11.12#1: Bind the final revision&#x27;s fingerprint and run one independent review of it."]
+    US_11_12 --> T_11_12_1
+    T_11_12_2["US-11.12#2: Repeat Gate 0 and the harness runbook on that revision, and publish validated evidence."]
+    US_11_12 --> T_11_12_2
+    T_11_12_3["US-11.12#3: Record a disposition for the 41 minors and open majors, and settle WORKER-INFERENCE-001&#x27;s status."]
+    US_11_12 --> T_11_12_3
+    T_11_12_4["US-11.12#4: Mark Claude&#x27;s crash and timeout hook behavior not qualified, and hand the record to US-10.2&#x27;s assessment."]
+    US_11_12 --> T_11_12_4
   end
 ```
 
@@ -2551,7 +2774,7 @@ Open Questions:
 
 ### US-10.2: Release traceability and evidence-based completion
 
-Status: READY
+Status: BLOCKED
 
 As a product owner
 I want a complete requirement-to-evidence record
@@ -2585,6 +2808,7 @@ Scenario: Preserve evidence limits
 Dependencies:
 - US-10.1
 - US-7.2
+- US-11.12
 
 Tasks:
 - [ ] Review full source-to-story-to-evidence coverage and resolve blocking findings.
@@ -2592,4 +2816,657 @@ Tasks:
 
 Open Questions:
 - None.
+
+# EPIC-11: Installable release readiness
+
+Phase reference: B7, preserved SP-020. Scope and spending come from Decision 0009. Routine stories follow Decision 0003, with one independent review of the final code in US-11.12.
+
+### US-11.1: Truthful qualification status
+
+Status: READY
+
+As an operator
+I want each route's qualification stored and shown with its date, configuration and limits
+So that Settings and the goal composer say only what was observed.
+
+Source:
+- [US-10.2 finding B6](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
+- [Decision 0009, B6](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
+- [LC-17](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [Settings screen](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [MP-04 Settings states](PRD-Model-Providers.md#mp-04-settings-flow-and-states)
+- [MP-05 qualification metadata](PRD-Model-Providers.md#mp-05-application-apis-and-authorization)
+- [US-3.4 route results](docs/engineering/evidence/US-3.4/summary.md#outcome)
+- [Decision 0005](docs/engineering/decisions/0005-deepseek-strict-nested-unsupported.md#decision) — DeepSeek's strict nested output stays disabled.
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Show each route's stored qualification
+  Given a durable qualification record for each approved route, with its date, configuration and limits
+  When the API restarts and an owner opens Settings
+  Then each route shows its own status, date, configuration and limits, apart from authentication and catalog status
+
+Scenario: Refuse to infer qualification
+  Given a route with no qualification record and a valid OpenRouter key
+  When Settings loads
+  Then that route reads as not qualified, and neither the key nor an available catalog changes that
+
+Scenario: Correct the goal message
+  Given a goal has been admitted
+  When the composer reports the result
+  Then it says the goal is queued and links the run, and no longer says that no worker runs it or that no model has been called
+```
+
+Dependencies:
+- US-3.2
+- US-3.4
+
+Tasks:
+- [ ] Add the per-route qualification record and widen the qualification status contract, with regenerated clients.
+- [ ] Record each route's current result from the US-3.4 evidence, with its date, configuration and limits.
+- [ ] Show the record in Settings, and correct the goal composer's message and the tests that pin the old text.
+
+Open Questions:
+- None.
+
+### US-11.2: Reasoning continuation check
+
+Status: READY
+
+As an operator
+I want a check and a capped live trial of reasoning metadata across a tool continuation
+So that LC-23 reports what happens instead of assuming it.
+
+Source:
+- [US-10.2 finding B10](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
+- [Decision 0009, B10 and spending](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
+- [LC-23](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [MP-02 reasoning metadata](PRD-Model-Providers.md#mp-02-catalog-and-request-contract)
+- [MP-A06](PRD-Model-Providers.md#mp-09-acceptance-evidence)
+- [Protected reasoning in logs](PRD-LangChain-Deep-Agents.md#122-logs-and-metrics)
+- [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Check the continuation request
+  Given a fake transport replies with reasoning metadata alongside a tool call
+  When the application builds the continuation request
+  Then the check reports survived only when that metadata is sent back with its original content and ordering, and reports dropped when it is dropped or altered
+
+Scenario: Trial each enabled route live
+  Given a route that returns reasoning metadata with a tool call, under Decision 0009's shared US$1 cap
+  When the capped trial continues that tool call through the real route
+  Then the result records the route, date, configuration, reported cost and whether the metadata survived, with no metadata in ordinary logs or activity events
+
+Scenario: Report loss honestly
+  Given a trial where the metadata did not survive, or the route returned none to preserve
+  When the result is recorded
+  Then it is reported as lost or as not exercised, never as survived, LC-23 stays partial and the owner is told
+
+Scenario: Stop at the shared cap
+  Given the spend so far plus the trial's worst-case cost would pass US$1
+  When the trial is about to start
+  Then no request is sent and the work left undone is reported as not run
+```
+
+Dependencies:
+- US-2.6
+- US-3.4
+
+Tasks:
+- [ ] Add the deterministic check on the application's continuation path, using a fake transport.
+- [ ] Run the capped trial on each enabled route, and record actual cost against the shared cap.
+- [ ] Report any loss to the owner, without changing LC-23's text.
+
+Open Questions:
+- None.
+
+### US-11.3: Guarded persistent install, exercised
+
+Status: BLOCKED
+
+As an owner
+I want a guarded migration path and a real persistent install on this Mac
+So that results come from an installation a person keeps, not only from throwaway stacks.
+
+Source:
+- [US-10.2 finding B1](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
+- [Runbooks not yet exercised](docs/engineering/evidence/US-10.2/summary.md#procedures)
+- [Decision 0009, B1 and spending](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
+- [Decision 0009, data stays](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#reversal)
+- [LM-04 addresses](PRD-Local-Mac-Deployment.md#lm-04-local-addresses-and-connection-types)
+- [LM-07 persistence](PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
+- [LM-A01, LM-A02 and LM-A04](PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
+- [LC-27](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [MP-A12](PRD-Model-Providers.md#mp-09-acceptance-evidence)
+- [Local shutdown, backup and upgrades](PRD-LangChain-Deep-Agents.md#105-local-shutdown-backup-restore-and-upgrades)
+- [DH-07 target guards](PRD-Development-Harness.md#dh-07-supabase-migrations-seeds-and-database-quality)
+- [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
+- [SP-018](docs/engineering/option-b-contract.md#sp-018--local-operations-and-runbooks)
+- [Operations runbook start](docs/engineering/runbooks/operations.md#start)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Refuse the wrong target
+  Given a target that is not the identified persistent install, or a request to reset that install
+  When the guarded apply runs
+  Then it refuses before any change, and nothing is migrated, reset or removed
+
+Scenario: Stand up beside other projects
+  Given other projects' Docker stacks are present on this Mac
+  When the install starts on its own loopback ports and its migrations apply through the guarded path
+  Then readiness is verified, its live listeners are only its recorded loopback bindings, and other projects' containers, ports and volumes are unchanged
+
+Scenario: Exercise the runbooks on the install
+  Given the running install, with an owner, a finished run and a published artifact
+  When the local Supabase, local app, operations, backup and upgrade runbooks are followed on it, including stop and start
+  Then each observed step is recorded, the owner, run, artifact bytes and volumes survive stop and start, a backup restores into an isolated instance, and any step not exercised is listed as not exercised
+
+Scenario: Run a real goal under the shared cap
+  Given inference is on, and the shared US$1 cap's remainder covers the goal's worst-case cost
+  When the owner's goal runs on OpenRouter through the install's API and worker
+  Then its actual outcome, reported cost and the running total are recorded whether it succeeded or failed, and no goal starts whose worst-case cost would take the total past US$1
+```
+
+Dependencies:
+- US-2.1
+- US-2.4
+- US-9.1
+- US-9.2
+- US-9.3
+- US-11.2
+
+Tasks:
+- [ ] Build the guarded persistent migration apply, with its refusals tested on a disposable target.
+- [ ] Choose and record the install's project name, ports, env file and data location outside the repository.
+- [ ] Stand up the stack and exercise the runbooks on it, correcting what they say about a persistent stack.
+- [ ] Run a real goal under the shared cap, record actual cost, and leave the worker's inference switch off afterward.
+
+Open Questions:
+- None.
+
+### US-11.4: Run controls on the run page
+
+Status: READY
+
+As a user
+I want pause, cancel, resume and model-call reconciliation on the run page
+So that a person can control a run without calling the API.
+
+Source:
+- [US-10.2 finding B9](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
+- [Decision 0009, B9](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
+- [PRD 10.3 pause, cancel and resume](PRD-LangChain-Deep-Agents.md#103-pause-cancel-and-resume)
+- [LC-08 and LC-11](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [MP-08 uncertain calls](PRD-Model-Providers.md#mp-08-failure-and-recovery)
+- [SP-010](docs/engineering/option-b-contract.md#sp-010--canonical-run-states-and-transitions)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Control a run from its page
+  Given a running run on a disposable stack with a scripted model
+  When a person pauses it, resumes it and then cancels it from the run page
+  Then the page shows each resulting state in text, and it matches the state the API reports
+
+Scenario: Offer no control a terminal run can't take
+  Given a succeeded, failed or cancelled run
+  When the run page loads
+  Then it offers no pause, resume or cancel, and nothing on the page can reopen the run
+
+Scenario: Refuse resume until a call is reconciled
+  Given a paused run with an uncertain model call
+  When a person presses resume
+  Then the page shows the refusal and its reason, the run stays paused, and no model call starts
+
+Scenario: Reconcile an uncertain call
+  Given a paused run with an uncertain model call
+  When the owner enters the charge seen in the provider's own records
+  Then that charge is recorded against the call, and resume is accepted once no uncertain call remains
+```
+
+Dependencies:
+- US-3.3
+- US-4.6
+- US-4.7
+
+Tasks:
+- [ ] Add pause, cancel and resume to the run page, using the existing routes and the run's current version.
+- [ ] Add owner-only model-call reconciliation, and show each refusal's reason.
+- [ ] Cover the controls with browser tests on a disposable stack with a scripted model.
+
+Open Questions:
+- None.
+
+### US-11.5: Run list and inspector
+
+Status: READY
+
+As a user
+I want a list of my workspace's runs and an inspector for each
+So that I can find a run and see what it used, attempted and saved.
+
+Source:
+- [US-10.2 finding B3](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
+- [Decision 0009, B3](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
+- [PRD 12.1 run inspector](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [PRD 12.2 frozen identity and upstream provider](PRD-LangChain-Deep-Agents.md#122-logs-and-metrics)
+- [LC-19 and LC-20](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [MP-02 upstream provider](PRD-Model-Providers.md#mp-02-catalog-and-request-contract)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: List this workspace's runs
+  Given this workspace and another each have runs, and no OpenRouter key is configured
+  When a person opens the run list
+  Then it shows only this workspace's runs with their states and links, and no run starts
+
+Scenario: Inspect a run
+  Given a finished run with model calls, tool operations and checkpoints
+  When a person opens its inspector
+  Then it shows each call's role, token counts and provider, canonical and wire identity, the upstream provider or unknown, each tool operation attempt and the run's checkpoints, with no raw checkpoint state, reasoning metadata or key
+
+Scenario: Refuse another workspace's run
+  Given a run in another workspace
+  When a person requests its inspector
+  Then the request is refused and none of that run's data appears
+```
+
+Dependencies:
+- US-3.3
+- US-4.2
+- US-4.4
+- US-4.6
+
+Tasks:
+- [ ] Add a workspace-scoped run list route and screen.
+- [ ] Add a sanitized inspector read model and screen for model calls, tool operation attempts and checkpoints.
+- [ ] Cover isolation and the absence of private fields on a disposable stack.
+
+Open Questions:
+- None.
+
+### US-11.6: Model and role choice in Settings
+
+Status: READY
+
+As a workspace owner
+I want to see the approved models and set the workspace default and role policy
+So that I can choose a model and know what that choice does in this release.
+
+Source:
+- [US-10.2 finding B3](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
+- [Decision 0009, revised role requirements](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#requirements-revised)
+- [Decision 0009, role overrides](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#what-this-gives-up)
+- [PRD 12.1 Settings](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [LC-01 and LC-25](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [MP-05 policy route](PRD-Model-Providers.md#mp-05-application-apis-and-authorization)
+- [MP-A08](PRD-Model-Providers.md#mp-09-acceptance-evidence)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Choose the workspace default
+  Given an owner on Settings, which lists each approved model's canonical and wire identity
+  When the owner saves a different workspace default
+  Then a new run freezes that choice, and a run already admitted keeps its bindings
+
+Scenario: Say what a role override does
+  Given an effective policy whose executor and another role differ, including when only the executor was overridden
+  When the screen shows that policy
+  Then it says only the executor's binding dispatches in this release, other differing roles don't take effect, and a summarizer that differs pauses the run with route_not_bound
+
+Scenario: Refuse a stale save
+  Given the policy changed after the screen loaded
+  When the owner saves
+  Then the save is refused with a reload message, and the stored policy is unchanged
+```
+
+Dependencies:
+- US-2.6
+- US-3.2
+
+Tasks:
+- [ ] Add a read of the current policy and its version, as only the write route exists.
+- [ ] Add the approved model list, workspace default and role policy to Settings.
+- [ ] State the effect of role overrides on the screen, and assert that text in a browser test.
+
+Open Questions:
+- None.
+
+### US-11.7: Approval reason and target
+
+Status: READY
+
+As a reviewer
+I want each approval to show the policy's reason and its target
+So that I know what the action touches and why it is asking me.
+
+Source:
+- [US-10.2 finding B3](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
+- [Decision 0009, B3 and the approval reason](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
+- [PRD 12.1 approval inbox](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [PRD 9.2 approval request](PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
+- [LC-10](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Show the policy's reason and the target
+  Given a pending approval whose request records the policy's reason and a resource target
+  When the reviewer opens the inbox
+  Then both appear as text with the exact proposed action and expiry, and the reason comes from the server's policy, not from model output
+
+Scenario: Don't invent what wasn't recorded
+  Given a pending approval saved before these fields existed
+  When the reviewer opens the inbox
+  Then it says which is not recorded, and any decision stays bound to the argument hash the reviewer saw
+```
+
+Dependencies:
+- US-5.3
+
+Tasks:
+- [ ] Persist the policy's reason and the resource target with the approval request.
+- [ ] Return both in the approval view, and show them in the inbox.
+- [ ] Cover both scenarios in a browser test.
+
+Open Questions:
+- None.
+
+### US-11.8: Operations completeness
+
+Status: BLOCKED
+
+As an operator
+I want delayed schedules, OpenRouter availability, restore history and qualification evidence in Operations
+So that the local install's state can be read in one place.
+
+Source:
+- [US-10.2 finding B3](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
+- [Decision 0009, B3](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
+- [PRD 12.1 Operations](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [PRD 10.4 missed occurrences](PRD-LangChain-Deep-Agents.md#104-routines-and-scheduled-work)
+- [PRD 10.5 restore](PRD-LangChain-Deep-Agents.md#105-local-shutdown-backup-restore-and-upgrades)
+- [LC-15 and LC-17](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [LM-07 network loss](PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
+- [SP-018](docs/engineering/option-b-contract.md#sp-018--local-operations-and-runbooks)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Show the four missing facts
+  Given a delayed routine occurrence, a known OpenRouter status, a verified restore and a stored qualification record
+  When an operator opens Operations
+  Then it shows the delayed schedule, OpenRouter availability, the restore's date and result, and each route's qualification date and limits, with no address, path, identifier or secret
+
+Scenario: Say what is unknown or unavailable
+  Given no restore has been recorded and OpenRouter can't be reached
+  When Operations loads
+  Then it says none is recorded and OpenRouter is unavailable, the page stays usable, and no model call is made
+```
+
+Dependencies:
+- US-7.1
+- US-9.1
+- US-9.2
+- US-11.1
+
+Tasks:
+- [ ] Record each restore and its verification result where Operations can read it.
+- [ ] Add delayed schedules, OpenRouter availability, restore history and qualification evidence to the status contract and screen.
+- [ ] Cover both scenarios in a browser test on a disposable stack.
+
+Open Questions:
+- None.
+
+### US-11.9: Run creation disclosure, role map and run details
+
+Status: BLOCKED
+
+As a user
+I want to see what a run will use, send and spend before I start it, and its full details afterward
+So that starting a cloud run is an informed choice and its cost and errors can be read.
+
+Source:
+- [US-10.2 finding B3](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
+- [Decision 0009, run screens](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
+- [PRD 12.1 run workspace and inspector](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [MP-07 budgets and disclosure](PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
+- [LC-01 and LC-20](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Disclose before starting
+  Given a person composing a goal on any screen that creates a run
+  When the form is shown
+  Then it states the selected model and roles, the budget and the categories of data sent to OpenRouter, and nothing is sent until the person presses Run
+
+Scenario: Choose a model for one run
+  Given the two approved models
+  When a person picks the other one for a single run
+  Then that run freezes the choice, the workspace default is unchanged, and the run workspace shows the complete effective role map and says only the executor's binding dispatches in this release
+
+Scenario: Read budgets, costs and errors
+  Given a finished run with reported charges and a failed call
+  When a person opens the run workspace and its inspector
+  Then the workspace shows token and spend budgets, and the inspector shows reported and estimated costs labeled apart, errors and evidence links, with no private reasoning or key
+
+Scenario: Refuse an unapproved model
+  Given a run request naming a model that isn't approved
+  When it is submitted
+  Then it is refused, no run starts and the draft is kept
+```
+
+Dependencies:
+- US-3.3
+- US-11.5
+- US-11.6
+
+Tasks:
+- [ ] Add the MP-07 disclosure to every run-creation screen.
+- [ ] Add a per-run model choice, the complete role map and budgets to the run workspace.
+- [ ] Add reported and estimated costs, errors and evidence links to the inspector, and cover all four scenarios in browser tests.
+
+Open Questions:
+- None.
+
+### US-11.10: Real Mac sleep proof
+
+Status: BLOCKED
+
+As an owner
+I want this Mac put to sleep during a run, following a written procedure
+So that recovery after sleep is observed rather than stood in for by SIGSTOP.
+
+Source:
+- [US-10.2 finding B2](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
+- [Decision 0009, B2](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
+- [LC-31](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [PRD 10.5 Mac sleep](PRD-LangChain-Deep-Agents.md#105-local-shutdown-backup-restore-and-upgrades)
+- [LM-07 interruptions](PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
+- [LM-A07](PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
+- [SP-012](docs/engineering/option-b-contract.md#sp-012--durable-job-ownership-and-recovery)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Observe one real sleep
+  Given a disposable stack with a scripted model, a run in progress and the written procedure
+  When the owner sleeps this Mac once and wakes it
+  Then the record states what was observed for run status, receipts and reservations, whether any call was redispatched or effect duplicated, and that a real sleep was used, not SIGSTOP
+
+Scenario: Build wake handling only if the test shows it's needed
+  Given the observed sleep's result
+  When it is assessed against LC-31 and LM-A07
+  Then a blind redispatch, duplicate effect, false status or stranded run is recorded as a failure and wake handling is built in this story, and otherwise none is built and the limit is recorded
+
+Scenario: Prove a fix under real sleep
+  Given wake handling had to be built
+  When the owner sleeps this Mac a second time under the same procedure
+  Then the failure is shown to be gone under real sleep, and SIGSTOP alone doesn't complete this story
+```
+
+Dependencies:
+- US-4.7
+- US-9.1
+- External: The owner must be present to sleep this Mac during a run, following the written procedure.
+
+Tasks:
+- [ ] Write the sleep procedure, with what to observe before and after.
+- [ ] Have the owner run it on a disposable stack with a scripted model, and record the observations.
+- [ ] Only if the result requires it, build wake handling and have the owner repeat the test.
+
+Open Questions:
+- None.
+
+### US-11.11: Design system migration and final visual evidence
+
+Status: BLOCKED
+
+As a user
+I want forms on shared components and the final screens measured in both themes
+So that design claims rest on the screens as they ship.
+
+Source:
+- [US-10.2 finding B7](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
+- [Decision 0009, B7](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
+- [DS-03 named surfaces](PRD-Design-System.md#ds-03--apply-semantic-tokens-across-the-whole-ui)
+- [DS-04 usability](PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
+- [DS-05 evidence](PRD-Design-System.md#ds-05--verification-and-design-evidence)
+- [LC-34](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [PRD 12.1.1 theme behavior](PRD-LangChain-Deep-Agents.md#1211-luma-design-and-theme-behavior)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Move forms to shared components
+  Given the web app's forms
+  When each is checked after the migration
+  Then its controls come from the shared components and use the input, border and ring tokens with visible keyboard focus
+
+Scenario: Capture every named surface once
+  Given the screens are final
+  When every DS-03 surface in use, including sign-in and key setup, is captured in dark and light
+  Then each has a retained screenshot, contrast measured in its actual states and an axe result, under docs/engineering/evidence/US-11.11/ with the revision they came from
+
+Scenario: Report what fails or is missing
+  Given a surface fails contrast or axe, or a named surface doesn't exist
+  When the evidence is reviewed
+  Then the failure or absence is recorded, the pairing, focus, label or structure is corrected first, and any token change is a recorded proposal rather than a silent substitution
+```
+
+Dependencies:
+- US-2.5
+- US-11.1
+- US-11.4
+- US-11.5
+- US-11.6
+- US-11.7
+- US-11.8
+- US-11.9
+
+Tasks:
+- [ ] Add the shared form components and move every form to them.
+- [ ] Capture both-theme screenshots, measured contrast and axe across all named surfaces.
+- [ ] Check keyboard use, zoom and reduced motion, and confirm appearance changes issue no model or task request.
+
+Open Questions:
+- NEEDS CLARIFICATION: The design PRD asks for accessible contrast and names no ratio. Is WCAG 2.1 AA, which the browser suites' axe checks already apply, the pass line?
+
+### US-11.12: Final independent review and Gate 0
+
+Status: BLOCKED
+
+As an owner
+I want one independent review of the final code that repeats Gate 0 and settles open findings
+So that review and harness claims rest on the revision being released.
+
+Source:
+- [US-10.2 findings B4 and B5](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
+- [Gate 0 approval void](docs/engineering/evidence/US-10.2/summary.md#dh-development-harness)
+- [Decision 0009, B4 and B5](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
+- [Decision 0009, revised LC-33 and DH-W03](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#requirements-revised)
+- [Decision 0003](docs/engineering/decisions/0003-openspec-only-delivery.md#decision)
+- [LC-32 and LC-33](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [DH-W03](PRD-Development-Harness.md#dh-091-work-item-evidence-contract)
+- [DH-A03 and DH-A13](PRD-Development-Harness.md#dh-10-acceptance-and-closure)
+- [The 41 minors](docs/engineering/evidence/REVIEW-US-5.1-to-US-9.3/review-r1.md#minors)
+- [The majors](docs/engineering/evidence/REVIEW-US-5.1-to-US-9.3/review-r1.md#majors)
+- [Owner decisions on majors](docs/engineering/evidence/REVIEW-US-5.1-to-US-9.3/fixes-majors.md#decisions-for-the-owner)
+- [WORKER-INFERENCE-001 review](docs/engineering/work-items/WORKER-INFERENCE-001.md#review)
+- [SP-002](docs/engineering/option-b-contract.md#sp-002--h1-prove-and-enable-the-baseline)
+- [SP-021](docs/engineering/option-b-contract.md#sp-021--completion-contract)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Review the final code and repeat Gate 0
+  Given the final code of every EPIC-11 story, bound to a fingerprint, and a reviewer who did not author it
+  When the reviewer inspects it, and Gate 0's checks and the harness runbook are repeated on that revision
+  Then findings, dispositions and commands are recorded under docs/engineering/evidence/US-11.12/, scripts/evidence.py validates them, and the record leaves H1 and product acceptance to be assessed afterward
+
+Scenario: Settle what earlier reviews left open
+  Given the 41 minors, majors M8, M30, M32 and M33, and WORKER-INFERENCE-001
+  When the review's dispositions are recorded
+  Then each has a stated outcome, M30 cites Decision 0009, and WORKER-INFERENCE-001 has a status backed by its evidence
+
+Scenario: Refuse a stale or unresolved result
+  Given a blocking finding is open, or a source changed after the reviewed fingerprint
+  When the story is assessed
+  Then it does not complete until the finding is resolved, the affected scope is reviewed again and the fingerprint is bound anew
+
+Scenario: Mark the hook behavior not qualified
+  Given Claude's crash and timeout hook behavior has not been qualified
+  When the Gate 0 report is published
+  Then it marks that behavior not qualified, and script fixtures are not reported as actual event delivery
+```
+
+Dependencies:
+- US-11.1
+- US-11.2
+- US-11.3
+- US-11.4
+- US-11.5
+- US-11.6
+- US-11.7
+- US-11.8
+- US-11.9
+- US-11.10
+- US-11.11
+
+Tasks:
+- [ ] Bind the final revision's fingerprint and run one independent review of it.
+- [ ] Repeat Gate 0 and the harness runbook on that revision, and publish validated evidence.
+- [ ] Record a disposition for the 41 minors and open majors, and settle WORKER-INFERENCE-001's status.
+- [ ] Mark Claude's crash and timeout hook behavior not qualified, and hand the record to US-10.2's assessment.
+
+Open Questions:
+- NEEDS CLARIFICATION: M8. Should members be able to choose an earlier Expert version at all? The fix chose owner-only.
+- NEEDS CLARIFICATION: M32. Is to_version 0 accepted as the interface for "no active version"?
+- NEEDS CLARIFICATION: M33. Are a reviewer's own text checks enough to gate promotion for now?
+- NEEDS CLARIFICATION: WORKER-INFERENCE-001. Should rate_limited and provider_error fail a run after their retries, or pause it?
 

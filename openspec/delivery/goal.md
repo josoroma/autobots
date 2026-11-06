@@ -10,8 +10,8 @@ markers are preserved across refreshes.
 | Target | EPIC-10 |
 | Kind | epic |
 | Focus | - |
-| Status | ACTIVE |
-| Reason | - |
+| Status | STOPPED |
+| Reason | stopped on request |
 | Started | 2026-11-06 |
 | Updated | 2026-11-06 |
 
@@ -20,16 +20,16 @@ markers are preserved across refreshes.
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
 | 1 | US-10.1 | us-10-1-held-out-task-policy | DONE | Held-out task, policy and performance qualification |
-| 2 | US-10.2 | us-10-2-release-traceability-evidence-based | READY | Release traceability and evidence-based completion |
+| 2 | US-10.2 | us-10-2-release-traceability-evidence-based | BLOCKED | Release traceability and evidence-based completion |
 
 ## Next Action
 
-Action: select
+Action: escalate
 Story: US-10.2
 Change: us-10-2-release-traceability-evidence-based
-Owner: main-session
-Command: openspec new change us-10-2-release-traceability-evidence-based; set US-10.2 to IN PROGRESS with a Change: line
-Reason: US-10.2 is READY and has no OpenSpec change
+Owner: human
+Command: resolve US-10.2 in SPECS.md (a product decision is required)
+Reason: US-10.2 is BLOCKED, not READY
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

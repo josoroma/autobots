@@ -721,6 +721,8 @@ Persist monotonically increasing sequence numbers per run. Clients deduplicate b
 
 ### 12.1 Required screens
 
+**Revised for this release by [Decision 0009](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md):** chat, routines, memory, improvements, skill and knowledge versions, and an Expert test run are later scope, and their API routes stay where they exist. The rest of this list is required.
+
 1. **Home/Experts:** local owner sign-in, coordinator entry point, direct Expert conversations, application/provider readiness. Missing OpenRouter setup leaves local files/history/Settings usable while clearly blocking inference.
 2. **Expert editor:** instructions, model-role mapping, tool/app grants, skill/knowledge versions, routines, test run.
 3. **Run workspace:** chat, goal/criteria, model/profile picker and complete effective role map, plan, delegated assignments, artifact list, status and token/spend budgets. Draft restoration never automatically starts a cloud run.
@@ -754,7 +756,7 @@ Hosted LangSmith tracing and other remote observability services are outside thi
 
 | ID | Requirement | Acceptance evidence |
 |---|---|---|
-| LC-01 | Every initial role uses `openrouter_terra`; every call uses an approved explicit binding | All 14 role defaults and precedence fixtures pass; coordinator, summaries, specialists, judges, and memory jobs use only the two OpenRouter registry entries |
+| LC-01 | Every initial role uses `openrouter_terra`; every call uses an approved explicit binding | All 14 role defaults and precedence fixtures pass; coordinator, summaries, specialists, judges, and memory jobs use only the two OpenRouter registry entries. In this release a run dispatches through one route, its `executor` binding, and a summarizer that differs pauses it with `route_not_bound` ([Decision 0009](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md)) |
 | LC-02 | Persistent configurable Experts | New session uses chosen revision; in-flight run keeps old revision |
 | LC-03 | Goal/criteria captured | User can inspect original request and normalized criteria before and after compaction |
 | LC-04 | Bounded planner/executor loop | Budget exhaustion stops dispatch across descendants and returns partial results |
@@ -769,8 +771,8 @@ Hosted LangSmith tracing and other remote observability services are outside thi
 | LC-13 | Event reconnect works | Disconnect/reconnect reconstructs plan, approvals, artifacts, and status without gaps/duplicates |
 | LC-14 | Workflow subset behaves predictably | Branch/foreach/join fixtures preserve emissions and node-instance identity |
 | LC-15 | Routines deduplicate | Duplicate trigger yields one occurrence; host downtime follows documented missed policy |
-| LC-16 | Memory is scoped/versioned | One workspace/user cannot read another's memory; promotion has provenance and rollback |
-| LC-17 | Provider/model capability status is honest | Authentication, catalog support, and runtime/task qualification remain distinct; unqualified features are disabled with test date/config visible |
+| LC-16 | Memory is scoped/versioned | One workspace cannot read another's memory; promotion has provenance and rollback. Separation between users in a workspace is later scope ([Decision 0009](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md)) |
+| LC-17 | Provider/model capability status is honest | Authentication, catalog support, and runtime/task qualification remain distinct; application code doesn't request an unqualified feature, enforced by a test, with test date/config visible ([Decision 0009](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md)) |
 | LC-18 | Secrets remain server-side | Prompt/event/artifact scans and connector tests reveal no secret values |
 | LC-19 | Provider identity and routing stay explicit | Exact canonical/wire mappings, five-minute catalog preflight, no batch/Pro/router substitution, no implicit fallback; matches MP-A05/08 |
 | LC-20 | Missing-key setup preserves user intent | All inference returns `credentials_required`; local UI/files/history/Settings stay usable; setup preserves draft/selection, validates without paid generation, and never auto-launches; matches MP-A02/04 |
@@ -778,15 +780,15 @@ Hosted LangSmith tracing and other remote observability services are outside thi
 | LC-22 | Credentials never enter durable agent state | Rotation/restart/replay use current authorized credential version; checkpoint/client/trace/export scans reveal no secret; matches MP-A10/11 |
 | LC-23 | OpenRouter tool and reasoning continuation is lossless | Two-tool named-choice counterexample, required/auto selection, fragmented SSE, schema validation, preserved reasoning metadata, and resume tests pass; matches MP-A06/07 |
 | LC-24 | Cloud costs and failures are bounded | Concurrent child/retry reservations, UTC rollover, 401/402/429/5xx, truncation, cancellation, and uncertain-charge tests pass; matches MP-A09 |
-| LC-25 | Every model-backed middleware and child uses the provider factory | Instrumented dispatch inventory matches every snapshotted role, including compaction and background learning; no SDK implicit model appears |
+| LC-25 | Every model-backed middleware and child uses the provider factory | Instrumented dispatch inventory matches every role that dispatches in this release, the `executor` and a matching `summarizer` ([Decision 0009](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md)), including compaction and background learning; no SDK implicit model appears |
 | LC-26 | Provider-specific generation options are validated | Terra receives no unadvertised sampler/parallel-tool flags or reasoning-off; unsupported required schema/tool capability blocks before dispatch |
 | LC-27 | Application services/data remain on this Mac | Runtime configuration and socket checks show native UI/API/workers plus local Supabase Compose; no hosted application/database/Auth/Storage/tracing endpoint or secondary primary database; Studio AI and inherited remote tracing are disabled |
 | LC-28 | Local Auth and RLS enforce ownership | Owner bootstrap/sign-in works; public signup is disabled; forged/expired tokens, cross-workspace queries and private-schema REST/Realtime access fail |
-| LC-29 | LangGraph uses scoped direct local SQL | Worker/checkpointer/store integration passes in `agent_runtime`; grants/search_path/migrations are verified; queue fencing works without PostgREST or Realtime |
+| LC-29 | LangGraph uses scoped direct local SQL | Worker/checkpointer integration passes in `agent_runtime`, with a LangGraph store later scope ([Decision 0009](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md)); grants/search_path/migrations are verified; queue fencing works without PostgREST or Realtime |
 | LC-30 | Private local artifacts persist and stay scoped | Container restart retains objects, cross-workspace reads fail, privileged service operations check ownership, and metadata/file mismatch is reconciled |
 | LC-31 | Local restore and sleep recovery are demonstrated | Isolated restore verifies Auth, DB, file hashes, encrypted credential access and checkpoints; wake/restart causes no blind paid replay or duplicate effect |
 | LC-32 | Development harness is the prerequisite for product work | H0 foundation and H1 activated baseline pass the normative harness acceptance suite in a disposable local project; portable runner works independently of Claude, deliberate violations fail, and no persistent database reset occurs |
-| LC-33 | Every work item has a proportionate delivery record | Plan, implementation, independent review/disposition, final verification and exercised runbook/evidence records follow SPECS.md and the harness contract; required failures or unavailable checks prevent completion |
+| LC-33 | Every work item has a proportionate delivery record | Plan, implementation, final verification and exercised runbook/evidence records follow SPECS.md and the harness contract, with one independent review and disposition of the final code before a release ([Decision 0009](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md)); required failures or unavailable checks prevent completion |
 | LC-34 | Shared shadcn Luma interface defaults to dark | DS-01–DS-05: exact tokens, fresh-visit dark behavior under both OS preferences, persisted explicit light/dark before paint, accessible key flows in both modes and revision-bound visual evidence |
 
 The shared [development harness acceptance suite](./PRD-Development-Harness.md), [provider acceptance suite](./PRD-Model-Providers.md), [local deployment acceptance suite](./PRD-Local-Mac-Deployment.md), and [design-system requirements](./PRD-Design-System.md) are mandatory in addition to LC-01–LC-34. These tables define work to implement and verify, not passing test results.
