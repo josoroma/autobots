@@ -27,7 +27,11 @@ MAX_PATH_BYTES = 4096
 DEADLINE_SECONDS = 9.0
 DEADLINE_OVERRIDE = 'AUTOBOTS_HOOK_DEADLINE_SECONDS'
 DIAGNOSTIC_TIMEOUT = 3.0
+GIT_TIMEOUT = 2.0
+WORKTREES = Path('.claude/worktrees')
 SUPPORTED_TOOLS = {'Read', 'Write', 'Edit', 'MultiEdit', 'Bash'}
+EDIT_TOOLS = {'Write', 'Edit', 'MultiEdit'}
+UNKNOWN_ROOT = 'Git could not say which checkout this session is in, so nothing was judged against it.'
 RUFF = Path('services/agent/.venv/bin/ruff')
 
 
@@ -48,6 +52,44 @@ def resolve_path(root: Path, raw: object) -> Path | None:
         return (root / path).resolve() if not path.is_absolute() else path.resolve()
     except (OSError, RuntimeError, ValueError):  # Python 3.12 raises RuntimeError on a symlink loop.
         return None
+
+
+def registered_worktrees(home: Path) -> list[Path]:
+    """Live worktrees Git has registered for this checkout's repository. Raises if Git cannot answer."""
+    # The allowlisted environment drops GIT_DIR and the like, and the ceiling stops Git searching above `home`.
+    result = subprocess.run(['git', 'worktree', 'list', '--porcelain', '-z'], cwd=home,
+                            env={**reduced_env(), 'GIT_CEILING_DIRECTORIES': str(home.parent)},
+                            stdin=subprocess.DEVNULL, capture_output=True, timeout=GIT_TIMEOUT, check=True)
+    worktrees = []
+    for record in result.stdout.decode('utf-8', 'surrogateescape').split('\0\0'):
+        first, *attributes = record.split('\0')
+        if first.startswith('worktree ') and not {'bare', 'prunable'}.intersection(
+                attribute.partition(' ')[0] for attribute in attributes):
+            worktrees.append(Path(first.removeprefix('worktree ')))
+    return worktrees
+
+
+def session_root(home: Path, raw_cwd: object) -> Path | None:
+    """The registered worktree under `home` holding the session, `home`, or None if Git cannot answer.
+
+    `cwd` is hook input and follows `cd`, so it selects only among worktrees Git registered strictly
+    inside `.claude/worktrees`. No value selects a root permitting an edit `home` would refuse. It does
+    choose whose reports `Stop` reads. None is not `home`: the session may be in a worktree, and `home`
+    would be wider than that.
+    """
+    cwd = resolve_path(home, raw_cwd)
+    place = home / WORKTREES
+    if cwd is None or not cwd.is_relative_to(place):
+        return home  # Every event in the main checkout lands here, and pays for no Git process.
+    try:
+        worktrees = registered_worktrees(home)
+    except TimeoutError:  # The dispatcher's own deadline, which must still block.
+        raise
+    except (subprocess.SubprocessError, OSError):
+        return None
+    # `cwd` is canonical, so a registered path since swapped for a link cannot hold it.
+    held_by = [path for path in worktrees if place in path.parents and cwd.is_relative_to(path) and path.is_dir()]
+    return max(held_by, key=lambda path: len(path.parts), default=home)
 
 
 def guard(root: Path, tool: str, value: dict) -> str | None:
@@ -117,7 +159,8 @@ def post_edit_diagnostic(root: Path, raw: object) -> str:
     return diagnostic
 
 
-def handle(root: Path, payload: dict) -> dict:
+def handle(home: Path, payload: dict) -> dict:
+    """Only events that judge a checkout ask Git, and none exits 2 for it: `Bash` must stay usable, and `Stop` must end."""
     event = payload.get('hook_event_name')
     if event == 'SessionStart':
         return {'hookSpecificOutput': {'hookEventName': event, 'additionalContext':
@@ -127,7 +170,8 @@ def handle(root: Path, payload: dict) -> dict:
         tool, value = payload.get('tool_name'), payload.get('tool_input')
         if tool not in SUPPORTED_TOOLS or not isinstance(value, dict):
             raise ValueError('Invalid tool input envelope')
-        reason = guard(root, tool, value)
+        root = session_root(home, payload.get('cwd')) if tool in EDIT_TOOLS else home
+        reason = guard(root, tool, value) if root else f'{UNKNOWN_ROOT} Edits are refused until it can.'
         if reason:
             return {'hookSpecificOutput': {'hookEventName': event,
                     'permissionDecision': 'deny', 'permissionDecisionReason': reason}}
@@ -135,9 +179,12 @@ def handle(root: Path, payload: dict) -> dict:
     if event == 'PostToolUse':
         value = payload.get('tool_input', {})
         raw = value.get('file_path') if isinstance(value, dict) else None
-        return {'hookSpecificOutput': {'hookEventName': event, 'additionalContext': post_edit_diagnostic(root, raw)}}
+        root = session_root(home, payload.get('cwd'))
+        return {'hookSpecificOutput': {'hookEventName': event, 'additionalContext':
+                post_edit_diagnostic(root, raw) if root else UNKNOWN_ROOT}}
     if event == 'Stop':
-        passed, reason = evidence_state(root)
+        root = session_root(home, payload.get('cwd'))
+        passed, reason = evidence_state(root) if root else (False, UNKNOWN_ROOT)
         if payload.get('stop_hook_active') is True:
             return {'systemMessage': reason + ' No repeat completion block; report any remaining limitation honestly.'}
         if not passed:
