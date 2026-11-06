@@ -14,6 +14,7 @@ from pydantic import SecretStr
 sys.path.insert(0, str(Path(__file__).parent))
 from goal_loop_script import DONE_A, ROUTE, SAVE, TASK_A, Script, calls, say  # noqa: E402
 
+from autobots.adapters.loop_middleware import ModelRoute  # noqa: E402
 from autobots.adapters.object_storage import SupabaseObjectStore  # noqa: E402
 from autobots.application.goal_loop import LoopConfig, process_next  # noqa: E402
 from autobots.operations.logs import configure_logging, forbid_remote_tracing, log_event  # noqa: E402
@@ -51,9 +52,11 @@ async def main() -> None:
     install_signal_handlers(stop)
 
     store = SupabaseObjectStore(os.environ['AUTOBOTS_STORAGE_BASE'], SecretStr(os.environ['AUTOBOTS_STORAGE_SERVICE']))
+    # This fixture has one route, where the real worker binds each run's own. A saved run keeps its model.
+    route = ModelRoute(ROUTE.role, os.environ.get('AUTOBOTS_TEST_ROUTE_PROFILE', ROUTE.profile), ROUTE.wire_id, ROUTE.worst_case_micro_usd)
 
     async def step(connection: Any) -> bool:
-        result = await process_next(connection, URL, NAME, script, LoopConfig(route=ROUTE, object_store=store, lease_seconds=8, heartbeat_seconds=2))
+        result = await process_next(connection, URL, NAME, script, LoopConfig(route=route, object_store=store, lease_seconds=8, heartbeat_seconds=2))
         return result is not None
 
     await serve(WorkerConfig(worker_id=NAME, database_url=URL, claims_inference=True, idle_seconds=0.3, beat_seconds=1, drain_seconds=DRAIN), step, stop)

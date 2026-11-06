@@ -85,7 +85,7 @@ async def main() -> None:
         check('the model sees a pointer and short preview rather than the long text', 'far shorter than the document', len(tool_text), len(tool_text) < 2000 and LONG not in tool_text)
         check('a summary was made once the view grew past its budget', 'at least one', len(model.summaries), len(model.summaries) >= 1)
         stored = await (await db.execute('select summary, sources, role, profile from app_private.run_summaries where run_id = %s order by covers desc limit 1', (run,))).fetchone()
-        check('it used the run\'s own summarizer role', 'summarizer, the frozen profile', stored[2:], stored[2] == 'summarizer' and stored[3] == 'openrouter_deepseek_flash')
+        check('it used the run\'s own summarizer role', 'summarizer, the frozen profile', stored[2:], stored[2] == 'summarizer' and stored[3] == 'openrouter_terra')
         invocation = await value("select count(*) from app_private.model_invocations where run_id = %s and role = 'summarizer'", run)
         check('and went through admission like any other call', 'recorded', invocation, invocation >= 1)
         check('its citations are the stored results, worked out by code', 'the offload', stored[1], str(offload[0]) in stored[1])

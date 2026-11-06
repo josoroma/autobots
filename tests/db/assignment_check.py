@@ -55,7 +55,7 @@ async def main() -> None:
             return await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=f'expert-{name}', name=name, config=ExpertConfig(**config_values))
 
         lead = await expert('Assign Lead', tools=['calculate', 'save_artifact', 'publish_artifact'])
-        helper = await expert('Assign Helper', tools=['calculate', 'save_artifact', 'publish_artifact', 'read_run_file'], role_bindings={'executor': 'openrouter_terra'}, instructions='Help.')
+        helper = await expert('Assign Helper', tools=['calculate', 'save_artifact', 'publish_artifact', 'read_run_file'], role_bindings={'executor': 'openrouter_deepseek_flash'}, instructions='Help.')
         limited = await expert('Assign Limited', tools=['read_run_file'])
         outside = await expert('Assign Outside', tools=['calculate'])
         session = await create_session(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='sess', kind='coordinator', experts=[SessionExpert(expert_id=e.id) for e in (lead, helper, limited)])
@@ -96,7 +96,7 @@ async def main() -> None:
         # Roles are inherited, and scope only narrows.
         parent_snapshot = await value('select policy_snapshot from public.runs where id = %s', run)
         child_snapshot = await value('select policy_snapshot from public.runs where id = %s', child)
-        check('the child keeps the parent\'s fixed policy, not its Expert\'s binding', 'the same snapshot', child_snapshot == parent_snapshot, child_snapshot == parent_snapshot and child_snapshot['bindings']['executor'] == 'openrouter_deepseek_flash')
+        check('the child keeps the parent\'s fixed policy, not its Expert\'s binding', 'the same snapshot', child_snapshot == parent_snapshot, child_snapshot == parent_snapshot and child_snapshot['bindings']['executor'] == 'openrouter_terra')
         spec = await value('select spec from app_private.goal_specs where run_id = %s', child)
         check('child tools are the intersection with the parent', 'no read_run_file', sorted(spec['allowed_tools']), 'read_run_file' not in spec['allowed_tools'] and 'calculate' in spec['allowed_tools'])
         check('child paths are the parent inputs and its own namespace', "inputs, outputs/child-1", spec['allowed_paths'], spec['allowed_paths'] == ['inputs', 'outputs/child-1'])

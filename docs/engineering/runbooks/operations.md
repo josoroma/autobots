@@ -29,11 +29,11 @@ Expected: `GET /v1/operations/local-status`, or the Operations page, says ready.
 
 ## What the worker does today
 
-`autobots.operations.worker` expires approvals, evaluates routines and applies retention. **By default it doesn't claim jobs**, because no live route is qualified yet (US-3.4). Queued runs wait, and Operations says `no_inference_worker`.
+`autobots.operations.worker` expires approvals, evaluates routines and applies retention. **By default it doesn't claim jobs**, because claiming spends real money. Queued runs wait, and Operations says `no_inference_worker`.
 
 ## Turning on inference
 
-**This spends real money once a key exists: every queued run in every workspace with a key sends billed requests to OpenRouter.** Only DeepSeek's adapter has met the real provider ([partial evidence, with its limits](../evidence/US-3.4/summary.md)). Terra hasn't, no goal has run this way with a real model, and strict nested output failed at the 512-token limit. So far this path has run only over a fake transport, as described below. Don't turn it on for real work before US-3.4, except as that story's explicitly authorized, bounded qualification.
+**This spends real money once a key exists: every queued run in every workspace with a key sends billed requests to OpenRouter.** Both routes have met the real provider ([with their limits](../evidence/US-3.4/summary.md)). [One goal, repeated on disposable stacks,](../evidence/LIVE-GOAL-1/summary.md) went Terra 5 of 5 and DeepSeek 0 of 5, and Terra is the default by [Decision 0006](../decisions/0006-terra-is-the-default.md). That doesn't show either is good at the work, and this path hasn't run live on a persistent stack. The check below uses a fake transport.
 
 Set the switch where the worker starts, alongside `AUTOBOTS_CONFIG_ROOT`, `AUTOBOTS_SUPABASE_URL`, `AUTOBOTS_SERVICE_ROLE_KEY` and, if the key file isn't in its default place, `AUTOBOTS_PROVIDER_MASTER_KEY_FILE`, all with the same values the API uses. Missing any of the required ones, the worker refuses to start.
 

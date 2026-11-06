@@ -63,7 +63,7 @@ def test_the_adapter_identity_names_the_pinned_release() -> None:
 
 
 def test_a_snapshot_records_its_models_and_a_changed_mapping_stops_the_run() -> None:
-    snapshot = json.loads(_snapshot(resolve_role_policy()))
+    snapshot = json.loads(_snapshot(resolve_role_policy(run_profile="openrouter_deepseek_flash")))
     assert frozen_policy(snapshot).bindings
     route = snapshot["routes"]["openrouter_deepseek_flash"]
     assert route["wire_id"] == "deepseek/deepseek-v4.1-flash-1017"

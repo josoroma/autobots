@@ -27,7 +27,7 @@ from autobots.application.goal_loop import LoopConfig, process_next
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 MARKER = Path(os.environ['AUTOBOTS_TEST_DIED_MARKER'])
-ROUTE = ModelRoute('executor', 'openrouter_deepseek_flash', 'fixture/model', 1000)
+ROUTE = ModelRoute('executor', 'openrouter_terra', 'fixture/model', 1000)
 TASKS = [{'id': 'report', 'title': 'Write the totals report', 'criteria': ['c1'], 'expected_evidence': 'the published report'}]
 PLAN = ('propose_plan', {'tasks': TASKS})
 READ = ('read_run_file', {'path': 'inputs/data.md'})

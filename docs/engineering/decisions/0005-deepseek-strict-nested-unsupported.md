@@ -19,7 +19,7 @@ On `openrouter_terra`, strict nested output works only with every object closed,
 Stated plainly, because the sources still ask for more:
 
 - **MP-A06** says strict schemas pass on each enabled route. For DeepSeek's nested schemas, that's not met. Flat schemas passed.
-- **The default model has this gap:** DeepSeek is the default for all 14 roles. Plans and other nested tool arguments aren't strict, and rely on server validation as SP-008 requires.
+- **The gap when DeepSeek is selected:** it was the default for all 14 roles when this was decided, and [Decision 0006](0006-terra-is-the-default.md) has since made Terra the default. Plans and other nested tool arguments aren't strict, and rely on server validation as SP-008 requires.
 
 ## What this doesn't establish
 

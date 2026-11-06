@@ -179,14 +179,14 @@ def qualify(root: Path) -> int:
         claiming = ops.sql("select claims_inference::text from app_private.worker_heartbeats where state = 'running';")
         cases.check('a claiming worker reads as one', 'claims true, worker_ready', f'{claiming}, {conditions(body).get("worker")}', claiming == 'true' and conditions(body).get('worker') == 'worker_ready')
         calls = sent('happy')
-        cases.check('every request goes to OpenRouter under the frozen route and routing flags', 'deepseek, no fallback, 512 tokens',
+        cases.check('every request goes to OpenRouter under the frozen route and routing flags', 'terra by default, no fallback, 512 tokens',
                     f'{len(calls)} requests, {sorted({call["model"] for call in calls})}, {calls[0]["provider"] if calls else None}, {sorted({call["max_tokens"] for call in calls})}',
-                    calls and all(call['url'] == CHAT_URL and call['model'] == DEEPSEEK_WIRE and call['provider'] == FLAGS and call['max_tokens'] == 512 and not call['models'] for call in calls))
+                    calls and all(call['url'] == CHAT_URL and call['model'] == TERRA_WIRE and call['provider'] == FLAGS and call['max_tokens'] == 512 and not call['models'] for call in calls))
         cases.check('the gateway offers the tools the plan needs', 'includes propose_plan and publish_artifact', calls[0]['tools'] if calls else None,
                     calls and {'propose_plan', 'save_artifact', 'publish_artifact', 'complete_task'} <= set(calls[0]['tools']))
         ledger = invocations(happy)
-        cases.check('each attempt is reserved from the catalog price, settled from the reply and audited', f'{DEEPSEEK}/{DEEPSEEK_WIRE}/succeeded/-/1/{DEEPSEEK_WORST}/100',
-                    ledger, ledger == f'{DEEPSEEK}/{DEEPSEEK_WIRE}/succeeded/-/1/{DEEPSEEK_WORST}/100')
+        cases.check('each attempt is reserved from the catalog price, settled from the reply and audited', f'{TERRA}/{TERRA_WIRE}/succeeded/-/1/{TERRA_WORST}/100',
+                    ledger, ledger == f'{TERRA}/{TERRA_WIRE}/succeeded/-/1/{TERRA_WORST}/100')
         used = {call['key'] for call in calls}
         cases.check('the workspace key was used', 'key one', used == {key_id(KEY_ONE)}, used == {key_id(KEY_ONE)})
         facts = reply_facts(happy)
@@ -195,12 +195,12 @@ def qualify(root: Path) -> int:
                                      'tool_calls/5/7/3/{complete_task}/0', 'stop/5/7/3/{}/0'])
 
         # Another run in the same process, frozen to the other profile.
-        terra = admit(workspace_a, 'terra', TERRA)
-        finished = settled(terra, 'succeeded')
-        calls = sent('terra')
-        ledger = invocations(terra)
-        cases.check('the route comes from each run, not the worker', 'same process, terra request and ledger', f'{status(terra)}, {sorted({call["model"] for call in calls})}, {ledger}, alive {worker.poll() is None}',
-                    finished and worker.poll() is None and bool(calls) and {call['model'] for call in calls} == {TERRA_WIRE} and ledger == f'{TERRA}/{TERRA_WIRE}/succeeded/-/1/{TERRA_WORST}/100')
+        other = admit(workspace_a, 'other', DEEPSEEK)
+        finished = settled(other, 'succeeded')
+        calls = sent('other')
+        ledger = invocations(other)
+        cases.check('the route comes from each run, not the worker', 'same process, deepseek request and ledger', f'{status(other)}, {sorted({call["model"] for call in calls})}, {ledger}, alive {worker.poll() is None}',
+                    finished and worker.poll() is None and bool(calls) and {call['model'] for call in calls} == {DEEPSEEK_WIRE} and ledger == f'{DEEPSEEK}/{DEEPSEEK_WIRE}/succeeded/-/1/{DEEPSEEK_WORST}/100')
 
         # A workflow reaches the same worker, in the same process.
         flow = helper('workflow', workspace_a).strip().splitlines()[-1]
@@ -278,7 +278,7 @@ def qualify(root: Path) -> int:
         cases.check('a refused attempt releases its reservation', 'failed_before_acceptance, charged 0', ledger, ledger.endswith('/0') and 'failed_before_acceptance/rate_limited' in ledger)
 
         # Each workspace's runs used only that workspace's keys, across every run that sent anything.
-        used_a = {call['key'] for tag in ('happy', 'terra', 'rotated', 'malformed', 'limited') for call in sent(tag)}
+        used_a = {call['key'] for tag in ('happy', 'other', 'rotated', 'malformed', 'limited') for call in sent(tag)}
         used_b = {call['key'] for tag in ('missing', 'rejected') for call in sent(tag)}
         cases.check("one workspace's key never served another's run", 'A used its two keys, B its two', f'{len(used_a)} and {len(used_b)} keys',
                     used_a == {key_id(KEY_ONE), key_id(KEY_TWO)} and used_b == {key_id(KEY_B), key_id(KEY_REJECTED)})
@@ -317,7 +317,7 @@ def qualify(root: Path) -> int:
         cases.check('the second worker stops cleanly too', 'exit 0', exited(second, 40), second.returncode == 0)
 
         # Across every run and process: nothing durable or logged holds a key, and nothing left loopback.
-        runs = "'" + "','".join((happy, terra, rotated, missing, rejected, malformed, limited, cancelling, verifying, unreadable)) + "'"
+        runs = "'" + "','".join((happy, other, rotated, missing, rejected, malformed, limited, cancelling, verifying, unreadable)) + "'"
         blobs = ops.sql(f"select (select count(*) from agent_runtime.checkpoint_blobs where thread_id in ({runs})) || '/' || "
                         f"(select count(*) from agent_runtime.checkpoint_blobs where thread_id in ({runs}) and encode(blob, 'escape') like '%arranged-%') || '/' || "
                         f"(select count(*) from agent_runtime.checkpoint_writes where thread_id in ({runs}) and encode(blob, 'escape') like '%arranged-%');")

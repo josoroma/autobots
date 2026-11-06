@@ -6,7 +6,7 @@
 **Normative contracts:** [PRD-Model-Providers.md](PRD-Model-Providers.md) governs model identities, credentials, selection, budgets and APIs; [PRD-Local-Mac-Deployment.md](PRD-Local-Mac-Deployment.md) governs this Mac's services, ports, storage and lifecycle.  
 **Normative interface design:** [PRD-Design-System.md](PRD-Design-System.md) and the exact [Luma tokens](docs/design/luma.css): shadcn Luma with dark mode as the default.  
 **Package evidence:** [dependency metadata](research/dependency-snapshot.json), [OpenRouter adapter](research/openrouter-nextjs-sdk.json), [Supabase JS/SSR](research/supabase-nextjs-sdk.json).  
-**Architecture:** native local Next.js 16 and a long-lived Workflow worker, AI SDK 7/Workflow SDK 5, Docker-hosted self-managed Supabase PostgreSQL/Auth/Storage, and server-only OpenRouter inference. Every role initially selects `openrouter_deepseek_flash`; `openrouter_terra` is the alternative explicit choice.
+**Architecture:** native local Next.js 16 and a long-lived Workflow worker, AI SDK 7/Workflow SDK 5, Docker-hosted self-managed Supabase PostgreSQL/Auth/Storage, and server-only OpenRouter inference. Every role initially selects `openrouter_terra`; `openrouter_deepseek_flash` is the alternative explicit choice.
 
 Earlier [local-model experiments](research/LOCAL-MODEL-EVIDENCE.md) are superseded research history, not dependencies, deployment options or acceptance evidence for this specification.
 
@@ -30,7 +30,7 @@ A user can ask, “Research these three products, compare them using this rubric
 4. Produces and validates an artifact; tells the user which criteria remain unresolved.
 5. Offers a reusable workflow/routine, showing its inputs and external effects.
 6. Resumes after an app restart and after a later approval without silently repeating a committed external action.
-7. Starts every inference role on the dated DeepSeek Flash profile through OpenRouter; preserves an explicit per-run/workspace/role choice of that profile or Terra, recorded before dispatch.
+7. Starts every inference role on the dated Terra profile through OpenRouter; preserves an explicit per-run/workspace/role choice of that profile or DeepSeek Flash, recorded before dispatch.
 
 The user should understand what happened, what evidence supports the result, and what needs intervention without reading a raw model transcript.
 
@@ -200,35 +200,35 @@ The [shared provider PRD](PRD-Model-Providers.md) is normative. This section spe
 
 | Registry entry | Provider | Requested canonical identity | Chat Completions wire `model` |
 |---|---|---|---|
-| `openrouter_deepseek_flash` — initial default | `openrouter` | `deepseek/deepseek-v4.1-flash-20261017` | `deepseek/deepseek-v4.1-flash-1017` |
-| `openrouter_terra` — explicit alternative | `openrouter` | `openai/gpt-6.1-terra-20261026` | `openai/gpt-6.1-terra` |
+| `openrouter_deepseek_flash` — explicit alternative | `openrouter` | `deepseek/deepseek-v4.1-flash-20261017` | `deepseek/deepseek-v4.1-flash-1017` |
+| `openrouter_terra` — initial default | `openrouter` | `openai/gpt-6.1-terra-20261026` | `openai/gpt-6.1-terra` |
 
 The requested dated strings are exact catalog **`canonical_slug` values**, not the current Chat API `id` strings. Persist both. Before each paid attempt, require catalog metadata no older than five minutes, match the same non-batch Chat ID to the exact canonical identity, and block as `model_unavailable` on missing, ambiguous or changed mapping. An expired catalog that cannot be refreshed blocks new paid requests. The public alias mapping is observed metadata, not a guarantee that OpenRouter hard-pins an immutable snapshot. Do not select an older family alias, Terra Pro, `:batch`, an automatic router, or a newer dated model. Catalog capability claims are not completed inference tests. [Captured catalog](research/openrouter-model-catalog.json), [OpenRouter models API](https://openrouter.ai/api/v1/models)
 
 ### 5.2 Defaults, policy selection and immutable bindings
 
-Retain a separate initial binding for each of the 14 canonical role keys, **all referencing `openrouter_deepseek_flash`**. This preserves future role-specific configuration without hidden framework defaults or unbudgeted reviewers. The following is a proposed constants contract, not implemented application code:
+Retain a separate initial binding for each of the 14 canonical role keys, **all referencing `openrouter_terra`**. This preserves future role-specific configuration without hidden framework defaults or unbudgeted reviewers. The following is a proposed constants contract, not implemented application code:
 
 ```ts
 export const DEFAULT_MODEL_ROLES = {
-  coordinator: 'openrouter_deepseek_flash',
-  router: 'openrouter_deepseek_flash',
-  planner: 'openrouter_deepseek_flash',
-  executor: 'openrouter_deepseek_flash',
-  researcher: 'openrouter_deepseek_flash',
-  coder: 'openrouter_deepseek_flash',
-  reviewer: 'openrouter_deepseek_flash',
-  evaluator: 'openrouter_deepseek_flash',
-  summarizer: 'openrouter_deepseek_flash',
-  memory_curator: 'openrouter_deepseek_flash',
-  skill_learner: 'openrouter_deepseek_flash',
-  tool_repair: 'openrouter_deepseek_flash',
-  workflow_generator: 'openrouter_deepseek_flash',
-  general_purpose: 'openrouter_deepseek_flash',
+  coordinator: 'openrouter_terra',
+  router: 'openrouter_terra',
+  planner: 'openrouter_terra',
+  executor: 'openrouter_terra',
+  researcher: 'openrouter_terra',
+  coder: 'openrouter_terra',
+  reviewer: 'openrouter_terra',
+  evaluator: 'openrouter_terra',
+  summarizer: 'openrouter_terra',
+  memory_curator: 'openrouter_terra',
+  skill_learner: 'openrouter_terra',
+  tool_repair: 'openrouter_terra',
+  workflow_generator: 'openrouter_terra',
+  general_purpose: 'openrouter_terra',
 } as const;
 ```
 
-A user may explicitly select an allowlisted model for a run, save a workspace default, or set advanced role overrides. Resolve each role in this order: **run role override → explicit run-wide profile → workspace role override → workspace default → DeepSeek Flash**. A simple run selection therefore replaces inherited workspace role choices; advanced mode shows the complete effective map. Run creation freezes provider, canonical identity, wire ID, role map and `role_policy_version`, capability/catalog revision and time, generation preset, data-scope policy, credential reference, and initial budgets. Display that selection before starting and retain it in run history. Settings edits affect future admissions. MVP provider/model bindings remain immutable: choosing another model for unfinished work creates a linked new run using selected artifact references, rather than rewriting the active run or replaying provider-specific protocol state under another model. Credential rotation still resolves the current authorized key version within the original binding.
+A user may explicitly select an allowlisted model for a run, save a workspace default, or set advanced role overrides. Resolve each role in this order: **run role override → explicit run-wide profile → workspace role override → workspace default → Terra**. A simple run selection therefore replaces inherited workspace role choices; advanced mode shows the complete effective map. Run creation freezes provider, canonical identity, wire ID, role map and `role_policy_version`, capability/catalog revision and time, generation preset, data-scope policy, credential reference, and initial budgets. Display that selection before starting and retain it in run history. Settings edits affect future admissions. MVP provider/model bindings remain immutable: choosing another model for unfinished work creates a linked new run using selected artifact references, rather than rewriting the active run or replaying provider-specific protocol state under another model. Credential rotation still resolves the current authorized key version within the original binding.
 
 Before Run, show the selected models/roles, spend limits and external payload categories: instructions, relevant conversation/context, retrieved material, tool results and required protocol metadata. Apply workspace data-scope restrictions when assembling them. Starting a model-backed run authorizes its bounded inference calls without another approval for every call. Consequential **tools** retain their independent approval policy.
 
@@ -304,7 +304,7 @@ Use local PostgreSQL lexical/full-text retrieval initially; selecting a chat mod
 
 ### 6.1 Create and execute a goal
 
-1. User supplies an objective, optional files, scope, deadline and constraints; the selector shows DeepSeek Flash or the explicit saved choice, with OpenRouter destination and cost limits visible.
+1. User supplies an objective, optional files, scope, deadline and constraints; the selector shows Terra or the explicit saved choice, with OpenRouter destination and cost limits visible.
 2. The local API creates a draft `Goal` and immutable `BriefRevision` without inference. Local files, settings and previous artifacts remain accessible even when the model service is unavailable.
 3. The user chooses Run or an explicitly model-backed planning action. If credentials are missing, open setup while preserving the draft. Save & validate returns to that draft without dispatching a paid call.
 4. Admission freezes the complete role map and checks authenticated credentials, fresh catalog/capabilities, permissions and reservations before any planner request. It creates the product run and durable dispatch record. Key presence alone never authorizes work.
@@ -659,7 +659,7 @@ Use deterministic checks where possible: arithmetic, schema conformity, file exi
 | Cancellation | No new effects admitted after cancellation becomes authoritative; active-effect outcomes accurately reported |
 | Provenance | Every externally sourced final claim required by a task has a resolvable evidence reference |
 | Inference allowlist | Network instrumentation confirms every role, retry, repair, summary and evaluation uses only the admitted OpenRouter route; no hidden default provider or model fallback |
-| Model selection | All 14 roles initialize to DeepSeek Flash; explicit Terra/role choices are frozen at admission; key setup never launches inference or silently reassigns a model |
+| Model selection | All 14 roles initialize to Terra; explicit DeepSeek/role choices are frozen at admission; key setup never launches inference or silently reassigns a model |
 | Credential boundary | MP-A01–MP-A04 and MP-A10–MP-A11 pass: full precedence/whitespace/test rules, invalid environment blocking, invalid-draft preservation, encrypted storage, auth/catalog separation, rotation/restart and tenant isolation; no raw key in bundles, logs or checkpoints |
 | Missing-key flow | MP-A12 passes: local UI, files, history and settings remain available, but all model calls are `credentials_required`; auth-valid save preserves composer draft/selection without dispatch; user Run initiates bounded work |
 | Luma interface | DS-01–DS-05 pass: exact semantic tokens, dark on a fresh visit under either OS preference, explicit light/dark persistence before paint, accessible key flows in both modes, and screenshots bound to the tested revision |
@@ -704,7 +704,7 @@ apps/web/                    Next.js UI, API, instrumentation and Workflow integ
 packages/contracts/          API/events/plan/graph/tool schemas
 packages/domain/             goals, plans, approvals, profiles and run state machine
 packages/agents/             prompts, role assembly and delegation rules
-packages/model-config/       initial DeepSeek role constants, immutable bindings and capability policy
+packages/model-config/       initial Terra role constants, immutable bindings and capability policy
 packages/model-providers/    OpenRouter request factory, credential-bound V4 wrapper and request shaping
 packages/credentials/        environment resolution, AES-GCM vault, validation and metadata-only settings
 packages/workflows/          goal orchestration and graph interpreter
@@ -737,7 +737,7 @@ Do not begin with a marketplace or a large graph canvas. Establish one end-to-en
 | Question / risk | Current decision | Remaining evidence |
 |---|---|---|
 | Where do application services/data run? | Only this Mac: native application/worker and Docker-hosted self-managed Supabase | Port, outbound-connection, restart and local backup/restore checks |
-| Which inference route is allowed? | OpenRouter only; DeepSeek Flash defaults and explicit Terra choice | Actual protocol/task evaluations, canonical-drift and budget tests |
+| Which inference route is allowed? | OpenRouter only; Terra defaults and explicit DeepSeek Flash choice | Actual protocol/task evaluations, canonical-drift and budget tests |
 | Are models qualified by catalog/key validation? | No; metadata/authentication and inference qualification are separate | Tools/schema/SSE, genuine named enforcement, continuation and semantic fixtures |
 | Can the published provider serialize app credentials safely by itself? | Not established for 3.1.0; use descriptor-only wrapper or explicit model-call steps | Environment/app-key restart, rotation and secret-leak tests |
 | Is local Supabase secure by default for this product? | No; configure private buckets, RLS, scoped DB roles and nonexposed runtime/credential schemas | Ownership, cross-scope, backup and key-loss tests |

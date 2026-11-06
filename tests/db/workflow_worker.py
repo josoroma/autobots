@@ -16,7 +16,7 @@ from autobots.application.worker_leases import claim_next
 from autobots.application.workflow_runner import run_workflow
 
 URL, BASE, DIE_AFTER = sys.argv[1], sys.argv[2], sys.argv[3]
-ROUTE = ModelRoute('executor', 'openrouter_deepseek_flash', 'fixture/model', 1000)
+ROUTE = ModelRoute('executor', 'openrouter_terra', 'fixture/model', 1000)
 
 
 def die_after(step: object) -> None:

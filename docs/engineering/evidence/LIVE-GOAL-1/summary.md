@@ -155,8 +155,46 @@ Held: no key in any durable row or log file, nothing of the project left behind,
 
 **Total across all live goals in this record:** US$0.021256.
 
-### Changed after this run, and not yet exercised live
+### Changed after this run
 
 The schema a model sees for `complete_task` now says to cite a saved file by the exact path `save_artifact` returned, with no version or hash added, or a tool's effect by its `operation_id`. Tool replies now include that `operation_id`, so receipt evidence can be cited at all. Verification is as strict as it was.
 
-**No paid run has tried this,** so whether it reduces `evidence_invalid` isn't known. `save_artifact` replying with `path`, `version` and `sha256` makes a decorated path plausible, but what was actually cited stays unrecorded. The check is local: tests and a scripted model.
+`save_artifact` replying with `path`, `version` and `sha256` makes a decorated path plausible, but what was actually cited stays unrecorded. The batch below is its first live use.
+
+## Ten goals: Terra 5 of 5, DeepSeek 0 of 5
+
+**Class: live, on disposable stacks.** Authorized by the user's "Yes, run 10 goals", after being told the expected cost and the per-run limit. Run on 2026-11-06 UTC from 01:12 to 01:31, at `ecb3490` with no local changes, alternating models, one at a time, with the same goal, the 512-token limit, the 130-second timeout and a US$0.25 limit per run. The batch would have stopped at US$0.25 in total. Raw results: `.checks/batch-10/` (ignored, local).
+
+| | Terra | DeepSeek |
+|---|---|---|
+| Succeeded, verification passed, `report.md` published | **5 of 5** | **0 of 5** |
+| Repairs used | 0 | 5 of 5 runs used their one repair |
+| `evidence_invalid` | 0 | Never got that far |
+| Stop reasons | none | `incomplete_output` 4, `repair_limit:plan_uncovered_criteria` 1 |
+| Plans rejected as `plan_uncovered_criteria` | 0 | 3 of 5 runs |
+| Calls cut off with `finish_reason=length` | 0 | 7 calls, across all 5 runs |
+| Files saved | 5 of 5 runs | 0 of 5 runs |
+| Largest output in any call | 174 | 512 |
+| Largest reasoning in any call | 69 | 512 |
+| Slowest call | 3.7s | 23.7s |
+| Goal seconds | 16.1–19.5 | 9.7–48.6 |
+| Ledger per run, micro-USD | 5,797–6,053 | 409–651 |
+
+**Spend:** US$0.032334 for the batch, matching the change in key usage. No call was left uncertain. Key usage is now US$0.073003 in all.
+
+**Terra.** All five planned, saved, published and verified with no failed receipt. Each report was 85 to 105 words and met its `must_contain` check.
+
+**`evidence_invalid` went from recurring to absent.** It hit 2 of the 2 Terra runs where the code was recorded, and none of these 5, after the citation rule changed. That fits the change, but five runs of one goal is a small sample, and no comparison was controlled.
+
+**DeepSeek fails two separate ways, and neither is about evidence.**
+
+- **The 512-token limit:** 7 calls were cut off at it, and each run's largest reasoning was 503 to 512 tokens, confirming the earlier finding at a larger sample. No DeepSeek run saved a file.
+- **Plans:** `plan_uncovered_criteria` means a plan left a criterion uncovered, in 3 of 5 runs. A larger output limit wouldn't obviously change this, and it spends the run's one repair.
+
+Some DeepSeek calls took far longer than the old 5-second timeout, up to 23.7s.
+
+**The default was the model that failed.** DeepSeek was then the default for all 14 roles. [Decision 0006](../../decisions/0006-terra-is-the-default.md) has since made Terra the default.
+
+**Not established:** quality. Verification checks that the file was published and holds the required line, not that its content is good. One goal, repeated, on one evening, so other goals may differ. Approvals, child runs, compaction, the 80% warning and budget refusals weren't exercised. No run needed more than 512 tokens on Terra, so this says nothing about 2,048. This doesn't establish H1, product acceptance or US-10.1.
+
+Held in all ten: no key in any durable row or log file, nothing of the project left behind, other Docker resources unchanged, no step failures, and the watchdog never fired.

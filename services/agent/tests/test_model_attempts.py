@@ -35,7 +35,12 @@ from autobots.application.model_attempts import (
     classify_status,
     executable_tool_calls,
 )
-from autobots.domain.models import PROFILES, ModelProfileId, ModelRole, resolve_role_policy
+from autobots.domain.models import (
+    DEFAULT_PROFILE,
+    PROFILES,
+    ModelRole,
+    resolve_role_policy,
+)
 from fake_openrouter import ARRANGED_KEY
 
 NOW = datetime(2026, 11, 5, 12, 0, tzinfo=UTC)
@@ -227,7 +232,7 @@ def test_worst_case_cost_rounds_up_and_needs_a_price() -> None:
 
 
 def model_over(handler: Any) -> Any:
-    profile = PROFILES[ModelProfileId.DEEPSEEK_FLASH]
+    profile = PROFILES[DEFAULT_PROFILE]
     catalog = CatalogSnapshot(
         "fixture", NOW, (CatalogEntry(profile.wire_id, profile.canonical_id, frozenset()),)
     )
@@ -275,7 +280,7 @@ async def test_a_slow_reply_outlasts_httpx_default_and_the_goal_loop_bound_decid
         timeouts.append(request.extensions["timeout"])
         return httpx.Response(500, json={"error": {"code": 500, "message": "arranged"}})
 
-    profile = PROFILES[ModelProfileId.DEEPSEEK_FLASH]
+    profile = PROFILES[DEFAULT_PROFILE]
     catalog = CatalogSnapshot(
         "fixture", NOW, (CatalogEntry(profile.wire_id, profile.canonical_id, frozenset()),)
     )
@@ -294,7 +299,7 @@ async def test_a_slow_reply_outlasts_httpx_default_and_the_goal_loop_bound_decid
 
 
 def test_the_default_client_has_sdk_retries_off() -> None:
-    profile = PROFILES[ModelProfileId.DEEPSEEK_FLASH]
+    profile = PROFILES[DEFAULT_PROFILE]
     catalog = CatalogSnapshot(
         "fixture", NOW, (CatalogEntry(profile.wire_id, profile.canonical_id, frozenset()),)
     )

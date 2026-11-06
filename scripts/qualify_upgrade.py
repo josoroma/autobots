@@ -194,7 +194,7 @@ print(hashlib.sha256(json.dumps(rows, default=str, sort_keys=True).encode()).hex
         reconciled, _ = api_call(api_port, ops.internal, token, 'POST', f'/v1/runs/{interrupted}/model-calls/reconcile', json.dumps({'charged_micro_usd': 100}).encode(), {'Idempotency-Key': secrets.token_hex(8)})
         resume = subprocess.run([str(root / PYTHON), str(root / 'tests/db/operations_check.py'), 'resume', workspace, interrupted], env=ops.env, capture_output=True, text=True, timeout=60, check=False)
         marker.unlink(missing_ok=True)
-        worker = ops.fixture_worker('upgraded-resume', 0, 30, marker, 'resume')
+        worker = ops.fixture_worker('upgraded-resume', 0, 30, marker, 'resume', 'openrouter_deepseek_flash')
         resumed = wait(lambda: ops.sql(f"select status from public.runs where id = '{interrupted}';") == 'succeeded', 60)
         worker.send_signal(signal.SIGTERM)
         exited(worker, 30)

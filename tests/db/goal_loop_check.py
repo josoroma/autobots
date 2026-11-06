@@ -160,7 +160,7 @@ async def main() -> None:
         result, model = await go(lease, [ProviderFailure(FailureClass.INVALID_CREDENTIAL)])
         check('a rejected credential pauses, with one attempt', 'invalid_credential, paused, 1', (result.code, result.run_status, len(model.seen)), result.code == 'invalid_credential' and result.run_status == 'paused' and len(model.seen) == 1)
         lease = await start()
-        result, model = await go(lease, [calls(PLAN)], route=ModelRoute('executor', 'openrouter_deepseek_flash', 'fixture/model', 2_000_000))
+        result, model = await go(lease, [calls(PLAN)], route=ModelRoute('executor', 'openrouter_terra', 'fixture/model', 2_000_000))
         check('a call past the budget pauses without dispatching', 'budget_exceeded, paused, 0', (result.code, result.run_status, len(model.seen)), result.code == 'budget_exceeded' and result.run_status == 'paused' and len(model.seen) == 0)
 
         # A generic counter refuses past its limit, ready for the delegation stories.

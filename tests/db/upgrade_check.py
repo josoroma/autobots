@@ -16,7 +16,7 @@ from psycopg.rows import dict_row
 from pydantic import SecretStr
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import DONE_A, ROUTE, SAVE, TASK_A, Script, calls, say  # noqa: E402
+from goal_loop_script import DONE_A, SAVE, TASK_A, Script, calls, say  # noqa: E402
 
 from autobots.adapters.checkpoints import ADAPTER_STATEMENTS, adapter_identity, identity_of  # noqa: E402
 from autobots.adapters.loop_middleware import ModelRoute  # noqa: E402
@@ -26,6 +26,9 @@ from autobots.application.runs import admit_run, apply_command  # noqa: E402
 from autobots.domain.execution import current_contract  # noqa: E402
 from autobots.domain.models import resolve_role_policy  # noqa: E402
 from autobots.domain.runs import Actor, RunCommand  # noqa: E402
+
+# The prior release froze its saved runs on the model that was then the default, as Decision 0006 keeps.
+ROUTE = ModelRoute('executor', 'openrouter_deepseek_flash', 'fixture/model', 1000)
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 PLAN = ('propose_plan', {'tasks': [TASK_A]})

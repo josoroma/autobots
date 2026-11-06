@@ -74,12 +74,12 @@ async def main() -> None:
         check('the run records its Expert and revision', 'version 2', recorded[2], recorded == (session.id, expert.id, 2))
 
         # Expert model bindings are frozen into the run's own policy.
-        terra = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='x3', name='Bound', config=ExpertConfig(role_bindings={'executor': 'openrouter_terra'}))
+        terra = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='x3', name='Bound', config=ExpertConfig(role_bindings={'executor': 'openrouter_deepseek_flash'}))
         direct = await create_session(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='s2', kind='direct', experts=[SessionExpert(expert_id=terra.id)])
         bound = await resolve_binding(db, WORKSPACE, direct.id)
         run = await admit(bound, resolve_role_policy(run_role_overrides=bound.role_bindings))
         snapshot = await value('select policy_snapshot from public.runs where id = %s', run)
-        check('an Expert binding reaches the run policy', 'executor terra, others default', (snapshot['bindings']['executor'], snapshot['bindings']['planner']), snapshot['bindings']['executor'] == 'openrouter_terra' and snapshot['bindings']['planner'] == 'openrouter_deepseek_flash')
+        check('an Expert binding reaches the run policy', 'executor deepseek, others default', (snapshot['bindings']['executor'], snapshot['bindings']['planner']), snapshot['bindings']['executor'] == 'openrouter_deepseek_flash' and snapshot['bindings']['planner'] == 'openrouter_terra')
         lease = await claim_next(db, worker_id='route', lease_seconds=120)
         model = Script(items=[say('x')], seen=[], bound=[])
         result = await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE))
@@ -87,7 +87,7 @@ async def main() -> None:
         run = await admit(bound, resolve_role_policy(run_role_overrides=bound.role_bindings))
         lease = await claim_next(db, worker_id='route', lease_seconds=120)
         model = Script(items=[say('x')], seen=[], bound=[])
-        result = await run_goal(db, URL, lease, model, LoopConfig(route=ModelRoute('executor', 'openrouter_terra', 'fixture/terra', 1000)))
+        result = await run_goal(db, URL, lease, model, LoopConfig(route=ModelRoute('executor', 'openrouter_deepseek_flash', 'fixture/terra', 1000)))
         check('the bound route runs', 'a model call', len(model.seen), len(model.seen) == 1)
         wire = await value('select wire_id from app_private.model_invocations where run_id = %s', run)
         check('and admission records that route, with nothing substituted', 'fixture/terra', wire, wire == 'fixture/terra')

@@ -3,22 +3,22 @@
 **Decision date:** 2026-11-04. **Status:** Finalized requirements; implementation and paid cloud qualification pending.  
 **Authority:** Normative for [Next.js](PRD-NextJS.md), [LangChain / Deep Agents](PRD-LangChain-Deep-Agents.md) and the [architecture recommendation](PRD-Comparison-Recommendation.md), alongside the [local Mac deployment contract](PRD-Local-Mac-Deployment.md). This specifies our independent clone, not upstream AutoGPT behavior.
 
-The application, workers, authentication, database, files and durable state run locally on this Mac; **all model inference uses OpenRouter**. Every role defaults to the approved DeepSeek profile, with Terra available through explicit selection. There is no local inference runtime or local-only model profile in scope. Setting a key never starts work or changes model bindings. “Configured” means authentication succeeded, not that model capability or task-quality gates passed. Public documentation/catalog metadata established this revision; paid qualification remains pending.
+The application, workers, authentication, database, files and durable state run locally on this Mac; **all model inference uses OpenRouter**. Every role defaults to the approved Terra profile, with DeepSeek available through explicit selection, by [Decision 0006](docs/engineering/decisions/0006-terra-is-the-default.md). There is no local inference runtime or local-only model profile in scope. Setting a key never starts work or changes model bindings. “Configured” means authentication succeeded, not that model capability or task-quality gates passed. Public documentation/catalog metadata established this revision; paid qualification remains pending.
 
 ## MP-01. Approved models and selection
 
 | Profile | Canonical identity | Request identity |
 |---|---|---|
-| `openrouter_deepseek_flash` — initial default | `deepseek/deepseek-v4.1-flash-20261017` | `deepseek/deepseek-v4.1-flash-1017` |
-| `openrouter_terra` — optional | `openai/gpt-6.1-terra-20261026` | `openai/gpt-6.1-terra` |
+| `openrouter_deepseek_flash` — optional | `deepseek/deepseek-v4.1-flash-20261017` | `deepseek/deepseek-v4.1-flash-1017` |
+| `openrouter_terra` — default | `openai/gpt-6.1-terra-20261026` | `openai/gpt-6.1-terra` |
 
 [Decision 0004](docs/engineering/decisions/0004-terra-replaces-astra.md) replaced Astra with Terra. The DeepSeek mapping is observed in the [dated public catalog snapshot](research/openrouter-model-catalog.json), and Terra's in the public catalog on 2026-11-05. Do not substitute a moving-family, Pro, batch or routing alias. In particular, Terra’s shorter request ID does not establish an immutable snapshot guarantee.
 
-The registry contains exactly these two profiles. Provide a per-run profile, an owner/admin workspace default for future runs and advanced versioned role bindings. New workspaces assign all 14 roles to `openrouter_deepseek_flash`. Persist the canonical role keys `coordinator`, `router`, `planner`, `executor`, `researcher`, `coder`, `reviewer`, `evaluator`, `summarizer`, `memory_curator`, `skill_learner`, `tool_repair`, `workflow_generator` and `general_purpose` consistently across languages.
+The registry contains exactly these two profiles. Provide a per-run profile, an owner/admin workspace default for future runs and advanced versioned role bindings. New workspaces assign all 14 roles to `openrouter_terra`. Persist the canonical role keys `coordinator`, `router`, `planner`, `executor`, `researcher`, `coder`, `reviewer`, `evaluator`, `summarizer`, `memory_curator`, `skill_learner`, `tool_repair`, `workflow_generator` and `general_purpose` consistently across languages.
 
 MVP retrieval uses local Postgres lexical/full-text search. No additional embedding/reranking model or inference endpoint is included.
 
-Resolve each role in this exact order: explicit run-specific role override; otherwise the explicitly selected run-wide profile; otherwise the workspace role override; otherwise the workspace default; otherwise `openrouter_deepseek_flash`. A run-wide selection applies to every role unless the user supplies a run-specific override. Display the complete effective map before dispatch. Reject local endpoints, unknown profiles and unapproved model IDs. There is no optional-cloud toggle: model-backed work always sends its approved payload to OpenRouter.
+Resolve each role in this exact order: explicit run-specific role override; otherwise the explicitly selected run-wide profile; otherwise the workspace role override; otherwise the workspace default; otherwise `openrouter_terra`. A run-wide selection applies to every role unless the user supplies a run-specific override. Display the complete effective map before dispatch. Reject local endpoints, unknown profiles and unapproved model IDs. There is no optional-cloud toggle: model-backed work always sends its approved payload to OpenRouter.
 
 Snapshot `provider`, canonical model, resolved wire ID, role map, `role_policy_version`, catalog revision/time, limits and credential reference at admission. Children, compaction, summaries and reviewers inherit this resolved policy; framework defaults cannot introduce another model. Model-policy changes affect future runs. MVP runs keep their model bindings immutable; selecting a different model for unfinished work creates a linked new run with explicit artifact/evidence references instead of rewriting the original transcript or replay history. Resume uses its saved policy and rechecks availability. Credential rotation is separate and follows MP-06.
 
@@ -159,7 +159,7 @@ These gates are implementation requirements, not completed tests:
 | MP-A05 | Canonical drift, missing IDs and batch/moving substitutions fail before any paid request. |
 | MP-A06 | Tools, strict schemas, SSE, cancellations, truncation and tool-result continuation pass on each enabled route; arithmetic and negative task fixtures remain separate quality gates. |
 | MP-A07 | Named tool selection uses a two-tool counterexample with conflicting prompt preference; a single matching call cannot prove enforcement. Unsupported selectors fail honestly. |
-| MP-A08 | All model calls use the approved OpenRouter boundary; no local inference/embedding endpoint or model fallback exists. Child/reviewer/summary assignments match the snapshotted map, with all 14 defaults resolving to DeepSeek. |
+| MP-A08 | All model calls use the approved OpenRouter boundary; no local inference/embedding endpoint or model fallback exists. Child/reviewer/summary assignments match the snapshotted map, with all 14 defaults resolving to Terra. |
 | MP-A09 | Concurrent admission, retry, child execution and UTC rollover cannot bypass reservations/caps; ambiguous billing stays explicit. |
 | MP-A10 | Restart/replay retains references and receipts without secrets/client serialization; rotation versions remain auditable. |
 | MP-A11 | Browser/network/log/checkpoint/export inspection finds no stored raw keys; workspace/CSRF/version attacks fail; master-key loss never creates plaintext storage. |
@@ -171,7 +171,7 @@ Use mocked adapters for deterministic credential/error/replay tests and a separa
 
 | Decision | Requirement status | Remaining gate |
 |---|---|---|
-| OpenRouter only; DeepSeek default, explicit Terra choice | Closed | Implement and test all 14 role bindings/inheritance. |
+| OpenRouter only; Terra default, explicit DeepSeek choice | Closed | Implement and test all 14 role bindings/inheritance. |
 | Canonical mapping and no fallback | Closed | Fresh-catalog preflight and drift tests. |
 | Environment-first/in-app credential setup | Closed | UI, authorization, encryption and restart/rotation tests. |
 | Budget, disclosure and error policy | Closed | Reservation concurrency, replay and failure tests. |

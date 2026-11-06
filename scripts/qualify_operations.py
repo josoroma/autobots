@@ -70,8 +70,9 @@ class Ops:
         return self.spawn(f'api-{port}', [str(self.root / PYTHON), '-m', 'uvicorn', '--factory', 'autobots.api.main:create_configured_app',
                                           '--host', '127.0.0.1', '--port', str(port), '--no-access-log'], api_env)
 
-    def fixture_worker(self, name: str, hold: float, drain: float, marker: Path, mode: str = 'fresh') -> subprocess.Popen:
-        return self.spawn(name, [str(self.root / PYTHON), str(self.root / 'tests/db/operations_worker.py'), self.url, name, str(hold), str(drain), str(marker), mode])
+    def fixture_worker(self, name: str, hold: float, drain: float, marker: Path, mode: str = 'fresh', profile: str | None = None) -> subprocess.Popen:
+        return self.spawn(name, [str(self.root / PYTHON), str(self.root / 'tests/db/operations_worker.py'), self.url, name, str(hold), str(drain), str(marker), mode],
+                          {'AUTOBOTS_TEST_ROUTE_PROFILE': profile} if profile else None)
 
     def sql(self, statement: str) -> str:
         result = self.stack.runtime(statement)

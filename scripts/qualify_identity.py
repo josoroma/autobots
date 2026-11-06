@@ -245,7 +245,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
         # The slice runs last, with a worker, so nothing above sees its jobs claimed.
         stack.runtime("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done';\n")
         # Arranged: the settings suite changed the workspace default, and the fixture worker's route is the original.
-        stack.runtime("update app_private.model_policies set default_profile = 'openrouter_deepseek_flash', role_overrides = '{}';\n")
+        stack.runtime("update app_private.model_policies set default_profile = 'openrouter_terra', role_overrides = '{}';\n")
         slice_report = root / '.checks/identity/playwright-slice.json'
         slice_report.unlink(missing_ok=True)
         worker_env = {**tool_env(), 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1', 'AUTOBOTS_DATABASE_URL': runtime_url,

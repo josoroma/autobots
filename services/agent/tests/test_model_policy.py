@@ -84,13 +84,19 @@ def test_exactly_two_profiles_with_their_identities() -> None:
         ),
         "openrouter_terra": ("openai/gpt-6.1-terra-20261026", "openai/gpt-6.1-terra"),
     }
-    assert DEFAULT_PROFILE is DEEPSEEK
+    assert DEFAULT_PROFILE is TERRA
 
 
-def test_a_new_workspace_binds_all_14_roles_to_deepseek() -> None:
+def test_a_workspace_that_chose_deepseek_keeps_it() -> None:
+    """Decision 0006 changes what a workspace gets with no choice, and nobody's choice."""
+    policy = resolve_role_policy(workspace_default="openrouter_deepseek_flash")
+    assert set(policy.bindings.values()) == {DEEPSEEK}
+
+
+def test_a_new_workspace_binds_all_14_roles_to_terra() -> None:
     policy = resolve_role_policy()
     assert {role.value for role in policy.bindings} == ROLES_FROM_PRD
-    assert set(policy.bindings.values()) == {DEEPSEEK}
+    assert set(policy.bindings.values()) == {TERRA}
 
 
 def test_the_documented_precedence() -> None:
@@ -173,7 +179,8 @@ def test_the_effective_map_can_be_displayed_before_dispatch() -> None:
 )
 def test_catalog_problems_block_dispatch(snapshot: CatalogSnapshot, reason: str) -> None:
     with pytest.raises(ModelUnavailable, match=reason) as caught:
-        prepare_attempt(resolve_role_policy(), ModelRole.CODER, snapshot, now=NOW)
+        deepseek = resolve_role_policy(run_profile="openrouter_deepseek_flash")
+        prepare_attempt(deepseek, ModelRole.CODER, snapshot, now=NOW)
     assert caught.value.code == "model_unavailable"
 
 
@@ -215,7 +222,7 @@ def test_an_option_the_catalog_lacks_is_refused_for_that_model() -> None:
             prepare_attempt(
                 terra, ModelRole.CODER, healthy_catalog(), options={option: 0.5}, now=NOW
             )
-    deepseek = resolve_role_policy()
+    deepseek = resolve_role_policy(run_profile="openrouter_deepseek_flash")
     attempt = prepare_attempt(
         deepseek, ModelRole.CODER, healthy_catalog(), options={"temperature": 0.5}, now=NOW
     )
@@ -268,8 +275,8 @@ def recording_factory() -> tuple[list[dict[str, Any]], list[str], Any]:
 @pytest.mark.parametrize(
     ("policy_arguments", "wire_id"),
     [
-        ({}, "deepseek/deepseek-v4.1-flash-1017"),
-        ({"run_profile": "openrouter_terra"}, "openai/gpt-6.1-terra"),
+        ({}, "openai/gpt-6.1-terra"),
+        ({"run_profile": "openrouter_deepseek_flash"}, "deepseek/deepseek-v4.1-flash-1017"),
     ],
 )
 def test_the_request_on_the_wire(policy_arguments: dict[str, Any], wire_id: str) -> None:

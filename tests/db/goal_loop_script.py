@@ -10,7 +10,7 @@ from pydantic import SecretStr
 
 from autobots.adapters.loop_middleware import ModelRoute
 
-ROUTE = ModelRoute('executor', 'openrouter_deepseek_flash', 'fixture/model', 1000)
+ROUTE = ModelRoute('executor', 'openrouter_terra', 'fixture/model', 1000)
 _ids = iter(range(1, 100000))
 
 

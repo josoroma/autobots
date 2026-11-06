@@ -11,7 +11,7 @@ CODEBASE Context: skipped (product intent predates implementation; CODEBASE.md d
 **Normative deployment contract:** [PRD-Local-Mac-Deployment.md](./PRD-Local-Mac-Deployment.md).  
 **Normative development prerequisite:** [PRD-Development-Harness.md](./PRD-Development-Harness.md); H0 foundation and H1 activated baseline precede product implementation.  
 **Normative interface design:** [PRD-Design-System.md](./PRD-Design-System.md) and the exact [Luma tokens](docs/design/luma.css); shadcn Luma with dark mode as the default.  
-**Decision:** run the Next.js interface, Python API/workers, LangGraph orchestration, tools, and all application persistence on this Mac. Use local Docker-hosted Supabase for PostgreSQL, Auth, and private Storage. OpenRouter is the only inference provider: every initial role uses `openrouter_deepseek_flash`, with `openrouter_terra` available through explicit selection. No error, missing key, or SDK default may silently change models or providers.
+**Decision:** run the Next.js interface, Python API/workers, LangGraph orchestration, tools, and all application persistence on this Mac. Use local Docker-hosted Supabase for PostgreSQL, Auth, and private Storage. OpenRouter is the only inference provider: every initial role uses `openrouter_terra`, with `openrouter_deepseek_flash` available through explicit selection. No error, missing key, or SDK default may silently change models or providers.
 
 ## 1. Product intent and evidence boundaries
 
@@ -50,7 +50,7 @@ The deepest uncertainty is model behavior. An advertised capability, a valid JSO
 4. Every consequential tool operation is associated with a policy decision and an operation record.
 5. A model's assertion of success cannot alone mark a run successful.
 6. The same tool registry serves direct expert work, delegation, and visual workflows.
-7. All 14 inference roles are separately configurable and initially resolve to the approved DeepSeek Flash profile; every actual model call uses the run's explicit OpenRouter role snapshot.
+7. All 14 inference roles are separately configurable and initially resolve to the approved Terra profile; every actual model call uses the run's explicit OpenRouter role snapshot.
 8. A user can securely configure OpenRouter, understand what context leaves the device, and select an approved model without repeated approval for each bounded inference call.
 9. Application services, authentication, files, database, logs, and credentials remain on this Mac; inference sends only the authorized request context to OpenRouter and its serving provider.
 
@@ -261,15 +261,15 @@ The active inference evidence is the dated public OpenRouter catalog and officia
 
 ### 6.2 Required role constants and approved registry
 
-All initial role constants resolve to `openrouter_deepseek_flash`. Runtime bindings are resolved from explicit model choices separately; defaults never overwrite a user's selected Terra binding. Roles separate prompts, permissions, and responsibilities, while inference for every role uses OpenRouter. The following is a configuration contract to implement, not an executed application:
+All initial role constants resolve to `openrouter_terra`. Runtime bindings are resolved from explicit model choices separately; defaults never overwrite a user's selected binding. Roles separate prompts, permissions, and responsibilities, while inference for every role uses OpenRouter. The following is a configuration contract to implement, not an executed application:
 
 ```python
 from types import MappingProxyType
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-DEFAULT_MODEL_PROFILE = "openrouter_deepseek_flash"
-DEFAULT_CANONICAL_MODEL = "deepseek/deepseek-v4.1-flash-20261017"
-DEFAULT_WIRE_MODEL_ID = "deepseek/deepseek-v4.1-flash-1017"
+DEFAULT_MODEL_PROFILE = "openrouter_terra"
+DEFAULT_CANONICAL_MODEL = "openai/gpt-6.1-terra-20261026"
+DEFAULT_WIRE_MODEL_ID = "openai/gpt-6.1-terra"
 
 MODEL_COORDINATOR = DEFAULT_MODEL_PROFILE
 MODEL_PLANNER = DEFAULT_MODEL_PROFILE
@@ -310,12 +310,12 @@ The registry contains exactly these two OpenRouter entries. There is no third pr
 
 | Profile / provider | Canonical selection identity | Wire `model` value | Initial status |
 |---|---|---|---|
-| `openrouter_deepseek_flash` / `openrouter` | `deepseek/deepseek-v4.1-flash-20261017` | `deepseek/deepseek-v4.1-flash-1017` | Default for all roles; credentials and qualification required |
-| `openrouter_terra` / `openrouter` | `openai/gpt-6.1-terra-20261026` | `openai/gpt-6.1-terra` | Explicit alternative; credentials and qualification required |
+| `openrouter_deepseek_flash` / `openrouter` | `deepseek/deepseek-v4.1-flash-20261017` | `deepseek/deepseek-v4.1-flash-1017` | Explicit alternative; credentials and qualification required |
+| `openrouter_terra` / `openrouter` | `openai/gpt-6.1-terra-20261026` | `openai/gpt-6.1-terra` | Default for all roles; credentials and qualification required |
 
 The two requested model names are catalog `canonical_slug` values, not necessarily request IDs. Retain both. Before each paid attempt, verify that the selected non-batch wire ID still maps to the recorded canonical slug using catalog metadata no older than five minutes. Missing entries, conflicting mappings, alias drift, or expired metadata that cannot be refreshed block the call. Public aliases do not guarantee immutable upstream weights; disclose that limitation. [Public catalog snapshot](./research/openrouter-model-catalog.json)
 
-Resolve each role in this exact shared order: explicit run-specific role override → explicit run-wide profile → workspace role override → workspace default → `openrouter_deepseek_flash`. A run-wide selection applies to every role unless the user supplies a run-specific override; show the complete map before launch. Resolve once into a `RunProviderSnapshot` covering all 14 canonical keys, including summaries, evaluations, background memory/skill work, and dynamically created children. Map the SDK's `general-purpose` subagent name to the product's `general_purpose` role. Routine definitions snapshot the explicitly authorized model policy for future occurrences.
+Resolve each role in this exact shared order: explicit run-specific role override → explicit run-wide profile → workspace role override → workspace default → `openrouter_terra`. A run-wide selection applies to every role unless the user supplies a run-specific override; show the complete map before launch. Resolve once into a `RunProviderSnapshot` covering all 14 canonical keys, including summaries, evaluations, background memory/skill work, and dynamically created children. Map the SDK's `general-purpose` subagent name to the product's `general_purpose` role. Routine definitions snapshot the explicitly authorized model policy for future occurrences.
 
 Selecting Run authorizes bounded calls to the displayed OpenRouter model/role map without a second approval for each inference call. A key's existence never starts inference. Failures pause or fail the affected work without switching models. MVP run bindings are immutable: changing the model for unfinished work creates a linked new run with explicit artifact/evidence references, preserving the original transcript and replay history. Policy edits affect future admissions only. [Shared provider policy](./PRD-Model-Providers.md)
 
@@ -421,7 +421,7 @@ The [shared provider PRD](./PRD-Model-Providers.md) is normative for both implem
 
 The implementation's `.env.example` includes an empty server-only `OPENROUTER_API_KEY=` entry and never a real key; real environment files remain outside version control. This specification update does not create or read those files.
 
-1. **Selection:** the run picker offers the two approved OpenRouter identities, with DeepSeek Flash initially selected. Explain that selected prompts, relevant history, tool results, and required protocol metadata go to OpenRouter and its serving provider while application persistence remains on the Mac. Selecting Run authorizes calls within the displayed scope/budget; ordinary tool-effect approvals still apply separately.
+1. **Selection:** the run picker offers the two approved OpenRouter identities, with Terra initially selected. Explain that selected prompts, relevant history, tool results, and required protocol metadata go to OpenRouter and its serving provider while application persistence remains on the Mac. Selecting Run authorizes calls within the displayed scope/budget; ordinary tool-effect approvals still apply separately.
 2. **Missing credential:** preserve the draft goal and selected model; link to **Settings → Models → OpenRouter** when the user attempts inference or opens Settings. All inference is blocked until a valid authorized credential and capability gates are available. Local UI, file/history viewing, and Settings remain usable. Do not repeatedly ask for a key in chat. After successful setup return to the composer with its draft and selection intact; Save & validate does not launch work. The user starts the bounded run using Run.
 3. **Managed environment:** resolve nonblank process `OPENROUTER_API_KEY` first, then the shared absolute `AUTOBOTS_CONFIG_ROOT` `.env` loader. Its order is `.env.$NODE_ENV.local`, `.env.local` except in tests, `.env.$NODE_ENV`, then `.env`; loaded files never overwrite a nonblank injected process value, and whitespace-only candidates count as absent. Only when no nonblank environment value exists may the encrypted application credential be used. A nonblank invalid environment value remains authoritative and blocked; app credentials cannot mask it. Show managed/read-only status and the configuration source category without exposing the value. Installation credentials are available only to explicitly authorized workspaces; environment changes require coordinated process restart.
 4. **Save & validate:** send the write-only draft input to the server. The server checks the draft with `GET https://openrouter.ai/api/v1/key`, then checks the selected identity/capabilities against the public catalog. It performs no paid generation. An invalid draft must not overwrite a previously valid stored key. Commit an authentication-valid draft encrypted even if catalog refresh is temporarily unavailable, but block cloud launch until the catalog check succeeds. A key-validation network failure leaves the draft uncommitted and the prior credential unchanged; it is unavailable, not proof of an invalid key. Return status metadata, never the key. [OpenRouter key metadata endpoint](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-api-key)
@@ -521,7 +521,7 @@ The default StateBackend persists through checkpoints for a thread; cross-thread
 
 Use short invariant instructions and a small active tool set to fit the configured context budget. Offload long source text and tool output to local artifacts, retain summaries plus references, and retrieve original evidence before consequential decisions. Pin the original goal, permissions, unresolved approval state, and acceptance criteria outside lossy summaries. Local persistence does not imply that content is never transmitted: only authorized excerpts needed for inference enter the OpenRouter request.
 
-Set compaction thresholds from the configured, qualified context limit; a catalog profile must not silently enlarge the allowance. The summarizer uses the run's explicit summarizer binding, initially `MODEL_SUMMARIZER`/DeepSeek Flash, and consumes the same global call/spend budget. Test compaction with pending tool messages so that tool/result pairing and required reasoning envelopes remain valid. Summarization must use the approved OpenRouter factory and authorized context scope. [Context engineering](https://docs.langchain.com/oss/python/deepagents/context-engineering), [release summarization implementation](https://github.com/langchain-ai/deepagents/blob/e85c6b98087861512d2c5240305e16cfac68a746/libs/deepagents/deepagents/middleware/summarization.py)
+Set compaction thresholds from the configured, qualified context limit; a catalog profile must not silently enlarge the allowance. The summarizer uses the run's explicit summarizer binding, initially `MODEL_SUMMARIZER`/Terra, and consumes the same global call/spend budget. Test compaction with pending tool messages so that tool/result pairing and required reasoning envelopes remain valid. Summarization must use the approved OpenRouter factory and authorized context scope. [Context engineering](https://docs.langchain.com/oss/python/deepagents/context-engineering), [release summarization implementation](https://github.com/langchain-ai/deepagents/blob/e85c6b98087861512d2c5240305e16cfac68a746/libs/deepagents/deepagents/middleware/summarization.py)
 
 ### 8.5 Skills and learning
 
@@ -754,7 +754,7 @@ Hosted LangSmith tracing and other remote observability services are outside thi
 
 | ID | Requirement | Acceptance evidence |
 |---|---|---|
-| LC-01 | Every initial role uses `openrouter_deepseek_flash`; every call uses an approved explicit binding | All 14 role defaults and precedence fixtures pass; coordinator, summaries, specialists, judges, and memory jobs use only the two OpenRouter registry entries |
+| LC-01 | Every initial role uses `openrouter_terra`; every call uses an approved explicit binding | All 14 role defaults and precedence fixtures pass; coordinator, summaries, specialists, judges, and memory jobs use only the two OpenRouter registry entries |
 | LC-02 | Persistent configurable Experts | New session uses chosen revision; in-flight run keeps old revision |
 | LC-03 | Goal/criteria captured | User can inspect original request and normalized criteria before and after compaction |
 | LC-04 | Bounded planner/executor loop | Budget exhaustion stops dispatch across descendants and returns partial results |
@@ -836,7 +836,7 @@ First use mocked providers and stored protocol fixtures for secret lifecycle, er
 
 ### 14.3 Evaluator independence
 
-The evaluator initially uses `MODEL_EVALUATOR`/DeepSeek Flash and thereafter the run's explicitly selected evaluator binding. Its judgment is advisory; same-model review has correlated weaknesses, and selecting Terra does not establish evaluator independence or truth. Prefer deterministic tests, schema checks, source matching, artifact existence, and human-scored samples for ground truth. Do not allow a self-generated score to erase an observed tool failure or missing deliverable.
+The evaluator initially uses `MODEL_EVALUATOR`/Terra and thereafter the run's explicitly selected evaluator binding. Its judgment is advisory; same-model review has correlated weaknesses, and selecting another model does not establish evaluator independence or truth. Prefer deterministic tests, schema checks, source matching, artifact existence, and human-scored samples for ground truth. Do not allow a self-generated score to erase an observed tool failure or missing deliverable.
 
 Structured evaluation outputs use an explicit supported strategy. `ToolStrategy` uses tool calling; `ProviderStrategy` assumes provider-native schema support. Selecting a schema type can trigger automatic capability selection, so explicitly choose and qualify the mode for each approved OpenRouter model and validate completed output independently. [Structured output strategies](https://docs.langchain.com/oss/python/langchain/structured-output)
 
@@ -861,7 +861,7 @@ Validate the mandatory portable harness in a disposable local project with expli
 | 6 — Memory improvement | Scoped memory, skills, reviewed consolidation | Provenance, isolation, regression gate, and rollback pass |
 | 7 — Local operations hardening | Retention, DB/Storage/key backups, Supabase/application upgrade migration, sleep/restart and disk dashboards | Isolated local restore, container recreation, sleep/replay, upgrade resume and full acceptance corpus pass |
 
-After H0–H1, do not spend the first product phase building a complete canvas. The earliest valuable product execution evidence is a bounded goal using the local application and qualified DeepSeek Flash binding, with validated tools, private artifacts, truthful logs, and restart behavior. If a binding fails qualification, keep it unavailable; another model is used only after explicit selection and its own qualification. No failed request is quietly replaced by another provider/model.
+After H0–H1, do not spend the first product phase building a complete canvas. The earliest valuable product execution evidence is a bounded goal using the local application and qualified Terra binding, with validated tools, private artifacts, truthful logs, and restart behavior. If a binding fails qualification, keep it unavailable; another model is used only after explicit selection and its own qualification. No failed request is quietly replaced by another provider/model.
 
 ## 16. Implementation risks and remaining qualification gates
 
@@ -888,7 +888,7 @@ After H0–H1, do not spend the first product phase building a complete canvas. 
 | Database backup omits local Storage bytes or host master key | History may restore while artifacts/credentials remain unusable | Versioned backup manifest and complete local restore drill |
 | Docker unavailable, disk full, or unsafe port merge | Local services stop or become externally reachable | Startup health/resource checks, loopback-only merged Compose verification and operator repair |
 
-Product decisions are closed: the prerequisite development harness, native local UI/API/workers, Docker Supabase persistence/Auth/Storage, OpenRouter-only inference, DeepSeek Flash defaults and optional Terra, credential precedence/local encryption, API/UX, role inheritance, budgets, and error policy are specified here and in the normative companion PRDs. Remaining gates require implementation and experiments: H0–H1 activation, Compose/image compatibility, scoped SQL/checkpoint migrations, Auth/RLS/Storage isolation, full local restore, per-model tools/schemas/reasoning/replay, task quality, cancellation, and usable cost receipts. Research facts do not replace those results.
+Product decisions are closed: the prerequisite development harness, native local UI/API/workers, Docker Supabase persistence/Auth/Storage, OpenRouter-only inference, Terra defaults and optional DeepSeek Flash, credential precedence/local encryption, API/UX, role inheritance, budgets, and error policy are specified here and in the normative companion PRDs. Remaining gates require implementation and experiments: H0–H1 activation, Compose/image compatibility, scoped SQL/checkpoint migrations, Auth/RLS/Storage isolation, full local restore, per-model tools/schemas/reasoning/replay, task quality, cancellation, and usable cost receipts. Research facts do not replace those results.
 
 ## 17. Comparison with the local Next.js / Vercel SDK implementation
 

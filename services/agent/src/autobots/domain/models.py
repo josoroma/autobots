@@ -49,7 +49,7 @@ PROFILES: Mapping[ModelProfileId, ModelProfile] = MappingProxyType(
         ),
     }
 )
-DEFAULT_PROFILE = ModelProfileId.DEEPSEEK_FLASH
+DEFAULT_PROFILE = ModelProfileId.TERRA
 ROLE_POLICY_VERSION = 1
 
 
@@ -89,7 +89,7 @@ def resolve_role_policy(
     workspace_role_overrides: Mapping[str, str] | None = None,
     workspace_default: str | None = None,
 ) -> RolePolicy:
-    """MP-01's exact order: run role, run-wide, workspace role, workspace default, then DeepSeek."""
+    """MP-01's exact order: run role, run-wide, workspace role, workspace default, then Terra."""
     run_roles = {
         approved_role(r): approved_profile(p) for r, p in (run_role_overrides or {}).items()
     }
