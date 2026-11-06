@@ -163,6 +163,36 @@ These are fixture-tested script behaviors in `tests/harness/test_hooks.py`, not 
 | A secret name in any case, before or after symlink resolution | `PreToolUse` denies. `Bash` commands are matched only by a narrow pattern list, and the `Grep` tool is outside the matcher, so this is a guardrail and no sandbox |
 | A filename with spaces, Unicode or shell metacharacters | Treated as data, and passed only as one argument after `--` |
 | An edited Python file under `services/agent/` | `PostToolUse` names the affected domains, checks syntax and runs the prepared `ruff` for at most 3 seconds, reporting a finding, a missing tool or a timeout without echoing its output |
+| A `cwd` inside a worktree Git has registered under this checkout's `.claude/worktrees/` | That worktree is the root for the event, as below |
+| Any other `cwd`: unusable, unregistered, prunable, outside `.claude/worktrees/` or belonging to another repository | The dispatcher's own checkout is the root |
+| A `cwd` under `.claude/worktrees/` when Git fails or takes over 2 seconds | A file edit is denied with a reason naming Git, because the dispatcher's own checkout would be wider than the worktree the session may be in. `PostToolUse` says the same and classifies nothing, and `Stop` blocks as it does for missing evidence, once per turn. Other events never ask Git |
+
+### Which checkout a hook evaluates
+
+`${CLAUDE_PROJECT_DIR}` stays at the project root where the session started, so a session in a worktree still runs the main checkout's dispatcher and `harness_lib`. The event's `cwd` is the field that says where the session is, and [Claude Code documents](https://code.claude.com/docs/en/hooks) that it follows the session, including after `cd`.
+
+So `cwd` does choose the root, within a fixed set. The dispatcher asks Git for the worktrees of its own checkout, using a reduced environment, and accepts only the innermost one strictly inside `.claude/worktrees/` that holds `cwd`. Otherwise the root is the dispatcher's own checkout. What this guarantees:
+
+- Every root it can select is inside the dispatcher's own checkout, so no `cwd`, and no entry in Git's list, can select a root permitting an edit that checkout would refuse.
+- It does not guarantee that a session stays in its worktree, or whose reports `Stop` reads, because both follow `cwd`. See the limits below.
+
+This needs Git 2.36 or later, for `worktree list -z`, and Git does not search above the dispatcher's checkout. An event in the main checkout starts no Git process. Under `.claude/worktrees/`, only file edits, `PostToolUse` and `Stop` start one. `Bash` and `Read` do not, and their guard does not use the root for an absolute path.
+
+In a worktree session:
+
+- A file-tool edit to the main checkout or a sibling worktree is refused as escaping the workspace.
+- `PostToolUse` classifies the path from the worktree and uses that worktree's prepared `ruff`, reporting it as unavailable if the worktree has not been bootstrapped.
+- `Stop` reads the worktree's own reports, and a main-checkout report does not count.
+
+A new worktree has no reports, so every input counts as changed. `Stop` then wants a current `fast` or `full` report and a current `db` report. A passing `harness` report alone does not clear it, `fast` needs a bootstrapped worktree, and `db` needs Docker. Until those exist, `Stop` blocks once at the end of each turn and does not repeat within that turn. If they cannot be produced, say so and report it as this limit.
+
+Limits:
+
+- `cd` moves all of this. A worktree session that moves into the main checkout, a sibling, or anywhere outside `.claude/worktrees/` gets the main checkout or that sibling as its root, and can then edit there with file tools. A main-checkout session that moves into a worktree has its edits to the main checkout refused, and `Stop` reads that worktree's reports, until it moves back. A session can also satisfy `Stop` by moving into a checkout with current reports. The guard stops a file tool's slip and confines nothing, and `Bash` could write to any of these anyway.
+- The dispatcher that runs is deliberately the main checkout's. Running the worktree's copy would let `cwd` choose the code doing the enforcing. So a change to the hooks or `harness_lib` in a worktree takes effect for sessions only once the main checkout has it, and until then only the tests exercise it. The `ruff` diagnostic is the exception: `cwd` does choose that executable, whose result is advisory and whose output is discarded.
+- If the two checkouts differ in input rules or required checks, the main checkout's code decides. It can judge a worktree's current report stale, in which case rerunning the verifier does not clear `Stop`, or accept a report the worktree's own rules would reject.
+- A lasting Git failure refuses file-tool edits in a worktree session, including edits to its own files, and `Stop` blocks once per turn. `Bash` still works, so the session or a person can repair Git, and the session then continues.
+- These are script and fixture results. Delivery of `cwd` in a real event is part of the unverified event delivery above.
 
 ### Read the adapter status
 
