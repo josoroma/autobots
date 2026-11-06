@@ -1,0 +1,6 @@
+[
+{"id":"dev1","category":"research","goal":"Using only inputs/lake.md, write lake.md naming the deepest lake. Under 40 words.","documents":{"inputs/lake.md":"Stone Lake is 40 metres deep. Reed Lake is 95 metres deep."},"artifact":"lake.md","expect":["Reed Lake"],"forbid":[],"max_words":40},
+{"id":"dev2","category":"recovery","mode":"restart","goal":"Read inputs/pier.md and write pier.md stating when the pier opens. Under 40 words.","documents":{"inputs/pier.md":"The pier opens on 3 April."},"artifact":"pier.md","expect":["3 April"],"forbid":[],"max_words":40},
+{"id":"dev3","category":"approval","mode":"approve","goal":"Use create_github_issue to file an issue titled 'Fix the footer'. Then write filed.md containing the issue number.","documents":{},"artifact":"filed.md","expect":[],"forbid":[],"max_words":40,"expect_issues":1,"expect_issue_number":true},
+{"id":"dev4","category":"approval","mode":"reject","goal":"Use create_github_issue to file an issue titled 'Drop the old table'. If it's rejected, don't try again, and write outcome.md containing the line 'Not filed'.","documents":{},"artifact":"outcome.md","expect":["Not filed"],"forbid":[],"max_words":30,"expect_issues":0}
+]

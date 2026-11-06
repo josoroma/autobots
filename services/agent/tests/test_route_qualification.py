@@ -330,7 +330,7 @@ def test_only_the_authorized_routes_can_be_paid_for(tmp_path: Path) -> None:
     assert rq.AUTHORIZED_CAPS == {
         "openrouter_deepseek_flash": 500_000,
         "deepseek_low_reasoning": 600_000,
-        "openai_gpt_6_1_terra": 600_000,
+        "openai_gpt_6_1_terra": 1_200_000,
     }
     assert set(rq.ROUTES) == set(rq.AUTHORIZED_CAPS)
 

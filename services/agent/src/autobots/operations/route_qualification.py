@@ -60,7 +60,7 @@ ROUTES = {
 AUTHORIZED_CAPS = {
     "openrouter_deepseek_flash": 500_000,
     "deepseek_low_reasoning": 600_000,
-    "openai_gpt_6_1_terra": 600_000,
+    "openai_gpt_6_1_terra": 1_200_000,
 }
 CONTEXT_TOKENS = 8_192
 OUTPUT_TOKENS = 512
@@ -490,7 +490,7 @@ class Corpus:
             fixtures.append(("schema_nested_closed", self.schema_nested_closed))
         if "schema_nested_constrained" in self.only:
             fixtures.append(("schema_nested_constrained", self.schema_nested_constrained))
-        for trial in range(1, TRIALS + 1):
+        for trial in range(1, max((*self.only.values(), TRIALS)) + 1):
             for name, fixture in fixtures:
                 if self.only and trial > self.only.get(name, 0):
                     continue
