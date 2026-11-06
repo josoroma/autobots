@@ -22,6 +22,7 @@ from autobots.adapters.checkpoints import (
     graph_config,
     is_stale_owner,
 )
+from autobots.adapters.github_issues import GITHUB_ISSUE
 from autobots.adapters.loop_middleware import (
     AdmittedModel,
     LoopMiddleware,
@@ -151,6 +152,7 @@ def loop_registry(
         SEARCH_MEMORY,
         READ_OFFLOAD,
         PROPOSE_IMPROVEMENT,
+        GITHUB_ISSUE,
     )
     for tool in (*tools, *plan_tools(limits)):
         registry.register(tool)

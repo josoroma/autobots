@@ -172,7 +172,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-7.1 | Explicit routines and deduplicated scheduled occurrences | DONE | EPIC-7 |
 | US-7.1#1 | Implement versioned routines and occurrence admission. | DONE | US-7.1 |
 | US-7.1#2 | Test duplicate, missed, overlap and timezone cases. | DONE | US-7.1 |
-| US-7.2 | Select and qualify the first consequential connector | NEEDS CLARIFICATION | EPIC-7 |
+| US-7.2 | Select and qualify the first consequential connector | IN PROGRESS | EPIC-7 |
 | US-7.2#1 | Resolve the connector/service and operation scope decision. | TODO | US-7.2 |
 | US-7.2#2 | Implement and qualify only that selected connector under the existing effect contract. | TODO | US-7.2 |
 | EPIC-8 | Scoped memory and reviewed learning | — | — |
@@ -344,8 +344,6 @@ flowchart TD
   US_4_7 -.-> US_7_1
   US_6_2 -.-> US_7_1
   US_5_4 -.-> US_7_2
-  EXT_US_7_2_1["External: The first concrete service, permitted operations and qualification fixture must be selected."]
-  EXT_US_7_2_1 -.-> US_7_2
   US_4_5 -.-> US_8_1
   US_5_1 -.-> US_8_1
   US_3_3 -.-> US_8_1
@@ -2240,7 +2238,8 @@ Open Questions:
 
 ### US-7.2: Select and qualify the first consequential connector
 
-Status: NEEDS CLARIFICATION
+Status: IN PROGRESS
+Change: `openspec/changes/us-7-2-select-qualify-first-consequential/`
 
 As a workspace owner
 I want a specifically selected connector with scoped operations
@@ -2252,6 +2251,7 @@ Source:
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence)
 - [Later connector scope](PRD-LangChain-Deep-Agents.md#23-explicit-scope-choices)
 - [Tool classes and policies](PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [Decision 0007](docs/engineering/decisions/0007-first-connector-github-issues.md#decision) — GitHub, creating an issue in one configured repository.
 
 Acceptance Criteria:
 
@@ -2269,14 +2269,13 @@ Scenario: Reject out-of-scope work
 
 Dependencies:
 - US-5.4
-- External: The first concrete service, permitted operations and qualification fixture must be selected.
 
 Tasks:
 - [ ] Resolve the connector/service and operation scope decision.
 - [ ] Implement and qualify only that selected connector under the existing effect contract.
 
 Open Questions:
-- Which first consequential service and operation should B5 support, and what destination-specific idempotency/readback test fixture is available?
+- None.
 
 # EPIC-8: Scoped memory and reviewed learning
 

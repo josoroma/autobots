@@ -22,7 +22,7 @@ GENERAL_TOOLS = {
     "search_memory": 1,
 }
 # Proposing an improvement changes nothing by itself, but a run only gets it if an owner chose that.
-EXPERT_TOOLS = {**GENERAL_TOOLS, "propose_improvement": 1}
+EXPERT_TOOLS = {**GENERAL_TOOLS, "propose_improvement": 1, "create_github_issue": 1}
 LOOP_TOOL_GRANTS = {**PLAN_TOOLS, **GENERAL_TOOLS}
 # Only a coordinator session's runs get this, and an Expert's own configuration can't name it.
 DELEGATION_TOOL = "assign_specialist"

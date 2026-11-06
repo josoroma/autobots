@@ -1,0 +1,234 @@
+"""The GitHub connector over a fake transport. The gateway is in tests/db/connector_check.py."""
+
+import asyncio
+import importlib.util
+import json
+import sys
+from pathlib import Path
+from typing import Any
+from uuid import uuid4
+
+import httpx
+import pytest
+from pydantic import ValidationError
+
+from autobots.adapters.github_issues import (
+    REPOSITORY_VARIABLE,
+    TOKEN_VARIABLE,
+    UnclearReply,
+    github_issue_tool,
+    marker,
+)
+from autobots.application.tool_gateway import (
+    NotDelivered,
+    ToolContext,
+    ToolFailed,
+    ToolScope,
+)
+from autobots.contracts.tools import CreateGithubIssueInput
+from autobots.domain.tools import EXPERT_TOOLS, LOOP_TOOL_GRANTS, OperationClass
+
+REPOSITORY = "owner/throwaway"
+TOKEN = "arranged-connector-token"
+ENV = {REPOSITORY_VARIABLE: REPOSITORY, TOKEN_VARIABLE: TOKEN}
+ARGUMENTS = CreateGithubIssueInput(title="A title", body="A body")
+OPERATION = "operation-1"
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+class FakeGithub:
+    def __init__(self, status: int = 201) -> None:
+        self.status = status
+        self.requests: list[httpx.Request] = []
+        self.issues: list[dict[str, Any]] = []
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        if request.method == "GET":
+            return httpx.Response(200 if self.status == 201 else self.status, json=self.issues)
+        if self.status != 201:
+            return httpx.Response(self.status, json={"message": "arranged"})
+        number = len(self.issues) + 1
+        issue = {
+            **json.loads(request.content),
+            "number": number,
+            "html_url": f"https://github.com/{REPOSITORY}/issues/{number}",
+        }
+        self.issues.append(issue)
+        return httpx.Response(201, json=issue)
+
+
+def context(operation: str = OPERATION) -> ToolContext:
+    return ToolContext(None, ToolScope(uuid4(), uuid4(), 1, {}), operation)
+
+
+def tool(handler: Any, environ: dict[str, str] | None = None) -> Any:
+    return github_issue_tool(httpx.MockTransport(handler), ENV if environ is None else environ)
+
+
+def create(handler: Any, environ: dict[str, str] | None = None) -> Any:
+    return asyncio.run(tool(handler, environ).handler(ARGUMENTS, context()))
+
+
+def read_back(handler: Any, operation: str = OPERATION) -> Any:
+    reconcile = tool(handler).reconcile
+    assert reconcile is not None
+    return asyncio.run(reconcile(ARGUMENTS, context(operation)))
+
+
+def test_the_tool_is_consequential_and_never_retried() -> None:
+    definition = tool(FakeGithub())
+    assert definition.operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE
+    assert definition.retries == 0
+    assert definition.safe_to_repeat is False
+    assert definition.reconcile is not None
+
+
+def test_an_owner_grants_it_and_a_plain_goal_does_not_get_it() -> None:
+    assert EXPERT_TOOLS[definition_id()] == 1
+    assert definition_id() not in LOOP_TOOL_GRANTS
+
+
+def definition_id() -> str:
+    return str(tool(FakeGithub()).tool_id)
+
+
+def test_a_call_goes_only_to_the_configured_repository_with_its_marker() -> None:
+    github = FakeGithub()
+    output = create(github)
+    assert output.number == 1
+    assert output.url.endswith(f"{REPOSITORY}/issues/1")
+    request = github.requests[0]
+    assert request.method == "POST"
+    assert str(request.url) == f"https://api.github.com/repos/{REPOSITORY}/issues"
+    assert request.headers["authorization"] == f"Bearer {TOKEN}"
+    sent = json.loads(request.content)
+    assert sent["title"] == "A title"
+    assert sent["body"].startswith("A body")
+    assert marker(OPERATION) in sent["body"]
+
+
+def test_the_output_holds_no_token() -> None:
+    assert TOKEN not in create(FakeGithub()).model_dump_json()
+
+
+@pytest.mark.parametrize("field", ["repository", "repo", "owner", "assignees", "url", "token"])
+def test_no_argument_can_choose_a_destination(field: str) -> None:
+    with pytest.raises(ValidationError):
+        CreateGithubIssueInput.model_validate({"title": "t", "body": "b", field: "other/repo"})
+
+
+@pytest.mark.parametrize(
+    "environ",
+    [
+        {},
+        {REPOSITORY_VARIABLE: REPOSITORY},
+        {TOKEN_VARIABLE: TOKEN},
+        {REPOSITORY_VARIABLE: "../../elsewhere", TOKEN_VARIABLE: TOKEN},
+        {REPOSITORY_VARIABLE: "https://evil.example/owner/repo", TOKEN_VARIABLE: TOKEN},
+        {REPOSITORY_VARIABLE: REPOSITORY, TOKEN_VARIABLE: ""},
+    ],
+)
+def test_missing_or_bad_configuration_sends_nothing(environ: dict[str, str]) -> None:
+    github = FakeGithub()
+    with pytest.raises(ToolFailed, match="connector_not_configured"):
+        create(github, environ)
+    assert github.requests == []
+
+
+@pytest.mark.parametrize("status", [400, 401, 403, 404, 410, 422, 429])
+def test_a_clear_refusal_is_a_failure_that_created_nothing(status: int) -> None:
+    with pytest.raises(ToolFailed, match=f"github_refused_{status}"):
+        create(FakeGithub(status))
+
+
+@pytest.mark.parametrize("status", [200, 202, 301, 500, 502, 503])
+def test_an_unclear_reply_stays_uncertain(status: int) -> None:
+    with pytest.raises(UnclearReply):
+        create(FakeGithub(status))
+
+
+def test_a_connection_that_never_opened_is_a_clean_failure() -> None:
+    def refuse(_: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("arranged")
+
+    with pytest.raises(ToolFailed, match="destination_unreachable"):
+        create(refuse)
+
+
+def test_a_lost_reply_stays_uncertain() -> None:
+    """The request went out, so the issue may exist. Only a readback can say."""
+
+    def lose(_: httpx.Request) -> httpx.Response:
+        raise httpx.ReadError("arranged")
+
+    with pytest.raises(httpx.ReadError):
+        create(lose)
+
+
+def test_a_redirect_is_not_followed() -> None:
+    def redirect(request: httpx.Request) -> httpx.Response:
+        assert request.url.host == "api.github.com"
+        return httpx.Response(302, headers={"location": "https://evil.example/issues"})
+
+    with pytest.raises(UnclearReply):
+        create(redirect)
+
+
+def test_a_readback_finds_the_issue_by_its_marker() -> None:
+    github = FakeGithub()
+    created = create(github)
+    found = read_back(github)
+    assert found == created
+    assert sum(request.method == "POST" for request in github.requests) == 1
+
+
+def test_a_readback_of_another_operation_finds_nothing() -> None:
+    github = FakeGithub()
+    create(github)
+    with pytest.raises(NotDelivered):
+        read_back(github, "another-operation")
+
+
+def test_a_readback_copes_with_an_issue_with_no_body() -> None:
+    github = FakeGithub()
+    github.issues.append({"number": 9, "html_url": "x", "body": None})
+    with pytest.raises(NotDelivered):
+        read_back(github)
+
+
+def test_a_failed_readback_says_nothing_about_delivery() -> None:
+    with pytest.raises(UnclearReply):
+        read_back(FakeGithub(500))
+
+
+def qualifier() -> Any:
+    path = REPO_ROOT / "scripts/qualify_github_connector.py"
+    spec = importlib.util.spec_from_file_location("qualify_github_connector", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.mark.parametrize(
+    ("scopes", "private", "refusal"),
+    [
+        ("repo", True, "broad"),
+        ("repo, workflow", True, "broad"),
+        ("", False, "public"),
+        (None, False, "public"),
+    ],
+)
+def test_the_live_qualifier_refuses_an_unsafe_target(
+    scopes: str | None, private: bool, refusal: str
+) -> None:
+    assert refusal in qualifier().unsafe_target(scopes, private)
+
+
+@pytest.mark.parametrize("scopes", ["", None])
+def test_the_live_qualifier_accepts_a_limited_token_on_a_private_repository(
+    scopes: str | None,
+) -> None:
+    assert qualifier().unsafe_target(scopes, True) == ""

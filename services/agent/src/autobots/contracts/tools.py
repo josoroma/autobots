@@ -36,6 +36,22 @@ class ReadRunFileOutput(BaseModel):
     sha256: str
 
 
+class CreateGithubIssueInput(BaseModel):
+    """No field names a repository: that's server configuration, by Decision 0007."""
+
+    model_config = TOOL_CONTRACT
+
+    title: str = Field(min_length=1, max_length=256)
+    body: str = Field(max_length=60_000)
+
+
+class CreateGithubIssueOutput(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    number: int
+    url: str
+
+
 class SaveArtifactInput(BaseModel):
     model_config = TOOL_CONTRACT
 

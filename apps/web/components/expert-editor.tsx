@@ -15,6 +15,7 @@ const TOOLS = [
   { id: "publish_artifact", label: "Publish artifacts" },
   { id: "search_memory", label: "Search memory" },
   { id: "propose_improvement", label: "Propose improvements for review" },
+  { id: "create_github_issue", label: "Create GitHub issues, after approval" },
 ];
 const PROFILES = [
   { id: "", label: "Workspace setting" },

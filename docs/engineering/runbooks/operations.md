@@ -67,6 +67,28 @@ These don't pause: after two retries, `rate_limited` (`429`) and `provider_error
 
 It makes no paid call, and says nothing about a live route, real response shapes, real prices or real billing. Its fake replies don't exercise compaction, a workflow or child run through this worker, two workers at once, a lost lease, or Terra's mandatory reasoning within 512 output tokens, which belongs to US-3.4.
 
+## The GitHub issue connector
+
+The first consequential connector, by [Decision 0007](../decisions/0007-first-connector-github-issues.md). It creates an issue in one repository and does nothing else. An owner grants it per Expert, goals without an Expert don't get it, and each call waits for a person's approval.
+
+Set both for the worker:
+
+```sh
+AUTOBOTS_GITHUB_ISSUES_REPOSITORY=owner/name
+AUTOBOTS_GITHUB_ISSUES_TOKEN=<a fine-grained token limited to that repository, with Issues read and write>
+```
+
+The token is read for each attempt and stored nowhere. Without both, a call fails as `connector_not_configured` and sends nothing.
+
+- **Refused by GitHub:** the call fails as `github_refused_<status>`, with that code on the receipt, and created nothing.
+- **Uncertain:** a lost reply or an unclear status records `unknown`. The connector looks for its marker in the newest 100 issues and only sends again if it isn't there, so an issue that hasn't appeared yet, or a repository busier than that, could be duplicated.
+
+Qualify it against a throwaway private repository. The script refuses a broad token or a public repository, writes one issue and closes it:
+
+```sh
+PYTHONPATH=services/agent/src services/agent/.venv/bin/python scripts/qualify_github_connector.py --live --repository owner/throwaway --token-file /path/outside/this/repository
+```
+
 ## Reading health
 
 | Condition | Code | Admission | What to do |

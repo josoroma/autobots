@@ -16,6 +16,7 @@ TOOL_VERSIONS: Mapping[str, int] = {
     "assign_specialist": 1,
     "calculate": 1,
     "complete_task": 1,
+    "create_github_issue": 1,
     "propose_improvement": 1,
     "propose_plan": 1,
     "publish_artifact": 1,
