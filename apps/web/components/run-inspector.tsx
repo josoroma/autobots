@@ -27,10 +27,16 @@ export function RunInspectorView({ runId }: { runId: string }) {
     })
       .then(async (reply) => {
         if (!active) return;
-        if (reply.ok) setView(parseRunInspector(await reply.json()));
-        else if (reply.status === 404 || reply.status === 401)
-          setState("unavailable");
-        else setState("error");
+        if (reply.ok) {
+          setView(parseRunInspector(await reply.json()));
+          return;
+        }
+        await reply.text();
+        setState(
+          reply.status === 404 || reply.status === 401
+            ? "unavailable"
+            : "error",
+        );
       })
       .catch(() => {
         if (active) setState("error");

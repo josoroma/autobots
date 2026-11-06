@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import { RunDisclosure } from "@/components/run-disclosure";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Select, Textarea } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
 
 const STARTER = JSON.stringify(
@@ -35,8 +36,6 @@ const STARTER = JSON.stringify(
   null,
   2,
 );
-const INPUT_CLASS =
-  "bg-background border-input block w-full rounded-md border px-3 py-2 font-mono text-sm";
 
 function parsed(text: string): unknown {
   try {
@@ -201,7 +200,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
         <label htmlFor="graph" className="text-sm font-medium">
           Graph
         </label>
-        <textarea
+        <Textarea
           id="graph"
           rows={16}
           spellCheck={false}
@@ -210,7 +209,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
             setDraft(event.target.value);
             setCheck(null);
           }}
-          className={INPUT_CLASS}
+          className="font-mono"
         />
         <div className="flex gap-3">
           <Button variant="secondary" onClick={() => void validate()}>
@@ -257,7 +256,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
             <label htmlFor="version" className="text-sm font-medium">
               Version
             </label>
-            <select
+            <Select
               id="version"
               value={chosen ?? ""}
               onChange={(event) => setChosen(Number(event.target.value))}
@@ -269,17 +268,17 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
                   {version.source === "model_proposal" ? ", from a model" : ""}
                 </option>
               ))}
-            </select>
+            </Select>
             <label htmlFor="inputs" className="text-sm font-medium">
               Inputs
             </label>
-            <textarea
+            <Textarea
               id="inputs"
               rows={3}
               spellCheck={false}
               value={inputs}
               onChange={(event) => setInputs(event.target.value)}
-              className={INPUT_CLASS}
+              className="font-mono"
             />
             <RunDisclosure sendsOnlyIfAgent />
             <Button onClick={() => void run()}>Run this version</Button>

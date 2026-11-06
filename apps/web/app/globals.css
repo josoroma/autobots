@@ -52,9 +52,17 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* US-11.11: light `--ring` measures about 2.5:1, under WCAG's 3:1. The token stays, and the
+     foreground beside it is what reaches 3:1, in the pairing DS-04 asks to correct first. */
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--foreground);
+  }
+  /* US-11.11: `--input` as a border measures 1.26:1 in light and 1.57:1 in dark, under 3:1. It stays,
+     and this edge is what identifies the control. Focus replaces it with the indicator above. */
+  .control-boundary:not(:focus-visible) {
+    box-shadow: inset 0 -1px 0 var(--muted-foreground);
   }
   @media (prefers-reduced-motion: reduce) {
     * {

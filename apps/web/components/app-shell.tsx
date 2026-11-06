@@ -14,7 +14,7 @@ const NAVIGATION = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen flex-col md:flex-row">
       <a
         href="#content"
         className="bg-primary text-primary-foreground sr-only rounded-md px-3 py-2 focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-10"
@@ -23,7 +23,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </a>
       <nav
         aria-label="Main"
-        className="bg-sidebar text-sidebar-foreground border-sidebar-border w-56 space-y-1 border-r p-4"
+        className="bg-sidebar text-sidebar-foreground border-sidebar-border w-full shrink-0 space-y-1 border-b p-4 md:w-56 md:border-r md:border-b-0"
       >
         <p className="px-3 pb-3 text-sm font-semibold">Autobots</p>
         {NAVIGATION.map((item) => (
@@ -36,7 +36,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
         ))}
       </nav>
-      <main id="content" className="flex-1 p-8">
+      <main id="content" className="min-w-0 flex-1 p-4 md:p-8">
         {children}
       </main>
     </div>

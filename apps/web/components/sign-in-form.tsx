@@ -4,10 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
-
-const INPUT =
-  "bg-background border-input block w-full rounded-md border px-3 py-2 text-sm";
 
 export function SignInForm() {
   const router = useRouter();
@@ -42,26 +40,24 @@ export function SignInForm() {
         <label htmlFor="email" className="text-sm font-medium">
           Email
         </label>
-        <input
+        <Input
           id="email"
           name="email"
           type="email"
           autoComplete="username"
           required
-          className={INPUT}
         />
       </div>
       <div className="space-y-1">
         <label htmlFor="password" className="text-sm font-medium">
           Password
         </label>
-        <input
+        <Input
           id="password"
           name="password"
           type="password"
           autoComplete="current-password"
           required
-          className={INPUT}
         />
       </div>
       {failed ? (

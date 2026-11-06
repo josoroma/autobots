@@ -3,6 +3,7 @@
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useSyncExternalStore } from "react";
+import { Choice } from "@/components/ui/field";
 
 const subscribe = () => () => undefined;
 
@@ -23,14 +24,13 @@ export function AppearanceControl() {
         { value: "light", label: "Light", Icon: Sun },
       ].map(({ value, label, Icon }) => (
         <label key={value} className="flex w-fit items-center gap-2 text-sm">
-          <input
+          <Choice
             type="radio"
             name="appearance"
             value={value}
             checked={current === value}
             disabled={!mounted}
             onChange={() => setTheme(value)}
-            className="accent-primary size-4"
           />
           <Icon aria-hidden="true" className="size-4" />
           {label}

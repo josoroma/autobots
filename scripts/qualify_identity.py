@@ -249,7 +249,8 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
                                      'AUTOBOTS_TEST_MEMBER_EMAIL': email_c, 'AUTOBOTS_TEST_MEMBER_PASSWORD': password_c,
                                      'AUTOBOTS_TEST_UPSTREAM_LOG': str(upstream_log), 'AUTOBOTS_TEST_CATALOG_DOWN': str(catalog_down), 'AUTOBOTS_TEST_BACKUP_DIR': str(backups),
                                      'AUTOBOTS_TEST_SERVICE_KEY': stack.values['SERVICE_ROLE_KEY'], 'AUTOBOTS_WEB_REPORT': str(report),
-                                     'AUTOBOTS_WEB_OUTPUT': str(root / '.checks/identity/results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots)}
+                                     'AUTOBOTS_WEB_OUTPUT': str(root / '.checks/identity/results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots),
+                                     'AUTOBOTS_TEST_VISUAL_DIR': str(root / '.checks/identity/visual')}
         result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'browser/operations', 'approvals', 'effects', 'experts', 'identity', 'settings', 'runs', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
                                 env=browser_env)
         # A real restart, then Settings reads the stored records. Then one is removed, under the same key.
@@ -276,7 +277,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
                       'AUTOBOTS_STORAGE_BASE': base, 'AUTOBOTS_STORAGE_SERVICE': stack.values['SERVICE_ROLE_KEY'],
                       'AUTOBOTS_TEST_DIED_MARKER': str(config_root / 'worker-died')}
         processes.append(start([str(root / PYTHON), str(root / 'tests/web/fixture_worker.py')], worker_env, root))
-        slice_result = subprocess.run([str(playwright), 'test', 'slice', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=600, check=False,
+        slice_result = subprocess.run([str(playwright), 'test', 'slice', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=900, check=False,
                                       env={**browser_env, 'AUTOBOTS_WEB_REPORT': str(slice_report)})
         if slice_result.returncode:
             print(slice_result.stdout[-2500:], file=sys.stderr)

@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { RunDisclosure } from "@/components/run-disclosure";
 import { Card } from "@/components/ui/card";
+import { Choice, Textarea } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
 
 export function SessionPanel({ sessionId }: { sessionId: string }) {
@@ -107,7 +108,7 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
             >
               {session.kind === "coordinator" ? (
                 <label className="flex items-center gap-2 font-medium">
-                  <input
+                  <Choice
                     type="radio"
                     name="expert"
                     checked={chosen === option.expert_id}
@@ -143,12 +144,11 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
         <label htmlFor="session-goal" className="text-sm font-medium">
           Goal
         </label>
-        <textarea
+        <Textarea
           id="session-goal"
           rows={3}
           value={goal}
           onChange={(event) => setGoal(event.target.value)}
-          className="bg-background border-input block w-full rounded-md border px-3 py-2 text-sm"
         />
         <RunDisclosure
           chosen={profile}

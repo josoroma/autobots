@@ -1,0 +1,8 @@
+{
+  "captured_at_utc": "2026-11-06T15:35:15.250062+00:00",
+  "base_revision": "b77cd3482d181f8bada79b8d0f8364bc342abb5c",
+  "note": "The story's commit is this base plus these screens.",
+  "screens_sha256": "96cf1fdc9f2b19e37922704e1b5aa408147f3cc75556de17866482d9c2254028",
+  "screens_files": 59,
+  "how": "sha256 over each sorted file path under apps/web/app, components and lib, then its bytes"
+}

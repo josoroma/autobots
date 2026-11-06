@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Select } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
 
 const WORKSPACE_DEFAULT = "";
@@ -81,6 +82,8 @@ export function ModelPolicyPanel() {
       .then(async ([modelReply, policyReply]) => {
         if (!active) return;
         if (!modelReply.ok || !policyReply.ok) {
+          // Read, or an unread refusal holds its connection open for as long as the page lives.
+          await Promise.all([modelReply.text(), policyReply.text()]);
           setFailed(true);
           return;
         }
@@ -160,18 +163,17 @@ export function ModelPolicyPanel() {
           <label htmlFor="workspace-default" className="text-sm font-medium">
             Workspace default
           </label>
-          <select
+          <Select
             id="workspace-default"
             value={defaultProfile}
             onChange={(event) => setDefaultProfile(event.target.value)}
-            className="bg-background border-input block w-full rounded-md border px-3 py-2 text-sm"
           >
             {models.models.map((model) => (
               <option key={model.profile} value={model.profile}>
                 {model.canonical_id}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">Role overrides</legend>
@@ -183,7 +185,7 @@ export function ModelPolicyPanel() {
               >
                 {binding.role}
               </label>
-              <select
+              <Select
                 id={`role-${binding.role}`}
                 value={overrides[binding.role] ?? WORKSPACE_DEFAULT}
                 onChange={(event) => {
@@ -195,7 +197,6 @@ export function ModelPolicyPanel() {
                   }
                   setOverrides(next);
                 }}
-                className="bg-background border-input block w-full rounded-md border px-3 py-2 text-sm"
               >
                 <option value={WORKSPACE_DEFAULT}>Workspace default</option>
                 {models.models.map((model) => (
@@ -203,7 +204,7 @@ export function ModelPolicyPanel() {
                     {model.canonical_id}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           ))}
         </fieldset>

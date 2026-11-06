@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
 
 const CONDITIONS: Record<string, string> = {
@@ -250,8 +251,8 @@ export function OperationsPanel() {
           </p>
           <label className="block text-sm">
             Run content, days after finishing
-            <input
-              className="ml-2 w-24 rounded border px-2 py-1"
+            <Input
+              className="ml-2 inline-block w-24"
               inputMode="numeric"
               value={runDays}
               onChange={(event) => setRunDays(event.target.value)}
@@ -259,8 +260,8 @@ export function OperationsPanel() {
           </label>
           <label className="block text-sm">
             Retry keys, days
-            <input
-              className="ml-2 w-24 rounded border px-2 py-1"
+            <Input
+              className="ml-2 inline-block w-24"
               inputMode="numeric"
               value={receiptDays}
               onChange={(event) => setReceiptDays(event.target.value)}

@@ -4,6 +4,7 @@ import { parseRunSummary } from "@autobots/api-client";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
 
 type Command = "pause" | "resume" | "cancel";
@@ -145,13 +146,12 @@ export function RunControls({
           <label htmlFor="model-call-charge" className="font-medium">
             Charge seen, in US dollars
           </label>
-          <input
+          <Input
             id="model-call-charge"
             value={charge}
             onChange={(event) => setCharge(event.target.value)}
             inputMode="decimal"
             autoComplete="off"
-            className="bg-background border-input block w-full rounded-md border px-3 py-2 text-sm"
           />
           <Button type="submit" variant="secondary" disabled={busy}>
             Record the charge

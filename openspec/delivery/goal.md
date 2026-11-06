@@ -10,8 +10,8 @@ markers are preserved across refreshes.
 | Target | EPIC-11 |
 | Kind | epic |
 | Focus | - |
-| Status | BLOCKED |
-| Reason | US-11.11 needs an answer: is WCAG 2.1 AA the contrast pass line? US-11.12 needs answers on M8 (can members choose an earlier Expert version?), M32 (is to_version 0 the interface for no active version?), M33 (are a reviewer's own text checks enough to gate promotion for now?) and WORKER-INFERENCE-001 (should rate_limited and provider_error fail a run after retries, or pause it?). |
+| Status | ACTIVE |
+| Reason | - |
 | Started | 2026-11-06 |
 | Updated | 2026-11-06 |
 
@@ -29,17 +29,17 @@ markers are preserved across refreshes.
 | 8 | US-11.8 | us-11-8-operations-completeness | DONE | Operations completeness |
 | 9 | US-11.9 | us-11-9-run-creation-disclosure-role | DONE | Run creation disclosure, role map and run details |
 | 10 | US-11.10 | us-11-10-real-mac-sleep-proof | DONE | Real Mac sleep proof |
-| 11 | US-11.11 | us-11-11-design-system-migration-final | BLOCKED | Design system migration and final visual evidence |
+| 11 | US-11.11 | us-11-11-design-system-migration-final | READY | Design system migration and final visual evidence |
 | 12 | US-11.12 | us-11-12-final-independent-review-gate | BLOCKED | Final independent review and Gate 0 |
 
 ## Next Action
 
-Action: escalate
+Action: select
 Story: US-11.11
 Change: us-11-11-design-system-migration-final
-Owner: human
-Command: resolve US-11.11 in SPECS.md (a product decision is required)
-Reason: US-11.11 is BLOCKED, not READY
+Owner: main-session
+Command: openspec new change us-11-11-design-system-migration-final; set US-11.11 to IN PROGRESS with a Change: line
+Reason: US-11.11 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

@@ -1,0 +1,4133 @@
+{
+  "schema_version": "autobots.visual-evidence/v1",
+  "pass_line": "WCAG 2.1 AA, Decision 0010",
+  "surfaces": 42,
+  "with_findings": [],
+  "absent": {
+    "onboarding": "No separate flow. Key setup on Models is what a new owner meets, and it's captured as key-setup.",
+    "dialogs and portals": "The app has none. Choices are inline, and selects are native.",
+    "menus": "None apart from native selects, whose open lists the OS draws.",
+    "notifications": "No toast or notification surface. Results are inline status text, measured where they appear.",
+    "charts": "The app has none, so no chart token is in use.",
+    "artifact previews": "Artifacts are downloaded through a link, and no preview exists. The list is captured on the run.",
+    "file lists": "No screen lists a run's working files. Published artifacts are on the run.",
+    "workflow canvas": "The editor is a validated text form, with no canvas, so no edge or node marker is drawn."
+  },
+  "results": [
+    {
+      "surface": "sign-in",
+      "theme": "dark",
+      "screenshot": "sign-in-dark.png",
+      "text_checked": 16,
+      "lowest_text_ratio": 6.94,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "input",
+          "label": "email",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "input",
+          "label": "password",
+          "ratio": 7.66,
+          "border": 1.57
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT#email",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT#password",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        }
+      ],
+      "focus_failures": [],
+      "hover": {
+        "sample": "Sign in",
+        "ratio": 8.84
+      },
+      "axe_violations": []
+    },
+    {
+      "surface": "key-setup",
+      "theme": "dark",
+      "screenshot": "key-setup-dark.png",
+      "text_checked": 65,
+      "lowest_text_ratio": 6.94,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "input",
+          "label": "openrouter-key",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "workspace-default",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-coordinator",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-router",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-planner",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-executor",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-researcher",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-coder",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-reviewer",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-evaluator",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-summarizer",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-memory_curator",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-skill_learner",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-tool_repair",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-workflow_generator",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-general_purpose",
+          "ratio": 7.66,
+          "border": 1.57
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT#openrouter-key",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "SELECT#workspace-default",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "SELECT#role-coordinator",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "SELECT#role-router",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "SELECT#role-planner",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "SELECT#role-executor",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "SELECT#role-researcher",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "SELECT#role-coder",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "SELECT#role-reviewer",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "SELECT#role-evaluator",
+          "outline_width": "2px",
+          "ratio": 17.18
+        }
+      ],
+      "focus_failures": [],
+      "hover": {
+        "sample": "Save & validate",
+        "ratio": 8.84
+      },
+      "axe_violations": []
+    },
+    {
+      "surface": "home",
+      "theme": "dark",
+      "screenshot": "home-dark.png",
+      "text_checked": 40,
+      "lowest_text_ratio": 6.94,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "textarea",
+          "label": "goal",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "run-model",
+          "ratio": 7.66,
+          "border": 1.61
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "TEXTAREA#goal",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "SELECT#run-model",
+          "outline_width": "2px",
+          "ratio": 14.5
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        }
+      ],
+      "focus_failures": [],
+      "hover": {
+        "sample": "Sign out",
+        "ratio": 14.88
+      },
+      "axe_violations": []
+    },
+    {
+      "surface": "runs",
+      "theme": "dark",
+      "screenshot": "runs-dark.png",
+      "text_checked": 212,
+      "lowest_text_ratio": 6.94,
+      "text_failures": [],
+      "boundaries": [],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "run",
+      "theme": "dark",
+      "screenshot": "run-dark.png",
+      "text_checked": 53,
+      "lowest_text_ratio": 6.94,
+      "text_failures": [],
+      "boundaries": [],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "inspector",
+      "theme": "dark",
+      "screenshot": "inspector-dark.png",
+      "text_checked": 103,
+      "lowest_text_ratio": 8.11,
+      "text_failures": [],
+      "boundaries": [],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "experts",
+      "theme": "dark",
+      "screenshot": "experts-dark.png",
+      "text_checked": 44,
+      "lowest_text_ratio": 6.94,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "input",
+          "label": "expert-name",
+          "ratio": 7.66,
+          "border": 1.57
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT#route-1df4bab9-2742-43cb-bbf6-eb877b1f308a",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT#route-441fec71-fe62-4fda-ba59-44e9b6caa6de",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT#route-1495216a-1434-41c0-82e7-eb8794e15db2",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT#route-08f569a6-838f-452b-9a5c-7c0c45c1565d",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT#route-67d2472c-06b8-4bb7-bcd5-1779f5e145dc",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT#route-99e5fac4-99db-4c66-b067-c9e11c8e80ee",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "expert-editor",
+      "theme": "dark",
+      "screenshot": "expert-editor-dark.png",
+      "text_checked": 27,
+      "lowest_text_ratio": 8.11,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "input",
+          "label": "purpose",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "textarea",
+          "label": "instructions",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "executor",
+          "ratio": 7.66,
+          "border": 1.57
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT#purpose",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "TEXTAREA#instructions",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "SELECT#executor",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        }
+      ],
+      "focus_failures": [],
+      "hover": {
+        "sample": "Save revision",
+        "ratio": 8.84
+      },
+      "axe_violations": []
+    },
+    {
+      "surface": "session",
+      "theme": "dark",
+      "screenshot": "session-dark.png",
+      "text_checked": 37,
+      "lowest_text_ratio": 8.11,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "textarea",
+          "label": "session-goal",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "run-model",
+          "ratio": 7.66,
+          "border": 1.61
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "TEXTAREA#session-goal",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "SELECT#run-model",
+          "outline_width": "2px",
+          "ratio": 14.5
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "workflows",
+      "theme": "dark",
+      "screenshot": "workflows-dark.png",
+      "text_checked": 52,
+      "lowest_text_ratio": 6.94,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "input",
+          "label": "workflow-name",
+          "ratio": 7.66,
+          "border": 1.57
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "workflow-editor",
+      "theme": "dark",
+      "screenshot": "workflow-editor-dark.png",
+      "text_checked": 74,
+      "lowest_text_ratio": 8.11,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "textarea",
+          "label": "graph",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "version",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "textarea",
+          "label": "inputs",
+          "ratio": 7.66,
+          "border": 1.57
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "TEXTAREA#graph",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "SELECT#version",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "TEXTAREA#inputs",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        }
+      ],
+      "focus_failures": [],
+      "hover": {
+        "sample": "Validate",
+        "ratio": 14.88
+      },
+      "axe_violations": []
+    },
+    {
+      "surface": "workflow-monitor",
+      "theme": "dark",
+      "screenshot": "workflow-monitor-dark.png",
+      "text_checked": 33,
+      "lowest_text_ratio": 6.94,
+      "text_failures": [],
+      "boundaries": [],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "approvals",
+      "theme": "dark",
+      "screenshot": "approvals-dark.png",
+      "text_checked": 48,
+      "lowest_text_ratio": 6.94,
+      "text_failures": [],
+      "boundaries": [],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        }
+      ],
+      "focus_failures": [],
+      "hover": {
+        "sample": "Approve",
+        "ratio": 8.84
+      },
+      "axe_violations": []
+    },
+    {
+      "surface": "approvals-empty",
+      "theme": "dark",
+      "screenshot": "approvals-empty-dark.png",
+      "text_checked": 12,
+      "lowest_text_ratio": 8.11,
+      "text_failures": [],
+      "boundaries": [],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "settings",
+      "theme": "dark",
+      "screenshot": "settings-dark.png",
+      "text_checked": 16,
+      "lowest_text_ratio": 6.94,
+      "text_failures": [],
+      "boundaries": [],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 17.18
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "models",
+      "theme": "dark",
+      "screenshot": "models-dark.png",
+      "text_checked": 70,
+      "lowest_text_ratio": 6.94,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "input",
+          "label": "openrouter-key",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "workspace-default",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-coordinator",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-router",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-planner",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-executor",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-researcher",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-coder",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-reviewer",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-evaluator",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-summarizer",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-memory_curator",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-skill_learner",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-tool_repair",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-workflow_generator",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "select",
+          "label": "role-general_purpose",
+          "ratio": 7.66,
+          "border": 1.57
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT#openrouter-key",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "SELECT#workspace-default",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "SELECT#role-coordinator",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "SELECT#role-router",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "SELECT#role-planner",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "SELECT#role-executor",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "SELECT#role-researcher",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "SELECT#role-coder",
+          "outline_width": "2px",
+          "ratio": 17.18
+        }
+      ],
+      "focus_failures": [],
+      "hover": {
+        "sample": "Save & validate",
+        "ratio": 8.84
+      },
+      "axe_violations": []
+    },
+    {
+      "surface": "operations",
+      "theme": "dark",
+      "screenshot": "operations-dark.png",
+      "text_checked": 51,
+      "lowest_text_ratio": 8.11,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "input",
+          "label": "INPUT",
+          "ratio": 7.66,
+          "border": 1.57
+        },
+        {
+          "slot": "input",
+          "label": "INPUT",
+          "ratio": 7.66,
+          "border": 1.57
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 17.18
+        }
+      ],
+      "focus_failures": [],
+      "hover": {
+        "sample": "Check again",
+        "ratio": 14.88
+      },
+      "axe_violations": []
+    },
+    {
+      "surface": "state-loading",
+      "theme": "dark",
+      "screenshot": "state-loading-dark.png",
+      "text_checked": 12,
+      "lowest_text_ratio": 8.11,
+      "text_failures": [],
+      "boundaries": [],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "state-error",
+      "theme": "dark",
+      "screenshot": "state-error-dark.png",
+      "text_checked": 12,
+      "lowest_text_ratio": 8.11,
+      "text_failures": [],
+      "boundaries": [],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "state-empty",
+      "theme": "dark",
+      "screenshot": "state-empty-dark.png",
+      "text_checked": 15,
+      "lowest_text_ratio": 8.11,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "input",
+          "label": "workflow-name",
+          "ratio": 7.66,
+          "border": 1.57
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT#workflow-name",
+          "outline_width": "2px",
+          "ratio": 17.18
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "state-local-only",
+      "theme": "dark",
+      "screenshot": "state-local-only-dark.png",
+      "text_checked": 13,
+      "lowest_text_ratio": 8.11,
+      "text_failures": [],
+      "boundaries": [],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "sign-in",
+      "theme": "light",
+      "screenshot": "sign-in-light.png",
+      "text_checked": 16,
+      "lowest_text_ratio": 4.74,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "input",
+          "label": "email",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "input",
+          "label": "password",
+          "ratio": 4.74,
+          "border": 1.26
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "INPUT#email",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "INPUT#password",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        }
+      ],
+      "focus_failures": [],
+      "hover": {
+        "sample": "Sign in",
+        "ratio": 5.21
+      },
+      "axe_violations": []
+    },
+    {
+      "surface": "key-setup",
+      "theme": "light",
+      "screenshot": "key-setup-light.png",
+      "text_checked": 65,
+      "lowest_text_ratio": 4.74,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "input",
+          "label": "openrouter-key",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "workspace-default",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-coordinator",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-router",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-planner",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-executor",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-researcher",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-coder",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-reviewer",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-evaluator",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-summarizer",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-memory_curator",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-skill_learner",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-tool_repair",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-workflow_generator",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-general_purpose",
+          "ratio": 4.74,
+          "border": 1.26
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "INPUT#openrouter-key",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "SELECT#workspace-default",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "SELECT#role-coordinator",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "SELECT#role-router",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "SELECT#role-planner",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "SELECT#role-executor",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "SELECT#role-researcher",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "SELECT#role-coder",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "SELECT#role-reviewer",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "SELECT#role-evaluator",
+          "outline_width": "2px",
+          "ratio": 19.8
+        }
+      ],
+      "focus_failures": [],
+      "hover": {
+        "sample": "Save & validate",
+        "ratio": 5.21
+      },
+      "axe_violations": []
+    },
+    {
+      "surface": "home",
+      "theme": "light",
+      "screenshot": "home-light.png",
+      "text_checked": 40,
+      "lowest_text_ratio": 4.74,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "textarea",
+          "label": "goal",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "run-model",
+          "ratio": 4.74,
+          "border": 1.16
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "TEXTAREA#goal",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "SELECT#run-model",
+          "outline_width": "2px",
+          "ratio": 18.16
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        }
+      ],
+      "focus_failures": [],
+      "hover": {
+        "sample": "Sign out",
+        "ratio": 16.43
+      },
+      "axe_violations": []
+    },
+    {
+      "surface": "runs",
+      "theme": "light",
+      "screenshot": "runs-light.png",
+      "text_checked": 212,
+      "lowest_text_ratio": 4.74,
+      "text_failures": [],
+      "boundaries": [],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "run",
+      "theme": "light",
+      "screenshot": "run-light.png",
+      "text_checked": 53,
+      "lowest_text_ratio": 4.74,
+      "text_failures": [],
+      "boundaries": [],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "inspector",
+      "theme": "light",
+      "screenshot": "inspector-light.png",
+      "text_checked": 103,
+      "lowest_text_ratio": 6.28,
+      "text_failures": [],
+      "boundaries": [],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "experts",
+      "theme": "light",
+      "screenshot": "experts-light.png",
+      "text_checked": 44,
+      "lowest_text_ratio": 4.74,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "input",
+          "label": "expert-name",
+          "ratio": 4.74,
+          "border": 1.26
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "INPUT#route-1df4bab9-2742-43cb-bbf6-eb877b1f308a",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "INPUT#route-441fec71-fe62-4fda-ba59-44e9b6caa6de",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "INPUT#route-1495216a-1434-41c0-82e7-eb8794e15db2",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "INPUT#route-08f569a6-838f-452b-9a5c-7c0c45c1565d",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "INPUT#route-67d2472c-06b8-4bb7-bcd5-1779f5e145dc",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "INPUT#route-99e5fac4-99db-4c66-b067-c9e11c8e80ee",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "expert-editor",
+      "theme": "light",
+      "screenshot": "expert-editor-light.png",
+      "text_checked": 27,
+      "lowest_text_ratio": 6.28,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "input",
+          "label": "purpose",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "textarea",
+          "label": "instructions",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "executor",
+          "ratio": 4.74,
+          "border": 1.26
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "INPUT#purpose",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "TEXTAREA#instructions",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "SELECT#executor",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        }
+      ],
+      "focus_failures": [],
+      "hover": {
+        "sample": "Save revision",
+        "ratio": 5.21
+      },
+      "axe_violations": []
+    },
+    {
+      "surface": "session",
+      "theme": "light",
+      "screenshot": "session-light.png",
+      "text_checked": 37,
+      "lowest_text_ratio": 6.28,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "textarea",
+          "label": "session-goal",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "run-model",
+          "ratio": 4.74,
+          "border": 1.16
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "TEXTAREA#session-goal",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "SELECT#run-model",
+          "outline_width": "2px",
+          "ratio": 18.16
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "workflows",
+      "theme": "light",
+      "screenshot": "workflows-light.png",
+      "text_checked": 52,
+      "lowest_text_ratio": 4.74,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "input",
+          "label": "workflow-name",
+          "ratio": 4.74,
+          "border": 1.26
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "workflow-editor",
+      "theme": "light",
+      "screenshot": "workflow-editor-light.png",
+      "text_checked": 74,
+      "lowest_text_ratio": 6.28,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "textarea",
+          "label": "graph",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "version",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "textarea",
+          "label": "inputs",
+          "ratio": 4.74,
+          "border": 1.26
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "TEXTAREA#graph",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "SELECT#version",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "TEXTAREA#inputs",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        }
+      ],
+      "focus_failures": [],
+      "hover": {
+        "sample": "Validate",
+        "ratio": 16.43
+      },
+      "axe_violations": []
+    },
+    {
+      "surface": "workflow-monitor",
+      "theme": "light",
+      "screenshot": "workflow-monitor-light.png",
+      "text_checked": 33,
+      "lowest_text_ratio": 4.74,
+      "text_failures": [],
+      "boundaries": [],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "approvals",
+      "theme": "light",
+      "screenshot": "approvals-light.png",
+      "text_checked": 48,
+      "lowest_text_ratio": 4.74,
+      "text_failures": [],
+      "boundaries": [],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        }
+      ],
+      "focus_failures": [],
+      "hover": {
+        "sample": "Approve",
+        "ratio": 5.21
+      },
+      "axe_violations": []
+    },
+    {
+      "surface": "approvals-empty",
+      "theme": "light",
+      "screenshot": "approvals-empty-light.png",
+      "text_checked": 12,
+      "lowest_text_ratio": 6.28,
+      "text_failures": [],
+      "boundaries": [],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "settings",
+      "theme": "light",
+      "screenshot": "settings-light.png",
+      "text_checked": 16,
+      "lowest_text_ratio": 4.74,
+      "text_failures": [],
+      "boundaries": [],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 19.8
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "models",
+      "theme": "light",
+      "screenshot": "models-light.png",
+      "text_checked": 70,
+      "lowest_text_ratio": 4.74,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "input",
+          "label": "openrouter-key",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "workspace-default",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-coordinator",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-router",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-planner",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-executor",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-researcher",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-coder",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-reviewer",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-evaluator",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-summarizer",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-memory_curator",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-skill_learner",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-tool_repair",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-workflow_generator",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "select",
+          "label": "role-general_purpose",
+          "ratio": 4.74,
+          "border": 1.26
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "INPUT#openrouter-key",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "SELECT#workspace-default",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "SELECT#role-coordinator",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "SELECT#role-router",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "SELECT#role-planner",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "SELECT#role-executor",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "SELECT#role-researcher",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "SELECT#role-coder",
+          "outline_width": "2px",
+          "ratio": 19.8
+        }
+      ],
+      "focus_failures": [],
+      "hover": {
+        "sample": "Save & validate",
+        "ratio": 5.21
+      },
+      "axe_violations": []
+    },
+    {
+      "surface": "operations",
+      "theme": "light",
+      "screenshot": "operations-light.png",
+      "text_checked": 51,
+      "lowest_text_ratio": 6.28,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "input",
+          "label": "INPUT",
+          "ratio": 4.74,
+          "border": 1.26
+        },
+        {
+          "slot": "input",
+          "label": "INPUT",
+          "ratio": 4.74,
+          "border": 1.26
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "INPUT",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "BUTTON",
+          "outline_width": "2px",
+          "ratio": 19.8
+        }
+      ],
+      "focus_failures": [],
+      "hover": {
+        "sample": "Check again",
+        "ratio": 16.43
+      },
+      "axe_violations": []
+    },
+    {
+      "surface": "state-loading",
+      "theme": "light",
+      "screenshot": "state-loading-light.png",
+      "text_checked": 12,
+      "lowest_text_ratio": 6.28,
+      "text_failures": [],
+      "boundaries": [],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "state-error",
+      "theme": "light",
+      "screenshot": "state-error-light.png",
+      "text_checked": 12,
+      "lowest_text_ratio": 6.28,
+      "text_failures": [],
+      "boundaries": [],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "state-empty",
+      "theme": "light",
+      "screenshot": "state-empty-light.png",
+      "text_checked": 15,
+      "lowest_text_ratio": 6.28,
+      "text_failures": [],
+      "boundaries": [
+        {
+          "slot": "input",
+          "label": "workflow-name",
+          "ratio": 4.74,
+          "border": 1.26
+        }
+      ],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "INPUT#workflow-name",
+          "outline_width": "2px",
+          "ratio": 19.8
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    },
+    {
+      "surface": "state-local-only",
+      "theme": "light",
+      "screenshot": "state-local-only-light.png",
+      "text_checked": 13,
+      "lowest_text_ratio": 6.28,
+      "text_failures": [],
+      "boundaries": [],
+      "boundary_failures": [],
+      "raw_controls": [],
+      "focus_stops": [
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 19.8
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        }
+      ],
+      "focus_failures": [],
+      "hover": null,
+      "axe_violations": []
+    }
+  ]
+}

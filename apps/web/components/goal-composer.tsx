@@ -6,6 +6,7 @@ import { useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { RunDisclosure } from "@/components/run-disclosure";
 import { Card } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
 
 // The draft and choice survive setup in this tab only. Opening or restoring them never starts anything:
@@ -89,12 +90,11 @@ export function GoalComposer() {
       <label htmlFor="goal" className="text-sm font-medium">
         Goal
       </label>
-      <textarea
+      <Textarea
         id="goal"
         value={draft}
         onChange={(event) => update(event.target.value)}
         rows={3}
-        className="bg-background border-input block w-full rounded-md border px-3 py-2 text-sm"
       />
       <RunDisclosure chosen={profile} onChoose={setProfile} />
       <Button onClick={() => void run()} disabled={draft.trim() === ""}>

@@ -1,0 +1,22 @@
+{
+  "200%": {
+    "/": 0,
+    "/runs": 0,
+    "/experts": 0,
+    "/workflows": 0,
+    "/approvals": 0,
+    "/settings": 0,
+    "/settings/models": 0,
+    "/operations": 0
+  },
+  "400%": {
+    "/": 0,
+    "/runs": 0,
+    "/experts": 0,
+    "/workflows": 0,
+    "/approvals": 0,
+    "/settings": 0,
+    "/settings/models": 0,
+    "/operations": 0
+  }
+}

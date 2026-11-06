@@ -29,7 +29,10 @@ export function RunList() {
       .then(async (reply) => {
         if (!active) return;
         if (reply.ok) setList(parseRunList(await reply.json()));
-        else setFailed(true);
+        else {
+          await reply.text();
+          setFailed(true);
+        }
       })
       .catch(() => {
         if (active) setFailed(true);

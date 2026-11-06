@@ -47,8 +47,8 @@ export default async function HomePage() {
           Services
         </h2>
         <p className="text-muted-foreground text-sm">
-          Everything runs on this Mac. Inference is not configured yet, and this
-          page calls no model.
+          The app and your data stay on this Mac. Model calls go to OpenRouter,
+          and this page makes none.
         </p>
         <ServiceStatusBadge status={status} />
         <AboutServices />

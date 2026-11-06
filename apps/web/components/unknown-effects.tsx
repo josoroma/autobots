@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
 
 type Operation = { operation_id: string; tool_id: string };
@@ -59,12 +60,11 @@ export function UnknownEffects({
       <label htmlFor="effect-evidence" className="font-medium">
         What you saw
       </label>
-      <textarea
+      <Textarea
         id="effect-evidence"
         rows={2}
         value={evidence}
         onChange={(event) => setEvidence(event.target.value)}
-        className="bg-background border-input block w-full rounded-md border px-3 py-2 text-sm"
       />
       <ul className="space-y-2">
         {operations.map((operation) => (

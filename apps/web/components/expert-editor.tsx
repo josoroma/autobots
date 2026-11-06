@@ -6,6 +6,7 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Choice, Input, Select, Textarea } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
 
 const TOOLS = [
@@ -163,7 +164,7 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
             <label htmlFor="purpose" className="text-sm font-medium">
               Purpose
             </label>
-            <input
+            <Input
               id="purpose"
               value={draft.purpose}
               onChange={(event) =>
@@ -176,7 +177,7 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
             <label htmlFor="instructions" className="text-sm font-medium">
               Instructions
             </label>
-            <textarea
+            <Textarea
               id="instructions"
               rows={5}
               value={draft.instructions}
@@ -190,7 +191,7 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
             <legend className="text-sm font-medium">Allowed tools</legend>
             {TOOLS.map((tool) => (
               <label key={tool.id} className="flex items-center gap-2 text-sm">
-                <input
+                <Choice
                   type="checkbox"
                   checked={draft.tools.includes(tool.id)}
                   onChange={(event) =>
@@ -210,7 +211,7 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
             <label htmlFor="executor" className="text-sm font-medium">
               Model for its work
             </label>
-            <select
+            <Select
               id="executor"
               value={draft.executor}
               onChange={(event) =>
@@ -223,7 +224,7 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
                   {profile.label}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
           <div className="flex gap-3">
             <Button type="submit">Save revision</Button>

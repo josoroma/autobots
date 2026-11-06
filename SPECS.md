@@ -254,10 +254,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-11.10#1 | Write the sleep procedure, with what to observe before and after. | DONE | US-11.10 |
 | US-11.10#2 | Have the owner run it on a disposable stack with a scripted model, and record the observations. | DONE | US-11.10 |
 | US-11.10#3 | Only if the result requires it, build wake handling and have the owner repeat the test. | DONE | US-11.10 |
-| US-11.11 | Design system migration and final visual evidence | BLOCKED | EPIC-11 |
-| US-11.11#1 | Add the shared form components and move every form to them. | TODO | US-11.11 |
-| US-11.11#2 | Capture both-theme screenshots, measured contrast and axe across all named surfaces. | TODO | US-11.11 |
-| US-11.11#3 | Check keyboard use, zoom and reduced motion, and confirm appearance changes issue no model or task request. | TODO | US-11.11 |
+| US-11.11 | Design system migration and final visual evidence | DONE | EPIC-11 |
+| US-11.11#1 | Add the shared form components and move every form to them. | DONE | US-11.11 |
+| US-11.11#2 | Capture both-theme screenshots, measured contrast and axe across all named surfaces. | DONE | US-11.11 |
+| US-11.11#3 | Check keyboard use, zoom and reduced motion, and confirm appearance changes issue no model or task request. | DONE | US-11.11 |
 | US-11.12 | Final independent review and Gate 0 | BLOCKED | EPIC-11 |
 | US-11.12#1 | Bind the final revision's fingerprint and run one independent review of it. | TODO | US-11.12 |
 | US-11.12#2 | Repeat Gate 0 and the harness runbook on that revision, and publish validated evidence. | TODO | US-11.12 |
@@ -3349,7 +3349,8 @@ Open Questions:
 
 ### US-11.11: Design system migration and final visual evidence
 
-Status: BLOCKED
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-11-11-design-system-migration-final/`
 
 As a user
 I want forms on shared components and the final screens measured in both themes
@@ -3358,6 +3359,7 @@ So that design claims rest on the screens as they ship.
 Source:
 - [US-10.2 finding B7](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
 - [Decision 0009, B7](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
+- [Decision 0010](docs/engineering/decisions/0010-contrast-pass-line.md#decision) — WCAG 2.1 AA is the contrast pass line.
 - [DS-03 named surfaces](PRD-Design-System.md#ds-03--apply-semantic-tokens-across-the-whole-ui)
 - [DS-04 usability](PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
 - [DS-05 evidence](PRD-Design-System.md#ds-05--verification-and-design-evidence)
@@ -3396,12 +3398,12 @@ Dependencies:
 - US-11.9
 
 Tasks:
-- [ ] Add the shared form components and move every form to them.
-- [ ] Capture both-theme screenshots, measured contrast and axe across all named surfaces.
-- [ ] Check keyboard use, zoom and reduced motion, and confirm appearance changes issue no model or task request.
+- [x] Add the shared form components and move every form to them.
+- [x] Capture both-theme screenshots, measured contrast and axe across all named surfaces.
+- [x] Check keyboard use, zoom and reduced motion, and confirm appearance changes issue no model or task request.
 
 Open Questions:
-- NEEDS CLARIFICATION: The design PRD asks for accessible contrast and names no ratio. Is WCAG 2.1 AA, which the browser suites' axe checks already apply, the pass line?
+- None.
 
 ### US-11.12: Final independent review and Gate 0
 

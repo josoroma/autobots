@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
 
 const AUTH_LABELS: Record<ProviderStatus["auth_status"], string> = {
@@ -227,7 +228,7 @@ export function ProviderSettingsPanel() {
             <label htmlFor="openrouter-key" className="text-sm font-medium">
               {hasAppKey ? "Replace key" : "API key"}
             </label>
-            <input
+            <Input
               id="openrouter-key"
               name="openrouter-key"
               type="password"
@@ -235,7 +236,6 @@ export function ProviderSettingsPanel() {
               autoComplete="off"
               data-1p-ignore
               spellCheck={false}
-              className="bg-background border-input block w-full rounded-md border px-3 py-2 text-sm"
             />
             <p className="text-muted-foreground text-sm">
               The key is sent to this Mac&apos;s server, checked against

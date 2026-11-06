@@ -11,6 +11,7 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
 
 export function WorkflowsPanel() {
@@ -116,12 +117,11 @@ export function WorkflowsPanel() {
           <label htmlFor="workflow-name" className="text-sm font-medium">
             Name
           </label>
-          <input
+          <Input
             id="workflow-name"
             value={name}
             onChange={(event) => setName(event.target.value)}
             maxLength={100}
-            className="bg-background border-input block w-full rounded-md border px-3 py-2 text-sm"
           />
           <Button type="submit" disabled={name.trim() === ""}>
             Create

@@ -11,6 +11,7 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Choice, Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
 
 export function ExpertsPanel() {
@@ -119,7 +120,7 @@ export function ExpertsPanel() {
           <ul className="space-y-2 text-sm">
             {experts.map((expert) => (
               <li key={expert.id} className="flex items-center gap-3">
-                <input
+                <Choice
                   type="checkbox"
                   id={`route-${expert.id}`}
                   checked={routed.has(expert.id)}
@@ -155,12 +156,11 @@ export function ExpertsPanel() {
           <label htmlFor="expert-name" className="text-sm font-medium">
             Name
           </label>
-          <input
+          <Input
             id="expert-name"
             value={name}
             onChange={(event) => setName(event.target.value)}
             maxLength={100}
-            className="bg-background border-input block w-full rounded-md border px-3 py-2 text-sm"
           />
           <Button type="submit" disabled={name.trim() === ""}>
             Create

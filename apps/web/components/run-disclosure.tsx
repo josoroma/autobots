@@ -7,6 +7,7 @@ import {
   type ModelPolicyState,
 } from "@autobots/api-client";
 import { useEffect, useState } from "react";
+import { Select } from "@/components/ui/field";
 
 // MP-07. Every screen that creates a run shows this, and reading it starts nothing.
 const EXECUTOR = "executor";
@@ -42,6 +43,8 @@ export function RunDisclosure({
       .then(async ([modelReply, policyReply]) => {
         if (!active) return;
         if (!modelReply.ok || !policyReply.ok) {
+          // Read, or an unread refusal holds its connection open for as long as the page lives.
+          await Promise.all([modelReply.text(), policyReply.text()]);
           setFailed(true);
           return;
         }
@@ -84,11 +87,10 @@ export function RunDisclosure({
           <label htmlFor="run-model" className="font-medium">
             Model for this run
           </label>
-          <select
+          <Select
             id="run-model"
             value={chosenProfile}
             onChange={(event) => onChoose(event.target.value)}
-            className="bg-background border-input block w-full rounded-md border px-3 py-2 text-sm"
           >
             <option value={WORKSPACE_DEFAULT}>The workspace setting</option>
             {models.models.map((model) => (
@@ -96,7 +98,7 @@ export function RunDisclosure({
                 {model.canonical_id}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       )}
       {failed ? (
