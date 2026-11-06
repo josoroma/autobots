@@ -70,6 +70,22 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
     };
   }, [expertId]);
 
+  // This form edits only the executor. Other offered bindings stay, and one naming a model that
+  // isn't offered goes with this save, which the form says, since it would otherwise refuse it.
+  const saved = (expert?.versions.at(-1)?.config.role_bindings ?? {}) as Record<
+    string,
+    string
+  >;
+  const others = Object.entries(saved).filter(([role]) => role !== "executor");
+  const kept = Object.fromEntries(
+    others.filter(([, profile]) =>
+      PROFILES.some((item) => item.id === profile),
+    ),
+  );
+  const dropped = others
+    .filter(([, profile]) => !PROFILES.some((item) => item.id === profile))
+    .map(([role]) => role);
+
   async function save(event: FormEvent): Promise<void> {
     event.preventDefault();
     if (expert === null || draft === null) return;
@@ -85,11 +101,15 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
         body: JSON.stringify({
           expected_version: expert.latest_version,
           config: {
+            // What this form doesn't edit, such as skills, stays as it was.
+            ...expert.versions.at(-1)?.config,
             purpose: draft.purpose,
             instructions: draft.instructions,
             tools: draft.tools,
-            role_bindings:
-              draft.executor === "" ? {} : { executor: draft.executor },
+            role_bindings: {
+              ...kept,
+              ...(draft.executor === "" ? {} : { executor: draft.executor }),
+            },
           },
         }),
       },
@@ -105,13 +125,16 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
     }
     const failure = (await reply?.json().catch(() => null)) as {
       code?: string;
+      message?: string;
     } | null;
     setMessage(
-      failure?.code === "owner_required"
-        ? "Only the workspace owner can save a revision."
-        : failure?.code === "expert_version_conflict"
-          ? "Someone saved a newer version. Reload to see it."
-          : "That could not be saved.",
+      failure?.code === "model_not_offered"
+        ? (failure.message ?? "That model isn't offered for new runs.")
+        : failure?.code === "owner_required"
+          ? "Only the workspace owner can save a revision."
+          : failure?.code === "expert_version_conflict"
+            ? "Someone saved a newer version. Reload to see it."
+            : "That could not be saved.",
     );
   }
 
@@ -232,6 +255,12 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
               )}
             </Select>
           </div>
+          {dropped.length === 0 ? null : (
+            <p data-field="dropped-bindings" className="text-sm">
+              The saved version names a model that isn&apos;t offered for new
+              runs for {dropped.join(", ")}. Saving removes that.
+            </p>
+          )}
           <div className="flex gap-3">
             <Button type="submit">Save revision</Button>
             <Button

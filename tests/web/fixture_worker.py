@@ -77,6 +77,9 @@ def next_step(goal: str, messages: Any) -> Any:
         return 'Arranged summary: the long parts were saved.'
     compact = re.search(r'slice-compact-\d+', goal)
     if compact:
+        # Slow at the start, so a person can read the page before anything compacts.
+        if POSITION.get(compact.group(0), 0) < 3:
+            time.sleep(SLOW_SECONDS)
         return scripted(compact.group(0), COMPACT_STEPS, FINISHED)
     if 'slice-child-part' in goal:
         return scripted(goal, PART_STEPS, 'The part is done.')

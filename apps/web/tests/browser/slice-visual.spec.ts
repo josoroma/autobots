@@ -63,15 +63,28 @@ interface Measured {
   focus_failures: unknown[];
   hover: { sample: string; ratio: number } | null;
   axe_violations: { id: string; nodes: number; summary: string }[];
-  keyboard: {
-    stops: number;
-    out_of_order: string[];
-    positive_tabindex: number;
-  };
-  disabled: { count: number; focusable: string[]; unnamed: string[] };
+  keyboard: Keyboard;
+  disabled: { count: number; unnamed: string[] };
   zoom: Record<string, number>;
-  moving: string[];
+  motion: Motion;
 }
+
+interface Keyboard {
+  stops: number;
+  truncated: boolean;
+  main_controls: number;
+  unreached_in_main: string[];
+  upward_in_main: string[];
+  positive_tabindex: number;
+}
+
+interface Motion {
+  checked: number;
+  moving_when_reduced: string[];
+  moving_by_default: number;
+}
+
+const KEYBOARD_CAP = 200;
 
 // Everything in the page's own colors, read back through a canvas so any CSS color becomes sRGB.
 const MEASURE = `
@@ -473,37 +486,82 @@ function surfaces(ids: Record<string, string>): Surface[] {
   ];
 }
 
-// Tab from the top: each stop must come later in the document than the one before it.
-async function walkKeyboard(page: Page): Promise<Measured["keyboard"]> {
-  const outOfOrder: string[] = [];
-  let stops = 0;
+// Tab from the top, as a person would. Inside main, focus must reach each visible enabled control
+// and never jump back up the page. The platform follows document order, so that's what could differ.
+async function walkKeyboard(page: Page): Promise<Keyboard> {
   await page.evaluate(() => {
-    (window as unknown as { __last: Element | null }).__last = null;
+    (window as unknown as { __reached: Element[] }).__reached = [];
   });
-  for (let index = 0; index < 60; index += 1) {
+  const upward: string[] = [];
+  let stops = 0;
+  let previousTop: number | null = null;
+  for (let index = 0; index < KEYBOARD_CAP; index += 1) {
     await page.keyboard.press("Tab");
     const step = await page.evaluate(() => {
-      const state = window as unknown as { __last: Element | null };
       const current = document.activeElement;
-      if (current === null || current === document.body) return "end";
-      const previous = state.__last;
-      state.__last = current;
-      if (previous === null) return "ok";
-      return previous.compareDocumentPosition(current) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-        ? "ok"
-        : `${previous.tagName} before ${current.tagName}`;
+      if (current === null || current === document.body) return null;
+      const reached = (window as unknown as { __reached: Element[] }).__reached;
+      reached.push(current);
+      const inMain = current.closest("main") !== null;
+      return {
+        label: `${current.tagName} ${current.textContent?.trim().slice(0, 30) ?? ""}`,
+        inMain,
+        top: current.getBoundingClientRect().top + window.scrollY,
+      };
     });
-    if (step === "end") break;
+    if (step === null) break;
     stops += 1;
-    if (step !== "ok") outOfOrder.push(step);
+    if (step.inMain) {
+      if (previousTop !== null && step.top < previousTop - 4) {
+        upward.push(step.label);
+      }
+      previousTop = step.top;
+    }
   }
-  const positive = await page.evaluate(
-    () =>
-      [...document.querySelectorAll<HTMLElement>("[tabindex]")].filter(
-        (item) => item.tabIndex > 0,
-      ).length,
-  );
+  const coverage = await page.evaluate(() => {
+    const reached = new Set(
+      (window as unknown as { __reached: Element[] }).__reached,
+    );
+    const controls = [
+      ...document.querySelectorAll<HTMLElement>(
+        "main a[href], main button, main input, main select, main textarea, main summary",
+      ),
+    ].filter(
+      (item) =>
+        item.tabIndex >= 0 &&
+        !(item as HTMLButtonElement).disabled &&
+        item.getClientRects().length > 0 &&
+        // A closed `details` hides what's inside it, and its own summary is still a stop.
+        (item.tagName === "SUMMARY" ||
+          item.closest("details:not([open])") === null),
+    );
+    return {
+      main_controls: controls.length,
+      unreached: controls
+        .filter(
+          (item) =>
+            !reached.has(item) &&
+            // Tab lands on one radio in a group, and arrow keys move within it.
+            !(
+              item instanceof HTMLInputElement &&
+              item.type === "radio" &&
+              [...reached].some(
+                (other) =>
+                  other instanceof HTMLInputElement &&
+                  other.type === "radio" &&
+                  other.name === item.name,
+              )
+            ),
+        )
+        .map(
+          (item) =>
+            `${item.tagName} ${item.id || item.textContent?.trim().slice(0, 30)}`,
+        ),
+      positive: [
+        ...document.querySelectorAll<HTMLElement>("[tabindex]"),
+      ].filter((item) => item.tabIndex > 0).length,
+    };
+  });
   // Back to the top, so what follows starts where a person's first Tab would.
   await page.evaluate(() => {
     const first = document.querySelector<HTMLElement>(
@@ -512,21 +570,68 @@ async function walkKeyboard(page: Page): Promise<Measured["keyboard"]> {
     first?.focus();
     first?.blur();
   });
-  return { stops, out_of_order: outOfOrder, positive_tabindex: positive };
+  return {
+    stops,
+    truncated: stops >= KEYBOARD_CAP,
+    main_controls: coverage.main_controls,
+    unreached_in_main: coverage.unreached,
+    upward_in_main: upward,
+    positive_tabindex: coverage.positive,
+  };
 }
 
-async function movingWithReducedMotion(page: Page): Promise<string[]> {
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  const moving = await page.evaluate(() =>
-    document
-      .getAnimations()
-      .filter(
-        (animation) => Number(animation.effect?.getTiming().duration ?? 0) > 1,
-      )
-      .map((animation) => String(animation.effect?.getTiming().duration)),
-  );
+async function readDisabled(page: Page): Promise<Measured["disabled"]> {
+  return page.evaluate(() => {
+    const items = [
+      ...document.querySelectorAll<HTMLElement>(
+        'main :disabled, main [aria-disabled="true"]',
+      ),
+    ];
+    const name = (item: HTMLElement) =>
+      item.getAttribute("aria-label") ||
+      item.innerText?.trim() ||
+      (item.id &&
+        document.querySelector(`label[for="${item.id}"]`)?.textContent) ||
+      "";
+    return {
+      count: items.length,
+      unnamed: items.filter((item) => !name(item)).map((item) => item.tagName),
+    };
+  });
+}
+
+// What could move, not what happens to be moving: each element's own durations, with and without it.
+async function readMotion(page: Page): Promise<Motion> {
+  const read = () =>
+    page.evaluate(() => {
+      const seconds = (value: string) =>
+        Math.max(...value.split(",").map((part) => parseFloat(part) || 0));
+      const items = [...document.querySelectorAll("body *")];
+      return {
+        checked: items.length,
+        moving: items
+          .filter((item) => {
+            const style = getComputedStyle(item);
+            return (
+              (style.transitionProperty !== "none" &&
+                seconds(style.transitionDuration) > 0.02) ||
+              (style.animationName !== "none" &&
+                seconds(style.animationDuration) > 0.02)
+            );
+          })
+          .map((item) => item.tagName),
+      };
+    });
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  return moving;
+  const byDefault = await read();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const reduced = await read();
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  return {
+    checked: reduced.checked,
+    moving_when_reduced: reduced.moving,
+    moving_by_default: byDefault.moving.length,
+  };
 }
 
 // The same page in a narrow viewport, as 200% and 400% zoom lay out on a 1280-wide window.
@@ -594,26 +699,8 @@ async function measure(
     )) as Stop | null;
     if (stop !== null) stops.push(stop);
   }
-  const disabled = await page.evaluate(() => {
-    const items = [...document.querySelectorAll<HTMLElement>("main :disabled")];
-    const name = (item: HTMLElement) =>
-      item.getAttribute("aria-label") ||
-      item.innerText?.trim() ||
-      (item.id &&
-        document.querySelector(`label[for="${item.id}"]`)?.textContent) ||
-      "";
-    return {
-      count: items.length,
-      focusable: items
-        .filter((item) => {
-          item.focus();
-          return document.activeElement === item;
-        })
-        .map((item) => item.tagName),
-      unnamed: items.filter((item) => !name(item)).map((item) => item.tagName),
-    };
-  });
-  const moving = await movingWithReducedMotion(page);
+  const disabled = await readDisabled(page);
+  const motion = await readMotion(page);
   const zoom = await sidewaysAtZoom(page);
   let hover: Measured["hover"] = null;
   const first = page.locator("main button:not(:disabled)").first();
@@ -648,7 +735,7 @@ async function measure(
     keyboard,
     disabled,
     zoom,
-    moving,
+    motion,
   };
 }
 
@@ -698,11 +785,12 @@ test("every named surface is captured in both themes, with measured contrast and
       item.axe_violations.length ||
       item.raw_controls.length ||
       item.keyboard.stops === 0 ||
-      item.keyboard.out_of_order.length ||
+      item.keyboard.truncated ||
+      item.keyboard.unreached_in_main.length ||
+      item.keyboard.upward_in_main.length ||
       item.keyboard.positive_tabindex ||
-      item.disabled.focusable.length ||
       item.disabled.unnamed.length ||
-      item.moving.length ||
+      item.motion.moving_when_reduced.length ||
       Object.values(item.zoom).some((over) => over > 0),
   );
   writeFileSync(
@@ -721,6 +809,65 @@ test("every named surface is captured in both themes, with measured contrast and
     ),
   );
   expect(failed.map((item) => `${item.surface}-${item.theme}`)).toEqual([]);
+});
+
+test("the walk's checks fail when they should, on a page broken on purpose", async ({
+  page,
+}) => {
+  await signIn(page, EMAIL_A, PASSWORD_A);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "New goal" })).toBeVisible();
+  await expect(page.getByLabel("Model for this run")).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  // Before: a clean page has nothing to report, so what follows comes from the breakage.
+  const clean = await walkKeyboard(page);
+  expect(clean.upward_in_main).toEqual([]);
+  expect(clean.unreached_in_main).toEqual([]);
+  expect(clean.positive_tabindex).toBe(0);
+  await page.evaluate(() => {
+    const main = document.querySelector("main") as HTMLElement;
+    // Painted out of order, so Tab climbs the page while following the document.
+    for (const [text, top] of [
+      ["Painted low", "2000px"],
+      ["Painted high", "10px"],
+    ] as const) {
+      const link = document.createElement("a");
+      link.href = "#";
+      link.textContent = text;
+      link.style.position = "absolute";
+      link.style.top = top;
+      main.append(link);
+    }
+    const out = document.createElement("div");
+    out.inert = true;
+    const unreachable = document.createElement("button");
+    unreachable.textContent = "Can't be reached";
+    out.append(unreachable);
+    main.append(out);
+    const jumpy = document.createElement("a");
+    jumpy.href = "#";
+    jumpy.textContent = "Jumps ahead";
+    jumpy.tabIndex = 5;
+    main.append(jumpy);
+    const moving = document.createElement("div");
+    moving.setAttribute(
+      "style",
+      "transition: opacity 1s !important; transition-duration: 1s !important;",
+    );
+    main.append(moving);
+    const nameless = document.createElement("button");
+    nameless.disabled = true;
+    main.append(nameless);
+  });
+  const keyboard = await walkKeyboard(page);
+  expect(keyboard.positive_tabindex).toBeGreaterThan(0);
+  expect(keyboard.upward_in_main.join()).toContain("Painted high");
+  expect(keyboard.unreached_in_main.join()).toContain("Can't be reached");
+  const motion = await readMotion(page);
+  expect(motion.moving_when_reduced.length).toBeGreaterThan(0);
+  expect(motion.moving_by_default).toBeGreaterThan(0);
+  const disabled = await readDisabled(page);
+  expect(disabled.unnamed.length).toBeGreaterThan(0);
 });
 
 test("keyboard use reaches every control on a form, with focus visible, and starts nothing by itself", async ({

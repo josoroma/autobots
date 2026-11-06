@@ -193,7 +193,7 @@ def main() -> int:
     parser.add_argument('--paid', action='store_true', help='required: this makes billed OpenRouter calls')
     parser.add_argument('--key-file', default='.env')
     parser.add_argument('--limit-micro-usd', type=int, default=AUTHORIZED_MICRO_USD)
-    parser.add_argument('--profile', choices=('openrouter_deepseek_flash', 'openrouter_terra'), help="the workspace's default model; the application's default if omitted")
+    parser.add_argument('--profile', choices=('openrouter_terra',), help="the workspace's default model; the application's default if omitted. DeepSeek isn't offered, by Decision 0013")
     arguments = parser.parse_args()
     if not arguments.paid:
         print('REFUSED: this makes billed calls, and needs --paid', file=sys.stderr)

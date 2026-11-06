@@ -1,0 +1,1559 @@
+{
+  "schema_version": "autobots.work-evidence/v1",
+  "template": false,
+  "work_item_id": "US-12.3",
+  "evidence_id": "gate-0",
+  "requirement_ids": [
+    "DH-A01",
+    "DH-A02",
+    "DH-A04",
+    "DH-A05",
+    "DH-A06",
+    "DH-A07",
+    "DH-A08",
+    "DH-A09",
+    "DH-A10",
+    "DH-A11",
+    "DH-A12",
+    "DH-A14",
+    "DH-A15",
+    "DH-A16"
+  ],
+  "fingerprint": {
+    "source_manifest_sha256": "09ea61fbfa52c71dc51072d6b9f830ae4ee04fcdea779b17268d3fb836c5a878",
+    "nonsecret_config_sha256": "9f5dc237d5b87871ea83dcbde1d2bf4eb4c53de7fef70a8f1909f62a5d64b903",
+    "lockfiles_sha256": {
+      "pnpm-lock.yaml": "e5d81f0de510d71360270717edf5dfffc959570da0d93d87115af4c6468b877e",
+      "services/agent/uv.lock": "73e4eae80394a7dc73a3cf6a2cf6776bcc141a58958ef72be90aff320bd811d9"
+    },
+    "generated_contracts_sha256": "ebe8cf1dcc087068cce07acb6fe84fbdd0ea1512c97834551911791a0b06d4b3",
+    "verifier_sha256": "15ea71c269084fc61ef3d943cd35003038e286297d1766b3b9d74b0cb98fcec6"
+  },
+  "tool_versions": {
+    "report_python": "3.12.16",
+    "node": {
+      "pin": "22.23.2",
+      "selected": "22.23.2",
+      "through_package_script": "v22.23.2"
+    },
+    "pnpm": {
+      "pin": "12.16.1",
+      "through_corepack": "12.16.1"
+    },
+    "corepack": "0.34.6",
+    "python": {
+      "pin": "3.12.16",
+      "selected": "3.12.16"
+    },
+    "uv": {
+      "pin": "0.13.6",
+      "selected": "0.13.6"
+    }
+  },
+  "reports": {
+    "harness": {
+      "status": "passed",
+      "input_fingerprint": "e170d4ac12708e2fa0588967d58f5b53459e6fb37ba6e4b907afac97b754d694",
+      "completed_at_utc": "2026-11-06T22:00:14.314975+00:00",
+      "assistant_adapter": {
+        "state": "configured_unqualified",
+        "reason": "delivery_unverified",
+        "minimum_version": "2.1.295",
+        "model_route": "not_checked",
+        "observed_version": "2.1.314"
+      },
+      "not_tested": [
+        "application",
+        "Claude event delivery",
+        "Supabase",
+        "Docker",
+        "OpenRouter inference",
+        "complete H0/H1"
+      ],
+      "scope": "Project configuration, backlog structure and deterministic harness fixtures only"
+    },
+    "full": {
+      "status": "passed",
+      "input_fingerprint": "e170d4ac12708e2fa0588967d58f5b53459e6fb37ba6e4b907afac97b754d694",
+      "completed_at_utc": "2026-11-06T21:58:52.180040+00:00",
+      "assistant_adapter": {
+        "state": "configured_unqualified",
+        "reason": "delivery_unverified",
+        "minimum_version": "2.1.295",
+        "model_route": "not_checked",
+        "observed_version": "2.1.314"
+      },
+      "not_tested": [
+        "Claude event delivery",
+        "Supabase",
+        "Docker",
+        "OpenRouter inference",
+        "complete H0/H1"
+      ],
+      "scope": "Harness checks plus local static checks, focused tests and, for full, the production build and the shell and appearance browser specs"
+    },
+    "db": {
+      "status": "passed",
+      "input_fingerprint": "e170d4ac12708e2fa0588967d58f5b53459e6fb37ba6e4b907afac97b754d694",
+      "completed_at_utc": "2026-11-06T21:57:30.735977+00:00",
+      "assistant_adapter": {
+        "state": "configured_unqualified",
+        "reason": "delivery_unverified",
+        "minimum_version": "2.1.295",
+        "model_route": "not_checked",
+        "observed_version": "2.1.314"
+      },
+      "not_tested": [
+        "the persistent database",
+        "Claude event delivery",
+        "OpenRouter inference",
+        "complete H0/H1"
+      ],
+      "scope": "Harness checks plus the pinned release and the application migrations and seeds, on disposable targets"
+    },
+    "operations": {
+      "status": "passed",
+      "input_fingerprint": "e170d4ac12708e2fa0588967d58f5b53459e6fb37ba6e4b907afac97b754d694",
+      "completed_at_utc": "2026-11-06T21:50:58.716108+00:00",
+      "assistant_adapter": {
+        "state": "configured_unqualified",
+        "reason": "delivery_unverified",
+        "minimum_version": "2.1.295",
+        "model_route": "not_checked",
+        "observed_version": "2.1.314"
+      },
+      "not_tested": [
+        "H1",
+        "product acceptance",
+        "the persistent stack",
+        "a real model call",
+        "a real credential",
+        "a real image or framework version change",
+        "Mac sleep",
+        "resource use under load",
+        "protection from losing this Mac",
+        "Claude event delivery",
+        "OpenRouter inference"
+      ],
+      "scope": "Harness checks plus the operations, backup and upgrade runbooks, on disposable Compose projects with a scripted model. Disposable evidence only, not H1 or product acceptance"
+    }
+  },
+  "checks": [
+    {
+      "id": "harness.project_configuration",
+      "source": {
+        "kind": "report",
+        "profile": "harness",
+        "check": "project_configuration"
+      },
+      "requirement_ids": [
+        "DH-A01"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "scripts/verify.py",
+        "--profile",
+        "harness"
+      ],
+      "cwd": ".",
+      "target_ref": "harness profile, this repository",
+      "expected": "configuration, documents, rules and hook settings validate",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T22:00:14.314975+00:00",
+      "finished_at_utc": "2026-11-06T22:00:14.314975+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "harness.backlog_validation",
+      "source": {
+        "kind": "report",
+        "profile": "harness",
+        "check": "backlog_validation"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "/opt/homebrew/opt/python@3.12/bin/python3.12",
+        "scripts/specs.py",
+        "validate"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "harness profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:59:51.339218+00:00",
+      "finished_at_utc": "2026-11-06T21:59:51.655191+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "harness.harness_behavior_tests",
+      "source": {
+        "kind": "report",
+        "profile": "harness",
+        "check": "harness_behavior_tests"
+      },
+      "requirement_ids": [
+        "DH-A11",
+        "DH-A14",
+        "DH-A15"
+      ],
+      "verification_class": "mock",
+      "model_transport": "none",
+      "command_argv": [
+        "/opt/homebrew/opt/python@3.12/bin/python3.12",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests/harness",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "harness profile, this repository",
+      "expected": "the harness fixtures pass, including unsafe hook input and rejected completion",
+      "observed": "status passed, exit 0, 284 tests executed, 0 skipped",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:59:51.655213+00:00",
+      "finished_at_utc": "2026-11-06T22:00:14.183564+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.project_configuration",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "project_configuration"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "scripts/verify.py",
+        "--profile",
+        "full"
+      ],
+      "cwd": ".",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:58:52.180040+00:00",
+      "finished_at_utc": "2026-11-06T21:58:52.180040+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.backlog_validation",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "backlog_validation"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "/opt/homebrew/opt/python@3.12/bin/python3.12",
+        "scripts/specs.py",
+        "validate"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:57:30.972003+00:00",
+      "finished_at_utc": "2026-11-06T21:57:31.317107+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.harness_behavior_tests",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "harness_behavior_tests"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "mock",
+      "model_transport": "none",
+      "command_argv": [
+        "/opt/homebrew/opt/python@3.12/bin/python3.12",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests/harness",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0, 284 tests executed, 0 skipped",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:57:31.317127+00:00",
+      "finished_at_utc": "2026-11-06T21:57:53.387483+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.python_lock",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "python_lock"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "uv",
+        "lock",
+        "--check",
+        "--offline"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots/services/agent",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:57:53.833209+00:00",
+      "finished_at_utc": "2026-11-06T21:57:53.891086+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.python_env",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "python_env"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "uv",
+        "sync",
+        "--check",
+        "--locked",
+        "--offline"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots/services/agent",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:57:53.891166+00:00",
+      "finished_at_utc": "2026-11-06T21:57:54.001705+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.ruff_check",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "ruff_check"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "ruff",
+        "check"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots/services/agent",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:57:54.001823+00:00",
+      "finished_at_utc": "2026-11-06T21:57:54.096966+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.ruff_format",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "ruff_format"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "ruff",
+        "format",
+        "--check"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots/services/agent",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:57:54.097068+00:00",
+      "finished_at_utc": "2026-11-06T21:57:54.110244+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.mypy",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "mypy"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "mypy"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots/services/agent",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:57:54.110337+00:00",
+      "finished_at_utc": "2026-11-06T21:57:55.183566+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.pytest",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "pytest"
+      },
+      "requirement_ids": [
+        "DH-A08"
+      ],
+      "verification_class": "mock",
+      "model_transport": "mock",
+      "command_argv": [
+        "pytest"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots/services/agent",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:57:55.183659+00:00",
+      "finished_at_utc": "2026-11-06T21:58:06.771935+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.node_lock",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "node_lock"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "corepack",
+        "pnpm",
+        "install",
+        "--frozen-lockfile",
+        "--lockfile-only",
+        "--offline"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:58:06.772024+00:00",
+      "finished_at_utc": "2026-11-06T21:58:06.996762+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.node_version",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "node_version"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "corepack",
+        "pnpm",
+        "run",
+        "--silent",
+        "node:version"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:58:06.996852+00:00",
+      "finished_at_utc": "2026-11-06T21:58:07.079001+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.lint",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "lint"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "corepack",
+        "pnpm",
+        "--filter",
+        "@autobots/web",
+        "run",
+        "lint"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:58:07.079090+00:00",
+      "finished_at_utc": "2026-11-06T21:58:16.006861+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.format_check",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "format_check"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "corepack",
+        "pnpm",
+        "--filter",
+        "@autobots/web",
+        "run",
+        "format:check"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:58:16.006950+00:00",
+      "finished_at_utc": "2026-11-06T21:58:16.808904+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.typegen",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "typegen"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "corepack",
+        "pnpm",
+        "--filter",
+        "@autobots/web",
+        "run",
+        "typegen"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:58:16.808995+00:00",
+      "finished_at_utc": "2026-11-06T21:58:17.189337+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.typecheck",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "typecheck"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "corepack",
+        "pnpm",
+        "--filter",
+        "@autobots/web",
+        "run",
+        "typecheck"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:58:17.189418+00:00",
+      "finished_at_utc": "2026-11-06T21:58:18.263475+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.build",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "build"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "corepack",
+        "pnpm",
+        "--filter",
+        "@autobots/web",
+        "run",
+        "build"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "full profile, this repository",
+      "expected": "next build succeeds",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:58:18.263545+00:00",
+      "finished_at_utc": "2026-11-06T21:58:21.220688+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.contract_drift",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "contract_drift"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "python3.12",
+        "scripts/generate_contracts.py",
+        "check"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:58:21.220788+00:00",
+      "finished_at_utc": "2026-11-06T21:58:22.762880+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.api_client_typecheck",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "api_client_typecheck"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "tsc",
+        "-p",
+        "packages/api-client"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:58:22.762986+00:00",
+      "finished_at_utc": "2026-11-06T21:58:23.109038+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.api_client_tests",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "api_client_tests"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "mock",
+      "model_transport": "none",
+      "command_argv": [
+        "node",
+        "--test",
+        "packages/api-client/tests/contract.test.ts"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:58:23.109142+00:00",
+      "finished_at_utc": "2026-11-06T21:58:23.254064+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.web_unit_tests",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "web_unit_tests"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "mock",
+      "model_transport": "none",
+      "command_argv": [
+        "node",
+        "--test",
+        "apps/web/tests/unit/request-guard.test.ts",
+        "apps/web/tests/unit/credential-precedence.test.ts"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:58:23.254178+00:00",
+      "finished_at_utc": "2026-11-06T21:58:23.401467+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.browser_qualification",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "browser_qualification"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "local_runtime",
+      "model_transport": "none",
+      "command_argv": [
+        "python3.12",
+        "scripts/qualify_web.py"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:58:23.401550+00:00",
+      "finished_at_utc": "2026-11-06T21:58:44.231429+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.fault_qualification",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "fault_qualification"
+      },
+      "requirement_ids": [
+        "DH-A04",
+        "DH-A05",
+        "DH-A08"
+      ],
+      "verification_class": "mock",
+      "model_transport": "mock",
+      "command_argv": [
+        "python3.12",
+        "scripts/qualify_faults.py"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "full profile, this repository",
+      "expected": "every good fixture passes and every bad one fails with its marker",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:58:44.231540+00:00",
+      "finished_at_utc": "2026-11-06T21:58:51.831121+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.toolchain_scope_tests",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "toolchain_scope_tests"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "python3.12",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests/toolchain",
+        "-p",
+        "test_scaffold_scope.py"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "full profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0, 2 tests executed, 0 skipped",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:58:51.831224+00:00",
+      "finished_at_utc": "2026-11-06T21:58:52.012560+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "full.non_mutation_guard",
+      "source": {
+        "kind": "report",
+        "profile": "full",
+        "check": "non_mutation_guard"
+      },
+      "requirement_ids": [
+        "DH-A02"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "scripts/verify.py",
+        "--profile",
+        "full"
+      ],
+      "cwd": ".",
+      "target_ref": "full profile, this repository",
+      "expected": "the run installs and rewrites nothing",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:58:52.180040+00:00",
+      "finished_at_utc": "2026-11-06T21:58:52.180040+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "db.project_configuration",
+      "source": {
+        "kind": "report",
+        "profile": "db",
+        "check": "project_configuration"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "scripts/verify.py",
+        "--profile",
+        "db"
+      ],
+      "cwd": ".",
+      "target_ref": "db profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:57:30.735977+00:00",
+      "finished_at_utc": "2026-11-06T21:57:30.735977+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "db.backlog_validation",
+      "source": {
+        "kind": "report",
+        "profile": "db",
+        "check": "backlog_validation"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "/opt/homebrew/opt/python@3.12/bin/python3.12",
+        "scripts/specs.py",
+        "validate"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "db profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:50:58.947860+00:00",
+      "finished_at_utc": "2026-11-06T21:50:59.268652+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "db.harness_behavior_tests",
+      "source": {
+        "kind": "report",
+        "profile": "db",
+        "check": "harness_behavior_tests"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "mock",
+      "model_transport": "none",
+      "command_argv": [
+        "/opt/homebrew/opt/python@3.12/bin/python3.12",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests/harness",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "db profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0, 284 tests executed, 0 skipped",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:50:59.268684+00:00",
+      "finished_at_utc": "2026-11-06T21:51:22.014687+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "db.disposable_qualification",
+      "source": {
+        "kind": "report",
+        "profile": "db",
+        "check": "disposable_qualification"
+      },
+      "requirement_ids": [
+        "DH-A06",
+        "DH-A07",
+        "DH-A09",
+        "DH-A10"
+      ],
+      "verification_class": "disposable",
+      "model_transport": "none",
+      "command_argv": [
+        "python3.12",
+        "scripts/disposable_db.py",
+        "qualify"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "a new autobots-disposable-<id> Compose project",
+      "expected": "all synthetic cases pass on a new disposable project, which is removed afterwards",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:51:22.577905+00:00",
+      "finished_at_utc": "2026-11-06T21:51:42.053877+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "db.supabase_stack_qualification",
+      "source": {
+        "kind": "report",
+        "profile": "db",
+        "check": "supabase_stack_qualification"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "disposable",
+      "model_transport": "none",
+      "command_argv": [
+        "python3.12",
+        "scripts/supabase_stack.py",
+        "qualify"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "db profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:51:42.053980+00:00",
+      "finished_at_utc": "2026-11-06T21:52:05.547534+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "db.app_db_qualification",
+      "source": {
+        "kind": "report",
+        "profile": "db",
+        "check": "app_db_qualification"
+      },
+      "requirement_ids": [
+        "DH-A06",
+        "DH-A07"
+      ],
+      "verification_class": "disposable",
+      "model_transport": "mock",
+      "command_argv": [
+        "python3.12",
+        "scripts/app_db.py",
+        "qualify"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "new autobots-disposable or Compose projects, removed afterwards",
+      "expected": "application migrations, seeds and the fixtures with a scripted model pass on a disposable stack",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:52:05.547675+00:00",
+      "finished_at_utc": "2026-11-06T21:52:48.007785+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "db.identity_qualification",
+      "source": {
+        "kind": "report",
+        "profile": "db",
+        "check": "identity_qualification"
+      },
+      "requirement_ids": [
+        "DH-A07"
+      ],
+      "verification_class": "disposable",
+      "model_transport": "mock",
+      "command_argv": [
+        "python3.12",
+        "scripts/qualify_identity.py"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "new autobots-disposable or Compose projects, removed afterwards",
+      "expected": "19 of the 23 browser spec files pass on a disposable stack with a scripted worker, and each Playwright run exits 0",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:52:48.007874+00:00",
+      "finished_at_utc": "2026-11-06T21:57:02.283073+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "db.persistent_apply_qualification",
+      "source": {
+        "kind": "report",
+        "profile": "db",
+        "check": "persistent_apply_qualification"
+      },
+      "requirement_ids": [
+        "DH-A06",
+        "DH-A10"
+      ],
+      "verification_class": "disposable",
+      "model_transport": "none",
+      "command_argv": [
+        "python3.12",
+        "scripts/qualify_persistent_apply.py"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "new autobots-disposable or Compose projects, removed afterwards",
+      "expected": "the guarded persistent apply refuses every unsafe case on a disposable stack",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:57:02.283317+00:00",
+      "finished_at_utc": "2026-11-06T21:57:30.558684+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "db.non_mutation_guard",
+      "source": {
+        "kind": "report",
+        "profile": "db",
+        "check": "non_mutation_guard"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "scripts/verify.py",
+        "--profile",
+        "db"
+      ],
+      "cwd": ".",
+      "target_ref": "db profile, this repository",
+      "expected": "the run leaves the repository unchanged",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:57:30.735977+00:00",
+      "finished_at_utc": "2026-11-06T21:57:30.735977+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "operations.project_configuration",
+      "source": {
+        "kind": "report",
+        "profile": "operations",
+        "check": "project_configuration"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "scripts/verify.py",
+        "--profile",
+        "operations"
+      ],
+      "cwd": ".",
+      "target_ref": "operations profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:50:58.716108+00:00",
+      "finished_at_utc": "2026-11-06T21:50:58.716108+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "operations.backlog_validation",
+      "source": {
+        "kind": "report",
+        "profile": "operations",
+        "check": "backlog_validation"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "/opt/homebrew/opt/python@3.12/bin/python3.12",
+        "scripts/specs.py",
+        "validate"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "operations profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:46:36.850835+00:00",
+      "finished_at_utc": "2026-11-06T21:46:37.192413+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "operations.harness_behavior_tests",
+      "source": {
+        "kind": "report",
+        "profile": "operations",
+        "check": "harness_behavior_tests"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "mock",
+      "model_transport": "none",
+      "command_argv": [
+        "/opt/homebrew/opt/python@3.12/bin/python3.12",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests/harness",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "operations profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0, 284 tests executed, 0 skipped",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:46:37.192450+00:00",
+      "finished_at_utc": "2026-11-06T21:46:58.751389+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "operations.operations_qualification",
+      "source": {
+        "kind": "report",
+        "profile": "operations",
+        "check": "operations_qualification"
+      },
+      "requirement_ids": [
+        "DH-A16"
+      ],
+      "verification_class": "disposable",
+      "model_transport": "mock",
+      "command_argv": [
+        "python3.12",
+        "scripts/qualify_operations.py"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "new autobots-disposable or Compose projects, removed afterwards",
+      "expected": "the operations runbook passes on a new disposable project with a scripted model",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:46:59.228047+00:00",
+      "finished_at_utc": "2026-11-06T21:48:24.957444+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "operations.backup_qualification",
+      "source": {
+        "kind": "report",
+        "profile": "operations",
+        "check": "backup_qualification"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "disposable",
+      "model_transport": "mock",
+      "command_argv": [
+        "python3.12",
+        "scripts/qualify_backup.py"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "new autobots-disposable or Compose projects, removed afterwards",
+      "expected": "backup and restore pass on a new disposable project",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:48:24.957549+00:00",
+      "finished_at_utc": "2026-11-06T21:50:04.297361+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "operations.upgrade_qualification",
+      "source": {
+        "kind": "report",
+        "profile": "operations",
+        "check": "upgrade_qualification"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "disposable",
+      "model_transport": "mock",
+      "command_argv": [
+        "python3.12",
+        "scripts/qualify_upgrade.py"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "new autobots-disposable or Compose projects, removed afterwards",
+      "expected": "an upgrade with data passes on a new disposable project",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:50:04.297503+00:00",
+      "finished_at_utc": "2026-11-06T21:50:58.542681+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "operations.non_mutation_guard",
+      "source": {
+        "kind": "report",
+        "profile": "operations",
+        "check": "non_mutation_guard"
+      },
+      "requirement_ids": [
+        "SP-002"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "scripts/verify.py",
+        "--profile",
+        "operations"
+      ],
+      "cwd": ".",
+      "target_ref": "operations profile, this repository",
+      "expected": "the check passes",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:50:58.716108+00:00",
+      "finished_at_utc": "2026-11-06T21:50:58.716108+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "manual.runbook_exercise",
+      "requirement_ids": [
+        "DH-A02",
+        "DH-A12",
+        "DH-A16"
+      ],
+      "verification_class": "disposable",
+      "model_transport": "none",
+      "command_argv": [
+        "sh",
+        ".checks/US-12.3/gate-0/exercise.sh"
+      ],
+      "cwd": ".",
+      "target_ref": "this repository, plus one killed autobots-disposable project",
+      "expected": "a stale lock exits 2 and recovers; a killed run is cleaned up; arranged adapters stay inactive",
+      "observed": "stale lock exit 2, then 0 after removal; killed run left 1 container and 1 volume, cleanup exit 0, then none; arranged unavailable gives inactive/unavailable, arranged 2.1.200 gives inactive/version_below_minimum; real client gives configured_unqualified/delivery_unverified; harness exit 0 in all three",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:35:28Z",
+      "finished_at_utc": "2026-11-06T21:41:24Z",
+      "exit_code": 0,
+      "exercises_runbook": true,
+      "artifacts": [
+        {
+          "path": ".checks/US-12.3/gate-0/exercise.txt",
+          "sha256": "281f1c58b5111020d9c8f5e38db2337e370678a4745b993c4559cad28873b7b8"
+        },
+        {
+          "path": ".checks/US-12.3/gate-0/exercise.sh",
+          "sha256": "38e5d829642f40e2b15642777e863023450f1b69ff4006674f721b9fd8861370"
+        }
+      ],
+      "source": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "manual.portable_runs",
+      "requirement_ids": [
+        "DH-A02"
+      ],
+      "verification_class": "disposable",
+      "model_transport": "none",
+      "command_argv": [
+        "sh",
+        ".checks/US-12.3/gate-0/final.sh"
+      ],
+      "cwd": ".",
+      "target_ref": "this repository",
+      "expected": "exit 0 with no inherited credentials; exit 2 with tools missing",
+      "observed": "env -i: operations, db, full, fast and harness exit 0; PATH=/usr/bin:/bin: full exit 2, status error",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:35:06Z",
+      "finished_at_utc": "2026-11-06T21:59:37Z",
+      "exit_code": 0,
+      "artifacts": [
+        {
+          "path": ".checks/US-12.3/gate-0/portable.txt",
+          "sha256": "826a6df6e5d6d4051ad59a10966e424f147224a5655b1ebf78586848424bd0d3"
+        },
+        {
+          "path": ".checks/US-12.3/gate-0/tools-missing.txt",
+          "sha256": "986ee0ca90640a4ea74e3fcf186397e3e71c81665d390803ba4b8955150b6760"
+        },
+        {
+          "path": ".checks/US-12.3/gate-0/final.sh",
+          "sha256": "91fa9c45f21e88229b7a9eb8ca42a652b2c00a28077165ddc0e19c38068f351f"
+        }
+      ],
+      "source": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "manual.committed_fault",
+      "requirement_ids": [
+        "DH-A04",
+        "DH-A11"
+      ],
+      "verification_class": "disposable",
+      "model_transport": "none",
+      "command_argv": [
+        "sh",
+        ".checks/US-12.3/gate-0/committed_fault.sh"
+      ],
+      "cwd": ".",
+      "target_ref": "a disposable repository copy with its own Git history",
+      "expected": "a committed type fault fails fast with a clean Git tree; a skipped test fails harness",
+      "observed": "fast exit 0 on the clean copy; after a committed fault exit 1 on mypy alone with 0 changed paths; corrected exit 0; arranged skip exit 1 with 284 executed, 1 skipped",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:41:24Z",
+      "finished_at_utc": "2026-11-06T21:45:01Z",
+      "exit_code": 0,
+      "artifacts": [
+        {
+          "path": ".checks/US-12.3/gate-0/committed_fault.txt",
+          "sha256": "eff26636f3a2959a0f361d6fe1a18b50674c265e32e0c1e364caeab986fed931"
+        },
+        {
+          "path": ".checks/US-12.3/gate-0/committed_fault.sh",
+          "sha256": "7057635009ae085f72e97bd2bb37669981ec79dc1fe7e89504eabb087a0da8b1"
+        }
+      ],
+      "source": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "manual.worker_inference",
+      "requirement_ids": [
+        "DH-A08"
+      ],
+      "verification_class": "disposable",
+      "model_transport": "mock",
+      "command_argv": [
+        "python3.12",
+        "scripts/qualify_worker_inference.py"
+      ],
+      "cwd": ".",
+      "target_ref": "a new autobots-disposable project, with a fake HTTP transport under the real SDK",
+      "expected": "every case of the product worker passes, WORKER-INFERENCE-001",
+      "observed": "exit 0, 50 of 50 cases, other Docker resources untouched, 45 before and after",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T21:45:01Z",
+      "finished_at_utc": "2026-11-06T21:46:36Z",
+      "exit_code": 0,
+      "artifacts": [
+        {
+          "path": ".checks/US-12.3/gate-0/worker-inference.json",
+          "sha256": "7fd70b111bc87c1e520ad05977c0b3f6f334088bc5fd530c55025b924762ed4a"
+        },
+        {
+          "path": ".checks/US-12.3/gate-0/worker-inference.txt",
+          "sha256": "9e3182339b918f65e42244dac392487e01a043ec667a11859ca67627672b7189"
+        }
+      ],
+      "source": {
+        "kind": "manual"
+      }
+    }
+  ],
+  "review": {
+    "author_id": "main delivery session",
+    "reviewer_id": "autobots-reviewer, separate read-only contexts",
+    "reviewed_fingerprint": "09ea61fbfa52c71dc51072d6b9f830ae4ee04fcdea779b17268d3fb836c5a878",
+    "outcome": "approved",
+    "findings": [
+      {
+        "id": "F-1",
+        "severity": "blocking",
+        "disposition": "resolved"
+      },
+      {
+        "id": "F-2",
+        "severity": "blocking",
+        "disposition": "resolved"
+      },
+      {
+        "id": "F-3",
+        "severity": "blocking",
+        "disposition": "resolved"
+      },
+      {
+        "id": "F-4",
+        "severity": "blocking",
+        "disposition": "resolved"
+      },
+      {
+        "id": "F-5",
+        "severity": "blocking",
+        "disposition": "resolved"
+      },
+      {
+        "id": "F2-1",
+        "severity": "blocking",
+        "disposition": "resolved"
+      },
+      {
+        "id": "F2-2",
+        "severity": "blocking",
+        "disposition": "resolved"
+      },
+      {
+        "id": "F2-3",
+        "severity": "blocking",
+        "disposition": "resolved"
+      },
+      {
+        "id": "F-6 to F-20, F2-4 to F2-9, F3-1 to F3-5",
+        "severity": "nonblocking",
+        "disposition": "see summary"
+      }
+    ]
+  },
+  "runbook": {
+    "path": "docs/engineering/runbooks/development-harness.md",
+    "exercised_evidence_ids": [
+      "gate-0"
+    ],
+    "revision_sha256": "d5c39163ffd2d26d2341db84ca9119a0561215de7e293910758c9719943d99cf"
+  },
+  "raw_artifacts": {
+    "local_root": ".checks/US-12.3/gate-0/",
+    "availability": "available",
+    "retention": "Raw reports stay in ignored .checks through acceptance, and are regenerated by rerunning the profiles. This summary keeps the observed results."
+  }
+}

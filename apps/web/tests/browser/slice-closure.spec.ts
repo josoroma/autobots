@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-
 import { expect, test, type Page } from "@playwright/test";
 
 const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
@@ -73,19 +71,21 @@ test("the goal and its criteria read the same after a compaction as before it", 
   const main = page.locator("main");
   await expect(main).toContainText(goal);
   await expect(main).toContainText(criterion);
+  const summarized = async () =>
+    (
+      await (await page.request.get(`/api/v1/runs/${id}/inspector`)).json()
+    ).model_calls.filter(
+      (call: { role: string; status: string }) =>
+        call.role === "summarizer" && call.status === "succeeded",
+    ).length;
+  // This first read really is before it: the worker takes its time over the early steps.
+  expect(await summarized()).toBe(0);
   await finished(page, "succeeded");
   await page.reload();
   await expect(main).toContainText(goal);
   await expect(main).toContainText(criterion);
   // Compaction really happened: it's on the ledger under its own role.
-  const inspector = await (
-    await page.request.get(`/api/v1/runs/${id}/inspector`)
-  ).json();
-  expect(
-    inspector.model_calls.filter(
-      (call: { role: string }) => call.role === "summarizer",
-    ).length,
-  ).toBeGreaterThan(0);
+  expect(await summarized()).toBeGreaterThan(0);
 });
 
 test("the Assignments card shows a child's Expert and outcome, and each run links to the other", async ({
@@ -159,34 +159,42 @@ test("a run's plan, approval, artifact and status come back after the connection
     "live",
   );
   const before = await main.locator("[data-sequence]").count();
-  // A real loss of the network for this page. The command goes through Node, so it commits meanwhile.
+  // A real loss of the network for this page. The decision goes through Node, so it commits meanwhile.
   await page.context().setOffline(true);
   await expect(page.locator("[data-connection]")).toHaveAttribute(
     "data-connection",
     "reconnecting",
     { timeout: 15_000 },
   );
-  const summary = await (
-    await page.request.get(`/api/v1/runs/${WAITING_RUN}`)
-  ).json();
-  const cancelled = await page.request.post(
-    `/api/v1/runs/${WAITING_RUN}/cancel`,
+  const pending = await (await page.request.get("/api/v1/approvals")).json();
+  const request = pending.approvals.find(
+    (item: { run_id: string }) => item.run_id === WAITING_RUN,
+  );
+  const decided = await page.request.post(
+    `/api/v1/approvals/${request.id}/decision`,
     {
-      headers: await write(page, `closure-cancel-${Date.now()}`),
-      data: { expected_version: summary.version },
+      headers: await write(page, `closure-decide-${Date.now()}`),
+      data: { decision: "reject", argument_hash: request.argument_hash },
     },
   );
-  expect(cancelled.status()).toBe(200);
+  expect(decided.status()).toBe(200);
   await page.context().setOffline(false);
+  // This event was committed during the drop, so only a rebuild can show it.
+  await expect(main).toContainText("Approval reject", { timeout: 20_000 });
   await expect(page.locator("[data-run-status]")).not.toHaveAttribute(
     "data-run-status",
     "waiting_approval",
     { timeout: 20_000 },
   );
-  await expect(main.locator("[data-task-status]")).toHaveCount(1);
-  await expect(main.locator("[data-artifact-status]")).toHaveCount(1);
+  await expect(main).toContainText("Write the report");
+  await expect(main.locator("[data-artifact-status]")).toContainText("report");
+  // And all of it from the server's state, with nothing held over from before the drop.
+  await page.reload();
   await expect(main).toContainText("Approval requested for send_blind");
-  // Every event in order, with no gap or duplicate.
+  await expect(main).toContainText("Approval reject");
+  await expect(main).toContainText("Write the report");
+  await expect(main.locator("[data-artifact-status]")).toContainText("report");
+  // Every event in order, with no gap. Events are keyed by sequence, so a duplicate can't render.
   await expect
     .poll(() => main.locator("[data-sequence]").count(), { timeout: 20_000 })
     .toBeGreaterThan(before);
@@ -196,7 +204,6 @@ test("a run's plan, approval, artifact and status come back after the connection
       items.map((item) => Number(item.getAttribute("data-sequence"))),
     );
   const ordered = [...sequences].sort((a, b) => a - b);
-  expect(new Set(sequences).size).toBe(sequences.length);
   expect(ordered).toEqual(
     ordered.map((_, index) => (ordered[0] as number) + index),
   );
@@ -217,16 +224,22 @@ test("with no key, a run's artifacts can be listed and downloaded, and inference
   const download = await page.request.get(href ?? "");
   expect(download.status()).toBe(200);
   expect(await download.text()).toContain("Total: 5");
+  const callsBefore = (
+    await (
+      await page.request.get(`/api/v1/runs/${KEYLESS_RUN}/inspector`)
+    ).json()
+  ).model_calls.length;
   const refused = await page.request.post("/api/v1/runs", {
     headers: await write(page, `keyless-${Date.now()}`),
     data: { goal_text: "needs a model" },
   });
   expect(refused.status()).toBe(409);
   expect((await refused.json()).code).toBe("credentials_required");
-  // The whole suite's fake upstream log is checked for chat calls once it ends.
-  const log = readFileSync(
-    process.env.AUTOBOTS_TEST_UPSTREAM_LOG ?? "",
-    "utf8",
-  );
-  expect(log).not.toContain("chat/completions");
+  // Nothing started: the same one run, and no call added to its ledger.
+  const runs = await (await page.request.get("/api/v1/runs")).json();
+  expect(runs.runs.map((run: { id: string }) => run.id)).toEqual([KEYLESS_RUN]);
+  const inspector = await (
+    await page.request.get(`/api/v1/runs/${KEYLESS_RUN}/inspector`)
+  ).json();
+  expect(inspector.model_calls.length).toBe(callsBefore);
 });

@@ -3143,6 +3143,7 @@ export const schemas = {
       "code": {
         "enum": [
           "ready",
+          "model_not_offered",
           "credentials_required",
           "credential_invalid",
           "credential_unavailable"
@@ -5279,7 +5280,7 @@ export function parseRunInspector(value: unknown): RunInspector {
 }
 
 export interface RunIntentCheck {
-  code: "ready" | "credentials_required" | "credential_invalid" | "credential_unavailable";
+  code: "ready" | "model_not_offered" | "credentials_required" | "credential_invalid" | "credential_unavailable";
   ready: boolean;
   schema_version: 1;
 }

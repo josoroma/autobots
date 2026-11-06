@@ -280,7 +280,14 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
               onChange={(event) => setInputs(event.target.value)}
               className="font-mono"
             />
-            <RunDisclosure sendsOnlyIfAgent />
+            <RunDisclosure
+              sendsOnlyIfAgent
+              usesModel={
+                workflow.versions
+                  .find((version) => version.version === chosen)
+                  ?.graph.nodes?.some((node) => node.block === "agent") ?? false
+              }
+            />
             <Button onClick={() => void run()}>Run this version</Button>
           </>
         )}

@@ -18,6 +18,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel
 
 from autobots.adapters.loop_middleware import (
+    LoopMiddleware,
     ModelRoute,
     past_known_price,
     request_bytes,
@@ -274,11 +275,17 @@ def test_a_request_counts_its_real_bytes() -> None:
     assert 3_000 <= request_bytes(request) < 4_000
 
 
-def test_a_lone_surrogate_doesnt_raise_while_counting_bytes() -> None:
+def test_a_lone_surrogate_is_refused_before_any_reservation() -> None:
     request = SimpleNamespace(
-        messages=[HumanMessage("before \ud83d after")], system_message=None, tools=[]
+        messages=[HumanMessage(b"before \\ud83d after".decode("unicode_escape"))],
+        system_message=None,
+        tools=[],
     )
-    assert request_bytes(request) > 0
+    with pytest.raises(UnicodeEncodeError):
+        request_bytes(request)
+    # The call site turns that into a stop, ahead of building the reservation.
+    source = inspect.getsource(LoopMiddleware._admitted_call)
+    assert source.index("request_unencodable") < source.index("AdmissionRequest(")
 
 
 def test_a_tools_real_bytes_count_too() -> None:

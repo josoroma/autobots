@@ -106,4 +106,10 @@ class RunIntentCheck(BaseModel):
 
     schema_version: Literal[1]
     ready: bool
-    code: Literal["ready", "credentials_required", "credential_invalid", "credential_unavailable"]
+    code: Literal[
+        "ready",
+        "model_not_offered",
+        "credentials_required",
+        "credential_invalid",
+        "credential_unavailable",
+    ]

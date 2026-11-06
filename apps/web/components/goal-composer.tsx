@@ -68,15 +68,15 @@ export function GoalComposer() {
       setOutcome("queued");
       return;
     }
-    if (reply?.status === 422) {
-      setOutcome("model_refused");
-      return;
-    }
     const failure = (await reply?.json().catch(() => null)) as {
       code?: string;
     } | null;
     if (failure?.code === "model_not_offered") {
       setOutcome("model_not_offered");
+      return;
+    }
+    if (reply?.status === 422) {
+      setOutcome("model_refused");
       return;
     }
     const known: Outcome[] = [

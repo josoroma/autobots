@@ -2,6 +2,8 @@
 
 The final review of EPIC-11 and the repeated Gate 0, on top of `5012235`, 2026-11-06. Manifest: [gate-0.json](gate-0.json). Raw reports are in ignored `.checks`, and the results here stand without them.
 
+**Replaced by [US-12.3's Gate 0](../US-12.3/summary.md).** Later source changes voided this binding, so this describes its own fingerprint only.
+
 **Result:** every portable gate below has passing evidence at its stated level, and DH-A03 stays partial by Decision 0012. **Nothing here is live, no real model call was made, and the real install wasn't touched.** This leaves H1 and product acceptance to US-10.2's assessment, and establishes neither.
 
 ## Gate 0 by DH-A gate

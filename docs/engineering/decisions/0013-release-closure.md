@@ -27,7 +27,7 @@ IDs stay, and each requirement's text is edited to match.
 - **H1.3:** for H0 and H1 stories delivered under Decision 0003, the record of the final review and Gate 0 carries the baseline.
 - **LC-23:** preserved reasoning metadata is tested where the pinned SDK passes it on, with Terra's removed `id` stated.
 - **MP-01, MP-10, SP-006 and PRD 6:** DeepSeek stays approved in the registry, and isn't offered for new runs until a recorded qualification and a decision bring it back. A choice saved earlier that names it is refused with no substitute, as MP-01 allows no fallback, and isn't rewritten.
-- **Older text:** finished stories that assume two choices, such as US-11.6 and US-11.9, read under this decision without being rewritten.
+- **Older text:** finished stories that assume two choices, such as US-11.6 and US-11.9, and unmapped documents such as `PRD-NextJS.md`, read under this decision without being rewritten.
 - **PRD 12.2:** queue wait, inference wait, time to first token, generation duration and the other measured fields are later scope. Structured logs, Operations and the inspector are what this release has.
 
 ## What this gives up

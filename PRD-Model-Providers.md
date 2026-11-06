@@ -46,7 +46,7 @@ Do not send a `models` fallback array, automatic routing names, provider plugins
 
 Maintain capabilities per model and qualified route. The current Terra catalog does not advertise `temperature`, `top_p` or `parallel_tool_calls`; omit them instead of copying another profile's settings. Serialize application tool execution where required without assuming that parameter is available. Reject required unsupported capabilities before dispatch. JSON requests use the qualified `response_format.json_schema` shape and independent final validation. [Structured outputs](https://openrouter.ai/docs/guides/features/structured-outputs).
 
-Preserve opaque provider reasoning metadata needed for tool continuation as access-controlled protocol state, with the original ordering and content. Do not display it as private thoughts or put it in ordinary activity logs. Present concise decision summaries and evidence instead. [Reasoning continuation requirements](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens).
+Preserve opaque provider reasoning metadata needed for tool continuation as access-controlled protocol state, with the original ordering and content where the pinned SDK passes it on. Terra's encrypted `id` is removed by that SDK, a stated limit by [Decision 0013](docs/engineering/decisions/0013-release-closure.md). Do not display it as private thoughts or put it in ordinary activity logs. Present concise decision summaries and evidence instead. [Reasoning continuation requirements](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens).
 
 ## MP-03. Configuration precedence
 

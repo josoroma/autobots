@@ -22,9 +22,11 @@ from goal_loop_script import ROUTE, Script, calls, say  # noqa: E402
 from mock_sink import Sink  # noqa: E402
 
 from autobots.adapters.object_storage import SupabaseObjectStore  # noqa: E402
+from autobots.application.experts import create_expert, create_session  # noqa: E402
 from autobots.application.goal_loop import LoopConfig, _drive  # noqa: E402, PLC2701
 from autobots.application.runs import admit_run  # noqa: E402
 from autobots.application.worker_leases import claim_run  # noqa: E402
+from autobots.contracts.experts import ExpertConfig, SessionExpert  # noqa: E402
 from autobots.domain.models import resolve_role_policy  # noqa: E402
 from autobots.domain.tools import LOOP_TOOL_GRANTS, PLAN_TOOLS  # noqa: E402
 
@@ -58,10 +60,14 @@ async def main() -> None:
         finished = await run(keyless_in, 'An artifact in a workspace with no key',
                              [calls(PLAN), calls(SAVE), calls(PUBLISH), calls(DONE), say('The report is ready.')],
                              {**PLAN_TOOLS, **LOOP_TOOL_GRANTS})
+        # A saved binding no write can make now, for the screens that have to say so.
+        stale = await create_expert(db, workspace_id=waiting_in, actor_id=uuid4(), idempotency_key=str(uuid4()), name='Saved on DeepSeek',
+                                    config=ExpertConfig(tools=['calculate'], role_bindings={'executor': 'openrouter_deepseek_flash', 'coder': 'openrouter_deepseek_flash'}))
+        pinned = await create_session(db, workspace_id=waiting_in, actor_id=uuid4(), idempotency_key=str(uuid4()), kind='direct', experts=[SessionExpert(expert_id=stale.id)])
         states = {}
         for name, run_id in (('waiting', waiting), ('finished', finished)):
             states[name] = (await (await db.execute('select status from public.runs where id = %s', (run_id,))).fetchone())[0]
-    print(json.dumps({'waiting_run': waiting, 'keyless_run': finished, 'states': states}))
+    print(json.dumps({'waiting_run': waiting, 'keyless_run': finished, 'stale_session': str(pinned.id), 'stale_expert': str(stale.id), 'states': states}))
 
 
 asyncio.run(main())

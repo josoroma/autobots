@@ -4,7 +4,7 @@
 
 Analyzed revision: 5012235bd79e47dd9775c3d4acae816ec2884904
 
-The inventory was taken at `5587a9f`, and each delivered story keeps it current, through US-11.12's fixes on top of the revision above. It includes the OhMyOrch delivery setup in [HARNESS-OHMYORCH-001](docs/engineering/work-items/HARNESS-OHMYORCH-001.md), US-1.1's inventory and five added cache ignore rules, US-1.2's rule mapping checks, derived `assistant_adapter` status and forward ingestion runbook, and US-1.3's locked toolchains and scaffold, plus the US-1.4 verification profiles and hook changes committed on top of it. The bullets added by each later delivered story describe that story's working tree, not a re-analysis of the whole repository, so this revision line is older than they are.
+The inventory was taken at `5587a9f`, and each delivered story keeps it current, through EPIC-12's stories on top of the revision above. It includes the OhMyOrch delivery setup in [HARNESS-OHMYORCH-001](docs/engineering/work-items/HARNESS-OHMYORCH-001.md), US-1.1's inventory and five added cache ignore rules, US-1.2's rule mapping checks, derived `assistant_adapter` status and forward ingestion runbook, and US-1.3's locked toolchains and scaffold, plus the US-1.4 verification profiles and hook changes committed on top of it. The bullets added by each later delivered story describe that story's working tree, not a re-analysis of the whole repository, so this revision line is older than they are.
 
 ## System Summary
 

@@ -142,14 +142,12 @@ def request_bytes(request: Any) -> int:
         if message is not None:
             calls = getattr(message, "tool_calls", None) or []
             total += len(
-                json.dumps([message.content, calls], default=str, ensure_ascii=False).encode(
-                    "utf-8", "surrogatepass"
-                )
+                json.dumps([message.content, calls], default=str, ensure_ascii=False).encode()
             )
     return total + len(
         json.dumps(
             getattr(request, "tools", None) or [], default=_tool_text, ensure_ascii=False
-        ).encode("utf-8", "surrogatepass")
+        ).encode()
     )
 
 
@@ -418,7 +416,11 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             "select model_calls from app_private.run_usage where run_id = %s", (budget,)
         )
         used = (await cursor.fetchone())[0]
-        prompt_bytes = request_bytes(request)
+        try:
+            prompt_bytes = request_bytes(request)
+        except UnicodeEncodeError:
+            # A lone surrogate is no text a provider can read, so nothing is reserved or sent.
+            raise LoopStopped("request_unencodable") from None
         if past_known_price(chosen, prompt_bytes):
             raise LoopStopped(FailureClass.COST_UNAVAILABLE.value)
         admission_request = AdmissionRequest(

@@ -1,7 +1,7 @@
 {
- "schema_version": "autobots.surface-walk/v1",
- "base_revision": "eff3498",
- "note": "US-12.2's tree, on this base plus its uncommitted change. US-12.3 captures again on the final tree.",
+ "schema_version": "autobots.surface-walk/v2",
+ "base_revision": "37d0c73",
+ "note": "On this base plus US-12.3's fixes. US-12.3 captures again at its bound fingerprint.",
  "absent": {
   "onboarding": "No separate flow. Key setup on Models is what a new owner meets, and it's captured as key-setup.",
   "dialogs and portals": "The app has none. Choices are inline, and selects are native.",
@@ -18,798 +18,1050 @@
    "theme": "dark",
    "keyboard": {
     "stops": 12,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 3,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 33,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "key-setup",
    "theme": "dark",
    "keyboard": {
     "stops": 28,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 19,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 163,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "home",
    "theme": "dark",
    "keyboard": {
     "stops": 14,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 5,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 1,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 71,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "runs",
    "theme": "dark",
    "keyboard": {
-    "stops": 60,
-    "out_of_order": [],
+    "stops": 109,
+    "truncated": false,
+    "main_controls": 100,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 325,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "run",
    "theme": "dark",
    "keyboard": {
     "stops": 12,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 3,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 83,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "inspector",
    "theme": "dark",
    "keyboard": {
     "stops": 11,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 2,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 133,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "experts",
    "theme": "dark",
    "keyboard": {
-    "stops": 50,
-    "out_of_order": [],
+    "stops": 58,
+    "truncated": false,
+    "main_controls": 49,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 2,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 128,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "expert-editor",
    "theme": "dark",
    "keyboard": {
     "stops": 21,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 12,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 59,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "session",
    "theme": "dark",
    "keyboard": {
     "stops": 12,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 3,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 1,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 61,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "workflows",
    "theme": "dark",
    "keyboard": {
-    "stops": 31,
-    "out_of_order": [],
+    "stops": 32,
+    "truncated": false,
+    "main_controls": 23,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 1,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 97,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "workflow-editor",
    "theme": "dark",
    "keyboard": {
     "stops": 16,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 7,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 108,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "workflow-monitor",
    "theme": "dark",
    "keyboard": {
     "stops": 10,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 1,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 54,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "approvals",
    "theme": "dark",
    "keyboard": {
     "stops": 25,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 12,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 67,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "approvals-empty",
    "theme": "dark",
    "keyboard": {
     "stops": 9,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 0,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 23,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "settings",
    "theme": "dark",
    "keyboard": {
     "stops": 10,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 2,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 43,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "models",
    "theme": "dark",
    "keyboard": {
     "stops": 30,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 21,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 169,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "operations",
    "theme": "dark",
    "keyboard": {
     "stops": 13,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 4,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 75,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "state-loading",
    "theme": "dark",
    "keyboard": {
     "stops": 9,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 0,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 23,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "state-error",
    "theme": "dark",
    "keyboard": {
     "stops": 9,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 0,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 23,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "state-empty",
    "theme": "dark",
    "keyboard": {
     "stops": 10,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 1,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 1,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 31,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "state-local-only",
    "theme": "dark",
    "keyboard": {
     "stops": 9,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 0,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 26,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "sign-in",
    "theme": "light",
    "keyboard": {
     "stops": 12,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 3,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 33,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "key-setup",
    "theme": "light",
    "keyboard": {
     "stops": 28,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 19,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 163,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "home",
    "theme": "light",
    "keyboard": {
     "stops": 14,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 5,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 1,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 71,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "runs",
    "theme": "light",
    "keyboard": {
-    "stops": 60,
-    "out_of_order": [],
+    "stops": 109,
+    "truncated": false,
+    "main_controls": 100,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 325,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "run",
    "theme": "light",
    "keyboard": {
     "stops": 12,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 3,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 83,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "inspector",
    "theme": "light",
    "keyboard": {
     "stops": 11,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 2,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 133,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "experts",
    "theme": "light",
    "keyboard": {
-    "stops": 50,
-    "out_of_order": [],
+    "stops": 58,
+    "truncated": false,
+    "main_controls": 49,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 2,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 128,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "expert-editor",
    "theme": "light",
    "keyboard": {
     "stops": 21,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 12,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 59,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "session",
    "theme": "light",
    "keyboard": {
     "stops": 12,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 3,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 1,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 61,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "workflows",
    "theme": "light",
    "keyboard": {
-    "stops": 31,
-    "out_of_order": [],
+    "stops": 32,
+    "truncated": false,
+    "main_controls": 23,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 1,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 97,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "workflow-editor",
    "theme": "light",
    "keyboard": {
     "stops": 16,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 7,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 108,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "workflow-monitor",
    "theme": "light",
    "keyboard": {
     "stops": 10,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 1,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 54,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "approvals",
    "theme": "light",
    "keyboard": {
     "stops": 25,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 12,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 67,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "approvals-empty",
    "theme": "light",
    "keyboard": {
     "stops": 9,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 0,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 23,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "settings",
    "theme": "light",
    "keyboard": {
     "stops": 10,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 2,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 43,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "models",
    "theme": "light",
    "keyboard": {
     "stops": 30,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 21,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 169,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "operations",
    "theme": "light",
    "keyboard": {
     "stops": 13,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 4,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 75,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "state-loading",
    "theme": "light",
    "keyboard": {
     "stops": 9,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 0,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 23,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "state-error",
    "theme": "light",
    "keyboard": {
     "stops": 9,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 0,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 23,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "state-empty",
    "theme": "light",
    "keyboard": {
     "stops": 10,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 1,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 1,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 31,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   },
   {
    "surface": "state-local-only",
    "theme": "light",
    "keyboard": {
     "stops": 9,
-    "out_of_order": [],
+    "truncated": false,
+    "main_controls": 0,
+    "unreached_in_main": [],
+    "upward_in_main": [],
     "positive_tabindex": 0
    },
    "disabled": {
     "count": 0,
-    "focusable": [],
     "unnamed": []
    },
    "zoom": {
     "200%": 0,
     "400%": 0
    },
-   "moving": []
+   "motion": {
+    "checked": 26,
+    "moving_when_reduced": [],
+    "moving_by_default": 0
+   }
   }
  ]
 }

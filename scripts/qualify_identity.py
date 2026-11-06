@@ -273,7 +273,8 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
         # A saved choice naming DeepSeek can't be made through the product now, so each is arranged.
         saved_choices = (('a saved default naming DeepSeek', "default_profile = 'openrouter_deepseek_flash', role_overrides = '{}'"),
                          ('a saved override on another role', "default_profile = 'openrouter_terra', role_overrides = '{\"coder\": \"openrouter_deepseek_flash\"}'"),
-                         ('a saved executor override', "default_profile = 'openrouter_terra', role_overrides = '{\"executor\": \"openrouter_deepseek_flash\"}'"))
+                         ('a saved executor override', "default_profile = 'openrouter_terra', role_overrides = '{\"executor\": \"openrouter_deepseek_flash\"}'"),
+                         ('a saved Expert binding', "default_profile = 'openrouter_terra', role_overrides = '{}'"))
         for index, (title, setting) in enumerate(saved_choices, start=1):
             report_path = root / f'.checks/identity/playwright-saved-choice-{index}.json'
             report_path.unlink(missing_ok=True)
@@ -396,7 +397,7 @@ def qualify(root: Path) -> int:
             raise Unavailable(f'the browser runs could not be arranged: {arranged_runs.stderr[-500:]}')
         arranged_ids = json.loads(arranged_runs.stdout.strip().splitlines()[-1])
         cases.check('the browser runs are arranged', 'waiting_approval and succeeded', str(arranged_ids['states']), arranged_ids['states'] == {'waiting': 'waiting_approval', 'finished': 'succeeded'})
-        artifacts = {**artifacts, 'AUTOBOTS_TEST_WAITING_RUN': arranged_ids['waiting_run'], 'AUTOBOTS_TEST_FILES_RUN': arranged_ids['keyless_run'], 'AUTOBOTS_TEST_FILES_EMAIL': email_e, 'AUTOBOTS_TEST_FILES_PASSWORD': password_e}
+        artifacts = {**artifacts, 'AUTOBOTS_TEST_STALE_SESSION': arranged_ids['stale_session'], 'AUTOBOTS_TEST_STALE_EXPERT': arranged_ids['stale_expert'], 'AUTOBOTS_TEST_WAITING_RUN': arranged_ids['waiting_run'], 'AUTOBOTS_TEST_FILES_RUN': arranged_ids['keyless_run'], 'AUTOBOTS_TEST_FILES_EMAIL': email_e, 'AUTOBOTS_TEST_FILES_PASSWORD': password_e}
         browser_cases(root, cases, stack, base, db_port, email_a, password_a, owner_a['workspace_id'], owner_b['workspace_id'],
                       email_b, password_b, email_c, password_c, artifacts)
     finally:

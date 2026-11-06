@@ -345,6 +345,30 @@ test("the model policy is versioned, and refuses an unapproved value", async ({
   });
   expect(expert.status()).toBe(422);
   expect((await expert.json()).code).toBe("model_not_offered");
+  const experts = await (await page.request.get("/api/v1/experts")).json();
+  expect(
+    experts.experts.filter(
+      (item: { name: string }) => item.name === "Names DeepSeek",
+    ),
+  ).toEqual([]);
+  const created = await (
+    await page.request.post("/api/v1/experts", {
+      headers: { ...headers, "Idempotency-Key": `plain-${Date.now()}` },
+      data: { name: `Plain ${Date.now()}`, config: {} },
+    })
+  ).json();
+  const revision = await page.request.post(
+    `/api/v1/experts/${created.id}/versions`,
+    {
+      headers: { ...headers, "Idempotency-Key": `revision-${Date.now()}` },
+      data: {
+        expected_version: created.latest_version,
+        config: { role_bindings: { executor: "openrouter_deepseek_flash" } },
+      },
+    },
+  );
+  expect(revision.status()).toBe(422);
+  expect((await revision.json()).code).toBe("model_not_offered");
   const stale = await page.request.put("/api/settings/model-policy", {
     headers,
     data: {

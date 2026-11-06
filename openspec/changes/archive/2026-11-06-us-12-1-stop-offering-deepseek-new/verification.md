@@ -26,3 +26,12 @@ Checks on the final code: `fast`, `harness` and `app_db.py qualify` exit 0, the 
 ## Not exercised
 
 Nothing live. This story makes no paid call.
+
+## Corrected by US-12.3's review
+
+This record overstated four rows, and the behavior was fixed or tested there.
+
+- **Refuse it through the API:** "nothing stored changes" was asserted only for the policy's version. US-12.3 also asserts no Expert is created, and that `POST /v1/experts/{id}/versions` refuses it.
+- **Refuse a saved choice without substituting:** the workflow case arranged a saved workspace default, not an Expert's binding, as a workflow doesn't read one. The routine case calls `_admit` directly, so its `blocked` row isn't asserted. A workflow with no agent step is no longer refused, as it calls no model.
+- **Keep its record visible:** Operations asserts date and limits, not configuration.
+- **A false statement this story left:** the run disclosure named a route the server would refuse. It now says the run would start nothing.

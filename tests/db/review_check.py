@@ -211,12 +211,22 @@ async def main() -> None:
         await db.execute("insert into app_private.model_policies (workspace_id, version, default_profile, role_overrides) values (%s, 1, 'openrouter_deepseek_flash', '{}')", (chooser,))
         saved_flow = await create_workflow(db, workspace_id=chooser, actor_id=actor, idempotency_key=str(uuid4()), name=f'Saved {uuid4().hex[:6]}')
         await publish_version(db, workspace_id=chooser, actor_id=actor, workflow_id=saved_flow.id, idempotency_key=str(uuid4()), expected_version=0, graph=WorkflowGraph.model_validate(graph), source='user')
+        # With no agent step it calls no model, so a saved choice can't stop it.
+        plain = await create_execution(db, workspace_id=chooser, actor_id=actor, workflow_id=saved_flow.id, idempotency_key=str(uuid4()), version=1, inputs={'in': 'x'})
+        check('a workflow with no agent step still runs under a saved DeepSeek default', 'admitted', plain.run_id, bool(plain.run_id))
+        await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where run_id = %s", (plain.run_id,))
+        helper = await create_expert(db, workspace_id=chooser, actor_id=actor, idempotency_key=str(uuid4()), name=f'Saved helper {uuid4().hex[:6]}', config=ExpertConfig(tools=['calculate']))
+        agent_graph = {'nodes': [{'id': 'in', 'block': 'input', 'version': 1, 'config': {'type': 'string'}}, {'id': 'ask', 'block': 'agent', 'version': 1, 'config': {'expert_id': str(helper.id)}}, {'id': 'out', 'block': 'output', 'version': 1, 'config': {}}],
+                       'links': [{'source': 'in', 'source_port': 'value', 'target': 'ask', 'target_port': 'goal'}, {'source': 'ask', 'source_port': 'result', 'target': 'out', 'target_port': 'value'}]}
+        agent_flow = await create_workflow(db, workspace_id=chooser, actor_id=actor, idempotency_key=str(uuid4()), name=f'Saved agent {uuid4().hex[:6]}')
+        await publish_version(db, workspace_id=chooser, actor_id=actor, workflow_id=agent_flow.id, idempotency_key=str(uuid4()), expected_version=0, graph=WorkflowGraph.model_validate(agent_graph), source='user')
+        started_before = (await (await db.execute('select count(*) from public.runs where workspace_id = %s', (chooser,))).fetchone())[0]
         try:
-            await create_execution(db, workspace_id=chooser, actor_id=actor, workflow_id=saved_flow.id, idempotency_key=str(uuid4()), version=1, inputs={'in': 'x'})
-            check("a workflow under a saved DeepSeek default is refused", 'model_not_offered', 'admitted', False)
+            await create_execution(db, workspace_id=chooser, actor_id=actor, workflow_id=agent_flow.id, idempotency_key=str(uuid4()), version=1, inputs={'in': 'x'})
+            check("a workflow with an agent step under a saved DeepSeek default is refused", 'model_not_offered', 'admitted', False)
         except WorkflowRefused as refused:
-            check("a workflow under a saved DeepSeek default is refused", 'model_not_offered', refused.code, refused.code == 'model_not_offered')
-        started = (await (await db.execute('select count(*) from public.runs where workspace_id = %s', (chooser,))).fetchone())[0]
+            check("a workflow with an agent step under a saved DeepSeek default is refused", 'model_not_offered', refused.code, refused.code == 'model_not_offered')
+        started = (await (await db.execute('select count(*) from public.runs where workspace_id = %s', (chooser,))).fetchone())[0] - started_before
         kept = (await (await db.execute('select default_profile, version from app_private.model_policies where workspace_id = %s', (chooser,))).fetchone())
         check('no run started, and the saved choice stands', "0 runs, still DeepSeek at version 1", (started, kept), started == 0 and kept == ('openrouter_deepseek_flash', 1))
         lover = await create_expert(db, workspace_id=WORKSPACE, actor_id=actor, idempotency_key=str(uuid4()), name=f'Saved binding {uuid4().hex[:6]}', config=ExpertConfig(tools=['calculate'], role_bindings={'executor': 'openrouter_deepseek_flash'}))
@@ -228,6 +238,27 @@ async def main() -> None:
         except RoutineRefused as refused:
             after_runs = (await (await db.execute('select count(*) from public.runs where workspace_id = %s', (WORKSPACE,))).fetchone())[0]
             check("an occurrence on a saved Expert binding is refused", 'model_not_offered, no run', (refused.code, after_runs - before_runs), refused.code == 'model_not_offered' and after_runs == before_runs)
+
+        # R5-4: a scripted model's tool arguments holding a lone surrogate, the way one could arrive.
+        odd = await admitted('A model that returns a lone surrogate', 1_000_000)
+        task = {'id': 'a', 'title': 'T', 'criteria': ['c1'], 'expected_evidence': 'a file'}
+        model = Aware(items=[calls(('propose_plan', {'tasks': [task]})), calls(('calculate', {'operation': 'sum', 'values': [1, 2], 'note': 'x\ud83dy'})), say('after'), say('after')], seen=[], bound=[])
+        odd_lease = await claim_run(db, odd, worker_id='surrogate')
+        try:
+            outcome = await _drive(db, URL, odd_lease, lambda: model, LoopConfig(route=ModelRoute('executor', 'openrouter_terra', 'fixture/model', 1_000, 1_000_000), sleep=lambda _: asyncio.sleep(0)))
+            ended = (outcome.run_status, outcome.code)
+        except Exception as raised:  # noqa: BLE001 - what the worker's loop would see.
+            ended = ('raised', type(raised).__name__)
+        reserved_rows = await (await db.execute('select count(*) from app_private.model_invocations where run_id = %s', (odd,))).fetchone()
+        status_now = (await (await db.execute('select status from public.runs where id = %s', (odd,))).fetchone())[0]
+        check('a lone surrogate from a model ends the run truthfully, with nothing more reserved', 'failed, request_unencodable, and neither a reservation nor a call after it', (ended, status_now, reserved_rows[0], len(model.seen)), ended == ('failed', 'request_unencodable') and status_now == 'failed' and reserved_rows[0] == 2 and len(model.seen) == 2)
+
+        # R5-4: whether a lone surrogate can arrive. A goal can't be stored with one.
+        try:
+            await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='before \ud83d after', limit_micro_usd=1000, policy=resolve_role_policy())
+            check('a goal holding a lone surrogate never reaches a model', 'refused on the way in', 'stored', False)
+        except (UnicodeEncodeError, psycopg.Error, ValueError) as refused:
+            check('a goal holding a lone surrogate never reaches a model', 'refused on the way in', type(refused).__name__, True)
     print(json.dumps({'cases': cases}))
 
 

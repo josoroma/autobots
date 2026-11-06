@@ -312,3 +312,39 @@ test("a member can't pin an earlier Expert version through a session, and an own
   });
   expect(pinned.status()).toBe(201);
 });
+
+test("saving a revision keeps what the form doesn't edit", async ({ page }) => {
+  await signIn(page, EMAIL_A, PASSWORD_A);
+  await page.goto("/experts");
+  const token = await (await page.request.get("/api/csrf")).json();
+  const stamp = Date.now();
+  const headers = (key: string) => ({
+    [token.header]: token.token,
+    Origin: new URL(page.url()).origin,
+    "Content-Type": "application/json",
+    "Idempotency-Key": `${key}-${stamp}`,
+  });
+  const expert = await (
+    await page.request.post("/api/v1/experts", {
+      headers: headers("keeps"),
+      data: {
+        name: `Keeps ${stamp}`,
+        config: {
+          skills: ["a-skill"],
+          role_bindings: { coder: "openrouter_terra" },
+        },
+      },
+    })
+  ).json();
+  await page.goto(`/experts/${expert.id}`);
+  await page.getByLabel("Purpose").fill("Changed here");
+  await page.getByRole("button", { name: "Save revision" }).click();
+  await expect(page.getByText(/Saved as version 2/)).toBeVisible();
+  const saved = await (
+    await page.request.get(`/api/v1/experts/${expert.id}`)
+  ).json();
+  const latest = saved.versions.at(-1).config;
+  expect(latest.purpose).toBe("Changed here");
+  expect(latest.skills).toEqual(["a-skill"]);
+  expect(latest.role_bindings).toEqual({ coder: "openrouter_terra" });
+});

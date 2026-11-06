@@ -44,17 +44,16 @@ RETRY_AFTER = 3
 
 
 # What a Terra request may carry, MP-07's unadvertised sampler and parallel-tool flags left out.
-REQUEST_FIELDS = frozenset({'model', 'messages', 'tools', 'tool_choice', 'max_tokens', 'provider', 'stream', 'stream_options', 'usage', 'models', 'route', 'session_id'})
+REQUEST_FIELDS = frozenset({'model', 'messages', 'tools', 'tool_choice', 'max_tokens', 'provider', 'stream'})
+REASONING_EFFORTS = frozenset({'minimal', 'low', 'medium', 'high'})
 
 
 def request_shape_problems(fields: list[str], reasoning: object) -> list[str]:
     """One request as sent. A flag that isn't advertised, or a reasoning setting that isn't one."""
     problems = [f'unexpected field {name}' for name in fields if name not in REQUEST_FIELDS and name != 'reasoning']
     if 'reasoning' in fields:
-        if not isinstance(reasoning, dict) or set(reasoning) - {'effort', 'summary', 'exclude'}:
-            problems.append('reasoning has an unknown shape')
-        elif reasoning.get('effort') == 'none' or reasoning.get('enabled') is False:
-            problems.append('reasoning is turned off')
+        if not isinstance(reasoning, dict) or set(reasoning) - {'effort', 'summary'} or reasoning.get('effort') not in REASONING_EFFORTS:
+            problems.append('reasoning has an unknown shape or is turned off')
     return problems
 
 
@@ -242,6 +241,7 @@ def qualify(root: Path) -> int:
         # A long run compacts through the real SDK, under its summarizer role. WI-5.
         compacted = admit(workspace_a, 'compact', TERRA)
         before_view = goal_view(token_a, compacted)
+        summaries_before = ops.sql(f"select count(*) from app_private.run_summaries where run_id = '{compacted}';")
         finished = settled(compacted, 'succeeded', 120)
         asked = sent('compact-summary')
         roles = ops.sql(f"select coalesce(string_agg(distinct role || '/' || status, ' '), 'none') from app_private.model_invocations where run_id = '{compacted}' and role = 'summarizer';")
@@ -254,12 +254,15 @@ def qualify(root: Path) -> int:
         passed, content = verified_report(workspace_a, compacted) if finished else ('', '')
         cases.check('and its result still verifies', 'verified, Total: 42', f'{passed}', passed == 'true' and 'Total: 42' in content)
         after_view = goal_view(token_a, compacted)
-        cases.check('the goal and criteria the API shows are the same after compaction', 'identical, and present', f'{after_view}', bool(before_view[0]) and bool(before_view[1]) and before_view == after_view)
+        cases.check('the goal and criteria the API shows are the same after compaction', 'identical, and present', f'{after_view}', bool(before_view[0]) and bool(before_view[1]) and before_view == after_view and summaries_before == '0')
 
         # LC-26: the shape of every request Terra's runs sent.
         terra_calls = [call for tag in ('compact', 'compact-summary', 'reasoning') for call in sent(tag) if 'fields' in call]
         problems = sorted({problem for call in terra_calls for problem in request_shape_problems(call['fields'], call.get('reasoning_field'))})
-        cases.check("Terra's requests carry no unadvertised flag, and reasoning stays well-formed", f'no problems across requests', f'{len(terra_calls)} requests, {problems}', bool(terra_calls) and not problems)
+        routed = all(call.get('provider') == FLAGS and not call.get('models') for call in terra_calls)
+        with_reasoning = sum('reasoning' in call['fields'] for call in terra_calls)
+        cases.check("Terra's requests carry no unadvertised flag, and their routing flags are exact", 'no problems, and none of them sets reasoning', f'{len(terra_calls)} requests, {problems}, routing exact {routed}, {with_reasoning} with reasoning',
+                    bool(terra_calls) and not problems and routed and with_reasoning == 0)
 
         # LC-25: every request the fake transport saw is on the ledger, by role, on the frozen route.
         inventory = ops.sql(f"select coalesce(string_agg(role || '/' || profile || '/' || wire_id || '=' || n, ' ' order by role), 'none') from (select role, profile, wire_id, count(*) n from app_private.model_invocations where run_id = '{compacted}' group by 1, 2, 3) t;")
@@ -279,6 +282,10 @@ def qualify(root: Path) -> int:
         billed = ops.sql(f"select count(distinct run_id) || '/' || count(*) from app_private.model_invocations where root_run_id = '{lead}';")
         cases.check('a child runs through the product worker and bills its root', 'succeeded, 2 runs on the root ledger', f'{row}, {billed}',
                     settled_child and row == 'succeeded/succeeded' and billed.startswith('2/'))
+        tree_roles = ops.sql(f"select string_agg(distinct role || '/' || profile || '/' || wire_id, ' ') from app_private.model_invocations where root_run_id = '{lead}';")
+        tree_requests = len([call for tag in ('parent', 'child-part') for call in sent(tag) if 'fields' in call])
+        cases.check("the tree's dispatches are on the root's ledger by role and frozen route, with none off it", f'executor on Terra, as many requests as rows', f'{tree_roles}; {tree_requests} requests, {billed}',
+                    tree_roles == f'executor/{TERRA}/{TERRA_WIRE}' and billed == f'2/{tree_requests}' and {call['model'] for tag in ('parent', 'child-part') for call in sent(tag) if 'fields' in call} == {TERRA_WIRE})
         cases.check('its parent, which stops with no evidence of its own, fails', 'failed', status(lead), parent_failed)
 
         # Rotation reaches the next attempt with no restart.
@@ -357,6 +364,16 @@ def qualify(root: Path) -> int:
         cases.check("one workspace's key never served another's run", 'A used its two keys, B its two', f'{len(used_a)} and {len(used_b)} keys',
                     used_a == {key_id(KEY_ONE), key_id(KEY_TWO)} and used_b == {key_id(KEY_B), key_id(KEY_REJECTED)})
 
+        # Below the factory: name lookups and Python's own connects, so a stray can't leave unseen.
+        lines = [json.loads(line) for line in requests_file.read_text().splitlines()]
+        looked_up = [line for line in lines if 'refused_host' in line]
+        connected = [line for line in lines if 'refused_connect' in line]
+        controls = {line['refused_host'] for line in looked_up if line.get('control')} | {line['refused_connect'] for line in connected if line.get('control')}
+        strays = [line for line in [*looked_up, *connected] if not line.get('control')]
+        cases.check('a stray client is seen by name, on loopback and by literal address, and no real dispatch left the fake transport',
+                    'all three controls caught, and no other', f'controls {sorted(controls)}, strays {strays}',
+                    controls == {'openrouter.ai', '127.0.0.1:9', '198.51.100.1:80'} and not strays)
+
         # A clean stop.
         worker.send_signal(signal.SIGTERM)
         exit_code = exited(worker, 40)
@@ -398,7 +415,8 @@ def qualify(root: Path) -> int:
         counts = blobs.split('/')
         cases.check('checkpoints hold no key', 'some blobs, 0 and 0 with a key', blobs, len(counts) == 3 and int(counts[0]) > 0 and counts[1:] == ['0', '0'])
         refused = [json.loads(line) for line in requests_file.read_text().splitlines() if 'refused_host' in line]
-        cases.check('nothing tried to resolve a host beyond loopback', 'none', refused or 'none', not refused)
+        refused = [line for line in refused if not line.get('control')]
+        cases.check('nothing tried to resolve a host beyond loopback', 'none, apart from the arranged control', refused or 'none', not refused)
         written = '\n'.join(path.read_text(errors='replace') for path in logs.glob('*.log'))
         planted = [key for key in (KEY_ONE, KEY_TWO, KEY_B, KEY_REJECTED, stack.runtime_password, service) if key in written]
         cases.check('no process log holds a key', 'none', len(planted), not planted)

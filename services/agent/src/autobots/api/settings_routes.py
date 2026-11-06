@@ -255,8 +255,28 @@ async def put_model_policy(
 
 @router.post("/runs/intent", operation_id="checkRunIntent", response_model=RunIntentCheck)
 async def check_run_intent(
-    settings: Settings, workspace_id: Annotated[UUID, Depends(current_workspace)]
+    request: Request,
+    settings: Settings,
+    workspace_id: Annotated[UUID, Depends(current_workspace)],
 ) -> RunIntentCheck:
     """Only a user's Run click reaches this. It admits nothing: run admission is a later story."""
     code = await settings.run_intent(workspace_id)
+    pool: Any = request.app.state.pool
+    if code == "ready" and pool is not None:
+        # Kept here, as a resume and the worker read `run_intent` for the key alone.
+        async with pool.connection() as connection:
+            cursor = await connection.execute(
+                "select default_profile, role_overrides from app_private.model_policies "
+                "where workspace_id = %s",
+                (workspace_id,),
+            )
+            row = await cursor.fetchone()
+        policy = resolve_role_policy(
+            workspace_default=row[0] if row else None,
+            workspace_role_overrides=row[1] if row else None,
+        )
+        try:
+            require_offered(policy.bindings.values())
+        except ProfileNotOffered as refused:
+            code = refused.code
     return RunIntentCheck(schema_version=1, ready=code == "ready", code=code)  # type: ignore[arg-type]

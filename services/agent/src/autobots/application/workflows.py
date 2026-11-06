@@ -236,10 +236,11 @@ async def create_execution(
                     workspace_default=chosen[0] if chosen else None,
                     workspace_role_overrides=chosen[1] if chosen else None,
                 )
-                try:
-                    require_offered(policy.bindings.values())
-                except ProfileNotOffered as refused:
-                    raise WorkflowRefused(refused.code) from None
+                if await needs_model(connection, workspace_id, workflow_id, version):
+                    try:
+                        require_offered(policy.bindings.values())
+                    except ProfileNotOffered as refused:
+                        raise WorkflowRefused(refused.code) from None
             granted = (
                 _WORKFLOW_TOOLS
                 if tools is None

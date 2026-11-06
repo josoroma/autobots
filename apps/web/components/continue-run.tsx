@@ -86,7 +86,7 @@ export function ContinueRun({ runId }: { runId: string }) {
         session, input documents, required artifacts and criteria aren&apos;t
         carried over.
       </p>
-      {lost && started === null ? (
+      {started !== null ? null : lost ? (
         <p>The model stays as chosen, as this may already be running.</p>
       ) : (
         <RunDisclosure chosen={profile} onChoose={setProfile} />

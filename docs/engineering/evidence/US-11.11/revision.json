@@ -1,8 +1,8 @@
 {
-  "captured_at_utc": "2026-11-06T18:16:32.266387+00:00",
-  "base_revision": "5012235bd79e47dd9775c3d4acae816ec2884904",
+  "captured_at_utc": "2026-11-06T22:01:11.956622+00:00",
+  "base_revision": "37d0c736ae56d36d63b5a783f6a391fe6143ec66",
   "note": "The story's commit is this base plus these screens.",
-  "screens_sha256": "275738cc088361dc0951e94644944634a74ac8bfbeedd205063c181976fdcb8d",
+  "screens_sha256": "8113134f657cef302f4049633aafb38479c7afb37f463444070cfccbdb54b9fa",
   "screens_files": 60,
   "how": "sha256 over each sorted file path under apps/web/app, components and lib, then its bytes"
 }

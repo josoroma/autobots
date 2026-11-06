@@ -15,6 +15,8 @@ import os
 import socket
 import time
 from pathlib import Path
+import sys
+from urllib.parse import urlparse
 from typing import Any
 
 import httpx
@@ -30,14 +32,42 @@ def record(entry: dict[str, Any]) -> None:
         stream.write(json.dumps(entry) + '\n')
 
 
+# Set while the control below runs, so a real attempt to leave can't be mistaken for it.
+CONTROL = [False]
+
+
 def guarded_getaddrinfo(host: Any, *args: Any, **kwargs: Any) -> Any:
     if host not in LOOPBACK:
-        record({'refused_host': str(host)})
+        record({'refused_host': host.decode() if isinstance(host, bytes) else str(host), 'control': CONTROL[0]})
         raise OSError('this check allows loopback only')
     return real_getaddrinfo(host, *args, **kwargs)
 
 
 socket.getaddrinfo = guarded_getaddrinfo
+
+
+def _port(name: str) -> int | None:
+    value = os.environ.get(name, '')
+    return urlparse(value).port if value else None
+
+
+# What this process may connect to by itself: the stack, and nothing else. libpq connects in C, so
+# the database never comes through here, and this sees what Python opens, such as an HTTP client.
+ALLOWED_PORTS = {port for port in (_port('AUTOBOTS_DATABASE_URL'), _port('AUTOBOTS_STORAGE_BASE')) if port}
+
+
+def guarded_connect(event: str, args: tuple) -> None:
+    if event != 'socket.connect':
+        return
+    address = args[1]
+    if isinstance(address, tuple) and address[0] in LOOPBACK and address[1] in ALLOWED_PORTS:
+        return
+    if isinstance(address, tuple):
+        record({'refused_connect': f'{address[0]}:{address[1]}', 'control': CONTROL[0]})
+        raise OSError('this check allows the stack only')
+
+
+sys.addaudithook(guarded_connect)
 
 from autobots.adapters.models.factory import default_sdk_client  # noqa: E402
 from autobots.application.compaction import SUMMARY_MARKER  # noqa: E402
@@ -172,5 +202,21 @@ async def fetch_catalog() -> dict[str, Any]:
                      for profile, (prompt, completion) in PRICES.items()]}
 
 
+async def leave_on_purpose() -> None:
+    """A client built outside the factory, as a stray dispatch would be. The guard has to see it."""
+    CONTROL[0] = True
+    try:
+        # By name, then past the name lookup: a local model server, and a literal address.
+        for url in ('https://openrouter.ai/api/v1/models', 'http://127.0.0.1:9/v1/chat/completions', 'http://198.51.100.1/v1/chat/completions'):
+            try:
+                async with httpx.AsyncClient() as stray:
+                    await stray.get(url)
+            except (OSError, httpx.HTTPError):
+                pass
+    finally:
+        CONTROL[0] = False
+
+
 if __name__ == '__main__':
+    asyncio.run(leave_on_purpose())
     asyncio.run(main(client_factory=client_factory, fetch_catalog=fetch_catalog))

@@ -41,7 +41,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
+          "ratio": 17.18
         },
         {
           "element": "A",
@@ -99,13 +99,34 @@
         "sample": "Sign in",
         "ratio": 8.84
       },
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 12,
+        "truncated": false,
+        "main_controls": 3,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 33,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "key-setup",
       "theme": "dark",
       "screenshot": "key-setup-dark.png",
-      "text_checked": 65,
+      "text_checked": 66,
       "lowest_text_ratio": 6.94,
       "text_failures": [],
       "boundaries": [
@@ -212,7 +233,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
+          "ratio": 17.18
         },
         {
           "element": "A",
@@ -315,7 +336,28 @@
         "sample": "Save & validate",
         "ratio": 8.84
       },
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 28,
+        "truncated": false,
+        "main_controls": 19,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 163,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "home",
@@ -344,7 +386,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
+          "ratio": 17.18
         },
         {
           "element": "A",
@@ -407,7 +449,28 @@
         "sample": "Sign out",
         "ratio": 14.88
       },
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 14,
+        "truncated": false,
+        "main_controls": 5,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 1,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 71,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "runs",
@@ -423,7 +486,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
+          "ratio": 17.18
         },
         {
           "element": "A",
@@ -523,7 +586,28 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 109,
+        "truncated": false,
+        "main_controls": 100,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 325,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "run",
@@ -539,7 +623,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
+          "ratio": 17.18
         },
         {
           "element": "A",
@@ -597,7 +681,28 @@
         "sample": "Continue in a new run",
         "ratio": 14.88
       },
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 12,
+        "truncated": false,
+        "main_controls": 3,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 83,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "inspector",
@@ -613,7 +718,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
+          "ratio": 17.18
         },
         {
           "element": "A",
@@ -663,13 +768,34 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 11,
+        "truncated": false,
+        "main_controls": 2,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 133,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "experts",
       "theme": "dark",
       "screenshot": "experts-dark.png",
-      "text_checked": 48,
+      "text_checked": 62,
       "lowest_text_ratio": 6.94,
       "text_failures": [],
       "boundaries": [
@@ -686,11 +812,6 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
-        },
-        {
-          "element": "A",
-          "outline_width": "2px",
           "ratio": 17.18
         },
         {
@@ -724,7 +845,12 @@
           "ratio": 17.18
         },
         {
-          "element": "INPUT#route-cfb5cebf-0567-451c-b6b4-a6656bd0ff26",
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 17.18
+        },
+        {
+          "element": "INPUT#route-3faf5cd4-9d41-4c25-ac61-2b66291513d3",
           "outline_width": "2px",
           "ratio": 17.18
         },
@@ -734,7 +860,7 @@
           "ratio": 17.18
         },
         {
-          "element": "INPUT#route-380d6eb2-51ad-4c56-90f1-8798c53d2a8e",
+          "element": "INPUT#route-41254c92-0b85-43fd-9a1d-c7230f707373",
           "outline_width": "2px",
           "ratio": 17.18
         },
@@ -744,7 +870,7 @@
           "ratio": 17.18
         },
         {
-          "element": "INPUT#route-89ca90bb-8a90-458e-8098-5913785f10ce",
+          "element": "INPUT#route-91dade53-fdc9-4896-bd1c-079b8b7d2326",
           "outline_width": "2px",
           "ratio": 17.18
         },
@@ -754,7 +880,7 @@
           "ratio": 17.18
         },
         {
-          "element": "INPUT#route-84ba04d6-3546-43fc-a2d0-3c33d387e5cb",
+          "element": "INPUT#route-3a21b625-090b-4334-9b19-53a4e905f3e6",
           "outline_width": "2px",
           "ratio": 17.18
         },
@@ -764,7 +890,7 @@
           "ratio": 17.18
         },
         {
-          "element": "INPUT#route-db362a84-7bf3-4d24-ba28-27d341e991a9",
+          "element": "INPUT#route-6a52d21d-7dee-4588-848d-35652b3362cb",
           "outline_width": "2px",
           "ratio": 17.18
         },
@@ -774,7 +900,7 @@
           "ratio": 17.18
         },
         {
-          "element": "INPUT#route-64bc13ec-7981-4b90-bc29-cf1007434e20",
+          "element": "INPUT#route-73ce7d0d-95d2-47ae-89c2-3c359d3b26a9",
           "outline_width": "2px",
           "ratio": 17.18
         },
@@ -786,7 +912,28 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 58,
+        "truncated": false,
+        "main_controls": 49,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 2,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 128,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "expert-editor",
@@ -821,7 +968,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
+          "ratio": 17.18
         },
         {
           "element": "A",
@@ -924,7 +1071,28 @@
         "sample": "Save revision",
         "ratio": 8.84
       },
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 21,
+        "truncated": false,
+        "main_controls": 12,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 59,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "session",
@@ -953,7 +1121,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
+          "ratio": 17.18
         },
         {
           "element": "A",
@@ -1003,13 +1171,34 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 12,
+        "truncated": false,
+        "main_controls": 3,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 1,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 61,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "workflows",
       "theme": "dark",
       "screenshot": "workflows-dark.png",
-      "text_checked": 56,
+      "text_checked": 58,
       "lowest_text_ratio": 6.94,
       "text_failures": [],
       "boundaries": [
@@ -1026,7 +1215,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
+          "ratio": 17.18
         },
         {
           "element": "A",
@@ -1126,7 +1315,28 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 32,
+        "truncated": false,
+        "main_controls": 23,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 1,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 97,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "workflow-editor",
@@ -1161,7 +1371,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
+          "ratio": 17.18
         },
         {
           "element": "A",
@@ -1234,7 +1444,28 @@
         "sample": "Validate",
         "ratio": 14.88
       },
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 16,
+        "truncated": false,
+        "main_controls": 7,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 108,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "workflow-monitor",
@@ -1250,7 +1481,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
+          "ratio": 17.18
         },
         {
           "element": "A",
@@ -1295,7 +1526,28 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 10,
+        "truncated": false,
+        "main_controls": 1,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 54,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "approvals",
@@ -1311,7 +1563,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
+          "ratio": 17.18
         },
         {
           "element": "A",
@@ -1414,7 +1666,28 @@
         "sample": "Approve",
         "ratio": 8.84
       },
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 25,
+        "truncated": false,
+        "main_controls": 12,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 67,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "approvals-empty",
@@ -1430,7 +1703,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
+          "ratio": 17.18
         },
         {
           "element": "A",
@@ -1470,7 +1743,28 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 9,
+        "truncated": false,
+        "main_controls": 0,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 23,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "settings",
@@ -1486,7 +1780,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
+          "ratio": 17.18
         },
         {
           "element": "A",
@@ -1531,13 +1825,34 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 10,
+        "truncated": false,
+        "main_controls": 2,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 43,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "models",
       "theme": "dark",
       "screenshot": "models-dark.png",
-      "text_checked": 70,
+      "text_checked": 71,
       "lowest_text_ratio": 6.94,
       "text_failures": [],
       "boundaries": [
@@ -1644,7 +1959,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
+          "ratio": 17.18
         },
         {
           "element": "A",
@@ -1747,7 +2062,28 @@
         "sample": "Save & validate",
         "ratio": 8.84
       },
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 30,
+        "truncated": false,
+        "main_controls": 21,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 169,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "operations",
@@ -1776,7 +2112,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
+          "ratio": 17.18
         },
         {
           "element": "A",
@@ -1839,7 +2175,28 @@
         "sample": "Check again",
         "ratio": 14.88
       },
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 13,
+        "truncated": false,
+        "main_controls": 4,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 75,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "state-loading",
@@ -1855,7 +2212,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
+          "ratio": 17.18
         },
         {
           "element": "A",
@@ -1895,7 +2252,28 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 9,
+        "truncated": false,
+        "main_controls": 0,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 23,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "state-error",
@@ -1911,7 +2289,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
+          "ratio": 17.18
         },
         {
           "element": "A",
@@ -1951,7 +2329,28 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 9,
+        "truncated": false,
+        "main_controls": 0,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 23,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "state-empty",
@@ -1974,7 +2373,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
+          "ratio": 17.18
         },
         {
           "element": "A",
@@ -2019,7 +2418,28 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 10,
+        "truncated": false,
+        "main_controls": 1,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 1,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 31,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "state-local-only",
@@ -2035,7 +2455,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 18.97
+          "ratio": 17.18
         },
         {
           "element": "A",
@@ -2075,7 +2495,28 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 9,
+        "truncated": false,
+        "main_controls": 0,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 26,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "sign-in",
@@ -2104,7 +2545,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
+          "ratio": 18.97
         },
         {
           "element": "A",
@@ -2162,13 +2603,34 @@
         "sample": "Sign in",
         "ratio": 5.21
       },
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 12,
+        "truncated": false,
+        "main_controls": 3,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 33,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "key-setup",
       "theme": "light",
       "screenshot": "key-setup-light.png",
-      "text_checked": 65,
+      "text_checked": 66,
       "lowest_text_ratio": 4.74,
       "text_failures": [],
       "boundaries": [
@@ -2275,7 +2737,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
+          "ratio": 18.97
         },
         {
           "element": "A",
@@ -2378,7 +2840,28 @@
         "sample": "Save & validate",
         "ratio": 5.21
       },
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 28,
+        "truncated": false,
+        "main_controls": 19,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 163,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "home",
@@ -2407,7 +2890,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
+          "ratio": 18.97
         },
         {
           "element": "A",
@@ -2470,7 +2953,28 @@
         "sample": "Sign out",
         "ratio": 16.43
       },
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 14,
+        "truncated": false,
+        "main_controls": 5,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 1,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 71,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "runs",
@@ -2486,7 +2990,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
+          "ratio": 18.97
         },
         {
           "element": "A",
@@ -2586,7 +3090,28 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 109,
+        "truncated": false,
+        "main_controls": 100,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 325,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "run",
@@ -2602,7 +3127,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
+          "ratio": 18.97
         },
         {
           "element": "A",
@@ -2660,7 +3185,28 @@
         "sample": "Continue in a new run",
         "ratio": 16.43
       },
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 12,
+        "truncated": false,
+        "main_controls": 3,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 83,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "inspector",
@@ -2676,7 +3222,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
+          "ratio": 18.97
         },
         {
           "element": "A",
@@ -2726,13 +3272,34 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 11,
+        "truncated": false,
+        "main_controls": 2,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 133,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "experts",
       "theme": "light",
       "screenshot": "experts-light.png",
-      "text_checked": 48,
+      "text_checked": 62,
       "lowest_text_ratio": 4.74,
       "text_failures": [],
       "boundaries": [
@@ -2749,11 +3316,6 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
-        },
-        {
-          "element": "A",
-          "outline_width": "2px",
           "ratio": 18.97
         },
         {
@@ -2787,7 +3349,12 @@
           "ratio": 18.97
         },
         {
-          "element": "INPUT#route-cfb5cebf-0567-451c-b6b4-a6656bd0ff26",
+          "element": "A",
+          "outline_width": "2px",
+          "ratio": 18.97
+        },
+        {
+          "element": "INPUT#route-3faf5cd4-9d41-4c25-ac61-2b66291513d3",
           "outline_width": "2px",
           "ratio": 19.8
         },
@@ -2797,7 +3364,7 @@
           "ratio": 19.8
         },
         {
-          "element": "INPUT#route-380d6eb2-51ad-4c56-90f1-8798c53d2a8e",
+          "element": "INPUT#route-41254c92-0b85-43fd-9a1d-c7230f707373",
           "outline_width": "2px",
           "ratio": 19.8
         },
@@ -2807,7 +3374,7 @@
           "ratio": 19.8
         },
         {
-          "element": "INPUT#route-89ca90bb-8a90-458e-8098-5913785f10ce",
+          "element": "INPUT#route-91dade53-fdc9-4896-bd1c-079b8b7d2326",
           "outline_width": "2px",
           "ratio": 19.8
         },
@@ -2817,7 +3384,7 @@
           "ratio": 19.8
         },
         {
-          "element": "INPUT#route-84ba04d6-3546-43fc-a2d0-3c33d387e5cb",
+          "element": "INPUT#route-3a21b625-090b-4334-9b19-53a4e905f3e6",
           "outline_width": "2px",
           "ratio": 19.8
         },
@@ -2827,7 +3394,7 @@
           "ratio": 19.8
         },
         {
-          "element": "INPUT#route-db362a84-7bf3-4d24-ba28-27d341e991a9",
+          "element": "INPUT#route-6a52d21d-7dee-4588-848d-35652b3362cb",
           "outline_width": "2px",
           "ratio": 19.8
         },
@@ -2837,7 +3404,7 @@
           "ratio": 19.8
         },
         {
-          "element": "INPUT#route-64bc13ec-7981-4b90-bc29-cf1007434e20",
+          "element": "INPUT#route-73ce7d0d-95d2-47ae-89c2-3c359d3b26a9",
           "outline_width": "2px",
           "ratio": 19.8
         },
@@ -2849,7 +3416,28 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 58,
+        "truncated": false,
+        "main_controls": 49,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 2,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 128,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "expert-editor",
@@ -2884,7 +3472,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
+          "ratio": 18.97
         },
         {
           "element": "A",
@@ -2987,7 +3575,28 @@
         "sample": "Save revision",
         "ratio": 5.21
       },
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 21,
+        "truncated": false,
+        "main_controls": 12,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 59,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "session",
@@ -3016,7 +3625,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
+          "ratio": 18.97
         },
         {
           "element": "A",
@@ -3066,13 +3675,34 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 12,
+        "truncated": false,
+        "main_controls": 3,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 1,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 61,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "workflows",
       "theme": "light",
       "screenshot": "workflows-light.png",
-      "text_checked": 56,
+      "text_checked": 58,
       "lowest_text_ratio": 4.74,
       "text_failures": [],
       "boundaries": [
@@ -3089,7 +3719,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
+          "ratio": 18.97
         },
         {
           "element": "A",
@@ -3189,7 +3819,28 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 32,
+        "truncated": false,
+        "main_controls": 23,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 1,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 97,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "workflow-editor",
@@ -3224,7 +3875,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
+          "ratio": 18.97
         },
         {
           "element": "A",
@@ -3297,7 +3948,28 @@
         "sample": "Validate",
         "ratio": 16.43
       },
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 16,
+        "truncated": false,
+        "main_controls": 7,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 108,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "workflow-monitor",
@@ -3313,7 +3985,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
+          "ratio": 18.97
         },
         {
           "element": "A",
@@ -3358,7 +4030,28 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 10,
+        "truncated": false,
+        "main_controls": 1,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 54,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "approvals",
@@ -3374,7 +4067,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
+          "ratio": 18.97
         },
         {
           "element": "A",
@@ -3477,7 +4170,28 @@
         "sample": "Approve",
         "ratio": 5.21
       },
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 25,
+        "truncated": false,
+        "main_controls": 12,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 67,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "approvals-empty",
@@ -3493,7 +4207,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
+          "ratio": 18.97
         },
         {
           "element": "A",
@@ -3533,7 +4247,28 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 9,
+        "truncated": false,
+        "main_controls": 0,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 23,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "settings",
@@ -3549,7 +4284,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
+          "ratio": 18.97
         },
         {
           "element": "A",
@@ -3599,13 +4334,34 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 10,
+        "truncated": false,
+        "main_controls": 2,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 43,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "models",
       "theme": "light",
       "screenshot": "models-light.png",
-      "text_checked": 70,
+      "text_checked": 71,
       "lowest_text_ratio": 4.74,
       "text_failures": [],
       "boundaries": [
@@ -3712,7 +4468,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
+          "ratio": 18.97
         },
         {
           "element": "A",
@@ -3815,7 +4571,28 @@
         "sample": "Save & validate",
         "ratio": 5.21
       },
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 30,
+        "truncated": false,
+        "main_controls": 21,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 169,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "operations",
@@ -3844,7 +4621,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
+          "ratio": 18.97
         },
         {
           "element": "A",
@@ -3907,7 +4684,28 @@
         "sample": "Check again",
         "ratio": 16.43
       },
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 13,
+        "truncated": false,
+        "main_controls": 4,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 75,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "state-loading",
@@ -3923,7 +4721,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
+          "ratio": 18.97
         },
         {
           "element": "A",
@@ -3963,7 +4761,28 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 9,
+        "truncated": false,
+        "main_controls": 0,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 23,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "state-error",
@@ -3979,7 +4798,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
+          "ratio": 18.97
         },
         {
           "element": "A",
@@ -4019,7 +4838,28 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 9,
+        "truncated": false,
+        "main_controls": 0,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 23,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "state-empty",
@@ -4042,7 +4882,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
+          "ratio": 18.97
         },
         {
           "element": "A",
@@ -4087,7 +4927,28 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 10,
+        "truncated": false,
+        "main_controls": 1,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 1,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 31,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     },
     {
       "surface": "state-local-only",
@@ -4103,7 +4964,7 @@
         {
           "element": "A",
           "outline_width": "2px",
-          "ratio": 19.8
+          "ratio": 18.97
         },
         {
           "element": "A",
@@ -4143,7 +5004,28 @@
       ],
       "focus_failures": [],
       "hover": null,
-      "axe_violations": []
+      "axe_violations": [],
+      "keyboard": {
+        "stops": 9,
+        "truncated": false,
+        "main_controls": 0,
+        "unreached_in_main": [],
+        "upward_in_main": [],
+        "positive_tabindex": 0
+      },
+      "disabled": {
+        "count": 0,
+        "unnamed": []
+      },
+      "zoom": {
+        "200%": 0,
+        "400%": 0
+      },
+      "motion": {
+        "checked": 26,
+        "moving_when_reduced": [],
+        "moving_by_default": 0
+      }
     }
   ]
 }

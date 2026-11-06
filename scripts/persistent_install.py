@@ -306,6 +306,12 @@ def http_json(method: str, url: str, headers: Mapping[str, str], body: Mapping |
         return failure.code, failure.read().decode(errors='replace')
 
 
+def note_failed(report: dict, what: str) -> None:
+    """Every check that couldn't run stays listed, and the exit code reads this."""
+    earlier = report.get('after_run_check_failed')
+    report['after_run_check_failed'] = f'{earlier}; {what}' if earlier else what
+
+
 def refuse_other_work(found: str) -> None:
     """The worker claims whatever is queued, in any workspace, so anything else would spend unseen."""
     if found == '0':
@@ -421,11 +427,11 @@ def goal(root: Path, record: Record, requested: str, key_file: Path, limit: int,
         if spent:
             report['committed_micro_usd'] = int(spent)
         else:
-            report['after_run_check_failed'] = 'the spend could not be read'
+            note_failed(report, 'the spend could not be read')
         if unsettled:
             report['calls_without_a_reported_charge'] = int(unsettled)
         else:
-            report['after_run_check_failed'] = 'the unsettled count could not be read'
+            note_failed(report, 'the unsettled count could not be read')
         charged = int(spent) if spent else None
     except Refused:
         ledger.settle(entry, 0, 'not_started')  # type: ignore[attr-defined]
@@ -444,13 +450,13 @@ def goal(root: Path, record: Record, requested: str, key_file: Path, limit: int,
         try:
             report['workers_claiming_inference_afterward'] = sql("select count(*) from app_private.worker_heartbeats where claims_inference and state <> 'stopped' and beat_at > now() - interval '60 seconds';")
         except (Unavailable, subprocess.SubprocessError, OSError) as problem:
-            report['after_run_check_failed'] = type(problem).__name__
+            note_failed(report, type(problem).__name__)
         write_report_needed = bool(run_id)
         # A failure on the way out still leaves what was seen and spent.
         failure = sys.exc_info()[0]
         if write_report_needed and failure is not None:
             report['failed_with'] = failure.__name__
-            absent = [name for name in ('status', 'timeline', 'committed_micro_usd', 'calls') if not report.get(name)]
+            absent = [name for name in ('status', 'timeline', 'committed_micro_usd', 'calls') if report.get(name) in (None, '', [])]
             report['not_checked'] = ['key usage after the run', 'the key in stored rows or logs', *absent]
             try:
                 write_report()
@@ -463,7 +469,7 @@ def goal(root: Path, record: Record, requested: str, key_file: Path, limit: int,
             durable, logged = helper('leaks', str(key_file), str(record.directory / 'logs')).split()
             report['key_found'] = {'durable_rows': int(durable), 'log_files': int(logged)}
         except (Unavailable, ValueError, subprocess.SubprocessError, OSError) as problem:
-            report['after_run_check_failed'] = str(problem) if isinstance(problem, Unavailable) else type(problem).__name__
+            note_failed(report, str(problem) if isinstance(problem, Unavailable) else type(problem).__name__)
     write_report()
     found = report.get('key_found')
     leaked = isinstance(found, dict) and any(found.values())

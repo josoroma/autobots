@@ -150,8 +150,8 @@ export function ModelPolicyPanel() {
     listed.filter((model) => !model.offered).map((model) => model.profile),
   );
   const savedChoiceNotOffered =
-    notOffered.has(defaultProfile as (typeof listed)[number]["profile"]) ||
-    Object.values(overrides).some((profile) =>
+    notOffered.has(state.default_profile) ||
+    Object.values(state.role_overrides).some((profile) =>
       notOffered.has(profile as (typeof listed)[number]["profile"]),
     );
   return (

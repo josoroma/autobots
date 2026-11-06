@@ -286,19 +286,19 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-12.2#4 | Walk every surface in both themes for LC-34, DS-04 and DS-05, retain the results, and capture again whatever changed. | DONE | US-12.2 |
 | US-12.2#5 | Fix R5-1 to R5-7. | DONE | US-12.2 |
 | US-12.2#6 | Put each new check in a profile or state the command that runs it, and list what stays a limit for US-10.2's record. | DONE | US-12.2 |
-| US-12.3 | Final review and Gate 0 at the final code | READY | EPIC-12 |
-| US-12.3#1 | Bind the final revision's fingerprint, and run the independent review of everything since US-11.12's bound tree. | TODO | US-12.3 |
-| US-12.3#2 | Repeat Gate 0 and the harness runbook on that revision as US-11.12 did, including `qualify_worker_inference.py` by hand and the visual measurements on the final tree. | TODO | US-12.3 |
-| US-12.3#3 | Record a disposition for each finding, and publish evidence that `scripts/evidence.py` validates. | TODO | US-12.3 |
-| US-12.3#4 | Mark the hook behavior not qualified, and hand the fingerprint to US-12.4, US-12.5, US-12.6 and US-10.2. | TODO | US-12.3 |
-| US-12.4 | Measure the two-call workload | BLOCKED | EPIC-12 |
+| US-12.3 | Final review and Gate 0 at the final code | DONE | EPIC-12 |
+| US-12.3#1 | Bind the final revision's fingerprint, and run the independent review of everything since US-11.12's bound tree. | DONE | US-12.3 |
+| US-12.3#2 | Repeat Gate 0 and the harness runbook on that revision as US-11.12 did, including `qualify_worker_inference.py` by hand and the visual measurements on the final tree. | DONE | US-12.3 |
+| US-12.3#3 | Record a disposition for each finding, and publish evidence that `scripts/evidence.py` validates. | DONE | US-12.3 |
+| US-12.3#4 | Mark the hook behavior not qualified, and hand the fingerprint to US-12.4, US-12.5, US-12.6 and US-10.2. | DONE | US-12.3 |
+| US-12.4 | Measure the two-call workload | READY | EPIC-12 |
 | US-12.4#1 | Arrange two goals at once, which needs two claiming workers because one worker runs one step at a time, and rehearse that on a fake transport first. | TODO | US-12.4 |
 | US-12.4#2 | Run the workload once on Terra on a disposable stack, under the shared ledger, sampling the four resources. | TODO | US-12.4 |
 | US-12.4#3 | Record the result, spending and limits, and hand LM-A09's row to US-10.2's record. | TODO | US-12.4 |
-| US-12.5 | Third real Mac sleep | BLOCKED | EPIC-12 |
+| US-12.5 | Third real Mac sleep | READY | EPIC-12 |
 | US-12.5#1 | Have the owner follow the runbook on a disposable stack with a scripted model. | TODO | US-12.5 |
 | US-12.5#2 | Record the report's observations with the fingerprint, and hand the LC-31 and LM-A07 rows to US-10.2's record. | TODO | US-12.5 |
-| US-12.6 | The real install at the final code | BLOCKED | EPIC-12 |
+| US-12.6 | The real install at the final code | READY | EPIC-12 |
 | US-12.6#1 | Back up the install, restore it to an isolated copy, and apply its pending migrations there first. | TODO | US-12.6 |
 | US-12.6#2 | Apply them to the install, start it on its own loopback ports, and record the other projects before and after. | TODO | US-12.6 |
 | US-12.6#3 | Run one goal on Terra under the shared ledger, record the outcome and spending, and leave the worker's inference switch off. | TODO | US-12.6 |
@@ -3842,7 +3842,8 @@ Open Questions:
 
 ### US-12.3: Final review and Gate 0 at the final code
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-12-3-final-review-gate-0/`
 
 As an owner
 I want an independent review of what changed since US-11.12, and Gate 0 repeated at the final code
@@ -3893,17 +3894,17 @@ Dependencies:
 - US-12.2
 
 Tasks:
-- [ ] Bind the final revision's fingerprint, and run the independent review of everything since US-11.12's bound tree.
-- [ ] Repeat Gate 0 and the harness runbook on that revision as US-11.12 did, including `qualify_worker_inference.py` by hand and the visual measurements on the final tree.
-- [ ] Record a disposition for each finding, and publish evidence that `scripts/evidence.py` validates.
-- [ ] Mark the hook behavior not qualified, and hand the fingerprint to US-12.4, US-12.5, US-12.6 and US-10.2.
+- [x] Bind the final revision's fingerprint, and run the independent review of everything since US-11.12's bound tree.
+- [x] Repeat Gate 0 and the harness runbook on that revision as US-11.12 did, including `qualify_worker_inference.py` by hand and the visual measurements on the final tree.
+- [x] Record a disposition for each finding, and publish evidence that `scripts/evidence.py` validates.
+- [x] Mark the hook behavior not qualified, and hand the fingerprint to US-12.4, US-12.5, US-12.6 and US-10.2.
 
 Open Questions:
 - None.
 
 ### US-12.4: Measure the two-call workload
 
-Status: BLOCKED
+Status: READY
 
 As an operator
 I want local resources measured while two Terra goals run at once
@@ -3966,7 +3967,7 @@ Open Questions:
 
 ### US-12.5: Third real Mac sleep
 
-Status: BLOCKED
+Status: READY
 
 As an owner
 I want this Mac put to sleep once more on the final code, following the runbook
@@ -4022,7 +4023,7 @@ Open Questions:
 
 ### US-12.6: The real install at the final code
 
-Status: BLOCKED
+Status: READY
 
 As an owner
 I want the real install backed up, migrated and running one real goal on the final code

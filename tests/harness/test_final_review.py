@@ -82,6 +82,12 @@ class PaidWorkerGuard(unittest.TestCase):
             persistent_install.refuse_other_work('')
 
 
+    def test_every_failed_check_stays_listed(self) -> None:
+        report: dict = {}
+        persistent_install.note_failed(report, 'first')
+        persistent_install.note_failed(report, 'second')
+        self.assertEqual(report['after_run_check_failed'], 'first; second')
+
     def test_a_paid_goal_really_asks(self) -> None:
         """Text only, as `goal` needs a running install to reach this line."""
         self.assertIn('refuse_other_work(sql(', inspect.getsource(persistent_install.goal))

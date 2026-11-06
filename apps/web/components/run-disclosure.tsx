@@ -21,6 +21,7 @@ export function RunDisclosure({
   roleOverrides,
   budgetMicroUsd = DEFAULT_BUDGET_MICRO_USD,
   sendsOnlyIfAgent = false,
+  usesModel = true,
 }: {
   // Absent where a screen offers no per-run choice.
   chosen?: string;
@@ -29,6 +30,8 @@ export function RunDisclosure({
   roleOverrides?: Readonly<Record<string, unknown>> | undefined;
   budgetMicroUsd?: number;
   sendsOnlyIfAgent?: boolean;
+  // False for a workflow version with no agent step, which calls no model and isn't refused.
+  usesModel?: boolean;
 }) {
   const [models, setModels] = useState<ModelList | null>(null);
   const [policy, setPolicy] = useState<ModelPolicyState | null>(null);
@@ -76,6 +79,14 @@ export function RunDisclosure({
     };
   });
   const executor = bindings.find((binding) => binding.role === EXECUTOR);
+  // The server's own rule: any binding that isn't offered refuses the whole run.
+  const notOffered = (profile: unknown): boolean =>
+    models?.models.find((model) => model.profile === profile)?.offered ===
+    false;
+  const refused =
+    usesModel && bindings.some((binding) => notOffered(binding.profile));
+  // An Expert's binding outranks the workspace and a run's own choice, and a session pins its version.
+  const fromExpert = Object.values(roleOverrides ?? {}).some(notOffered);
 
   return (
     <div
@@ -110,6 +121,14 @@ export function RunDisclosure({
         </p>
       ) : executor === undefined ? (
         <p>Loading what this run would use.</p>
+      ) : refused ? (
+        <p data-disclosure="not-offered" role="alert">
+          A saved model choice here isn&apos;t offered for new runs until
+          it&apos;s qualified, so pressing Run would start nothing.{" "}
+          {fromExpert
+            ? "It's in this Expert's saved version, so settings won't change it. Save a new revision of the Expert, without it, and start a new session."
+            : "Change it in settings."}
+        </p>
       ) : (
         <>
           <p data-disclosure="model">

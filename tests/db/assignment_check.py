@@ -21,6 +21,7 @@ from autobots.application.experts import create_expert, create_session, resolve_
 from autobots.application.goal_loop import LoopConfig, _finish, process_next  # noqa: E402
 from autobots.application.model_admission import ModelAdmission  # noqa: E402
 from autobots.application.plans import load_goal  # noqa: E402
+from autobots.application.run_projection import read_workspace  # noqa: E402
 from autobots.application.run_usage import RootLimits  # noqa: E402
 from autobots.application.worker_leases import claim_run  # noqa: E402
 from autobots.application.runs import Inheritance, admit_run, apply_command  # noqa: E402
@@ -156,9 +157,13 @@ async def main() -> None:
         result, model, run = await go([calls(PARENT_PLAN), calls(assign(helper, goal='First')), calls(CHILD_PLAN), calls(CHILD_SAVE), calls(CHILD_PUBLISH), calls(CHILD_DONE), say('child finished'), calls(assign(helper, goal='Second')), calls(CHILD_PLAN), say('never'), say('never')],
                                       LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0), limits=RootLimits(model_calls=8)))
         first = await (await db.execute("select child_run_id, outcome from app_private.assignments where parent_run_id = %s order by created_at limit 1", (run,))).fetchone()
-        published = await value("select count(*) from public.artifacts where run_id = %s and status = 'published'", first[0])
-        check('a limit across the tree stops new calls at the limit', '8 calls on the root', len(model.seen), len(model.seen) == 8)
-        check("a finished child's result and artifact stay readable from the run", 'succeeded, 1 published', (first[1], published), first[1] == 'succeeded' and published == 1)
+        readable = await read_workspace(db, WORKSPACE, first[0])
+        parent_view = await read_workspace(db, WORKSPACE, run)
+        stop = await value('select stop_reason from app_private.run_usage where run_id = %s', run)
+        later = await (await db.execute("select count(*), coalesce(sum((select count(*) from app_private.tool_receipts t where t.run_id = a.child_run_id)), 0) from app_private.assignments a where a.parent_run_id = %s and a.child_run_id <> %s", (run, first[0]))).fetchone()
+        check('a limit across the tree stops new calls at the limit', '8 calls, stopped by the limit', (len(model.seen), stop), len(model.seen) == 8 and stop == 'model_calls_limit')
+        check('and no later child made a tool call', 'a later child exists, with no receipts', later, later[0] >= 1 and later[1] == 0)
+        check("a finished child's result and artifact stay readable from the run", 'the card reads succeeded, and the child shows 1 published artifact', ([item.outcome for item in parent_view.assignments], [item.status for item in readable.artifacts]), parent_view.assignments[0].outcome == 'succeeded' and [item.status for item in readable.artifacts] == ['published'])
 
         # US-12.1: a run admitted on DeepSeek before it stopped being offered keeps its route, and so do its children.
         frozen = await admit_run(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), goal_text='Lead on a frozen route', limit_micro_usd=1_000_000, policy=resolve_role_policy(run_profile='openrouter_deepseek_flash'), binding=await resolve_binding(db, WORKSPACE, session.id, expert_id=lead.id))

@@ -25,3 +25,16 @@ Checks on the final code: `fast` and `harness` exit 0, the identity qualifier's 
 
 - **A vacuous test of mine:** the first keyboard walk recorded 0 stops on most surfaces and passed. Found by reading its values. It now runs first, and 0 stops is a finding.
 - **A real gap:** a child run had no link to its parent.
+
+## Corrected by US-12.3's review
+
+This record marked rows PASS that were only partly observed. Each is now either tested in US-12.3 or stated here.
+
+- **Fix round 5's small findings:** R5-4 had neither outcome its acceptance allows, since counting the bytes let the request go on to a reservation. A request that can't be encoded now stops as `request_unencodable` before any reservation. A scripted model returning one in tool arguments was run: the run ends `failed`, with no reservation or call after it, in `tests/db/review_check.py`. A goal holding a lone surrogate is refused when `admit_run` stores it, and the API's own refusal isn't asserted.
+- **Rebuild across a disconnect:** the approval assertion read an event held in the page's state, so it couldn't fail, and the duplicate check couldn't either. An approval is now decided during the drop, its event must appear, and a reload rebuilds all of it from the server. A duplicate can't render, as events are keyed by sequence, which is stated, not tested.
+- **Inventory each dispatch:** the first version couldn't catch a dispatch outside the factory. Guards on name lookups and on Python's own connects now do, with a control each for a name, a loopback port and a literal address, and the tree's child is on the inventory. An SDK implicit model would show on the wire, as each request's model is compared. A connection made inside a C library wouldn't be seen, as libpq's aren't.
+- **Walk each surface in both themes:** three of its checks couldn't fail. Their replacements, and a test breaking a page on purpose, are in [the summary](../../../../docs/engineering/evidence/US-12.2/summary.md).
+- **Check the shape of Terra's requests:** no request sets `reasoning`, so its shape check runs only on the harness test's inputs. The allowed field list is now what's observed, and routing flags are compared exactly.
+- **Return partial results across descendants:** it now reads through the run's own view, and asserts the stop reason and no tool call on the later child.
+- **Use local files with no key:** the log check couldn't fail. It now asserts the run list and ledger are unchanged.
+- **Inspect the goal after a compaction:** the first read now asserts no summary exists yet.
