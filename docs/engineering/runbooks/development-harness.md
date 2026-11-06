@@ -192,7 +192,7 @@ Limits:
 - The dispatcher that runs is deliberately the main checkout's. Running the worktree's copy would let `cwd` choose the code doing the enforcing. So a change to the hooks or `harness_lib` in a worktree takes effect for sessions only once the main checkout has it, and until then only the tests exercise it. The `ruff` diagnostic is the exception: `cwd` does choose that executable, whose result is advisory and whose output is discarded.
 - If the two checkouts differ in input rules or required checks, the main checkout's code decides. It can judge a worktree's current report stale, in which case rerunning the verifier does not clear `Stop`, or accept a report the worktree's own rules would reject.
 - A lasting Git failure refuses file-tool edits in a worktree session, including edits to its own files, and `Stop` blocks once per turn. `Bash` still works, so the session or a person can repair Git, and the session then continues.
-- These are script and fixture results. Delivery of `cwd` in a real event is part of the unverified event delivery above.
+- These are script and fixture results, apart from one real `Stop` event whose message showed its `cwd` selecting a worktree, recorded in [the work item](../work-items/HARNESS-WORKTREE-ROOT-001.md#verification). Delivery of `cwd` in other real events is part of the unverified event delivery above.
 
 ### Read the adapter status
 

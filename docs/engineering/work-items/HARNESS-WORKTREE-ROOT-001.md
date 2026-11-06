@@ -34,12 +34,13 @@ DH-W03.
 
 ## Verification
 
-DH-W04. Static and disposable-fixture classes only.
+DH-W04. Static and disposable-fixture classes, plus one observed live event.
 
-- **Not exercised:** a real Claude event carrying `cwd`. The running session still uses the main checkout's old hook code, so this change has guarded nothing live.
+- **Observed live, once:** after the merge at `68fdb8b`, a real `Stop` event in this worktree's session, running the main checkout's dispatcher, blocked on "the last passing fast or full report". Sent by synthetic payload, the same event gave that list for this worktree's `cwd`, and "harness or fast or full or db or operations" for the main checkout's. So the real event's `cwd` selected the worktree. That is inferred from the message, because the event's payload was not captured.
+- **Not exercised live:** an edit denied by `PreToolUse`, and `PostToolUse` classifying from a worktree. One event qualifies nothing, so event delivery stays `not_tested`.
 - **Observed by synthetic payload on the real repository, before the change:** the main checkout's dispatcher classified a worktree's `scripts/harness_lib.py` as `harness`, and allowed edits to the main checkout and a sibling from a worktree `cwd`.
 - **Observed the same way with this change, with the main checkout as home:** from the worktree, edits to its own files were allowed and edits to the main checkout and a sibling denied, and `scripts/harness_lib.py` classified as `db, python, web`. From the main checkout, an edit there was allowed. A `cwd` of `/private/tmp` could edit the main checkout, as before, and not `/private/tmp`.
-- **Checks:** `python3.12 scripts/verify.py --profile harness` exit 0, with 236 behavior tests. It proves repository checks only. `fast`, `db` and `operations` were not run, because this changes none of their inputs' behavior.
+- **Checks:** `python3.12 scripts/verify.py --profile harness` exit 0, with 236 behavior tests. It proves repository checks only. It also passed on the merged tree at `68fdb8b`. `fast` exited 2 in this worktree, which was not bootstrapped, and nothing was installed for it. `db` and `operations` were not run, because this changes none of their inputs' behavior.
 - **Mutation:** each validation and failure path was removed in turn, and each removal failed `test_hooks.py`. The first attempt left two survivors: one was dead code, since removed, and one was an untested filter, since tested.
 
 ## Runbook
