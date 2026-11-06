@@ -75,6 +75,10 @@ class ToolDefinition:
     retries: int = 0
     max_output_bytes: int = 300_000
     approval_required: bool = False
+    # What a reviewer is told this touches, from the arguments or server configuration.
+    resource_target: Callable[[Any], str | None] = lambda _: None
+    # Why policy asks, when this tool has a reason of its own. Never from the model.
+    approval_reason: str | None = None
     # What the arguments touch, checked against the scope's path grants.
     resources: Callable[[Any], tuple[str, ...]] = lambda _: ()
     # Finds out whether an interrupted effect happened, from the destination rather than memory.
@@ -141,6 +145,17 @@ class ToolRegistry:
 def _hash(arguments: BaseModel) -> str:
     encoded = json.dumps(arguments.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode()).hexdigest()
+
+
+def _approval_reason(tool: ToolDefinition) -> str:
+    """Fixed text from this tool's policy, so nothing a model wrote can reach it."""
+    if tool.approval_reason is not None:
+        return tool.approval_reason
+    if tool.operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE:
+        return (
+            "This tool changes something outside this Mac, so policy holds each call for a person."
+        )
+    return "This tool is marked to wait for a person, so policy holds each call."
 
 
 def _operation_id(scope: ToolScope, tool: ToolDefinition, parsed: BaseModel) -> str:
@@ -239,6 +254,8 @@ class ToolGateway:
                 argument_hash=_hash(parsed),
                 arguments=tool.redact(parsed.model_dump(mode="json")),
                 current_scope_hash=scope_hash(scope.tools, scope.paths),
+                policy_reason=_approval_reason(tool),
+                resource_target=tool.resource_target(parsed),
             )
             if code is not None:
                 return _denied(code)

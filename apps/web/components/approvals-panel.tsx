@@ -124,6 +124,16 @@ export function ApprovalsPanel() {
             <h2 className="text-lg font-medium">
               {approval.tool_id}, version {approval.tool_version}
             </h2>
+            <p data-approval-reason="true" className="text-sm">
+              Why it&apos;s asking:{" "}
+              {approval.policy_reason ??
+                "not recorded, as this request is older than that record."}
+            </p>
+            <p data-approval-target="true" className="text-sm break-words">
+              Target:{" "}
+              {approval.resource_target ??
+                "not recorded. Read the exact request below."}
+            </p>
             <p className="text-sm">
               Effect: {approval.operation_class.replaceAll("_", " ")}
             </p>

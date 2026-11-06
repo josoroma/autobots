@@ -76,6 +76,7 @@ APPROVAL_GATE = ToolDefinition(
     output_model=ApprovalOutput,
     operation_class=OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE,
     handler=_release,
+    approval_reason="This workflow has an approval step, so policy holds it for a person.",
 )
 # Not this node's failure: it runs again, and any recorded effect comes back from its receipt.
 STOPS = frozenset(

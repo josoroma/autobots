@@ -62,6 +62,8 @@ async def get_approvals(
                 arguments_truncated=exceeds_review_limit(row["arguments"]),
                 status=row["status"],
                 expires_at=row["expires_at"].isoformat(),
+                policy_reason=row["policy_reason"],
+                resource_target=row["resource_target"],
             )
             for row in rows
         ],

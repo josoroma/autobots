@@ -238,10 +238,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-11.6#1 | Add a read of the current policy and its version, as only the write route exists. | DONE | US-11.6 |
 | US-11.6#2 | Add the approved model list, workspace default and role policy to Settings. | DONE | US-11.6 |
 | US-11.6#3 | State the effect of role overrides on the screen, and assert that text in a browser test. | DONE | US-11.6 |
-| US-11.7 | Approval reason and target | READY | EPIC-11 |
-| US-11.7#1 | Persist the policy's reason and the resource target with the approval request. | TODO | US-11.7 |
-| US-11.7#2 | Return both in the approval view, and show them in the inbox. | TODO | US-11.7 |
-| US-11.7#3 | Cover both scenarios in a browser test. | TODO | US-11.7 |
+| US-11.7 | Approval reason and target | DONE | EPIC-11 |
+| US-11.7#1 | Persist the policy's reason and the resource target with the approval request. | DONE | US-11.7 |
+| US-11.7#2 | Return both in the approval view, and show them in the inbox. | DONE | US-11.7 |
+| US-11.7#3 | Cover both scenarios in a browser test. | DONE | US-11.7 |
 | US-11.8 | Operations completeness | READY | EPIC-11 |
 | US-11.8#1 | Record each restore and its verification result where Operations can read it. | TODO | US-11.8 |
 | US-11.8#2 | Add delayed schedules, OpenRouter availability, restore history and qualification evidence to the status contract and screen. | TODO | US-11.8 |
@@ -3154,7 +3154,8 @@ Open Questions:
 
 ### US-11.7: Approval reason and target
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-11-7-approval-reason-target/`
 
 As a reviewer
 I want each approval to show the policy's reason and its target
@@ -3187,9 +3188,9 @@ Dependencies:
 - US-5.3
 
 Tasks:
-- [ ] Persist the policy's reason and the resource target with the approval request.
-- [ ] Return both in the approval view, and show them in the inbox.
-- [ ] Cover both scenarios in a browser test.
+- [x] Persist the policy's reason and the resource target with the approval request.
+- [x] Return both in the approval view, and show them in the inbox.
+- [x] Cover both scenarios in a browser test.
 
 Open Questions:
 - None.

@@ -11,6 +11,12 @@ const APPROVE = process.env.AUTOBOTS_TEST_APPROVAL_APPROVE ?? "";
 const REJECT = process.env.AUTOBOTS_TEST_APPROVAL_REJECT ?? "";
 const HASH = process.env.AUTOBOTS_TEST_APPROVAL_HASH ?? "";
 const RUN = process.env.AUTOBOTS_TEST_APPROVAL_RUN ?? "";
+const LEGACY = process.env.AUTOBOTS_TEST_APPROVAL_LEGACY ?? "";
+const LEGACY_HASH = process.env.AUTOBOTS_TEST_APPROVAL_LEGACY_HASH ?? "";
+const LEGACY_RUN = process.env.AUTOBOTS_TEST_APPROVAL_LEGACY_RUN ?? "";
+const LOUD = process.env.AUTOBOTS_TEST_APPROVAL_LOUD ?? "";
+const POLICY_REASON =
+  "This tool changes something outside this Mac, so policy holds each call for a person.";
 
 async function signIn(
   page: Page,
@@ -59,6 +65,66 @@ test("another workspace and a member can't decide", async ({ browser }) => {
     },
   );
   expect(denied.status()).toBe(403);
+});
+
+test("each request shows the policy's reason, its target, the exact action and its expiry", async ({
+  page,
+}) => {
+  await signIn(page, EMAIL_A, PASSWORD_A);
+  await page.goto("/approvals");
+  const card = page.locator(`[data-approval="${APPROVE}"]`);
+  await expect(card.locator("[data-approval-reason]")).toHaveText(
+    `Why it's asking: ${POLICY_REASON}`,
+  );
+  await expect(card.locator("[data-approval-target]")).toHaveText(
+    "Target: Mail to team@example.invalid",
+  );
+  await expect(card.locator("pre")).toContainText('"body": "hello"');
+  await expect(card).toContainText(/Expires \d/);
+
+  // What the model wrote stays in the request, and doesn't reach the reason.
+  const loud = page.locator(`[data-approval="${LOUD}"]`);
+  await expect(loud.locator("pre")).toContainText("REASON FROM THE MODEL");
+  await expect(loud.locator("[data-approval-reason]")).toHaveText(
+    `Why it's asking: ${POLICY_REASON}`,
+  );
+});
+
+test("a request saved before these fields says so, and its decision stays bound to the hash shown", async ({
+  page,
+}) => {
+  await signIn(page, EMAIL_A, PASSWORD_A);
+  await page.goto("/approvals");
+  const card = page.locator(`[data-approval="${LEGACY}"]`);
+  await expect(card.locator("[data-approval-reason]")).toContainText(
+    "not recorded",
+  );
+  await expect(card.locator("[data-approval-target]")).toContainText(
+    "not recorded",
+  );
+  await expect(card.locator("pre")).toContainText("old@example.invalid");
+  const tampered = await page.request.post(
+    `/api/v1/approvals/${LEGACY}/decision`,
+    {
+      headers: await write(page, "legacy-tamper"),
+      data: { decision: "approve", argument_hash: "0".repeat(64) },
+    },
+  );
+  expect(tampered.status()).toBe(409);
+  expect((await tampered.json()).code).toBe("approval_mismatch");
+  const listed = await (await page.request.get("/api/v1/approvals")).json();
+  const shown = listed.approvals.find(
+    (item: { id: string }) => item.id === LEGACY,
+  );
+  expect(shown.argument_hash).toBe(LEGACY_HASH);
+  await card.getByRole("button", { name: "Reject" }).click();
+  await expect(page.locator('[data-message="decision"]')).toContainText(
+    "Rejected.",
+  );
+  const summary = await (
+    await page.request.get(`/api/v1/runs/${LEGACY_RUN}`)
+  ).json();
+  expect(summary.status).not.toBe("waiting_approval");
 });
 
 test("the inbox shows the exact request, and a tampered decision releases nothing", async ({

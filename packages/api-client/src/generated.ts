@@ -167,6 +167,28 @@ export const schemas = {
         "title": "Operation Class",
         "type": "string"
       },
+      "policy_reason": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Policy Reason"
+      },
+      "resource_target": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Resource Target"
+      },
       "run_id": {
         "format": "uuid",
         "title": "Run Id",
@@ -195,7 +217,9 @@ export const schemas = {
       "arguments",
       "arguments_truncated",
       "status",
-      "expires_at"
+      "expires_at",
+      "policy_reason",
+      "resource_target"
     ],
     "title": "ApprovalView",
     "type": "object"
@@ -4061,6 +4085,8 @@ export interface ApprovalView {
   expires_at: string;
   id: string;
   operation_class: string;
+  policy_reason: string | null;
+  resource_target: string | null;
   run_id: string;
   status: string;
   tool_id: string;

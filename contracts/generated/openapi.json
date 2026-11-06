@@ -166,6 +166,28 @@
             "title": "Operation Class",
             "type": "string"
           },
+          "policy_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Reason"
+          },
+          "resource_target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Target"
+          },
           "run_id": {
             "format": "uuid",
             "title": "Run Id",
@@ -194,7 +216,9 @@
           "arguments",
           "arguments_truncated",
           "status",
-          "expires_at"
+          "expires_at",
+          "policy_reason",
+          "resource_target"
         ],
         "title": "ApprovalView",
         "type": "object"

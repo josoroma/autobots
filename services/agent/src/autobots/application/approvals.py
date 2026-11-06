@@ -85,6 +85,8 @@ async def approval_gate(
     argument_hash: str,
     arguments: dict[str, Any],
     current_scope_hash: str,
+    policy_reason: str,
+    resource_target: str | None,
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
 ) -> str | None:
     """None releases the operation. Any code means no effect, and says why."""
@@ -100,7 +102,8 @@ async def approval_gate(
             await connection.execute(
                 "insert into public.approval_requests (id, workspace_id, run_id, operation_id, "
                 "tool_id, tool_version, operation_class, argument_hash, arguments, scope_hash, "
-                "expires_at) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
+                "policy_reason, resource_target, expires_at) "
+                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
                 "clock_timestamp() + make_interval(secs => %s))",
                 (
                     approval_id,
@@ -113,6 +116,8 @@ async def approval_gate(
                     argument_hash,
                     json.dumps(arguments),
                     current_scope_hash,
+                    policy_reason,
+                    resource_target,
                     ttl_seconds,
                 ),
             )
@@ -281,7 +286,8 @@ async def decide(
 async def list_approvals(connection: Any, workspace_id: UUID, status: str) -> list[dict[str, Any]]:
     cursor = await connection.execute(
         "select id, run_id, tool_id, tool_version, operation_class, argument_hash, "
-        "arguments::text, status, expires_at from public.approval_requests "
+        "arguments::text, status, expires_at, policy_reason, resource_target "
+        "from public.approval_requests "
         "where workspace_id = %s and status = %s order by created_at desc limit 200",
         (workspace_id, status),
     )
@@ -295,5 +301,7 @@ async def list_approvals(connection: Any, workspace_id: UUID, status: str) -> li
         "arguments",
         "status",
         "expires_at",
+        "policy_reason",
+        "resource_target",
     )
     return [dict(zip(names, row, strict=True)) for row in await cursor.fetchall()]

@@ -55,6 +55,11 @@ def github_issue_tool(
     environ: Mapping[str, str] = os.environ,
     settle_seconds: Sequence[float] = READBACK_SETTLE_SECONDS,
 ) -> ToolDefinition:
+    def review_target(_arguments: Any) -> str | None:
+        """Server configuration only, so a reviewer sees where it goes whatever a model asked."""
+        repository = environ.get(REPOSITORY_VARIABLE, "")
+        return f"GitHub repository {repository}" if _REPOSITORY.fullmatch(repository) else None
+
     def target() -> tuple[str, str]:
         repository = environ.get(REPOSITORY_VARIABLE, "")
         token = environ.get(TOKEN_VARIABLE, "")
@@ -130,6 +135,7 @@ def github_issue_tool(
         handler=create,
         timeout_seconds=30.0,
         reconcile=readback,
+        resource_target=review_target,
     )
 
 

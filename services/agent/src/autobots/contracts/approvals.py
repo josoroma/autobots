@@ -24,6 +24,9 @@ class ApprovalView(BaseModel):
     arguments_truncated: bool
     status: str
     expires_at: str
+    # Empty on a request saved before these were recorded. They're never filled in afterward.
+    policy_reason: str | None
+    resource_target: str | None
 
 
 class ApprovalList(BaseModel):
