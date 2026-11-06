@@ -1199,6 +1199,36 @@
         "title": "ExpertView",
         "type": "object"
       },
+      "FrozenBinding": {
+        "additionalProperties": false,
+        "description": "One role's binding as this run froze it at admission, which later settings don't change.",
+        "properties": {
+          "canonical_id": {
+            "title": "Canonical Id",
+            "type": "string"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "wire_id": {
+            "title": "Wire Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "profile",
+          "canonical_id",
+          "wire_id"
+        ],
+        "title": "FrozenBinding",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1665,8 +1695,18 @@
       "ModelPolicyState": {
         "additionalProperties": false,
         "properties": {
+          "default_profile": {
+            "$ref": "#/components/schemas/ModelProfileId"
+          },
           "policy": {
             "$ref": "#/components/schemas/EffectiveRolePolicy"
+          },
+          "role_overrides": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ModelProfileId"
+            },
+            "title": "Role Overrides",
+            "type": "object"
           },
           "schema_version": {
             "const": 1,
@@ -1681,6 +1721,8 @@
         "required": [
           "schema_version",
           "version",
+          "default_profile",
+          "role_overrides",
           "policy"
         ],
         "title": "ModelPolicyState",
@@ -3173,6 +3215,13 @@
               }
             ]
           },
+          "role_map": {
+            "items": {
+              "$ref": "#/components/schemas/FrozenBinding"
+            },
+            "title": "Role Map",
+            "type": "array"
+          },
           "run": {
             "$ref": "#/components/schemas/RunSummary"
           },
@@ -3227,7 +3276,8 @@
           "assignments",
           "outstanding",
           "unknown_operations",
-          "cursor"
+          "cursor",
+          "role_map"
         ],
         "title": "RunWorkspace",
         "type": "object"
@@ -7572,6 +7622,84 @@
       }
     },
     "/v1/settings/model-policy": {
+      "get": {
+        "description": "What a new run would freeze. No row yet means version 0, with the application's default.",
+        "operationId": "getModelPolicy",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelPolicyState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Model Policy"
+      },
       "put": {
         "operationId": "putModelPolicy",
         "parameters": [

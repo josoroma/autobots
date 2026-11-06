@@ -92,6 +92,8 @@ class ModelPolicyState(BaseModel):
 
     schema_version: Literal[1]
     version: int
+    default_profile: ModelProfileId
+    role_overrides: dict[str, ModelProfileId]
     policy: EffectiveRolePolicy
 
 

@@ -19,6 +19,7 @@ from autobots.contracts.run_workspace import (
     CriterionView,
     EventPage,
     ExpertBinding,
+    FrozenBinding,
     ModelCallView,
     OutstandingSummary,
     PlanSummary,
@@ -208,6 +209,24 @@ async def _expert(connection: Any, run_id: UUID) -> ExpertBinding | None:
     )
 
 
+async def _role_map(connection: Any, run_id: UUID) -> list[FrozenBinding]:
+    cursor = await connection.execute(
+        "select policy_snapshot from public.runs where id = %s", (run_id,)
+    )
+    row = await cursor.fetchone()
+    snapshot = (row[0] if row else None) or {}
+    routes = snapshot.get("routes") or {}
+    return [
+        FrozenBinding(
+            role=role,
+            profile=profile,
+            canonical_id=_canonical_id(profile, routes),
+            wire_id=str((routes.get(profile) or {}).get("wire_id") or "unknown"),
+        )
+        for role, profile in sorted((snapshot.get("bindings") or {}).items())
+    ]
+
+
 async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> RunWorkspace:
     row = await _require_run(connection, workspace_id, run_id)
     summary = _summary(row)
@@ -257,6 +276,7 @@ async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> R
             unreported_charges=left.unreported_charges,
         ),
         cursor=row[-1],
+        role_map=await _role_map(connection, run_id),
     )
 
 

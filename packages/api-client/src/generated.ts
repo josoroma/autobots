@@ -1200,6 +1200,36 @@ export const schemas = {
     "title": "ExpertView",
     "type": "object"
   },
+  "FrozenBinding": {
+    "additionalProperties": false,
+    "description": "One role's binding as this run froze it at admission, which later settings don't change.",
+    "properties": {
+      "canonical_id": {
+        "title": "Canonical Id",
+        "type": "string"
+      },
+      "profile": {
+        "title": "Profile",
+        "type": "string"
+      },
+      "role": {
+        "title": "Role",
+        "type": "string"
+      },
+      "wire_id": {
+        "title": "Wire Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "role",
+      "profile",
+      "canonical_id",
+      "wire_id"
+    ],
+    "title": "FrozenBinding",
+    "type": "object"
+  },
   "HTTPValidationError": {
     "properties": {
       "detail": {
@@ -1666,8 +1696,18 @@ export const schemas = {
   "ModelPolicyState": {
     "additionalProperties": false,
     "properties": {
+      "default_profile": {
+        "$ref": "#/components/schemas/ModelProfileId"
+      },
       "policy": {
         "$ref": "#/components/schemas/EffectiveRolePolicy"
+      },
+      "role_overrides": {
+        "additionalProperties": {
+          "$ref": "#/components/schemas/ModelProfileId"
+        },
+        "title": "Role Overrides",
+        "type": "object"
       },
       "schema_version": {
         "const": 1,
@@ -1682,6 +1722,8 @@ export const schemas = {
     "required": [
       "schema_version",
       "version",
+      "default_profile",
+      "role_overrides",
       "policy"
     ],
     "title": "ModelPolicyState",
@@ -3174,6 +3216,13 @@ export const schemas = {
           }
         ]
       },
+      "role_map": {
+        "items": {
+          "$ref": "#/components/schemas/FrozenBinding"
+        },
+        "title": "Role Map",
+        "type": "array"
+      },
       "run": {
         "$ref": "#/components/schemas/RunSummary"
       },
@@ -3228,7 +3277,8 @@ export const schemas = {
       "assignments",
       "outstanding",
       "unknown_operations",
-      "cursor"
+      "cursor",
+      "role_map"
     ],
     "title": "RunWorkspace",
     "type": "object"
@@ -4348,6 +4398,17 @@ export function parseExpertView(value: unknown): ExpertView {
   return parseWith(schemas, "ExpertView", value) as ExpertView;
 }
 
+export interface FrozenBinding {
+  canonical_id: string;
+  profile: string;
+  role: string;
+  wire_id: string;
+}
+
+export function parseFrozenBinding(value: unknown): FrozenBinding {
+  return parseWith(schemas, "FrozenBinding", value) as FrozenBinding;
+}
+
 export interface HTTPValidationError {
   detail?: ValidationError[];
 }
@@ -4482,7 +4543,9 @@ export function parseModelList(value: unknown): ModelList {
 }
 
 export interface ModelPolicyState {
+  default_profile: ModelProfileId;
   policy: EffectiveRolePolicy;
+  role_overrides: Record<string, unknown>;
   schema_version: 1;
   version: number;
 }
@@ -4917,6 +4980,7 @@ export interface RunWorkspace {
   objective: string | null;
   outstanding: OutstandingSummary;
   plan: PlanSummary | null;
+  role_map: FrozenBinding[];
   run: RunSummary;
   schema_version: 1;
   stop_reason: string | null;
@@ -5322,6 +5386,10 @@ export async function createWorkSession(options: ClientOptions, body: SessionCre
 
 export async function getWorkSession(options: ClientOptions, session_id: string): Promise<SessionView> {
   return parseSessionView(await requestJson(options, "GET", `/v1/sessions/${encodeURIComponent(session_id)}`));
+}
+
+export async function getModelPolicy(options: ClientOptions): Promise<ModelPolicyState> {
+  return parseModelPolicyState(await requestJson(options, "GET", `/v1/settings/model-policy`));
 }
 
 export async function putModelPolicy(options: ClientOptions, body: ModelPolicyUpdate): Promise<ModelPolicyState> {

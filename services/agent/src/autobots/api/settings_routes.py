@@ -30,7 +30,12 @@ from autobots.contracts.settings import (
     ProviderStatus,
     RunIntentCheck,
 )
-from autobots.domain.models import UnknownModelProfile, resolve_role_policy
+from autobots.domain.models import (
+    DEFAULT_PROFILE,
+    UnknownModelProfile,
+    approved_profile,
+    resolve_role_policy,
+)
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 
@@ -164,6 +169,43 @@ async def get_models(
     return await settings.models()
 
 
+def _policy_state(
+    version: int, default_profile: str, overrides: dict[str, str]
+) -> ModelPolicyState:
+    policy = resolve_role_policy(
+        workspace_default=default_profile, workspace_role_overrides=overrides
+    )
+    return ModelPolicyState(
+        schema_version=1,
+        version=version,
+        default_profile=approved_profile(default_profile),
+        role_overrides={role: approved_profile(profile) for role, profile in overrides.items()},
+        policy=effective_policy(policy),
+    )
+
+
+@router.get(
+    "/settings/model-policy", operation_id="getModelPolicy", response_model=ModelPolicyState
+)
+async def get_model_policy(
+    request: Request, workspace_id: Annotated[UUID, Depends(current_workspace)]
+) -> ModelPolicyState:
+    """What a new run would freeze. No row yet means version 0, with the application's default."""
+    pool: Any = request.app.state.pool
+    if pool is None:
+        raise ApiError(503, "service_unavailable", "Provider settings are unavailable.")
+    async with pool.connection() as connection:
+        cursor = await connection.execute(
+            "select version, default_profile, role_overrides from app_private.model_policies "
+            "where workspace_id = %s",
+            (workspace_id,),
+        )
+        row = await cursor.fetchone()
+    if row is None:
+        return _policy_state(0, DEFAULT_PROFILE.value, {})
+    return _policy_state(row[0], row[1], row[2] or {})
+
+
 @router.put(
     "/settings/model-policy", operation_id="putModelPolicy", response_model=ModelPolicyState
 )
@@ -174,7 +216,7 @@ async def put_model_policy(
 ) -> ModelPolicyState:
     overrides = {role: profile.value for role, profile in body.role_overrides.items()}
     try:
-        policy = resolve_role_policy(
+        resolve_role_policy(
             workspace_default=body.default_profile.value, workspace_role_overrides=overrides
         )
     except UnknownModelProfile as error:
@@ -203,7 +245,7 @@ async def put_model_policy(
                 policy_overrides_json(overrides),
             ),
         )
-    return ModelPolicyState(schema_version=1, version=current + 1, policy=effective_policy(policy))
+    return _policy_state(current + 1, body.default_profile.value, overrides)
 
 
 @router.post("/runs/intent", operation_id="checkRunIntent", response_model=RunIntentCheck)

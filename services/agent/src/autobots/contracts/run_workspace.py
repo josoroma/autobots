@@ -105,6 +105,17 @@ class UnknownEffect(BaseModel):
     tool_version: int
 
 
+class FrozenBinding(BaseModel):
+    """One role's binding as this run froze it at admission, which later settings don't change."""
+
+    model_config = VIEW
+
+    role: str
+    profile: str
+    canonical_id: str
+    wire_id: str
+
+
 class RunWorkspace(BaseModel):
     model_config = VIEW
 
@@ -122,6 +133,7 @@ class RunWorkspace(BaseModel):
     outstanding: OutstandingSummary
     unknown_operations: list[UnknownEffect]
     cursor: int
+    role_map: list[FrozenBinding]
 
 
 class RunListItem(BaseModel):

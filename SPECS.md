@@ -234,10 +234,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-11.5#1 | Add a workspace-scoped run list route and screen. | DONE | US-11.5 |
 | US-11.5#2 | Add a sanitized inspector read model and screen for model calls, tool operation attempts and checkpoints. | DONE | US-11.5 |
 | US-11.5#3 | Cover isolation and the absence of private fields on a disposable stack. | DONE | US-11.5 |
-| US-11.6 | Model and role choice in Settings | READY | EPIC-11 |
-| US-11.6#1 | Add a read of the current policy and its version, as only the write route exists. | TODO | US-11.6 |
-| US-11.6#2 | Add the approved model list, workspace default and role policy to Settings. | TODO | US-11.6 |
-| US-11.6#3 | State the effect of role overrides on the screen, and assert that text in a browser test. | TODO | US-11.6 |
+| US-11.6 | Model and role choice in Settings | DONE | EPIC-11 |
+| US-11.6#1 | Add a read of the current policy and its version, as only the write route exists. | DONE | US-11.6 |
+| US-11.6#2 | Add the approved model list, workspace default and role policy to Settings. | DONE | US-11.6 |
+| US-11.6#3 | State the effect of role overrides on the screen, and assert that text in a browser test. | DONE | US-11.6 |
 | US-11.7 | Approval reason and target | READY | EPIC-11 |
 | US-11.7#1 | Persist the policy's reason and the resource target with the approval request. | TODO | US-11.7 |
 | US-11.7#2 | Return both in the approval view, and show them in the inbox. | TODO | US-11.7 |
@@ -246,7 +246,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-11.8#1 | Record each restore and its verification result where Operations can read it. | TODO | US-11.8 |
 | US-11.8#2 | Add delayed schedules, OpenRouter availability, restore history and qualification evidence to the status contract and screen. | TODO | US-11.8 |
 | US-11.8#3 | Cover both scenarios in a browser test on a disposable stack. | TODO | US-11.8 |
-| US-11.9 | Run creation disclosure, role map and run details | BLOCKED | EPIC-11 |
+| US-11.9 | Run creation disclosure, role map and run details | READY | EPIC-11 |
 | US-11.9#1 | Add the MP-07 disclosure to every run-creation screen. | TODO | US-11.9 |
 | US-11.9#2 | Add a per-run model choice, the complete role map and budgets to the run workspace. | TODO | US-11.9 |
 | US-11.9#3 | Add reported and estimated costs, errors and evidence links to the inspector, and cover all four scenarios in browser tests. | TODO | US-11.9 |
@@ -3104,7 +3104,8 @@ Open Questions:
 
 ### US-11.6: Model and role choice in Settings
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-11-6-model-role-choice-settings/`
 
 As a workspace owner
 I want to see the approved models and set the workspace default and role policy
@@ -3144,9 +3145,9 @@ Dependencies:
 - US-3.2
 
 Tasks:
-- [ ] Add a read of the current policy and its version, as only the write route exists.
-- [ ] Add the approved model list, workspace default and role policy to Settings.
-- [ ] State the effect of role overrides on the screen, and assert that text in a browser test.
+- [x] Add a read of the current policy and its version, as only the write route exists.
+- [x] Add the approved model list, workspace default and role policy to Settings.
+- [x] State the effect of role overrides on the screen, and assert that text in a browser test.
 
 Open Questions:
 - None.
@@ -3242,7 +3243,7 @@ Open Questions:
 
 ### US-11.9: Run creation disclosure, role map and run details
 
-Status: BLOCKED
+Status: READY
 
 As a user
 I want to see what a run will use, send and spend before I start it, and its full details afterward
