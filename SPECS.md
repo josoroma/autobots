@@ -258,7 +258,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-11.11#1 | Add the shared form components and move every form to them. | DONE | US-11.11 |
 | US-11.11#2 | Capture both-theme screenshots, measured contrast and axe across all named surfaces. | DONE | US-11.11 |
 | US-11.11#3 | Check keyboard use, zoom and reduced motion, and confirm appearance changes issue no model or task request. | DONE | US-11.11 |
-| US-11.12 | Final independent review and Gate 0 | BLOCKED | EPIC-11 |
+| US-11.12 | Final independent review and Gate 0 | IN PROGRESS | EPIC-11 |
 | US-11.12#1 | Bind the final revision's fingerprint and run one independent review of it. | TODO | US-11.12 |
 | US-11.12#2 | Repeat Gate 0 and the harness runbook on that revision, and publish validated evidence. | TODO | US-11.12 |
 | US-11.12#3 | Record a disposition for the 41 minors and open majors, and settle WORKER-INFERENCE-001's status. | TODO | US-11.12 |
@@ -3407,7 +3407,8 @@ Open Questions:
 
 ### US-11.12: Final independent review and Gate 0
 
-Status: BLOCKED
+Status: IN PROGRESS
+Change: `openspec/changes/us-11-12-final-independent-review-gate/`
 
 As an owner
 I want one independent review of the final code that repeats Gate 0 and settles open findings
@@ -3419,6 +3420,7 @@ Source:
 - [Decision 0009, B4 and B5](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
 - [Decision 0009, revised LC-33 and DH-W03](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#requirements-revised)
 - [Decision 0003](docs/engineering/decisions/0003-openspec-only-delivery.md#decision)
+- [Decision 0011](docs/engineering/decisions/0011-review-dispositions.md#decision) — M8, M32, M33 and WORKER-INFERENCE-001, as built.
 - [LC-32 and LC-33](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
 - [DH-W03](PRD-Development-Harness.md#dh-091-work-item-evidence-contract)
 - [DH-A03 and DH-A13](PRD-Development-Harness.md#dh-10-acceptance-and-closure)
@@ -3474,8 +3476,5 @@ Tasks:
 - [ ] Mark Claude's crash and timeout hook behavior not qualified, and hand the record to US-10.2's assessment.
 
 Open Questions:
-- NEEDS CLARIFICATION: M8. Should members be able to choose an earlier Expert version at all? The fix chose owner-only.
-- NEEDS CLARIFICATION: M32. Is to_version 0 accepted as the interface for "no active version"?
-- NEEDS CLARIFICATION: M33. Are a reviewer's own text checks enough to gate promotion for now?
-- NEEDS CLARIFICATION: WORKER-INFERENCE-001. Should rate_limited and provider_error fail a run after their retries, or pause it?
+- None.
 
