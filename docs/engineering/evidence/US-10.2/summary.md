@@ -154,6 +154,8 @@ From [US-11.12's Gate 0](../US-11.12/summary.md), at its bound fingerprint. US-1
 
 ## What stops a release now
 
+**[Decision 0013](../../decisions/0013-release-closure.md) has since decided all of these, and [EPIC-12](../../../../SPECS.md#epic-12-release-closure) delivers what it chose.** This record is assessed again after that.
+
 ### For the owner
 
 No source decides these, or they need authority only the owner has.

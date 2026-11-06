@@ -111,7 +111,7 @@ Use local password Auth with public signup disabled and explicit owner bootstrap
 
 | Profile | Requested canonical identity | OpenRouter request ID |
 |---|---|---|
-| `openrouter_deepseek_flash` — explicit alternative | `deepseek/deepseek-v4.1-flash-20261017` | `deepseek/deepseek-v4.1-flash-1017` |
+| `openrouter_deepseek_flash` — approved, and not offered for new runs until qualified, by [Decision 0013](decisions/0013-release-closure.md) | `deepseek/deepseek-v4.1-flash-20261017` | `deepseek/deepseek-v4.1-flash-1017` |
 | `openrouter_terra` — default, by [Decision 0006](decisions/0006-terra-is-the-default.md) | `openai/gpt-6.1-terra-20261026` | `openai/gpt-6.1-terra` |
 
 All 14 roles initially bind to Terra: `coordinator`, `router`, `planner`, `executor`, `researcher`, `coder`, `reviewer`, `evaluator`, `summarizer`, `memory_curator`, `skill_learner`, `tool_repair`, `workflow_generator`, `general_purpose`. Maintain role constants for future explicit configuration; children and middleware cannot create hidden model defaults.

@@ -69,6 +69,16 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
   - [US-11.10: Real Mac sleep proof](#us-1110-real-mac-sleep-proof)
   - [US-11.11: Design system migration and final visual evidence](#us-1111-design-system-migration-and-final-visual-evidence)
   - [US-11.12: Final independent review and Gate 0](#us-1112-final-independent-review-and-gate-0)
+- [EPIC-12: Release closure](#epic-12-release-closure)
+  - [US-12.1: Stop offering DeepSeek for new runs](#us-121-stop-offering-deepseek-for-new-runs)
+  - [US-12.2: Close what a test can settle](#us-122-close-what-a-test-can-settle)
+  - [US-12.3: Final review and Gate 0 at the final code](#us-123-final-review-and-gate-0-at-the-final-code)
+  - [US-12.4: Measure the two-call workload](#us-124-measure-the-two-call-workload)
+  - [US-12.5: Third real Mac sleep](#us-125-third-real-mac-sleep)
+  - [US-12.6: The real install at the final code](#us-126-the-real-install-at-the-final-code)
+- [EPIC-13: After release](#epic-13-after-release)
+  - [US-13.1: Requester, scope snapshot and policy version on an approval request](#us-131-requester-scope-snapshot-and-policy-version-on-an-approval-request)
+  - [US-13.2: Held-out replay before promotion](#us-132-held-out-replay-before-promotion)
 
 ## Work Item Status
 
@@ -209,7 +219,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-10.1 | Held-out task, policy and performance qualification | DONE | EPIC-10 |
 | US-10.1#1 | Run the held-out behavioral and policy/recovery suites without tuning on held-out data. | DONE | US-10.1 |
 | US-10.1#2 | Publish per-category outcomes, resource measurements and actual latency/cost evidence. | DONE | US-10.1 |
-| US-10.2 | Release traceability and evidence-based completion | IN PROGRESS | EPIC-10 |
+| US-10.2 | Release traceability and evidence-based completion | BLOCKED | EPIC-10 |
 | US-10.2#1 | Review full source-to-story-to-evidence coverage and resolve blocking findings. | TODO | US-10.2 |
 | US-10.2#2 | Publish exercised operating/user procedures and truthful release limitations. | TODO | US-10.2 |
 | EPIC-11 | Installable release readiness | — | — |
@@ -263,6 +273,43 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-11.12#2 | Repeat Gate 0 and the harness runbook on that revision, and publish validated evidence. | DONE | US-11.12 |
 | US-11.12#3 | Record a disposition for the 41 minors and open majors, and settle WORKER-INFERENCE-001's status. | DONE | US-11.12 |
 | US-11.12#4 | Mark Claude's crash and timeout hook behavior not qualified, and hand the record to US-10.2's assessment. | DONE | US-11.12 |
+| EPIC-12 | Release closure | — | — |
+| US-12.1 | Stop offering DeepSeek for new runs | READY | EPIC-12 |
+| US-12.1#1 | Refuse DeepSeek on the server for new runs and for writes to the workspace default, role overrides and Expert bindings, with regenerated clients if a public contract changes. | TODO | US-12.1 |
+| US-12.1#2 | Remove it from every picker, and say on Settings why it isn't offered. | TODO | US-12.1 |
+| US-12.1#3 | Update the tests that choose DeepSeek through the product path, and arrange the frozen-route cases on runs already admitted. | TODO | US-12.1 |
+| US-12.1#4 | Correct text that still says a person can choose it, including `README.md` and `.claude/rules/model-gateway.md`. | TODO | US-12.1 |
+| US-12.2 | Close what a test can settle | READY | EPIC-12 |
+| US-12.2#1 | Add the LC-03, LC-04, LC-07 and LC-13 tests on a disposable stack, and fix what they find. | TODO | US-12.2 |
+| US-12.2#2 | Add the no-key file cases for LC-20, MP-A12 and LM-A06. | TODO | US-12.2 |
+| US-12.2#3 | Add the dispatch inventory for LC-25 and the request shape check for LC-26. | TODO | US-12.2 |
+| US-12.2#4 | Walk every surface in both themes for LC-34, DS-04 and DS-05, retain the results, and capture again whatever changed. | TODO | US-12.2 |
+| US-12.2#5 | Fix R5-1 to R5-7. | TODO | US-12.2 |
+| US-12.2#6 | Put each new check in a profile or state the command that runs it, and list what stays a limit for US-10.2's record. | TODO | US-12.2 |
+| US-12.3 | Final review and Gate 0 at the final code | BLOCKED | EPIC-12 |
+| US-12.3#1 | Bind the final revision's fingerprint, and run the independent review of everything since US-11.12's bound tree. | TODO | US-12.3 |
+| US-12.3#2 | Repeat Gate 0 and the harness runbook on that revision as US-11.12 did, including `qualify_worker_inference.py` by hand and the visual measurements on the final tree. | TODO | US-12.3 |
+| US-12.3#3 | Record a disposition for each finding, and publish evidence that `scripts/evidence.py` validates. | TODO | US-12.3 |
+| US-12.3#4 | Mark the hook behavior not qualified, and hand the fingerprint to US-12.4, US-12.5, US-12.6 and US-10.2. | TODO | US-12.3 |
+| US-12.4 | Measure the two-call workload | BLOCKED | EPIC-12 |
+| US-12.4#1 | Arrange two goals at once, which needs two claiming workers because one worker runs one step at a time, and rehearse that on a fake transport first. | TODO | US-12.4 |
+| US-12.4#2 | Run the workload once on Terra on a disposable stack, under the shared ledger, sampling the four resources. | TODO | US-12.4 |
+| US-12.4#3 | Record the result, spending and limits, and hand LM-A09's row to US-10.2's record. | TODO | US-12.4 |
+| US-12.5 | Third real Mac sleep | BLOCKED | EPIC-12 |
+| US-12.5#1 | Have the owner follow the runbook on a disposable stack with a scripted model. | TODO | US-12.5 |
+| US-12.5#2 | Record the report's observations with the fingerprint, and hand the LC-31 and LM-A07 rows to US-10.2's record. | TODO | US-12.5 |
+| US-12.6 | The real install at the final code | BLOCKED | EPIC-12 |
+| US-12.6#1 | Back up the install, restore it to an isolated copy, and apply its pending migrations there first. | TODO | US-12.6 |
+| US-12.6#2 | Apply them to the install, start it on its own loopback ports, and record the other projects before and after. | TODO | US-12.6 |
+| US-12.6#3 | Run one goal on Terra under the shared ledger, record the outcome and spending, and leave the worker's inference switch off. | TODO | US-12.6 |
+| US-12.6#4 | Hand the LM-A01, LM-A02, LM-A04 and LM-A08 rows to US-10.2's record. | TODO | US-12.6 |
+| EPIC-13 | After release | — | — |
+| US-13.1 | Requester, scope snapshot and policy version on an approval request | BLOCKED | EPIC-13 |
+| US-13.1#1 | Persist the three fields with the approval request, by migration. | TODO | US-13.1 |
+| US-13.1#2 | Return them in the approval view as the owner decides, and cover both scenarios on a disposable stack. | TODO | US-13.1 |
+| US-13.2 | Held-out replay before promotion | BLOCKED | EPIC-13 |
+| US-13.2#1 | Add the held-out replay to the promotion path, in place of the reviewer's text checks. | TODO | US-13.2 |
+| US-13.2#2 | Cover both scenarios, with a scripted model unless a paid replay is separately authorized. | TODO | US-13.2 |
 
 ## Dependency Diagram
 
@@ -343,6 +390,18 @@ flowchart TD
     US_11_10["US-11.10: Real Mac sleep proof"]
     US_11_11["US-11.11: Design system migration and final visual evidence"]
     US_11_12["US-11.12: Final independent review and Gate 0"]
+  end
+  subgraph EPIC_12["EPIC-12: Release closure"]
+    US_12_1["US-12.1: Stop offering DeepSeek for new runs"]
+    US_12_2["US-12.2: Close what a test can settle"]
+    US_12_3["US-12.3: Final review and Gate 0 at the final code"]
+    US_12_4["US-12.4: Measure the two-call workload"]
+    US_12_5["US-12.5: Third real Mac sleep"]
+    US_12_6["US-12.6: The real install at the final code"]
+  end
+  subgraph EPIC_13["EPIC-13: After release"]
+    US_13_1["US-13.1: Requester, scope snapshot and policy version on an approval request"]
+    US_13_2["US-13.2: Held-out replay before promotion"]
   end
   US_1_1 -.-> US_1_2
   US_1_1 -.-> US_1_3
@@ -446,6 +505,10 @@ flowchart TD
   US_10_1 -.-> US_10_2
   US_7_2 -.-> US_10_2
   US_11_12 -.-> US_10_2
+  US_12_3 -.-> US_10_2
+  US_12_4 -.-> US_10_2
+  US_12_5 -.-> US_10_2
+  US_12_6 -.-> US_10_2
   US_3_2 -.-> US_11_1
   US_3_4 -.-> US_11_1
   US_2_6 -.-> US_11_2
@@ -494,6 +557,34 @@ flowchart TD
   US_11_9 -.-> US_11_12
   US_11_10 -.-> US_11_12
   US_11_11 -.-> US_11_12
+  US_2_6 -.-> US_12_1
+  US_5_1 -.-> US_12_1
+  US_6_2 -.-> US_12_1
+  US_7_1 -.-> US_12_1
+  US_11_1 -.-> US_12_1
+  US_11_6 -.-> US_12_1
+  US_11_9 -.-> US_12_1
+  US_2_6 -.-> US_12_2
+  US_3_2 -.-> US_12_2
+  US_4_3 -.-> US_12_2
+  US_4_6 -.-> US_12_2
+  US_5_2 -.-> US_12_2
+  US_8_1 -.-> US_12_2
+  US_11_5 -.-> US_12_2
+  US_11_11 -.-> US_12_2
+  US_11_12 -.-> US_12_2
+  US_12_1 -.-> US_12_3
+  US_12_2 -.-> US_12_3
+  US_12_3 -.-> US_12_4
+  US_12_3 -.-> US_12_5
+  US_12_3 -.-> US_12_6
+  US_5_3 -.-> US_13_1
+  US_11_7 -.-> US_13_1
+  EXT_US_13_1_1["External: The owner schedules this story after the release, by Decision 0013."]
+  EXT_US_13_1_1 -.-> US_13_1
+  US_8_2 -.-> US_13_2
+  EXT_US_13_2_1["External: The owner schedules this story after the release, by Decision 0013."]
+  EXT_US_13_2_1 -.-> US_13_2
 ```
 
 ```mermaid
@@ -861,6 +952,80 @@ flowchart TD
     US_11_12 --> T_11_12_3
     T_11_12_4["US-11.12#4: Mark Claude&#x27;s crash and timeout hook behavior not qualified, and hand the record to US-10.2&#x27;s assessment."]
     US_11_12 --> T_11_12_4
+  end
+```
+
+```mermaid
+flowchart TD
+  subgraph EPIC_12["EPIC-12 tasks"]
+    US_12_1["US-12.1: Stop offering DeepSeek for new runs"]
+    T_12_1_1["US-12.1#1: Refuse DeepSeek on the server for new runs and for writes to the workspace default, role overrides and Expert bindings, with regenerated clients if a public contract changes."]
+    US_12_1 --> T_12_1_1
+    T_12_1_2["US-12.1#2: Remove it from every picker, and say on Settings why it isn&#x27;t offered."]
+    US_12_1 --> T_12_1_2
+    T_12_1_3["US-12.1#3: Update the tests that choose DeepSeek through the product path, and arrange the frozen-route cases on runs already admitted."]
+    US_12_1 --> T_12_1_3
+    T_12_1_4["US-12.1#4: Correct text that still says a person can choose it, including `README.md` and `.claude/rules/model-gateway.md`."]
+    US_12_1 --> T_12_1_4
+    US_12_2["US-12.2: Close what a test can settle"]
+    T_12_2_1["US-12.2#1: Add the LC-03, LC-04, LC-07 and LC-13 tests on a disposable stack, and fix what they find."]
+    US_12_2 --> T_12_2_1
+    T_12_2_2["US-12.2#2: Add the no-key file cases for LC-20, MP-A12 and LM-A06."]
+    US_12_2 --> T_12_2_2
+    T_12_2_3["US-12.2#3: Add the dispatch inventory for LC-25 and the request shape check for LC-26."]
+    US_12_2 --> T_12_2_3
+    T_12_2_4["US-12.2#4: Walk every surface in both themes for LC-34, DS-04 and DS-05, retain the results, and capture again whatever changed."]
+    US_12_2 --> T_12_2_4
+    T_12_2_5["US-12.2#5: Fix R5-1 to R5-7."]
+    US_12_2 --> T_12_2_5
+    T_12_2_6["US-12.2#6: Put each new check in a profile or state the command that runs it, and list what stays a limit for US-10.2&#x27;s record."]
+    US_12_2 --> T_12_2_6
+    US_12_3["US-12.3: Final review and Gate 0 at the final code"]
+    T_12_3_1["US-12.3#1: Bind the final revision&#x27;s fingerprint, and run the independent review of everything since US-11.12&#x27;s bound tree."]
+    US_12_3 --> T_12_3_1
+    T_12_3_2["US-12.3#2: Repeat Gate 0 and the harness runbook on that revision as US-11.12 did, including `qualify_worker_inference.py` by hand and the visual measurements on the final tree."]
+    US_12_3 --> T_12_3_2
+    T_12_3_3["US-12.3#3: Record a disposition for each finding, and publish evidence that `scripts/evidence.py` validates."]
+    US_12_3 --> T_12_3_3
+    T_12_3_4["US-12.3#4: Mark the hook behavior not qualified, and hand the fingerprint to US-12.4, US-12.5, US-12.6 and US-10.2."]
+    US_12_3 --> T_12_3_4
+    US_12_4["US-12.4: Measure the two-call workload"]
+    T_12_4_1["US-12.4#1: Arrange two goals at once, which needs two claiming workers because one worker runs one step at a time, and rehearse that on a fake transport first."]
+    US_12_4 --> T_12_4_1
+    T_12_4_2["US-12.4#2: Run the workload once on Terra on a disposable stack, under the shared ledger, sampling the four resources."]
+    US_12_4 --> T_12_4_2
+    T_12_4_3["US-12.4#3: Record the result, spending and limits, and hand LM-A09&#x27;s row to US-10.2&#x27;s record."]
+    US_12_4 --> T_12_4_3
+    US_12_5["US-12.5: Third real Mac sleep"]
+    T_12_5_1["US-12.5#1: Have the owner follow the runbook on a disposable stack with a scripted model."]
+    US_12_5 --> T_12_5_1
+    T_12_5_2["US-12.5#2: Record the report&#x27;s observations with the fingerprint, and hand the LC-31 and LM-A07 rows to US-10.2&#x27;s record."]
+    US_12_5 --> T_12_5_2
+    US_12_6["US-12.6: The real install at the final code"]
+    T_12_6_1["US-12.6#1: Back up the install, restore it to an isolated copy, and apply its pending migrations there first."]
+    US_12_6 --> T_12_6_1
+    T_12_6_2["US-12.6#2: Apply them to the install, start it on its own loopback ports, and record the other projects before and after."]
+    US_12_6 --> T_12_6_2
+    T_12_6_3["US-12.6#3: Run one goal on Terra under the shared ledger, record the outcome and spending, and leave the worker&#x27;s inference switch off."]
+    US_12_6 --> T_12_6_3
+    T_12_6_4["US-12.6#4: Hand the LM-A01, LM-A02, LM-A04 and LM-A08 rows to US-10.2&#x27;s record."]
+    US_12_6 --> T_12_6_4
+  end
+```
+
+```mermaid
+flowchart TD
+  subgraph EPIC_13["EPIC-13 tasks"]
+    US_13_1["US-13.1: Requester, scope snapshot and policy version on an approval request"]
+    T_13_1_1["US-13.1#1: Persist the three fields with the approval request, by migration."]
+    US_13_1 --> T_13_1_1
+    T_13_1_2["US-13.1#2: Return them in the approval view as the owner decides, and cover both scenarios on a disposable stack."]
+    US_13_1 --> T_13_1_2
+    US_13_2["US-13.2: Held-out replay before promotion"]
+    T_13_2_1["US-13.2#1: Add the held-out replay to the promotion path, in place of the reviewer&#x27;s text checks."]
+    US_13_2 --> T_13_2_1
+    T_13_2_2["US-13.2#2: Cover both scenarios, with a scripted model unless a paid replay is separately authorized."]
+    US_13_2 --> T_13_2_2
   end
 ```
 
@@ -2772,7 +2937,7 @@ Open Questions:
 
 ### US-10.2: Release traceability and evidence-based completion
 
-Status: IN PROGRESS
+Status: BLOCKED
 Change: `openspec/changes/us-10-2-release-traceability-evidence-based/`
 
 As a product owner
@@ -2808,6 +2973,10 @@ Dependencies:
 - US-10.1
 - US-7.2
 - US-11.12
+- US-12.3
+- US-12.4
+- US-12.5
+- US-12.6
 
 Tasks:
 - [ ] Review full source-to-story-to-evidence coverage and resolve blocking findings.
@@ -3479,3 +3648,539 @@ Tasks:
 Open Questions:
 - None.
 
+
+# EPIC-12: Release closure
+
+Phase reference: B7, preserved SP-020. Scope and spending come from Decision 0013. Routine stories follow Decision 0003, with the independent review of the final code in US-12.3.
+
+### US-12.1: Stop offering DeepSeek for new runs
+
+Status: READY
+
+As a workspace owner
+I want DeepSeek kept out of everything that starts new work until it's qualified
+So that nobody can choose a route with no task qualification.
+
+Source:
+- [Decision 0013, DeepSeek](docs/engineering/decisions/0013-release-closure.md#decision)
+- [Decision 0013, revised MP-01 and PRD 6](docs/engineering/decisions/0013-release-closure.md#requirements-revised)
+- [US-10.2 decision 4](docs/engineering/evidence/US-10.2/summary.md#for-the-owner)
+- [Review finding RR-7](docs/engineering/evidence/US-10.2/review-r2.md#blocking)
+- [MP-01](PRD-Model-Providers.md#mp-01-approved-models-and-selection)
+- [MP-05 model and policy routes](PRD-Model-Providers.md#mp-05-application-apis-and-authorization)
+- [Separate gates per binding](PRD-LangChain-Deep-Agents.md#64-capability-gate-matrix)
+- [A binding that fails qualification stays unavailable](PRD-LangChain-Deep-Agents.md#15-implementation-sequence-and-exit-gates)
+- [LC-17](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [Decision 0006, saved choices and frozen runs](docs/engineering/decisions/0006-terra-is-the-default.md#consequences)
+- [SP-006](docs/engineering/option-b-contract.md#sp-006--exactly-two-model-profiles)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Leave it out of every choice
+  Given each screen that creates a run or sets a model for future runs, including the goal composer, a session, Continue in a new run, the workspace default, role overrides and the Expert editor
+  When its model choices are shown
+  Then DeepSeek isn't among them
+
+Scenario: Refuse it through the API
+  Given a request naming DeepSeek for a new run, the workspace default, a role override or an Expert's role binding
+  When it is submitted
+  Then it is refused with a reason saying DeepSeek isn't offered for new runs until it's qualified, no run starts and nothing stored changes
+
+Scenario: Refuse a saved choice without substituting
+  Given a workspace default, role override or Expert version saved earlier that names DeepSeek
+  When a new run, workflow run or routine occurrence would resolve to it
+  Then it is refused with the same reason, no run starts, no other model is substituted and the saved choice isn't rewritten
+
+Scenario: Leave admitted runs as they are
+  Given a run already admitted on DeepSeek
+  When it resumes, or a child is admitted under its frozen policy
+  Then it keeps its frozen route, and the registry still holds the profile
+
+Scenario: Keep its record visible
+  Given DeepSeek's stored qualification record
+  When an owner opens Settings and Operations
+  Then the record shows with its date, configuration and limits, and Settings lists the model as approved and says it isn't offered for new runs
+
+Scenario: Keep the qualification runner working
+  Given the route qualification runner and a fake transport
+  When it is run for DeepSeek
+  Then it sends on DeepSeek's route, nothing that stops new runs refuses it, and this story makes no paid call
+```
+
+Dependencies:
+- US-2.6
+- US-5.1
+- US-6.2
+- US-7.1
+- US-11.1
+- US-11.6
+- US-11.9
+
+Tasks:
+- [ ] Refuse DeepSeek on the server for new runs and for writes to the workspace default, role overrides and Expert bindings, with regenerated clients if a public contract changes.
+- [ ] Remove it from every picker, and say on Settings why it isn't offered.
+- [ ] Update the tests that choose DeepSeek through the product path, and arrange the frozen-route cases on runs already admitted.
+- [ ] Correct text that still says a person can choose it, including `README.md` and `.claude/rules/model-gateway.md`.
+
+Open Questions:
+- None.
+
+### US-12.2: Close what a test can settle
+
+Status: READY
+
+As a product owner
+I want the partial rows' testable parts observed, and round 5's small findings fixed
+So that only what a test can't settle stays a limit at the final review.
+
+Source:
+- [Decision 0013, partial rows](docs/engineering/decisions/0013-release-closure.md#decision)
+- [What engineering can close](docs/engineering/evidence/US-10.2/summary.md#engineering-can-close-these-with-no-paid-call-or-persistent-change)
+- [US-10.2 LC rows](docs/engineering/evidence/US-10.2/summary.md#lc-product-requirements)
+- [US-10.2 MP rows](docs/engineering/evidence/US-10.2/summary.md#mp-model-providers)
+- [US-10.2 LM rows](docs/engineering/evidence/US-10.2/summary.md#lm-local-mac-deployment)
+- [US-10.2 DS rows](docs/engineering/evidence/US-10.2/summary.md#ds-design-system)
+- [Review findings RR-4, RR-5 and RR-10](docs/engineering/evidence/US-10.2/review-r2.md#blocking)
+- [R5-1 to R5-7](docs/engineering/evidence/US-11.12/review-r5.md#nonblocking)
+- [Their earlier dispositions](docs/engineering/evidence/US-11.12/summary.md#found-by-the-later-rounds)
+- [LC-03, LC-04, LC-07, LC-13, LC-20, LC-25, LC-26 and LC-34](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [Dispatch inventory and Terra's generation options](PRD-LangChain-Deep-Agents.md#63-openrouter-only-model-factory)
+- [PRD 12.1.1 theme behavior](PRD-LangChain-Deep-Agents.md#1211-luma-design-and-theme-behavior)
+- [MP-A12](PRD-Model-Providers.md#mp-09-acceptance-evidence)
+- [LM-06 with no key](PRD-Local-Mac-Deployment.md#lm-06-configuration-and-credentials)
+- [LM-A06](PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
+- [DS-03 named surfaces](PRD-Design-System.md#ds-03--apply-semantic-tokens-across-the-whole-ui)
+- [DS-04 usability](PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
+- [DS-05 evidence](PRD-Design-System.md#ds-05--verification-and-design-evidence)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Inspect the goal after a compaction
+  Given a run on a disposable stack that compacts through the real SDK on a fake transport
+  When a person opens the run in a browser before and after the compaction
+  Then the original request and its normalized criteria read the same both times
+
+Scenario: Return partial results across descendants
+  Given a run tree with a finished child and a limit exhausted across the tree
+  When the limit stops dispatch
+  Then no new model or tool call starts in any descendant, and the finished child's results can be read from the run
+
+Scenario: See delegation on the Assignments card
+  Given a run with a child, on a disposable stack with a scripted model
+  When a person opens the run page in a browser
+  Then the Assignments card shows the child's Expert and its state or outcome, its link opens the child run, and the child's result links to its parent
+
+Scenario: Rebuild across a disconnect
+  Given a run with a plan, a pending approval and a published artifact, on a disposable stack with a scripted model
+  When the browser's connection drops and returns while events are committed
+  Then the plan, approval, artifact and status are rebuilt on screen with no gap or duplicate
+
+Scenario: Use local files with no key
+  Given a published artifact and a workspace with no OpenRouter key
+  When a person opens the artifact list and downloads the artifact
+  Then both work, and any attempt at inference reports credentials_required with no model call
+
+Scenario: Inventory each dispatch
+  Given instrumentation at the model factory's boundary, and a fake-transport run that dispatches through its executor, a matching summarizer during compaction and a child
+  When the run finishes
+  Then the inventory lists every dispatch by role and route and matches the frozen role map, and a dispatch outside the factory or from an SDK implicit model fails the test
+
+Scenario: Check the shape of Terra's requests
+  Given requests for Terra captured on a fake transport
+  When each body is checked
+  Then it carries no unadvertised sampler or parallel-tool flag and no reasoning-off, `reasoning` has a checked shape, and a request that breaks either fails the check
+
+Scenario: Walk each surface in both themes
+  Given every DS-03 surface in use, in dark and light
+  When keyboard order, disabled controls, zoom and reduced motion are checked on each
+  Then each result is retained under docs/engineering/evidence/US-12.2/ with the revision it came from, a surface that doesn't exist is listed as absent, and a failure is recorded and corrected first in its pairing, focus, label or structure
+
+Scenario: Fix round 5's small findings
+  Given findings R5-1 to R5-7
+  When the fixes are checked
+  Then R5-1's browser test is named for what it asserts
+  And R5-2's runbook row says the refusal counts bytes, and that its remedy isn't available for a child or workflow run
+  And R5-3's report can't read an unread count as 0, and its not_checked catches a blank value
+  And R5-4's lone surrogate is shown unreachable, or is refused with a stated reason before any reservation
+  And R5-5's text is gone once the outcome is known
+  And R5-6's hidden picker after a lost reply, and the key cleared by a refusal, each have a test
+  And R5-7's guard names `grep . master.key` and piped forms among its limits
+
+Scenario: State what a test can't settle
+  Given a part of a row that needs a live route, a real interruption or a person, such as a real compaction, live request bodies, real host downtime for LC-15, a cut TCP connection that wasn't arranged, or a screen reader
+  When the row is reported
+  Then that part is named as a limit and never as passing, fake-transport and disposable results keep their own class, and this story makes no paid call or persistent change
+```
+
+Dependencies:
+- US-2.6
+- US-3.2
+- US-4.3
+- US-4.6
+- US-5.2
+- US-8.1
+- US-11.5
+- US-11.11
+- US-11.12
+
+Tasks:
+- [ ] Add the LC-03, LC-04, LC-07 and LC-13 tests on a disposable stack, and fix what they find.
+- [ ] Add the no-key file cases for LC-20, MP-A12 and LM-A06.
+- [ ] Add the dispatch inventory for LC-25 and the request shape check for LC-26.
+- [ ] Walk every surface in both themes for LC-34, DS-04 and DS-05, retain the results, and capture again whatever changed.
+- [ ] Fix R5-1 to R5-7.
+- [ ] Put each new check in a profile or state the command that runs it, and list what stays a limit for US-10.2's record.
+
+Open Questions:
+- None.
+
+### US-12.3: Final review and Gate 0 at the final code
+
+Status: BLOCKED
+
+As an owner
+I want an independent review of what changed since US-11.12, and Gate 0 repeated at the final code
+So that review and harness claims rest on the revision being released.
+
+Source:
+- [Decision 0013, H1.3's records](docs/engineering/decisions/0013-release-closure.md#decision)
+- [Decision 0013, revised H1.3](docs/engineering/decisions/0013-release-closure.md#requirements-revised)
+- [US-11.12's bound fingerprint](docs/engineering/evidence/US-10.2/summary.md#revisions)
+- [US-11.12's Gate 0](docs/engineering/evidence/US-11.12/summary.md#gate-0-by-dh-a-gate)
+- [US-11.12's results](docs/engineering/evidence/US-11.12/summary.md#results-on-these-inputs)
+- [H1.3](PRD-Development-Harness.md#dh-02-first-implementation-tasks)
+- [DH-W03](PRD-Development-Harness.md#dh-091-work-item-evidence-contract)
+- [Fingerprints](PRD-Development-Harness.md#dh-092-fingerprints-manifests-and-retained-artifacts)
+- [DH-A01 to DH-A16](PRD-Development-Harness.md#dh-10-acceptance-and-closure)
+- [Decision 0012](docs/engineering/decisions/0012-unqualified-hooks-in-h1.md#decision)
+- [LC-32 and LC-33](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [SP-002](docs/engineering/option-b-contract.md#sp-002--h1-prove-and-enable-the-baseline)
+- [SP-021](docs/engineering/option-b-contract.md#sp-021--completion-contract)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Review what changed and repeat Gate 0
+  Given the final code of US-12.1 and US-12.2 bound to a fingerprint, and a reviewer who did not author it
+  When the reviewer inspects everything changed since US-11.12's bound fingerprint, and Gate 0's checks and the harness runbook are repeated on that revision
+  Then findings, dispositions and commands are recorded under docs/engineering/evidence/US-12.3/, scripts/evidence.py validates them, and the record leaves H1 and product acceptance to US-10.2's assessment
+
+Scenario: Carry the H1.3 baseline
+  Given H0 and H1 stories delivered under Decision 0003 with no DH-W record
+  When the record is published
+  Then it says it carries their baseline, as revised H1.3 allows, and doesn't claim H1 is met
+
+Scenario: Void a stale binding
+  Given a blocking finding is open, or a source the fingerprint covers changed after it was bound, which `scripts/evidence.py` decides and which leaves out `SPECS.md`, `CODEBASE.md` and evidence as records
+  When this story, or evidence resting on its fingerprint, is assessed
+  Then the binding is void until the finding is resolved, the affected scope is reviewed again and the fingerprint is bound anew
+
+Scenario: Mark the hook behavior not qualified
+  Given Claude's crash, timeout and Stop recursion hook behavior has not been qualified
+  When the Gate 0 report is published
+  Then it marks that behavior not qualified, and script fixtures are not reported as actual event delivery
+```
+
+Dependencies:
+- US-12.1
+- US-12.2
+
+Tasks:
+- [ ] Bind the final revision's fingerprint, and run the independent review of everything since US-11.12's bound tree.
+- [ ] Repeat Gate 0 and the harness runbook on that revision as US-11.12 did, including `qualify_worker_inference.py` by hand and the visual measurements on the final tree.
+- [ ] Record a disposition for each finding, and publish evidence that `scripts/evidence.py` validates.
+- [ ] Mark the hook behavior not qualified, and hand the fingerprint to US-12.4, US-12.5, US-12.6 and US-10.2.
+
+Open Questions:
+- None.
+
+### US-12.4: Measure the two-call workload
+
+Status: BLOCKED
+
+As an operator
+I want local resources measured while two Terra goals run at once
+So that PRD 13.1's stability target rests on an observation or a reported failure.
+
+Source:
+- [Decision 0013, the workload and its spending](docs/engineering/decisions/0013-release-closure.md#decision)
+- [Decision 0009, the ledger](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
+- [US-10.2 decision 5](docs/engineering/evidence/US-10.2/summary.md#for-the-owner)
+- [Review finding RR-8](docs/engineering/evidence/US-10.2/review-r2.md#blocking)
+- [PRD 13.1](PRD-LangChain-Deep-Agents.md#131-nonfunctional-targets)
+- [Two calls per workspace](PRD-LangChain-Deep-Agents.md#65-provider-admission-and-budgets)
+- [MP-07 limits and spend](PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
+- [LM-07 measured resources](PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
+- [LM-A09](PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
+- [What hasn't run through this worker](docs/engineering/evidence/US-11.12/summary.md#failures-errors-skips-and-limitations)
+- [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
+- [SP-021](docs/engineering/option-b-contract.md#sp-021--completion-contract)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Measure two goals at once
+  Given a disposable stack on US-12.3's bound code, and the shared cap's remainder covers both goals' worst cases
+  When two goals run at once on Terra in one workspace, through the real API and workers
+  Then CPU, memory, disk and connections are recorded through the workload for the UI, API, workers and Docker, with each goal's outcome and the fingerprint it ran on
+
+Scenario: Don't count goals that never overlapped
+  Given the two goals' model calls never ran at the same time
+  When the result is assessed
+  Then the two-call workload is reported as not measured, never as stable
+
+Scenario: Report a failed result as failed
+  Given a service crashed, restarted or went unhealthy during the workload, or a run was stranded or reported a false status
+  When the result is recorded
+  Then it is reported as a failed stability result, LM-A09 stays partial and the owner is told
+
+Scenario: Stop at the shared cap
+  Given the shared ledger plus a goal's worst-case cost would pass US$1
+  When the goal is about to start
+  Then no request is sent, and the work left undone is reported as not run
+
+Scenario: Record what was spent
+  Given the goals have settled
+  When the result is recorded
+  Then each reported charge and the ledger's total stand beside actual key usage before and after, with no key in the record
+```
+
+Dependencies:
+- US-12.3
+
+Tasks:
+- [ ] Arrange two goals at once, which needs two claiming workers because one worker runs one step at a time, and rehearse that on a fake transport first.
+- [ ] Run the workload once on Terra on a disposable stack, under the shared ledger, sampling the four resources.
+- [ ] Record the result, spending and limits, and hand LM-A09's row to US-10.2's record.
+
+Open Questions:
+- None.
+
+### US-12.5: Third real Mac sleep
+
+Status: BLOCKED
+
+As an owner
+I want this Mac put to sleep once more on the final code, following the runbook
+So that recovery after sleep is observed with the lease keeper as it ships.
+
+Source:
+- [Decision 0013, a third real sleep](docs/engineering/decisions/0013-release-closure.md#decision)
+- [US-10.2 decision 8](docs/engineering/evidence/US-10.2/summary.md#for-the-owner)
+- [The changed lease keeper](docs/engineering/evidence/US-11.12/summary.md#failures-errors-skips-and-limitations)
+- [Runbook procedure](docs/engineering/runbooks/mac-sleep.md#procedure)
+- [What to observe](docs/engineering/runbooks/mac-sleep.md#what-to-observe)
+- [How it's assessed](docs/engineering/runbooks/mac-sleep.md#how-its-assessed)
+- [LC-31](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [PRD 10.5 Mac sleep](PRD-LangChain-Deep-Agents.md#105-local-shutdown-backup-restore-and-upgrades)
+- [LM-07 interruptions](PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
+- [LM-A07](PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
+- [SP-012](docs/engineering/option-b-contract.md#sp-012--durable-job-ownership-and-recovery)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Observe a real sleep on the final code
+  Given a disposable stack with a scripted model on US-12.3's bound code, a run in progress and the written runbook
+  When the owner sleeps this Mac for at least two minutes and wakes it
+  Then the record states what was observed for run status, receipts and reservations, whether any call was redispatched or effect duplicated, macOS's own Sleep and Wake, and the fingerprint it ran on, and SIGSTOP isn't used
+
+Scenario: Report a failure as a failure
+  Given the report lists blind_redispatch, duplicate_effect, false_status or stranded_run
+  When it is assessed against LC-31 and LM-A07
+  Then it is recorded as a failure, this story doesn't complete, and any fix voids US-12.3's binding and needs another real sleep
+
+Scenario: Don't count a run that never slept
+  Given the report says no_sleep_during_the_run
+  When it is assessed
+  Then nothing is claimed from it, and the owner starts again
+
+Scenario: Keep what this doesn't prove
+  Given the model is scripted
+  When the record is published
+  Then a real provider's connection dropped across a sleep, and network loss, stay stated limits
+```
+
+Dependencies:
+- US-12.3
+
+Tasks:
+- [ ] Have the owner follow the runbook on a disposable stack with a scripted model.
+- [ ] Record the report's observations with the fingerprint, and hand the LC-31 and LM-A07 rows to US-10.2's record.
+
+Open Questions:
+- None.
+
+### US-12.6: The real install at the final code
+
+Status: BLOCKED
+
+As an owner
+I want the real install backed up, migrated and running one real goal on the final code
+So that the code released has run on the install a person keeps.
+
+Source:
+- [Decision 0013, the real install and its spending](docs/engineering/decisions/0013-release-closure.md#decision)
+- [Decision 0009, the ledger](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
+- [US-10.2 decision 3](docs/engineering/evidence/US-10.2/summary.md#for-the-owner)
+- [No live run on the final code](docs/engineering/evidence/US-10.2/summary.md#limits-on-the-release-as-it-stands)
+- [The persistent install](docs/engineering/runbooks/local-supabase.md#the-persistent-install)
+- [Take a backup](docs/engineering/runbooks/backup-restore.md#take-a-backup)
+- [Restore into an isolated instance](docs/engineering/runbooks/backup-restore.md#restore-into-an-isolated-instance)
+- [Upgrade procedure](docs/engineering/runbooks/upgrade.md#upgrade-procedure)
+- [Operations runbook start](docs/engineering/runbooks/operations.md#start)
+- [Turning on inference](docs/engineering/runbooks/operations.md#turning-on-inference)
+- [LM-04 addresses](PRD-Local-Mac-Deployment.md#lm-04-local-addresses-and-connection-types)
+- [LM-07 persistence](PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
+- [LM-A01, LM-A02, LM-A04 and LM-A08](PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
+- [PRD 10.5 backup and upgrades](PRD-LangChain-Deep-Agents.md#105-local-shutdown-backup-restore-and-upgrades)
+- [DH-07 target guards](PRD-Development-Harness.md#dh-07-supabase-migrations-seeds-and-database-quality)
+- [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
+- [SP-018](docs/engineering/option-b-contract.md#sp-018--local-operations-and-runbooks)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Try the migrations on a restored copy first
+  Given the real install on US-12.3's bound code, with its pending migrations
+  When it is backed up, the backup is restored to an isolated held copy and the pending migrations are applied there through the guarded path
+  Then each step is recorded, and a failure there leaves the install's database unchanged and stops the story with a report
+
+Scenario: Apply and start beside other projects
+  Given the restored copy took the migrations
+  When the same migrations are applied to the install through the guarded path and it starts on its own loopback ports
+  Then readiness is verified, its schema is current, its live listeners are only its recorded loopback bindings, its owner, runs and artifacts remain, and other projects' containers, ports and volumes are unchanged
+
+Scenario: Run one real goal under the shared cap
+  Given inference is on for this goal, and the shared cap's remainder covers its worst-case cost
+  When one goal runs on Terra through the install's API and worker
+  Then its frozen route, actual outcome, reported cost, the ledger's total and actual key usage are recorded whether it succeeded or failed, and the worker's inference switch is off afterward
+
+Scenario: Stop at the shared cap
+  Given the shared ledger plus the goal's worst-case cost would pass US$1
+  When the goal is about to start
+  Then no request is sent and the goal is reported as not run
+
+Scenario: Stay inside what was authorized
+  Given a step beyond this backup, these migrations, this start and one goal would be needed
+  When it comes up
+  Then the story stops and reports it, and nothing is reset, removed or spent beyond the decision
+```
+
+Dependencies:
+- US-12.3
+
+Tasks:
+- [ ] Back up the install, restore it to an isolated copy, and apply its pending migrations there first.
+- [ ] Apply them to the install, start it on its own loopback ports, and record the other projects before and after.
+- [ ] Run one goal on Terra under the shared ledger, record the outcome and spending, and leave the worker's inference switch off.
+- [ ] Hand the LM-A01, LM-A02, LM-A04 and LM-A08 rows to US-10.2's record.
+
+Open Questions:
+- None.
+
+# EPIC-13: After release
+
+Post-release, by Decision 0013, and not a dependency of US-10.2. Each story waits for the owner to schedule it.
+
+### US-13.1: Requester, scope snapshot and policy version on an approval request
+
+Status: BLOCKED
+
+As a reviewer
+I want an approval request to record who asked, under what scope and under which policy version
+So that PRD 9.2's approval contract is complete.
+
+Source:
+- [Decision 0013, review items marked later](docs/engineering/decisions/0013-release-closure.md#decision)
+- [US-10.2 decision 7](docs/engineering/evidence/US-10.2/summary.md#for-the-owner)
+- [LC-10's row](docs/engineering/evidence/US-10.2/summary.md#lc-product-requirements)
+- [N-22, N-24 and N-25](docs/engineering/evidence/US-11.12/review-r1-open-findings.md#table-1-minors)
+- [PRD 9.2 approval request](PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
+- [LC-10](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — after B7, post-release.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Record the three fields with the proposal
+  Given a tool call that needs approval
+  When its approval request is stored before the wait
+  Then it holds the requester, scope snapshot and policy version as immutable fields, alongside its arguments hash
+
+Scenario: Don't invent what wasn't recorded
+  Given an approval request saved before these fields existed
+  When a reviewer opens it
+  Then the missing fields read as not recorded, and any decision stays bound to the argument hash the reviewer saw
+```
+
+Dependencies:
+- US-5.3
+- US-11.7
+- External: The owner schedules this story after the release, by Decision 0013.
+
+Tasks:
+- [ ] Persist the three fields with the approval request, by migration.
+- [ ] Return them in the approval view as the owner decides, and cover both scenarios on a disposable stack.
+
+Open Questions:
+- Who is the requester when a model proposes the action: the person who started the run, the Expert, or both?
+- What does the scope snapshot hold, given that a hash is stored and checked today?
+- Which versioned policy does the policy version name, given that a request records only the policy's reason text today?
+- Does the inbox show these fields, given that PRD 12.1's inbox doesn't list them?
+
+### US-13.2: Held-out replay before promotion
+
+Status: BLOCKED
+
+As a specialist owner
+I want a real held-out replay before a memory or skill is promoted
+So that a text match can't pass a promotion a replay would catch.
+
+Source:
+- [Decision 0013, review items marked later](docs/engineering/decisions/0013-release-closure.md#decision)
+- [Decision 0011, M33](docs/engineering/decisions/0011-review-dispositions.md#decision)
+- [What Decision 0011 gives up](docs/engineering/decisions/0011-review-dispositions.md#what-this-gives-up)
+- [N-new-2's disposition](docs/engineering/evidence/US-11.12/summary.md#found-by-this-review)
+- [N-new-2](docs/engineering/evidence/US-11.12/review-r1-open-findings.md#new-findings)
+- [Promotion's limit in this release](docs/engineering/evidence/US-10.2/summary.md#limits-on-the-release-as-it-stands)
+- [Skills and learning](PRD-LangChain-Deep-Agents.md#85-skills-and-learning)
+- [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — after B7, post-release.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Gate promotion on a real replay
+  Given a memory or skill proposal, and held-out regression tasks it wasn't drawn from
+  When the replay runs before promotion
+  Then promotion needs its passing result, and a reviewer's text checks can no longer pass a proposal alone
+
+Scenario: Refuse without a passing replay
+  Given the replay failed or didn't run
+  When an owner tries to promote the proposal
+  Then it is refused with the reason, the active version is unchanged and rollback still works
+```
+
+Dependencies:
+- US-8.2
+- External: The owner schedules this story after the release, by Decision 0013.
+
+Tasks:
+- [ ] Add the held-out replay to the promotion path, in place of the reviewer's text checks.
+- [ ] Cover both scenarios, with a scripted model unless a paid replay is separately authorized.
+
+Open Questions:
+- Which held-out tasks does a replay use, and who keeps them apart from what a proposal is drawn from?
+- Does a replay use a real model? If so, who authorizes its spending, since Decision 0013's spending covers nothing else?
+- What result counts as passing?
