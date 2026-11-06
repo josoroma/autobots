@@ -217,11 +217,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-11.1#1 | Add the per-route qualification record and widen the qualification status contract, with regenerated clients. | DONE | US-11.1 |
 | US-11.1#2 | Record each route's current result from the US-3.4 evidence, with its date, configuration and limits. | DONE | US-11.1 |
 | US-11.1#3 | Show the record in Settings, and correct the goal composer's message and the tests that pin the old text. | DONE | US-11.1 |
-| US-11.2 | Reasoning continuation check | READY | EPIC-11 |
-| US-11.2#1 | Add the deterministic check on the application's continuation path, using a fake transport. | TODO | US-11.2 |
-| US-11.2#2 | Run the capped trial on each enabled route, and record actual cost against the shared cap. | TODO | US-11.2 |
-| US-11.2#3 | Report any loss to the owner, without changing LC-23's text. | TODO | US-11.2 |
-| US-11.3 | Guarded persistent install, exercised | BLOCKED | EPIC-11 |
+| US-11.2 | Reasoning continuation check | DONE | EPIC-11 |
+| US-11.2#1 | Add the deterministic check on the application's continuation path, using a fake transport. | DONE | US-11.2 |
+| US-11.2#2 | Run the capped trial on each enabled route, and record actual cost against the shared cap. | DONE | US-11.2 |
+| US-11.2#3 | Report any loss to the owner, without changing LC-23's text. | DONE | US-11.2 |
+| US-11.3 | Guarded persistent install, exercised | READY | EPIC-11 |
 | US-11.3#1 | Build the guarded persistent migration apply, with its refusals tested on a disposable target. | TODO | US-11.3 |
 | US-11.3#2 | Choose and record the install's project name, ports, env file and data location outside the repository. | TODO | US-11.3 |
 | US-11.3#3 | Stand up the stack and exercise the runbooks on it, correcting what they say about a persistent stack. | TODO | US-11.3 |
@@ -2874,7 +2874,8 @@ Open Questions:
 
 ### US-11.2: Reasoning continuation check
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-11-2-reasoning-continuation-check/`
 
 As an operator
 I want a check and a capped live trial of reasoning metadata across a tool continuation
@@ -2919,16 +2920,16 @@ Dependencies:
 - US-3.4
 
 Tasks:
-- [ ] Add the deterministic check on the application's continuation path, using a fake transport.
-- [ ] Run the capped trial on each enabled route, and record actual cost against the shared cap.
-- [ ] Report any loss to the owner, without changing LC-23's text.
+- [x] Add the deterministic check on the application's continuation path, using a fake transport.
+- [x] Run the capped trial on each enabled route, and record actual cost against the shared cap.
+- [x] Report any loss to the owner, without changing LC-23's text.
 
 Open Questions:
 - None.
 
 ### US-11.3: Guarded persistent install, exercised
 
-Status: BLOCKED
+Status: READY
 
 As an owner
 I want a guarded migration path and a real persistent install on this Mac

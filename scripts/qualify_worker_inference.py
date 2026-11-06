@@ -202,6 +202,16 @@ def qualify(root: Path) -> int:
         cases.check('the route comes from each run, not the worker', 'same process, deepseek request and ledger', f'{status(other)}, {sorted({call["model"] for call in calls})}, {ledger}, alive {worker.poll() is None}',
                     finished and worker.poll() is None and bool(calls) and {call['model'] for call in calls} == {DEEPSEEK_WIRE} and ledger == f'{DEEPSEEK}/{DEEPSEEK_WIRE}/succeeded/-/1/{DEEPSEEK_WORST}/100')
 
+        # Reasoning metadata on every tool reply, compared with each request that follows, US-11.2.
+        reasoning = admit(workspace_a, 'reasoning', TERRA)
+        finished = settled(reasoning, 'succeeded')
+        compared = [call for call in sent('reasoning') if 'reasoning' in call]
+        outcomes = sorted({call['reasoning'] for call in compared})
+        cases.check('reasoning metadata comes back unchanged on every continuation', 'succeeded, every comparison survived', f'{status(reasoning)}, {len(compared)} comparisons, {outcomes}, {[call["differences"] for call in compared if call["differences"]][:2]}',
+                    finished and len(compared) >= 4 and outcomes == ['survived'])
+        leaked = ops.sql(f"select count(*) from public.run_events where run_id = '{reasoning}' and payload::text like '%ARRANGED-REASONING-MARKER%';")
+        cases.check('it reaches no activity event', '0 events', f'{leaked} events', leaked == '0')
+
         # A workflow reaches the same worker, in the same process.
         flow = helper('workflow', workspace_a).strip().splitlines()[-1]
         flow_done = settled(flow, 'succeeded', 60)
@@ -328,6 +338,7 @@ def qualify(root: Path) -> int:
         written = '\n'.join(path.read_text(errors='replace') for path in logs.glob('*.log'))
         planted = [key for key in (KEY_ONE, KEY_TWO, KEY_B, KEY_REJECTED, stack.runtime_password, service) if key in written]
         cases.check('no process log holds a key', 'none', len(planted), not planted)
+        cases.check('no process log holds reasoning metadata', 'none', 'ARRANGED-REASONING-MARKER' in written, 'ARRANGED-REASONING-MARKER' not in written)
         cases.check('no step failed in either worker', 'no worker.step_failed', 'worker.step_failed' in written, 'worker.step_failed' not in written)
         stable = fingerprint(root)
         cases.check('the inputs held still for the whole run', 'same fingerprint', stable == input_fingerprint, stable == input_fingerprint)

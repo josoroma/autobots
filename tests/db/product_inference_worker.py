@@ -40,9 +40,12 @@ socket.getaddrinfo = guarded_getaddrinfo
 
 from autobots.adapters.models.factory import default_sdk_client  # noqa: E402
 from autobots.domain.models import PROFILES, ModelProfileId  # noqa: E402
+from autobots.operations.reasoning_trial import continuation_result  # noqa: E402
 from autobots.operations.worker import main  # noqa: E402
 
 RETRY_AFTER = 3
+REASONING_MARKER = 'ARRANGED-REASONING-MARKER'
+RETURNED: dict[str, dict[str, Any]] = {}
 CONTENT = '# Totals\n\nTotal: 42\n'
 TASK = {'id': 'report', 'title': 'Write the report', 'criteria': ['c1'], 'expected_evidence': 'the published report'}
 EVIDENCE = [{'kind': 'artifact', 'reference': 'outputs/report.md'}]
@@ -87,6 +90,16 @@ def handle(request: httpx.Request) -> httpx.Response:
         return httpx.Response(429, json={'error': {'code': 429, 'message': 'arranged'}}, headers={'Retry-After': str(RETRY_AFTER)})
     usage = {'prompt_tokens': 5, 'completion_tokens': 7, 'total_tokens': 12, 'cost': 0.0001, 'completion_tokens_details': {'reasoning_tokens': 3}}
     choice = {'index': 0, **next_reply(body['messages'])}
+    if '[reasoning]' in goal:
+        for returned in RETURNED.values():
+            comparison = continuation_result(returned, body['messages'])
+            record({'goal': goal.splitlines()[0], 'reasoning': comparison.outcome, 'differences': list(comparison.differences)})
+        if choice['finish_reason'] == 'tool_calls':
+            number = len(body['messages'])
+            choice['message'] = {**choice['message'], 'reasoning': f'{REASONING_MARKER} text {number}',
+                                 'reasoning_details': [{'type': 'reasoning.encrypted', 'data': f'{REASONING_MARKER} second-first {number}', 'format': 'openai-responses-v1', 'index': 1},
+                                                       {'type': 'reasoning.text', 'text': f'{REASONING_MARKER} first-second {number}', 'format': 'openai-responses-v1', 'index': 0}]}
+            RETURNED[choice['message']['tool_calls'][0]['id']] = choice['message']
     if '[cutoff]' in goal:
         # Cut off mid tool call, as a real model could be: its arguments aren't valid JSON.
         cut = {'id': 'call-cut', 'type': 'function', 'function': {'name': 'save_artifact', 'arguments': '{"path": "outputs/rep'}}

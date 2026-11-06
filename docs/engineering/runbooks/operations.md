@@ -67,6 +67,16 @@ These don't pause: after two retries, `rate_limited` (`429`) and `provider_error
 
 It makes no paid call, and says nothing about a live route, real response shapes, real prices or real billing. Its fake replies don't exercise compaction, a workflow or child run through this worker, two workers at once, a lost lease, or Terra's mandatory reasoning within 512 output tokens, which belongs to US-3.4.
 
+## Reasoning metadata across a tool call
+
+A route can return opaque reasoning metadata with a tool call, and LC-23 wants it sent back unchanged. `autobots.operations.reasoning_trial` compares the HTTP bodies of a real reply and its continuation, and keeps only where they differ, never the metadata. Nothing is sent without `--paid`. It counts against the ledger in `.checks/decision-0009/ledger.json`, shared with the persistent install's goals, and refuses to start a route's trial when its worst case would take that ledger past US$1.
+
+```sh
+PYTHONPATH=services/agent/src services/agent/.venv/bin/python -m autobots.operations.reasoning_trial --paid --key-file .env
+```
+
+`survived` means unchanged in content and order. `lost` names what differed. `not_exercised` means the route returned nothing to preserve, or made no tool call. `not_run` means the cap stopped it. [The last result](../../../openspec/changes/archive/2026-11-06-us-11-2-reasoning-continuation-check/verification.md) is that Terra's encrypted item comes back with its `id` removed, by the pinned SDK, so LC-23 is partial on that route.
+
 ## The GitHub issue connector
 
 The first consequential connector, by [Decision 0007](../decisions/0007-first-connector-github-issues.md). It creates an issue in one repository and does nothing else. An owner grants it per Expert, goals without an Expert don't get it, and each call waits for a person's approval.
