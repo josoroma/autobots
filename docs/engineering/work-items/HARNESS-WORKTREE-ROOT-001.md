@@ -19,7 +19,7 @@ DH-W02.
 - **Actual behavior:** `session_root` chooses the innermost worktree Git registers strictly inside the dispatcher's `.claude/worktrees/` that holds `cwd`, otherwise the dispatcher's checkout. `handle` asks for it per event. If Git fails or takes over 2 seconds for a `cwd` there, a file edit is denied with a reason, `PostToolUse` says so, and `Stop` blocks once per turn. Only those three events ask Git.
 - **Rejected:** trusting `cwd` as given, which lets input move the guard outside the checkout. Running the worktree's copy of the hook, which lets input choose the enforcing code. Refusing edits under `.claude/worktrees/` from the main root, which `cd` into a sibling bypasses anyway. Falling back to the main root when Git cannot answer, which is wider than the worktree the session may be in. Exiting 2 for every event when Git cannot answer, which the second review showed traps a session in a `Stop` loop with `Bash` blocked.
 - **Deferred:** live event delivery stays with the adapter's separate qualification.
-- **Open decision:** `Stop` in a new worktree wants current `fast` or `full` and `db` reports, so an unbootstrapped worktree blocks once at the end of each turn. It is recorded in the runbook as a limit, and nothing here reduces it.
+- **Decided by the user, 2026-11-06:** `Stop` in a new worktree keeps wanting its own current `fast` or `full` and `db` reports, so an unbootstrapped worktree blocks once at the end of each turn. Main-checkout reports do not count for a worktree. It is recorded in the runbook as a limit.
 
 ## Review
 
