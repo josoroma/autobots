@@ -27,7 +27,7 @@ The final review of EPIC-11 and the repeated Gate 0, on top of `5012235`, 2026-1
 
 ## Results on these inputs
 
-Bound to one source fingerprint, in the manifest. It matches what round 5 read.
+Bound to one source fingerprint, in the manifest. A reviewer can't compute a hash, so I bound it to the tree round 5 read. `fast` also exited 0 under `env -i`, kept in the retained output and not in the manifest.
 
 | Check | Class, model transport | Result |
 |---|---|---|
@@ -66,8 +66,8 @@ Round 1's reports, kept verbatim: [code](review-r1-code.md), [open findings](rev
 | **Partly fixed** | N-70: after a stop the worker claims nothing new. A step already running can send further paid calls during the drain, and the runbook says so |
 | **Already fixed before this review** | N-3, N-16, N-23, N-29, N-31, N-57, N-68 |
 | **No longer applies** | N-36: not reachable through the product path |
-| **Later, under LC-16's audit scope, with no story yet** | N-22, N-24, N-25, N-37, N-51, N-52 |
-| **Later, under PRD 8.3's context passing, with no story yet** | N-7 |
+| **Suggested for later, under the audit requirements, with no story and no owner's decision** | N-22, N-24, N-25, N-37, N-51, N-52. [US-10.2](../US-10.2/summary.md#what-stops-a-release-now) puts them to the owner |
+| **Suggested for later, under PRD 8.3's context passing, with no story and no owner's decision** | N-7. The same |
 | **Accepted, the state stays consistent or it fails closed** | N-1, N-5, N-6, N-10, N-17, N-19, N-20, N-21, N-30, N-32, N-34, N-35, N-49, N-50, N-63 |
 | **Accepted, no harm found or a person decides** | N-26, N-27, N-28, N-33, N-38, N-39, N-40, N-42, N-45, N-46, N-47, N-54, N-58, N-59, N-60, N-61, N-67, N-72, N-73 |
 | **Accepted, and reported to the owner since no decision covers it** | N-48: a routine reads model policy and skill text at each occurrence, and each occurrence freezes them at its own admission |

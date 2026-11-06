@@ -7,11 +7,11 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | EPIC-11 |
-| Kind | epic |
+| Target | US-10.2 |
+| Kind | story |
 | Focus | - |
 | Status | BLOCKED |
-| Reason | no progress: next action 'implement' for US-11.12 unchanged across 4 stop attempts |
+| Reason | US-10.2 assessed against the final code: not release-ready, and unresolved mandatory work prevents completion. The owner must decide, per docs/engineering/evidence/US-10.2/summary.md#what-stops-a-release-now: 1 H1.3's DH-W records clause (accept US-11.12's record or write the missing ones); 2 LC-23 on Terra (build preservation or revise); 3 real install at migrations 33-35 (authorize apply or accept); 4 DeepSeek selectable with no task qualification (disable, qualify or accept); 5 two-call workload (measure or revise); 6 PRD 12.2 metrics (build, revise or defer); 7 review items marked later with no decision (accept or schedule); 8 a third real sleep (repeat or accept). Partial rows engineering can close also need scheduling or accepting. |
 | Started | 2026-11-06 |
 | Updated | 2026-11-06 |
 
@@ -19,27 +19,16 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-11.1 | us-11-1-truthful-qualification-status | DONE | Truthful qualification status |
-| 2 | US-11.2 | us-11-2-reasoning-continuation-check | DONE | Reasoning continuation check |
-| 3 | US-11.3 | us-11-3-guarded-persistent-install-exercised | DONE | Guarded persistent install, exercised |
-| 4 | US-11.4 | us-11-4-run-controls-run-page | DONE | Run controls on the run page |
-| 5 | US-11.5 | us-11-5-run-list-inspector | DONE | Run list and inspector |
-| 6 | US-11.6 | us-11-6-model-role-choice-settings | DONE | Model and role choice in Settings |
-| 7 | US-11.7 | us-11-7-approval-reason-target | DONE | Approval reason and target |
-| 8 | US-11.8 | us-11-8-operations-completeness | DONE | Operations completeness |
-| 9 | US-11.9 | us-11-9-run-creation-disclosure-role | DONE | Run creation disclosure, role map and run details |
-| 10 | US-11.10 | us-11-10-real-mac-sleep-proof | DONE | Real Mac sleep proof |
-| 11 | US-11.11 | us-11-11-design-system-migration-final | DONE | Design system migration and final visual evidence |
-| 12 | US-11.12 | us-11-12-final-independent-review-gate | IN PROGRESS | Final independent review and Gate 0 |
+| 1 | US-10.2 | us-10-2-release-traceability-evidence-based | IN PROGRESS | Release traceability and evidence-based completion |
 
 ## Next Action
 
-Action: implement
-Story: US-11.12
-Change: us-11-12-final-independent-review-gate
+Action: verify
+Story: US-10.2
+Change: us-10-2-release-traceability-evidence-based
 Owner: main-session
-Command: /ohmyorch:opsx-apply us-11-12-final-independent-review-gate
-Reason: gate implementation: 0/5 tasks complete
+Command: /ohmyorch:opsx-verify us-10-2-release-traceability-evidence-based
+Reason: gate verification: verification.md records no OpenSpec verify outcome
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.
