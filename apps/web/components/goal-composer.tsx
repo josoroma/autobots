@@ -109,8 +109,7 @@ export function GoalComposer() {
             "Credential storage is unavailable, so model-backed work is blocked. Your draft is kept."
           ) : outcome === "queued" ? (
             <>
-              Your goal is queued. No worker runs it yet, so no model has been
-              called.{" "}
+              Your goal is queued.{" "}
               {runId === null ? null : (
                 <Link href={`/runs/${runId}`} className="font-medium underline">
                   Open this run

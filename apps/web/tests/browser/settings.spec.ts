@@ -110,7 +110,7 @@ test("Save and validate encrypts, keeps statuses separate, returns to the draft 
   );
   await expect(page.locator('[data-field="catalog"]')).toHaveText("Available");
   await expect(page.locator('[data-field="qualification"]')).toContainText(
-    "Not qualified",
+    "A configured key does not mean a route was tested",
   );
   await expect(page.locator('[data-field="version"]')).toHaveText("1");
   await page.waitForTimeout(200);

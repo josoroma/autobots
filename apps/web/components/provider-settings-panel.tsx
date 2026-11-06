@@ -1,6 +1,10 @@
 "use client";
 
-import { parseProviderStatus, type ProviderStatus } from "@autobots/api-client";
+import {
+  parseProviderStatus,
+  type ProviderStatus,
+  type RouteQualification,
+} from "@autobots/api-client";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
@@ -27,6 +31,65 @@ const SOURCE_LABELS: Record<ProviderStatus["source"], string> = {
   app: "Stored for this workspace, encrypted on this Mac",
   environment: "The server environment, which is managed outside the app",
 };
+
+const QUALIFICATION_LABELS: Record<RouteQualification["status"], string> = {
+  qualified_with_limits: "Qualified, with the limits below",
+  not_qualified: "Not qualified",
+};
+
+function RouteQualifications({ routes }: { routes: RouteQualification[] }) {
+  return (
+    <Card
+      aria-labelledby="qualification-heading"
+      data-field="qualification"
+      className="space-y-3"
+    >
+      <h2 id="qualification-heading" className="text-lg font-medium">
+        Live qualification
+      </h2>
+      <p className="text-muted-foreground text-sm">
+        What a live test of each route found. A configured key does not mean a
+        route was tested, and an available catalog does not either.
+      </p>
+      {routes.map((route) => (
+        <section
+          key={route.profile}
+          data-route={route.profile}
+          aria-label={route.canonical_id}
+          className="space-y-2 text-sm"
+        >
+          <h3 className="font-medium break-all">{route.canonical_id}</h3>
+          <dl className="space-y-2">
+            <div>
+              <dt className="font-medium">Status</dt>
+              <dd data-route-field="status">
+                {QUALIFICATION_LABELS[route.status]}
+              </dd>
+            </div>
+            {route.qualified_on === null ? null : (
+              <div>
+                <dt className="font-medium">Tested on</dt>
+                <dd data-route-field="date">{route.qualified_on}</dd>
+              </div>
+            )}
+            {route.configuration === null ? null : (
+              <div>
+                <dt className="font-medium">Configuration</dt>
+                <dd data-route-field="configuration">{route.configuration}</dd>
+              </div>
+            )}
+            {route.limits === null ? null : (
+              <div>
+                <dt className="font-medium">Limits</dt>
+                <dd data-route-field="limits">{route.limits}</dd>
+              </div>
+            )}
+          </dl>
+        </section>
+      ))}
+    </Card>
+  );
+}
 
 export function ProviderSettingsPanel() {
   const [status, setStatus] = useState<ProviderStatus | null>(null);
@@ -142,13 +205,6 @@ export function ProviderSettingsPanel() {
               {CATALOG_LABELS[status.catalog_status]}
             </dd>
           </div>
-          <div>
-            <dt className="font-medium">Live qualification</dt>
-            <dd data-field="qualification">
-              Not qualified yet. A configured key does not mean the models were
-              tested.
-            </dd>
-          </div>
           {status.credential_version === null ? null : (
             <div>
               <dt className="font-medium">Stored version</dt>
@@ -231,6 +287,7 @@ export function ProviderSettingsPanel() {
           </p>
         ) : null}
       </Card>
+      <RouteQualifications routes={status.qualification} />
       <Link href="/" className="text-sm font-medium underline">
         Return to your draft
       </Link>

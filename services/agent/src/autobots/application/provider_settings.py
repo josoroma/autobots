@@ -1,7 +1,7 @@
 """MP-04 and MP-05. Validation uses key metadata and the public catalog, and never a completion."""
 
 import json
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -26,8 +26,13 @@ from autobots.application.credentials.store import (
     ResolvedCredential,
     resolve_for_attempt,
 )
-from autobots.contracts.settings import ModelAvailability, ModelList, ProviderStatus
-from autobots.domain.models import PROFILES
+from autobots.contracts.settings import (
+    ModelAvailability,
+    ModelList,
+    ProviderStatus,
+    RouteQualification,
+)
+from autobots.domain.models import PROFILES, ModelProfileId
 
 
 class KeyCheck(StrEnum):
@@ -122,6 +127,19 @@ class ProviderSettings:
         except OSError:
             return "unavailable"
 
+    async def route_qualifications(self) -> list[RouteQualification]:
+        """Only a stored record for the route's own canonical model counts, MP-04. Neither a key nor
+        the catalog changes this."""
+        cursor = await self._connection.execute(
+            "select profile, canonical_id, status, qualified_on, configuration, limits "
+            "from agent_runtime.route_qualifications"
+        )
+        stored = {row[0]: row for row in await cursor.fetchall()}
+        return [
+            qualification_from_record(profile.id, profile.canonical_id, stored.get(profile.id))
+            for profile in PROFILES.values()
+        ]
+
     async def status(self, workspace_id: UUID) -> ProviderStatus:
         version, auth_status, validated_at = await self._settings_row(workspace_id)
         source = "none"
@@ -147,7 +165,7 @@ class ProviderSettings:
             source=source,  # type: ignore[arg-type]
             auth_status=auth_status,  # type: ignore[arg-type]
             catalog_status=await self.catalog_status(),  # type: ignore[arg-type]
-            qualification_status="not_qualified",
+            qualification=await self.route_qualifications(),
             credential_id=credential_id,
             credential_version=credential_version,
             validated_at=validated_at,
@@ -271,6 +289,28 @@ class ProviderSettings:
             )
         status = "available" if payload is not None else "unavailable"
         return ModelList(schema_version=1, catalog_status=status, models=models)  # type: ignore[arg-type]
+
+
+def qualification_from_record(
+    profile: ModelProfileId, canonical_id: str, record: Sequence[Any] | None
+) -> RouteQualification:
+    if record is None or record[1] != canonical_id:
+        return RouteQualification(
+            profile=profile,
+            canonical_id=canonical_id,
+            status="not_qualified",
+            qualified_on=None,
+            configuration=None,
+            limits=None,
+        )
+    return RouteQualification(
+        profile=profile,
+        canonical_id=canonical_id,
+        status=record[2],
+        qualified_on=record[3],
+        configuration=record[4],
+        limits=record[5],
+    )
 
 
 def policy_overrides_json(overrides: dict[str, str]) -> str:

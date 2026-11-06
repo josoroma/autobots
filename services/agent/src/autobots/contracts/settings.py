@@ -1,6 +1,6 @@
 """Safe provider settings. Nothing here carries a stored key; only a request holds a draft."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -11,8 +11,21 @@ from autobots.domain.models import ModelProfileId
 
 AuthStatus = Literal["missing", "configured", "invalid", "unavailable"]
 CatalogStatus = Literal["available", "unavailable", "unknown"]
-QualificationStatus = Literal["not_qualified"]
+RouteQualificationStatus = Literal["qualified_with_limits", "not_qualified"]
 CredentialSource = Literal["none", "app", "environment"]
+
+
+class RouteQualification(BaseModel):
+    """One route's stored live result. No record means not qualified, and the rest stay empty."""
+
+    model_config = STRICT_CONTRACT
+
+    profile: ModelProfileId
+    canonical_id: str
+    status: RouteQualificationStatus
+    qualified_on: date | None
+    configuration: str | None
+    limits: str | None
 
 
 class ProviderStatus(BaseModel):
@@ -26,7 +39,7 @@ class ProviderStatus(BaseModel):
     source: CredentialSource
     auth_status: AuthStatus
     catalog_status: CatalogStatus
-    qualification_status: QualificationStatus
+    qualification: list[RouteQualification]
     credential_id: Identifier | None
     credential_version: int | None
     validated_at: datetime | None

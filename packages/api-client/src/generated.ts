@@ -1784,10 +1784,12 @@ export const schemas = {
         "title": "Provider",
         "type": "string"
       },
-      "qualification_status": {
-        "const": "not_qualified",
-        "title": "Qualification Status",
-        "type": "string"
+      "qualification": {
+        "items": {
+          "$ref": "#/components/schemas/RouteQualification"
+        },
+        "title": "Qualification",
+        "type": "array"
       },
       "schema_version": {
         "const": 1,
@@ -1827,7 +1829,7 @@ export const schemas = {
       "source",
       "auth_status",
       "catalog_status",
-      "qualification_status",
+      "qualification",
       "credential_id",
       "credential_version",
       "validated_at"
@@ -2133,6 +2135,71 @@ export const schemas = {
       "role_bindings"
     ],
     "title": "RouteOption",
+    "type": "object"
+  },
+  "RouteQualification": {
+    "additionalProperties": false,
+    "description": "One route's stored live result. No record means not qualified, and the rest stay empty.",
+    "properties": {
+      "canonical_id": {
+        "title": "Canonical Id",
+        "type": "string"
+      },
+      "configuration": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Configuration"
+      },
+      "limits": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Limits"
+      },
+      "profile": {
+        "$ref": "#/components/schemas/ModelProfileId"
+      },
+      "qualified_on": {
+        "anyOf": [
+          {
+            "format": "date",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Qualified On"
+      },
+      "status": {
+        "enum": [
+          "qualified_with_limits",
+          "not_qualified"
+        ],
+        "title": "Status",
+        "type": "string"
+      }
+    },
+    "required": [
+      "profile",
+      "canonical_id",
+      "status",
+      "qualified_on",
+      "configuration",
+      "limits"
+    ],
+    "title": "RouteQualification",
     "type": "object"
   },
   "RoutineConfig": {
@@ -4130,7 +4197,7 @@ export interface ProviderStatus {
   credential_id: string | null;
   credential_version: number | null;
   provider: "openrouter";
-  qualification_status: "not_qualified";
+  qualification: RouteQualification[];
   schema_version: 1;
   settings_version: number;
   source: "none" | "app" | "environment";
@@ -4240,6 +4307,19 @@ export interface RouteOption {
 
 export function parseRouteOption(value: unknown): RouteOption {
   return parseWith(schemas, "RouteOption", value) as RouteOption;
+}
+
+export interface RouteQualification {
+  canonical_id: string;
+  configuration: string | null;
+  limits: string | null;
+  profile: ModelProfileId;
+  qualified_on: string | null;
+  status: "qualified_with_limits" | "not_qualified";
+}
+
+export function parseRouteQualification(value: unknown): RouteQualification {
+  return parseWith(schemas, "RouteQualification", value) as RouteQualification;
 }
 
 export interface RoutineConfig {

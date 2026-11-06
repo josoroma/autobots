@@ -29,6 +29,7 @@ REQUIRED_RELATIONS = (
     "app_private.worker_heartbeats",
     "app_private.installation_holds",
     "agent_runtime.adapter_qualifications",
+    "agent_runtime.route_qualifications",
 )
 # Admission stops on these. A missing worker only means a job waits.
 BLOCKING = frozenset({"database", "schema", "storage", "disk", "hold", "adapter"})

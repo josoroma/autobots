@@ -58,7 +58,11 @@ test("Run admits exactly once through the real form, and a reload starts nothing
       posts.push(request.url());
   });
   await page.getByRole("button", { name: "Run" }).click();
-  await expect(page.locator('[data-outcome="queued"]')).toContainText("queued");
+  const queued = page.locator('[data-outcome="queued"]');
+  await expect(queued).toHaveText(/^Your goal is queued\. Open this run$/);
+  await expect(
+    queued.getByRole("link", { name: "Open this run" }),
+  ).toHaveAttribute("href", /^\/runs\/[0-9a-f-]+$/);
   expect(posts).toHaveLength(1);
   await page.reload();
   await page.waitForLoadState("networkidle");

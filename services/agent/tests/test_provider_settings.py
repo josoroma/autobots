@@ -1,12 +1,16 @@
 """Key checks and decisions that need no database. Real rows run in scripts/qualify_identity.py."""
 
+from datetime import date
+from typing import Any
+
 import httpx
 import pytest
 from pydantic import SecretStr
 
 from autobots.adapters.models.openrouter_metadata import catalog_fetcher, key_validator
-from autobots.application.provider_settings import KeyCheck
+from autobots.application.provider_settings import KeyCheck, qualification_from_record
 from autobots.contracts.settings import CredentialDraft, ProviderStatus
+from autobots.domain.models import PROFILES, ModelProfileId
 
 
 def client_for(handler: httpx.MockTransport) -> httpx.AsyncClient:
@@ -62,3 +66,17 @@ def test_a_status_cannot_carry_a_key() -> None:
 
 def test_a_draft_repr_does_not_matter_because_it_is_never_returned() -> None:
     assert CredentialDraft(draft_key="x", expected_version=0).expected_version == 0
+
+
+def test_only_a_record_for_the_routes_own_model_counts() -> None:
+    canonical = PROFILES[ModelProfileId.TERRA].canonical_id
+    record = (ModelProfileId.TERRA, canonical, "qualified_with_limits", date(2026, 11, 5), "c", "l")
+
+    def status(stored: tuple[Any, ...] | None) -> str:
+        return qualification_from_record(ModelProfileId.TERRA, canonical, stored).status
+
+    assert status(record) == "qualified_with_limits"
+    assert status(None) == "not_qualified"
+    assert status((record[0], "openai/another-model", *record[2:])) == "not_qualified"
+    empty = qualification_from_record(ModelProfileId.TERRA, canonical, None)
+    assert (empty.qualified_on, empty.configuration, empty.limits) == (None, None, None)

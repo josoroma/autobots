@@ -243,6 +243,20 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
                                      'AUTOBOTS_WEB_OUTPUT': str(root / '.checks/identity/results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots)}
         result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'browser/operations.spec', 'approvals', 'effects', 'experts', 'identity', 'settings', 'runs', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
                                 env=browser_env)
+        # A real restart, then Settings reads the stored records. Then one is removed, under the same key.
+        stop(processes[0])
+        processes[0] = start([str(root / PYTHON), str(root / 'tests/web/fixture_upstream_api.py'), str(api_port)], api_env, root)
+        wait_until_up(f'{api_url}/v1/health', processes[0])
+        qualification_reports = [root / '.checks/identity/playwright-qualification-1.json', root / '.checks/identity/playwright-qualification-2.json']
+        for report_path, title in zip(qualification_reports, ('after an API restart', 'a route with no record')):
+            report_path.unlink(missing_ok=True)
+            if title == 'a route with no record':
+                stack.sql("create table public.arranged_route_rows as select * from agent_runtime.route_qualifications;\ndelete from agent_runtime.route_qualifications where profile = 'openrouter_terra';\n")
+            ran = subprocess.run([str(playwright), 'test', 'browser/qualification', '-g', title, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=120, check=False,
+                                 env={**browser_env, 'AUTOBOTS_WEB_REPORT': str(report_path)})
+            if ran.returncode:
+                print(ran.stdout[-1500:], file=sys.stderr)
+        stack.sql("delete from agent_runtime.route_qualifications;\ninsert into agent_runtime.route_qualifications select * from public.arranged_route_rows;\ndrop table public.arranged_route_rows;\n")
         # The slice runs last, with a worker, so nothing above sees its jobs claimed.
         stack.runtime("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done';\n")
         # Arranged: the settings suite changed the workspace default, and the fixture worker's route is the original.
@@ -270,6 +284,11 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
         found.extend(summarize(slice_report)[0])
     else:
         cases.check('the slice suite produced a report', 'a report', 'none', False)
+    for report_path in qualification_reports:
+        if report_path.exists():
+            found.extend(summarize(report_path)[0])
+        else:
+            cases.check('the qualification suite produced a report', 'a report', 'none', False)
     for case in found:
         cases.check(f"browser: {case['id']}", 'passed', case['status'], case['status'] == 'passed')
     calls = sorted(set(upstream_log.read_text().splitlines()))

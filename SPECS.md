@@ -213,10 +213,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-10.2#1 | Review full source-to-story-to-evidence coverage and resolve blocking findings. | TODO | US-10.2 |
 | US-10.2#2 | Publish exercised operating/user procedures and truthful release limitations. | TODO | US-10.2 |
 | EPIC-11 | Installable release readiness | — | — |
-| US-11.1 | Truthful qualification status | READY | EPIC-11 |
-| US-11.1#1 | Add the per-route qualification record and widen the qualification status contract, with regenerated clients. | TODO | US-11.1 |
-| US-11.1#2 | Record each route's current result from the US-3.4 evidence, with its date, configuration and limits. | TODO | US-11.1 |
-| US-11.1#3 | Show the record in Settings, and correct the goal composer's message and the tests that pin the old text. | TODO | US-11.1 |
+| US-11.1 | Truthful qualification status | DONE | EPIC-11 |
+| US-11.1#1 | Add the per-route qualification record and widen the qualification status contract, with regenerated clients. | DONE | US-11.1 |
+| US-11.1#2 | Record each route's current result from the US-3.4 evidence, with its date, configuration and limits. | DONE | US-11.1 |
+| US-11.1#3 | Show the record in Settings, and correct the goal composer's message and the tests that pin the old text. | DONE | US-11.1 |
 | US-11.2 | Reasoning continuation check | READY | EPIC-11 |
 | US-11.2#1 | Add the deterministic check on the application's continuation path, using a fake transport. | TODO | US-11.2 |
 | US-11.2#2 | Run the capped trial on each enabled route, and record actual cost against the shared cap. | TODO | US-11.2 |
@@ -242,7 +242,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-11.7#1 | Persist the policy's reason and the resource target with the approval request. | TODO | US-11.7 |
 | US-11.7#2 | Return both in the approval view, and show them in the inbox. | TODO | US-11.7 |
 | US-11.7#3 | Cover both scenarios in a browser test. | TODO | US-11.7 |
-| US-11.8 | Operations completeness | BLOCKED | EPIC-11 |
+| US-11.8 | Operations completeness | READY | EPIC-11 |
 | US-11.8#1 | Record each restore and its verification result where Operations can read it. | TODO | US-11.8 |
 | US-11.8#2 | Add delayed schedules, OpenRouter availability, restore history and qualification evidence to the status contract and screen. | TODO | US-11.8 |
 | US-11.8#3 | Cover both scenarios in a browser test on a disposable stack. | TODO | US-11.8 |
@@ -2823,7 +2823,8 @@ Phase reference: B7, preserved SP-020. Scope and spending come from Decision 000
 
 ### US-11.1: Truthful qualification status
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-11-1-truthful-qualification-status/`
 
 As an operator
 I want each route's qualification stored and shown with its date, configuration and limits
@@ -2864,9 +2865,9 @@ Dependencies:
 - US-3.4
 
 Tasks:
-- [ ] Add the per-route qualification record and widen the qualification status contract, with regenerated clients.
-- [ ] Record each route's current result from the US-3.4 evidence, with its date, configuration and limits.
-- [ ] Show the record in Settings, and correct the goal composer's message and the tests that pin the old text.
+- [x] Add the per-route qualification record and widen the qualification status contract, with regenerated clients.
+- [x] Record each route's current result from the US-3.4 evidence, with its date, configuration and limits.
+- [x] Show the record in Settings, and correct the goal composer's message and the tests that pin the old text.
 
 Open Questions:
 - None.
@@ -3190,7 +3191,7 @@ Open Questions:
 
 ### US-11.8: Operations completeness
 
-Status: BLOCKED
+Status: READY
 
 As an operator
 I want delayed schedules, OpenRouter availability, restore history and qualification evidence in Operations

@@ -841,6 +841,9 @@ class Settings(ProviderSettings):
     async def _settings_row(self, *_: Any, **__: Any) -> tuple[int, str, Any]:
         return 1, self.stored, None
 
+    async def route_qualifications(self) -> list[Any]:
+        return []
+
     async def _record(self, _: Any, status: str) -> None:
         self.recorded.append(status)
 
