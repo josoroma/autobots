@@ -10,9 +10,9 @@
 | Task success, 40 held-out tasks 3 times | At least 85% of 120 | **104 of 120, 86.7%** | Met, narrowly, and see below |
 | Permission and replay failures | Zero | **0** | Met, by this runner's checks |
 | API p95 | Below 300 ms | 3.7 ms | Met, with the limits below |
-| Committed event readable | Below 1 s | 13.9 ms | Met, with the limits below |
+| Committed event visible in the UI | Below 1 s | 13.9 ms through the API | **UI not measured** |
 | Cancellation acknowledged | Within 1 s | 8.1 ms | Queued runs only |
-| Eligible recovery | Within 60 s | **56.2–64.4 s, 6 of 9 over** | **Missed** |
+| Eligible recovery, after lease expiry | Within 60 s | **At most about 24 s** | Met, inferred. See the correction below |
 
 | | |
 |---|---|
@@ -56,9 +56,11 @@ Checked on every goal, from outputs and receipts:
 
 This counts what these 120 goals did. The deterministic policy suites are `db` and `operations`, which last passed before the run, on the same application code apart from the protocol runner.
 
-## Recovery: the missed target
+## Recovery
 
-The 9 goals whose worker was killed all finished, with no repeated effect, but **6 took over 60 seconds, up to 64.4**. The worker's lease is 60 seconds, so recovery can't be faster than that once a worker dies. Meeting this target means a shorter lease or a recorded revision of it, and **that's a decision for the owner**.
+The 9 goals whose worker was killed all finished, with no repeated effect, 56.2 to 64.4 seconds after the kill.
+
+**Correction: this was first reported as a missed target, and that was wrong.** The source, [PRD-LangChain-Deep-Agents.md](../../../../PRD-LangChain-Deep-Agents.md), says an eligible run is reclaimed "within 60 seconds after lease expiry/worker availability". The first reading used SPECS' shorter wording and timed from the kill. The lease expiry itself isn't recorded, so the figure after it is inferred: a heartbeat every 20 seconds on a 60-second lease means expiry 40 to 60 seconds after a kill, so reclaim came at most about 24 seconds after it. Commit `93245b9`'s message still says missed.
 
 **Each of the 9 needed an owner's action.** The kill landed during a model call, so the charge was uncertain and the run paused until it was reconciled. The runner did that immediately, recording the worst case, so these figures leave out any time a real person would take.
 
@@ -81,11 +83,12 @@ Memory on the stack at the end came to about 807 MiB across 8 containers, with 2
 - **Scoring is deterministic and checks strings,** so it can't judge quality. Three samples were read by the assistant, and nobody has scored any by hand.
 - **The GitHub connector's destination was fake** in the approval tasks. Everything else was real.
 - **The benchmark's conditions:** one client, sequential requests over loopback, on queued runs, with the worker stopped and a load average near 3. It shows the API isn't the bottleneck, not behavior under real concurrency or how fast a running call stops.
+- **Not measured against the PRD's targets:** a durable event's time to appear in the UI, as this read the API, and CPU, disk and connection use during the workload, as only memory at the end was recorded. Those gaps remain for US-10.1's delivery.
 - **Load during the run:** another session's stress test overlapped its first 21 minutes, ending by 22:01:32 CST, with a load average near 100. Goal timings from then may read high. The benchmark ran well after it.
 - **One goal set, one evening, one model.** DeepSeek wasn't run, and this says nothing about other hours.
 
 ## Decisions for the owner
 
-1. **Recovery:** shorten the 60-second lease, or revise the target.
+1. **Recovery: decided.** The user kept the 60-second lease, after this correction. A crashed worker holds its run for up to a minute.
 2. **Plan rejections:** fix them and measure on a fresh corpus, or accept the margin.
 3. **Independence:** whether a corpus written by the assistant is enough for release, or needs review.
