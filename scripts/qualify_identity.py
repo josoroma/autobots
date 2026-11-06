@@ -215,13 +215,21 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
     upstream_log.parent.mkdir(parents=True, exist_ok=True)
     upstream_log.write_text('')
     catalog_down = config_root / 'catalog-down'
+    backups = config_root / 'backups'
+    backups.mkdir(parents=True, exist_ok=True)
+    # Arranged: a delayed occurrence, on a routine that's off so no worker evaluates it.
+    routine = '44444444-4444-4444-8444-444444444444'
+    arranged = stack.sql(f"insert into public.routines (id, workspace_id, name, enabled, evaluated_until) values ('{routine}', '{workspace_a}', 'Arranged nightly report', false, now());\n"
+                         f"insert into public.routine_versions (routine_id, version, config, created_by) values ('{routine}', 1, '{{}}', '{workspace_a}');\n"
+                         f"insert into public.routine_occurrences (routine_id, occurrence_time, routine_version, status, reason) values ('{routine}', '2026-11-05T03:00:00Z', 1, 'missed', 'host_away');\n")
+    cases.check('the delayed occurrence is arranged', 'exit 0', f'exit {arranged.returncode}', arranged.returncode == 0)
     api_url, web_url = f'http://127.0.0.1:{api_port}', f'http://127.0.0.1:{web_port}'
     runtime_url = f'postgresql://autobots_runtime:{stack.runtime_password}@127.0.0.1:{db_port}/postgres'
     api_env = {**tool_env(), 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1', 'AUTOBOTS_INTERNAL_TOKEN': internal,
                'AUTOBOTS_JWT_SECRET': stack.values['JWT_SECRET'], 'AUTOBOTS_DATABASE_URL': runtime_url,
                'AUTOBOTS_SUPABASE_URL': base, 'AUTOBOTS_SERVICE_ROLE_KEY': stack.values['SERVICE_ROLE_KEY'], 'AUTOBOTS_STREAM_SECONDS': '4',
                'AUTOBOTS_CONFIG_ROOT': str(config_root), 'AUTOBOTS_PROVIDER_MASTER_KEY_FILE': str(config_root / 'secrets/master.key'),
-               'AUTOBOTS_TEST_UPSTREAM_LOG': str(upstream_log), 'AUTOBOTS_TEST_CATALOG_DOWN': str(catalog_down), 'NODE_ENV': 'production'}
+               'AUTOBOTS_TEST_UPSTREAM_LOG': str(upstream_log), 'AUTOBOTS_TEST_CATALOG_DOWN': str(catalog_down), 'AUTOBOTS_BACKUP_DIR': str(backups), 'NODE_ENV': 'production'}
     web_env = {**env, 'AUTOBOTS_INTERNAL_TOKEN': internal, 'AUTOBOTS_API_URL': api_url, 'AUTOBOTS_ALLOWED_ORIGIN': web_url, 'NODE_ENV': 'production',
                'AUTOBOTS_SUPABASE_URL': base, 'AUTOBOTS_SUPABASE_ANON_KEY': stack.values['ANON_KEY']}
     screenshots = root / '.checks/identity/screenshots'
@@ -238,10 +246,10 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
                                      'AUTOBOTS_TEST_WORKSPACE_A': workspace_a, 'AUTOBOTS_TEST_WORKSPACE_B': workspace_b,
                                      'AUTOBOTS_TEST_OWNER_B_EMAIL': email_b, 'AUTOBOTS_TEST_OWNER_B_PASSWORD': password_b,
                                      'AUTOBOTS_TEST_MEMBER_EMAIL': email_c, 'AUTOBOTS_TEST_MEMBER_PASSWORD': password_c,
-                                     'AUTOBOTS_TEST_UPSTREAM_LOG': str(upstream_log), 'AUTOBOTS_TEST_CATALOG_DOWN': str(catalog_down),
+                                     'AUTOBOTS_TEST_UPSTREAM_LOG': str(upstream_log), 'AUTOBOTS_TEST_CATALOG_DOWN': str(catalog_down), 'AUTOBOTS_TEST_BACKUP_DIR': str(backups),
                                      'AUTOBOTS_TEST_SERVICE_KEY': stack.values['SERVICE_ROLE_KEY'], 'AUTOBOTS_WEB_REPORT': str(report),
                                      'AUTOBOTS_WEB_OUTPUT': str(root / '.checks/identity/results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots)}
-        result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'browser/operations.spec', 'approvals', 'effects', 'experts', 'identity', 'settings', 'runs', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
+        result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'browser/operations', 'approvals', 'effects', 'experts', 'identity', 'settings', 'runs', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
                                 env=browser_env)
         # A real restart, then Settings reads the stored records. Then one is removed, under the same key.
         stop(processes[0])

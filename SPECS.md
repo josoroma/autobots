@@ -242,10 +242,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-11.7#1 | Persist the policy's reason and the resource target with the approval request. | DONE | US-11.7 |
 | US-11.7#2 | Return both in the approval view, and show them in the inbox. | DONE | US-11.7 |
 | US-11.7#3 | Cover both scenarios in a browser test. | DONE | US-11.7 |
-| US-11.8 | Operations completeness | READY | EPIC-11 |
-| US-11.8#1 | Record each restore and its verification result where Operations can read it. | TODO | US-11.8 |
-| US-11.8#2 | Add delayed schedules, OpenRouter availability, restore history and qualification evidence to the status contract and screen. | TODO | US-11.8 |
-| US-11.8#3 | Cover both scenarios in a browser test on a disposable stack. | TODO | US-11.8 |
+| US-11.8 | Operations completeness | DONE | EPIC-11 |
+| US-11.8#1 | Record each restore and its verification result where Operations can read it. | DONE | US-11.8 |
+| US-11.8#2 | Add delayed schedules, OpenRouter availability, restore history and qualification evidence to the status contract and screen. | DONE | US-11.8 |
+| US-11.8#3 | Cover both scenarios in a browser test on a disposable stack. | DONE | US-11.8 |
 | US-11.9 | Run creation disclosure, role map and run details | READY | EPIC-11 |
 | US-11.9#1 | Add the MP-07 disclosure to every run-creation screen. | TODO | US-11.9 |
 | US-11.9#2 | Add a per-run model choice, the complete role map and budgets to the run workspace. | TODO | US-11.9 |
@@ -3197,7 +3197,8 @@ Open Questions:
 
 ### US-11.8: Operations completeness
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-11-8-operations-completeness/`
 
 As an operator
 I want delayed schedules, OpenRouter availability, restore history and qualification evidence in Operations
@@ -3235,9 +3236,9 @@ Dependencies:
 - US-11.1
 
 Tasks:
-- [ ] Record each restore and its verification result where Operations can read it.
-- [ ] Add delayed schedules, OpenRouter availability, restore history and qualification evidence to the status contract and screen.
-- [ ] Cover both scenarios in a browser test on a disposable stack.
+- [x] Record each restore and its verification result where Operations can read it.
+- [x] Add delayed schedules, OpenRouter availability, restore history and qualification evidence to the status contract and screen.
+- [x] Cover both scenarios in a browser test on a disposable stack.
 
 Open Questions:
 - None.

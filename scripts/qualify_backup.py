@@ -184,11 +184,18 @@ def qualify(root: Path) -> int:
         report = json.loads(verified.stdout.strip().splitlines()[-1]) if verified.stdout.strip() else {'cases': []}
         failed = [case['id'] for case in report['cases'] if not case['passed']]
         cases.check("the operator's own verify command passes on the restore", 'exit 0, all facts match', f"exit {verified.returncode}, {len(report['cases'])} facts, failed {failed or 'none'}", verified.returncode == 0 and report['cases'] and not failed)
+        records = [json.loads(line) for line in (backup_dir / 'restores.jsonl').read_text().splitlines()]
+        last = records[-1] if records else {}
+        cases.check('each restore and its verification are recorded where Operations reads them', 'not_verified, then passed, with counts and no instance name',
+                    f"{[item['result'] for item in records]}, {last.get('checks_passed')} of {last.get('checks_total')}",
+                    [item['result'] for item in records] == ['not_verified', 'passed'] and last['checks_passed'] == last['checks_total'] > 0 and restored_project not in (backup_dir / 'restores.jsonl').read_text())
         other_keys = work / 'other-provider-keys'
         other_keys.mkdir(mode=0o700)
         (other_keys / 'provider-master.key').write_bytes(secrets.token_bytes(32))
         mismatch = backup_tool(root, 'verify', '--backup', str(backup_dir), '--backup-key', str(backup_key), '--key-dir', str(other_keys), '--project', restored_project)
         cases.check('and it fails on the wrong provider key', 'exit 1', mismatch.returncode, mismatch.returncode == 1)
+        failed_record = json.loads((backup_dir / 'restores.jsonl').read_text().splitlines()[-1])
+        cases.check('a failed verification is recorded as failed', 'failed', failed_record['result'], failed_record['result'] == 'failed')
         source_volumes = run(['docker', 'volume', 'ls', '--filter', f'label=com.docker.compose.project={project}', '--format', '{{.Name}}'], tool_env()).stdout.split()
         shared = set(source_volumes) & set(result['volumes'])
         cases.check('the restore has its own ports and volumes', 'different ports, no shared volume', f"{result['gateway_port']}/{result['db_port']} vs {gateway_port}/{db_port}, {len(shared)} shared", result['gateway_port'] != gateway_port and result['db_port'] != db_port and not shared)

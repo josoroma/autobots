@@ -62,6 +62,8 @@ On your restored instance, this checks every fact in the manifest, and exits 1 o
 services/agent/.venv/bin/python scripts/local_backup.py verify --backup "$BACKUP_DIR/<name>" --backup-key "$BACKUP_KEY" --key-dir "$KEY_DIR" --project "$RESTORED_PROJECT"
 ```
 
+Each `restore` and `verify` adds a line to `restores.jsonl` in the backup's directory, with a date, a result and counts, and nothing about the instance. Operations shows the newest five, from `AUTOBOTS_BACKUP_DIR`.
+
 It covers counts, users, credentials, migrations, checkpoint threads, the provider key's fingerprint, the hold, anonymous reads and every artifact's hash. It can't test your sign-in, so also sign in on the restored instance yourself.
 
 `scripts/qualify_backup.py` additionally asserts each of these on its restored instance:

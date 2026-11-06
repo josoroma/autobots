@@ -277,6 +277,14 @@ def verify_backup(backup_dir: Path, key: bytes) -> dict:
     return manifest
 
 
+def record_restore(backup_dir: Path, result: str, passed: int | None = None, total: int | None = None) -> None:
+    """Beside the backup, where Operations reads it. A date and a result, and nothing about the instance."""
+    entry = {'at': datetime.now(timezone.utc).isoformat(), 'result': result, 'checks_passed': passed, 'checks_total': total}
+    descriptor = os.open(backup_dir / 'restores.jsonl', os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    with os.fdopen(descriptor, 'a') as handle:
+        handle.write(json.dumps(entry) + '\n')
+
+
 def restored_values(values: dict[str, str], gateway_port: int, db_port: int) -> dict[str, str]:
     """The source's secrets, so Auth tokens and role passwords still hold, on this target's ports."""
     url = f'http://127.0.0.1:{gateway_port}'
@@ -410,6 +418,8 @@ def main() -> int:
     try:
         if args.command == 'verify':
             cases = verify_restore(args.backup, args.backup_key, args.key_dir, args.project)
+            passed = sum(1 for case in cases if case['passed'])
+            record_restore(args.backup, 'passed' if passed == len(cases) else 'failed', passed, len(cases))
             print(json.dumps({'cases': cases}))
             return 0 if all(case['passed'] for case in cases) else 1
         if args.command == 'keygen':
@@ -426,7 +436,9 @@ def main() -> int:
         else:
             gateway = args.gateway_port or free_port()
             database = args.db_port or free_port([gateway])
-            print(json.dumps(restore(args.backup, args.backup_key, args.project, gateway, database)))
+            restored = restore(args.backup, args.backup_key, args.project, gateway, database)
+            record_restore(args.backup, 'not_verified')
+            print(json.dumps(restored))
         return 0
     except Refused as refusal:
         print(f'REFUSED before any change: {refusal}', file=sys.stderr)

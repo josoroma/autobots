@@ -672,6 +672,49 @@ export const schemas = {
     "title": "CriterionView",
     "type": "object"
   },
+  "DelayedOccurrence": {
+    "additionalProperties": false,
+    "description": "A routine occurrence that didn't run at its time, and the code for why.",
+    "properties": {
+      "occurrence_time": {
+        "format": "date-time",
+        "title": "Occurrence Time",
+        "type": "string"
+      },
+      "reason": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Reason"
+      },
+      "routine": {
+        "title": "Routine",
+        "type": "string"
+      },
+      "status": {
+        "enum": [
+          "missed",
+          "skipped_overlap",
+          "blocked"
+        ],
+        "title": "Status",
+        "type": "string"
+      }
+    },
+    "required": [
+      "routine",
+      "occurrence_time",
+      "status",
+      "reason"
+    ],
+    "title": "DelayedOccurrence",
+    "type": "object"
+  },
   "EffectEvidence": {
     "additionalProperties": false,
     "description": "What the destination's own records show. This is a person's report, kept as evidence.",
@@ -1397,6 +1440,22 @@ export const schemas = {
         "title": "Conditions",
         "type": "array"
       },
+      "delayed_schedules": {
+        "items": {
+          "$ref": "#/components/schemas/DelayedOccurrence"
+        },
+        "title": "Delayed Schedules",
+        "type": "array"
+      },
+      "openrouter": {
+        "enum": [
+          "available",
+          "unavailable",
+          "unknown"
+        ],
+        "title": "Openrouter",
+        "type": "string"
+      },
       "queue": {
         "anyOf": [
           {
@@ -1419,6 +1478,13 @@ export const schemas = {
         "title": "Remote Tracing",
         "type": "string"
       },
+      "restores": {
+        "items": {
+          "$ref": "#/components/schemas/RestoreRecord"
+        },
+        "title": "Restores",
+        "type": "array"
+      },
       "retention": {
         "anyOf": [
           {
@@ -1428,6 +1494,13 @@ export const schemas = {
             "type": "null"
           }
         ]
+      },
+      "route_qualifications": {
+        "items": {
+          "$ref": "#/components/schemas/RouteQualification"
+        },
+        "title": "Route Qualifications",
+        "type": "array"
       },
       "schema_version": {
         "const": 1,
@@ -1451,7 +1524,11 @@ export const schemas = {
       "conditions",
       "queue",
       "retention",
-      "backup_age_hours"
+      "backup_age_hours",
+      "openrouter",
+      "delayed_schedules",
+      "restores",
+      "route_qualifications"
     ],
     "title": "LocalStatus",
     "type": "object"
@@ -2174,6 +2251,58 @@ export const schemas = {
       "name"
     ],
     "title": "RequiredArtifact",
+    "type": "object"
+  },
+  "RestoreRecord": {
+    "additionalProperties": false,
+    "description": "One restore drill: when, and what its verification found. Never which instance or where.",
+    "properties": {
+      "at": {
+        "format": "date-time",
+        "title": "At",
+        "type": "string"
+      },
+      "checks_passed": {
+        "anyOf": [
+          {
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Checks Passed"
+      },
+      "checks_total": {
+        "anyOf": [
+          {
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Checks Total"
+      },
+      "result": {
+        "enum": [
+          "passed",
+          "failed",
+          "not_verified"
+        ],
+        "title": "Result",
+        "type": "string"
+      }
+    },
+    "required": [
+      "at",
+      "result",
+      "checks_passed",
+      "checks_total"
+    ],
+    "title": "RestoreRecord",
     "type": "object"
   },
   "RetentionApplied": {
@@ -4242,6 +4371,17 @@ export function parseCriterionView(value: unknown): CriterionView {
   return parseWith(schemas, "CriterionView", value) as CriterionView;
 }
 
+export interface DelayedOccurrence {
+  occurrence_time: string;
+  reason: string | null;
+  routine: string;
+  status: "missed" | "skipped_overlap" | "blocked";
+}
+
+export function parseDelayedOccurrence(value: unknown): DelayedOccurrence {
+  return parseWith(schemas, "DelayedOccurrence", value) as DelayedOccurrence;
+}
+
 export interface EffectEvidence {
   evidence: string;
   outcome: "delivered" | "not_delivered";
@@ -4478,10 +4618,14 @@ export function parseKnowledgeHead(value: unknown): KnowledgeHead {
 export interface LocalStatus {
   backup_age_hours: number | null;
   conditions: OperationCondition[];
+  delayed_schedules: DelayedOccurrence[];
+  openrouter: "available" | "unavailable" | "unknown";
   queue: QueueStatus | null;
   ready: boolean;
   remote_tracing: "disabled" | "enabled";
+  restores: RestoreRecord[];
   retention: RetentionSettings | null;
+  route_qualifications: RouteQualification[];
   schema_version: 1;
   scope: "workspace" | "installation";
 }
@@ -4704,6 +4848,17 @@ export interface RequiredArtifact {
 
 export function parseRequiredArtifact(value: unknown): RequiredArtifact {
   return parseWith(schemas, "RequiredArtifact", value) as RequiredArtifact;
+}
+
+export interface RestoreRecord {
+  at: string;
+  checks_passed: number | null;
+  checks_total: number | null;
+  result: "passed" | "failed" | "not_verified";
+}
+
+export function parseRestoreRecord(value: unknown): RestoreRecord {
+  return parseWith(schemas, "RestoreRecord", value) as RestoreRecord;
 }
 
 export interface RetentionApplied {

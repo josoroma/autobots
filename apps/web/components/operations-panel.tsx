@@ -151,6 +151,14 @@ export function OperationsPanel() {
             ? "none found in the configured directory."
             : `${status.backup_age_hours} hours ago.`}
         </p>
+        <p data-field="openrouter" className="text-sm">
+          OpenRouter:{" "}
+          {status.openrouter === "available"
+            ? "OpenRouter's catalog answered. That says nothing about your key or a model call."
+            : status.openrouter === "unavailable"
+              ? "OpenRouter can't be reached. Local work and this page keep working, and new model calls wait."
+              : "not checked, as provider settings aren't configured for this process."}
+        </p>
         {status.queue === null ? (
           <p className="text-sm">
             Workspace counts need the database, so they aren&apos;t shown.
@@ -166,6 +174,71 @@ export function OperationsPanel() {
           Check again
         </Button>
       </Card>
+      <Card aria-labelledby="delayed-heading" className="space-y-3 p-4">
+        <h2 id="delayed-heading" className="font-medium">
+          Delayed schedules
+        </h2>
+        {status.delayed_schedules.length === 0 ? (
+          <p data-field="delayed" className="text-sm">
+            No routine occurrence is recorded as delayed.
+          </p>
+        ) : (
+          <ul data-field="delayed" className="space-y-1 text-sm">
+            {status.delayed_schedules.map((occurrence) => (
+              <li key={`${occurrence.routine}-${occurrence.occurrence_time}`}>
+                {occurrence.routine}: {occurrence.status.replaceAll("_", " ")}{" "}
+                at {new Date(occurrence.occurrence_time).toISOString()}
+                {occurrence.reason === null
+                  ? ""
+                  : `, ${occurrence.reason.replaceAll("_", " ")}`}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+      <Card aria-labelledby="restores-heading" className="space-y-3 p-4">
+        <h2 id="restores-heading" className="font-medium">
+          Restore history
+        </h2>
+        {status.restores.length === 0 ? (
+          <p data-field="restores" className="text-sm">
+            No restore is recorded, so no backup here is known to restore.
+          </p>
+        ) : (
+          <ul data-field="restores" className="space-y-1 text-sm">
+            {status.restores.map((restore) => (
+              <li key={`${restore.at}-${restore.result}`}>
+                {new Date(restore.at).toISOString()}:{" "}
+                {restore.result === "passed"
+                  ? `verified, ${restore.checks_passed} of ${restore.checks_total} checks`
+                  : restore.result === "failed"
+                    ? `verification failed, ${restore.checks_passed} of ${restore.checks_total} checks`
+                    : "restored, and not verified"}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+      {status.route_qualifications.length === 0 ? null : (
+        <Card aria-labelledby="routes-heading" className="space-y-3 p-4">
+          <h2 id="routes-heading" className="font-medium">
+            Route qualification
+          </h2>
+          <ul className="space-y-3 text-sm">
+            {status.route_qualifications.map((route) => (
+              <li key={route.profile} data-operations-route={route.profile}>
+                <p className="font-medium break-all">{route.canonical_id}</p>
+                <p>
+                  {route.status === "qualified_with_limits"
+                    ? `Tested ${route.qualified_on}, with limits.`
+                    : "Not qualified."}
+                </p>
+                {route.limits === null ? null : <p>{route.limits}</p>}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
       {status.retention === null ? null : (
         <Card className="space-y-3 p-4">
           <h2 className="font-medium">Retention</h2>

@@ -16,26 +16,34 @@ from autobots.application.operations import (
     Condition,
     backup_age_hours,
     database_conditions,
+    delayed_occurrences,
     disk_condition,
     is_ready,
+    openrouter_availability,
     queue_condition,
     queue_counts,
+    restore_history,
     storage_condition,
     worker_condition,
 )
+from autobots.application.provider_settings import read_route_qualifications
 from autobots.application.retention import (
     RetentionPolicy,
     apply_retention,
     read_policy,
     write_policy,
 )
+from autobots.application.run_projection import public_text
 from autobots.contracts.operations import (
+    DelayedOccurrence,
     LocalStatus,
     OperationCondition,
     QueueStatus,
+    RestoreRecord,
     RetentionApplied,
     RetentionSettings,
 )
+from autobots.contracts.settings import RouteQualification
 from autobots.operations.logs import remote_tracing_disabled
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
@@ -74,6 +82,8 @@ async def get_local_status(
     database_up = conditions[0].state == "ok" and conditions[1].state == "ok"
     queue: QueueStatus | None = None
     retention: RetentionSettings | None = None
+    delayed: list[DelayedOccurrence] = []
+    qualifications: list[RouteQualification] = []
     if database_up:
         workspace_id = await current_workspace(request, user_id, x_autobots_workspace)
         if await request.app.state.membership.role_in(user_id, workspace_id) != "owner":
@@ -83,6 +93,16 @@ async def get_local_status(
             conditions.append(queue_condition(counts))
             conditions.append(await worker_condition(connection, counts))
             policy = await read_policy(connection, workspace_id)
+            delayed = [
+                DelayedOccurrence(
+                    routine=public_text(row[0]),
+                    occurrence_time=row[1],
+                    status=row[2],
+                    reason=row[3],
+                )
+                for row in await delayed_occurrences(connection, workspace_id)
+            ]
+            qualifications = await read_route_qualifications(connection)
         queue = QueueStatus(
             queued=counts.queued,
             claimed=counts.claimed,
@@ -104,6 +124,15 @@ async def get_local_status(
         backup_age_hours=backup_age_hours(
             os.environ.get("AUTOBOTS_BACKUP_DIR", ""), datetime.now(UTC)
         ),
+        openrouter=await openrouter_availability(
+            getattr(getattr(request.app.state, "provider_context", None), "fetch_catalog", None)
+        ),  # type: ignore[arg-type]
+        delayed_schedules=delayed,
+        restores=[
+            RestoreRecord.model_validate(item)
+            for item in restore_history(os.environ.get("AUTOBOTS_BACKUP_DIR", ""))
+        ],
+        route_qualifications=qualifications,
     )
 
 

@@ -1,8 +1,11 @@
 """Local Operations, SP-018: conditions and counts only. No address, path, identifier or secret."""
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from autobots.contracts.settings import RouteQualification
 
 VIEW = ConfigDict(extra="forbid", frozen=True)
 Name = Literal["database", "schema", "hold", "adapter", "storage", "disk", "queue", "worker"]
@@ -46,6 +49,28 @@ class RetentionSettings(BaseModel):
         return self
 
 
+class DelayedOccurrence(BaseModel):
+    """A routine occurrence that didn't run at its time, and the code for why."""
+
+    model_config = VIEW
+
+    routine: str
+    occurrence_time: datetime
+    status: Literal["missed", "skipped_overlap", "blocked"]
+    reason: str | None
+
+
+class RestoreRecord(BaseModel):
+    """One restore drill: when, and what its verification found. Never which instance or where."""
+
+    model_config = VIEW
+
+    at: datetime
+    result: Literal["passed", "failed", "not_verified"]
+    checks_passed: int | None = Field(ge=0)
+    checks_total: int | None = Field(ge=0)
+
+
 class LocalStatus(BaseModel):
     """`scope` is `installation` when the database is down, as no workspace can be verified."""
 
@@ -59,6 +84,10 @@ class LocalStatus(BaseModel):
     queue: QueueStatus | None
     retention: RetentionSettings | None
     backup_age_hours: int | None = Field(ge=0)
+    openrouter: Literal["available", "unavailable", "unknown"]
+    delayed_schedules: list[DelayedOccurrence]
+    restores: list[RestoreRecord]
+    route_qualifications: list[RouteQualification]
 
 
 class RetentionApplied(BaseModel):

@@ -31,6 +31,9 @@ REQUIRED_RELATIONS = (
     "agent_runtime.adapter_qualifications",
     "agent_runtime.route_qualifications",
 )
+RESTORES_SHOWN = 5
+DELAYED_SHOWN = 10
+CATALOG_CHECK_SECONDS = 3.0
 # Admission stops on these. A missing worker only means a job waits.
 BLOCKING = frozenset({"database", "schema", "storage", "disk", "hold", "adapter"})
 
@@ -130,6 +133,49 @@ def backup_age_hours(directory: str, now: datetime) -> int | None:
             continue
         newest = created if newest is None or created > newest else newest
     return None if newest is None else max(int((now - newest).total_seconds() // 3600), 0)
+
+
+def restore_history(directory: str, limit: int = RESTORES_SHOWN) -> list[dict[str, Any]]:
+    """What `local_backup.py` wrote beside each backup, newest first. A bad line is skipped."""
+    found: list[dict[str, Any]] = []
+    for path in Path(directory).glob("*/restores.jsonl") if directory else ():
+        try:
+            lines = path.read_text().splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            try:
+                found.append(json.loads(line))
+            except ValueError:
+                continue
+    return sorted(found, key=lambda item: str(item.get("at")), reverse=True)[:limit]
+
+
+async def delayed_occurrences(
+    connection: Any, workspace_id: UUID, limit: int = DELAYED_SHOWN
+) -> list[tuple[Any, ...]]:
+    """Occurrences of this workspace's routines that didn't run at their time, newest first."""
+    cursor = await connection.execute(
+        "select r.name, o.occurrence_time, o.status, o.reason from public.routine_occurrences o "
+        "join public.routines r on r.id = o.routine_id where r.workspace_id = %s "
+        "and o.status in ('missed', 'skipped_overlap', 'blocked') "
+        "order by o.occurrence_time desc limit %s",
+        (workspace_id, limit),
+    )
+    return list(await cursor.fetchall())
+
+
+async def openrouter_availability(
+    fetch_catalog: Any, seconds: float = CATALOG_CHECK_SECONDS
+) -> str:
+    """The public catalog only, as a page load must not make a model call or wait long."""
+    if fetch_catalog is None:
+        return "unknown"
+    try:
+        payload = await asyncio.wait_for(fetch_catalog(), seconds)
+    except (TimeoutError, OSError, ValueError):
+        return "unavailable"
+    return "available" if payload is not None else "unavailable"
 
 
 async def queue_counts(connection: Any, workspace_id: UUID) -> QueueCounts:

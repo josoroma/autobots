@@ -112,6 +112,8 @@ PYTHONPATH=services/agent/src services/agent/.venv/bin/python scripts/qualify_gi
 | Hold | `restore_hold` | refused | This is a restored instance. See [the backup and restore runbook](backup-restore.md). |
 | Checkpoints | `adapter_unqualified` | refused, and nothing is claimed | This release's checkpoint adapter has no recorded qualification. See [the upgrade runbook](upgrade.md). |
 
+The page also shows delayed routine occurrences, OpenRouter's availability from its public catalog, which is no model call, restore history and each route's qualification date and limits.
+
 With the database down the page still answers, with `scope: installation` and no workspace counts. Only an owner sees it while the database is up.
 
 Logs are JSON lines on stderr, kept in `$LOG_DIR` on this Mac. Secret shapes are replaced with `[redacted]` and identifiers are cut to eight characters. An exception logs its type, never its message. uvicorn's own start and stop lines are plain text. API and worker bootstrap turn inherited LangSmith and OTLP settings off, and Operations reports it.

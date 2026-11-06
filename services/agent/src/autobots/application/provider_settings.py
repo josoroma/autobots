@@ -128,17 +128,7 @@ class ProviderSettings:
             return "unavailable"
 
     async def route_qualifications(self) -> list[RouteQualification]:
-        """Only a stored record for the route's own canonical model counts, MP-04. Neither a key nor
-        the catalog changes this."""
-        cursor = await self._connection.execute(
-            "select profile, canonical_id, status, qualified_on, configuration, limits "
-            "from agent_runtime.route_qualifications"
-        )
-        stored = {row[0]: row for row in await cursor.fetchall()}
-        return [
-            qualification_from_record(profile.id, profile.canonical_id, stored.get(profile.id))
-            for profile in PROFILES.values()
-        ]
+        return await read_route_qualifications(self._connection)
 
     async def status(self, workspace_id: UUID) -> ProviderStatus:
         version, auth_status, validated_at = await self._settings_row(workspace_id)
@@ -289,6 +279,20 @@ class ProviderSettings:
             )
         status = "available" if payload is not None else "unavailable"
         return ModelList(schema_version=1, catalog_status=status, models=models)  # type: ignore[arg-type]
+
+
+async def read_route_qualifications(connection: Any) -> list[RouteQualification]:
+    """Only a stored record for the route's own canonical model counts, MP-04. Neither a key nor
+    the catalog changes this."""
+    cursor = await connection.execute(
+        "select profile, canonical_id, status, qualified_on, configuration, limits "
+        "from agent_runtime.route_qualifications"
+    )
+    stored = {row[0]: row for row in await cursor.fetchall()}
+    return [
+        qualification_from_record(profile.id, profile.canonical_id, stored.get(profile.id))
+        for profile in PROFILES.values()
+    ]
 
 
 def qualification_from_record(
