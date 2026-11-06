@@ -246,10 +246,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-11.8#1 | Record each restore and its verification result where Operations can read it. | DONE | US-11.8 |
 | US-11.8#2 | Add delayed schedules, OpenRouter availability, restore history and qualification evidence to the status contract and screen. | DONE | US-11.8 |
 | US-11.8#3 | Cover both scenarios in a browser test on a disposable stack. | DONE | US-11.8 |
-| US-11.9 | Run creation disclosure, role map and run details | READY | EPIC-11 |
-| US-11.9#1 | Add the MP-07 disclosure to every run-creation screen. | TODO | US-11.9 |
-| US-11.9#2 | Add a per-run model choice, the complete role map and budgets to the run workspace. | TODO | US-11.9 |
-| US-11.9#3 | Add reported and estimated costs, errors and evidence links to the inspector, and cover all four scenarios in browser tests. | TODO | US-11.9 |
+| US-11.9 | Run creation disclosure, role map and run details | DONE | EPIC-11 |
+| US-11.9#1 | Add the MP-07 disclosure to every run-creation screen. | DONE | US-11.9 |
+| US-11.9#2 | Add a per-run model choice, the complete role map and budgets to the run workspace. | DONE | US-11.9 |
+| US-11.9#3 | Add reported and estimated costs, errors and evidence links to the inspector, and cover all four scenarios in browser tests. | DONE | US-11.9 |
 | US-11.10 | Real Mac sleep proof | BLOCKED | EPIC-11 |
 | US-11.10#1 | Write the sleep procedure, with what to observe before and after. | TODO | US-11.10 |
 | US-11.10#2 | Have the owner run it on a disposable stack with a scripted model, and record the observations. | TODO | US-11.10 |
@@ -3245,7 +3245,8 @@ Open Questions:
 
 ### US-11.9: Run creation disclosure, role map and run details
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-11-9-run-creation-disclosure-role/`
 
 As a user
 I want to see what a run will use, send and spend before I start it, and its full details afterward
@@ -3291,9 +3292,9 @@ Dependencies:
 - US-11.6
 
 Tasks:
-- [ ] Add the MP-07 disclosure to every run-creation screen.
-- [ ] Add a per-run model choice, the complete role map and budgets to the run workspace.
-- [ ] Add reported and estimated costs, errors and evidence links to the inspector, and cover all four scenarios in browser tests.
+- [x] Add the MP-07 disclosure to every run-creation screen.
+- [x] Add a per-run model choice, the complete role map and budgets to the run workspace.
+- [x] Add reported and estimated costs, errors and evidence links to the inspector, and cover all four scenarios in browser tests.
 
 Open Questions:
 - None.

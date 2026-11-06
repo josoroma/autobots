@@ -18,11 +18,13 @@ from autobots.contracts.run_workspace import (
     CheckpointView,
     CriterionView,
     EventPage,
+    EvidenceView,
     ExpertBinding,
     FrozenBinding,
     ModelCallView,
     OutstandingSummary,
     PlanSummary,
+    RunBudgets,
     RunInspector,
     RunList,
     RunListItem,
@@ -34,7 +36,13 @@ from autobots.contracts.run_workspace import (
     VerificationSummary,
 )
 from autobots.contracts.runs import RunEvent, RunSummary
-from autobots.domain.models import PROFILES, UnknownModelProfile, approved_profile
+from autobots.domain.models import (
+    CONTEXT_TOKENS,
+    MAX_OUTPUT_TOKENS,
+    PROFILES,
+    UnknownModelProfile,
+    approved_profile,
+)
 from autobots.domain.tools import PLAN_TOOLS
 
 PAGE_SIZE = 200
@@ -245,6 +253,12 @@ async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> R
         (run_id,),
     )
     usage = await cursor.fetchone() or (0, 0, 0, 0, None)
+    cursor = await connection.execute(
+        "select coalesce(sum(input_tokens), 0)::bigint, coalesce(sum(output_tokens), 0)::bigint "
+        "from app_private.model_invocations where run_id = %s or root_run_id = %s",
+        (run_id, run_id),
+    )
+    tokens = await cursor.fetchone()
     artifacts = await list_artifacts(connection, workspace_id, run_id)
     left = await outstanding(connection, run_id)
     return RunWorkspace(
@@ -259,6 +273,8 @@ async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> R
             tool_dispatches=usage[1],
             repairs=usage[2],
             plan_revisions=usage[3],
+            input_tokens=tokens[0],
+            output_tokens=tokens[1],
         ),
         stop_reason=usage[4],
         verification=await _verification(connection, run_id),
@@ -277,6 +293,9 @@ async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> R
         ),
         cursor=row[-1],
         role_map=await _role_map(connection, run_id),
+        budgets=RunBudgets(
+            context_tokens=CONTEXT_TOKENS, max_output_tokens_per_call=MAX_OUTPUT_TOKENS
+        ),
     )
 
 
@@ -315,6 +334,35 @@ def _canonical_id(profile: str, routes: dict[str, Any]) -> str:
         return "unknown"
 
 
+async def _evidence(connection: Any, run_id: UUID) -> list[EvidenceView]:
+    cursor = await connection.execute(
+        "select name, id from public.artifacts where run_id = %s and status = 'published'",
+        (run_id,),
+    )
+    published = {row[0]: row[1] for row in await cursor.fetchall()}
+    cursor = await connection.execute(
+        "select task_id, evidence, summary from app_private.plan_evidence "
+        "where run_id = %s order by completed_at",
+        (run_id,),
+    )
+    found = []
+    for task_id, items, summary in await cursor.fetchall():
+        for item in items or []:
+            reference = str(item.get("reference", ""))
+            found.append(
+                EvidenceView(
+                    task_id=public_text(task_id),
+                    kind=str(item.get("kind", "")),
+                    reference=public_text(reference),
+                    summary=public_text(summary),
+                    artifact_id=published.get(reference.rsplit("/", 1)[-1])
+                    if item.get("kind") == "artifact"
+                    else None,
+                )
+            )
+    return found
+
+
 async def read_inspector(connection: Any, workspace_id: UUID, run_id: UUID) -> RunInspector:
     """Typed columns only. No checkpoint content, tool arguments or partial model output is read."""
     row = await _require_run(connection, workspace_id, run_id)
@@ -328,7 +376,8 @@ async def read_inspector(connection: Any, workspace_id: UUID, run_id: UUID) -> R
     routes = (snapshot or {}).get("routes") or {}
     cursor = await connection.execute(
         "select id, run_id, role, attempt, status, profile, wire_id, upstream_provider, "
-        "input_tokens, output_tokens, reasoning_tokens, created_at "
+        "input_tokens, output_tokens, reasoning_tokens, charged_micro_usd, reserved_micro_usd, "
+        "finish_reason, failure_class, created_at "
         "from app_private.model_invocations where run_id = %s or root_run_id = %s "
         "order by created_at, attempt",
         (run_id, run_id),
@@ -348,7 +397,11 @@ async def read_inspector(connection: Any, workspace_id: UUID, run_id: UUID) -> R
             input_tokens=item[8],
             output_tokens=item[9],
             reasoning_tokens=item[10],
-            created_at=item[11],
+            reported_micro_usd=item[11],
+            estimated_micro_usd=item[12],
+            finish_reason=item[13],
+            failure_class=item[14],
+            created_at=item[15],
         )
         for item in await cursor.fetchall()
     ]
@@ -391,4 +444,5 @@ async def read_inspector(connection: Any, workspace_id: UUID, run_id: UUID) -> R
             for item in rows[:INSPECTOR_CHECKPOINTS]
         ],
         checkpoints_truncated=len(rows) > INSPECTOR_CHECKPOINTS,
+        evidence=await _evidence(connection, run_id),
     )

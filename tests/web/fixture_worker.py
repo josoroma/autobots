@@ -37,6 +37,8 @@ DONE = ('complete_task', {'task_id': 'report', 'evidence': [{'kind': 'artifact',
 FINISHED = 'The report is ready.'
 # A second death, for a run page test, since the first marker is the slice's.
 DIED_AGAIN = MARKER.with_name(MARKER.name + '-again')
+# One provider failure on a run, retried, so a finished run has a failed call to show.
+FLAKED = MARKER.with_name(MARKER.name + '-flaked')
 # Long enough for a person's controls to meet a run that's really running.
 SLOW_SECONDS = 2.0
 
@@ -78,6 +80,10 @@ def next_step(goal: str, messages: Any) -> Any:
     return FINISHED
 
 
+class ProviderFlake(Exception):
+    status_code = 500
+
+
 class GoalScript(BaseChatModel):
     @property
     def _llm_type(self) -> str:
@@ -88,6 +94,9 @@ class GoalScript(BaseChatModel):
 
     def _generate(self, messages: Any, stop: Any = None, run_manager: Any = None, **_: Any) -> ChatResult:
         goal = ' '.join(str(message.content) for message in messages if message.type == 'human')
+        if 'slice-failed-call' in goal and not FLAKED.exists():
+            FLAKED.write_text('failed once')
+            raise ProviderFlake('arranged')
         if 'slice-slow' in goal:
             time.sleep(SLOW_SECONDS)
         step = next_step(goal, messages)

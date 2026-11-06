@@ -415,6 +415,52 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
           </ul>
         )}
       </Card>
+      <Card aria-labelledby="models-heading" className="space-y-2">
+        <h2 id="models-heading" className="text-lg font-medium">
+          Models
+        </h2>
+        {snapshot.role_map.length === 0 ? (
+          <p className="text-sm">This run has no frozen role map.</p>
+        ) : (
+          <div data-field="role-map" className="space-y-2 text-sm">
+            <p>
+              What this run froze when it was admitted. Only the executor&apos;s
+              binding dispatches in this release, and other roles that differ
+              from it don&apos;t take effect.
+            </p>
+            <ul className="space-y-1">
+              {snapshot.role_map.map((binding) => (
+                <li key={binding.role} className="break-words">
+                  {binding.role}: {binding.canonical_id}, requested as{" "}
+                  {binding.wire_id}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </Card>
+      <Card aria-labelledby="budgets-heading" className="space-y-2">
+        <h2 id="budgets-heading" className="text-lg font-medium">
+          Budgets
+        </h2>
+        <div data-field="budgets" className="space-y-1 text-sm">
+          <p>
+            Tokens: up to {snapshot.budgets.max_output_tokens_per_call} output
+            tokens per call, and about{" "}
+            {Math.round(snapshot.budgets.context_tokens / 1000)}K tokens of
+            context. Used so far: {snapshot.usage.input_tokens} in,{" "}
+            {snapshot.usage.output_tokens} out.
+          </p>
+          <p>
+            Spend limit: US$
+            {(snapshot.run.budget.limit_micro_usd / 1_000_000).toFixed(2)}.
+            Reported so far: US$
+            {snapshot.run.budget.spent_micro_usd / 1_000_000}. Held as an
+            estimate for calls not settled: US$
+            {snapshot.run.budget.reserved_micro_usd / 1_000_000}.
+          </p>
+        </div>
+      </Card>
       <Card aria-labelledby="usage-heading" className="space-y-2">
         <h2 id="usage-heading" className="text-lg font-medium">
           Usage

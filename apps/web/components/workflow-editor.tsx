@@ -12,6 +12,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { RunDisclosure } from "@/components/run-disclosure";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { csrfFetch } from "@/lib/csrf-fetch";
@@ -280,6 +281,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
               onChange={(event) => setInputs(event.target.value)}
               className={INPUT_CLASS}
             />
+            <RunDisclosure sendsOnlyIfAgent />
             <Button onClick={() => void run()}>Run this version</Button>
           </>
         )}

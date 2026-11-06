@@ -119,6 +119,7 @@ async def post_run(
                 raise ApiError(status_code, error.code, "That routing isn't available.") from None
         policy = resolve_role_policy(
             run_role_overrides=binding.role_bindings if binding else None,
+            run_profile=body.run_profile.value if body.run_profile else None,
             workspace_default=row[0] if row else None,
             workspace_role_overrides=row[1] if row else None,
         )

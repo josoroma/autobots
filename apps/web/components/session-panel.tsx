@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { RunDisclosure } from "@/components/run-disclosure";
 import { Card } from "@/components/ui/card";
 import { csrfFetch } from "@/lib/csrf-fetch";
 
@@ -15,6 +16,7 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
   const [chosen, setChosen] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [profile, setProfile] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -53,6 +55,7 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
         goal_text: goal,
         session_id: session.id,
         expert_id: expertId,
+        ...(profile === "" ? {} : { run_profile: profile }),
       }),
     }).catch(() => null);
     if (reply?.ok === true) {
@@ -65,7 +68,9 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
     setProblem(
       failure?.code === "credentials_required"
         ? "Model-backed work needs an OpenRouter key."
-        : "That could not be started.",
+        : reply?.status === 422
+          ? "That request isn't approved, so no run started. Your goal is kept."
+          : "That could not be started.",
     );
   }
 
@@ -144,6 +149,16 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
           value={goal}
           onChange={(event) => setGoal(event.target.value)}
           className="bg-background border-input block w-full rounded-md border px-3 py-2 text-sm"
+        />
+        <RunDisclosure
+          chosen={profile}
+          onChoose={setProfile}
+          roleOverrides={
+            (session.kind === "direct"
+              ? session.options[0]
+              : session.options.find((option) => option.expert_id === chosen)
+            )?.role_bindings
+          }
         />
         <Button onClick={() => void run()} disabled={!ready}>
           Run

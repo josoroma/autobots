@@ -66,7 +66,6 @@ from autobots.application.provider_settings import (
 )
 from autobots.application.worker_inference import (
     CATALOG_REFRESH,
-    MAX_OUTPUT_TOKENS,
     ROLE,
     AttemptModel,
     CatalogCache,
@@ -75,7 +74,7 @@ from autobots.application.worker_inference import (
     prepared,
 )
 from autobots.application.worker_leases import Lease
-from autobots.domain.models import PROFILES, ModelProfileId, UnknownModelProfile
+from autobots.domain.models import MAX_OUTPUT_TOKENS, PROFILES, ModelProfileId, UnknownModelProfile
 from autobots.operations import worker
 from fake_openrouter import ARRANGED_KEY, DEEPSEEK_WIRE_ID, TERRA_WIRE_ID
 

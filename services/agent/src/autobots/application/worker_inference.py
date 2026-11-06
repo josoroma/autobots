@@ -48,6 +48,7 @@ from autobots.application.provider_settings import (
 )
 from autobots.application.worker_leases import Lease
 from autobots.domain.models import (
+    MAX_OUTPUT_TOKENS,
     PROFILES,
     ModelRole,
     RolePolicy,
@@ -59,8 +60,6 @@ from autobots.operations.logs import log_event
 
 logger = logging.getLogger("autobots.worker")
 ROLE = ModelRole.EXECUTOR
-# MP-07's initial output limit, sent on every call so the reservation below stays an upper bound.
-MAX_OUTPUT_TOKENS = 512
 OPTIONS: Mapping[str, Any] = {"max_tokens": MAX_OUTPUT_TOKENS}
 # Sooner than MP-02's five minutes, so a slow call doesn't turn into an expired catalog.
 CATALOG_REFRESH = timedelta(minutes=4)

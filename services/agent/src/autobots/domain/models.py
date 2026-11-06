@@ -50,6 +50,9 @@ PROFILES: Mapping[ModelProfileId, ModelProfile] = MappingProxyType(
     }
 )
 DEFAULT_PROFILE = ModelProfileId.TERRA
+# MP-07's initial budgets. Output is sent on every call. Context is the budget compaction works to.
+MAX_OUTPUT_TOKENS = 512
+CONTEXT_TOKENS = 8_000
 ROLE_POLICY_VERSION = 1
 
 

@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from autobots.contracts.plans import InputDocument, RequiredArtifact
 from autobots.contracts.primitives import STRICT_CONTRACT, Identifier, MicroUsd
+from autobots.domain.models import ModelProfileId
 from autobots.domain.runs import RunStatus
 
 
@@ -20,6 +21,8 @@ class RunRequest(BaseModel):
     expert_version: int | None = Field(default=None, ge=1)
     goal_text: str = Field(min_length=1, max_length=20000)
     limit_micro_usd: MicroUsd = 1_000_000
+    # One approved model for this run alone. An unknown value is refused, and no run starts.
+    run_profile: ModelProfileId | None = None
     acceptance_criteria: list[str] = Field(default_factory=list, max_length=20)
     required_artifacts: list[RequiredArtifact] = Field(default_factory=list, max_length=20)
     input_documents: list[InputDocument] = Field(default_factory=list, max_length=10)

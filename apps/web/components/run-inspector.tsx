@@ -6,6 +6,10 @@ import { useEffect, useState } from "react";
 
 import { Card } from "@/components/ui/card";
 
+function dollars(micro: number): string {
+  return `US$${micro / 1_000_000}`;
+}
+
 function tokens(value: number | null): string {
   return value === null ? "not reported" : String(value);
 }
@@ -74,7 +78,8 @@ export function RunInspectorView({ runId }: { runId: string }) {
             {view.model_calls.map((call) => (
               <li key={call.id} data-call={call.status} className="break-words">
                 <p className="font-medium">
-                  {call.role}, attempt {call.attempt}: {call.status}
+                  {call.role}, attempt {call.attempt}:{" "}
+                  {call.status.replaceAll("_", " ")}
                 </p>
                 <p>
                   Provider {call.provider}. Upstream{" "}
@@ -90,6 +95,21 @@ export function RunInspectorView({ runId }: { runId: string }) {
                   {tokens(call.output_tokens)} out, of which{" "}
                   {tokens(call.reasoning_tokens)} reasoning.
                 </p>
+                <p data-cost="reported">
+                  Reported charge:{" "}
+                  {call.reported_micro_usd === null
+                    ? "none"
+                    : dollars(call.reported_micro_usd)}
+                </p>
+                <p data-cost="estimated">
+                  Estimated worst case, not a charge:{" "}
+                  {dollars(call.estimated_micro_usd)}
+                </p>
+                {call.failure_class === null ? null : (
+                  <p data-error="true">
+                    Error: {call.failure_class.replaceAll("_", " ")}
+                  </p>
+                )}
               </li>
             ))}
           </ul>
@@ -114,6 +134,41 @@ export function RunInspectorView({ runId }: { runId: string }) {
                 {attempt.failure_code === null
                   ? ""
                   : ` (${attempt.failure_code})`}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+      <Card aria-labelledby="evidence-heading" className="space-y-3">
+        <h2 id="evidence-heading" className="text-lg font-medium">
+          Evidence
+        </h2>
+        {view.evidence.length === 0 ? (
+          <p data-field="evidence" className="text-sm">
+            No task has cited evidence.
+          </p>
+        ) : (
+          <ul data-field="evidence" className="space-y-2 text-sm">
+            {view.evidence.map((item) => (
+              <li
+                key={`${item.task_id}-${item.reference}`}
+                className="break-words"
+              >
+                <p>
+                  Task {item.task_id}: {item.summary}
+                </p>
+                <p>
+                  {item.kind === "artifact" && item.artifact_id !== null ? (
+                    <a
+                      href={`/api/v1/artifacts/${item.artifact_id}/download`}
+                      className="font-medium underline"
+                    >
+                      {item.reference}
+                    </a>
+                  ) : (
+                    `${item.kind}: ${item.reference}`
+                  )}
+                </p>
               </li>
             ))}
           </ul>

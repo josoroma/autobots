@@ -56,6 +56,8 @@ class UsageSummary(BaseModel):
     tool_dispatches: int
     repairs: int
     plan_revisions: int
+    input_tokens: int
+    output_tokens: int
 
 
 class VerificationSummary(BaseModel):
@@ -105,6 +107,15 @@ class UnknownEffect(BaseModel):
     tool_version: int
 
 
+class RunBudgets(BaseModel):
+    """MP-07's limits this run works under. Spend is on the run itself."""
+
+    model_config = VIEW
+
+    context_tokens: int
+    max_output_tokens_per_call: int
+
+
 class FrozenBinding(BaseModel):
     """One role's binding as this run froze it at admission, which later settings don't change."""
 
@@ -134,6 +145,7 @@ class RunWorkspace(BaseModel):
     unknown_operations: list[UnknownEffect]
     cursor: int
     role_map: list[FrozenBinding]
+    budgets: RunBudgets
 
 
 class RunListItem(BaseModel):
@@ -174,6 +186,11 @@ class ModelCallView(BaseModel):
     input_tokens: int | None
     output_tokens: int | None
     reasoning_tokens: int | None
+    # What the provider reported, and the most this call could have cost. Never added together.
+    reported_micro_usd: int | None
+    estimated_micro_usd: int
+    finish_reason: str | None
+    failure_class: str | None
     created_at: UtcTimestamp
 
 
@@ -201,6 +218,18 @@ class CheckpointView(BaseModel):
     source: str | None
 
 
+class EvidenceView(BaseModel):
+    """What a completed task cited. The artifact, if it names one, is what to link."""
+
+    model_config = VIEW
+
+    task_id: str
+    kind: str
+    reference: str
+    summary: str
+    artifact_id: Identifier | None
+
+
 class RunInspector(BaseModel):
     model_config = VIEW
 
@@ -211,3 +240,4 @@ class RunInspector(BaseModel):
     tool_attempts: list[ToolAttemptView]
     checkpoints: list[CheckpointView]
     checkpoints_truncated: bool
+    evidence: list[EvidenceView]

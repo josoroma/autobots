@@ -890,6 +890,49 @@ export const schemas = {
     "title": "EventPage",
     "type": "object"
   },
+  "EvidenceView": {
+    "additionalProperties": false,
+    "description": "What a completed task cited. The artifact, if it names one, is what to link.",
+    "properties": {
+      "artifact_id": {
+        "anyOf": [
+          {
+            "format": "uuid",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Artifact Id"
+      },
+      "kind": {
+        "title": "Kind",
+        "type": "string"
+      },
+      "reference": {
+        "title": "Reference",
+        "type": "string"
+      },
+      "summary": {
+        "title": "Summary",
+        "type": "string"
+      },
+      "task_id": {
+        "title": "Task Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "task_id",
+      "kind",
+      "reference",
+      "summary",
+      "artifact_id"
+    ],
+    "title": "EvidenceView",
+    "type": "object"
+  },
   "ExecutionBinding": {
     "additionalProperties": false,
     "properties": {
@@ -1673,6 +1716,32 @@ export const schemas = {
         "title": "Created At",
         "type": "string"
       },
+      "estimated_micro_usd": {
+        "title": "Estimated Micro Usd",
+        "type": "integer"
+      },
+      "failure_class": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Failure Class"
+      },
+      "finish_reason": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Finish Reason"
+      },
       "id": {
         "format": "uuid",
         "title": "Id",
@@ -1720,6 +1789,17 @@ export const schemas = {
         ],
         "title": "Reasoning Tokens"
       },
+      "reported_micro_usd": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Reported Micro Usd"
+      },
       "role": {
         "title": "Role",
         "type": "string"
@@ -1756,6 +1836,10 @@ export const schemas = {
       "input_tokens",
       "output_tokens",
       "reasoning_tokens",
+      "reported_micro_usd",
+      "estimated_micro_usd",
+      "finish_reason",
+      "failure_class",
       "created_at"
     ],
     "title": "ModelCallView",
@@ -2805,6 +2889,26 @@ export const schemas = {
     "title": "RunAccepted",
     "type": "object"
   },
+  "RunBudgets": {
+    "additionalProperties": false,
+    "description": "MP-07's limits this run works under. Spend is on the run itself.",
+    "properties": {
+      "context_tokens": {
+        "title": "Context Tokens",
+        "type": "integer"
+      },
+      "max_output_tokens_per_call": {
+        "title": "Max Output Tokens Per Call",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "context_tokens",
+      "max_output_tokens_per_call"
+    ],
+    "title": "RunBudgets",
+    "type": "object"
+  },
   "RunCommandRequest": {
     "additionalProperties": false,
     "properties": {
@@ -2960,6 +3064,13 @@ export const schemas = {
         "title": "Checkpoints Truncated",
         "type": "boolean"
       },
+      "evidence": {
+        "items": {
+          "$ref": "#/components/schemas/EvidenceView"
+        },
+        "title": "Evidence",
+        "type": "array"
+      },
       "goal_summary": {
         "title": "Goal Summary",
         "type": "string"
@@ -2994,7 +3105,8 @@ export const schemas = {
       "model_calls",
       "tool_attempts",
       "checkpoints",
-      "checkpoints_truncated"
+      "checkpoints_truncated",
+      "evidence"
     ],
     "title": "RunInspector",
     "type": "object"
@@ -3181,6 +3293,16 @@ export const schemas = {
         "title": "Required Artifacts",
         "type": "array"
       },
+      "run_profile": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ModelProfileId"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
       "session_id": {
         "anyOf": [
           {
@@ -3324,6 +3446,9 @@ export const schemas = {
         "title": "Assignments",
         "type": "array"
       },
+      "budgets": {
+        "$ref": "#/components/schemas/RunBudgets"
+      },
       "criteria": {
         "items": {
           "$ref": "#/components/schemas/CriterionView"
@@ -3431,7 +3556,8 @@ export const schemas = {
       "outstanding",
       "unknown_operations",
       "cursor",
-      "role_map"
+      "role_map",
+      "budgets"
     ],
     "title": "RunWorkspace",
     "type": "object"
@@ -3739,8 +3865,16 @@ export const schemas = {
   "UsageSummary": {
     "additionalProperties": false,
     "properties": {
+      "input_tokens": {
+        "title": "Input Tokens",
+        "type": "integer"
+      },
       "model_calls": {
         "title": "Model Calls",
+        "type": "integer"
+      },
+      "output_tokens": {
+        "title": "Output Tokens",
         "type": "integer"
       },
       "plan_revisions": {
@@ -3760,7 +3894,9 @@ export const schemas = {
       "model_calls",
       "tool_dispatches",
       "repairs",
-      "plan_revisions"
+      "plan_revisions",
+      "input_tokens",
+      "output_tokens"
     ],
     "title": "UsageSummary",
     "type": "object"
@@ -4443,6 +4579,18 @@ export function parseEventPage(value: unknown): EventPage {
   return parseWith(schemas, "EventPage", value) as EventPage;
 }
 
+export interface EvidenceView {
+  artifact_id: string | null;
+  kind: string;
+  reference: string;
+  summary: string;
+  task_id: string;
+}
+
+export function parseEvidenceView(value: unknown): EvidenceView {
+  return parseWith(schemas, "EvidenceView", value) as EvidenceView;
+}
+
 export interface ExecutionBinding {
   block_versions: Record<string, unknown>;
   graph_hash: string;
@@ -4685,12 +4833,16 @@ export interface ModelCallView {
   attempt: number;
   canonical_id: string;
   created_at: string;
+  estimated_micro_usd: number;
+  failure_class: string | null;
+  finish_reason: string | null;
   id: string;
   input_tokens: number | null;
   output_tokens: number | null;
   profile: string;
   provider: "openrouter";
   reasoning_tokens: number | null;
+  reported_micro_usd: number | null;
   role: string;
   run_id: string;
   status: string;
@@ -5016,6 +5168,15 @@ export function parseRunAccepted(value: unknown): RunAccepted {
   return parseWith(schemas, "RunAccepted", value) as RunAccepted;
 }
 
+export interface RunBudgets {
+  context_tokens: number;
+  max_output_tokens_per_call: number;
+}
+
+export function parseRunBudgets(value: unknown): RunBudgets {
+  return parseWith(schemas, "RunBudgets", value) as RunBudgets;
+}
+
 export interface RunCommandRequest {
   expected_version: number;
 }
@@ -5061,6 +5222,7 @@ export function parseRunInputRequest(value: unknown): RunInputRequest {
 export interface RunInspector {
   checkpoints: CheckpointView[];
   checkpoints_truncated: boolean;
+  evidence: EvidenceView[];
   goal_summary: string;
   model_calls: ModelCallView[];
   run: RunSummary;
@@ -5113,6 +5275,7 @@ export interface RunRequest {
   input_documents?: InputDocument[];
   limit_micro_usd?: number;
   required_artifacts?: RequiredArtifact[];
+  run_profile?: ModelProfileId | null;
   session_id?: string | null;
 }
 
@@ -5155,6 +5318,7 @@ export function parseRunSummary(value: unknown): RunSummary {
 export interface RunWorkspace {
   artifacts: ArtifactSummary[];
   assignments: AssignmentView[];
+  budgets: RunBudgets;
   criteria: CriterionView[];
   cursor: number;
   expert: ExpertBinding | null;
@@ -5269,7 +5433,9 @@ export function parseUnknownEffect(value: unknown): UnknownEffect {
 }
 
 export interface UsageSummary {
+  input_tokens: number;
   model_calls: number;
+  output_tokens: number;
   plan_revisions: number;
   repairs: number;
   tool_dispatches: number;

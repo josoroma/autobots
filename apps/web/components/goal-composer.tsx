@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
+import { RunDisclosure } from "@/components/run-disclosure";
 import { Card } from "@/components/ui/card";
 import { csrfFetch } from "@/lib/csrf-fetch";
 
@@ -25,6 +26,7 @@ type Outcome =
   | "credentials_required"
   | "credential_invalid"
   | "credential_unavailable"
+  | "model_refused"
   | "error";
 
 export function GoalComposer() {
@@ -32,6 +34,7 @@ export function GoalComposer() {
   const [edited, setEdited] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
+  const [profile, setProfile] = useState("");
   const draft = edited ?? restored;
 
   function update(value: string): void {
@@ -52,12 +55,19 @@ export function GoalComposer() {
         "Content-Type": "application/json",
         "Idempotency-Key": crypto.randomUUID(),
       },
-      body: JSON.stringify({ goal_text: draft }),
+      body: JSON.stringify({
+        goal_text: draft,
+        ...(profile === "" ? {} : { run_profile: profile }),
+      }),
     }).catch(() => null);
     if (reply?.ok === true) {
       const accepted = (await reply.json()) as { run_id: string };
       setRunId(accepted.run_id);
       setOutcome("queued");
+      return;
+    }
+    if (reply?.status === 422) {
+      setOutcome("model_refused");
       return;
     }
     const failure = (await reply?.json().catch(() => null)) as {
@@ -86,6 +96,7 @@ export function GoalComposer() {
         rows={3}
         className="bg-background border-input block w-full rounded-md border px-3 py-2 text-sm"
       />
+      <RunDisclosure chosen={profile} onChoose={setProfile} />
       <Button onClick={() => void run()} disabled={draft.trim() === ""}>
         Run
       </Button>
@@ -107,6 +118,8 @@ export function GoalComposer() {
             </>
           ) : outcome === "credential_unavailable" ? (
             "Credential storage is unavailable, so model-backed work is blocked. Your draft is kept."
+          ) : outcome === "model_refused" ? (
+            "That model or request isn't approved, so no run started. Your draft is kept."
           ) : outcome === "queued" ? (
             <>
               Your goal is queued.{" "}
