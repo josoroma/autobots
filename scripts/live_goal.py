@@ -46,7 +46,7 @@ def rows(ops: Ops, statement: str) -> list[dict]:
     return [json.loads(line) for line in result.stdout.splitlines() if line.strip().startswith('{')]
 
 
-def attempt(root: Path, key_file: Path, limit: int) -> int:
+def attempt(root: Path, key_file: Path, limit: int, profile: str | None = None) -> int:
     project = f'{PROJECT_PREFIX}{secrets.token_hex(4)}'
     gateway_port = free_port()
     db_port = free_port([gateway_port])
@@ -105,6 +105,13 @@ def attempt(root: Path, key_file: Path, limit: int) -> int:
         wait(lambda: api_call(api_port, ops.internal, token)[0] == 200, 40)
         helper('save', str(key_file), workspace)
         report['key_check'] = rows(ops, f"select auth_status from app_private.provider_settings where workspace_id = '{workspace}'")
+
+        if profile:
+            code, reply = api_call(api_port, ops.internal, token, 'PUT', '/v1/settings/model-policy',
+                                   json.dumps({'expected_version': 0, 'default_profile': profile, 'role_overrides': {}}).encode())
+            report['policy_put'] = code
+            if code != 200:
+                raise Unavailable(f'the policy was refused: {code} {reply[:200]}')
 
         body = json.dumps({'goal_text': GOAL, 'limit_micro_usd': limit, 'required_artifacts': REQUIRED}).encode()
         code, reply = api_call(api_port, ops.internal, token, 'POST', '/v1/runs', body, {'Idempotency-Key': secrets.token_hex(8)})
@@ -186,6 +193,7 @@ def main() -> int:
     parser.add_argument('--paid', action='store_true', help='required: this makes billed OpenRouter calls')
     parser.add_argument('--key-file', default='.env')
     parser.add_argument('--limit-micro-usd', type=int, default=AUTHORIZED_MICRO_USD)
+    parser.add_argument('--profile', choices=('openrouter_deepseek_flash', 'openrouter_terra'), help="the workspace's default model; the seeded default if omitted")
     arguments = parser.parse_args()
     if not arguments.paid:
         print('REFUSED: this makes billed calls, and needs --paid', file=sys.stderr)
@@ -195,7 +203,7 @@ def main() -> int:
         return 2
     root = project_root()
     try:
-        return attempt(root, (root / arguments.key_file).resolve(), arguments.limit_micro_usd)
+        return attempt(root, (root / arguments.key_file).resolve(), arguments.limit_micro_usd, arguments.profile)
     except Unavailable as error:
         print(f'ERROR: {error}', file=sys.stderr)
         return 2

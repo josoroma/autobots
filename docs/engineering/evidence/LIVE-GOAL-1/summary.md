@@ -100,3 +100,26 @@ A second DeepSeek run at 23:44 repeated run 3, and logged `ReadTimeout` with no 
 Held in all four runs: no key in any durable row or log file, nothing of the project left behind, other Docker resources unchanged, and the watchdog never fired.
 
 **Spend:** US$0.007001 across these goals, and US$0.00889 with the two above, against ledger figures. Key usage rose by exactly those amounts, to the rounding of its reporting, across the two charged runs.
+
+## Telling the model to publish
+
+**Class: live, on a disposable stack.** Authorized by the user's "Yes, fix publishing", after being told a small paid run would follow, under the same US$0.25 limit. Run on 2026-11-06 UTC at 00:21, on Terra, at the repository's settings: the 512-token limit and the 130-second timeout. Raw result: `.checks/trial-publish/terra-publish.json` (ignored, local).
+
+**The cause of run 4 is now confirmed by code, and its fix observed once.** `_opening` told the model the goal and criteria, but not the required artifacts or that saving alone delivers nothing, while verification accepts only published files. It now says both when the run may publish. In this run the model called `publish_artifact`, and `report.md` was published, the first artifact a real model has published here.
+
+**Outcome: the goal still failed, for a different reason.** Status `failed` after 23s, stop reason `repair_limit:evidence_invalid`, so verification never ran.
+
+| Call | Tool | Result | Output tokens | Charged, micro-USD |
+|---|---|---|---|---|
+| 1 | `propose_plan` | **rejected, which used the run's one repair** | 139 | 1,577 |
+| 2 | `propose_plan` | accepted | 133 | 1,982 |
+| 3 | `save_artifact` | succeeded | 160 | 1,076 |
+| 4 | `complete_task` | succeeded | 59 | 669 |
+| 5 | `publish_artifact` | succeeded | 25 | 326 |
+| 6 | `complete_task` | **`evidence_invalid`, which stopped the run** | 68 | 604 |
+
+**Why those two failed isn't known.** Evidence must be a saved file's path or a succeeded receipt's operation ID, but what the model cited isn't recorded, and neither is the code for the first plan's rejection. Call 4's evidence was accepted and call 6's wasn't, which suggests the published artifact was cited in a form the rule doesn't accept. That's inferred. Run 4 also had a `complete_task` fail, and run 5's plans were rejected, so this looks repeated.
+
+**Total:** US$0.006234 in the ledger, matching key usage. Across all live goals in this record, US$0.015124.
+
+Held: no key in any durable row or log file, nothing of the project left behind, other Docker resources unchanged, and the watchdog never fired. The report is 88 words and ends in the required line, but no check has scored it, and this doesn't establish H1 or product acceptance.

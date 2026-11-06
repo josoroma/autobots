@@ -232,7 +232,18 @@ async def _scope_guidance(connection: Any, run_id: UUID, goal: GoalSpec) -> str:
 
 def _opening(goal: GoalSpec) -> str:
     criteria = "\n".join(f"- {name}: {text}" for name, text in sorted(goal.criteria.items()))
-    return f"Goal: {goal.objective}\n\nCriteria:\n{criteria}"
+    opening = f"Goal: {goal.objective}\n\nCriteria:\n{criteria}"
+    if "publish_artifact" not in goal.allowed_tools:
+        return opening
+    # Verification accepts only published files, so the model has to know that from the start.
+    lines = [
+        "Saving a file delivers nothing. Before your final reply, save it under outputs/ with "
+        "save_artifact, then call publish_artifact with its path and version."
+    ]
+    for required in goal.required_artifacts:
+        lines.append(f"- Publish a file named {required.name}.")
+        lines.extend(f'  It must contain: "{text}"' for text in required.must_contain)
+    return f"{opening}\n\nDelivery:\n" + "\n".join(lines)
 
 
 async def run_goal(

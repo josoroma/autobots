@@ -2,8 +2,9 @@
 
 import pytest
 
+from autobots.application.goal_loop import _opening
 from autobots.application.plans import PlanRejected, validate_proposal
-from autobots.contracts.plans import GoalSpec, PlanProposal, PlanTask
+from autobots.contracts.plans import GoalSpec, PlanProposal, PlanTask, RequiredArtifact
 
 GOAL = GoalSpec(
     objective="Report",
@@ -92,3 +93,23 @@ def test_a_revision_keeps_completed_work() -> None:
 
 def test_an_open_task_may_be_replaced() -> None:
     validate_proposal(GOAL, proposal(task("c"), reason="better"), [task("a")], frozenset())
+
+
+def test_the_opening_says_a_goal_is_delivered_by_publishing() -> None:
+    """Verification accepts only published files. A live model, not told so, saved and stopped."""
+    required = RequiredArtifact(name="report.md", must_contain=["Trade-offs covered: 3"])
+    goal = GOAL.model_copy(
+        update={
+            "allowed_tools": {"save_artifact": 1, "publish_artifact": 1},
+            "required_artifacts": [required],
+        }
+    )
+    opening = _opening(goal)
+    assert "publish_artifact" in opening
+    assert "named report.md" in opening
+    assert '"Trade-offs covered: 3"' in opening
+    assert "c1: Has a summary" in opening
+
+
+def test_the_opening_names_no_tool_the_run_cannot_call() -> None:
+    assert "publish" not in _opening(GOAL).lower()
