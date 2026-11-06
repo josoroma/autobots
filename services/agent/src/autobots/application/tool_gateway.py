@@ -94,11 +94,14 @@ class ToolResult:
     replayed: bool = False
 
     def for_model(self) -> str:
-        """Codes and validated output only. A tool's own error text never reaches the model."""
-        return json.dumps(
-            {"outcome": self.outcome.value, "code": self.code, "output": self.output},
-            sort_keys=True,
-        )
+        """Codes and validated output only. A tool's own error text never reaches the model.
+
+        The operation_id is what `complete_task` accepts as a receipt, so the model needs to see it.
+        """
+        reply = {"outcome": self.outcome.value, "code": self.code, "output": self.output}
+        if self.operation_id is not None:
+            reply["operation_id"] = self.operation_id
+        return json.dumps(reply, sort_keys=True)
 
 
 @dataclass

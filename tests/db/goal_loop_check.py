@@ -19,7 +19,7 @@ from autobots.adapters.loop_middleware import AdmittedModel, ModelRoute, Unadmit
 from autobots.application.goal_loop import LoopConfig, run_goal
 from autobots.application.model_admission import ModelAdmission
 from autobots.application.model_attempts import FailureClass, ProviderFailure
-from autobots.application.plans import latest_plan, load_goal
+from autobots.application.plans import _evidence_exists, latest_plan, load_goal
 from autobots.application.run_usage import RootLimits, consume, LimitReached, ensure_usage
 from autobots.application.runs import admit_run, apply_command
 from autobots.application.worker_leases import claim_next
@@ -70,6 +70,9 @@ async def main() -> None:
         check('the earlier version is still there', 'Figures', first, first == 'Figures')
         kept = await value("select evidence -> 0 ->> 'reference' from app_private.plan_evidence where run_id = %s and task_id = 'a'", lease.run_id)
         check('completed evidence survives the revision', 'outputs/a.md', kept, kept == 'outputs/a.md')
+        shown = [reply.get('operation_id') for reply in (json.loads(m.content) for m in model.seen[-1] if m.type == 'tool') if reply['outcome'] == 'succeeded']
+        check('a reply shows an operation_id that receipt evidence accepts', 'accepted', shown[:1], bool(shown[0]) and await _evidence_exists(db, lease.run_id, 'receipt', shown[0]))
+        check('and receipt evidence refuses anything else', 'refused', 'not-an-operation', not await _evidence_exists(db, lease.run_id, 'receipt', 'not-an-operation'))
         check('usage is counted', '8 calls, 7 tools, 1 revision', result.usage, result.usage['model_calls'] == 8 and result.usage['tool_dispatches'] == 7 and result.usage['plan_revisions'] == 1)
         settled = await value("select count(*) from app_private.model_invocations where run_id = %s and status = 'succeeded'", lease.run_id)
         check('every model call went through admission and settled', '8', settled, settled == 8)

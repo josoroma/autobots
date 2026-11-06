@@ -154,3 +154,9 @@ Held: no key in any durable row or log file, nothing of the project left behind,
 **Not established:** that goals succeed reliably, as this is one run of one goal on one model. DeepSeek hasn't completed a goal. The report's quality wasn't scored. Compaction, approvals, child runs and budget refusals weren't exercised. This doesn't establish H1, product acceptance or US-10.1.
 
 **Total across all live goals in this record:** US$0.021256.
+
+### Changed after this run, and not yet exercised live
+
+The schema a model sees for `complete_task` now says to cite a saved file by the exact path `save_artifact` returned, with no version or hash added, or a tool's effect by its `operation_id`. Tool replies now include that `operation_id`, so receipt evidence can be cited at all. Verification is as strict as it was.
+
+**No paid run has tried this,** so whether it reduces `evidence_invalid` isn't known. `save_artifact` replying with `path`, `version` and `sha256` makes a decorated path plausible, but what was actually cited stays unrecorded. The check is local: tests and a scripted model.

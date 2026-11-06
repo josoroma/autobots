@@ -67,8 +67,18 @@ class PlanCommitted(BaseModel):
 class Evidence(BaseModel):
     model_config = TOOL_CONTRACT
 
-    kind: Literal["artifact", "receipt"]
-    reference: str = Field(min_length=1, max_length=500)
+    kind: Literal["artifact", "receipt"] = Field(
+        description="artifact for a file this run saved, receipt for a tool's recorded effect."
+    )
+    reference: str = Field(
+        min_length=1,
+        max_length=500,
+        description=(
+            "For artifact, the file's exact path as save_artifact returned it, such as "
+            "outputs/report.md, with no version, hash or other text added. For receipt, the "
+            "operation_id from that tool's reply."
+        ),
+    )
 
 
 class CompleteTask(BaseModel):

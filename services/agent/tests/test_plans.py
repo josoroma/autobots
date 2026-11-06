@@ -1,10 +1,20 @@
 """What a proposed plan may not do. No database and no model."""
 
+import json
+
 import pytest
 
 from autobots.application.goal_loop import _opening
 from autobots.application.plans import PlanRejected, reference_shape, validate_proposal
-from autobots.contracts.plans import GoalSpec, PlanProposal, PlanTask, RequiredArtifact
+from autobots.application.tool_gateway import ToolResult
+from autobots.contracts.plans import (
+    CompleteTask,
+    GoalSpec,
+    PlanProposal,
+    PlanTask,
+    RequiredArtifact,
+)
+from autobots.domain.tools import ToolOutcome
 
 GOAL = GoalSpec(
     objective="Report",
@@ -138,3 +148,16 @@ def test_a_rejection_says_which_part_widened_scope() -> None:
     with pytest.raises(PlanRejected) as tool:
         validate_proposal(GOAL, proposal(task("a", tools=["send_email"])), None, frozenset())
     assert tool.value.detail == "tool"
+
+
+def test_the_schema_a_model_sees_says_how_to_cite_evidence() -> None:
+    reference = CompleteTask.model_json_schema()["$defs"]["Evidence"]["properties"]["reference"]
+    assert "outputs/report.md" in reference["description"]
+    assert "no version" in reference["description"]
+    assert "operation_id" in reference["description"]
+
+
+def test_a_reply_shows_the_operation_id_a_receipt_has_to_cite() -> None:
+    effect = ToolResult(ToolOutcome.SUCCEEDED, output={}, operation_id="op-1")
+    assert json.loads(effect.for_model())["operation_id"] == "op-1"
+    assert "operation_id" not in json.loads(ToolResult(ToolOutcome.SUCCEEDED).for_model())

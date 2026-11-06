@@ -265,7 +265,10 @@ def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
         ToolDefinition(
             tool_id="complete_task",
             version=1,
-            description="Mark a plan task complete, citing saved artifacts or tool receipts.",
+            description=(
+                "Mark a plan task complete, citing saved files by their exact path or tool "
+                "effects by their operation_id. A reference matching neither is refused."
+            ),
             input_model=CompleteTask,
             output_model=TaskCompleted,
             operation_class=OperationClass.REVERSIBLE_INTERNAL_WRITE,
