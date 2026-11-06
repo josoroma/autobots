@@ -301,7 +301,7 @@ test("reusing a key with a model chosen is a conflict, not a replay of the first
   expect((await other.json()).code).toBe("idempotency_conflict");
 });
 
-test("a finished run can be continued in a new linked run, with the disclosure, and stays as it was", async ({
+test("continuing a finished run asks for a new run naming it, with the disclosure, and it stays as it was", async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -342,6 +342,10 @@ test("a finished run can be continued in a new linked run, with the disclosure, 
   await expect(page.locator("[data-continue-run]")).toContainText(
     "it may have started",
   );
+  // The same key has to carry the same body, so the model can't change now.
+  await expect(
+    page.locator("[data-continue-run]").getByLabel("Model for this run"),
+  ).toHaveCount(0);
   await page.unroute("**/api/v1/runs");
   const sent = page.waitForRequest(
     (request) =>
@@ -371,4 +375,54 @@ test("a finished run can be continued in a new linked run, with the disclosure, 
   await expect(
     page.getByText("slice-only-claims to continue").first(),
   ).toBeVisible();
+});
+
+test("a refusal clears the key to continue with, and a refusal after a lost reply keeps it", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await signIn(page);
+  await ensureKey(page);
+  await page.goto("/");
+  const reply = await page.request.post("/api/v1/runs", {
+    headers: await write(page, `continue-keys-${Date.now()}`),
+    data: { goal_text: "slice-only-claims keys" },
+  });
+  await page.goto(`/runs/${(await reply.json()).run_id}`);
+  await expect(page.locator("[data-run-status]")).toHaveAttribute(
+    "data-run-status",
+    "failed",
+    { timeout: 60_000 },
+  );
+  await page.getByRole("button", { name: "Continue in a new run" }).click();
+  const run = page.locator("[data-continue-run]").getByRole("button", {
+    name: "Run",
+  });
+  const keys: string[] = [];
+  const answers = [
+    { status: 409, body: JSON.stringify({ message: "Arranged refusal." }) },
+    { status: 503, body: "{}" },
+    { status: 409, body: JSON.stringify({ message: "Arranged again." }) },
+    { status: 409, body: JSON.stringify({ message: "And again." }) },
+  ];
+  await page.route("**/api/v1/runs", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    keys.push(route.request().headers()["idempotency-key"] ?? "");
+    return route.fulfill(
+      answers[keys.length - 1] ?? { status: 500, body: "{}" },
+    );
+  });
+  await run.click();
+  await expect(page.getByText("Arranged refusal.")).toBeVisible();
+  await run.click();
+  await expect(page.getByText(/it may have started/)).toBeVisible();
+  expect(keys[1]).not.toBe(keys[0]);
+  await run.click();
+  await expect(page.getByText("Arranged again.")).toBeVisible();
+  await run.click();
+  await expect(page.getByText("And again.")).toBeVisible();
+  // Once the outcome is unknown, no refusal proves nothing started under that key.
+  expect(keys[2]).toBe(keys[1]);
+  expect(keys[3]).toBe(keys[1]);
+  await page.unroute("**/api/v1/runs");
 });

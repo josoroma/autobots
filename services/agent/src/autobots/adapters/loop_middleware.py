@@ -142,12 +142,14 @@ def request_bytes(request: Any) -> int:
         if message is not None:
             calls = getattr(message, "tool_calls", None) or []
             total += len(
-                json.dumps([message.content, calls], default=str, ensure_ascii=False).encode()
+                json.dumps([message.content, calls], default=str, ensure_ascii=False).encode(
+                    "utf-8", "surrogatepass"
+                )
             )
     return total + len(
         json.dumps(
             getattr(request, "tools", None) or [], default=_tool_text, ensure_ascii=False
-        ).encode()
+        ).encode("utf-8", "surrogatepass")
     )
 
 

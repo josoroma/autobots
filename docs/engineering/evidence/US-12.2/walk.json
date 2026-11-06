@@ -1,0 +1,815 @@
+{
+ "schema_version": "autobots.surface-walk/v1",
+ "base_revision": "eff3498",
+ "note": "US-12.2's tree, on this base plus its uncommitted change. US-12.3 captures again on the final tree.",
+ "absent": {
+  "onboarding": "No separate flow. Key setup on Models is what a new owner meets, and it's captured as key-setup.",
+  "dialogs and portals": "The app has none. Choices are inline, and selects are native.",
+  "menus": "None apart from native selects, whose open lists the OS draws.",
+  "notifications": "No toast or notification surface. Results are inline status text, measured where they appear.",
+  "charts": "The app has none, so no chart token is in use.",
+  "artifact previews": "Artifacts are downloaded through a link, and no preview exists. The list is captured on the run.",
+  "file lists": "No screen lists a run's working files. Published artifacts are on the run.",
+  "workflow canvas": "The editor is a validated text form, with no canvas, so no edge or node marker is drawn."
+ },
+ "surfaces": [
+  {
+   "surface": "sign-in",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 12,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "key-setup",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 28,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "home",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 14,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 1,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "runs",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 60,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "run",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 12,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "inspector",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 11,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "experts",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 50,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 2,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "expert-editor",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 21,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "session",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 12,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 1,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "workflows",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 31,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 1,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "workflow-editor",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 16,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "workflow-monitor",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 10,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "approvals",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 25,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "approvals-empty",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 9,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "settings",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 10,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "models",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 30,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "operations",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 13,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "state-loading",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 9,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "state-error",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 9,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "state-empty",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 10,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 1,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "state-local-only",
+   "theme": "dark",
+   "keyboard": {
+    "stops": 9,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "sign-in",
+   "theme": "light",
+   "keyboard": {
+    "stops": 12,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "key-setup",
+   "theme": "light",
+   "keyboard": {
+    "stops": 28,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "home",
+   "theme": "light",
+   "keyboard": {
+    "stops": 14,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 1,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "runs",
+   "theme": "light",
+   "keyboard": {
+    "stops": 60,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "run",
+   "theme": "light",
+   "keyboard": {
+    "stops": 12,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "inspector",
+   "theme": "light",
+   "keyboard": {
+    "stops": 11,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "experts",
+   "theme": "light",
+   "keyboard": {
+    "stops": 50,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 2,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "expert-editor",
+   "theme": "light",
+   "keyboard": {
+    "stops": 21,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "session",
+   "theme": "light",
+   "keyboard": {
+    "stops": 12,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 1,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "workflows",
+   "theme": "light",
+   "keyboard": {
+    "stops": 31,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 1,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "workflow-editor",
+   "theme": "light",
+   "keyboard": {
+    "stops": 16,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "workflow-monitor",
+   "theme": "light",
+   "keyboard": {
+    "stops": 10,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "approvals",
+   "theme": "light",
+   "keyboard": {
+    "stops": 25,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "approvals-empty",
+   "theme": "light",
+   "keyboard": {
+    "stops": 9,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "settings",
+   "theme": "light",
+   "keyboard": {
+    "stops": 10,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "models",
+   "theme": "light",
+   "keyboard": {
+    "stops": 30,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "operations",
+   "theme": "light",
+   "keyboard": {
+    "stops": 13,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "state-loading",
+   "theme": "light",
+   "keyboard": {
+    "stops": 9,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "state-error",
+   "theme": "light",
+   "keyboard": {
+    "stops": 9,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "state-empty",
+   "theme": "light",
+   "keyboard": {
+    "stops": 10,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 1,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  },
+  {
+   "surface": "state-local-only",
+   "theme": "light",
+   "keyboard": {
+    "stops": 9,
+    "out_of_order": [],
+    "positive_tabindex": 0
+   },
+   "disabled": {
+    "count": 0,
+    "focusable": [],
+    "unnamed": []
+   },
+   "zoom": {
+    "200%": 0,
+    "400%": 0
+   },
+   "moving": []
+  }
+ ]
+}

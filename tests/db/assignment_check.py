@@ -152,6 +152,14 @@ async def main() -> None:
         stopped = await value('select u.stop_reason from app_private.run_usage u join public.runs r on r.id = u.run_id where r.parent_run_id = %s', run)
         check("a child past the root's active time stops", 'active_time_limit, failed, 3 calls', (stopped, row, len(model.seen)), stopped == 'active_time_limit' and row[0] == 'failed' and len(model.seen) == 3)
 
+        # LC-04: a limit across the tree stops new work, and what a finished child made stays readable.
+        result, model, run = await go([calls(PARENT_PLAN), calls(assign(helper, goal='First')), calls(CHILD_PLAN), calls(CHILD_SAVE), calls(CHILD_PUBLISH), calls(CHILD_DONE), say('child finished'), calls(assign(helper, goal='Second')), calls(CHILD_PLAN), say('never'), say('never')],
+                                      LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0), limits=RootLimits(model_calls=8)))
+        first = await (await db.execute("select child_run_id, outcome from app_private.assignments where parent_run_id = %s order by created_at limit 1", (run,))).fetchone()
+        published = await value("select count(*) from public.artifacts where run_id = %s and status = 'published'", first[0])
+        check('a limit across the tree stops new calls at the limit', '8 calls on the root', len(model.seen), len(model.seen) == 8)
+        check("a finished child's result and artifact stay readable from the run", 'succeeded, 1 published', (first[1], published), first[1] == 'succeeded' and published == 1)
+
         # US-12.1: a run admitted on DeepSeek before it stopped being offered keeps its route, and so do its children.
         frozen = await admit_run(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), goal_text='Lead on a frozen route', limit_micro_usd=1_000_000, policy=resolve_role_policy(run_profile='openrouter_deepseek_flash'), binding=await resolve_binding(db, WORKSPACE, session.id, expert_id=lead.id))
         held = await (await db.execute("update app_private.run_jobs set available_at = clock_timestamp() + interval '1 hour' where status = 'queued' and run_id <> %s returning run_id", (frozen.run_id,))).fetchall()

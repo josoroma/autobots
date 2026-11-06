@@ -272,3 +272,22 @@ def test_a_request_counts_its_real_bytes() -> None:
     request = SimpleNamespace(messages=[HumanMessage(text)], system_message=None, tools=[])
     # Three bytes each in UTF-8, where an escaped form would count six.
     assert 3_000 <= request_bytes(request) < 4_000
+
+
+def test_a_lone_surrogate_doesnt_raise_while_counting_bytes() -> None:
+    request = SimpleNamespace(
+        messages=[HumanMessage("before \ud83d after")], system_message=None, tools=[]
+    )
+    assert request_bytes(request) > 0
+
+
+def test_a_tools_real_bytes_count_too() -> None:
+    def tool(description: str) -> SimpleNamespace:
+        return SimpleNamespace(
+            messages=[],
+            system_message=None,
+            tools=[{"type": "function", "function": {"description": description}}],
+        )
+
+    # Three bytes each in UTF-8, where an escaped form would count six.
+    assert request_bytes(tool("\u6f22" * 100)) - request_bytes(tool("")) == 300

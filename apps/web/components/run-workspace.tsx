@@ -368,6 +368,18 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
           />
         </Card>
       )}
+      {snapshot.run.parent_run_id === null ? null : (
+        <p data-field="parent-run" className="text-sm">
+          This run is a part of{" "}
+          <a
+            href={`/runs/${snapshot.run.parent_run_id}`}
+            className="font-medium underline"
+          >
+            its parent run
+          </a>
+          .
+        </p>
+      )}
       {snapshot.assignments.length === 0 ? null : (
         <Card aria-labelledby="assignments-heading" className="space-y-2">
           <h2 id="assignments-heading" className="text-lg font-medium">

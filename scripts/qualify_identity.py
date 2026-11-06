@@ -387,6 +387,16 @@ def qualify(root: Path) -> int:
         no_key_run = '33333333-3333-4333-8333-333333333333'
         stack.runtime(f"insert into public.runs (id, workspace_id, limit_micro_usd, goal_summary) values ('{no_key_run}', '{owner_d['workspace_id']}', 1, 'Arranged in a workspace with no key');\n")
         artifacts = {**artifacts, 'AUTOBOTS_TEST_NO_KEY_RUN': no_key_run, 'AUTOBOTS_TEST_NO_KEY_EMAIL': email_d, 'AUTOBOTS_TEST_NO_KEY_PASSWORD': password_d}
+        # Its own workspace with no key, as the one above asserts that it holds exactly one run.
+        email_e, password_e = 'owner-e@example.invalid', secrets.token_urlsafe(24)
+        owner_e = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_e, password_e)
+        arranged_runs = subprocess.run([str(root / PYTHON), str(root / 'tests/db/browser_runs.py'), owner_a['workspace_id'], owner_e['workspace_id']], capture_output=True, text=True, errors='replace', timeout=120, check=False, cwd=root,
+                                       env={**tool_env(), 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1', 'AUTOBOTS_DATABASE_URL': runtime_url, 'AUTOBOTS_STORAGE_BASE': base, 'AUTOBOTS_STORAGE_SERVICE': stack.values['SERVICE_ROLE_KEY']})
+        if arranged_runs.returncode:
+            raise Unavailable(f'the browser runs could not be arranged: {arranged_runs.stderr[-500:]}')
+        arranged_ids = json.loads(arranged_runs.stdout.strip().splitlines()[-1])
+        cases.check('the browser runs are arranged', 'waiting_approval and succeeded', str(arranged_ids['states']), arranged_ids['states'] == {'waiting': 'waiting_approval', 'finished': 'succeeded'})
+        artifacts = {**artifacts, 'AUTOBOTS_TEST_WAITING_RUN': arranged_ids['waiting_run'], 'AUTOBOTS_TEST_FILES_RUN': arranged_ids['keyless_run'], 'AUTOBOTS_TEST_FILES_EMAIL': email_e, 'AUTOBOTS_TEST_FILES_PASSWORD': password_e}
         browser_cases(root, cases, stack, base, db_port, email_a, password_a, owner_a['workspace_id'], owner_b['workspace_id'],
                       email_b, password_b, email_c, password_c, artifacts)
     finally:

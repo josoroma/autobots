@@ -24,6 +24,7 @@ from pydantic import SecretStr
 
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.adapters.object_storage import SupabaseObjectStore
+from autobots.application.compaction import SUMMARY_MARKER
 from autobots.application.goal_loop import LoopConfig, process_next
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
@@ -47,10 +48,44 @@ def replies(messages: Any, name: str) -> list[dict[str, Any]]:
     return [json.loads(message.content) for message in messages if message.type == 'tool' and message.name == name]
 
 
+LONG = 'x' * 6_000
+COMPACT_TASKS = [{'id': 'report', 'title': 'Write the long report', 'criteria': ['c1'], 'expected_evidence': 'the published report'}]
+COMPACT_STEPS = (('propose_plan', {'tasks': COMPACT_TASKS}),
+                 *(('save_artifact', {'path': f'outputs/part-{n}.md', 'content': LONG}) for n in range(6)),
+                 ('save_artifact', {'path': 'outputs/report.md', 'content': '# Totals\n\nTotal: 5\n'}),
+                 PUBLISH, DONE)
+POSITION: dict[str, int] = {}
+PART_TASK = {'id': 'k', 'title': 'Do the part', 'criteria': ['c1'], 'expected_evidence': 'a file'}
+PART_STEPS = (('propose_plan', {'tasks': [PART_TASK]}),
+              ('save_artifact', {'path': 'outputs/child-1/part.md', 'content': 'the part'}),
+              ('publish_artifact', {'path': 'outputs/child-1/part.md', 'version': 1}),
+              ('complete_task', {'task_id': 'k', 'evidence': [{'kind': 'artifact', 'reference': 'outputs/child-1/part.md'}], 'summary': 'Did the part.'}))
+
+
+def scripted(name: str, steps: tuple, final: str) -> Any:
+    """Compaction takes earlier replies out of the model's view, so the position lives here."""
+    position = POSITION.get(name, 0)
+    POSITION[name] = position + 1
+    return steps[position] if position < len(steps) else final
+
+
 def next_step(goal: str, messages: Any) -> Any:
     """Each step uses what the tools really returned, so a refused tool can't reach a total."""
     if 'slice-only-claims' in goal:
         return 'It is all done, trust me.'
+    if SUMMARY_MARKER in str(messages[-1].content):
+        return 'Arranged summary: the long parts were saved.'
+    compact = re.search(r'slice-compact-\d+', goal)
+    if compact:
+        return scripted(compact.group(0), COMPACT_STEPS, FINISHED)
+    if 'slice-child-part' in goal:
+        return scripted(goal, PART_STEPS, 'The part is done.')
+    delegate = re.search(r'slice-delegate expert=([0-9a-f-]{36})', goal)
+    if delegate:
+        assign = ('assign_specialist', {'expert_id': delegate.group(1), 'goal': 'slice-child-part', 'criteria': ['Finish the part']})
+        lead = {'id': 'p', 'title': 'Delegate', 'criteria': ['c1'], 'expected_evidence': 'a child result'}
+        done = ('complete_task', {'task_id': 'p', 'evidence': [{'kind': 'note', 'reference': 'the child reported'}], 'summary': 'The part came back.'})
+        return scripted(delegate.group(0), (('propose_plan', {'tasks': [lead]}), assign, done), FINISHED)
     if not replies(messages, 'propose_plan'):
         return PLAN
     if not replies(messages, 'read_run_file'):

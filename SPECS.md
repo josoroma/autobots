@@ -279,14 +279,14 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-12.1#2 | Remove it from every picker, and say on Settings why it isn't offered. | DONE | US-12.1 |
 | US-12.1#3 | Update the tests that choose DeepSeek through the product path, and arrange the frozen-route cases on runs already admitted. | DONE | US-12.1 |
 | US-12.1#4 | Correct text that still says a person can choose it, including `README.md` and `.claude/rules/model-gateway.md`. | DONE | US-12.1 |
-| US-12.2 | Close what a test can settle | READY | EPIC-12 |
-| US-12.2#1 | Add the LC-03, LC-04, LC-07 and LC-13 tests on a disposable stack, and fix what they find. | TODO | US-12.2 |
-| US-12.2#2 | Add the no-key file cases for LC-20, MP-A12 and LM-A06. | TODO | US-12.2 |
-| US-12.2#3 | Add the dispatch inventory for LC-25 and the request shape check for LC-26. | TODO | US-12.2 |
-| US-12.2#4 | Walk every surface in both themes for LC-34, DS-04 and DS-05, retain the results, and capture again whatever changed. | TODO | US-12.2 |
-| US-12.2#5 | Fix R5-1 to R5-7. | TODO | US-12.2 |
-| US-12.2#6 | Put each new check in a profile or state the command that runs it, and list what stays a limit for US-10.2's record. | TODO | US-12.2 |
-| US-12.3 | Final review and Gate 0 at the final code | BLOCKED | EPIC-12 |
+| US-12.2 | Close what a test can settle | DONE | EPIC-12 |
+| US-12.2#1 | Add the LC-03, LC-04, LC-07 and LC-13 tests on a disposable stack, and fix what they find. | DONE | US-12.2 |
+| US-12.2#2 | Add the no-key file cases for LC-20, MP-A12 and LM-A06. | DONE | US-12.2 |
+| US-12.2#3 | Add the dispatch inventory for LC-25 and the request shape check for LC-26. | DONE | US-12.2 |
+| US-12.2#4 | Walk every surface in both themes for LC-34, DS-04 and DS-05, retain the results, and capture again whatever changed. | DONE | US-12.2 |
+| US-12.2#5 | Fix R5-1 to R5-7. | DONE | US-12.2 |
+| US-12.2#6 | Put each new check in a profile or state the command that runs it, and list what stays a limit for US-10.2's record. | DONE | US-12.2 |
+| US-12.3 | Final review and Gate 0 at the final code | READY | EPIC-12 |
 | US-12.3#1 | Bind the final revision's fingerprint, and run the independent review of everything since US-11.12's bound tree. | TODO | US-12.3 |
 | US-12.3#2 | Repeat Gate 0 and the harness runbook on that revision as US-11.12 did, including `qualify_worker_inference.py` by hand and the visual measurements on the final tree. | TODO | US-12.3 |
 | US-12.3#3 | Record a disposition for each finding, and publish evidence that `scripts/evidence.py` validates. | TODO | US-12.3 |
@@ -3729,7 +3729,8 @@ Open Questions:
 
 ### US-12.2: Close what a test can settle
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-12-2-close-what-test-can/`
 
 As a product owner
 I want the partial rows' testable parts observed, and round 5's small findings fixed
@@ -3829,19 +3830,19 @@ Dependencies:
 - US-11.12
 
 Tasks:
-- [ ] Add the LC-03, LC-04, LC-07 and LC-13 tests on a disposable stack, and fix what they find.
-- [ ] Add the no-key file cases for LC-20, MP-A12 and LM-A06.
-- [ ] Add the dispatch inventory for LC-25 and the request shape check for LC-26.
-- [ ] Walk every surface in both themes for LC-34, DS-04 and DS-05, retain the results, and capture again whatever changed.
-- [ ] Fix R5-1 to R5-7.
-- [ ] Put each new check in a profile or state the command that runs it, and list what stays a limit for US-10.2's record.
+- [x] Add the LC-03, LC-04, LC-07 and LC-13 tests on a disposable stack, and fix what they find.
+- [x] Add the no-key file cases for LC-20, MP-A12 and LM-A06.
+- [x] Add the dispatch inventory for LC-25 and the request shape check for LC-26.
+- [x] Walk every surface in both themes for LC-34, DS-04 and DS-05, retain the results, and capture again whatever changed.
+- [x] Fix R5-1 to R5-7.
+- [x] Put each new check in a profile or state the command that runs it, and list what stays a limit for US-10.2's record.
 
 Open Questions:
 - None.
 
 ### US-12.3: Final review and Gate 0 at the final code
 
-Status: BLOCKED
+Status: READY
 
 As an owner
 I want an independent review of what changed since US-11.12, and Gate 0 repeated at the final code

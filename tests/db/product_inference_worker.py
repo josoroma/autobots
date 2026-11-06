@@ -121,7 +121,8 @@ def handle(request: httpx.Request) -> httpx.Response:
         goal = 'Lead [parent]'
     record({'url': str(request.url), 'goal': goal.splitlines()[0], 'model': body.get('model'), 'models': body.get('models'),
             'provider': body.get('provider'), 'max_tokens': body.get('max_tokens'), 'key': fingerprint(key), 'at': time.monotonic(),
-            'tools': sorted(item['function']['name'] for item in body.get('tools') or [])})
+            'tools': sorted(item['function']['name'] for item in body.get('tools') or []),
+            'fields': sorted(body), 'reasoning_field': body.get('reasoning')})
     if key == REJECTED_KEY:
         return httpx.Response(401, json={'error': {'code': 401, 'message': 'arranged rejection'}})
     if '[malformed]' in goal:

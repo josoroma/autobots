@@ -63,6 +63,14 @@ interface Measured {
   focus_failures: unknown[];
   hover: { sample: string; ratio: number } | null;
   axe_violations: { id: string; nodes: number; summary: string }[];
+  keyboard: {
+    stops: number;
+    out_of_order: string[];
+    positive_tabindex: number;
+  };
+  disabled: { count: number; focusable: string[]; unnamed: string[] };
+  zoom: Record<string, number>;
+  moving: string[];
 }
 
 // Everything in the page's own colors, read back through a canvas so any CSS color becomes sRGB.
@@ -465,12 +473,85 @@ function surfaces(ids: Record<string, string>): Surface[] {
   ];
 }
 
+// Tab from the top: each stop must come later in the document than the one before it.
+async function walkKeyboard(page: Page): Promise<Measured["keyboard"]> {
+  const outOfOrder: string[] = [];
+  let stops = 0;
+  await page.evaluate(() => {
+    (window as unknown as { __last: Element | null }).__last = null;
+  });
+  for (let index = 0; index < 60; index += 1) {
+    await page.keyboard.press("Tab");
+    const step = await page.evaluate(() => {
+      const state = window as unknown as { __last: Element | null };
+      const current = document.activeElement;
+      if (current === null || current === document.body) return "end";
+      const previous = state.__last;
+      state.__last = current;
+      if (previous === null) return "ok";
+      return previous.compareDocumentPosition(current) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+        ? "ok"
+        : `${previous.tagName} before ${current.tagName}`;
+    });
+    if (step === "end") break;
+    stops += 1;
+    if (step !== "ok") outOfOrder.push(step);
+  }
+  const positive = await page.evaluate(
+    () =>
+      [...document.querySelectorAll<HTMLElement>("[tabindex]")].filter(
+        (item) => item.tabIndex > 0,
+      ).length,
+  );
+  // Back to the top, so what follows starts where a person's first Tab would.
+  await page.evaluate(() => {
+    const first = document.querySelector<HTMLElement>(
+      "a[href], button, input, select, textarea",
+    );
+    first?.focus();
+    first?.blur();
+  });
+  return { stops, out_of_order: outOfOrder, positive_tabindex: positive };
+}
+
+async function movingWithReducedMotion(page: Page): Promise<string[]> {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const moving = await page.evaluate(() =>
+    document
+      .getAnimations()
+      .filter(
+        (animation) => Number(animation.effect?.getTiming().duration ?? 0) > 1,
+      )
+      .map((animation) => String(animation.effect?.getTiming().duration)),
+  );
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  return moving;
+}
+
+// The same page in a narrow viewport, as 200% and 400% zoom lay out on a 1280-wide window.
+async function sidewaysAtZoom(page: Page): Promise<Record<string, number>> {
+  const results: Record<string, number> = {};
+  for (const [zoom, width] of Object.entries({ "200%": 640, "400%": 320 })) {
+    await page.setViewportSize({ width, height: 400 });
+    results[zoom] = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    );
+  }
+  await page.setViewportSize({ width: 1280, height: 800 });
+  return results;
+}
+
 async function measure(
   page: Page,
   surface: Surface,
   theme: Theme,
 ): Promise<Measured> {
   await page.addScriptTag({ content: MEASURE });
+  // First, from the top of the page. Any focus before this would move where Tab starts from.
+  const keyboard = await walkKeyboard(page);
   type Text = { sample: string; ratio: number; need: number };
   type Boundary = { slot: string; label: string; ratio: number };
   type Stop = { element: string; outline_width: string; ratio: number };
@@ -513,6 +594,27 @@ async function measure(
     )) as Stop | null;
     if (stop !== null) stops.push(stop);
   }
+  const disabled = await page.evaluate(() => {
+    const items = [...document.querySelectorAll<HTMLElement>("main :disabled")];
+    const name = (item: HTMLElement) =>
+      item.getAttribute("aria-label") ||
+      item.innerText?.trim() ||
+      (item.id &&
+        document.querySelector(`label[for="${item.id}"]`)?.textContent) ||
+      "";
+    return {
+      count: items.length,
+      focusable: items
+        .filter((item) => {
+          item.focus();
+          return document.activeElement === item;
+        })
+        .map((item) => item.tagName),
+      unnamed: items.filter((item) => !name(item)).map((item) => item.tagName),
+    };
+  });
+  const moving = await movingWithReducedMotion(page);
+  const zoom = await sidewaysAtZoom(page);
   let hover: Measured["hover"] = null;
   const first = page.locator("main button:not(:disabled)").first();
   if ((await first.count()) > 0) {
@@ -543,13 +645,17 @@ async function measure(
       nodes: violation.nodes.length,
       summary: violation.nodes[0]?.failureSummary?.slice(0, 200) ?? "",
     })),
+    keyboard,
+    disabled,
+    zoom,
+    moving,
   };
 }
 
 test("every named surface is captured in both themes, with measured contrast and axe", async ({
   browser,
 }) => {
-  test.setTimeout(420_000);
+  test.setTimeout(600_000);
   mkdirSync(OUT, { recursive: true });
   const owner = await browser.newContext();
   const ownerPage = await owner.newPage();
@@ -590,7 +696,14 @@ test("every named surface is captured in both themes, with measured contrast and
       item.focus_failures.length ||
       (item.hover !== null && item.hover.ratio < TEXT_MINIMUM) ||
       item.axe_violations.length ||
-      item.raw_controls.length,
+      item.raw_controls.length ||
+      item.keyboard.stops === 0 ||
+      item.keyboard.out_of_order.length ||
+      item.keyboard.positive_tabindex ||
+      item.disabled.focusable.length ||
+      item.disabled.unnamed.length ||
+      item.moving.length ||
+      Object.values(item.zoom).some((over) => over > 0),
   );
   writeFileSync(
     `${OUT}/results.json`,

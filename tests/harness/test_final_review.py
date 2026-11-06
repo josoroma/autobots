@@ -16,6 +16,7 @@ import generate_contracts  # noqa: E402
 import harness_lib  # noqa: E402
 import persistent_install  # noqa: E402
 import qualify_web  # noqa: E402
+import qualify_worker_inference  # noqa: E402
 import toolchain  # noqa: E402
 import verify  # noqa: E402
 
@@ -84,6 +85,22 @@ class PaidWorkerGuard(unittest.TestCase):
     def test_a_paid_goal_really_asks(self) -> None:
         """Text only, as `goal` needs a running install to reach this line."""
         self.assertIn('refuse_other_work(sql(', inspect.getsource(persistent_install.goal))
+
+
+class RequestShape(unittest.TestCase):
+    """The check in `qualify_worker_inference.py`, on requests that break it."""
+
+    def test_a_plain_request_passes(self) -> None:
+        self.assertEqual(qualify_worker_inference.request_shape_problems(['max_tokens', 'messages', 'model', 'provider', 'tools'], None), [])
+
+    def test_an_unadvertised_flag_fails(self) -> None:
+        for flag in ('temperature', 'top_p', 'parallel_tool_calls', 'seed'):
+            self.assertTrue(qualify_worker_inference.request_shape_problems(['model', flag], None), flag)
+
+    def test_reasoning_off_or_malformed_fails(self) -> None:
+        for reasoning in ({'effort': 'none'}, 'high', {'unknown': 1}):
+            self.assertTrue(qualify_worker_inference.request_shape_problems(['model', 'reasoning'], reasoning), reasoning)
+        self.assertEqual(qualify_worker_inference.request_shape_problems(['model', 'reasoning'], {'effort': 'high'}), [])
 
 
 class NonMutationGuard(unittest.TestCase):

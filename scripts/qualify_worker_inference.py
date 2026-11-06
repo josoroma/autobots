@@ -43,6 +43,21 @@ CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions'
 RETRY_AFTER = 3
 
 
+# What a Terra request may carry, MP-07's unadvertised sampler and parallel-tool flags left out.
+REQUEST_FIELDS = frozenset({'model', 'messages', 'tools', 'tool_choice', 'max_tokens', 'provider', 'stream', 'stream_options', 'usage', 'models', 'route', 'session_id'})
+
+
+def request_shape_problems(fields: list[str], reasoning: object) -> list[str]:
+    """One request as sent. A flag that isn't advertised, or a reasoning setting that isn't one."""
+    problems = [f'unexpected field {name}' for name in fields if name not in REQUEST_FIELDS and name != 'reasoning']
+    if 'reasoning' in fields:
+        if not isinstance(reasoning, dict) or set(reasoning) - {'effort', 'summary', 'exclude'}:
+            problems.append('reasoning has an unknown shape')
+        elif reasoning.get('effort') == 'none' or reasoning.get('enabled') is False:
+            problems.append('reasoning is turned off')
+    return problems
+
+
 def key_id(key: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()[:12]
 
@@ -100,6 +115,13 @@ def qualify(root: Path) -> int:
             return []
         lines = [json.loads(line) for line in requests_file.read_text().splitlines()]
         return [line for line in lines if f'[{tag}]' in line.get('goal', '')]
+
+    def goal_view(token: str, run_id: str) -> tuple[str, list]:
+        code, reply = api_call(api_port, ops.internal, token, 'GET', f'/v1/runs/{run_id}/workspace')
+        if code != 200:
+            return '', []
+        view = json.loads(reply)
+        return view.get('objective') or '', view.get('criteria') or []
 
     def invocations(run_id: str) -> str:
         return ops.sql(f"select coalesce(string_agg(distinct profile || '/' || wire_id || '/' || status || '/' || coalesce(failure_class, '-') || '/' "
@@ -218,7 +240,8 @@ def qualify(root: Path) -> int:
         cases.check('the product worker runs a workflow to the end', 'succeeded', f'{status(flow)}, worker alive {worker.poll() is None}', flow_done and worker.poll() is None)
 
         # A long run compacts through the real SDK, under its summarizer role. WI-5.
-        compacted = admit(workspace_a, 'compact')
+        compacted = admit(workspace_a, 'compact', TERRA)
+        before_view = goal_view(token_a, compacted)
         finished = settled(compacted, 'succeeded', 120)
         asked = sent('compact-summary')
         roles = ops.sql(f"select coalesce(string_agg(distinct role || '/' || status, ' '), 'none') from app_private.model_invocations where run_id = '{compacted}' and role = 'summarizer';")
@@ -230,6 +253,23 @@ def qualify(root: Path) -> int:
         cases.check('the summary is in the view of the calls that follow', 'seen', f'{sum(line["saw_summary"] for line in after)} of {len(after)}', any(line['saw_summary'] for line in after))
         passed, content = verified_report(workspace_a, compacted) if finished else ('', '')
         cases.check('and its result still verifies', 'verified, Total: 42', f'{passed}', passed == 'true' and 'Total: 42' in content)
+        after_view = goal_view(token_a, compacted)
+        cases.check('the goal and criteria the API shows are the same after compaction', 'identical, and present', f'{after_view}', bool(before_view[0]) and bool(before_view[1]) and before_view == after_view)
+
+        # LC-26: the shape of every request Terra's runs sent.
+        terra_calls = [call for tag in ('compact', 'compact-summary', 'reasoning') for call in sent(tag) if 'fields' in call]
+        problems = sorted({problem for call in terra_calls for problem in request_shape_problems(call['fields'], call.get('reasoning_field'))})
+        cases.check("Terra's requests carry no unadvertised flag, and reasoning stays well-formed", f'no problems across requests', f'{len(terra_calls)} requests, {problems}', bool(terra_calls) and not problems)
+
+        # LC-25: every request the fake transport saw is on the ledger, by role, on the frozen route.
+        inventory = ops.sql(f"select coalesce(string_agg(role || '/' || profile || '/' || wire_id || '=' || n, ' ' order by role), 'none') from (select role, profile, wire_id, count(*) n from app_private.model_invocations where run_id = '{compacted}' group by 1, 2, 3) t;")
+        frozen = ops.sql(f"select coalesce(string_agg(distinct value, ' '), 'none') from public.runs, jsonb_each_text(policy_snapshot -> 'bindings') where id = '{compacted}';")
+        billed = ops.sql(f"select count(*) from app_private.model_invocations where run_id = '{compacted}';")
+        seen_requests = len([call for tag in ('compact', 'compact-summary') for call in sent(tag) if 'fields' in call])
+        expected_inventory = ' '.join(sorted(f"{role}/{TERRA}/{TERRA_WIRE}" for role in ('executor', 'summarizer')))
+        listed = ' '.join(sorted(item.split('=')[0] for item in inventory.split()))
+        cases.check('the dispatch inventory matches the frozen role map, and no request is off the ledger', f'{expected_inventory}, as many requests as rows',
+                    f'{inventory}; frozen {frozen}; {seen_requests} requests, {billed} rows', listed == expected_inventory and frozen == TERRA and str(seen_requests) == billed and {call['model'] for tag in ('compact', 'compact-summary') for call in sent(tag) if 'fields' in call} == {TERRA_WIRE})
 
         # A child through the same worker and SDK, on its parent's ledger. WI-5.
         lead = helper('admit-lead', workspace_a).strip().splitlines()[-1]

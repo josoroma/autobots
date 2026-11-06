@@ -422,7 +422,10 @@ def goal(root: Path, record: Record, requested: str, key_file: Path, limit: int,
             report['committed_micro_usd'] = int(spent)
         else:
             report['after_run_check_failed'] = 'the spend could not be read'
-        report['calls_without_a_reported_charge'] = int(unsettled or 0)
+        if unsettled:
+            report['calls_without_a_reported_charge'] = int(unsettled)
+        else:
+            report['after_run_check_failed'] = 'the unsettled count could not be read'
         charged = int(spent) if spent else None
     except Refused:
         ledger.settle(entry, 0, 'not_started')  # type: ignore[attr-defined]
@@ -447,7 +450,7 @@ def goal(root: Path, record: Record, requested: str, key_file: Path, limit: int,
         failure = sys.exc_info()[0]
         if write_report_needed and failure is not None:
             report['failed_with'] = failure.__name__
-            absent = [name for name in ('status', 'timeline', 'committed_micro_usd', 'calls') if name not in report]
+            absent = [name for name in ('status', 'timeline', 'committed_micro_usd', 'calls') if not report.get(name)]
             report['not_checked'] = ['key usage after the run', 'the key in stored rows or logs', *absent]
             try:
                 write_report()

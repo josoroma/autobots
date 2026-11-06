@@ -161,7 +161,7 @@ These are fixture-tested script behaviors in `tests/harness/test_hooks.py`, not 
 | Malformed or oversized JSON, an unsupported event or tool, or an internal error such as a missing `harness_lib` | Exit 2, empty stdout and one fixed stderr line. Input is never echoed |
 | No complete input within 9 seconds, below the configured 10-second timeout | Exit 2, the same way. `AUTOBOTS_HOOK_DEADLINE_SECONDS` can only shorten this |
 | An unusable `file_path`: missing, over 4096 bytes, containing NUL, or a symlink loop | `PreToolUse` denies; `PostToolUse` returns the generic diagnostic |
-| A secret name in any case, before or after symlink resolution | `PreToolUse` denies. `Bash` commands are matched only by a narrow pattern list, and the `Grep` tool is outside the matcher, so this is a guardrail and no sandbox |
+| A secret name in any case, before or after symlink resolution | `PreToolUse` denies. `Bash` commands are matched only by a narrow pattern list, so `grep . master.key`, a key named on the far side of a pipe, and a relative path to a key outside the install's folder all get through, and the `Grep` tool is outside the matcher. This is a guardrail and no sandbox |
 | A filename with spaces, Unicode or shell metacharacters | Treated as data, and passed only as one argument after `--` |
 | An edited Python file under `services/agent/` | `PostToolUse` names the affected domains, checks syntax and runs the prepared `ruff` for at most 3 seconds, reporting a finding, a missing tool or a timeout without echoing its output |
 | A `cwd` inside a worktree Git has registered under this checkout's `.claude/worktrees/` | That worktree is the root for the event, as below |
