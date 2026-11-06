@@ -4,7 +4,7 @@ The [first slice runbook](first-slice.md) exercises a goal end to end on disposa
 
 ## Scope and prerequisites
 
-Native Next.js on `127.0.0.1:3000` and the Python API on `127.0.0.1:8001`, with the prepared environments from [the toolchains runbook](toolchains.md), and a Supabase stack. No model is called. **Nothing here starts a persistent stack:** only disposable qualification does so far, so the steps below need a stack you already run.
+Native Next.js on `127.0.0.1:3000` and the Python API on `127.0.0.1:8001`, with the prepared environments from [the toolchains runbook](toolchains.md), and a Supabase stack. No model is called here. [The persistent install](local-supabase.md#the-persistent-install) is the stack to run these on: its `app.env` holds every value below except `AUTOBOTS_OWNER_PASSWORD`, which is in `owner.env`. These steps ran on it on 2026-11-06, with `set -a; . "$APP_ENV"; set +a` first. `next start` needs a production build from `next build`, and the Node on `PATH` that [the toolchains runbook](toolchains.md) pins.
 
 The browser suite needs the pinned Chromium for the locked `@playwright/test`, repo-local and Git-ignored, installed once and on purpose:
 
@@ -40,7 +40,7 @@ Settings → Models → OpenRouter shows the source, authentication, catalog and
 
 The API also needs `AUTOBOTS_CONFIG_ROOT`, the absolute directory holding any `.env` files, which every native process shares. With it unset, settings report unavailable. `AUTOBOTS_PROVIDER_MASTER_KEY_FILE` overrides the default key path. The installation's environment key applies only to a workspace with a row in `app_private.installation_credential_grants`.
 
-Only a user's **Run** reaches the credential gate, and it admits nothing yet. Without a key it returns `credentials_required`, and the draft stays in this tab's `sessionStorage`. No credential is stored in the browser.
+Only a user's **Run** reaches the credential gate. Without a key it returns `credentials_required`, and the draft stays in this tab's `sessionStorage`. No credential is stored in the browser. With one, the goal is queued, and only a worker with [the inference switch](operations.md#turning-on-inference) runs it.
 
 ## Boundaries
 

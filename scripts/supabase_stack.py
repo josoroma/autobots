@@ -116,8 +116,11 @@ class SupabaseStack(Stack):
                             '-v', 'ON_ERROR_STOP=1', stdin=statements)
 
 
-def rendered_refusals(rendered: Mapping, project: str, root: Path) -> list[str]:
-    """What Compose would actually do, after merging. Appended ports would keep an upstream wildcard, so check all."""
+def rendered_refusals(rendered: Mapping, project: str, root: Path, marked: bool = True) -> list[str]:
+    """What Compose would actually do, after merging. Appended ports would keep an upstream wildcard, so check all.
+
+    `marked=False` is the persistent install, which carries no disposable marking. Everything else still applies.
+    """
     reasons = []
     services = rendered.get('services') or {}
     if set(services) != REQUIRED_SERVICES:
@@ -131,7 +134,7 @@ def rendered_refusals(rendered: Mapping, project: str, root: Path) -> list[str]:
         if service.get('network_mode') or service.get('privileged') or service.get('pid'):
             reasons.append(f'service {name} leaves the isolated project network')
         labels = service.get('labels') or {}
-        if labels.get(TARGET_LABEL) != 'disposable' or labels.get(RUN_LABEL) != project:
+        if marked and (labels.get(TARGET_LABEL) != 'disposable' or labels.get(RUN_LABEL) != project):
             reasons.append(f'service {name} lacks the disposable labels')
         ports = service.get('ports') or []
         if bool(ports) != (name in PUBLISHED_SERVICES):
@@ -147,7 +150,7 @@ def rendered_refusals(rendered: Mapping, project: str, root: Path) -> list[str]:
             elif mount.get('type') != 'volume':
                 reasons.append(f"service {name} has an unexpected mount at {mount.get('target')}")
     for key, volume in (rendered.get('volumes') or {}).items():
-        if volume.get('external') or (volume.get('labels') or {}).get(TARGET_LABEL) != 'disposable':
+        if volume.get('external') or (marked and (volume.get('labels') or {}).get(TARGET_LABEL) != 'disposable'):
             reasons.append(f'volume {key} is external or unmarked')
         if not str(volume.get('name', '')).startswith(f'{project}_'):
             reasons.append(f'volume {key} is not owned by the project')

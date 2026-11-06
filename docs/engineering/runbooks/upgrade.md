@@ -2,7 +2,7 @@
 
 Moving to a new application, schema, Supabase or framework release without changing what saved runs mean.
 
-**Last exercised:** `python3.12 scripts/qualify_upgrade.py`, on a disposable project, writing `.checks/upgrade/qualification.json`. It starts from a prior release's own code and migrations (`PRIOR_REVISION` in the script, read from git history) with a scripted model. Images and pinned packages are the same in both releases, so an image change was **not** observed, and an adapter change was arranged. It has not run on a persistent stack, because none is configured here.
+**Last exercised:** `python3.12 scripts/qualify_upgrade.py`, on a disposable project, writing `.checks/upgrade/qualification.json`. It starts from a prior release's own code and migrations (`PRIOR_REVISION` in the script, read from git history) with a scripted model. Images and pinned packages are the same in both releases, so an image change was **not** observed, and an adapter change was arranged. On the real install, on 2026-11-06, it was followed for one real migration, [as US-11.3 records](../../../openspec/changes/archive/2026-11-06-us-11-3-guarded-persistent-install-exercised/verification.md).
 
 ## What's protected
 
@@ -18,9 +18,11 @@ In `domain/execution.py`: raise the version. Old runs then stop at `incompatible
 
 1. Read the new migrations, and any change in `infra/supabase`, `uv.lock` or adapter version.
 2. Drain, stop and back up as in [the operations runbook](operations.md) and [the backup runbook](backup-restore.md).
-3. Restore that backup to an isolated instance and try the upgrade there first. Physical backups restore only with the Compose files and images they were taken with, so restore from the old revision, then upgrade.
-4. Apply migrations with the migration role. For a disposable target that's `scripts/app_db.py`. **The guarded persistent apply isn't implemented**, so a persistent upgrade is an explicit step for whoever owns that stack.
+3. Restore that backup to an isolated instance and try the upgrade there first, with `services/agent/.venv/bin/python scripts/persistent_install.py apply --project "$RESTORED_PROJECT" --restored-copy`. That needs the copy's matching identity and its restore hold still in place. Physical backups restore only with the Compose files and images they were taken with, so restore from the old revision, then upgrade.
+4. Apply migrations to the install with `services/agent/.venv/bin/python scripts/persistent_install.py apply --project autobots-install`. For a disposable target it's `scripts/app_db.py`.
 5. Start the API. `schema_behind` means migrations are still missing, and nothing is admitted. Start workers once it's ready.
+
+**Not exercised on the install:** `schema_behind`, as its one migration only changed a row, and a failed migration, an image change or a framework change, which only the disposable qualifiers cover.
 
 ## Qualifying a framework release
 

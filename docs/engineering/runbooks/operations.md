@@ -2,7 +2,7 @@
 
 Starting, draining, stopping and reading the health of the local stack, and applying retention.
 
-**Last exercised:** on a disposable Compose project by `python3.12 scripts/qualify_operations.py`, which runs this procedure with a scripted model and writes `.checks/operations/qualification.json`. It has **not** been run on a persistent stack: none is configured on this machine, because the proposed ports `54321` and `54322` belong to another project. The commands below are the ones qualified, with the persistent project's name and env file still to be chosen.
+**Last exercised:** on the real install on 2026-11-06, [as US-11.3 records](../../../openspec/changes/archive/2026-11-06-us-11-3-guarded-persistent-install-exercised/verification.md), with a real goal, a drain, a stop and a start. Its project is `autobots-install`, on `127.0.0.1:55321` and `127.0.0.1:55322`, because `54321` and `54322` belong to another project, with its files in `~/.local/share/autobots-install`. `python3.12 scripts/qualify_operations.py` still runs this procedure on a disposable project with a scripted model, including what the real install didn't: a run cut short by a drain, and retention.
 
 ## Prerequisites and target
 
@@ -18,7 +18,7 @@ In this order, as LM-07 states.
 docker compose -p "$PROJECT" --env-file "$ENV_FILE" -f infra/supabase/upstream/docker-compose.yml -f infra/supabase/compose.overlay.yaml up -d --wait --wait-timeout 240
 ```
 
-Then apply reviewed migrations with the migration role. The guarded persistent apply isn't implemented yet: `scripts/app_db.py` refuses anything but a disposable target, so a persistent apply is an explicit step for whoever owns that stack. Then start the processes:
+Then apply reviewed migrations with [the guarded apply](local-supabase.md#the-persistent-install). It's refused unless the project is the recorded install. Then start the processes, with `set -a; . "$APP_ENV"; set +a` first, where `APP_ENV` is the install's `app.env`:
 
 ```sh
 services/agent/.venv/bin/python -m uvicorn --factory autobots.api.main:create_configured_app --host 127.0.0.1 --port 8001 --no-access-log 2>> "$LOG_DIR/api.log"
@@ -29,11 +29,11 @@ Expected: `GET /v1/operations/local-status`, or the Operations page, says ready.
 
 ## What the worker does today
 
-`autobots.operations.worker` expires approvals, evaluates routines and applies retention. **By default it doesn't claim jobs**, because claiming spends real money. Queued runs wait, and Operations says `no_inference_worker`.
+`autobots.operations.worker` expires approvals, evaluates routines and applies retention. **By default it doesn't claim jobs**, because claiming spends real money. Queued runs wait. With at least one queued, Operations says `no_inference_worker`, and with none it says `worker_ready`, as observed on the install.
 
 ## Turning on inference
 
-**This spends real money once a key exists: every queued run in every workspace with a key sends billed requests to OpenRouter.** Both routes have met the real provider ([with their limits](../evidence/US-3.4/summary.md)). [One goal, repeated on disposable stacks,](../evidence/LIVE-GOAL-1/summary.md) went Terra 5 of 5 and DeepSeek 0 of 5, and Terra is the default by [Decision 0006](../decisions/0006-terra-is-the-default.md). That doesn't show either is good at the work, and this path hasn't run live on a persistent stack. The check below uses a fake transport.
+**This spends real money once a key exists: every queued run in every workspace with a key sends billed requests to OpenRouter.** Both routes have met the real provider ([with their limits](../evidence/US-3.4/summary.md)). [One goal, repeated on disposable stacks,](../evidence/LIVE-GOAL-1/summary.md) went Terra 5 of 5 and DeepSeek 0 of 5, and Terra is the default by [Decision 0006](../decisions/0006-terra-is-the-default.md). That doesn't show either is good at the work. [One goal has run on the real install](../../../openspec/changes/archive/2026-11-06-us-11-3-guarded-persistent-install-exercised/verification.md), on Terra. The check below uses a fake transport.
 
 Set the switch where the worker starts, alongside `AUTOBOTS_CONFIG_ROOT`, `AUTOBOTS_SUPABASE_URL`, `AUTOBOTS_SERVICE_ROLE_KEY` and, if the key file isn't in its default place, `AUTOBOTS_PROVIDER_MASTER_KEY_FILE`, all with the same values the API uses. Missing any of the required ones, the worker refuses to start.
 
@@ -127,7 +127,7 @@ kill -TERM "$WORKER_PID"
 docker compose -p "$PROJECT" stop
 ```
 
-Expected: the worker's heartbeat goes to `draining` then `stopped`, and it logs `worker.draining` and `worker.stopped`. A step finishes if it can within `AUTOBOTS_WORKER_DRAIN_SECONDS` (default 30). uvicorn exits with status -15 after `Application shutdown complete`, which is its normal clean stop.
+Expected: the worker logs `worker.stopped`, and its heartbeat ends at `stopped`. With a step still running it first goes to `draining` and logs `worker.draining`. On the install no step was running, so only `worker.stopped` appeared. A step finishes if it can within `AUTOBOTS_WORKER_DRAIN_SECONDS` (default 30). uvicorn exits with status -15 after `Application shutdown complete`, which is its normal clean stop.
 
 **If the drain runs out:** the worker logs `worker.drain_cut_short` and exits. The job's lease expires, and Operations shows `leases_expired`. A model call in flight at that moment may have been charged, so the run pauses with `uncertain_model_call` instead of retrying. Look up the charge in OpenRouter's own records, then reconcile it and resume:
 

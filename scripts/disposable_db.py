@@ -270,6 +270,12 @@ def remove_stack(stack: Stack) -> None:
     result = stack.compose('--profile', 'storage', 'down', '--volumes', '--remove-orphans', '--timeout', '5')
     if result.returncode:
         raise Unavailable('docker compose could not remove the disposable project')
+    # Compose only removes volumes its given file names, and `cleanup` can be handed another project's
+    # stack. Each was proven this project's by its labels above.
+    left = run(['docker', 'volume', 'ls', '--filter', f'label=com.docker.compose.project={stack.target.project}', '--filter', f'label={TARGET_LABEL}=disposable', '-q'], tool_env())
+    for name in left.stdout.split():
+        if run(['docker', 'volume', 'rm', name], tool_env()).returncode:
+            raise Unavailable(f'the volume {name} could not be removed')
 
 
 def free_port(excluded: Sequence[int] = ()) -> int:

@@ -2,7 +2,7 @@
 
 ## Scope and prerequisites
 
-The pinned release is `self-hosted/v0.8.3`, commit `bc27d2661edd09a5d0b8d76ce33da6d4071a756e`, vendored unmodified in `infra/supabase/upstream/` with hashes in `UPSTREAM.json`. `infra/supabase/compose.overlay.yaml` holds local decisions. This covers preflight and disposable qualification. **Starting a persistent stack is not implemented here**, and nothing below creates or changes one.
+The pinned release is `self-hosted/v0.8.3`, commit `bc27d2661edd09a5d0b8d76ce33da6d4071a756e`, vendored unmodified in `infra/supabase/upstream/` with hashes in `UPSTREAM.json`. `infra/supabase/compose.overlay.yaml` holds local decisions. This covers preflight, disposable qualification and [the persistent install](#the-persistent-install).
 
 Needs Docker with the eight images in the overlay already local, and the prepared `services/agent/.venv` for the direct connection check. Nothing is pulled by a check.
 
@@ -31,7 +31,7 @@ It checks the merged Compose result, then actual listeners: both published ports
 | Symptom | Recovery |
 |---|---|
 | Exit 2 naming an image | Pull that exact tag deliberately. The check never pulls |
-| A run was killed and left a project | `python3.12 scripts/disposable_db.py cleanup --project autobots-disposable-<id>` |
+| A run was killed and left a project | `python3.12 scripts/disposable_db.py cleanup --project autobots-disposable-<id>`, which removes that project's containers and labelled volumes |
 | `every service is healthy` fails | Its stderr and the case's `observed` name the states. Nothing persistent is involved, and the project is removed anyway |
 | Upgrading the release | Vendor new files, regenerate `UPSTREAM.json`, re-resolve digests, and requalify. Never edit vendored files in place |
 
@@ -47,7 +47,24 @@ jq -r '.status, (.cases[] | "\(.status) \(.id)")' .checks/app_db/qualification.j
 
 Expected: `qualify` exits 0, after creating a new disposable database on the pinned image, proving replay, upgrade from the prior version, seeds, constraints, access and migration authority, and removing it. It fails if `packages/db-types/src/generated.ts` has drifted. After a migration change, `types` runs the same cycle and rewrites that file. Exit 2 means Docker or the pinned image is missing. `--profile db` runs `qualify`.
 
-**No persistent apply exists.** Applying to a persistent stack needs a target-identity and baseline check that belongs with whichever story first starts one. The framework's checkpoint tables are set up in `agent_runtime` by the migration identity during qualification only; a persistent path must do the same, and workers must never call its `setup()`.
+## The persistent install
+
+`scripts/persistent_install.py` is the only path that changes the persistent database. There's one install, recorded outside this repository in `~/.local/share/autobots-install`: `install.json` holds its identity and ports, and `stack.env`, `app.env` and `owner.env` its secrets, all mode `0600`. Data is in the Compose project's named volumes. No command here removes a container or a volume, and `reset` is always refused.
+
+```sh
+PYTHON=services/agent/.venv/bin/python
+$PYTHON scripts/persistent_install.py init --project autobots-install
+$PYTHON scripts/persistent_install.py up --project autobots-install
+$PYTHON scripts/persistent_install.py setup --project autobots-install
+$PYTHON scripts/persistent_install.py apply --project autobots-install
+$PYTHON scripts/persistent_install.py status --project autobots-install
+```
+
+`init` refuses a held port, a disposable name or an existing record, and touches no database. `up` refuses a Compose result that isn't loopback-only with pinned images. `setup` runs the role bootstrap and writes the identity row in `autobots_install.identity`, once, on a database with no application tables. `apply` applies pending migrations in order, each with its history row in one transaction, as the migration role, then the seed, and the Storage policies once. The framework's checkpoint tables are created by those migrations, and workers never call its `setup()`.
+
+**Before any change,** `apply` refuses a project that isn't the recorded one, a target with no running database, a disposable label, a database published on another port, an identity row that doesn't match, an edited applied migration or a badly named file. `status` lists the actual listeners. `python3.12 scripts/qualify_persistent_apply.py`, in `--profile db`, tests each refusal on a disposable target. A real install's stop and start use `docker compose -p autobots-install stop` and `up`, as in [the operations runbook](operations.md).
+
+**Not exercised on the install:** this page's recovery rows, which are about disposable projects, and upgrading the pinned release.
 
 ## Credentials and the master key
 

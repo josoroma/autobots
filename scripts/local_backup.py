@@ -47,8 +47,7 @@ FACTS = """select json_build_object(
   'live_workers', (select count(*) from app_private.worker_heartbeats where state <> 'stopped' and beat_at > now() - interval '60 seconds'),
   'artifacts', (select coalesce(json_agg(json_build_object('id', id, 'workspace_id', workspace_id, 'sha256', sha256, 'size_bytes', size_bytes)), '[]') from public.artifacts where status = 'published'),
   'threads', (select coalesce(json_agg(t), '[]') from (select thread_id, max(checkpoint_id) as latest, count(*) as count from agent_runtime.checkpoints group by 1) t),
-  'migrations', case when to_regclass('autobots_disposable.migrations') is null then '[]'::json
-    else (select coalesce(json_agg(name order by name), '[]') from autobots_disposable.migrations) end
+  'migrations', {migrations}
 );"""
 
 
@@ -78,8 +77,14 @@ def db_container(project: str) -> str:
 
 
 def read_facts(project: str) -> dict:
-    result = docker('exec', db_container(project), 'psql', '-U', 'supabase_admin', '-d', 'postgres', '-X', '-q', '-A', '-t', '-c', FACTS)
-    if result.returncode:
+    container = db_container(project)
+    # A name in a query has to exist when it's parsed, so which history table is read is decided first.
+    command = ('psql', '-U', 'supabase_admin', '-d', 'postgres', '-X', '-q', '-A', '-t', '-c')
+    which = docker('exec', container, *command, "select coalesce(to_regclass('autobots_install.migrations')::text, to_regclass('autobots_disposable.migrations')::text, '');")
+    history = which.stdout.strip()
+    migrations = f"(select coalesce(json_agg(name order by name), '[]') from {history})" if history else "'[]'::json"
+    result = docker('exec', container, *command, FACTS.replace('{migrations}', migrations))
+    if which.returncode or result.returncode:
         raise Refused(f'the running database of {project} could not be read')
     return json.loads(result.stdout)
 

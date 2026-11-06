@@ -7,11 +7,11 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | EPIC-10 |
+| Target | EPIC-11 |
 | Kind | epic |
 | Focus | - |
-| Status | STOPPED |
-| Reason | stopped on request |
+| Status | ACTIVE |
+| Reason | - |
 | Started | 2026-11-06 |
 | Updated | 2026-11-06 |
 
@@ -19,17 +19,27 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-10.1 | us-10-1-held-out-task-policy | DONE | Held-out task, policy and performance qualification |
-| 2 | US-10.2 | us-10-2-release-traceability-evidence-based | BLOCKED | Release traceability and evidence-based completion |
+| 1 | US-11.1 | us-11-1-truthful-qualification-status | READY | Truthful qualification status |
+| 2 | US-11.2 | us-11-2-reasoning-continuation-check | READY | Reasoning continuation check |
+| 3 | US-11.3 | us-11-3-guarded-persistent-install-exercised | BLOCKED | Guarded persistent install, exercised |
+| 4 | US-11.4 | us-11-4-run-controls-run-page | READY | Run controls on the run page |
+| 5 | US-11.5 | us-11-5-run-list-inspector | READY | Run list and inspector |
+| 6 | US-11.6 | us-11-6-model-role-choice-settings | READY | Model and role choice in Settings |
+| 7 | US-11.7 | us-11-7-approval-reason-target | READY | Approval reason and target |
+| 8 | US-11.8 | us-11-8-operations-completeness | BLOCKED | Operations completeness |
+| 9 | US-11.9 | us-11-9-run-creation-disclosure-role | BLOCKED | Run creation disclosure, role map and run details |
+| 10 | US-11.10 | us-11-10-real-mac-sleep-proof | BLOCKED | Real Mac sleep proof |
+| 11 | US-11.11 | us-11-11-design-system-migration-final | BLOCKED | Design system migration and final visual evidence |
+| 12 | US-11.12 | us-11-12-final-independent-review-gate | BLOCKED | Final independent review and Gate 0 |
 
 ## Next Action
 
-Action: escalate
-Story: US-10.2
-Change: us-10-2-release-traceability-evidence-based
-Owner: human
-Command: resolve US-10.2 in SPECS.md (a product decision is required)
-Reason: US-10.2 is BLOCKED, not READY
+Action: select
+Story: US-11.1
+Change: us-11-1-truthful-qualification-status
+Owner: main-session
+Command: openspec new change us-11-1-truthful-qualification-status; set US-11.1 to IN PROGRESS with a Change: line
+Reason: US-11.1 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

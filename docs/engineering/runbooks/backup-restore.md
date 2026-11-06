@@ -2,7 +2,7 @@
 
 A complete local backup, and a restore into a separate instance to prove it works.
 
-**Last exercised:** between two disposable Compose projects by `python3.12 scripts/qualify_backup.py`, which writes `.checks/backup/qualification.json`. The source stood in for the persistent stack, which isn't configured on this machine. Its credential was an arranged fake, and its model was scripted. **Restoring over a live instance isn't supported or provided.**
+**Last exercised:** on the real install on 2026-11-06, [as US-11.3 records](../../../openspec/changes/archive/2026-11-06-us-11-3-guarded-persistent-install-exercised/verification.md), restoring into an isolated `autobots-disposable-*` project. `python3.12 scripts/qualify_backup.py` also runs it between two disposable projects, and asserts more on the restored instance, as listed below. **Restoring over a live instance isn't supported or provided, and neither is moving to another machine.**
 
 Backups on this Mac don't protect you from losing this Mac. Copy the backup and both keys elsewhere, each separately, if that matters.
 
@@ -10,7 +10,7 @@ Backups on this Mac don't protect you from losing this Mac. Copy the backup and 
 
 - `services/agent/.venv` (the tool needs `cryptography`), Docker, and the pinned images already local. Nothing is pulled.
 - `PROJECT` is the Compose project to back up. Check the name.
-- `ENV_FILE` is that stack's configuration, including its role passwords. It's sealed into the backup because Auth signing and role passwords must match the restored data.
+- `ENV_FILE` is that stack's configuration, including its role passwords: the install's `stack.env`. It's sealed into the backup because Auth signing and role passwords must match the restored data.
 
 ## Keys
 
@@ -92,4 +92,4 @@ Before releasing, cancel or review what's pending, because workers will take que
 
 ## Cleanup
 
-The qualifier removes only its own two `autobots-disposable-*` projects and temporary directory. Removing a restored instance you made is your call: it's the project's containers and volumes, and nothing else. Nothing removes a backup.
+The qualifier removes only its own two `autobots-disposable-*` projects and temporary directory. Removing a restored instance you made is your call: `python3.12 scripts/disposable_db.py cleanup --project "$RESTORED_PROJECT"` removes the project's containers and labelled volumes, and nothing else. Nothing removes a backup.

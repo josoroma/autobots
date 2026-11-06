@@ -221,11 +221,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-11.2#1 | Add the deterministic check on the application's continuation path, using a fake transport. | DONE | US-11.2 |
 | US-11.2#2 | Run the capped trial on each enabled route, and record actual cost against the shared cap. | DONE | US-11.2 |
 | US-11.2#3 | Report any loss to the owner, without changing LC-23's text. | DONE | US-11.2 |
-| US-11.3 | Guarded persistent install, exercised | READY | EPIC-11 |
-| US-11.3#1 | Build the guarded persistent migration apply, with its refusals tested on a disposable target. | TODO | US-11.3 |
-| US-11.3#2 | Choose and record the install's project name, ports, env file and data location outside the repository. | TODO | US-11.3 |
-| US-11.3#3 | Stand up the stack and exercise the runbooks on it, correcting what they say about a persistent stack. | TODO | US-11.3 |
-| US-11.3#4 | Run a real goal under the shared cap, record actual cost, and leave the worker's inference switch off afterward. | TODO | US-11.3 |
+| US-11.3 | Guarded persistent install, exercised | DONE | EPIC-11 |
+| US-11.3#1 | Build the guarded persistent migration apply, with its refusals tested on a disposable target. | DONE | US-11.3 |
+| US-11.3#2 | Choose and record the install's project name, ports, env file and data location outside the repository. | DONE | US-11.3 |
+| US-11.3#3 | Stand up the stack and exercise the runbooks on it, correcting what they say about a persistent stack. | DONE | US-11.3 |
+| US-11.3#4 | Run a real goal under the shared cap, record actual cost, and leave the worker's inference switch off afterward. | DONE | US-11.3 |
 | US-11.4 | Run controls on the run page | READY | EPIC-11 |
 | US-11.4#1 | Add pause, cancel and resume to the run page, using the existing routes and the run's current version. | TODO | US-11.4 |
 | US-11.4#2 | Add owner-only model-call reconciliation, and show each refusal's reason. | TODO | US-11.4 |
@@ -2929,7 +2929,8 @@ Open Questions:
 
 ### US-11.3: Guarded persistent install, exercised
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-11-3-guarded-persistent-install-exercised/`
 
 As an owner
 I want a guarded migration path and a real persistent install on this Mac
@@ -2985,10 +2986,10 @@ Dependencies:
 - US-11.2
 
 Tasks:
-- [ ] Build the guarded persistent migration apply, with its refusals tested on a disposable target.
-- [ ] Choose and record the install's project name, ports, env file and data location outside the repository.
-- [ ] Stand up the stack and exercise the runbooks on it, correcting what they say about a persistent stack.
-- [ ] Run a real goal under the shared cap, record actual cost, and leave the worker's inference switch off afterward.
+- [x] Build the guarded persistent migration apply, with its refusals tested on a disposable target.
+- [x] Choose and record the install's project name, ports, env file and data location outside the repository.
+- [x] Stand up the stack and exercise the runbooks on it, correcting what they say about a persistent stack.
+- [x] Run a real goal under the shared cap, record actual cost, and leave the worker's inference switch off afterward.
 
 Open Questions:
 - None.
