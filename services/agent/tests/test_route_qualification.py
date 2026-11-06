@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,7 @@ from pydantic import SecretStr
 
 from autobots.adapters.models.catalog import ModelUnavailable
 from autobots.adapters.models.factory import default_sdk_client
+from autobots.domain.models import PROFILES
 from autobots.operations import route_qualification as rq
 
 WIRE_ID = "deepseek/deepseek-v4.1-flash-1017"
@@ -331,6 +333,25 @@ def test_only_the_authorized_routes_can_be_paid_for(tmp_path: Path) -> None:
         "openai_gpt_6_1_terra": 600_000,
     }
     assert set(rq.ROUTES) == set(rq.AUTHORIZED_CAPS)
+
+
+def test_every_approved_profile_has_a_route_to_qualify() -> None:
+    """Otherwise "each enabled route" could quietly stop meaning the routes the app uses."""
+    routes = {(route.wire_id, route.canonical_id) for route in rq.ROUTES.values()}
+    for profile in PROFILES.values():
+        assert (profile.wire_id, profile.canonical_id) in routes
+
+
+def test_no_application_code_asks_for_strict_output() -> None:
+    """Decision 0005: a capability that failed qualification stays disabled until it passes."""
+    asks = re.compile(r"with_structured_output|response_format|bind_tools\([^)]*strict")
+    source = Path(rq.__file__).parents[1]
+    found = [
+        path.relative_to(source).as_posix()
+        for path in source.rglob("*.py")
+        if path != Path(rq.__file__) and asks.search(path.read_text())
+    ]
+    assert found == []
 
 
 def _with_terra() -> dict[str, Any]:

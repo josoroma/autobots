@@ -122,3 +122,20 @@ The runner's worst-case estimate used DeepSeek's base rate, though the catalog s
 
 What happened when the limit was tried on a real goal is in [the live goal record](../LIVE-GOAL-1/summary.md#trial-2048-output-tokens-deepseek-and-terra). This round doesn't change US-3.4's status.
 
+## Outcome
+
+**This replaces the opening's "the story isn't complete" and the decisions listed above.** The owner decided them: Terra replaced Astra in [Decision 0004](../../decisions/0004-terra-replaces-astra.md), and DeepSeek's strict nested output is unsupported and stays disabled in [Decision 0005](../../decisions/0005-deepseek-strict-nested-unsupported.md). The shared limit stays 512.
+
+| Fixture group | DeepSeek | Terra |
+|---|---|---|
+| Tools, including named against a conflicting prompt | Pass | Pass |
+| Strict schema, flat | Pass | Pass |
+| Strict schema, nested | **Unsupported, disabled** | Pass with closed objects only |
+| Streaming, continuation, truncation | Pass | Pass |
+| Refusal | Pass on rerun, in text only | Pass, in text only |
+| Cancellation | Our side stopped | Our side stopped |
+
+Two tests guard this in `services/agent/tests/test_route_qualification.py`: application code can't start asking for strict output, and an approved profile can't lack a route to qualify. Both were confirmed failing on a temporary break.
+
+**Still open, and not settled by this story:** whether the provider stopped on a cancelled call and what it charged, the upstream provider, concurrent admission on a live route (MP-A09), and real fragmentation of DeepSeek's streamed tool arguments, covered only by the fake transport. No real goal has succeeded on either model. Three trials per fixture on one day. This doesn't establish H1, product acceptance or task quality, which stays with US-10.1.
+

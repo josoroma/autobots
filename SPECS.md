@@ -117,9 +117,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-3.3 | Model admission, spending and uncertain invocation receipts | DONE | EPIC-3 |
 | US-3.3#1 | Implement slot/cost admission and per-attempt receipts. | DONE | US-3.3 |
 | US-3.3#2 | Test concurrent reservations, UTC rollover, failure classes and cancellation ambiguity. | DONE | US-3.3 |
-| US-3.4 | Qualify each enabled live OpenRouter route | BLOCKED | EPIC-3 |
-| US-3.4#1 | Run the per-route adapter corpus under the shared limits. | TODO | US-3.4 |
-| US-3.4#2 | Publish actual qualification and failure evidence without substituting another model. | TODO | US-3.4 |
+| US-3.4 | Qualify each enabled live OpenRouter route | DONE | EPIC-3 |
+| US-3.4#1 | Run the per-route adapter corpus under the shared limits. | DONE | US-3.4 |
+| US-3.4#2 | Publish actual qualification and failure evidence without substituting another model. | DONE | US-3.4 |
 | EPIC-4 | Durable goal-to-artifact execution | — | — |
 | US-4.1 | Atomic run admission and canonical transition commands | DONE | EPIC-4 |
 | US-4.1#1 | Implement typed admission and atomic transition/outbox commands. | DONE | US-4.1 |
@@ -193,7 +193,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-9.3#1 | Implement version checks and supported migration/forward-recovery paths. | DONE | US-9.3 |
 | US-9.3#2 | Exercise prior-fixture upgrade and resumed-checkpoint compatibility. | DONE | US-9.3 |
 | EPIC-10 | Product qualification and completion | — | — |
-| US-10.1 | Held-out task, policy and performance qualification | BLOCKED | EPIC-10 |
+| US-10.1 | Held-out task, policy and performance qualification | READY | EPIC-10 |
 | US-10.1#1 | Run the held-out behavioral and policy/recovery suites without tuning on held-out data. | TODO | US-10.1 |
 | US-10.1#2 | Publish per-category outcomes, resource measurements and actual latency/cost evidence. | TODO | US-10.1 |
 | US-10.2 | Release traceability and evidence-based completion | BLOCKED | EPIC-10 |
@@ -298,8 +298,6 @@ flowchart TD
   US_3_2 -.-> US_3_4
   US_3_3 -.-> US_3_4
   US_4_8 -.-> US_3_4
-  EXT_US_3_4_1["External: Authorized usable OpenRouter credentials and bounded paid qualification are required."]
-  EXT_US_3_4_1 -.-> US_3_4
   US_2_2 -.-> US_4_1
   US_2_3 -.-> US_4_1
   US_2_5 -.-> US_4_1
@@ -1508,7 +1506,8 @@ Open Questions:
 
 ### US-3.4: Qualify each enabled live OpenRouter route
 
-Status: BLOCKED
+Status: DONE
+Change: `openspec/changes/archive/2026-11-05-us-3-4-qualify-each-enabled-live/`
 
 As an operator
 I want actual protocol evidence for an enabled model
@@ -1521,6 +1520,7 @@ Source:
 - [MP-A06/07/09/10](PRD-Model-Providers.md#mp-09-acceptance-evidence)
 - [Option B capability gate matrix](PRD-LangChain-Deep-Agents.md#64-capability-gate-matrix)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B1 qualification.
+- [Decision 0005](docs/engineering/decisions/0005-deepseek-strict-nested-unsupported.md#decision) — DeepSeek's strict nested output stays disabled.
 
 Acceptance Criteria:
 
@@ -1540,11 +1540,10 @@ Dependencies:
 - US-3.2
 - US-3.3
 - US-4.8
-- External: Authorized usable OpenRouter credentials and bounded paid qualification are required.
 
 Tasks:
-- [ ] Run the per-route adapter corpus under the shared limits.
-- [ ] Publish actual qualification and failure evidence without substituting another model.
+- [x] Run the per-route adapter corpus under the shared limits.
+- [x] Publish actual qualification and failure evidence without substituting another model.
 
 Open Questions:
 - None.
@@ -2505,7 +2504,7 @@ Phase reference: B7, preserved SP-020. All story completion also requires SP-003
 
 ### US-10.1: Held-out task, policy and performance qualification
 
-Status: BLOCKED
+Status: READY
 
 As a product owner
 I want measured end-to-end outcomes

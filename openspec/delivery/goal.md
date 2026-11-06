@@ -7,8 +7,8 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | EPIC-8 |
-| Kind | epic |
+| Target | US-3.4 |
+| Kind | story |
 | Focus | - |
 | Status | COMPLETE |
 | Reason | - |
@@ -19,8 +19,7 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-8.1 | us-8-1-scoped-memory-lexical-retrieval | DONE | Scoped memory, lexical retrieval and safe compaction |
-| 2 | US-8.2 | us-8-2-reviewed-memory-skill-promotion | DONE | Reviewed memory and skill promotion with rollback |
+| 1 | US-3.4 | us-3-4-qualify-each-enabled-live | DONE | Qualify each enabled live OpenRouter route |
 
 ## Next Action
 
@@ -29,7 +28,7 @@ Story: -
 Change: -
 Owner: main-session
 Command: none — every story in the goal is DONE
-Reason: all 2 story/stories are DONE
+Reason: all 1 story/stories are DONE
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.
