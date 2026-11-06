@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 const NAVIGATION = [
   { href: "/", label: "Home" },
+  { href: "/runs", label: "Runs" },
   { href: "/experts", label: "Experts" },
   { href: "/approvals", label: "Approvals" },
   { href: "/operations", label: "Operations" },

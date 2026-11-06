@@ -211,6 +211,14 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Run</h1>
+      <p className="text-sm">
+        <Link
+          href={`/runs/${runId}/inspector`}
+          className="font-medium underline"
+        >
+          Inspect this run
+        </Link>
+      </p>
       <Card aria-labelledby="status-heading" className="space-y-2">
         <h2 id="status-heading" className="text-lg font-medium">
           Status

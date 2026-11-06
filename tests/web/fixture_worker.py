@@ -97,6 +97,9 @@ class GoalScript(BaseChatModel):
         else:
             position = sum(item.type == 'ai' for item in messages)
             message = AIMessage(content='', response_metadata=metadata, tool_calls=[{'name': step[0], 'args': step[1], 'id': f'call-{position}', 'type': 'tool_call'}])
+        if 'slice-reasoned' in goal:
+            # Arranged: what a real route can return, which reaches checkpoints and must go no further.
+            message.additional_kwargs['reasoning_details'] = [{'type': 'reasoning.encrypted', 'data': 'PROTECTED-REASONING', 'index': 0}]
         return ChatResult(generations=[ChatGeneration(message=message)])
 
 

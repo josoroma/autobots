@@ -15,21 +15,30 @@ from autobots.contracts.adapters import run_from_row, run_summary_from_domain
 from autobots.contracts.artifacts import ArtifactSummary
 from autobots.contracts.run_workspace import (
     AssignmentView,
+    CheckpointView,
     CriterionView,
     EventPage,
     ExpertBinding,
+    ModelCallView,
     OutstandingSummary,
     PlanSummary,
+    RunInspector,
+    RunList,
+    RunListItem,
     RunWorkspace,
     TaskView,
+    ToolAttemptView,
     UnknownEffect,
     UsageSummary,
     VerificationSummary,
 )
 from autobots.contracts.runs import RunEvent, RunSummary
+from autobots.domain.models import PROFILES, UnknownModelProfile, approved_profile
 from autobots.domain.tools import PLAN_TOOLS
 
 PAGE_SIZE = 200
+RUN_LIST_SIZE = 100
+INSPECTOR_CHECKPOINTS = 500
 MAX_TEXT = 500
 # Plans and summaries are written by a model, so a key it was shown must not be displayed.
 _SECRETS = re.compile(
@@ -248,4 +257,118 @@ async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> R
             unreported_charges=left.unreported_charges,
         ),
         cursor=row[-1],
+    )
+
+
+async def read_run_list(connection: Any, workspace_id: UUID, limit: int = RUN_LIST_SIZE) -> RunList:
+    """Only this workspace's, newest first. A read, so it starts nothing and needs no key."""
+    cursor = await connection.execute(
+        "select id, parent_run_id, status, goal_summary, created_at from public.runs "
+        "where workspace_id = %s order by created_at desc, id desc limit %s",
+        (workspace_id, limit + 1),
+    )
+    rows = await cursor.fetchall()
+    return RunList(
+        schema_version=1,
+        runs=[
+            RunListItem(
+                id=row[0],
+                parent_run_id=row[1],
+                status=row[2],
+                goal_summary=public_text(row[3]),
+                created_at=row[4],
+            )
+            for row in rows[:limit]
+        ],
+        has_more=len(rows) > limit,
+    )
+
+
+def _canonical_id(profile: str, routes: dict[str, Any]) -> str:
+    """What this run froze, then what the profile means now. A retired one keeps only its name."""
+    frozen = routes.get(profile)
+    if isinstance(frozen, dict) and frozen.get("canonical_id"):
+        return str(frozen["canonical_id"])
+    try:
+        return PROFILES[approved_profile(profile)].canonical_id
+    except UnknownModelProfile:
+        return "unknown"
+
+
+async def read_inspector(connection: Any, workspace_id: UUID, run_id: UUID) -> RunInspector:
+    """Typed columns only. No checkpoint content, tool arguments or partial model output is read."""
+    row = await _require_run(connection, workspace_id, run_id)
+    summary = _summary(row)
+    cursor = await connection.execute(
+        "select goal_summary, policy_snapshot, coalesce(checkpoint_thread_id, id::text) "
+        "from public.runs where id = %s",
+        (run_id,),
+    )
+    goal_summary, snapshot, thread = await cursor.fetchone()
+    routes = (snapshot or {}).get("routes") or {}
+    cursor = await connection.execute(
+        "select id, run_id, role, attempt, status, profile, wire_id, upstream_provider, "
+        "input_tokens, output_tokens, reasoning_tokens, created_at "
+        "from app_private.model_invocations where run_id = %s or root_run_id = %s "
+        "order by created_at, attempt",
+        (run_id, run_id),
+    )
+    calls = [
+        ModelCallView(
+            id=item[0],
+            run_id=item[1],
+            role=item[2],
+            attempt=item[3],
+            status=item[4],
+            provider="openrouter",
+            profile=item[5],
+            canonical_id=_canonical_id(item[5], routes),
+            wire_id=item[6],
+            upstream_provider=item[7] or "unknown",
+            input_tokens=item[8],
+            output_tokens=item[9],
+            reasoning_tokens=item[10],
+            created_at=item[11],
+        )
+        for item in await cursor.fetchall()
+    ]
+    cursor = await connection.execute(
+        "select operation_id, tool_id, tool_version, status, failure_code, created_at "
+        "from app_private.tool_receipts where run_id = %s order by created_at",
+        (run_id,),
+    )
+    attempts = [
+        ToolAttemptView(
+            operation_id=item[0],
+            tool_id=item[1],
+            tool_version=item[2],
+            status=item[3],
+            failure_code=item[4],
+            created_at=item[5],
+        )
+        for item in await cursor.fetchall()
+    ]
+    cursor = await connection.execute(
+        "select checkpoint_id, parent_checkpoint_id, (metadata ->> 'step')::integer, "
+        "metadata ->> 'source' from agent_runtime.checkpoints where thread_id = %s "
+        "order by checkpoint_id limit %s",
+        (thread, INSPECTOR_CHECKPOINTS + 1),
+    )
+    rows = await cursor.fetchall()
+    return RunInspector(
+        schema_version=1,
+        run=summary,
+        goal_summary=public_text(goal_summary),
+        model_calls=calls,
+        tool_attempts=attempts,
+        checkpoints=[
+            CheckpointView(
+                checkpoint_id=item[0],
+                parent_checkpoint_id=item[1],
+                step=item[2],
+                source=item[3],
+            )
+            for item in rows[:INSPECTOR_CHECKPOINTS]
+        ],
+        checkpoints_truncated=len(rows) > INSPECTOR_CHECKPOINTS,
     )

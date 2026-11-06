@@ -5,8 +5,9 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 from autobots.contracts.artifacts import ArtifactSummary
-from autobots.contracts.primitives import Identifier
+from autobots.contracts.primitives import Identifier, UtcTimestamp
 from autobots.contracts.runs import RunEvent, RunSummary
+from autobots.domain.runs import RunStatus
 
 VIEW = ConfigDict(extra="forbid", frozen=True)
 
@@ -121,3 +122,80 @@ class RunWorkspace(BaseModel):
     outstanding: OutstandingSummary
     unknown_operations: list[UnknownEffect]
     cursor: int
+
+
+class RunListItem(BaseModel):
+    model_config = VIEW
+
+    id: Identifier
+    parent_run_id: Identifier | None
+    status: RunStatus
+    goal_summary: str
+    created_at: UtcTimestamp
+
+
+class RunList(BaseModel):
+    """The newest of a workspace's runs. `has_more` says older ones aren't in this page."""
+
+    model_config = VIEW
+
+    schema_version: Literal[1]
+    runs: list[RunListItem]
+    has_more: bool
+
+
+class ModelCallView(BaseModel):
+    """One attempt's facts. Its partial output and any reasoning stay out of this view."""
+
+    model_config = VIEW
+
+    id: Identifier
+    run_id: Identifier
+    role: str
+    attempt: int
+    status: str
+    provider: Literal["openrouter"]
+    profile: str
+    canonical_id: str
+    wire_id: str
+    upstream_provider: str
+    input_tokens: int | None
+    output_tokens: int | None
+    reasoning_tokens: int | None
+    created_at: UtcTimestamp
+
+
+class ToolAttemptView(BaseModel):
+    """What a tool operation did. Its arguments and result stay out of this view."""
+
+    model_config = VIEW
+
+    operation_id: str
+    tool_id: str
+    tool_version: int
+    status: str
+    failure_code: str | None
+    created_at: UtcTimestamp
+
+
+class CheckpointView(BaseModel):
+    """That a checkpoint exists, and where. Never what it holds."""
+
+    model_config = VIEW
+
+    checkpoint_id: str
+    parent_checkpoint_id: str | None
+    step: int | None
+    source: str | None
+
+
+class RunInspector(BaseModel):
+    model_config = VIEW
+
+    schema_version: Literal[1]
+    run: RunSummary
+    goal_summary: str
+    model_calls: list[ModelCallView]
+    tool_attempts: list[ToolAttemptView]
+    checkpoints: list[CheckpointView]
+    checkpoints_truncated: bool

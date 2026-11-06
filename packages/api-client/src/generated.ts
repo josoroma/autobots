@@ -555,6 +555,57 @@ export const schemas = {
     "title": "CandidateView",
     "type": "object"
   },
+  "CheckpointView": {
+    "additionalProperties": false,
+    "description": "That a checkpoint exists, and where. Never what it holds.",
+    "properties": {
+      "checkpoint_id": {
+        "title": "Checkpoint Id",
+        "type": "string"
+      },
+      "parent_checkpoint_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Parent Checkpoint Id"
+      },
+      "source": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Source"
+      },
+      "step": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Step"
+      }
+    },
+    "required": [
+      "checkpoint_id",
+      "parent_checkpoint_id",
+      "step",
+      "source"
+    ],
+    "title": "CheckpointView",
+    "type": "object"
+  },
   "CredentialDraft": {
     "additionalProperties": false,
     "description": "Transient. It is validated and encrypted, and never returned, logged or echoed.",
@@ -1471,6 +1522,112 @@ export const schemas = {
       "charged_micro_usd"
     ],
     "title": "ModelCallReconciliation",
+    "type": "object"
+  },
+  "ModelCallView": {
+    "additionalProperties": false,
+    "description": "One attempt's facts. Its partial output and any reasoning stay out of this view.",
+    "properties": {
+      "attempt": {
+        "title": "Attempt",
+        "type": "integer"
+      },
+      "canonical_id": {
+        "title": "Canonical Id",
+        "type": "string"
+      },
+      "created_at": {
+        "format": "date-time",
+        "pattern": "^.+(Z|[+-]00:00)$",
+        "title": "Created At",
+        "type": "string"
+      },
+      "id": {
+        "format": "uuid",
+        "title": "Id",
+        "type": "string"
+      },
+      "input_tokens": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Input Tokens"
+      },
+      "output_tokens": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Output Tokens"
+      },
+      "profile": {
+        "title": "Profile",
+        "type": "string"
+      },
+      "provider": {
+        "const": "openrouter",
+        "title": "Provider",
+        "type": "string"
+      },
+      "reasoning_tokens": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Reasoning Tokens"
+      },
+      "role": {
+        "title": "Role",
+        "type": "string"
+      },
+      "run_id": {
+        "format": "uuid",
+        "title": "Run Id",
+        "type": "string"
+      },
+      "status": {
+        "title": "Status",
+        "type": "string"
+      },
+      "upstream_provider": {
+        "title": "Upstream Provider",
+        "type": "string"
+      },
+      "wire_id": {
+        "title": "Wire Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "run_id",
+      "role",
+      "attempt",
+      "status",
+      "provider",
+      "profile",
+      "canonical_id",
+      "wire_id",
+      "upstream_provider",
+      "input_tokens",
+      "output_tokens",
+      "reasoning_tokens",
+      "created_at"
+    ],
+    "title": "ModelCallView",
     "type": "object"
   },
   "ModelList": {
@@ -2594,6 +2751,59 @@ export const schemas = {
     "title": "RunInputRequest",
     "type": "object"
   },
+  "RunInspector": {
+    "additionalProperties": false,
+    "properties": {
+      "checkpoints": {
+        "items": {
+          "$ref": "#/components/schemas/CheckpointView"
+        },
+        "title": "Checkpoints",
+        "type": "array"
+      },
+      "checkpoints_truncated": {
+        "title": "Checkpoints Truncated",
+        "type": "boolean"
+      },
+      "goal_summary": {
+        "title": "Goal Summary",
+        "type": "string"
+      },
+      "model_calls": {
+        "items": {
+          "$ref": "#/components/schemas/ModelCallView"
+        },
+        "title": "Model Calls",
+        "type": "array"
+      },
+      "run": {
+        "$ref": "#/components/schemas/RunSummary"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "tool_attempts": {
+        "items": {
+          "$ref": "#/components/schemas/ToolAttemptView"
+        },
+        "title": "Tool Attempts",
+        "type": "array"
+      }
+    },
+    "required": [
+      "schema_version",
+      "run",
+      "goal_summary",
+      "model_calls",
+      "tool_attempts",
+      "checkpoints",
+      "checkpoints_truncated"
+    ],
+    "title": "RunInspector",
+    "type": "object"
+  },
   "RunIntentCheck": {
     "additionalProperties": false,
     "description": "Whether model-backed work could proceed. It creates no run and calls no model.",
@@ -2624,6 +2834,79 @@ export const schemas = {
       "code"
     ],
     "title": "RunIntentCheck",
+    "type": "object"
+  },
+  "RunList": {
+    "additionalProperties": false,
+    "description": "The newest of a workspace's runs. `has_more` says older ones aren't in this page.",
+    "properties": {
+      "has_more": {
+        "title": "Has More",
+        "type": "boolean"
+      },
+      "runs": {
+        "items": {
+          "$ref": "#/components/schemas/RunListItem"
+        },
+        "title": "Runs",
+        "type": "array"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "runs",
+      "has_more"
+    ],
+    "title": "RunList",
+    "type": "object"
+  },
+  "RunListItem": {
+    "additionalProperties": false,
+    "properties": {
+      "created_at": {
+        "format": "date-time",
+        "pattern": "^.+(Z|[+-]00:00)$",
+        "title": "Created At",
+        "type": "string"
+      },
+      "goal_summary": {
+        "title": "Goal Summary",
+        "type": "string"
+      },
+      "id": {
+        "format": "uuid",
+        "title": "Id",
+        "type": "string"
+      },
+      "parent_run_id": {
+        "anyOf": [
+          {
+            "format": "uuid",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Parent Run Id"
+      },
+      "status": {
+        "$ref": "#/components/schemas/RunStatus"
+      }
+    },
+    "required": [
+      "id",
+      "parent_run_id",
+      "status",
+      "goal_summary",
+      "created_at"
+    ],
+    "title": "RunListItem",
     "type": "object"
   },
   "RunRequest": {
@@ -3175,6 +3458,55 @@ export const schemas = {
       "evidence_summary"
     ],
     "title": "TaskView",
+    "type": "object"
+  },
+  "ToolAttemptView": {
+    "additionalProperties": false,
+    "description": "What a tool operation did. Its arguments and result stay out of this view.",
+    "properties": {
+      "created_at": {
+        "format": "date-time",
+        "pattern": "^.+(Z|[+-]00:00)$",
+        "title": "Created At",
+        "type": "string"
+      },
+      "failure_code": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Failure Code"
+      },
+      "operation_id": {
+        "title": "Operation Id",
+        "type": "string"
+      },
+      "status": {
+        "title": "Status",
+        "type": "string"
+      },
+      "tool_id": {
+        "title": "Tool Id",
+        "type": "string"
+      },
+      "tool_version": {
+        "title": "Tool Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "operation_id",
+      "tool_id",
+      "tool_version",
+      "status",
+      "failure_code",
+      "created_at"
+    ],
+    "title": "ToolAttemptView",
     "type": "object"
   },
   "UnknownEffect": {
@@ -3805,6 +4137,17 @@ export function parseCandidateView(value: unknown): CandidateView {
   return parseWith(schemas, "CandidateView", value) as CandidateView;
 }
 
+export interface CheckpointView {
+  checkpoint_id: string;
+  parent_checkpoint_id: string | null;
+  source: string | null;
+  step: number | null;
+}
+
+export function parseCheckpointView(value: unknown): CheckpointView {
+  return parseWith(schemas, "CheckpointView", value) as CheckpointView;
+}
+
 export interface CredentialDraft {
   draft_key: string;
   expected_version: number;
@@ -4105,6 +4448,27 @@ export interface ModelCallReconciliation {
 
 export function parseModelCallReconciliation(value: unknown): ModelCallReconciliation {
   return parseWith(schemas, "ModelCallReconciliation", value) as ModelCallReconciliation;
+}
+
+export interface ModelCallView {
+  attempt: number;
+  canonical_id: string;
+  created_at: string;
+  id: string;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  profile: string;
+  provider: "openrouter";
+  reasoning_tokens: number | null;
+  role: string;
+  run_id: string;
+  status: string;
+  upstream_provider: string;
+  wire_id: string;
+}
+
+export function parseModelCallView(value: unknown): ModelCallView {
+  return parseWith(schemas, "ModelCallView", value) as ModelCallView;
 }
 
 export interface ModelList {
@@ -4450,6 +4814,20 @@ export function parseRunInputRequest(value: unknown): RunInputRequest {
   return parseWith(schemas, "RunInputRequest", value) as RunInputRequest;
 }
 
+export interface RunInspector {
+  checkpoints: CheckpointView[];
+  checkpoints_truncated: boolean;
+  goal_summary: string;
+  model_calls: ModelCallView[];
+  run: RunSummary;
+  schema_version: 1;
+  tool_attempts: ToolAttemptView[];
+}
+
+export function parseRunInspector(value: unknown): RunInspector {
+  return parseWith(schemas, "RunInspector", value) as RunInspector;
+}
+
 export interface RunIntentCheck {
   code: "ready" | "credentials_required" | "credential_invalid" | "credential_unavailable";
   ready: boolean;
@@ -4458,6 +4836,28 @@ export interface RunIntentCheck {
 
 export function parseRunIntentCheck(value: unknown): RunIntentCheck {
   return parseWith(schemas, "RunIntentCheck", value) as RunIntentCheck;
+}
+
+export interface RunList {
+  has_more: boolean;
+  runs: RunListItem[];
+  schema_version: 1;
+}
+
+export function parseRunList(value: unknown): RunList {
+  return parseWith(schemas, "RunList", value) as RunList;
+}
+
+export interface RunListItem {
+  created_at: string;
+  goal_summary: string;
+  id: string;
+  parent_run_id: string | null;
+  status: RunStatus;
+}
+
+export function parseRunListItem(value: unknown): RunListItem {
+  return parseWith(schemas, "RunListItem", value) as RunListItem;
 }
 
 export interface RunRequest {
@@ -4598,6 +4998,19 @@ export interface TaskView {
 
 export function parseTaskView(value: unknown): TaskView {
   return parseWith(schemas, "TaskView", value) as TaskView;
+}
+
+export interface ToolAttemptView {
+  created_at: string;
+  failure_code: string | null;
+  operation_id: string;
+  status: string;
+  tool_id: string;
+  tool_version: number;
+}
+
+export function parseToolAttemptView(value: unknown): ToolAttemptView {
+  return parseWith(schemas, "ToolAttemptView", value) as ToolAttemptView;
 }
 
 export interface UnknownEffect {
@@ -4843,6 +5256,10 @@ export async function addRoutineVersion(options: ClientOptions, routine_id: stri
   return parseRoutineView(await requestJson(options, "POST", `/v1/routines/${encodeURIComponent(routine_id)}/versions`, body));
 }
 
+export async function listRuns(options: ClientOptions): Promise<RunList> {
+  return parseRunList(await requestJson(options, "GET", `/v1/runs`));
+}
+
 export async function admitRun(options: ClientOptions, body: RunRequest): Promise<RunAccepted> {
   return parseRunAccepted(await requestJson(options, "POST", `/v1/runs`, body));
 }
@@ -4873,6 +5290,10 @@ export async function listRunEvents(options: ClientOptions, run_id: string): Pro
 
 export async function submitRunInput(options: ClientOptions, run_id: string, body: RunInputRequest): Promise<RunCommandResult> {
   return parseRunCommandResult(await requestJson(options, "POST", `/v1/runs/${encodeURIComponent(run_id)}/input`, body));
+}
+
+export async function getRunInspector(options: ClientOptions, run_id: string): Promise<RunInspector> {
+  return parseRunInspector(await requestJson(options, "GET", `/v1/runs/${encodeURIComponent(run_id)}/inspector`));
 }
 
 export async function reconcileRunModelCalls(options: ClientOptions, run_id: string, body: ModelCallReconciliation): Promise<ReconciliationResult> {

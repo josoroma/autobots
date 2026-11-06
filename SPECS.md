@@ -230,10 +230,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-11.4#1 | Add pause, cancel and resume to the run page, using the existing routes and the run's current version. | DONE | US-11.4 |
 | US-11.4#2 | Add owner-only model-call reconciliation, and show each refusal's reason. | DONE | US-11.4 |
 | US-11.4#3 | Cover the controls with browser tests on a disposable stack with a scripted model. | DONE | US-11.4 |
-| US-11.5 | Run list and inspector | READY | EPIC-11 |
-| US-11.5#1 | Add a workspace-scoped run list route and screen. | TODO | US-11.5 |
-| US-11.5#2 | Add a sanitized inspector read model and screen for model calls, tool operation attempts and checkpoints. | TODO | US-11.5 |
-| US-11.5#3 | Cover isolation and the absence of private fields on a disposable stack. | TODO | US-11.5 |
+| US-11.5 | Run list and inspector | DONE | EPIC-11 |
+| US-11.5#1 | Add a workspace-scoped run list route and screen. | DONE | US-11.5 |
+| US-11.5#2 | Add a sanitized inspector read model and screen for model calls, tool operation attempts and checkpoints. | DONE | US-11.5 |
+| US-11.5#3 | Cover isolation and the absence of private fields on a disposable stack. | DONE | US-11.5 |
 | US-11.6 | Model and role choice in Settings | READY | EPIC-11 |
 | US-11.6#1 | Add a read of the current policy and its version, as only the write route exists. | TODO | US-11.6 |
 | US-11.6#2 | Add the approved model list, workspace default and role policy to Settings. | TODO | US-11.6 |
@@ -3052,7 +3052,8 @@ Open Questions:
 
 ### US-11.5: Run list and inspector
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-11-5-run-list-inspector/`
 
 As a user
 I want a list of my workspace's runs and an inspector for each
@@ -3094,9 +3095,9 @@ Dependencies:
 - US-4.6
 
 Tasks:
-- [ ] Add a workspace-scoped run list route and screen.
-- [ ] Add a sanitized inspector read model and screen for model calls, tool operation attempts and checkpoints.
-- [ ] Cover isolation and the absence of private fields on a disposable stack.
+- [x] Add a workspace-scoped run list route and screen.
+- [x] Add a sanitized inspector read model and screen for model calls, tool operation attempts and checkpoints.
+- [x] Cover isolation and the absence of private fields on a disposable stack.
 
 Open Questions:
 - None.

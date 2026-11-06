@@ -348,6 +348,12 @@ def qualify(root: Path) -> int:
         email_c, password_c = 'member-c@example.invalid', secrets.token_urlsafe(24)
         owner_c = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_c, password_c)
         stack.runtime(f"insert into public.workspace_members (workspace_id, user_id, role) values ('{owner_a['workspace_id']}', '{owner_c['user_id']}', 'member');\\n")
+        # Arranged: a run in a workspace with no key at all, since admission would refuse one.
+        email_d, password_d = 'owner-d@example.invalid', secrets.token_urlsafe(24)
+        owner_d = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_d, password_d)
+        no_key_run = '33333333-3333-4333-8333-333333333333'
+        stack.runtime(f"insert into public.runs (id, workspace_id, limit_micro_usd, goal_summary) values ('{no_key_run}', '{owner_d['workspace_id']}', 1, 'Arranged in a workspace with no key');\n")
+        artifacts = {**artifacts, 'AUTOBOTS_TEST_NO_KEY_RUN': no_key_run, 'AUTOBOTS_TEST_NO_KEY_EMAIL': email_d, 'AUTOBOTS_TEST_NO_KEY_PASSWORD': password_d}
         browser_cases(root, cases, stack, base, db_port, email_a, password_a, owner_a['workspace_id'], owner_b['workspace_id'],
                       email_b, password_b, email_c, password_c, artifacts)
     finally:

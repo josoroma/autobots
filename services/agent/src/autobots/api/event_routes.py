@@ -12,9 +12,14 @@ from fastapi.responses import StreamingResponse
 from autobots.api.errors import ApiError
 from autobots.api.security import require_internal
 from autobots.api.settings_routes import current_workspace
-from autobots.application.run_projection import read_events, read_workspace
+from autobots.application.run_projection import (
+    read_events,
+    read_inspector,
+    read_run_list,
+    read_workspace,
+)
 from autobots.application.runs import RunNotFound
-from autobots.contracts.run_workspace import EventPage, RunWorkspace
+from autobots.contracts.run_workspace import EventPage, RunInspector, RunList, RunWorkspace
 from autobots.domain.runs import TERMINAL, RunStatus
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
@@ -53,6 +58,21 @@ async def get_workspace(run_id: UUID, request: Request, workspace_id: Workspace)
     async with _pool(request).connection() as connection:
         try:
             return await read_workspace(connection, workspace_id, run_id)
+        except RunNotFound:
+            raise _not_found() from None
+
+
+@router.get("/runs", operation_id="listRuns", response_model=RunList)
+async def get_runs(request: Request, workspace_id: Workspace) -> RunList:
+    async with _pool(request).connection() as connection:
+        return await read_run_list(connection, workspace_id)
+
+
+@router.get("/runs/{run_id}/inspector", operation_id="getRunInspector", response_model=RunInspector)
+async def get_inspector(run_id: UUID, request: Request, workspace_id: Workspace) -> RunInspector:
+    async with _pool(request).connection() as connection:
+        try:
+            return await read_inspector(connection, workspace_id, run_id)
         except RunNotFound:
             raise _not_found() from None
 

@@ -554,6 +554,57 @@
         "title": "CandidateView",
         "type": "object"
       },
+      "CheckpointView": {
+        "additionalProperties": false,
+        "description": "That a checkpoint exists, and where. Never what it holds.",
+        "properties": {
+          "checkpoint_id": {
+            "title": "Checkpoint Id",
+            "type": "string"
+          },
+          "parent_checkpoint_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Checkpoint Id"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          }
+        },
+        "required": [
+          "checkpoint_id",
+          "parent_checkpoint_id",
+          "step",
+          "source"
+        ],
+        "title": "CheckpointView",
+        "type": "object"
+      },
       "CredentialDraft": {
         "additionalProperties": false,
         "description": "Transient. It is validated and encrypted, and never returned, logged or echoed.",
@@ -1470,6 +1521,112 @@
           "charged_micro_usd"
         ],
         "title": "ModelCallReconciliation",
+        "type": "object"
+      },
+      "ModelCallView": {
+        "additionalProperties": false,
+        "description": "One attempt's facts. Its partial output and any reasoning stay out of this view.",
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "canonical_id": {
+            "title": "Canonical Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "provider": {
+            "const": "openrouter",
+            "title": "Provider",
+            "type": "string"
+          },
+          "reasoning_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Tokens"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "upstream_provider": {
+            "title": "Upstream Provider",
+            "type": "string"
+          },
+          "wire_id": {
+            "title": "Wire Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "role",
+          "attempt",
+          "status",
+          "provider",
+          "profile",
+          "canonical_id",
+          "wire_id",
+          "upstream_provider",
+          "input_tokens",
+          "output_tokens",
+          "reasoning_tokens",
+          "created_at"
+        ],
+        "title": "ModelCallView",
         "type": "object"
       },
       "ModelList": {
@@ -2593,6 +2750,59 @@
         "title": "RunInputRequest",
         "type": "object"
       },
+      "RunInspector": {
+        "additionalProperties": false,
+        "properties": {
+          "checkpoints": {
+            "items": {
+              "$ref": "#/components/schemas/CheckpointView"
+            },
+            "title": "Checkpoints",
+            "type": "array"
+          },
+          "checkpoints_truncated": {
+            "title": "Checkpoints Truncated",
+            "type": "boolean"
+          },
+          "goal_summary": {
+            "title": "Goal Summary",
+            "type": "string"
+          },
+          "model_calls": {
+            "items": {
+              "$ref": "#/components/schemas/ModelCallView"
+            },
+            "title": "Model Calls",
+            "type": "array"
+          },
+          "run": {
+            "$ref": "#/components/schemas/RunSummary"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "tool_attempts": {
+            "items": {
+              "$ref": "#/components/schemas/ToolAttemptView"
+            },
+            "title": "Tool Attempts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "schema_version",
+          "run",
+          "goal_summary",
+          "model_calls",
+          "tool_attempts",
+          "checkpoints",
+          "checkpoints_truncated"
+        ],
+        "title": "RunInspector",
+        "type": "object"
+      },
       "RunIntentCheck": {
         "additionalProperties": false,
         "description": "Whether model-backed work could proceed. It creates no run and calls no model.",
@@ -2623,6 +2833,79 @@
           "code"
         ],
         "title": "RunIntentCheck",
+        "type": "object"
+      },
+      "RunList": {
+        "additionalProperties": false,
+        "description": "The newest of a workspace's runs. `has_more` says older ones aren't in this page.",
+        "properties": {
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/RunListItem"
+            },
+            "title": "Runs",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "runs",
+          "has_more"
+        ],
+        "title": "RunList",
+        "type": "object"
+      },
+      "RunListItem": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
+            "title": "Created At",
+            "type": "string"
+          },
+          "goal_summary": {
+            "title": "Goal Summary",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "parent_run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Run Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          }
+        },
+        "required": [
+          "id",
+          "parent_run_id",
+          "status",
+          "goal_summary",
+          "created_at"
+        ],
+        "title": "RunListItem",
         "type": "object"
       },
       "RunRequest": {
@@ -3174,6 +3457,55 @@
           "evidence_summary"
         ],
         "title": "TaskView",
+        "type": "object"
+      },
+      "ToolAttemptView": {
+        "additionalProperties": false,
+        "description": "What a tool operation did. Its arguments and result stay out of this view.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
+            "title": "Created At",
+            "type": "string"
+          },
+          "failure_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Code"
+          },
+          "operation_id": {
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tool_id": {
+            "title": "Tool Id",
+            "type": "string"
+          },
+          "tool_version": {
+            "title": "Tool Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "operation_id",
+          "tool_id",
+          "tool_version",
+          "status",
+          "failure_code",
+          "created_at"
+        ],
+        "title": "ToolAttemptView",
         "type": "object"
       },
       "UnknownEffect": {
@@ -5604,6 +5936,83 @@
       }
     },
     "/v1/runs": {
+      "get": {
+        "operationId": "listRuns",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Runs"
+      },
       "post": {
         "operationId": "admitRun",
         "parameters": [
@@ -6399,6 +6808,95 @@
           }
         },
         "summary": "Post Input"
+      }
+    },
+    "/v1/runs/{run_id}/inspector": {
+      "get": {
+        "operationId": "getRunInspector",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunInspector"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Inspector"
       }
     },
     "/v1/runs/{run_id}/model-calls/reconcile": {

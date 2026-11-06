@@ -57,6 +57,7 @@ def test_the_schema_builds_without_any_connection() -> None:
         "/v1/runs/{run_id}/model-calls/reconcile",
         "/v1/runs/{run_id}/pause",
         "/v1/runs/{run_id}/resume",
+        "/v1/runs/{run_id}/inspector",
         "/v1/runs/{run_id}/workspace",
         "/v1/session",
         "/v1/settings/model-policy",
