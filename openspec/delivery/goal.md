@@ -7,11 +7,11 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | EPIC-12 |
-| Kind | epic |
+| Target | US-10.2 |
+| Kind | story |
 | Focus | - |
 | Status | BLOCKED |
-| Reason | no progress: next action 'implement' for US-12.3 unchanged across 4 stop attempts |
+| Reason | US-10.2 needs six owner decisions, listed in docs/engineering/evidence/US-10.2/summary.md#what-needs-the-owner: (1) the unexplained uncertain_acceptance pause, LM-A09; (2) network loss and a real provider across a sleep, LM-A07; (3) two route behaviors, MP-A06 and MP-A07; (4) restarting Docker itself, LM-A04; (5) active time that can go uncounted, PRD 6.5; (6) N-70, the reload's second paid run and US-10.1's age. Recording the answers voids US-12.3's binding, so they go in together, followed by one review and one Gate 0. |
 | Started | 2026-11-06 |
 | Updated | 2026-11-06 |
 
@@ -19,21 +19,16 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-12.1 | us-12-1-stop-offering-deepseek-new | DONE | Stop offering DeepSeek for new runs |
-| 2 | US-12.2 | us-12-2-close-what-test-can | DONE | Close what a test can settle |
-| 3 | US-12.3 | us-12-3-final-review-gate-0 | IN PROGRESS | Final review and Gate 0 at the final code |
-| 4 | US-12.4 | us-12-4-measure-two-call-workload | BLOCKED | Measure the two-call workload |
-| 5 | US-12.5 | us-12-5-third-real-mac-sleep | BLOCKED | Third real Mac sleep |
-| 6 | US-12.6 | us-12-6-real-install-final-code | BLOCKED | The real install at the final code |
+| 1 | US-10.2 | us-10-2-release-traceability-evidence-based | IN PROGRESS | Release traceability and evidence-based completion |
 
 ## Next Action
 
 Action: implement
-Story: US-12.3
-Change: us-12-3-final-review-gate-0
+Story: US-10.2
+Change: us-10-2-release-traceability-evidence-based
 Owner: main-session
-Command: /ohmyorch:opsx-apply us-12-3-final-review-gate-0
-Reason: gate implementation: 0/4 tasks complete
+Command: /ohmyorch:opsx-apply us-10-2-release-traceability-evidence-based
+Reason: gate implementation: 1/2 tasks complete
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

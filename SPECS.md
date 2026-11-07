@@ -219,7 +219,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-10.1 | Held-out task, policy and performance qualification | DONE | EPIC-10 |
 | US-10.1#1 | Run the held-out behavioral and policy/recovery suites without tuning on held-out data. | DONE | US-10.1 |
 | US-10.1#2 | Publish per-category outcomes, resource measurements and actual latency/cost evidence. | DONE | US-10.1 |
-| US-10.2 | Release traceability and evidence-based completion | READY | EPIC-10 |
+| US-10.2 | Release traceability and evidence-based completion | IN PROGRESS | EPIC-10 |
 | US-10.2#1 | Review full source-to-story-to-evidence coverage and resolve blocking findings. | TODO | US-10.2 |
 | US-10.2#2 | Publish exercised operating/user procedures and truthful release limitations. | TODO | US-10.2 |
 | EPIC-11 | Installable release readiness | — | — |
@@ -2937,7 +2937,8 @@ Open Questions:
 
 ### US-10.2: Release traceability and evidence-based completion
 
-Status: READY
+Status: IN PROGRESS
+Change: `openspec/changes/us-10-2-release-traceability-evidence-based/`
 
 As a product owner
 I want a complete requirement-to-evidence record
@@ -3664,7 +3665,6 @@ So that nobody can choose a route with no task qualification.
 Source:
 - [Decision 0013, DeepSeek](docs/engineering/decisions/0013-release-closure.md#decision)
 - [Decision 0013, revised MP-01 and PRD 6](docs/engineering/decisions/0013-release-closure.md#requirements-revised)
-- [US-10.2 decision 4](docs/engineering/evidence/US-10.2/summary.md#for-the-owner)
 - [Review finding RR-7](docs/engineering/evidence/US-10.2/review-r2.md#blocking)
 - [MP-01](PRD-Model-Providers.md#mp-01-approved-models-and-selection)
 - [MP-05 model and policy routes](PRD-Model-Providers.md#mp-05-application-apis-and-authorization)
@@ -3738,7 +3738,6 @@ So that only what a test can't settle stays a limit at the final review.
 
 Source:
 - [Decision 0013, partial rows](docs/engineering/decisions/0013-release-closure.md#decision)
-- [What engineering can close](docs/engineering/evidence/US-10.2/summary.md#engineering-can-close-these-with-no-paid-call-or-persistent-change)
 - [US-10.2 LC rows](docs/engineering/evidence/US-10.2/summary.md#lc-product-requirements)
 - [US-10.2 MP rows](docs/engineering/evidence/US-10.2/summary.md#mp-model-providers)
 - [US-10.2 LM rows](docs/engineering/evidence/US-10.2/summary.md#lm-local-mac-deployment)
@@ -3914,7 +3913,6 @@ So that PRD 13.1's stability target rests on an observation or a reported failur
 Source:
 - [Decision 0013, the workload and its spending](docs/engineering/decisions/0013-release-closure.md#decision)
 - [Decision 0009, the ledger](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
-- [US-10.2 decision 5](docs/engineering/evidence/US-10.2/summary.md#for-the-owner)
 - [Review finding RR-8](docs/engineering/evidence/US-10.2/review-r2.md#blocking)
 - [PRD 13.1](PRD-LangChain-Deep-Agents.md#131-nonfunctional-targets)
 - [Two calls per workspace](PRD-LangChain-Deep-Agents.md#65-provider-admission-and-budgets)
@@ -3977,7 +3975,6 @@ So that recovery after sleep is observed with the lease keeper as it ships.
 
 Source:
 - [Decision 0013, a third real sleep](docs/engineering/decisions/0013-release-closure.md#decision)
-- [US-10.2 decision 8](docs/engineering/evidence/US-10.2/summary.md#for-the-owner)
 - [The changed lease keeper](docs/engineering/evidence/US-11.12/summary.md#failures-errors-skips-and-limitations)
 - [Runbook procedure](docs/engineering/runbooks/mac-sleep.md#procedure)
 - [What to observe](docs/engineering/runbooks/mac-sleep.md#what-to-observe)
@@ -4035,8 +4032,6 @@ So that the code released has run on the install a person keeps.
 Source:
 - [Decision 0013, the real install and its spending](docs/engineering/decisions/0013-release-closure.md#decision)
 - [Decision 0009, the ledger](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
-- [US-10.2 decision 3](docs/engineering/evidence/US-10.2/summary.md#for-the-owner)
-- [No live run on the final code](docs/engineering/evidence/US-10.2/summary.md#limits-on-the-release-as-it-stands)
 - [The persistent install](docs/engineering/runbooks/local-supabase.md#the-persistent-install)
 - [Take a backup](docs/engineering/runbooks/backup-restore.md#take-a-backup)
 - [Restore into an isolated instance](docs/engineering/runbooks/backup-restore.md#restore-into-an-isolated-instance)
@@ -4107,7 +4102,6 @@ So that PRD 9.2's approval contract is complete.
 
 Source:
 - [Decision 0013, review items marked later](docs/engineering/decisions/0013-release-closure.md#decision)
-- [US-10.2 decision 7](docs/engineering/evidence/US-10.2/summary.md#for-the-owner)
 - [LC-10's row](docs/engineering/evidence/US-10.2/summary.md#lc-product-requirements)
 - [N-22, N-24 and N-25](docs/engineering/evidence/US-11.12/review-r1-open-findings.md#table-1-minors)
 - [PRD 9.2 approval request](PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)

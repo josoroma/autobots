@@ -1,0 +1,281 @@
+{
+  "schema_version": "autobots.us-10-2-closing-checks/v1",
+  "started_at_utc": "2026-11-07T00:46:43.050571+00:00",
+  "source_fingerprint": "05916d5ebab063469b0f9905a2a5d5a6160dbaaef07e3da5e49eb7cefd8249f4",
+  "target_class": "disposable",
+  "model_transport": "fake transport under the real SDK",
+  "spending": "none",
+  "not_established": [
+    "H1",
+    "product acceptance",
+    "a real provider",
+    "a persistent stack",
+    "a cut between the browser and the web app"
+  ],
+  "stream_cut": {
+    "run_id": "21806afa-e713-4a0c-99d2-c9ea6007fb54",
+    "cuts_with_events_still_to_come": 5,
+    "events_delivered": 5,
+    "events_stored": 5,
+    "in_order_no_gap_no_duplicate": true,
+    "final": "succeeded",
+    "problems": []
+  },
+  "cancel_while_running": {
+    "samples": [
+      {
+        "number": 0,
+        "cancelled_during_call": 1,
+        "answer": 200,
+        "answered_status": "cancelling",
+        "acknowledged_ms": 11.2,
+        "final": "cancelled",
+        "settled": true,
+        "calls_sent_after_the_answer": 0,
+        "calls_sent": 1,
+        "reserved_after": "0"
+      },
+      {
+        "number": 1,
+        "cancelled_during_call": 2,
+        "answer": 200,
+        "answered_status": "cancelling",
+        "acknowledged_ms": 8.8,
+        "final": "cancelled",
+        "settled": true,
+        "calls_sent_after_the_answer": 0,
+        "calls_sent": 2,
+        "reserved_after": "0"
+      },
+      {
+        "number": 2,
+        "cancelled_during_call": 3,
+        "answer": 200,
+        "answered_status": "cancelling",
+        "acknowledged_ms": 9.3,
+        "final": "cancelled",
+        "settled": true,
+        "calls_sent_after_the_answer": 0,
+        "calls_sent": 3,
+        "reserved_after": "0"
+      },
+      {
+        "number": 3,
+        "cancelled_during_call": 1,
+        "answer": 200,
+        "answered_status": "cancelling",
+        "acknowledged_ms": 10.4,
+        "final": "cancelled",
+        "settled": true,
+        "calls_sent_after_the_answer": 0,
+        "calls_sent": 1,
+        "reserved_after": "0"
+      },
+      {
+        "number": 4,
+        "cancelled_during_call": 2,
+        "answer": 200,
+        "answered_status": "cancelling",
+        "acknowledged_ms": 11.2,
+        "final": "cancelled",
+        "settled": true,
+        "calls_sent_after_the_answer": 0,
+        "calls_sent": 2,
+        "reserved_after": "0"
+      },
+      {
+        "number": 5,
+        "cancelled_during_call": 3,
+        "answer": 200,
+        "answered_status": "cancelling",
+        "acknowledged_ms": 12.1,
+        "final": "cancelled",
+        "settled": true,
+        "calls_sent_after_the_answer": 0,
+        "calls_sent": 3,
+        "reserved_after": "0"
+      },
+      {
+        "number": 6,
+        "cancelled_during_call": 1,
+        "answer": 200,
+        "answered_status": "cancelling",
+        "acknowledged_ms": 9.4,
+        "final": "cancelled",
+        "settled": true,
+        "calls_sent_after_the_answer": 0,
+        "calls_sent": 1,
+        "reserved_after": "0"
+      },
+      {
+        "number": 7,
+        "cancelled_during_call": 2,
+        "answer": 200,
+        "answered_status": "cancelling",
+        "acknowledged_ms": 9.7,
+        "final": "cancelled",
+        "settled": true,
+        "calls_sent_after_the_answer": 0,
+        "calls_sent": 2,
+        "reserved_after": "0"
+      },
+      {
+        "number": 8,
+        "cancelled_during_call": 3,
+        "answer": 200,
+        "answered_status": "cancelling",
+        "acknowledged_ms": 9.1,
+        "final": "cancelled",
+        "settled": true,
+        "calls_sent_after_the_answer": 0,
+        "calls_sent": 3,
+        "reserved_after": "0"
+      },
+      {
+        "number": 9,
+        "cancelled_during_call": 1,
+        "answer": 200,
+        "answered_status": "cancelling",
+        "acknowledged_ms": 10.4,
+        "final": "cancelled",
+        "settled": true,
+        "calls_sent_after_the_answer": 0,
+        "calls_sent": 1,
+        "reserved_after": "0"
+      },
+      {
+        "number": 10,
+        "cancelled_during_call": 2,
+        "answer": 200,
+        "answered_status": "cancelling",
+        "acknowledged_ms": 9.3,
+        "final": "cancelled",
+        "settled": true,
+        "calls_sent_after_the_answer": 0,
+        "calls_sent": 2,
+        "reserved_after": "0"
+      },
+      {
+        "number": 11,
+        "cancelled_during_call": 3,
+        "answer": 200,
+        "answered_status": "cancelling",
+        "acknowledged_ms": 10.1,
+        "final": "cancelled",
+        "settled": true,
+        "calls_sent_after_the_answer": 0,
+        "calls_sent": 3,
+        "reserved_after": "0"
+      }
+    ],
+    "most_ms": 12.1,
+    "median_ms": 10.1,
+    "problems": []
+  },
+  "worker_exit": 0,
+  "secret_scan": {
+    "requests_read": 29,
+    "surface_bytes": {
+      "prompts_sent": 148440,
+      "request_headers_without_authorization": 7540,
+      "events": 4200,
+      "application_rows": 244024,
+      "stored_objects": 8704,
+      "logs": 884
+    },
+    "secrets_checked": [
+      "dashboard_password",
+      "internal_token",
+      "jwt_secret",
+      "master_key",
+      "migrator_password",
+      "postgres_password",
+      "provider_key",
+      "runtime_password",
+      "service_role_key"
+    ],
+    "found": {
+      "prompts_sent": {
+        "provider_key": 0,
+        "master_key": 0,
+        "internal_token": 0,
+        "migrator_password": 0,
+        "runtime_password": 0,
+        "service_role_key": 0,
+        "jwt_secret": 0,
+        "postgres_password": 0,
+        "dashboard_password": 0
+      },
+      "request_headers_without_authorization": {
+        "provider_key": 0,
+        "master_key": 0,
+        "internal_token": 0,
+        "migrator_password": 0,
+        "runtime_password": 0,
+        "service_role_key": 0,
+        "jwt_secret": 0,
+        "postgres_password": 0,
+        "dashboard_password": 0
+      },
+      "events": {
+        "provider_key": 0,
+        "master_key": 0,
+        "internal_token": 0,
+        "migrator_password": 0,
+        "runtime_password": 0,
+        "service_role_key": 0,
+        "jwt_secret": 0,
+        "postgres_password": 0,
+        "dashboard_password": 0
+      },
+      "application_rows": {
+        "provider_key": 0,
+        "master_key": 0,
+        "internal_token": 0,
+        "migrator_password": 0,
+        "runtime_password": 0,
+        "service_role_key": 0,
+        "jwt_secret": 0,
+        "postgres_password": 0,
+        "dashboard_password": 0
+      },
+      "stored_objects": {
+        "provider_key": 0,
+        "master_key": 0,
+        "internal_token": 0,
+        "migrator_password": 0,
+        "runtime_password": 0,
+        "service_role_key": 0,
+        "jwt_secret": 0,
+        "postgres_password": 0,
+        "dashboard_password": 0
+      },
+      "logs": {
+        "provider_key": 0,
+        "master_key": 0,
+        "internal_token": 0,
+        "migrator_password": 0,
+        "runtime_password": 0,
+        "service_role_key": 0,
+        "jwt_secret": 0,
+        "postgres_password": 0,
+        "dashboard_password": 0
+      }
+    },
+    "canary_found": {
+      "prompts_sent": 17,
+      "request_headers_without_authorization": 0,
+      "events": 0,
+      "application_rows": 29,
+      "stored_objects": 1,
+      "logs": 0
+    },
+    "events_naming_the_artifact": 1,
+    "problems": []
+  },
+  "left_behind": "none",
+  "other_docker_unchanged": true,
+  "finished_at_utc": "2026-11-07T00:48:44.891766+00:00",
+  "problems": [],
+  "verdict": "held"
+}
