@@ -360,21 +360,21 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.5#2 | Refuse a grant of an unavailable tool at run admission and at Expert save with a typed code. | DONE | US-14.5 |
 | US-14.5#3 | Add fake-key patterns to the secret scan. | DONE | US-14.5 |
 | US-14.5#4 | Document `TAVILY_API_KEY` and `JINA_API_KEY` in the operations runbook, and add Decision 0017 C8's warning that a broader developer token under `GITHUB_TOKEN` would be picked up. | DONE | US-14.5 |
-| US-14.6 | Tavily search, extract, map and crawl | BLOCKED | EPIC-14 |
+| US-14.6 | Tavily search, extract, map and crawl | READY | EPIC-14 |
 | US-14.6#1 | Add `tavily_search`, `tavily_extract`, `tavily_map` and `tavily_crawl` as plain `httpx` adapters with an injectable transport, the PRD's schema ceilings and recorded fixtures. | TODO | US-14.6 |
 | US-14.6#2 | Cover the scenarios with fake transports only. | TODO | US-14.6 |
-| US-14.7 | Jina Search The Web and Extract Website Content | BLOCKED | EPIC-14 |
+| US-14.7 | Jina Search The Web and Extract Website Content | READY | EPIC-14 |
 | US-14.7#1 | Add `search_web` and `extract_website_content` as plain `httpx` adapters with an injectable transport, schema ceilings and recorded fixtures. | TODO | US-14.7 |
 | US-14.7#2 | Cover the scenarios with fake transports only. | TODO | US-14.7 |
-| US-14.8 | URL guard for tools that fetch | READY | EPIC-14 |
-| US-14.8#1 | Add one shared guard with DNS checks on every answer, redirect revalidation, a limit of 3 redirects, and size and time caps. | TODO | US-14.8 |
-| US-14.8#2 | Cover the scenarios with a fake resolver and transport. | TODO | US-14.8 |
-| US-14.9 | Agent File Input, read_run_file v2, read_csv and store_remote_file | BLOCKED | EPIC-14 |
+| US-14.8 | URL guard for tools that fetch | DONE | EPIC-14 |
+| US-14.8#1 | Add one shared guard with DNS checks on every answer, redirect revalidation, a limit of 3 redirects, and size and time caps. | DONE | US-14.8 |
+| US-14.8#2 | Cover the scenarios with a fake resolver and transport. | DONE | US-14.8 |
+| US-14.9 | Agent File Input, read_run_file v2, read_csv and store_remote_file | READY | EPIC-14 |
 | US-14.9#1 | Add the goal composer's attachment of text files to run inputs, through the BFF and API. | TODO | US-14.9 |
 | US-14.9#2 | Register `read_run_file` version 2 with media type and line paging, keeping saved grants on the version they pinned, and add `read_csv`. | TODO | US-14.9 |
 | US-14.9#3 | Add `store_remote_file` as a reversible internal write through the URL guard. | TODO | US-14.9 |
 | US-14.9#4 | Cover the scenarios, with browser specs for the composer and fake transports for remote storage. | TODO | US-14.9 |
-| US-14.10 | Market history and inflation rates | BLOCKED | EPIC-14 |
+| US-14.10 | Market history and inflation rates | READY | EPIC-14 |
 | US-14.10#1 | Add `market_history` and `inflation_rates` as read-only plain `httpx` adapters with an injectable transport and recorded fixtures, with no new package. | TODO | US-14.10 |
 | US-14.10#2 | Cover the scenarios with fake transports only. | TODO | US-14.10 |
 | US-14.11 | Code tools over run files | READY | EPIC-14 |
@@ -4815,7 +4815,7 @@ Open Questions:
 
 ### US-14.6: Tavily search, extract, map and crawl
 
-Status: BLOCKED
+Status: READY
 
 As a goal's owner
 I want Tavily's four operations as bounded read-only tools
@@ -4861,7 +4861,7 @@ Open Questions:
 
 ### US-14.7: Jina Search The Web and Extract Website Content
 
-Status: BLOCKED
+Status: READY
 
 As a goal's owner
 I want Search The Web and Extract Website Content backed by Jina
@@ -4907,7 +4907,8 @@ Open Questions:
 
 ### US-14.8: URL guard for tools that fetch
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-14-8-url-guard-tools-that/`
 
 As a workspace owner
 I want every URL a tool fetches, or sends to a provider, to pass one guard
@@ -4941,15 +4942,15 @@ Dependencies:
 - US-14.1
 
 Tasks:
-- [ ] Add one shared guard with DNS checks on every answer, redirect revalidation, a limit of 3 redirects, and size and time caps.
-- [ ] Cover the scenarios with a fake resolver and transport.
+- [x] Add one shared guard with DNS checks on every answer, redirect revalidation, a limit of 3 redirects, and size and time caps.
+- [x] Cover the scenarios with a fake resolver and transport.
 
 Open Questions:
 - None.
 
 ### US-14.9: Agent File Input, read_run_file v2, read_csv and store_remote_file
 
-Status: BLOCKED
+Status: READY
 
 As a goal's owner
 I want to attach text files to a goal, and give agents paged reading, CSV reading and guarded remote storage over run files
@@ -4997,7 +4998,7 @@ Open Questions:
 
 ### US-14.10: Market history and inflation rates
 
-Status: BLOCKED
+Status: READY
 
 As a goal's owner
 I want price history from Yahoo Finance's chart endpoint and annual inflation from the World Bank
