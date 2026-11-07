@@ -107,16 +107,17 @@ Use local password Auth with public signup disabled and explicit owner bootstrap
 
 ## 5. Model and credential contracts
 
-### SP-006 — exactly two model profiles
+### SP-006 — approved model profiles
 
 | Profile | Requested canonical identity | OpenRouter request ID |
 |---|---|---|
 | `openrouter_deepseek_flash` — approved, and not offered for new runs until qualified, with a saved choice naming it refused and no substitute, by [Decision 0013](decisions/0013-release-closure.md) | `deepseek/deepseek-v4.1-flash-20261017` | `deepseek/deepseek-v4.1-flash-1017` |
 | `openrouter_terra` — default, by [Decision 0006](decisions/0006-terra-is-the-default.md) | `openai/gpt-6.1-terra-20261026` | `openai/gpt-6.1-terra` |
+| `openrouter_sol` — approved, and not offered for new runs until its route is qualified; then the `researcher` role's built-in default, by [Decision 0019](decisions/0019-sol-profile-and-browser-use.md) | `openai/gpt-6.1-sol-20260929` | `openai/gpt-6.1-sol` |
 
-All 14 roles initially bind to Terra: `coordinator`, `router`, `planner`, `executor`, `researcher`, `coder`, `reviewer`, `evaluator`, `summarizer`, `memory_curator`, `skill_learner`, `tool_repair`, `workflow_generator`, `general_purpose`. Maintain role constants for future explicit configuration; children and middleware cannot create hidden model defaults.
+All 14 roles initially bind to Terra, except `researcher`, which binds to Sol once Sol is offered (Decision 0019): `coordinator`, `router`, `planner`, `executor`, `researcher`, `coder`, `reviewer`, `evaluator`, `summarizer`, `memory_curator`, `skill_learner`, `tool_repair`, `workflow_generator`, `general_purpose`. Maintain role constants for future explicit configuration; children and middleware cannot create hidden model defaults.
 
-Resolve run role override → explicit run-wide profile → workspace role override → workspace default → Terra. Freeze the complete map, canonical/wire IDs, revision references, limits, data scope and credential reference at admission. Changing models for unfinished work creates a linked new run using selected evidence references; it does not reinterpret an old checkpoint. Credential rotation remains late-bound per attempt.
+Resolve run role override → explicit run-wide profile → workspace role override → workspace default → the role's built-in default (Sol for `researcher` once offered, otherwise Terra). Freeze the complete map, canonical/wire IDs, revision references, limits, data scope and credential reference at admission. Changing models for unfinished work creates a linked new run using selected evidence references; it does not reinterpret an old checkpoint. Credential rotation remains late-bound per attempt.
 
 Before each paid attempt, revalidate the exact canonical/wire association with catalog metadata at most five minutes old. Use only OpenRouter Chat Completions with `require_parameters=true` and `allow_fallbacks=false`. Reject unknown profiles, arbitrary base URLs, implicit SDK models, fallback arrays, batch/Pro/router substitutions and additional embedding services. Preserve required opaque reasoning metadata privately; omit unsupported Terra sampler/parallel-tool settings. Catalog support is not runtime qualification.
 

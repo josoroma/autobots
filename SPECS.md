@@ -96,6 +96,8 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
   - [US-14.12: Goal-driven browsing](#us-1412-goal-driven-browsing)
   - [US-14.13: Isolated browser executor](#us-1413-isolated-browser-executor)
   - [US-14.14: Admitted model for browser-use](#us-1414-admitted-model-for-browser-use)
+  - [US-14.15: Sol profile and route qualification](#us-1415-sol-profile-and-route-qualification)
+  - [US-14.16: Live browse trial with Sol](#us-1416-live-browse-trial-with-sol)
 
 ## Work Item Status
 
@@ -393,9 +395,20 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.13#3 | Tie the executor to the attempt's lease, cancellation and time cap, with labelled containers and a sweeper. | DONE | US-14.13 |
 | US-14.13#4 | Qualify every refusal live on a disposable stack with a scripted model, and report qualified only after that check passes. | DONE | US-14.13 |
 | US-14.14 | Admitted model for browser-use | READY | EPIC-14 |
-| US-14.14#1 | Add `browser-use` pinned in `uv.lock`, with its dependency tree reviewed and recorded. | TODO | US-14.14 |
-| US-14.14#2 | Implement the adapter over the pinned version's chat-model protocol through model admission, reservations, receipts and the run's frozen `researcher` route. | TODO | US-14.14 |
-| US-14.14#3 | Cover the scenarios offline with a scripted model. | TODO | US-14.14 |
+| US-14.14#1 | Drop the unused `langchain-mcp-adapters` pin and add `browser-use==0.13.14` pinned in `uv.lock`, with its dependency tree reviewed and recorded, and update US-1.3's toolchain record (`docs/engineering/runbooks/toolchains.md`, `services/agent/tests/test_environment.py`, `tests/toolchain/test_manifests.py`). | TODO | US-14.14 |
+| US-14.14#2 | Switch off browser-use's telemetry and cloud sync before it is imported, and prove offline that no telemetry client is created. | TODO | US-14.14 |
+| US-14.14#3 | Implement the adapter over the pinned version's chat-model protocol through model admission, reservations, receipts and the run's frozen `researcher` route. | TODO | US-14.14 |
+| US-14.14#4 | Cover the scenarios offline with a scripted model. | TODO | US-14.14 |
+| US-14.15 | Sol profile and route qualification | READY | EPIC-14 |
+| US-14.15#1 | Add `openrouter_sol` to the domain's approved profiles, not offered for new runs until its route is qualified, with Sol as the `researcher` role's built-in default once offered, and regenerated clients if a public contract changes. | TODO | US-14.15 |
+| US-14.15#2 | Add a migration widening every profile check to include `openrouter_sol` and seeding its `model_profiles` row. | TODO | US-14.15 |
+| US-14.15#3 | Add Sol's route entry and its authorized US$1.20 cap to the route qualification runner. | TODO | US-14.15 |
+| US-14.15#4 | List Sol in Settings as approved with its offering state, qualification and limits, and in every picker once it's offered. | TODO | US-14.15 |
+| US-14.15#5 | Run Sol's live route qualification once within the cap, and record it. | TODO | US-14.15 |
+| US-14.15#6 | Cover the refusal, resolution, frozen-run and removal scenarios offline and on a disposable stack with a fake transport. | TODO | US-14.15 |
+| US-14.16 | Live browse trial with Sol | BLOCKED | EPIC-14 |
+| US-14.16#1 | Add the trial runner, in no verification profile, reading the owner's key file in its own process and refusing a repeat without the owner's request. | TODO | US-14.16 |
+| US-14.16#2 | Run the trial once and record the redacted evidence: the summary's label, visited URLs, model calls, receipts, spend and the hosts the proxy connected to. | TODO | US-14.16 |
 
 ## Dependency Diagram
 
@@ -506,6 +519,8 @@ flowchart TD
     US_14_12["US-14.12: Goal-driven browsing"]
     US_14_13["US-14.13: Isolated browser executor"]
     US_14_14["US-14.14: Admitted model for browser-use"]
+    US_14_15["US-14.15: Sol profile and route qualification"]
+    US_14_16["US-14.16: Live browse trial with Sol"]
   end
   US_1_1 -.-> US_1_2
   US_1_1 -.-> US_1_3
@@ -717,6 +732,11 @@ flowchart TD
   US_14_3 -.-> US_14_13
   US_14_8 -.-> US_14_13
   US_3_3 -.-> US_14_14
+  US_3_4 -.-> US_14_15
+  US_11_6 -.-> US_14_15
+  US_12_1 -.-> US_14_15
+  US_14_12 -.-> US_14_16
+  US_14_15 -.-> US_14_16
 ```
 
 ```mermaid
@@ -1278,12 +1298,32 @@ flowchart TD
     T_14_13_4["US-14.13#4: Qualify every refusal live on a disposable stack with a scripted model, and report qualified only after that check passes."]
     US_14_13 --> T_14_13_4
     US_14_14["US-14.14: Admitted model for browser-use"]
-    T_14_14_1["US-14.14#1: Add `browser-use` pinned in `uv.lock`, with its dependency tree reviewed and recorded."]
+    T_14_14_1["US-14.14#1: Drop the unused `langchain-mcp-adapters` pin and add `browser-use==0.13.14` pinned in `uv.lock`, with its dependency tree reviewed and recorded, and update US-1.3&#x27;s toolchain record (`docs/engineering/runbooks/toolchains.md`, `services/agent/tests/test_environment.py`, `tests/toolchain/test_manifests.py`)."]
     US_14_14 --> T_14_14_1
-    T_14_14_2["US-14.14#2: Implement the adapter over the pinned version&#x27;s chat-model protocol through model admission, reservations, receipts and the run&#x27;s frozen `researcher` route."]
+    T_14_14_2["US-14.14#2: Switch off browser-use&#x27;s telemetry and cloud sync before it is imported, and prove offline that no telemetry client is created."]
     US_14_14 --> T_14_14_2
-    T_14_14_3["US-14.14#3: Cover the scenarios offline with a scripted model."]
+    T_14_14_3["US-14.14#3: Implement the adapter over the pinned version&#x27;s chat-model protocol through model admission, reservations, receipts and the run&#x27;s frozen `researcher` route."]
     US_14_14 --> T_14_14_3
+    T_14_14_4["US-14.14#4: Cover the scenarios offline with a scripted model."]
+    US_14_14 --> T_14_14_4
+    US_14_15["US-14.15: Sol profile and route qualification"]
+    T_14_15_1["US-14.15#1: Add `openrouter_sol` to the domain&#x27;s approved profiles, not offered for new runs until its route is qualified, with Sol as the `researcher` role&#x27;s built-in default once offered, and regenerated clients if a public contract changes."]
+    US_14_15 --> T_14_15_1
+    T_14_15_2["US-14.15#2: Add a migration widening every profile check to include `openrouter_sol` and seeding its `model_profiles` row."]
+    US_14_15 --> T_14_15_2
+    T_14_15_3["US-14.15#3: Add Sol&#x27;s route entry and its authorized US$1.20 cap to the route qualification runner."]
+    US_14_15 --> T_14_15_3
+    T_14_15_4["US-14.15#4: List Sol in Settings as approved with its offering state, qualification and limits, and in every picker once it&#x27;s offered."]
+    US_14_15 --> T_14_15_4
+    T_14_15_5["US-14.15#5: Run Sol&#x27;s live route qualification once within the cap, and record it."]
+    US_14_15 --> T_14_15_5
+    T_14_15_6["US-14.15#6: Cover the refusal, resolution, frozen-run and removal scenarios offline and on a disposable stack with a fake transport."]
+    US_14_15 --> T_14_15_6
+    US_14_16["US-14.16: Live browse trial with Sol"]
+    T_14_16_1["US-14.16#1: Add the trial runner, in no verification profile, reading the owner&#x27;s key file in its own process and refusing a repeat without the owner&#x27;s request."]
+    US_14_16 --> T_14_16_1
+    T_14_16_2["US-14.16#2: Run the trial once and record the redacted evidence: the summary&#x27;s label, visited URLs, model calls, receipts, spend and the hosts the proxy connected to."]
+    US_14_16 --> T_14_16_2
   end
 ```
 
@@ -1306,7 +1346,7 @@ Story IDs are the execution identifiers. The H0/H1/B0–B7 labels retain the pre
 | [SP-003](docs/engineering/option-b-contract.md#sp-003--one-traceable-work-record-per-meaningful-change) | US-1.5, US-1.8, US-10.2 |
 | [SP-004](docs/engineering/option-b-contract.md#sp-004--local-architecture) | US-1.3, US-2.5 |
 | [SP-005](docs/engineering/option-b-contract.md#sp-005--local-services-and-isolation) | US-2.1, US-2.3 |
-| [SP-006](docs/engineering/option-b-contract.md#sp-006--exactly-two-model-profiles) | US-2.6 |
+| [SP-006](docs/engineering/option-b-contract.md#sp-006--approved-model-profiles) | US-2.6 |
 | [SP-007](docs/engineering/option-b-contract.md#sp-007--credentials-and-configuration-ux) | US-3.1, US-3.2 |
 | [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification) | US-3.3, US-3.4, US-4.3, US-5.2, US-10.1 |
 | [SP-009](docs/engineering/option-b-contract.md#sp-009--types-and-ownership) | US-2.2 |
@@ -1973,7 +2013,7 @@ I want explicit approved model bindings
 So that all model-backed roles follow one auditable policy.
 
 Source:
-- [SP-006](docs/engineering/option-b-contract.md#sp-006--exactly-two-model-profiles)
+- [SP-006](docs/engineering/option-b-contract.md#sp-006--approved-model-profiles)
 - [MP-01 profiles and precedence](PRD-Model-Providers.md#mp-01-approved-models-and-selection)
 - [MP-02 catalog and request contract](PRD-Model-Providers.md#mp-02-catalog-and-request-contract)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B0.
@@ -3932,7 +3972,7 @@ Source:
 - [A binding that fails qualification stays unavailable](PRD-LangChain-Deep-Agents.md#15-implementation-sequence-and-exit-gates)
 - [LC-17](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
 - [Decision 0006, saved choices and frozen runs](docs/engineering/decisions/0006-terra-is-the-default.md#consequences)
-- [SP-006](docs/engineering/option-b-contract.md#sp-006--exactly-two-model-profiles)
+- [SP-006](docs/engineering/option-b-contract.md#sp-006--approved-model-profiles)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
 
 Acceptance Criteria:
@@ -5252,8 +5292,9 @@ So that browsing spends only within the run's budget, on an approved profile, wi
 Source:
 - [Admitted browser model](PRD-Tool-Catalog.md#admitted-browser-model)
 - [Decision 0018, B4 and B7](docs/engineering/decisions/0018-browser-executor.md#decision)
+- [Decision 0019, S5](docs/engineering/decisions/0019-sol-profile-and-browser-use.md#decision)
 - [Decision 0017, C4](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
-- [SP-006](docs/engineering/option-b-contract.md#sp-006--exactly-two-model-profiles)
+- [SP-006](docs/engineering/option-b-contract.md#sp-006--approved-model-profiles)
 - [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
 
 Acceptance Criteria:
@@ -5274,6 +5315,11 @@ Scenario: No other model path
   When a model call is made outside the adapter, or a call is made with the run's budget exhausted
   Then browser-use's own model clients were never constructed, the outside call fails as unadmitted, the exhausted budget refuses the call before it is sent, and neither reaches the transport
 
+Scenario: Telemetry and cloud sync stay off
+  Given the worker switching off browser-use's telemetry and cloud sync before it imports browser-use, offline
+  When browser-use is imported and the agent takes a step with a scripted model
+  Then its telemetry and cloud sync read off, and no telemetry client is created
+
 Scenario: Structured actions are enforced or refused
   Given a route that enforces structured output and a route that doesn't
   When the agent requests its typed actions on each
@@ -5284,9 +5330,109 @@ Dependencies:
 - US-3.3
 
 Tasks:
-- [ ] Add `browser-use` pinned in `uv.lock`, with its dependency tree reviewed and recorded.
+- [ ] Drop the unused `langchain-mcp-adapters` pin and add `browser-use==0.13.14` pinned in `uv.lock`, with its dependency tree reviewed and recorded, and update US-1.3's toolchain record (`docs/engineering/runbooks/toolchains.md`, `services/agent/tests/test_environment.py`, `tests/toolchain/test_manifests.py`).
+- [ ] Switch off browser-use's telemetry and cloud sync before it is imported, and prove offline that no telemetry client is created.
 - [ ] Implement the adapter over the pinned version's chat-model protocol through model admission, reservations, receipts and the run's frozen `researcher` route.
 - [ ] Cover the scenarios offline with a scripted model.
+
+Open Questions:
+- None.
+
+### US-14.15: Sol profile and route qualification
+
+Status: READY
+
+As a workspace owner
+I want Sol approved for the researcher role, and offered only once its route is qualified
+So that browsing can use Sol without anyone choosing a route that hasn't been tested.
+
+Source:
+- [Decision 0019, S1 to S4](docs/engineering/decisions/0019-sol-profile-and-browser-use.md#decision)
+- [Decision 0019, revised SP-006 and MP-01](docs/engineering/decisions/0019-sol-profile-and-browser-use.md#requirements-revised)
+- [Decision 0019, reversal](docs/engineering/decisions/0019-sol-profile-and-browser-use.md#reversal)
+- [Decision 0004, a run bound to a removed profile stops](docs/engineering/decisions/0004-terra-replaces-astra.md#consequences)
+- [MP-01](PRD-Model-Providers.md#mp-01-approved-models-and-selection)
+- [SP-006](docs/engineering/option-b-contract.md#sp-006--approved-model-profiles)
+- [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Approved, and refused for new runs until qualified
+  Given Sol in the registry with no stored qualification of its route
+  When a new run, the workspace default, a role override or an Expert's role binding names it
+  Then it is refused with model_not_offered and a reason saying Sol isn't offered for new runs until its route is qualified, no run starts, no other model is substituted and nothing stored changes, no picker lists it, and Settings lists it as approved and says it isn't offered
+
+Scenario: Qualify the route live within its cap
+  Given an authorized live qualification of Sol's route with US-3.4's runner and suite and a cap of US$1.20
+  When the suite runs
+  Then each call is counted at its worst case before it is sent, no call is sent that wouldn't fit in what's left of the cap, no call is retried and no other model is tried, the route's actual results and reported usage are stored as Sol's qualification apart from mocks with unsupported capabilities left disabled, and Settings shows that qualification with its date, configuration and limits
+
+Scenario: Offered once qualified, with researcher on Sol by default
+  Given Sol's route qualified and a workspace with no saved model policy
+  When a run is admitted with no model choice, a run naming Sol is admitted, and runs are admitted with a run role override, a run-wide profile, a workspace role override or a workspace default, each naming Terra for researcher
+  Then the first freezes researcher on Sol and every other role on Terra, the second is admitted, Sol is listed in the pickers, and each of the others freezes researcher on Terra
+
+Scenario: Frozen runs keep Sol, and removing it stops them
+  Given a run admitted with researcher frozen on Sol
+  When it resumes or a child is admitted under its frozen policy, and then when Sol is removed from the approved set by migration on a disposable stack and the run resumes
+  Then it keeps its frozen route in the first case, and in the second it stops with no call sent, no other model is put in its place and its saved policy isn't rewritten
+```
+
+Dependencies:
+- US-3.4
+- US-11.6
+- US-12.1
+
+Tasks:
+- [ ] Add `openrouter_sol` to the domain's approved profiles, not offered for new runs until its route is qualified, with Sol as the `researcher` role's built-in default once offered, and regenerated clients if a public contract changes.
+- [ ] Add a migration widening every profile check to include `openrouter_sol` and seeding its `model_profiles` row.
+- [ ] Add Sol's route entry and its authorized US$1.20 cap to the route qualification runner.
+- [ ] List Sol in Settings as approved with its offering state, qualification and limits, and in every picker once it's offered.
+- [ ] Run Sol's live route qualification once within the cap, and record it.
+- [ ] Cover the refusal, resolution, frozen-run and removal scenarios offline and on a disposable stack with a fake transport.
+
+Open Questions:
+- None.
+
+### US-14.16: Live browse trial with Sol
+
+Status: BLOCKED
+
+As a workspace owner
+I want one capped live browse with a real model
+So that browsing on Sol is seen working once from start to finish, and not only with a scripted model.
+
+Source:
+- [Decision 0019, S6](docs/engineering/decisions/0019-sol-profile-and-browser-use.md#decision)
+- [Decision 0019, what this doesn't establish](docs/engineering/decisions/0019-sol-profile-and-browser-use.md#what-this-doesnt-establish)
+- [Decision 0018, B8](docs/engineering/decisions/0018-browser-executor.md#decision)
+- [Decision 0018, the qualification host](docs/engineering/decisions/0018-browser-executor.md#the-qualification-host)
+- [Autonomous browsing](PRD-Tool-Catalog.md#autonomous-browsing)
+- [Admitted browser model](PRD-Tool-Catalog.md#admitted-browser-model)
+- [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: One live read-only browse within US$1
+  Given the owner's authorized trial on the persistent or a disposable stack, the owner's key read from the key file by the trial's own process, a run whose researcher route is frozen on Sol with a US$1 budget, and one approved read-only browse_goal call
+  When it browses from https://example.com/ with allowed_domains example.com and iana.org
+  Then it returns a summary labelled third-party and the visited URLs, every model call is admitted with a reservation, invocation ticket and receipt on Sol through the shared gateway, the run's spend with its reservations stays within US$1, and the egress proxy connects to no host outside example.com and iana.org
+
+Scenario: Not repeated without the owner
+  Given the trial's recorded result
+  When the trial is started again without a new request from the owner
+  Then it refuses before any container starts or model call is made
+```
+
+Dependencies:
+- US-14.12
+- US-14.15
+
+Tasks:
+- [ ] Add the trial runner, in no verification profile, reading the owner's key file in its own process and refusing a repeat without the owner's request.
+- [ ] Run the trial once and record the redacted evidence: the summary's label, visited URLs, model calls, receipts, spend and the hosts the proxy connected to.
 
 Open Questions:
 - None.
