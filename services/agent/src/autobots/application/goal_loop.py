@@ -32,6 +32,7 @@ from autobots.adapters.loop_middleware import (
     ModelRoute,
     UnadmittedModelCall,
 )
+from autobots.adapters.market_data import MARKET_TOOLS
 from autobots.adapters.remote_files import STORE_REMOTE_FILE
 from autobots.adapters.tavily import TAVILY_TOOLS
 from autobots.adapters.tool_middleware import GatewayMiddleware, visible_tools
@@ -173,6 +174,7 @@ def loop_registry(
         GITHUB_ISSUE,
         *TAVILY_TOOLS,
         *JINA_TOOLS,
+        *MARKET_TOOLS,
     )
     for tool in (*tools, *plan_tools(limits)):
         registry.register(tool)

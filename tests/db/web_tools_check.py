@@ -16,6 +16,7 @@ import httpx
 import psycopg
 
 from autobots.adapters.jina import jina_tools
+from autobots.adapters.market_data import market_tools
 from autobots.adapters.remote_files import store_remote_file_tool
 from autobots.application.tools import READ_CSV, READ_RUN_FILE, READ_RUN_FILE_V2
 from autobots.contracts.plans import InputDocument
@@ -54,6 +55,14 @@ def jina(request: httpx.Request) -> httpx.Response:
                                               'links': {'One': 'https://example.com/1'}}})
 
 
+def markets(request: httpx.Request) -> httpx.Response:
+    requests.append(f'market:{request.url.host}')
+    if request.url.host == 'api.worldbank.org':
+        return httpx.Response(200, json=[{'page': 1}, [{'countryiso3code': 'EMU', 'date': '2024', 'value': 2.36}]])
+    return httpx.Response(200, json={'chart': {'result': [{'meta': {'currency': 'USD'}, 'timestamp': [1761955200, 1762041600],
+                                                           'indicators': {'quote': [{'close': [100.0, 101.0]}]}}], 'error': None}})
+
+
 def remote(request: httpx.Request) -> httpx.Response:
     requests.append(f'remote:{request.url.path}')
     if request.url.path == '/rates.csv':
@@ -68,6 +77,8 @@ async def main() -> None:
     for tool in tavily_tools(httpx.MockTransport(tavily), environ={'TAVILY_API_KEY': 'tvly-fixtureDB0123456'}, resolver=resolve):
         registry.register(tool)
     for tool in jina_tools(httpx.MockTransport(jina), environ={'JINA_API_KEY': 'jina_fixtureDB0123456'}, resolver=resolve):
+        registry.register(tool)
+    for tool in market_tools(httpx.MockTransport(markets)):
         registry.register(tool)
     for tool in (READ_RUN_FILE, READ_RUN_FILE_V2, READ_CSV, store_remote_file_tool(httpx.MockTransport(remote), resolve)):
         registry.register(tool)
@@ -195,6 +206,33 @@ async def main() -> None:
                                                'outside outputs/': ('denied', 'invalid_arguments')} and written == 1)
         check('refused URLs were never requested', 'only the stored, png and big requests',
               sorted(requests), sorted(requests) == ['remote:/big.txt', 'remote:/logo.png', 'remote:/rates.csv'])
+
+        # US-14.10: market data counts against the run tree's 20 metered calls.
+        await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
+        admitted = await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='market data', limit_micro_usd=1000, policy=resolve_role_policy())
+        lease = await claim_next(db, worker_id='market-tools', lease_seconds=120)
+        assert lease is not None
+        scope = ToolScope(WORKSPACE, admitted.run_id, lease.generation, {'market_history': 1, 'inflation_rates': 1}, ('outputs',))
+        requests.clear()
+        priced = [await gateway.execute(db, scope, 'market_history', {'symbols': ['BTC-USD']}) for _ in range(19)]
+        rates = await gateway.execute(db, scope, 'inflation_rates', {'countries': ['EMU'], 'start_year': 2024, 'end_year': 2024})
+        late = await gateway.execute(db, scope, 'inflation_rates', {'countries': ['CRI'], 'start_year': 2024, 'end_year': 2024})
+        wrong = await gateway.execute(db, scope, 'inflation_rates', {'countries': ['MEX'], 'start_year': 2024, 'end_year': 2024})
+        out = rates.output or {}
+        check('inflation is returned with its indicator and source, as the 20th metered call', 'EMU 2024 2.36, FP.CPI.TOTL.ZG',
+              (rates.outcome.value, out.get('countries'), out.get('indicator')),
+              all(item.outcome.value == 'succeeded' for item in priced) and rates.outcome.value == 'succeeded'
+              and out.get('countries') == [{'country': 'EMU', 'name': 'Euro area', 'rows': [{'year': 2024, 'inflation_pct': 2.36}]}]
+              and out.get('indicator') == 'FP.CPI.TOTL.ZG' and 'World Bank' in out.get('source', ''))
+        check('the 21st metered call is denied before any request, and another country is refused first',
+              'tool_budget_exceeded, invalid_arguments, 20 requests', (late.code, wrong.code, len(requests)),
+              late.code == 'tool_budget_exceeded' and wrong.code == 'invalid_arguments' and len(requests) == 20)
+        listed = await list_tool_uses(db, WORKSPACE, admitted.run_id)
+        last = [use for use in (listed.uses if listed else []) if use.tool_id == 'inflation_rates']
+        check("the inflation call's record names its countries and source, not its values", 'countries, years, source',
+              (last[0].input_public, last[0].output_public) if last else None,
+              bool(last) and last[0].input_public == {'countries': ['EMU'], 'start_year': 2024, 'end_year': 2024}
+              and (last[0].output_public or {}).get('indicator') == 'FP.CPI.TOTL.ZG' and '2.36' not in last[0].model_dump_json())
     print(json.dumps({'cases': cases}))
 
 

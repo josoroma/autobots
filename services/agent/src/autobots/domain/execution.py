@@ -18,6 +18,8 @@ TOOL_VERSIONS: Mapping[str, int] = {
     "complete_task": 1,
     "create_github_issue": 1,
     "extract_website_content": 1,
+    "inflation_rates": 1,
+    "market_history": 1,
     "propose_improvement": 1,
     "propose_plan": 1,
     "publish_artifact": 1,

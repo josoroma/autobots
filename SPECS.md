@@ -374,9 +374,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.9#2 | Register `read_run_file` version 2 with media type and line paging, keeping saved grants on the version they pinned, and add `read_csv`. | DONE | US-14.9 |
 | US-14.9#3 | Add `store_remote_file` as a reversible internal write through the URL guard. | DONE | US-14.9 |
 | US-14.9#4 | Cover the scenarios, with browser specs for the composer and fake transports for remote storage. | DONE | US-14.9 |
-| US-14.10 | Market history and inflation rates | READY | EPIC-14 |
-| US-14.10#1 | Add `market_history` and `inflation_rates` as read-only plain `httpx` adapters with an injectable transport and recorded fixtures, with no new package. | TODO | US-14.10 |
-| US-14.10#2 | Cover the scenarios with fake transports only. | TODO | US-14.10 |
+| US-14.10 | Market history and inflation rates | DONE | EPIC-14 |
+| US-14.10#1 | Add `market_history` and `inflation_rates` as read-only plain `httpx` adapters with an injectable transport and recorded fixtures, with no new package. | DONE | US-14.10 |
+| US-14.10#2 | Cover the scenarios with fake transports only. | DONE | US-14.10 |
 | US-14.11 | Code tools over run files | READY | EPIC-14 |
 | US-14.11#1 | Add `search_files`, `read_code_file`, `write_code_file` and `patch_code_file` over the run's files only, in pure Python, with names that never match the SDK's file tools. | TODO | US-14.11 |
 | US-14.11#2 | Cover the scenarios. | TODO | US-14.11 |
@@ -5001,7 +5001,8 @@ Open Questions:
 
 ### US-14.10: Market history and inflation rates
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-14-10-market-history-inflation-rates/`
 
 As a goal's owner
 I want price history from Yahoo Finance's chart endpoint and annual inflation from the World Bank
@@ -5037,8 +5038,8 @@ Dependencies:
 - US-14.8
 
 Tasks:
-- [ ] Add `market_history` and `inflation_rates` as read-only plain `httpx` adapters with an injectable transport and recorded fixtures, with no new package.
-- [ ] Cover the scenarios with fake transports only.
+- [x] Add `market_history` and `inflation_rates` as read-only plain `httpx` adapters with an injectable transport and recorded fixtures, with no new package.
+- [x] Cover the scenarios with fake transports only.
 
 Open Questions:
 - None.

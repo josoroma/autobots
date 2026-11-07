@@ -32,6 +32,8 @@ PROVIDER_TOOLS = {
     "tavily_crawl": 1,
     "search_web": 1,
     "extract_website_content": 1,
+    "market_history": 1,
+    "inflation_rates": 1,
 }
 EXPERT_TOOLS = {
     **GENERAL_TOOLS,
