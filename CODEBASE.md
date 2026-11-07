@@ -1,119 +1,300 @@
 # Autobots codebase context
 
-**Inspected:** 2026-11-04, kept current through 2026-11-06. **Scope:** descriptive inventory; this file supplies no product requirements.
+**Inspected:** 2026-11-06. **Scope:** descriptive inventory of what the repository currently is. This file supplies no product requirements.
 
-Analyzed revision: 5012235bd79e47dd9775c3d4acae816ec2884904
-
-The inventory was taken at `5587a9f`, and each delivered story keeps it current, through EPIC-12's stories on top of the revision above. It includes the OhMyOrch delivery setup in [HARNESS-OHMYORCH-001](docs/engineering/work-items/HARNESS-OHMYORCH-001.md), US-1.1's inventory and five added cache ignore rules, US-1.2's rule mapping checks, derived `assistant_adapter` status and forward ingestion runbook, and US-1.3's locked toolchains and scaffold, plus the US-1.4 verification profiles and hook changes committed on top of it. The bullets added by each later delivered story describe that story's working tree, not a re-analysis of the whole repository, so this revision line is older than they are.
+Analyzed revision: 4315944bf8dc34300360e4a4cec2cf8c3937e7b6
+Working tree: dirty. Modified: `.env.example`. Untracked and not described here: `README-QA.md`, `docs/diagrams/`, `docs/engineering/evidence/DOC-QA-001/`, `docs/engineering/work-items/DOC-QA-001.md`.
 
 ## System Summary
 
-A repository of product PRDs, a source-traceable backlog, local tooling to plan, deliver and verify work, and a partial product application: the web app, the API, SQL migrations and the model layer below. It has run admission, and nothing runs a run yet.
+The repository holds product PRDs, a source-traceable backlog, local delivery and verification tooling, and a local application: a Next.js web app, a FastAPI API, a Python worker running goals through Deep Agents and LangGraph, self-hosted Supabase in Docker, and inference through OpenRouter only. `SPECS.md` has 13 epics and 64 stories: 62 `DONE` and 2 `BLOCKED` (US-13.1 and US-13.2, each with an `External:` dependency on the owner scheduling it).
+
+The worker claims and runs admitted jobs only when `AUTOBOTS_WORKER_INFERENCE=enabled`; by default it does maintenance only. That path has run on fake transports, on disposable stacks with a real provider, and on one persistent install on this Mac, which its latest record leaves stopped.
+
+[The US-10.2 release record](docs/engineering/evidence/US-10.2/summary.md) reads H1 as "met, with its stated limits" and product acceptance as "supported by this record, with the limits the owner accepted", leaving release to the owner. Passing a verification profile establishes neither.
 
 ## Repository Map
 
-- `PRD-*.md`, `SPECS.md`: product and harness intent, and the execution backlog.
-- `docs/engineering/`: technical contract, decisions, work items, runbooks and evidence. `prerequisite-inventory.md` there is the point-in-time inventory of repository assets and local tools.
-- `docs/design/`, `docs/imagine/`: Luma tokens and generated interface concepts.
-- `.claude/`: project skills, agents, rules, hooks and the document map in `autobots.json`.
-- `scripts/`, `tests/harness/`: backlog tooling, harness verifier and their tests.
-- `openspec/`, `SPEC-LOGS/`, `.claude/ohmyorch/`: OhMyOrch delivery state, per [Decision 0002](docs/engineering/decisions/0002-ohmyorch-delivery-loop.md).
-- `research/`: research material. `research/upstream/` is ignored and not repository input.
+- **Intent:** `PRD-*.md` and `SPECS.md`, mapped through `.claude/autobots.json`. `docs/engineering/option-b-contract.md` is the technical contract.
+- **Source:**
+  - `services/agent/src/autobots/`: Python service.
+  - `apps/web/`: Next.js.
+  - `packages/api-client/src/runtime.ts`: client runtime.
+  - `supabase/migrations/`, `supabase/seeds/`, `supabase/bootstrap/`: SQL.
+  - `infra/`: Compose, including a vendored Supabase release in `infra/supabase/upstream/`.
+- **Generated:** `contracts/generated/openapi.json`, `packages/api-client/src/generated.ts`, `packages/db-types/src/generated.ts`. Backlog navigation in `SPECS.md` is also generated.
+- **Tests:** `services/agent/tests/` (24 test modules plus a fake OpenRouter), `apps/web/tests/` (25 browser specs, 2 unit tests), `packages/api-client/tests/`, `tests/harness/`, `tests/db/`, `tests/web/`, `tests/faults/`, `tests/toolchain/`, `tests/qualification/`. `contracts/fixtures/` holds shared cases.
+- **Tooling:** `scripts/`, with `.claude/` (agents, skills, rules, hooks, `settings.json`).
+- **Delivery records:** `openspec/` (63 archived changes, 63 specs, `delivery/goal.md`), `SPEC-LOGS/`, `.claude/ohmyorch/project.json`.
+- **Engineering records:** under `docs/engineering/`: `decisions/` (0001 to 0014), `runbooks/` (10), `evidence/`, `work-items/` (12 tracked), `templates/`, `prerequisite-inventory.md`.
+- **Design:** `docs/design/luma.css` and concept art in `docs/imagine/`.
+- **Research:** `research/`. `research/upstream/` is ignored and isn't repository input.
+- **No CI:** `.github/` has no tracked files, and no other CI configuration was found at the top level.
 
 ## Runtime and Tooling
 
-Observed on 2026-11-04, on this Mac. Presence is not qualification of an application environment.
+Probed with `--version` on 2026-11-06, on this Mac. Presence isn't qualification.
 
-- Python 3.12.16 at `/opt/homebrew/bin/python3.12`, used by project scripts and hooks.
-- OpenSpec 1.13.2, jq 1.7.1, Bash 3.2.57 and Claude Code 2.1.314, used by OhMyOrch delivery.
-- Node 26.13.0 is the shell default and 22.23.2 is under nvm; `scripts/toolchain.py` selects the pinned 22.23.2 per process. uv 0.13.6, Supabase CLI 2.98.2 and Docker 29.9.2 are present. pnpm is not installed globally; it runs repo-local through Corepack.
+- **Probed tools:** Python 3.12.16, uv 0.13.6, Docker 29.9.2, Supabase CLI 2.98.2, OpenSpec 1.13.2, jq 1.7.1-apple, Bash 3.2.57, Claude Code 2.1.314.
+- **Node:** the shell default is 26.13.0. The repository pins 22.23.2 (`.node-version`, `package.json`), and `scripts/toolchain.py` selects it per process. pnpm 12.16.1 is pinned through Corepack.
+- **Python service:** `services/agent/pyproject.toml` requires `==3.12.*` and uses `uv.lock`. It pins `deepagents` 0.7.32, `langgraph` 1.2.19, `langgraph-checkpoint-postgres` 3.2.0, `langchain` 1.4.8, `langchain-openrouter` 0.2.9, `openrouter` 0.11.46, `fastapi` 0.162.0, `psycopg` 3.3.8 and `cryptography` 50.0.2. Dev tools are ruff, mypy (strict) and pytest.
+- **Web:** `apps/web/package.json` pins Next 16.4.5, React 19.3.1, TypeScript 6.0.3, Tailwind 4.3.4, `@supabase/ssr` 0.12.7, Playwright 1.64.1 and axe. `pnpm-lock.yaml` is the lock.
+- **Infrastructure:** `infra/disposable/compose.yaml` pins images by digest. `infra/supabase/compose.overlay.yaml` binds gateway and database to `127.0.0.1` and puts Realtime, Edge Functions and Supavisor in a `removed` profile.
 
-## Evidence Paths
+## Architecture
 
-- `scripts/verify.py` writes its local report to `.checks/<profile>/latest.json` (ignored).
-- Reviewed summaries are under `docs/engineering/evidence/<work-item-id>/`.
-- Work records are under `docs/engineering/work-items/`.
+Layers under `services/agent/src/autobots/`:
 
-## Unknowns
+- **`domain/`:** pure rules.
+  - `models.py`: two approved profiles, 14 roles, the policy order, `OFFERED_FOR_NEW_RUNS`.
+  - `runs.py`: run states and commands.
+  - `tools.py`: operation classes and tool grants.
+  - `workflows.py` and `workflow_execution.py`: the workflow subset and readiness.
+  - `routines.py`, and `execution.py`: the versions a run records.
+- **`contracts/`:** public Pydantic DTOs, the source of OpenAPI. `persistence/rows.py` holds row helpers.
+- **`application/`:**
+  - Admission: `runs.py`.
+  - Goal loop: `goal_loop.py`, `plans.py`, `run_usage.py`, `verification.py`, `recovery.py`, `compaction.py`.
+  - Model spend: `model_admission.py`, `model_attempts.py`, `worker_inference.py`.
+  - Tools: `tool_gateway.py`, `tools.py`, `reconciliation.py`, `approvals.py`.
+  - Product surfaces: `experts.py`, `assignments.py`, `workflows.py`, `workflow_runner.py`, `routines.py`, `memory.py`, `improvements.py`, `artifacts.py`, `run_projection.py`.
+  - Local operations: `operations.py`, `retention.py`, `worker_leases.py`, `provider_settings.py`, `credentials/`.
+- **`adapters/`:**
+  - `loop_middleware.py`: limits and admission around every dispatch.
+  - `tool_middleware.py`: answers tool calls from the gateway.
+  - `checkpoints.py`, `object_storage.py`, `github_issues.py`.
+  - `models/`: catalog, client factory, OpenRouter metadata.
+- **`api/`:** the factory in `app.py`, the configured entry in `main.py`, 12 route modules, and safe errors. `contracts/generated/openapi.json` lists 48 paths under `/v1`. Artifact download and the event stream are outside the schema.
+- **`operations/`:** the worker, structured logs, owner bootstrap, route qualification and the reasoning trial.
 
-- Whether the OhMyOrch role identity and full story lifecycle hold in a live session; upstream 0.0.1 lists these as unproven.
-- Whether installed tool versions satisfy the toolchain US-1.3 will lock.
+**The model path.** `goal_loop.py` builds the graph with `create_deep_agent`, wrapping the client in `AdmittedModel`, which refuses any call outside an admitted dispatch, so an SDK-initiated call can't spend unseen. `LoopMiddleware` in `adapters/loop_middleware.py` does the following for each dispatch:
 
-## Current capabilities
+- Rechecks ownership, parent status and active time.
+- Consumes the root's `model_calls` limit.
+- Bounds a call at 120 seconds and interrupts it on cancel.
+- Compacts the model's view, with summaries through the same admission.
+- Allows one shorter retry after a `length` cut-off.
+- Records reply facts with no message content.
+- Reserves the route's worst case plus an amount for prompt bytes beyond the assumed 32,000 tokens.
+- Stops with `cost_unavailable` if a request could reach a higher long-prompt tier, or if a fresh catalog price exceeds what was reserved (the latter check is in `worker_inference.py`).
+- Stops with `request_unencodable` on text that can't be encoded.
+- Reconciles a late reply on a lost lease as `source="provider"`.
 
-The workspace contains the research PRDs, historical model evidence and an Option B technical contract. The technical contract preserves SP-001–SP-021 at `docs/engineering/option-b-contract.md`; root `SPECS.md` now contains a source-traceable backlog with 10 epics, 42 stories and generated navigation.
+**Uncertain calls.** When a call's failure class is uncertain, `_log_uncertain` writes a `worker.call_uncertain` WARNING to the worker's log. It holds the shortened invocation and run, the failure class, the exception's and cause's type names, any HTTP status, and a `reason` of `call_time_limit` or `run_interrupted`. It holds no message text and no charge, there is no column for it, and no screen shows it ([Decision 0014](docs/engineering/decisions/0014-release-limits-accepted.md)).
 
-The current adaptation adds project-local `.claude` skills, specialist agents, scoped rules, command-hook configuration, a standalone backlog validator/navigation renderer, and a deterministic harness verifier. They are development tooling, not a product API or worker. Verification details belong to the adaptation evidence record; code existence is not proof a check passed.
+**Routes.** All 14 role bindings resolve and freeze at admission, and a run dispatches through its `executor` binding. A `summarizer` binding that differs pauses a run needing compaction with `route_not_bound` ([Decision 0009](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md)).
 
-The design artifacts include `PRD-Design-System.md`, the user-supplied light/dark token definitions at `docs/design/luma.css`, and generated interface concepts with a local gallery under `docs/imagine`. The design source is mapped into the harness and frontend guidance. These files document shadcn Luma with dark as the default; they do not implement an app theme provider or qualify browser behavior.
+**Ownership.** `worker_leases.py` claims jobs by database time with a rising generation, and triggers from `20261105000008_worker_ownership.sql` refuse checkpoint writes from any other generation. `WakeClock` detects a real sleep from two clocks. `goal_loop._keep_lease` reconnects after a dropped connection, revives an unclaimed lease after a wake, and discounts time asleep through `run_usage.discount_sleep`, deliberately uncapped by the database clock ([US-12.5](docs/engineering/evidence/US-12.5/summary.md)).
 
-## Product implementation status
+**Web.** `apps/web/app/` holds the pages. Same-origin BFF routes under `app/api/` forward through `lib/bff.ts`. `packages/api-client` is the generated client. Form controls come from `components/ui/field.tsx`, which `tests/harness/test_shared_form_controls.py` enforces.
 
-The Next.js application, FastAPI service, LangGraph goal loop and application migrations and seeds exist, as the bullets below describe, and have run on disposable stacks with a scripted model. One persistent install exists on this Mac, by [Decision 0009](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md): Compose project `autobots-install`, on `127.0.0.1:55321` and `55322`, with its record and secrets in `~/.local/share/autobots-install`, normally stopped. It has run one real goal. By default the product worker runs maintenance only, and its inference step is off unless `AUTOBOTS_WORKER_INFERENCE=enabled`. No local model runtime is part of the selected design. Public OpenRouter catalog research does not establish authenticated live model qualification.
+## Entry Points
 
-This harness adaptation itself performed no application lockfile/toolchain qualification or persistent database operation. The `harness` profile is limited to the delivered development tooling. `fast` and `full` add the scaffold's static checks, tests and build. `db` runs synthetic fixtures on a disposable Docker target. `operations` runs `scripts/qualify_operations.py`, `scripts/qualify_backup.py` and `scripts/qualify_upgrade.py` on disposable Compose projects with a scripted model, which is disposable evidence and not H1, product acceptance or proof about a persistent stack.
+- **API:** `uvicorn --factory autobots.api.main:create_configured_app`. It turns inherited tracing off first. uvicorn's own lines go through the JSON format, and access lines aren't logged (`operations/logs.py`).
+- **Worker:** `python -m autobots.operations.worker`.
+  - It always runs `maintenance_step`: expiring approvals, `evaluate_routines`, and `retention.apply_all` hourly.
+  - `AUTOBOTS_WORKER_INFERENCE=enabled` adds `inference_step`, which calls `goal_loop.process_next` with `InferenceSource.bind`. The worker refuses to start half configured.
+  - `_drive` routes a workflow's run to `workflow_runner.run_workflow`.
+- **Web:** `next start apps/web` ([local app runbook](docs/engineering/runbooks/local-app.md)).
+- **Owner bootstrap:** `python -m autobots.operations.bootstrap_owner`.
+- **Paid operations modules:** `operations/route_qualification.py` and `operations/reasoning_trial.py`.
+- **Install and data:** `scripts/persistent_install.py` (`init`, `up`, `setup`, `status`, `apply`, `goal`; `reset` and `apply --reset` exist only to refuse), `scripts/local_backup.py` (`keygen`, `backup`, `restore`, `verify`).
+- **Verification and generation:** see [Common Commands](#common-commands).
+- **Paid or real-world runners, in no profile:** `scripts/live_goal.py`, `scripts/qualify_release.py`, `scripts/qualify_github_connector.py`. `scripts/qualify_mac_sleep.py` needs a person to sleep the Mac.
+- **Hooks:** `.claude/hooks/dispatch.py`, for `SessionStart`, `PreToolUse`, `PostToolUse`, `Stop` and `SubagentStop` in `.claude/settings.json`.
+
+## Data and Persistence
+
+- **Migrations:** `supabase/migrations/` holds 35 ordered files, `20261105000001_workspaces.sql` to `20261106000035_charge_source.sql`, in the schemas `public`, `app_private` and `agent_runtime`. The newest two:
+  - `20261106000034_route_limits_from_review.sql` appends stored limits text to `agent_runtime.route_qualifications`: concurrent admission on a live route wasn't tested, and per profile, one real goal repeated on disposable stacks went 0 of 5 for DeepSeek and 5 of 5 for Terra.
+  - `20261106000035_charge_source.sql` adds nullable `app_private.model_invocations.charge_source`, checked to `provider` or `owner`. `ModelAdmission.reconcile` writes it. `RunInspector`'s `ModelCallView` exposes `reconciled`, `outcome_unknown` and `charge_source_unknown`.
+- **Seeds and bootstrap:** `supabase/seeds/reference.sql` is the repeatable model reference. `supabase/bootstrap/` holds roles and Storage policies.
+- **Public tables:** workspaces and members, runs and `run_events`, `artifacts`, `approval_requests`, Experts and versions, `sessions`, workflows with versions, executions, node instances and emissions, routines with versions and occurrences, `memory_items`, improvement and knowledge tables, `model_profiles`.
+- **Private tables:** jobs, goal specs, plans, usage, verifications, `model_invocations`, `tool_receipts`, assignments, credentials, policies and spend limits, idempotency receipts, heartbeats, retention, `installation_holds`.
+- **`agent_runtime`:** LangGraph checkpoints, `adapter_qualifications`, `route_qualifications`.
+- **Schema readiness:** `application/operations.py` checks required relations and also `REQUIRED_COLUMNS`, including `charge_source`, so a column-only migration not yet applied reads as a schema problem and gates admission.
+- **Install-only schema:** `autobots_install`, holding identity and applied-migration digests (`scripts/persistent_install.py`). [US-12.6](docs/engineering/evidence/US-12.6/summary.md) records 36 history rows: 35 migrations and the Storage policies.
+- **Objects and files:**
+  - Artifacts are in private Supabase Storage through `adapters/object_storage.py`.
+  - Provider keys are AES-256-GCM sealed under a master key file (`application/credentials/`).
+  - Backups are cold and encrypted, with a signed manifest, and restore only into a new held disposable project.
+  - The shared spending ledger is `.checks/decision-0009/ledger.json` (ignored).
+  - The install's record, secrets and logs are recorded at `~/.local/share/autobots-install` by [the operations runbook](docs/engineering/runbooks/operations.md); this analysis didn't read them.
 
 ## Integration points
 
-- `.claude/autobots.json` maps source documents, backlog, technical contract and this inventory.
-- `.claude/agents/autobots-spec-ingestor.md` reads sources and returns a proposed backlog; its caller writes approved changes.
-- `scripts/specs.py` checks backlog structure, local source references, Gherkin, statuses and dependencies; it generates navigation from story bodies and promotes dependency-blocked stories whose dependencies are DONE. It cannot prove semantic source entailment.
-- The `ohmyorch` plugin, on a local OpenSpec-only branch, provides `/ohmyorch:deliver`; `.claude/rules/ohmyorch-delivery.md` holds the project's delivery rule.
-- `scripts/verify.py` runs the `harness`, `fast` and `full` profiles, with exit codes 0, 1 and 2, and records current input fingerprints/results locally. `fast` chooses Python and web steps from what differs since the last passing report, and records the rest as `not_run`.
-- `services/agent/src/autobots/contracts/` holds the initial public Pydantic contracts, separate from `domain/` and `persistence/`. `scripts/generate_contracts.py` generates `contracts/generated/openapi.json` and the TypeScript client in `packages/api-client/`, offline, and detects drift.
-- `supabase/migrations/` holds the ordered application schema, `supabase/seeds/` its reference rows and `supabase/bootstrap/` the migration and runtime roles. `scripts/app_db.py` qualifies them on a disposable database and generates `packages/db-types`. It has no persistent path.
-- `services/agent/src/autobots/api/` holds the FastAPI factory, lifespan, settings, safe errors, internal and session checks, and two routes. `apps/web` is a Next.js shell with exact Luma tokens, dark default, a guarded same-origin BFF and a generated client. `scripts/qualify_web.py` drives both with a real browser. `scripts/qualify_identity.py` qualifies real Auth, membership in the database, PostgREST and Storage on a disposable stack.
-- `services/agent/src/autobots/domain/models.py` holds the two approved profiles and role precedence, and `adapters/models/` the catalog association check and the only factory that builds an inference client. Tests use a fake transport. No model has been called and no real catalog fetch exists yet.
-- `services/agent/src/autobots/application/credentials/` holds source precedence, AES-256-GCM sealing, master key handling and the encrypted store, and `apps/web/lib/credential-precedence.ts` the same precedence for Next.js. `application/provider_settings.py` and `api/settings_routes.py` expose the MP-05 routes, with a write-only form in `apps/web`. Validation has only been run against a fake upstream.
-- `application/model_admission.py` holds slot and spend reservation under a lock, in the private `app_private.model_invocations` ledger, and `application/model_attempts.py` failure classes and bounded retries. The goal loop dispatches through them, and each reply's finish reason, token counts and tool names are recorded in the ledger, with no message content.
-- `application/runs.py` and `api/run_routes.py` admit runs atomically with idempotency receipts, and apply SP-010's commands with version and actor guards. A queued run has a job row.
-- `application/worker_leases.py` claims jobs by database time with a rising generation, and `adapters/checkpoints.py` gives a worker a direct checkpointer. Triggers in `20261105000008_worker_ownership.sql` refuse a checkpoint write from any generation but the current one. There is no worker loop yet, so nothing claims a job in the running product.
-- `application/tool_gateway.py` is the one place a tool runs, with receipts in `app_private.tool_receipts`, and `application/tools.py` holds the first three tools. `adapters/tool_middleware.py` answers every tool call inside a Deep Agents loop from the gateway, because the SDK attaches file, shell and subagent tools of its own.
-- `application/goal_loop.py` runs one bounded pass over an admitted goal in a Deep Agents graph, with `application/plans.py` and `application/run_usage.py` keeping versioned plans, evidence and root limits in the database. Only tests call it: no worker process exists, and no real model has run it.
-- `application/artifacts.py` stages, uploads, verifies and then publishes private artifacts, and reconciles interrupted ones. `adapters/object_storage.py` reaches Supabase Storage with the service key, so the workspace check comes from `public.artifacts` rows. `api/artifact_routes.py` serves listing and downloads.
-- `application/run_projection.py` builds the public view of a run from typed records, and `api/event_routes.py` serves cursor replay, a live stream and a snapshot. `app/runs/[id]` shows them. Nothing reads checkpoints for display.
-- `application/recovery.py` classifies what an interrupted owner left before anything else is dispatched, and `run_goal` checks obligations, uncertain calls and the frozen policy first. `process_next` claims a job, runs it and settles it, and `application/verification.py` decides completion from required artifacts and checks. Test fixtures call it with a scripted model, and the product worker calls it only when inference is switched on, as below. No real model has run this.
-- `application/experts.py` holds Experts, immutable revisions, sessions and routing, and `api/expert_routes.py` and `app/experts` expose them. A run freezes its Expert's tools, instructions and model bindings at admission. Skills are stored as references, and nothing loads them yet.
-- `application/assignments.py` runs specialists synchronously as child runs, with scope intersected from the parent, the parent's policy, and calls, tools and spend counted on the root.
-- `application/approvals.py` stores a proposal bound to its exact arguments before the wait, and validates decisions against it. `app/approvals` is the inbox. The worker's tool step runs again after a decision, and only then can the effect happen.
-- `application/reconciliation.py` keeps unknown effects visible until a tool's readback or an owner's report resolves them. No real external tool exists yet: only fixtures over a controlled sink use this.
-- `domain/workflows.py` holds the documented workflow subset and its typed validation, and `application/workflows.py` publishes immutable versions and binds executions to an exact version and hash. `domain/workflow_execution.py` decides readiness, and `application/workflow_runner.py` runs a bound execution under a lease with insert-only emissions. Only tests run a worker. `app/workflows` edits, validates, publishes and runs a graph as JSON, and `app/workflow-executions` monitors saved state.
-- `application/routines.py` holds explicit routines with immutable versions, and `evaluate_routines` admits due occurrences with a unique key. No process calls it yet.
-- `application/memory.py` holds scoped memory and lexical search in Postgres, with no embedding service, and `application/compaction.py` bounds what a model sees while keeping the goal, permissions and open waits out of any summary.
-- `application/improvements.py` takes a memory or skill proposal through regression and an owner's review to a new version, with rollback. A promoted skill reaches a new run's instructions as reference, and nothing there can change a grant or a model.
-- `infra/supabase/` vendors the pinned self-hosted release with a local overlay; `scripts/supabase_stack.py` runs port preflight and disposable qualification.
-- `operations/worker.py` is the worker process: heartbeat, bounded drain and reconnection around whatever step it's given. Its own entry runs maintenance (approvals, routines, retention) and claims no job, unless `AUTOBOTS_WORKER_INFERENCE=enabled` adds `application/worker_inference.py`'s step: `process_next` binds each claimed job's route from its frozen `policy_snapshot`, reserves from catalog prices, and builds a client from `adapters/models/factory.py` inside each attempt from a key resolved there, pausing the run when no usable key or catalog exists. That path is qualified over a fake transport by `scripts/qualify_worker_inference.py`, and `scripts/live_goal.py` runs it live on a disposable stack, where [a batch of one repeated goal went Terra 5 of 5 and DeepSeek 0 of 5](docs/engineering/evidence/LIVE-GOAL-1/summary.md). `tool_receipts` records each failed tool call's code and category, never what the model wrote, and tool replies carry the `operation_id` that receipt evidence cites. `application/operations.py` and `api/operation_routes.py` report local status and gate admission on database, schema, Storage and disk. `operations/logs.py` holds redacted JSON logs and turns inherited tracing off at bootstrap. `application/retention.py` applies per-workspace windows through two security-definer functions. `scripts/qualify_operations.py` exercises `docs/engineering/runbooks/operations.md` on a disposable stack.
-- `scripts/local_backup.py` takes a cold, encrypted backup of a Compose project's named volumes and configuration with a signed manifest, keeps the provider key apart, and restores only into a new disposable project under a hold (`app_private.installation_holds`), which stops claims, admission, routines and retention until an operator releases it. `scripts/qualify_backup.py` exercises it between two disposable stacks.
-- `domain/execution.py` holds the versions a run records at admission, and `goal_loop.execution_block` pauses a saved run they no longer match, before any model or checkpoint. `adapters/checkpoints.py` fingerprints the installed checkpoint adapter, and `agent_runtime.adapter_qualifications` records which fingerprints may continue saved work. `scripts/qualify_upgrade.py` exercises `docs/engineering/runbooks/upgrade.md` from a prior release read out of git history.
-- Review round 1's blockers are fixed: `tool_gateway` admits effects under the lease and only moves a receipt forward, `goal_loop` keeps a cancelled parent queued until its children are terminal at any depth, `assignments` answers a replay from a finished child, `workflow_runner` treats pauses as stops and fails a stalled or newly invalid graph, `approvals` refuses to approve what can't be shown whole, `compaction` and `memory` read stored evidence back in pages, and an Expert can name `propose_improvement`. `tests/db/blocker_check.py` holds the arranged cases.
-- `operations/reasoning_trial.py` compares a real reply's reasoning metadata with its continuation request, under the shared ledger in `.checks/decision-0009/ledger.json`, and `scripts/qualify_worker_inference.py` makes the same comparison on the worker's own path with a fake transport.
-- `scripts/persistent_install.py` is the guarded path for that install: its identity, loopback checks, migrations, and a capped goal against the shared ledger. It has no reset. `scripts/qualify_persistent_apply.py` tests its refusals on a disposable target.
-- `GET /v1/runs` and `GET /v1/runs/{id}/inspector` read typed columns in `application/run_projection.py` for the Runs and Run inspector screens. Neither reads checkpoint content, tool arguments or partial output.
-- `GET /v1/settings/model-policy` and `components/model-policy-panel.tsx` show and save the workspace default and role overrides, and say that only the executor's binding dispatches. `RunWorkspace.role_map` holds what a run froze.
-- Approval requests store the policy's reason and the resource target, written by the gateway from the tool's definition, and the inbox says when an older request has neither.
-- Local status also reports delayed routine occurrences, OpenRouter's catalog availability, restore history from `restores.jsonl` beside each backup, and each route's qualification.
-- `components/run-disclosure.tsx` shows MP-07's disclosure on every run-creation screen, with a per-run model choice where one applies. The run workspace shows its frozen role map and budgets, and the inspector shows reported and estimated costs apart, errors and evidence links.
-- Admission reserves from an upper bound on the real request, including the system prompt and tool schemas, for work and summaries alike. A fresh catalog price above that reservation, or a request that could reach a higher long-prompt tier, is refused before sending. `_keep_lease` reconnects after a dropped connection, and its discount for time asleep is fenced by generation and deliberately not capped at the database's clock, which can lag a wake.
-- `WakeClock` in `application/worker_leases.py` sees a real Mac sleep from a process's two clocks, and `goal_loop._keep_lease` then revives a lease nobody claimed and leaves the time asleep out of active time. `scripts/qualify_mac_sleep.py` observes a real sleep, following `docs/engineering/runbooks/mac-sleep.md`.
-- US-11.12's review added: `components/continue-run.tsx`, the linked new run after a failure, and notes in the inspector and budget text on what each list and limit covers. Effect rulings carry the receipt's generation and a stale one is refused.
-- `slice-closure.spec.ts` and `tests/db/browser_runs.py` observe a compaction's goal on screen, delegation, a disconnect and files with no key. `slice-visual.spec.ts` also walks keyboard order, disabled controls, zoom and reduced motion on every surface.
-- Form controls come from `components/ui/field.tsx`, which a harness test enforces. `slice-visual.spec.ts` captures every surface in both themes, and its results are in `docs/engineering/evidence/US-11.11/`.
-- `components/run-controls.tsx` puts pause, resume, cancel and owner-only reconciliation of a model call's charge on the run page, over the existing routes, and shows each refusal's reason.
-- `agent_runtime.route_qualifications` holds each route's live result with its date, configuration and limits, added by migration. `ProviderSettings.route_qualifications` reads it into the provider status, and a route with no record for its own canonical model reads as not qualified.
-- `OFFERED_FOR_NEW_RUNS` in `domain/models.py` holds what new work can choose, Terra alone by Decision 0013. The API, workflows and routines refuse anything else with `model_not_offered` and no substitute, and a run already admitted keeps its frozen route.
-- The two approved profiles in `domain/models.py` are DeepSeek and Terra, by [Decision 0004](docs/engineering/decisions/0004-terra-replaces-astra.md), and Terra is the default for all 14 roles by [Decision 0006](docs/engineering/decisions/0006-terra-is-the-default.md). Migration `20261105000026` removes Astra from what can be selected and keeps it in invocation history. `operations/route_qualification.py` runs capped paid qualifications of named routes, with results in `docs/engineering/evidence/US-3.4/`. DeepSeek's strict nested output is unsupported by [Decision 0005](docs/engineering/decisions/0005-deepseek-strict-nested-unsupported.md), and `tests/test_route_qualification.py` fails if application code asks for strict output or an approved profile has no route to qualify. `adapters/models/factory.py` gives model calls a 130-second client timeout, above the goal loop's 120-second bound. `adapters/github_issues.py` is the one consequential connector, by [Decision 0007](docs/engineering/decisions/0007-first-connector-github-issues.md): it creates an issue in one configured repository, an owner grants it per Expert, and `scripts/qualify_github_connector.py` has run it against the owner's throwaway private repository. That run found GitHub's issue list lagging a create by about 9 seconds, so its readback waits up to 15 seconds before saying not delivered. `scripts/qualify_release.py` measures US-10.1's protocol cases, held-out tasks in `tests/qualification/tasks.json`, local benchmark and resources on a disposable stack, under a spending cap each run must state. With `--ui` it also times events in a real browser through `apps/web/tests/browser/release-latency.spec.ts`, which no other suite runs. [Results are in `docs/engineering/evidence/US-10.1/`](docs/engineering/evidence/US-10.1/summary.md).
-- Review round 1's majors are recorded in `docs/engineering/evidence/REVIEW-US-5.1-to-US-9.3/fixes-majors.md`, with arranged cases in `tests/db/major_check.py`. `workflow_executions.current_instance` lets the monitor name the node in progress, `memory_items.expert_id` scopes memory, and `knowledge_heads.active_version` can be null after undoing a first promotion.
-- `scripts/disposable_db.py` holds target-guarded `reset`, `cleanup` and `migrate` wrappers and the `db` profile's qualification, including a synthetic stub worker, using `infra/disposable/compose.yaml` and synthetic SQL in `tests/db/`.
-- `scripts/qualify_faults.py` runs the pinned tools on known-good and known-bad fixtures in `tests/faults/`, and `full` includes it. `services/agent/tests` has a fake OpenRouter transport; its tests make no real model call.
-- `scripts/evidence.py` validates DH-W01–06 completion evidence from the templates in `docs/engineering/templates/`, under the contract in `docs/engineering/evidence/README.md`. US-1.8's Gate 0 record is the first work item validated with it.
-- `.claude/hooks/dispatch.py` integrates selected events with bounded local checks: a deadline, fail-closed errors, path validation, affected check domains and a `ruff` diagnostic. An event's `cwd` selects its root only among worktrees Git has registered under `.claude/worktrees/`, otherwise the root is the dispatcher's own checkout. If Git fails there, file edits are denied and `Stop` blocks once per turn, while `Bash` carries on. Script fixture tests have their own evidence, and actual Claude event delivery isn't qualified, by [Decision 0012](docs/engineering/decisions/0012-unqualified-hooks-in-h1.md).
+**Internal.**
+- `.claude/autobots.json` maps documents, the verifier report and upstream pins. `.claude/ohmyorch/project.json` activates OhMyOrch.
+- `scripts/specs.py` (`validate`, `render`, `promote`) checks structure, sources, Gherkin, statuses and dependencies. It can't prove semantic entailment.
+- `scripts/generate_contracts.py` (`write`, `check`) generates OpenAPI and the TypeScript client offline. `scripts/app_db.py types` generates row types for `public`.
+
+**External.**
+- **OpenRouter:** the only inference provider, through `adapters/models/factory.py` and `openrouter_metadata.py` (key check and real catalog fetch). Profiles are `openrouter_terra` and `openrouter_deepseek_flash`. A client is built inside each attempt from a key resolved there, and requests ask for at most 512 output tokens.
+- **GitHub:** `adapters/github_issues.py`, tool `create_github_issue`, one operation on one configured repository, granted per Expert ([Decision 0007](docs/engineering/decisions/0007-first-connector-github-issues.md)). Readback waits up to 15 seconds, after one measured lag of about 9 seconds.
+- **Supabase:** Auth, Storage and PostgREST, self-hosted and loopback-bound.
+- **MCP:** `langchain-mcp-adapters` is pinned but not imported under `src/` (grep), and the release record says no MCP adapter exists.
+- **Tracing:** `forbid_remote_tracing` turns inherited LangSmith and OTLP settings off.
+
+## Authentication and Authorization
+
+- **Browser to web:** an HttpOnly, SameSite=strict session cookie (`lib/session.ts`), with host, origin, fetch-site and CSRF checks in `lib/request-guard.ts`. The BFF adds the internal token on the server.
+- **Web to API:** `api/security.py` requires `X-Autobots-Internal` (compared in constant time) and a Bearer JWT verified as HS256 with audience `authenticated`. Membership comes from `public.workspace_members` (`api/membership.py`). Client-supplied user or workspace IDs aren't trusted.
+- **Owners:** owner-only routes include Expert writes. A non-owner naming an Expert version gets `403 owner_required` ([Decision 0011](docs/engineering/decisions/0011-review-dispositions.md)). Public signup is disabled ([local app runbook](docs/engineering/runbooks/local-app.md)).
+- **Effects:** `application/approvals.py` binds a proposal to its exact arguments before the wait. Effect rulings must carry the receipt's `generation`, and a stale one is refused.
+- **Accepted single-owner limits:** memory is scoped to the workspace, not to a user (Decision 0009). `authenticated` can read raw emissions within a workspace, and a rollback's actor and a promoted memory's `created_by` aren't recorded ([Decision 0013](docs/engineering/decisions/0013-release-closure.md)).
+
+## Current capabilities
+
+- **Screens:** Home, Runs, Run, Run inspector, Experts and editor, Sessions, Workflows, editor and monitor, Approvals, Operations, Settings, Models, Sign-in. Routines, memory and improvements have API routes and no screens (Decision 0009).
+- **Runs:**
+  - `POST /v1/runs` admits atomically with idempotency receipts and refuses when not ready (`503 not_ready`) or with no usable key.
+  - `components/run-controls.tsx` exposes pause, resume, cancel and owner reconciliation of a model call's charge.
+  - `components/continue-run.tsx` starts a linked new run. With `goal_text` omitted, the server repeats the stored goal, and `RunWorkspace.can_continue` says whether a run qualifies. Terminal runs don't resume.
+  - A rate limit or provider error ends a run after its retries (Decision 0011).
+- **New-run model choice:**
+  - `OFFERED_FOR_NEW_RUNS` is Terra alone, by Decision 0013. DeepSeek stays approved in `PROFILES`, the seed and the catalog list, where `ModelAvailability.offered` is false.
+  - New work naming it is refused with `model_not_offered` and no substitute: `422` when the request names it, including Experts and settings; `409` for a saved choice or a workflow; `RoutineRefused` for a routine. A workflow is checked only if it needs a model. `/v1/runs/intent` returns the same code.
+  - A run already admitted keeps its frozen route, so `worker_inference.py` can still serve one.
+  - The web panels keep a saved choice visible and unselectable.
+- **Goal execution:** versioned plans and evidence, required artifacts, verification from artifacts and checks, staged and verified artifact publication, cursor replay and a live event stream.
+- **Tools:** plan tools, `calculate`, `read_run_file`, `save_artifact`, `publish_artifact`, `search_memory`, and optionally `propose_improvement` and `create_github_issue`. `assign_specialist` is for coordinator sessions only. Receipts are in `app_private.tool_receipts`.
+- **Specialists:** `application/assignments.py` runs child runs synchronously, with scope intersected from the parent and spend counted on the root.
+- **Unknown effects:** these stay visible until a tool's readback or an owner's report resolves them.
+- **Workflows:** a typed subset, immutable versions, a run bound to version and hash, and insert-only emissions.
+- **Routines:** explicit, with immutable versions, admitted with a unique key by the maintenance step when readiness allows.
+- **Memory and learning:** lexical search in Postgres, and proposals through regression and an owner's review with rollback. A promoted skill reaches a new run's instructions as reference (`experts.py`, `improvements.py`). Promotion gates on a reviewer's text checks (Decision 0011).
+- **Operations:** the status page reports database, schema, Storage, disk, queue, delayed routines, catalog availability, restore history and each route's qualification. Logs are redacted JSON lines. Retention is per workspace.
+- **Evidence-limited behavior:** the inspector reads typed columns and checkpoint metadata (ID, parent, step, source), never checkpoint content, tool arguments or partial output (`run_projection.py`).
+- **Design:** Luma tokens, dark by default, with `components/theme-provider.tsx`. Eight named surfaces, such as charts and a workflow canvas, don't exist in the app, and the owner confirmed reading the requirement as not reaching them yet ([US-10.2, DS-03](docs/engineering/evidence/US-10.2/summary.md#ds-design-system)).
+
+## Product implementation status
+
+What has run how. These classes aren't interchangeable, and later code doesn't inherit earlier live results. Most live evidence predates US-12.8's bound fingerprint `51212ae1…`, and **nothing live ran at that fingerprint** ([record](docs/engineering/evidence/US-10.2/summary.md#revisions)).
+
+| Class | What ran | Result and limit |
+|---|---|---|
+| Fake transport under the real SDK | `services/agent/tests`, `scripts/qualify_worker_inference.py` on a disposable stack | 55 of 55 cases at the bound fingerprint. Credential failures, catalog outages and compaction through the worker are mock-level |
+| Disposable stack, scripted model | `db` and `operations` profiles, [closing checks](docs/engineering/evidence/US-10.2/closing-checks.json), [the screen walk](docs/engineering/evidence/US-12.2/summary.md) | [US-12.8](docs/engineering/evidence/US-12.8/summary.md): all exit 0. Closing checks: 12 of 12 cancels on running runs, at most 13.5 ms; a stream cut by TCP reset 4 times and rebuilt; 9 secrets found nowhere scanned |
+| Real sleep, disposable stack, scripted model | [US-12.5](docs/engineering/evidence/US-12.5/summary.md) | 988 s across 20 wakes ended `succeeded`, at `05916d5e…`. An earlier attempt found a defect, since fixed. No real provider across a sleep |
+| Live, direct | [US-3.4](docs/engineering/evidence/US-3.4/summary.md), US-7.2 against GitHub, US-11.2's reasoning trial | No worker or ledger around them. Terra's reasoning `id` is removed by the pinned SDK, accepted in Decision 0013 |
+| Live, disposable stack | [LIVE-GOAL-1](docs/engineering/evidence/LIVE-GOAL-1/summary.md), [US-10.1](docs/engineering/evidence/US-10.1/summary.md), [US-12.4](docs/engineering/evidence/US-12.4/summary.md) | One repeated goal: Terra 5 of 5, DeepSeek 0 of 5. Corpus: 104 of 120 (86.7%), scored by string checks on an assistant-written corpus. Two calls at once: 9 of 10 goals, and **one of five rounds paused as `uncertain_acceptance` with no known cause** |
+| Persistent install | US-11.3 and [US-12.6](docs/engineering/evidence/US-12.6/summary.md) | Compose project `autobots-install`, gateway `127.0.0.1:55321`, database `55322`, API `8001`, web `3000`. Two real goals in total, both succeeded, on Terra. Recorded stopped, data kept, at migration 35 of 35, at `05916d5e…` |
+
+**Release record ([US-10.2](docs/engineering/evidence/US-10.2/summary.md)).**
+- It maps LC, MP, LM, DS and DH items to evidence or a decision, and says nothing mandatory is open.
+- It states that partial rows stand on owner decisions and don't meet their text, and that PRD 13.1's stability target is "not met, not revised, accepted as a limit".
+- Open in substance:
+  - The owner's call on whether to release.
+  - The pause's cause stays unexplained, and `worker.call_uncertain` hasn't caught a real one.
+  - No person new to the app has used it, and no person has judged task quality.
+  - No screen reader has been used.
+  - No real network loss or real provider across a sleep has been observed.
+  - Docker or Mac restart wasn't run.
+- EPIC-13 waits for the owner to schedule it.
+- PRD 12.2's timing metrics are later scope, and routine screens are later scope.
+
+**Spending.** The shared ledger read US$0.315650 of US$1 after US-12.6, including US$0.25 held from US-12.4's paused round. [Decision 0014](docs/engineering/decisions/0014-release-limits-accepted.md) says the authority for paid calls and persistent changes has ended.
+
+## Tests and Quality Gates
+
+`scripts/verify.py` has five profiles and exits 0 passed, 1 a check failed, 2 unavailable. It never installs.
+
+- **`harness`:** configuration, backlog validation, deterministic harness tests.
+- **`fast`:** adds Python and web steps for what changed, and records the rest `not_run`.
+- **`full`:** every static and unit step, `next build`, `contract_drift`, the fault qualification (`scripts/qualify_faults.py`), the toolchain scope test, and `qualify_web.py`.
+- **`db`:** disposable targets for `disposable_db`, `supabase_stack`, `app_db`, `qualify_identity` and `qualify_persistent_apply`.
+- **`operations`:** `qualify_operations`, `qualify_backup` and `qualify_upgrade`, on disposable projects with a scripted model.
+
+Last recorded at [US-12.8](docs/engineering/evidence/US-12.8/summary.md), on 2026-11-06: `harness` 284 tests; `full` 24 checks, 554 Python tests and 32 browser tests; `db` 44, 18, 449, 447 and 29 cases; `operations` 69, 50 and 45 cases. Only `harness` was re-run for this document.
+
+**Browser specs.** By this analysis of Playwright filters (inference from `scripts/`), of 25 spec files:
+- 21 run through `qualify_identity.py`.
+- 2 through `qualify_web.py`.
+- `release-latency` runs only under `qualify_release.py --ui`.
+- `install.spec.ts` runs by hand on the install.
+
+**In no profile:** `qualify_worker_inference.py`, `qualify_mac_sleep.py`, `qualify_release.py`, `qualify_github_connector.py`, `live_goal.py`, and `tests/toolchain` other than its scope test.
+
+**Evidence and hooks.** `scripts/evidence.py` (`fingerprints`, `validate`, `complete`, `record`) checks work-item records for consistency, not correctness. Hook script fixtures are in `tests/harness/test_hooks.py`. Hooks are configured and not qualified: nothing shows Claude's own crash, timeout or Stop recursion behavior ([Decision 0012](docs/engineering/decisions/0012-unqualified-hooks-in-h1.md)).
+
+## Common Commands
+
+```sh
+python3.12 scripts/specs.py validate
+python3.12 scripts/specs.py render
+python3.12 scripts/verify.py --profile harness   # also fast, full, db, operations
+python3.12 scripts/toolchain.py versions         # also lock, bootstrap, check
+python3.12 scripts/generate_contracts.py check   # or write
+python3.12 scripts/evidence.py fingerprints
+python3.12 scripts/qualify_worker_inference.py
+```
+
+Start, drain and stop are in [the operations runbook](docs/engineering/runbooks/operations.md). Other procedures are in `docs/engineering/runbooks/`: `backup-restore`, `upgrade`, `mac-sleep`, `local-supabase`, `local-app`, `first-slice`, `toolchains`, `development-harness`, `ohmyorch-delivery`.
+
+## Conventions
+
+- Stable `SP-*`, `EPIC-*`, `US-*` and requirement IDs. Revisions keep IDs and are recorded in decisions.
+- Routine delivery follows the OpenSpec lifecycle, with the archived change as its record ([Decision 0003](docs/engineering/decisions/0003-openspec-only-delivery.md), `.claude/rules/ohmyorch-delivery.md`). Final reviews and Gate 0 have fuller records under `docs/engineering/evidence/`.
+- Money is integer micro-USD. Errors reach clients as typed codes. Logs carry exception type names, never messages, and identifiers are cut to eight characters.
+- Pydantic owns public contracts and SQL owns schema. Generated files aren't hand-edited. Migrations and seeds are separate. Each migration is applied once and digest-checked on the install.
+- Loopback-only ports, digest-pinned disposable images, and marked `autobots-disposable-*` projects for checks.
+- Runners that a change under `scripts/` would void a binding for are kept beside their evidence, such as `docs/engineering/evidence/US-12.4/measure_two_calls.py`.
+
+## Constraints and Technical Debt
+
+Accepted limits, by decision:
+- [Decision 0005](docs/engineering/decisions/0005-deepseek-strict-nested-unsupported.md): DeepSeek strict nested output is unsupported.
+- [Decision 0008](docs/engineering/decisions/0008-us-10-1-limits-accepted.md): US-10.1's limits.
+- [Decision 0010](docs/engineering/decisions/0010-contrast-pass-line.md): WCAG 2.1 AA as the pass line.
+- Decision 0013: PRD 8.3's empty `inputs` grant, and routines reading policy and skill text at each occurrence.
+- Decision 0014: active time can go uncounted in rare clock cases; a running step can send further paid calls during a drain; a page reload loses Continue's kept key, so a later press can start a second paid run.
+
+Observed risks:
+- A reservation's input size is a byte-based estimate, as no tokenizer is pinned.
+- `charge_not_reported`, `cancelled_after_dispatch` and a call left by a cut drain emit no `worker.call_uncertain` (US-10.2).
+- GitHub issue creation has no idempotency key, and a failure after acceptance can create a duplicate (Decision 0007).
+- `input_manifest` in `scripts/harness_lib.py` hashes everything under `supabase/`, including git-ignored files. Run from this repository, even `supabase --version` writes `supabase/.temp/cli-latest`, which changes the source fingerprint and makes `scripts/evidence.py validate` fail until the file is removed. Observed once during this refresh.
+
+Text in the repository that differs from the code or tree:
+- `README.md` says implementation and release qualification remain pending, and calls the product unimplemented.
+- `SPECS.md`'s `CODEBASE Context` line reads "development-harness work only, product unimplemented".
+- `docs/engineering/runbooks/development-harness.md` counts 23 browser spec files; 25 are tracked.
+- `application/run_projection.py:1` says nothing there reads checkpoints, while line 447 reads their metadata.
+- `check_run_intent`'s docstring in `api/settings_routes.py` calls run admission a later story.
+- `docs/engineering/runbooks/mac-sleep.md` doesn't name `sleep_counted_as_work`, which `scripts/qualify_mac_sleep.py` reports.
+- `services/agent/pyproject.toml` still describes a "minimal non-feature scaffold".
+
+Hooks are guardrails and not OS confinement. [The harness runbook](docs/engineering/runbooks/development-harness.md) lists Bash forms that get past the secret patterns.
 
 ## Upstream evidence and local constraints
 
-OhMyOrch is cloned at `research/upstream/OhMyOrch`, pinned to `fddfbf53c8c10d45782796cc9a7edf95bc8d3a07`. The spec-ingestion adaptation does not depend on running its plugin, shell/JQ tooling or OpenSpec lifecycle. Epic delivery does, per [Decision 0002](docs/engineering/decisions/0002-ohmyorch-delivery-loop.md): the plugin is installed from this checkout at local scope. The clone stays excluded from repository verification input and future commits.
-
-Read-only local probes found Python 3.15.2, Python 3.12.16 at /opt/homebrew/bin/python3.12, and Claude Code 2.1.314 available. A separate process resolved plain python3 to macOS 3.9.6, so project hooks explicitly select the available 3.12 executable and scripts reject unsupported versions. The application Python baseline remains 3.12 as specified; the local interpreter probe is not a changed product requirement or a qualified application environment. No assistant model conversation was started to perform those probes.
+- `.claude/autobots.json` records two OhMyOrch pins: `fddfbf53c8c10d45782796cc9a7edf95bc8d3a07` for the spec-ingestor agent, and `9f384fa97ea9bf43d46c2a19770bb580697ccf14`, branch `openspec-only`, for the delivery plugin. The clone at `research/upstream/OhMyOrch` is ignored and its HEAD is `9f384fa`; `fddfbf5` is present in its history. The plugin reports version 0.0.1.
+- The same file records assistant event delivery as `not_tested`, and the plugin's as `not_qualified_one_pretooluse_event_observed`.
+- Local model research under `research/` is historical, per `README.md`. No local model runtime is part of the application.
 
 ## Gaps and evidence limits
 
-H0/H1 and product work remain separately tracked in SPECS. Installed project files and synthetic hook tests do not establish an active, authenticated Claude/OpenRouter integration, a complete engineering baseline, or a working application. Update this inventory from actual observed changes and evidence; never derive new requirements from it.
+- Passing `harness`, `fast`, `full`, `db` or `operations` proves those checks, not H1, product acceptance or anything about a persistent stack. The H1 reading belongs to the release record, and a later source change voids its binding.
+- `SPECS.md`, `CODEBASE.md`, work items and runbooks are excluded from the source fingerprint (`scripts/evidence.py`, `RECORD_FILES`), as are evidence directories. `scripts/evidence.py validate US-12.8` passed at this refresh, so the source inputs matched `51212ae1…` then.
+- US-10.1's figures predate EPIC-11 and EPIC-12 and stand by Decision 0014 without repetition. US-3.4, US-7.2 and LIVE-GOAL-1 predate later admission changes.
+- Raw reports under `.checks/` are ignored and local, so committed summaries are what a reader of this repository can check.
+
+## Evidence Paths
+
+- [`docs/engineering/evidence/US-10.2/`](docs/engineering/evidence/US-10.2/summary.md): release record, three reviews, closing checks and their runner.
+- [`docs/engineering/evidence/US-12.8/`](docs/engineering/evidence/US-12.8/summary.md): the current Gate 0 binding, manifest and reviews. US-12.3 and US-11.12 are replaced and kept as history.
+- `docs/engineering/evidence/US-12.2/`, `US-12.4/`, `US-12.5/`, `US-12.6/`, `US-11.11/`: screen walk, two-call workload, real sleep, install, visual captures.
+- `docs/engineering/evidence/LIVE-GOAL-1/`, `US-10.1/`, `US-3.4/`, `WORKER-INFERENCE-001/`: live and mock inference.
+- `docs/engineering/evidence/README.md`, `docs/engineering/templates/`: the evidence contract.
+- `docs/engineering/decisions/`: Decisions 0001 to 0014.
+- `openspec/changes/archive/*/verification.md`: per-story records, mostly written by the session that built the story.
+- `services/agent/src/autobots/adapters/loop_middleware.py`, `domain/models.py`, `operations/worker.py`, `application/worker_inference.py`, `application/goal_loop.py`: the inference path.
+- `supabase/migrations/`, `contracts/generated/openapi.json`, `scripts/verify.py`, `scripts/harness_lib.py`: schema, public contract and verifier.
+
+## Unknowns
+
+- Whether the install is stopped and at migration 35 now. Records say so, and neither Docker nor its directory was inspected. `persistent_install.py status` would settle it.
+- Why US-12.4's round 1 paused. The record calls it unexplained.
+- Whether the OhMyOrch role identity and full lifecycle hold in a live session beyond what this delivery did, and what Claude does when a hook crashes or times out.
+- Real behavior of provider credential validation against OpenRouter's own failures: MP-A02 and MP-A03 ran against a fake upstream.
+- This refresh didn't re-read every module line by line. The descriptions of `recovery`, `approvals`, `memory`, `compaction`, `workflow_runner` internals, `retention` and `scripts/local_backup.py` rest on the prior inventory, with no contradicting change found in the diff. Reading them would settle it. The diffs of `improvements`, `model_attempts`, `reconciliation`, `reasoning_trial` and `route_qualification` weren't read.
