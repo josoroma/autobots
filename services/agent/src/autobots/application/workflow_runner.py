@@ -36,6 +36,7 @@ from autobots.application.tool_gateway import (
 )
 from autobots.application.worker_leases import Lease
 from autobots.domain.runs import Actor, CommandRefused, RunCommand, RunStatus
+from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import DELEGATION_TOOL, OperationClass
 from autobots.domain.workflow_execution import (
     BlockFailed,
@@ -70,6 +71,10 @@ async def _release(arguments: ApprovalInput, _: ToolContext) -> ApprovalOutput:
 # Passing through an approval is the gate itself. Replay finds the decision by operation identity.
 APPROVAL_GATE = ToolDefinition(
     tool_id="workflow_approval",
+    title="Workflow approval",
+    group=ToolGroup.PLANNING,
+    public_input_fields=("node",),
+    public_output_fields=(),
     version=1,
     description="A workflow's explicit approval step.",
     input_model=ApprovalInput,

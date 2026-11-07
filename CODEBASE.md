@@ -160,6 +160,7 @@ Layers under `services/agent/src/autobots/`:
   - The web panels keep a saved choice visible and unselectable.
 - **Goal execution:** versioned plans and evidence, required artifacts, verification from artifacts and checks, staged and verified artifact publication, cursor replay and a live event stream.
 - **Tools:** plan tools, `calculate`, `read_run_file`, `save_artifact`, `publish_artifact`, `search_memory`, and optionally `propose_improvement` and `create_github_issue`. `assign_specialist` is for coordinator sessions only. Receipts are in `app_private.tool_receipts`.
+- **Tool catalog (US-14.1, after the analyzed revision):** `application/tool_catalog.py` derives descriptors from the worker's registry, and `GET /v1/tools`, `/v1/tools/{tool_id}` and `/v1/tools/{tool_id}/versions/{version}` serve them to members. Availability is computed per request from whether key variables are set. `browse_goal` is catalogued as `disabled_by_policy` and never registered.
 - **Specialists:** `application/assignments.py` runs child runs synchronously, with scope intersected from the parent and spend counted on the root.
 - **Unknown effects:** these stay visible until a tool's readback or an owner's report resolves them.
 - **Workflows:** a typed subset, immutable versions, a run bound to version and hash, and insert-only emissions.

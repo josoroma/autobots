@@ -176,3 +176,51 @@ test("an unavailable API is a visible, safe state", async ({ page }) => {
     path: `${process.env.AUTOBOTS_WEB_SCREENSHOTS ?? "test-results/screenshots"}/api-unavailable.png`,
   });
 });
+
+test("US-14.1: a member reads the tool catalog through the BFF, and nothing else does", async ({
+  request,
+}) => {
+  const reply = await request.get("/api/v1/tools", {
+    headers: session(SESSION_A),
+  });
+  expect(reply.status()).toBe(200);
+  const catalog = await reply.json();
+  expect(catalog.schema_version).toBe(1);
+  expect(catalog.catalog_digest).toMatch(/^[0-9a-f]{64}$/);
+  const ids = catalog.tools.map(
+    (tool: { tool_id: string; version: number }) =>
+      `${tool.tool_id}@${tool.version}`,
+  );
+  expect(new Set(ids).size).toBe(ids.length);
+  expect(ids).toEqual(
+    expect.arrayContaining(["calculate@1", "create_github_issue@1"]),
+  );
+  const browse = catalog.tools.find(
+    (tool: { tool_id: string }) => tool.tool_id === "browse_goal",
+  );
+  expect(browse).toMatchObject({
+    registered: false,
+    availability: "disabled_by_policy",
+    grantable_to: [],
+  });
+  const github = catalog.tools.find(
+    (tool: { tool_id: string }) => tool.tool_id === "create_github_issue",
+  );
+  expect(github.key_requirement.variables).toEqual([
+    "GITHUB_REPOSITORY",
+    "GITHUB_TOKEN",
+  ]);
+  expect(github.availability).toBe("key_missing");
+  const version = await request.get("/api/v1/tools/calculate/versions/1", {
+    headers: session(SESSION_A),
+  });
+  expect((await version.json()).input_schema.properties.operation.enum).toEqual(
+    ["sum", "mean", "min", "max"],
+  );
+  expect((await request.get("/api/v1/tools")).status()).toBe(401);
+  expect(
+    (
+      await request.get("/api/v1/tools", { headers: session(SESSION_B) })
+    ).status(),
+  ).toBe(403);
+});

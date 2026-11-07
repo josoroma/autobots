@@ -15,6 +15,7 @@ from autobots.application.tool_gateway import (
     hold_lease,
 )
 from autobots.contracts.artifacts import PublishArtifact, PublishedArtifact
+from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import OperationClass
 
 MEDIA_TYPES = frozenset({"text/plain", "text/markdown", "application/json"})
@@ -278,6 +279,10 @@ def publish_tool(store: ObjectStore) -> ToolDefinition:
 
     return ToolDefinition(
         tool_id="publish_artifact",
+        title="Publish artifact",
+        group=ToolGroup.FILES,
+        public_input_fields=("path", "version"),
+        public_output_fields=("artifact_id", "name", "sha256", "size_bytes"),
         version=1,
         description="Publish a saved file of this run as a verified private artifact.",
         input_model=PublishArtifact,

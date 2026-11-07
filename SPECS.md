@@ -336,16 +336,16 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-13.2#1 | Add the held-out replay to the promotion path, in place of the reviewer's text checks, as Decision 0016 defines it. | DONE | US-13.2 |
 | US-13.2#2 | Cover both scenarios, with a scripted model unless a paid replay is separately authorized. | DONE | US-13.2 |
 | EPIC-14 | Tool catalog and tool-use record | — | — |
-| US-14.1 | Tool catalog API derived from the registry | READY | EPIC-14 |
-| US-14.1#1 | Add the descriptive fields to tool definitions and derive the descriptors from the registry, including flattened fields, limits and grantable_to, with the planned browse_goal descriptor as disabled_by_policy and never registered. | TODO | US-14.1 |
-| US-14.1#2 | Compute availability and its typed reason per request from the worker-facing configuration, never stored. | TODO | US-14.1 |
-| US-14.1#3 | Add `GET /v1/tools`, `/v1/tools/{tool_id}` and `/v1/tools/{tool_id}/versions/{version}` with schema_version, catalog_digest and filters, behind the existing checks and the BFF, then regenerate OpenAPI and the TypeScript client. | TODO | US-14.1 |
-| US-14.1#4 | Test registry–catalog parity, agent-view filtering and secret absence. | TODO | US-14.1 |
-| US-14.2 | Tools page and grants by group | BLOCKED | EPIC-14 |
+| US-14.1 | Tool catalog API derived from the registry | DONE | EPIC-14 |
+| US-14.1#1 | Add the descriptive fields to tool definitions and derive the descriptors from the registry, including flattened fields, limits and grantable_to, with the planned browse_goal descriptor as disabled_by_policy and never registered. | DONE | US-14.1 |
+| US-14.1#2 | Compute availability and its typed reason per request from the worker-facing configuration, never stored. | DONE | US-14.1 |
+| US-14.1#3 | Add `GET /v1/tools`, `/v1/tools/{tool_id}` and `/v1/tools/{tool_id}/versions/{version}` with schema_version, catalog_digest and filters, behind the existing checks and the BFF, then regenerate OpenAPI and the TypeScript client. | DONE | US-14.1 |
+| US-14.1#4 | Test registry–catalog parity, agent-view filtering and secret absence. | DONE | US-14.1 |
+| US-14.2 | Tools page and grants by group | READY | EPIC-14 |
 | US-14.2#1 | Add the Tools sidebar entry and the `/tools` list and `/tools/{tool_id}` detail pages through the BFF and the generated client, with the raw JSON Schema in a disclosure. | TODO | US-14.2 |
 | US-14.2#2 | Add group selection, an expansion preview and refusal of unavailable tools to the Expert editor, and record both the pairs and the groups on save, by migration where the schema needs it. | TODO | US-14.2 |
 | US-14.2#3 | Cover the scenarios in browser specs with axe. | TODO | US-14.2 |
-| US-14.3 | Durable tool-use record and events | BLOCKED | EPIC-14 |
+| US-14.3 | Durable tool-use record and events | READY | EPIC-14 |
 | US-14.3#1 | Add the private tool-use table by migration, with no PostgREST, Realtime or browser access and under workspace retention, and write it from the gateway for every dispatch, fenced by lease generation. | TODO | US-14.3 |
 | US-14.3#2 | Add per-definition public fields, defaulting to none, applied after the tool's own redaction. | TODO | US-14.3 |
 | US-14.3#3 | Add the two event types to the typed union, the generated client and the consumer in the same change that emits them, with the consumer ignoring unknown types. | TODO | US-14.3 |
@@ -355,7 +355,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.4#1 | Add Tools used to the run workspace from `tool.use.*` events and the listing. | TODO | US-14.4 |
 | US-14.4#2 | Add tool uses under node runs in the workflow monitor. | TODO | US-14.4 |
 | US-14.4#3 | Cover the scenarios in browser specs with axe. | TODO | US-14.4 |
-| US-14.5 | Tool-provider key readiness | BLOCKED | EPIC-14 |
+| US-14.5 | Tool-provider key readiness | READY | EPIC-14 |
 | US-14.5#1 | Read tool-provider keys from the worker's environment for each attempt and pass them only to the adapter's HTTP client, with no credential field in any tool input. | TODO | US-14.5 |
 | US-14.5#2 | Refuse a grant of an unavailable tool at run admission and at Expert save with a typed code. | TODO | US-14.5 |
 | US-14.5#3 | Add fake-key patterns to the secret scan. | TODO | US-14.5 |
@@ -366,7 +366,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.7 | Jina Search The Web and Extract Website Content | BLOCKED | EPIC-14 |
 | US-14.7#1 | Add `search_web` and `extract_website_content` as plain `httpx` adapters with an injectable transport, schema ceilings and recorded fixtures. | TODO | US-14.7 |
 | US-14.7#2 | Cover the scenarios with fake transports only. | TODO | US-14.7 |
-| US-14.8 | URL guard for tools that fetch | BLOCKED | EPIC-14 |
+| US-14.8 | URL guard for tools that fetch | READY | EPIC-14 |
 | US-14.8#1 | Add one shared guard with DNS checks on every answer, redirect revalidation, a limit of 3 redirects, and size and time caps. | TODO | US-14.8 |
 | US-14.8#2 | Cover the scenarios with a fake resolver and transport. | TODO | US-14.8 |
 | US-14.9 | Agent File Input, read_run_file v2, read_csv and store_remote_file | BLOCKED | EPIC-14 |
@@ -4569,7 +4569,8 @@ Scheduled now by [Decision 0017](docs/engineering/decisions/0017-tool-catalog.md
 
 ### US-14.1: Tool catalog API derived from the registry
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-14-1-tool-catalog-api-derived/`
 
 As a developer or agent author
 I want one versioned catalog of every registered tool with its schemas, group, provider, classes and availability
@@ -4609,17 +4610,17 @@ Dependencies:
 - US-2.2
 
 Tasks:
-- [ ] Add the descriptive fields to tool definitions and derive the descriptors from the registry, including flattened fields, limits and grantable_to, with the planned browse_goal descriptor as disabled_by_policy and never registered.
-- [ ] Compute availability and its typed reason per request from the worker-facing configuration, never stored.
-- [ ] Add `GET /v1/tools`, `/v1/tools/{tool_id}` and `/v1/tools/{tool_id}/versions/{version}` with schema_version, catalog_digest and filters, behind the existing checks and the BFF, then regenerate OpenAPI and the TypeScript client.
-- [ ] Test registry–catalog parity, agent-view filtering and secret absence.
+- [x] Add the descriptive fields to tool definitions and derive the descriptors from the registry, including flattened fields, limits and grantable_to, with the planned browse_goal descriptor as disabled_by_policy and never registered.
+- [x] Compute availability and its typed reason per request from the worker-facing configuration, never stored.
+- [x] Add `GET /v1/tools`, `/v1/tools/{tool_id}` and `/v1/tools/{tool_id}/versions/{version}` with schema_version, catalog_digest and filters, behind the existing checks and the BFF, then regenerate OpenAPI and the TypeScript client.
+- [x] Test registry–catalog parity, agent-view filtering and secret absence.
 
 Open Questions:
 - None.
 
 ### US-14.2: Tools page and grants by group
 
-Status: BLOCKED
+Status: READY
 
 As a workspace owner
 I want a Tools page before Settings that shows each tool's inputs, outputs, types and availability, and an Expert editor that grants tools singly or by group
@@ -4665,7 +4666,7 @@ Open Questions:
 
 ### US-14.3: Durable tool-use record and events
 
-Status: BLOCKED
+Status: READY
 
 As a run's owner
 I want every tool dispatch recorded with when, why, what it used and produced, and its outcome
@@ -4763,7 +4764,7 @@ Open Questions:
 
 ### US-14.5: Tool-provider key readiness
 
-Status: BLOCKED
+Status: READY
 
 As a workspace owner
 I want each tool provider's key read in the worker for each attempt and shown only as available or not
@@ -4902,7 +4903,7 @@ Open Questions:
 
 ### US-14.8: URL guard for tools that fetch
 
-Status: BLOCKED
+Status: READY
 
 As a workspace owner
 I want every URL a tool fetches, or sends to a provider, to pass one guard

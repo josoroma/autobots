@@ -1475,6 +1475,62 @@
         "title": "ExpertView",
         "type": "object"
       },
+      "FieldDescriptor": {
+        "additionalProperties": false,
+        "properties": {
+          "constraints": {
+            "additionalProperties": true,
+            "title": "Constraints",
+            "type": "object"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "direction": {
+            "enum": [
+              "input",
+              "output"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "public": {
+            "title": "Public",
+            "type": "boolean"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "direction",
+          "type",
+          "required",
+          "description",
+          "constraints",
+          "public"
+        ],
+        "title": "FieldDescriptor",
+        "type": "object"
+      },
       "FrozenBinding": {
         "additionalProperties": false,
         "description": "One role's binding as this run froze it at admission, which later settings don't change.",
@@ -1613,6 +1669,34 @@
           "error_code"
         ],
         "title": "InstanceView",
+        "type": "object"
+      },
+      "KeyRequirementView": {
+        "additionalProperties": false,
+        "properties": {
+          "credential": {
+            "title": "Credential",
+            "type": "string"
+          },
+          "source": {
+            "const": "environment",
+            "title": "Source",
+            "type": "string"
+          },
+          "variables": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Variables",
+            "type": "array"
+          }
+        },
+        "required": [
+          "credential",
+          "variables",
+          "source"
+        ],
+        "title": "KeyRequirementView",
         "type": "object"
       },
       "KnowledgeHead": {
@@ -4140,6 +4224,340 @@
           "created_at"
         ],
         "title": "ToolAttemptView",
+        "type": "object"
+      },
+      "ToolCatalog": {
+        "additionalProperties": false,
+        "properties": {
+          "catalog_digest": {
+            "title": "Catalog Digest",
+            "type": "string"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/ToolGroupDescriptor"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/ToolDescriptor"
+            },
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "schema_version",
+          "catalog_digest",
+          "groups",
+          "tools"
+        ],
+        "title": "ToolCatalog",
+        "type": "object"
+      },
+      "ToolDescriptor": {
+        "additionalProperties": false,
+        "properties": {
+          "approval": {
+            "enum": [
+              "never",
+              "always"
+            ],
+            "title": "Approval",
+            "type": "string"
+          },
+          "availability": {
+            "enum": [
+              "available",
+              "key_missing",
+              "disabled_by_policy",
+              "not_qualified"
+            ],
+            "title": "Availability",
+            "type": "string"
+          },
+          "availability_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Availability Reason"
+          },
+          "cost_class": {
+            "enum": [
+              "free_local",
+              "metered_provider"
+            ],
+            "title": "Cost Class",
+            "type": "string"
+          },
+          "cost_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Note"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/FieldDescriptor"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "grantable_to": {
+            "items": {
+              "enum": [
+                "goal",
+                "expert",
+                "workflow_node",
+                "coordinator"
+              ],
+              "type": "string"
+            },
+            "title": "Grantable To",
+            "type": "array"
+          },
+          "group": {
+            "enum": [
+              "planning",
+              "general",
+              "web_search",
+              "web_extraction",
+              "web_crawling",
+              "files",
+              "market_data",
+              "browsing",
+              "code",
+              "connectors",
+              "delegation",
+              "learning"
+            ],
+            "title": "Group",
+            "type": "string"
+          },
+          "input_schema": {
+            "additionalProperties": true,
+            "title": "Input Schema",
+            "type": "object"
+          },
+          "key_requirement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeyRequirementView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limits": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ToolLimits"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "network": {
+            "title": "Network",
+            "type": "boolean"
+          },
+          "operation_class": {
+            "enum": [
+              "pure",
+              "read_only",
+              "reversible_internal_write",
+              "consequential_external_write",
+              "arbitrary_execution"
+            ],
+            "title": "Operation Class",
+            "type": "string"
+          },
+          "output_schema": {
+            "additionalProperties": true,
+            "title": "Output Schema",
+            "type": "object"
+          },
+          "provider": {
+            "enum": [
+              "autobots",
+              "tavily",
+              "jina",
+              "yahoo_finance",
+              "world_bank",
+              "github",
+              "browser_use"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "registered": {
+            "title": "Registered",
+            "type": "boolean"
+          },
+          "side_effects": {
+            "enum": [
+              "none",
+              "internal_write",
+              "external_write",
+              "arbitrary"
+            ],
+            "title": "Side Effects",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tool_id": {
+            "pattern": "^[a-z][a-z0-9_]{2,63}$",
+            "title": "Tool Id",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tool_id",
+          "version",
+          "title",
+          "description",
+          "group",
+          "provider",
+          "operation_class",
+          "side_effects",
+          "network",
+          "cost_class",
+          "cost_note",
+          "key_requirement",
+          "approval",
+          "input_schema",
+          "output_schema",
+          "fields",
+          "limits",
+          "grantable_to",
+          "registered",
+          "availability",
+          "availability_reason"
+        ],
+        "title": "ToolDescriptor",
+        "type": "object"
+      },
+      "ToolGroupDescriptor": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "group": {
+            "enum": [
+              "planning",
+              "general",
+              "web_search",
+              "web_extraction",
+              "web_crawling",
+              "files",
+              "market_data",
+              "browsing",
+              "code",
+              "connectors",
+              "delegation",
+              "learning"
+            ],
+            "title": "Group",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tool_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tool Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "group",
+          "title",
+          "description",
+          "tool_ids"
+        ],
+        "title": "ToolGroupDescriptor",
+        "type": "object"
+      },
+      "ToolLimits": {
+        "additionalProperties": false,
+        "properties": {
+          "max_output_bytes": {
+            "title": "Max Output Bytes",
+            "type": "integer"
+          },
+          "retries": {
+            "title": "Retries",
+            "type": "integer"
+          },
+          "timeout_seconds": {
+            "title": "Timeout Seconds",
+            "type": "number"
+          }
+        },
+        "required": [
+          "timeout_seconds",
+          "retries",
+          "max_output_bytes"
+        ],
+        "title": "ToolLimits",
+        "type": "object"
+      },
+      "ToolVersions": {
+        "additionalProperties": false,
+        "properties": {
+          "tool_id": {
+            "title": "Tool Id",
+            "type": "string"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/ToolDescriptor"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tool_id",
+          "versions"
+        ],
+        "title": "ToolVersions",
         "type": "object"
       },
       "UnknownEffect": {
@@ -8830,6 +9248,347 @@
           }
         },
         "summary": "Validate Credential"
+      }
+    },
+    "/v1/tools": {
+      "get": {
+        "operationId": "listTools",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "planning",
+                    "general",
+                    "web_search",
+                    "web_extraction",
+                    "web_crawling",
+                    "files",
+                    "market_data",
+                    "browsing",
+                    "code",
+                    "connectors",
+                    "delegation",
+                    "learning"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Group"
+            }
+          },
+          {
+            "in": "query",
+            "name": "availability",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "available",
+                    "key_missing",
+                    "disabled_by_policy",
+                    "not_qualified"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Availability"
+            }
+          },
+          {
+            "in": "query",
+            "name": "provider",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "autobots",
+                    "tavily",
+                    "jina",
+                    "yahoo_finance",
+                    "world_bank",
+                    "github",
+                    "browser_use"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolCatalog"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Tools"
+      }
+    },
+    "/v1/tools/{tool_id}": {
+      "get": {
+        "operationId": "getToolVersions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tool_id",
+            "required": true,
+            "schema": {
+              "title": "Tool Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolVersions"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Tool"
+      }
+    },
+    "/v1/tools/{tool_id}/versions/{version}": {
+      "get": {
+        "operationId": "getToolVersion",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tool_id",
+            "required": true,
+            "schema": {
+              "title": "Tool Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolDescriptor"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Tool Version"
       }
     },
     "/v1/workflow-blocks": {

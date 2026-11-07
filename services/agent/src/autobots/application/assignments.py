@@ -21,6 +21,7 @@ from autobots.application.tool_gateway import (
 from autobots.application.worker_leases import Lease, claim_run
 from autobots.contracts.assignments import AssignmentResult, AssignSpecialist
 from autobots.domain.runs import Actor, RunCommand, RunStatus
+from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import DELEGATION_TOOL, PLAN_TOOLS, OperationClass
 
 Driver = Callable[[Any, Lease], Awaitable[Any]]
@@ -294,6 +295,10 @@ def assign_tool(delegation: Delegation) -> ToolDefinition:
 
     return ToolDefinition(
         tool_id=DELEGATION_TOOL,
+        title="Assign specialist",
+        group=ToolGroup.DELEGATION,
+        public_input_fields=("expert_id",),
+        public_output_fields=("assignment_id", "child_run_id", "outcome", "code"),
         version=1,
         description="Give a bounded task to an Expert in this session, and wait for its result.",
         input_model=AssignSpecialist,

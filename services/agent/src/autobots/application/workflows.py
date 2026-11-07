@@ -36,7 +36,7 @@ from autobots.domain.workflows import (
 
 # What a workflow's own blocks reach. Its approval step is the only consequential one here.
 DEFAULT_LIMIT_MICRO_USD = 1_000_000
-_WORKFLOW_TOOLS = {**LOOP_TOOL_GRANTS, DELEGATION_TOOL: 1, "workflow_approval": 1}
+WORKFLOW_TOOLS = {**LOOP_TOOL_GRANTS, DELEGATION_TOOL: 1, "workflow_approval": 1}
 
 
 class WorkflowRefused(Exception):
@@ -243,11 +243,11 @@ async def create_execution(
                     except ProfileNotOffered as refused:
                         raise WorkflowRefused(refused.code) from None
             granted = (
-                _WORKFLOW_TOOLS
+                WORKFLOW_TOOLS
                 if tools is None
                 else {
                     name: version
-                    for name, version in _WORKFLOW_TOOLS.items()
+                    for name, version in WORKFLOW_TOOLS.items()
                     if name in tools or name in PLAN_TOOLS or name == "workflow_approval"
                 }
             )

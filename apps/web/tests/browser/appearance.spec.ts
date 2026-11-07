@@ -333,7 +333,8 @@ test("status meaning is in text and icon, not color alone", async ({
   await visit(page);
   const status = page.getByRole("status");
   await expect(status).toContainText("Python API: available");
-  await expect(status.locator("svg")).toHaveCount(1);
+  // The decorative service icon isn't the meaning, so only the state icon is counted.
+  await expect(status.locator("svg[data-status-icon]")).toHaveCount(1);
 });
 
 test("the settings radios have labels and are usable by keyboard", async ({

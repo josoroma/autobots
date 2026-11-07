@@ -1476,6 +1476,62 @@ export const schemas = {
     "title": "ExpertView",
     "type": "object"
   },
+  "FieldDescriptor": {
+    "additionalProperties": false,
+    "properties": {
+      "constraints": {
+        "additionalProperties": true,
+        "title": "Constraints",
+        "type": "object"
+      },
+      "description": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Description"
+      },
+      "direction": {
+        "enum": [
+          "input",
+          "output"
+        ],
+        "title": "Direction",
+        "type": "string"
+      },
+      "path": {
+        "title": "Path",
+        "type": "string"
+      },
+      "public": {
+        "title": "Public",
+        "type": "boolean"
+      },
+      "required": {
+        "title": "Required",
+        "type": "boolean"
+      },
+      "type": {
+        "title": "Type",
+        "type": "string"
+      }
+    },
+    "required": [
+      "path",
+      "direction",
+      "type",
+      "required",
+      "description",
+      "constraints",
+      "public"
+    ],
+    "title": "FieldDescriptor",
+    "type": "object"
+  },
   "FrozenBinding": {
     "additionalProperties": false,
     "description": "One role's binding as this run froze it at admission, which later settings don't change.",
@@ -1614,6 +1670,34 @@ export const schemas = {
       "error_code"
     ],
     "title": "InstanceView",
+    "type": "object"
+  },
+  "KeyRequirementView": {
+    "additionalProperties": false,
+    "properties": {
+      "credential": {
+        "title": "Credential",
+        "type": "string"
+      },
+      "source": {
+        "const": "environment",
+        "title": "Source",
+        "type": "string"
+      },
+      "variables": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Variables",
+        "type": "array"
+      }
+    },
+    "required": [
+      "credential",
+      "variables",
+      "source"
+    ],
+    "title": "KeyRequirementView",
     "type": "object"
   },
   "KnowledgeHead": {
@@ -4143,6 +4227,340 @@ export const schemas = {
     "title": "ToolAttemptView",
     "type": "object"
   },
+  "ToolCatalog": {
+    "additionalProperties": false,
+    "properties": {
+      "catalog_digest": {
+        "title": "Catalog Digest",
+        "type": "string"
+      },
+      "groups": {
+        "items": {
+          "$ref": "#/components/schemas/ToolGroupDescriptor"
+        },
+        "title": "Groups",
+        "type": "array"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "tools": {
+        "items": {
+          "$ref": "#/components/schemas/ToolDescriptor"
+        },
+        "title": "Tools",
+        "type": "array"
+      }
+    },
+    "required": [
+      "schema_version",
+      "catalog_digest",
+      "groups",
+      "tools"
+    ],
+    "title": "ToolCatalog",
+    "type": "object"
+  },
+  "ToolDescriptor": {
+    "additionalProperties": false,
+    "properties": {
+      "approval": {
+        "enum": [
+          "never",
+          "always"
+        ],
+        "title": "Approval",
+        "type": "string"
+      },
+      "availability": {
+        "enum": [
+          "available",
+          "key_missing",
+          "disabled_by_policy",
+          "not_qualified"
+        ],
+        "title": "Availability",
+        "type": "string"
+      },
+      "availability_reason": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Availability Reason"
+      },
+      "cost_class": {
+        "enum": [
+          "free_local",
+          "metered_provider"
+        ],
+        "title": "Cost Class",
+        "type": "string"
+      },
+      "cost_note": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Cost Note"
+      },
+      "description": {
+        "title": "Description",
+        "type": "string"
+      },
+      "fields": {
+        "items": {
+          "$ref": "#/components/schemas/FieldDescriptor"
+        },
+        "title": "Fields",
+        "type": "array"
+      },
+      "grantable_to": {
+        "items": {
+          "enum": [
+            "goal",
+            "expert",
+            "workflow_node",
+            "coordinator"
+          ],
+          "type": "string"
+        },
+        "title": "Grantable To",
+        "type": "array"
+      },
+      "group": {
+        "enum": [
+          "planning",
+          "general",
+          "web_search",
+          "web_extraction",
+          "web_crawling",
+          "files",
+          "market_data",
+          "browsing",
+          "code",
+          "connectors",
+          "delegation",
+          "learning"
+        ],
+        "title": "Group",
+        "type": "string"
+      },
+      "input_schema": {
+        "additionalProperties": true,
+        "title": "Input Schema",
+        "type": "object"
+      },
+      "key_requirement": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/KeyRequirementView"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "limits": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ToolLimits"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "network": {
+        "title": "Network",
+        "type": "boolean"
+      },
+      "operation_class": {
+        "enum": [
+          "pure",
+          "read_only",
+          "reversible_internal_write",
+          "consequential_external_write",
+          "arbitrary_execution"
+        ],
+        "title": "Operation Class",
+        "type": "string"
+      },
+      "output_schema": {
+        "additionalProperties": true,
+        "title": "Output Schema",
+        "type": "object"
+      },
+      "provider": {
+        "enum": [
+          "autobots",
+          "tavily",
+          "jina",
+          "yahoo_finance",
+          "world_bank",
+          "github",
+          "browser_use"
+        ],
+        "title": "Provider",
+        "type": "string"
+      },
+      "registered": {
+        "title": "Registered",
+        "type": "boolean"
+      },
+      "side_effects": {
+        "enum": [
+          "none",
+          "internal_write",
+          "external_write",
+          "arbitrary"
+        ],
+        "title": "Side Effects",
+        "type": "string"
+      },
+      "title": {
+        "title": "Title",
+        "type": "string"
+      },
+      "tool_id": {
+        "pattern": "^[a-z][a-z0-9_]{2,63}$",
+        "title": "Tool Id",
+        "type": "string"
+      },
+      "version": {
+        "minimum": 1.0,
+        "title": "Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "tool_id",
+      "version",
+      "title",
+      "description",
+      "group",
+      "provider",
+      "operation_class",
+      "side_effects",
+      "network",
+      "cost_class",
+      "cost_note",
+      "key_requirement",
+      "approval",
+      "input_schema",
+      "output_schema",
+      "fields",
+      "limits",
+      "grantable_to",
+      "registered",
+      "availability",
+      "availability_reason"
+    ],
+    "title": "ToolDescriptor",
+    "type": "object"
+  },
+  "ToolGroupDescriptor": {
+    "additionalProperties": false,
+    "properties": {
+      "description": {
+        "title": "Description",
+        "type": "string"
+      },
+      "group": {
+        "enum": [
+          "planning",
+          "general",
+          "web_search",
+          "web_extraction",
+          "web_crawling",
+          "files",
+          "market_data",
+          "browsing",
+          "code",
+          "connectors",
+          "delegation",
+          "learning"
+        ],
+        "title": "Group",
+        "type": "string"
+      },
+      "title": {
+        "title": "Title",
+        "type": "string"
+      },
+      "tool_ids": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Tool Ids",
+        "type": "array"
+      }
+    },
+    "required": [
+      "group",
+      "title",
+      "description",
+      "tool_ids"
+    ],
+    "title": "ToolGroupDescriptor",
+    "type": "object"
+  },
+  "ToolLimits": {
+    "additionalProperties": false,
+    "properties": {
+      "max_output_bytes": {
+        "title": "Max Output Bytes",
+        "type": "integer"
+      },
+      "retries": {
+        "title": "Retries",
+        "type": "integer"
+      },
+      "timeout_seconds": {
+        "title": "Timeout Seconds",
+        "type": "number"
+      }
+    },
+    "required": [
+      "timeout_seconds",
+      "retries",
+      "max_output_bytes"
+    ],
+    "title": "ToolLimits",
+    "type": "object"
+  },
+  "ToolVersions": {
+    "additionalProperties": false,
+    "properties": {
+      "tool_id": {
+        "title": "Tool Id",
+        "type": "string"
+      },
+      "versions": {
+        "items": {
+          "$ref": "#/components/schemas/ToolDescriptor"
+        },
+        "title": "Versions",
+        "type": "array"
+      }
+    },
+    "required": [
+      "tool_id",
+      "versions"
+    ],
+    "title": "ToolVersions",
+    "type": "object"
+  },
   "UnknownEffect": {
     "additionalProperties": false,
     "properties": {
@@ -5050,6 +5468,20 @@ export function parseExpertView(value: unknown): ExpertView {
   return parseWith(schemas, "ExpertView", value) as ExpertView;
 }
 
+export interface FieldDescriptor {
+  constraints: Record<string, unknown>;
+  description: string | null;
+  direction: "input" | "output";
+  path: string;
+  public: boolean;
+  required: boolean;
+  type: string;
+}
+
+export function parseFieldDescriptor(value: unknown): FieldDescriptor {
+  return parseWith(schemas, "FieldDescriptor", value) as FieldDescriptor;
+}
+
 export interface FrozenBinding {
   canonical_id: string;
   profile: string;
@@ -5097,6 +5529,16 @@ export interface InstanceView {
 
 export function parseInstanceView(value: unknown): InstanceView {
   return parseWith(schemas, "InstanceView", value) as InstanceView;
+}
+
+export interface KeyRequirementView {
+  credential: string;
+  source: "environment";
+  variables: string[];
+}
+
+export function parseKeyRequirementView(value: unknown): KeyRequirementView {
+  return parseWith(schemas, "KeyRequirementView", value) as KeyRequirementView;
 }
 
 export interface KnowledgeHead {
@@ -5803,6 +6245,75 @@ export function parseToolAttemptView(value: unknown): ToolAttemptView {
   return parseWith(schemas, "ToolAttemptView", value) as ToolAttemptView;
 }
 
+export interface ToolCatalog {
+  catalog_digest: string;
+  groups: ToolGroupDescriptor[];
+  schema_version: 1;
+  tools: ToolDescriptor[];
+}
+
+export function parseToolCatalog(value: unknown): ToolCatalog {
+  return parseWith(schemas, "ToolCatalog", value) as ToolCatalog;
+}
+
+export interface ToolDescriptor {
+  approval: "never" | "always";
+  availability: "available" | "key_missing" | "disabled_by_policy" | "not_qualified";
+  availability_reason: string | null;
+  cost_class: "free_local" | "metered_provider";
+  cost_note: string | null;
+  description: string;
+  fields: FieldDescriptor[];
+  grantable_to: "goal" | "expert" | "workflow_node" | "coordinator"[];
+  group: "planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning";
+  input_schema: Record<string, unknown>;
+  key_requirement: KeyRequirementView | null;
+  limits: ToolLimits | null;
+  network: boolean;
+  operation_class: "pure" | "read_only" | "reversible_internal_write" | "consequential_external_write" | "arbitrary_execution";
+  output_schema: Record<string, unknown>;
+  provider: "autobots" | "tavily" | "jina" | "yahoo_finance" | "world_bank" | "github" | "browser_use";
+  registered: boolean;
+  side_effects: "none" | "internal_write" | "external_write" | "arbitrary";
+  title: string;
+  tool_id: string;
+  version: number;
+}
+
+export function parseToolDescriptor(value: unknown): ToolDescriptor {
+  return parseWith(schemas, "ToolDescriptor", value) as ToolDescriptor;
+}
+
+export interface ToolGroupDescriptor {
+  description: string;
+  group: "planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning";
+  title: string;
+  tool_ids: string[];
+}
+
+export function parseToolGroupDescriptor(value: unknown): ToolGroupDescriptor {
+  return parseWith(schemas, "ToolGroupDescriptor", value) as ToolGroupDescriptor;
+}
+
+export interface ToolLimits {
+  max_output_bytes: number;
+  retries: number;
+  timeout_seconds: number;
+}
+
+export function parseToolLimits(value: unknown): ToolLimits {
+  return parseWith(schemas, "ToolLimits", value) as ToolLimits;
+}
+
+export interface ToolVersions {
+  tool_id: string;
+  versions: ToolDescriptor[];
+}
+
+export function parseToolVersions(value: unknown): ToolVersions {
+  return parseWith(schemas, "ToolVersions", value) as ToolVersions;
+}
+
 export interface UnknownEffect {
   generation: number;
   operation_id: string;
@@ -6143,6 +6654,18 @@ export async function deleteOpenRouterCredential(options: ClientOptions, body: E
 
 export async function validateOpenRouter(options: ClientOptions): Promise<ProviderStatus> {
   return parseProviderStatus(await requestJson(options, "POST", `/v1/settings/model-providers/openrouter/validate`));
+}
+
+export async function listTools(options: ClientOptions): Promise<ToolCatalog> {
+  return parseToolCatalog(await requestJson(options, "GET", `/v1/tools`));
+}
+
+export async function getToolVersions(options: ClientOptions, tool_id: string): Promise<ToolVersions> {
+  return parseToolVersions(await requestJson(options, "GET", `/v1/tools/${encodeURIComponent(tool_id)}`));
+}
+
+export async function getToolVersion(options: ClientOptions, tool_id: string, version: string): Promise<ToolDescriptor> {
+  return parseToolDescriptor(await requestJson(options, "GET", `/v1/tools/${encodeURIComponent(tool_id)}/versions/${encodeURIComponent(version)}`));
 }
 
 export async function listWorkflowBlocks(options: ClientOptions): Promise<BlockCatalog> {

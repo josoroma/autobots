@@ -22,6 +22,7 @@ from autobots.api.run_routes import router as run_router
 from autobots.api.security import DenyAllMembership, MembershipStore
 from autobots.api.settings import Settings
 from autobots.api.settings_routes import router as settings_router
+from autobots.api.tool_routes import router as tool_router
 from autobots.api.workflow_routes import router as workflow_router
 
 
@@ -85,4 +86,5 @@ def create_app(
     app.include_router(memory_router)
     app.include_router(improvement_router)
     app.include_router(operation_router)
+    app.include_router(tool_router)
     return app

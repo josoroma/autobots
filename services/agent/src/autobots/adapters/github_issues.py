@@ -20,12 +20,14 @@ from autobots.application.tool_gateway import (
     ToolFailed,
 )
 from autobots.contracts.tools import CreateGithubIssueInput, CreateGithubIssueOutput
+from autobots.domain.tool_catalog import KeyRequirement, ToolGroup, ToolProvider
 from autobots.domain.tools import OperationClass
 
 API_URL = "https://api.github.com"
 REPOSITORY_VARIABLE = "GITHUB_REPOSITORY"
 TOKEN_VARIABLE = "GITHUB_TOKEN"
 TOOL_ID = "create_github_issue"
+GITHUB_KEY = KeyRequirement("github", (REPOSITORY_VARIABLE, TOKEN_VARIABLE))
 _REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 # GitHub answered, and nothing was created. Anything else unclear stays uncertain.
 _REFUSED = frozenset({400, 401, 403, 404, 410, 422, 429})
@@ -124,6 +126,13 @@ def github_issue_tool(
 
     return ToolDefinition(
         tool_id=TOOL_ID,
+        title="Create GitHub issue",
+        group=ToolGroup.CONNECTORS,
+        provider=ToolProvider.GITHUB,
+        network=True,
+        key_requirement=GITHUB_KEY,
+        public_input_fields=("title",),
+        public_output_fields=("number", "url"),
         version=1,
         description=(
             "Create an issue in the one GitHub repository this workspace configured. "

@@ -13,6 +13,7 @@ from pydantic import BaseModel, ValidationError
 from autobots.application.approvals import approval_gate, scope_hash, scope_snapshot
 from autobots.application.runs import LeaseLost
 from autobots.domain.runs import RunStatus
+from autobots.domain.tool_catalog import CostClass, KeyRequirement, ToolGroup, ToolProvider
 from autobots.domain.tools import EFFECTFUL, OperationClass, ToolOutcome, path_granted
 
 
@@ -87,6 +88,17 @@ class ToolDefinition:
     safe_to_repeat: bool = False
     # Applied to anything returned to the model or stored in a receipt.
     redact: Callable[[dict[str, Any]], dict[str, Any]] = lambda output: output
+    # How the catalog describes it, PRD-Tool-Catalog TC-02. None of these grant anything.
+    title: str = ""
+    group: ToolGroup = ToolGroup.GENERAL
+    provider: ToolProvider = ToolProvider.AUTOBOTS
+    network: bool = False
+    cost_class: CostClass = CostClass.FREE_LOCAL
+    cost_note: str | None = None
+    key_requirement: KeyRequirement | None = None
+    # Top-level fields a run's screens may show, TU-04. The default shows none.
+    public_input_fields: tuple[str, ...] = ()
+    public_output_fields: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -121,6 +133,9 @@ class ToolRegistry:
         if key in self._tools:
             raise ValueError(f"{tool.tool_id} v{tool.version} is already registered")
         self._tools[key] = tool
+
+    def definitions(self) -> list[ToolDefinition]:
+        return [tool for _, tool in sorted(self._tools.items())]
 
     def versions(self) -> dict[str, int]:
         return {tool_id: version for tool_id, version in self._tools}

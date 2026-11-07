@@ -22,6 +22,7 @@ from autobots.contracts.improvements import (
 )
 from autobots.domain.models import RolePolicy
 from autobots.domain.runs import TERMINAL, RunStatus
+from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import LOOP_TOOL_GRANTS, OperationClass
 
 # Text that tries to act as policy. It can still be stored as a note about what someone wrote, but
@@ -460,6 +461,10 @@ async def _propose_tool(arguments: ImprovementProposal, context: ToolContext) ->
 
 PROPOSE_IMPROVEMENT = ToolDefinition(
     tool_id="propose_improvement",
+    title="Propose improvement",
+    group=ToolGroup.LEARNING,
+    public_input_fields=("kind", "key"),
+    public_output_fields=("candidate_id", "status"),
     version=1,
     description="Propose a memory or skill change for a person to review. It changes nothing yet.",
     input_model=ImprovementProposal,

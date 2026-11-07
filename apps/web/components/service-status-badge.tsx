@@ -28,6 +28,7 @@ export function ServiceStatusBadge({ status }: { status: ServiceStatus }) {
         <span className="flex items-start gap-1.5">
           <Icon
             aria-hidden="true"
+            data-status-icon
             className={cn(
               "mt-0.5 size-4 shrink-0",
               available ? "text-foreground" : "text-destructive",

@@ -17,6 +17,7 @@ from autobots.contracts.memory import (
     SearchMemory,
     SearchResults,
 )
+from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import OperationClass
 
 MAX_HITS = 10
@@ -187,6 +188,10 @@ async def _read_offload(arguments: ReadOffload, context: ToolContext) -> Offload
 
 SEARCH_MEMORY = ToolDefinition(
     tool_id="search_memory",
+    title="Search memory",
+    group=ToolGroup.GENERAL,
+    public_input_fields=("query",),
+    public_output_fields=(),
     version=1,
     description="Search this workspace's memory and saved evidence by keyword.",
     input_model=SearchMemory,
@@ -198,6 +203,10 @@ SEARCH_MEMORY = ToolDefinition(
 )
 READ_OFFLOAD = ToolDefinition(
     tool_id="read_offload",
+    title="Read offloaded result",
+    group=ToolGroup.GENERAL,
+    public_input_fields=("offload_id", "offset", "limit"),
+    public_output_fields=("tool_name", "sha256", "total_chars", "next_offset"),
     version=1,
     description=(
         "Read back a long tool result stored outside the conversation, a page at a time. "

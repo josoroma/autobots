@@ -16,6 +16,7 @@ from autobots.contracts.plans import (
     PlanTask,
     TaskCompleted,
 )
+from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import OperationClass
 
 # What the model can fix. Each one spends the root's single repair.
@@ -253,6 +254,10 @@ def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
     return (
         ToolDefinition(
             tool_id="propose_plan",
+            title="Propose plan",
+            group=ToolGroup.PLANNING,
+            public_input_fields=("revision_reason",),
+            public_output_fields=("version", "tasks"),
             version=1,
             description="Propose the plan for this goal, or revise it with a reason.",
             input_model=PlanProposal,
@@ -264,6 +269,10 @@ def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
         ),
         ToolDefinition(
             tool_id="complete_task",
+            title="Complete task",
+            group=ToolGroup.PLANNING,
+            public_input_fields=("task_id",),
+            public_output_fields=("task_id", "remaining"),
             version=1,
             description=(
                 "Mark a plan task complete, citing saved files by their exact path or tool "

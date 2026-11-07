@@ -17,6 +17,7 @@ from autobots.contracts.tools import (
     SaveArtifactInput,
     SaveArtifactOutput,
 )
+from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import OperationClass
 
 
@@ -91,6 +92,10 @@ async def _save(arguments: SaveArtifactInput, context: ToolContext) -> SaveArtif
 
 CALCULATE = ToolDefinition(
     tool_id="calculate",
+    title="Calculate",
+    group=ToolGroup.GENERAL,
+    public_input_fields=("operation",),
+    public_output_fields=("result",),
     version=1,
     description="Sum, mean, minimum or maximum of a list of numbers.",
     input_model=CalculateInput,
@@ -102,6 +107,10 @@ CALCULATE = ToolDefinition(
 )
 READ_RUN_FILE = ToolDefinition(
     tool_id="read_run_file",
+    title="File Read",
+    group=ToolGroup.FILES,
+    public_input_fields=("path",),
+    public_output_fields=("path", "version", "sha256"),
     version=1,
     description="Read the latest version of a file belonging to this run.",
     input_model=ReadRunFileInput,
@@ -114,6 +123,10 @@ READ_RUN_FILE = ToolDefinition(
 )
 SAVE_ARTIFACT = ToolDefinition(
     tool_id="save_artifact",
+    title="Save file",
+    group=ToolGroup.FILES,
+    public_input_fields=("path", "media_type"),
+    public_output_fields=("path", "version", "sha256"),
     version=1,
     description="Save a file for this run as a new version.",
     input_model=SaveArtifactInput,
