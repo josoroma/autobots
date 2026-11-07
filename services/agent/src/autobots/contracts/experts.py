@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from autobots.contracts.primitives import Identifier
+from autobots.contracts.tools import ToolGroupName
 from autobots.domain.models import ModelProfileId
 
 VIEW = ConfigDict(extra="forbid", frozen=True)
@@ -18,6 +19,9 @@ class ExpertConfig(BaseModel):
     purpose: str = Field(default="", max_length=1000)
     instructions: str = Field(default="", max_length=20000)
     tools: list[str] = Field(default_factory=list, max_length=20)
+    # Groups granted whole, PRD-Tool-Catalog TC-06. Saving expands them into `tools`, so a saved
+    # version names explicit tools, and this keeps where they came from for display.
+    tool_groups: list[ToolGroupName] = Field(default_factory=list, max_length=12)
     skills: list[str] = Field(default_factory=list, max_length=50)
     role_bindings: dict[str, ModelProfileId] = Field(default_factory=dict)
 

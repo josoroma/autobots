@@ -1344,6 +1344,28 @@
             "title": "Skills",
             "type": "array"
           },
+          "tool_groups": {
+            "items": {
+              "enum": [
+                "planning",
+                "general",
+                "web_search",
+                "web_extraction",
+                "web_crawling",
+                "files",
+                "market_data",
+                "browsing",
+                "code",
+                "connectors",
+                "delegation",
+                "learning"
+              ],
+              "type": "string"
+            },
+            "maxItems": 12,
+            "title": "Tool Groups",
+            "type": "array"
+          },
           "tools": {
             "items": {
               "type": "string"

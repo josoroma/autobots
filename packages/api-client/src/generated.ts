@@ -1345,6 +1345,28 @@ export const schemas = {
         "title": "Skills",
         "type": "array"
       },
+      "tool_groups": {
+        "items": {
+          "enum": [
+            "planning",
+            "general",
+            "web_search",
+            "web_extraction",
+            "web_crawling",
+            "files",
+            "market_data",
+            "browsing",
+            "code",
+            "connectors",
+            "delegation",
+            "learning"
+          ],
+          "type": "string"
+        },
+        "maxItems": 12,
+        "title": "Tool Groups",
+        "type": "array"
+      },
       "tools": {
         "items": {
           "type": "string"
@@ -5413,6 +5435,7 @@ export interface ExpertConfig {
   purpose?: string;
   role_bindings?: Record<string, unknown>;
   skills?: string[];
+  tool_groups?: ("planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning")[];
   tools?: string[];
 }
 
@@ -6264,7 +6287,7 @@ export interface ToolDescriptor {
   cost_note: string | null;
   description: string;
   fields: FieldDescriptor[];
-  grantable_to: "goal" | "expert" | "workflow_node" | "coordinator"[];
+  grantable_to: ("goal" | "expert" | "workflow_node" | "coordinator")[];
   group: "planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning";
   input_schema: Record<string, unknown>;
   key_requirement: KeyRequirementView | null;
@@ -6341,7 +6364,7 @@ export function parseUsageSummary(value: unknown): UsageSummary {
 export interface ValidationError {
   ctx?: Record<string, unknown>;
   input?: unknown;
-  loc: string | number[];
+  loc: (string | number)[];
   msg: string;
   type: string;
 }

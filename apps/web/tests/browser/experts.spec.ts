@@ -348,3 +348,70 @@ test("saving a revision keeps what the form doesn't edit", async ({ page }) => {
   expect(latest.skills).toEqual(["a-skill"]);
   expect(latest.role_bindings).toEqual({ coder: "openrouter_terra" });
 });
+
+test("US-14.2: a group grant is previewed, saved as explicit tools, and an unavailable tool is refused", async ({
+  page,
+}) => {
+  await signIn(page, EMAIL_A, PASSWORD_A);
+  await page.goto("/experts");
+  await page.getByLabel("Name").fill("Grouped");
+  await page.getByRole("button", { name: "Create" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Grouped, version 1" }),
+  ).toBeVisible();
+
+  // This stack's API has no GitHub variables, so the connector can't be granted.
+  const github = page.locator('[data-tool="create_github_issue"]');
+  await expect(github.getByRole("checkbox")).toBeDisabled();
+  await expect(github.locator('[data-field="unavailable"]')).toContainText(
+    "Unavailable: key not set",
+  );
+  await expect(
+    page.getByLabel(/Connectors group .*includes an unavailable tool/),
+  ).toBeDisabled();
+
+  await page.getByLabel("Calculate").check();
+  await page.getByLabel(/^Files group \(3 tools\)/).check();
+  await expect(page.locator('[data-field="expansion"]')).toHaveText(
+    "This version grants: calculate, publish_artifact, read_run_file, save_artifact, from the group files and the tools named.",
+  );
+  await page.getByRole("button", { name: "Save revision" }).click();
+  await expect(page.locator('[data-message="save"]')).toContainText(
+    "Saved as version 2",
+  );
+  const version = page.locator('[data-version="2"]');
+  await expect(version).toContainText(
+    "calculate, publish_artifact, read_run_file, save_artifact",
+  );
+  await expect(version).toContainText("(groups: files)");
+  await expect(page.locator('[data-version="1"]')).toContainText("no tools");
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa"])
+    .analyze();
+  expect(results.violations.map((violation) => violation.id)).toEqual([]);
+
+  // The stored version names the tools, so it doesn't follow the group later.
+  const url = new URL(page.url());
+  const id = url.pathname.split("/").at(-1) ?? "";
+  const stored = await (await page.request.get(`/api/v1/experts/${id}`)).json();
+  expect(stored.versions[1].config.tools).toEqual([
+    "calculate",
+    "publish_artifact",
+    "read_run_file",
+    "save_artifact",
+  ]);
+  expect(stored.versions[1].config.tool_groups).toEqual(["files"]);
+
+  for (const [config, code] of [
+    [{ tools: ["create_github_issue"] }, "expert_tool_unavailable"],
+    [{ tool_groups: ["connectors"] }, "expert_tool_unavailable"],
+    [{ tool_groups: ["planning"] }, "expert_tool_group_empty"],
+  ] as const) {
+    const refused = await page.request.post(`/api/v1/experts/${id}/versions`, {
+      headers: await write(page, crypto.randomUUID()),
+      data: { expected_version: 2, config },
+    });
+    expect(refused.status()).toBe(422);
+    expect((await refused.json()).code).toBe(code);
+  }
+});

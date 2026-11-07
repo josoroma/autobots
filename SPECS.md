@@ -341,10 +341,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.1#2 | Compute availability and its typed reason per request from the worker-facing configuration, never stored. | DONE | US-14.1 |
 | US-14.1#3 | Add `GET /v1/tools`, `/v1/tools/{tool_id}` and `/v1/tools/{tool_id}/versions/{version}` with schema_version, catalog_digest and filters, behind the existing checks and the BFF, then regenerate OpenAPI and the TypeScript client. | DONE | US-14.1 |
 | US-14.1#4 | Test registry–catalog parity, agent-view filtering and secret absence. | DONE | US-14.1 |
-| US-14.2 | Tools page and grants by group | READY | EPIC-14 |
-| US-14.2#1 | Add the Tools sidebar entry and the `/tools` list and `/tools/{tool_id}` detail pages through the BFF and the generated client, with the raw JSON Schema in a disclosure. | TODO | US-14.2 |
-| US-14.2#2 | Add group selection, an expansion preview and refusal of unavailable tools to the Expert editor, and record both the pairs and the groups on save, by migration where the schema needs it. | TODO | US-14.2 |
-| US-14.2#3 | Cover the scenarios in browser specs with axe. | TODO | US-14.2 |
+| US-14.2 | Tools page and grants by group | DONE | EPIC-14 |
+| US-14.2#1 | Add the Tools sidebar entry and the `/tools` list and `/tools/{tool_id}` detail pages through the BFF and the generated client, with the raw JSON Schema in a disclosure. | DONE | US-14.2 |
+| US-14.2#2 | Add group selection, an expansion preview and refusal of unavailable tools to the Expert editor, and record both the pairs and the groups on save, by migration where the schema needs it. | DONE | US-14.2 |
+| US-14.2#3 | Cover the scenarios in browser specs with axe. | DONE | US-14.2 |
 | US-14.3 | Durable tool-use record and events | READY | EPIC-14 |
 | US-14.3#1 | Add the private tool-use table by migration, with no PostgREST, Realtime or browser access and under workspace retention, and write it from the gateway for every dispatch, fenced by lease generation. | TODO | US-14.3 |
 | US-14.3#2 | Add per-definition public fields, defaulting to none, applied after the tool's own redaction. | TODO | US-14.3 |
@@ -4620,7 +4620,8 @@ Open Questions:
 
 ### US-14.2: Tools page and grants by group
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-14-2-tools-page-grants-group/`
 
 As a workspace owner
 I want a Tools page before Settings that shows each tool's inputs, outputs, types and availability, and an Expert editor that grants tools singly or by group
@@ -4657,9 +4658,9 @@ Dependencies:
 - US-5.1
 
 Tasks:
-- [ ] Add the Tools sidebar entry and the `/tools` list and `/tools/{tool_id}` detail pages through the BFF and the generated client, with the raw JSON Schema in a disclosure.
-- [ ] Add group selection, an expansion preview and refusal of unavailable tools to the Expert editor, and record both the pairs and the groups on save, by migration where the schema needs it.
-- [ ] Cover the scenarios in browser specs with axe.
+- [x] Add the Tools sidebar entry and the `/tools` list and `/tools/{tool_id}` detail pages through the BFF and the generated client, with the raw JSON Schema in a disclosure.
+- [x] Add group selection, an expansion preview and refusal of unavailable tools to the Expert editor, and record both the pairs and the groups on save, by migration where the schema needs it.
+- [x] Cover the scenarios in browser specs with axe.
 
 Open Questions:
 - None.

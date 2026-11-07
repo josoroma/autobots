@@ -1,6 +1,8 @@
 """Experts, immutable revisions, sessions and bounded routing, PRD 8.2 and 8.3."""
 
 import json
+import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID, uuid4
@@ -27,12 +29,36 @@ class ExpertRefused(Exception):
         self.code = code
 
 
-def validate_config(config: ExpertConfig) -> None:
-    """A revision can only name what exists. Anything else is refused, not dropped."""
+def expand_groups(config: ExpertConfig, environ: Mapping[str, str] = os.environ) -> ExpertConfig:
+    """Groups become explicit tools when a version is saved, so a tool added to a group later
+    never changes a saved version (TC-06). A tool an editor didn't name stays out."""
+    if not config.tool_groups:
+        return config
+    from autobots.application.tool_catalog import expert_tools_by_group
+
+    if len(set(config.tool_groups)) != len(config.tool_groups):
+        raise ExpertRefused("expert_tool_group_duplicated")
+    by_group = expert_tools_by_group(environ)
+    tools = list(config.tools)
+    for group in config.tool_groups:
+        members = by_group.get(group, [])
+        if not members:
+            raise ExpertRefused("expert_tool_group_empty")
+        tools += [tool for tool in members if tool not in tools]
+    return config.model_copy(update={"tools": tools})
+
+
+def validate_config(config: ExpertConfig, environ: Mapping[str, str] = os.environ) -> None:
+    """A revision can only name what exists and is available. Anything else is refused, not
+    dropped."""
     if any(tool not in EXPERT_TOOLS for tool in config.tools):
         raise ExpertRefused("expert_tool_not_available")
     if len(set(config.tools)) != len(config.tools):
         raise ExpertRefused("expert_tool_duplicated")
+    from autobots.application.tool_catalog import unavailable_tools
+
+    if unavailable_tools(config.tools, environ):
+        raise ExpertRefused("expert_tool_unavailable")
     try:
         for role in config.role_bindings:
             approved_role(role)
@@ -82,8 +108,9 @@ async def create_expert(
     name: str,
     config: ExpertConfig,
 ) -> ExpertView:
-    validate_config(config)
     fingerprint = request_hash({"name": name, "config": config.model_dump(mode="json")})
+    config = expand_groups(config)
+    validate_config(config)
     scope = (workspace_id, actor_id, "create_expert", str(workspace_id), idempotency_key)
     async with connection.transaction():
         existing = await existing_receipt(connection, scope, fingerprint)
@@ -120,10 +147,11 @@ async def add_version(
     config: ExpertConfig,
 ) -> ExpertView:
     """A new revision. Earlier ones never change, so work holding them is unaffected."""
-    validate_config(config)
     fingerprint = request_hash(
         {"expected": expected_version, "config": config.model_dump(mode="json")}
     )
+    config = expand_groups(config)
+    validate_config(config)
     scope = (workspace_id, actor_id, "add_expert_version", str(expert_id), idempotency_key)
     async with connection.transaction():
         existing = await existing_receipt(connection, scope, fingerprint)

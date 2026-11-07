@@ -139,3 +139,53 @@ def test_the_routes_answer_members(path: str, status: int) -> None:
     assert reply.status_code == status
     if path == "/v1/tools/calculate/versions/1":
         assert reply.json()["tool_id"] == "calculate"
+
+
+# US-14.2: a group grant expands to explicit tools when a version is saved.
+
+
+def test_a_group_expands_to_the_tools_an_expert_may_name() -> None:
+    from autobots.application.experts import expand_groups
+    from autobots.contracts.experts import ExpertConfig
+
+    expanded = expand_groups(ExpertConfig(tools=["calculate"], tool_groups=["files"]), {})
+    assert expanded.tools == ["calculate", "publish_artifact", "read_run_file", "save_artifact"]
+    assert expanded.tool_groups == ["files"]
+
+
+def test_a_saved_expansion_does_not_follow_the_group() -> None:
+    from autobots.application.experts import expand_groups
+    from autobots.contracts.experts import ExpertConfig
+
+    saved = expand_groups(ExpertConfig(tool_groups=["files"]), {})
+    # The saved config holds the explicit list, so reading it back never re-expands it.
+    assert ExpertConfig.model_validate(saved.model_dump()).tools == saved.tools
+
+
+@pytest.mark.parametrize(
+    ("config", "code"),
+    [
+        ({"tool_groups": ["planning"]}, "expert_tool_group_empty"),
+        ({"tool_groups": ["files", "files"]}, "expert_tool_group_duplicated"),
+        ({"tools": ["create_github_issue"]}, "expert_tool_unavailable"),
+        ({"tool_groups": ["connectors"]}, "expert_tool_unavailable"),
+        ({"tools": ["browse_goal"]}, "expert_tool_not_available"),
+    ],
+)
+def test_an_unavailable_or_empty_grant_is_refused(config: dict[str, object], code: str) -> None:
+    from autobots.application.experts import ExpertRefused, expand_groups, validate_config
+    from autobots.contracts.experts import ExpertConfig
+
+    with pytest.raises(ExpertRefused) as refused:
+        validate_config(expand_groups(ExpertConfig.model_validate(config), {}), {})
+    assert refused.value.code == code
+
+
+def test_a_configured_connector_can_be_granted() -> None:
+    from autobots.application.experts import expand_groups, validate_config
+    from autobots.contracts.experts import ExpertConfig
+
+    environ = {"GITHUB_TOKEN": FAKE_TOKEN, "GITHUB_REPOSITORY": FAKE_REPOSITORY}
+    config = expand_groups(ExpertConfig(tool_groups=["connectors"]), environ)
+    validate_config(config, environ)
+    assert config.tools == ["create_github_issue"]

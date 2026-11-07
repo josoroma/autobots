@@ -40,7 +40,9 @@ def typescript_type(schema: Mapping) -> str:
         return ' | '.join(typescript_type(option) for option in schema['anyOf'])
     kind = schema.get('type')
     if kind == 'array':
-        return f"{typescript_type(schema.get('items', {}))}[]"
+        item = typescript_type(schema.get('items', {}))
+        # A union of items needs parentheses, or `[]` binds to its last member only.
+        return f"({item})[]" if ' | ' in item else f"{item}[]"
     if kind == 'object' and 'properties' not in schema:
         return 'Record<string, unknown>'
     return {'string': 'string', 'integer': 'number', 'number': 'number', 'boolean': 'boolean', 'null': 'null'}.get(kind, 'unknown')

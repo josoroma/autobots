@@ -1,23 +1,20 @@
 "use client";
 
-import { parseExpertView, type ExpertView } from "@autobots/api-client";
+import {
+  parseExpertView,
+  parseToolCatalog,
+  type ExpertView,
+  type ToolCatalog,
+  type ToolDescriptor,
+} from "@autobots/api-client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Choice, Input, Select, Textarea } from "@/components/ui/field";
+import { AVAILABILITY, repair } from "@/components/tool-catalog";
 import { csrfFetch } from "@/lib/csrf-fetch";
-
-const TOOLS = [
-  { id: "calculate", label: "Calculate" },
-  { id: "read_run_file", label: "Read run files" },
-  { id: "save_artifact", label: "Save run files" },
-  { id: "publish_artifact", label: "Publish artifacts" },
-  { id: "search_memory", label: "Search memory" },
-  { id: "propose_improvement", label: "Propose improvements for review" },
-  { id: "create_github_issue", label: "Create GitHub issues, after approval" },
-];
 const PROFILES = [
   { id: "", label: "Workspace setting" },
   { id: "openrouter_terra", label: "Terra" },
@@ -27,8 +24,33 @@ type Draft = {
   purpose: string;
   instructions: string;
   tools: readonly string[];
+  groups: readonly string[];
   executor: string;
 };
+
+// What an Expert may be granted, from the same catalog the Tools page shows (TC-06, TS-04).
+function grantable(catalog: ToolCatalog | null): ToolDescriptor[] {
+  return (catalog?.tools ?? []).filter((tool) =>
+    tool.grantable_to.includes("expert"),
+  );
+}
+
+function members(catalog: ToolCatalog | null, group: string): string[] {
+  return grantable(catalog)
+    .filter((tool) => tool.group === group)
+    .map((tool) => tool.tool_id);
+}
+
+// The explicit list a save will record: the tools named, then each whole group's tools.
+function expansion(catalog: ToolCatalog | null, draft: Draft): string[] {
+  const tools = [...draft.tools];
+  for (const group of draft.groups) {
+    for (const tool of members(catalog, group)) {
+      if (!tools.includes(tool)) tools.push(tool);
+    }
+  }
+  return tools;
+}
 
 function draftOf(expert: ExpertView): Draft {
   const latest = expert.versions.at(-1)?.config;
@@ -36,6 +58,7 @@ function draftOf(expert: ExpertView): Draft {
     purpose: latest?.purpose ?? "",
     instructions: latest?.instructions ?? "",
     tools: latest?.tools ?? [],
+    groups: latest?.tool_groups ?? [],
     executor: String(latest?.role_bindings?.executor ?? ""),
   };
 }
@@ -46,6 +69,20 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [state, setState] = useState<"ready" | "unavailable">("ready");
   const [message, setMessage] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<ToolCatalog | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/v1/tools", { cache: "no-store" })
+      .then(async (reply) => {
+        if (active && reply.ok)
+          setCatalog(parseToolCatalog(await reply.json()));
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -106,6 +143,7 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
             purpose: draft.purpose,
             instructions: draft.instructions,
             tools: draft.tools,
+            tool_groups: draft.groups,
             role_bindings: {
               ...kept,
               ...(draft.executor === "" ? {} : { executor: draft.executor }),
@@ -134,7 +172,11 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
           ? "Only the workspace owner can save a revision."
           : failure?.code === "expert_version_conflict"
             ? "Someone saved a newer version. Reload to see it."
-            : "That could not be saved.",
+            : failure?.code === "expert_tool_unavailable"
+              ? "A granted tool is unavailable in this install. Remove it, or configure it first."
+              : failure?.code === "expert_tool_group_empty"
+                ? "A granted group has no tools an Expert may use."
+                : "That could not be saved.",
     );
   }
 
@@ -205,26 +247,117 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
               }
             />
           </div>
+          <fieldset className="space-y-1" data-field="tool-groups">
+            <legend className="text-sm font-medium">Grant whole groups</legend>
+            {catalog === null ? (
+              <p className="text-sm">Loading the tool catalog.</p>
+            ) : (
+              catalog.groups
+                .filter((group) => members(catalog, group.group).length > 0)
+                .map((group) => {
+                  const tools = grantable(catalog).filter(
+                    (tool) => tool.group === group.group,
+                  );
+                  const blocked = tools.some(
+                    (tool) => tool.availability !== "available",
+                  );
+                  const checked = draft.groups.includes(group.group);
+                  return (
+                    <label
+                      key={group.group}
+                      htmlFor={`grant-group-${group.group}`}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <Choice
+                        id={`grant-group-${group.group}`}
+                        type="checkbox"
+                        checked={checked}
+                        disabled={blocked && !checked}
+                        onChange={(event) =>
+                          setDraft({
+                            ...draft,
+                            groups: event.target.checked
+                              ? [...draft.groups, group.group]
+                              : draft.groups.filter(
+                                  (item) => item !== group.group,
+                                ),
+                          })
+                        }
+                      />
+                      {group.title} group ({tools.length}{" "}
+                      {tools.length === 1 ? "tool" : "tools"})
+                      {blocked ? ", includes an unavailable tool" : ""}
+                    </label>
+                  );
+                })
+            )}
+          </fieldset>
           <fieldset className="space-y-1">
             <legend className="text-sm font-medium">Allowed tools</legend>
-            {TOOLS.map((tool) => (
-              <label key={tool.id} className="flex items-center gap-2 text-sm">
-                <Choice
-                  type="checkbox"
-                  checked={draft.tools.includes(tool.id)}
-                  onChange={(event) =>
-                    setDraft({
-                      ...draft,
-                      tools: event.target.checked
-                        ? [...draft.tools, tool.id]
-                        : draft.tools.filter((item) => item !== tool.id),
-                    })
-                  }
-                />
-                {tool.label}
-              </label>
-            ))}
+            {grantable(catalog).map((tool) => {
+              const named = draft.tools.includes(tool.tool_id);
+              const fromGroup = draft.groups.includes(tool.group);
+              const unavailable = tool.availability !== "available";
+              const fix = repair(tool);
+              return (
+                <div key={tool.tool_id} data-tool={tool.tool_id}>
+                  <label
+                    htmlFor={`grant-tool-${tool.tool_id}`}
+                    className="flex items-center gap-2 text-sm"
+                  >
+                    <Choice
+                      id={`grant-tool-${tool.tool_id}`}
+                      aria-describedby={
+                        unavailable
+                          ? `grant-tool-${tool.tool_id}-why`
+                          : undefined
+                      }
+                      type="checkbox"
+                      checked={named || fromGroup}
+                      disabled={unavailable && !named && !fromGroup}
+                      onChange={(event) =>
+                        setDraft({
+                          ...draft,
+                          tools: event.target.checked
+                            ? [...draft.tools, tool.tool_id]
+                            : draft.tools.filter(
+                                (item) => item !== tool.tool_id,
+                              ),
+                          // Unchecking one tool of a whole group means the group isn't whole.
+                          groups: event.target.checked
+                            ? draft.groups
+                            : draft.groups.filter(
+                                (item) => item !== tool.group,
+                              ),
+                        })
+                      }
+                    />
+                    {tool.title}
+                    {tool.approval === "always" ? ", after approval" : ""}
+                  </label>
+                  {unavailable ? (
+                    <p
+                      id={`grant-tool-${tool.tool_id}-why`}
+                      className="text-muted-foreground ml-6 text-xs"
+                      data-field="unavailable"
+                    >
+                      {AVAILABILITY[tool.availability] ?? tool.availability}
+                      {fix === null ? "" : `. ${fix}`}
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })}
           </fieldset>
+          <p className="text-sm" data-field="expansion" aria-live="polite">
+            {expansion(catalog, draft).length === 0
+              ? "This version grants no tools."
+              : `This version grants: ${expansion(catalog, draft).join(", ")}${
+                  draft.groups.length === 0
+                    ? "."
+                    : `, from ${draft.groups.length === 1 ? "the group" : "the groups"} ${draft.groups.join(", ")} and the tools named.`
+                }`}
+          </p>
           <div className="space-y-1">
             <label htmlFor="executor" className="text-sm font-medium">
               Model for its work
@@ -282,6 +415,9 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
             <li key={version.version} data-version={version.version}>
               Version {version.version}:{" "}
               {version.config.tools?.join(", ") || "no tools"}
+              {(version.config.tool_groups ?? []).length === 0
+                ? ""
+                : ` (groups: ${(version.config.tool_groups ?? []).join(", ")})`}
             </li>
           ))}
         </ol>

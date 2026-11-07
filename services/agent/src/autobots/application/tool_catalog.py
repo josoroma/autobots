@@ -242,3 +242,22 @@ def tool_catalog(
         if any(item.group == name.value for item in current)
     ]
     return ToolCatalog(schema_version=1, catalog_digest=digest, groups=groups, tools=shown)
+
+
+def expert_tools_by_group(environ: Mapping[str, str]) -> dict[str, list[str]]:
+    """What granting a whole group to an Expert means today: its tools an Expert may name."""
+    groups: dict[str, list[str]] = {}
+    for item in latest(all_descriptors(environ)):
+        if "expert" in item.grantable_to:
+            groups.setdefault(item.group, []).append(item.tool_id)
+    return groups
+
+
+def unavailable_tools(tool_ids: list[str], environ: Mapping[str, str]) -> list[str]:
+    """Named tools a grant can't use in this install: a missing key or a disabled class."""
+    named = set(tool_ids)
+    return [
+        item.tool_id
+        for item in latest(all_descriptors(environ))
+        if item.tool_id in named and item.availability != ToolAvailability.AVAILABLE.value
+    ]

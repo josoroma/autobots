@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   UsersRound,
   Workflow,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -23,6 +24,7 @@ const NAVIGATION: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/approvals", label: "Approvals", icon: ShieldCheck },
   { href: "/operations", label: "Operations", icon: Activity },
   { href: "/workflows", label: "Workflows", icon: Workflow },
+  { href: "/tools", label: "Tools", icon: Wrench },
   { href: "/settings", label: "Settings", icon: Settings },
   { href: "/settings/models", label: "Models", icon: Cpu },
 ];
