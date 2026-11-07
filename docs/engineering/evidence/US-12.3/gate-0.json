@@ -20,7 +20,7 @@
     "DH-A16"
   ],
   "fingerprint": {
-    "source_manifest_sha256": "09ea61fbfa52c71dc51072d6b9f830ae4ee04fcdea779b17268d3fb836c5a878",
+    "source_manifest_sha256": "05916d5ebab063469b0f9905a2a5d5a6160dbaaef07e3da5e49eb7cefd8249f4",
     "nonsecret_config_sha256": "9f5dc237d5b87871ea83dcbde1d2bf4eb4c53de7fef70a8f1909f62a5d64b903",
     "lockfiles_sha256": {
       "pnpm-lock.yaml": "e5d81f0de510d71360270717edf5dfffc959570da0d93d87115af4c6468b877e",
@@ -53,8 +53,8 @@
   "reports": {
     "harness": {
       "status": "passed",
-      "input_fingerprint": "e170d4ac12708e2fa0588967d58f5b53459e6fb37ba6e4b907afac97b754d694",
-      "completed_at_utc": "2026-11-06T22:00:14.314975+00:00",
+      "input_fingerprint": "b05e4393756665ffc64a9b38f155dc38bc29121288f94590480dafaac3502404",
+      "completed_at_utc": "2026-11-06T23:34:27.643458+00:00",
       "assistant_adapter": {
         "state": "configured_unqualified",
         "reason": "delivery_unverified",
@@ -74,8 +74,8 @@
     },
     "full": {
       "status": "passed",
-      "input_fingerprint": "e170d4ac12708e2fa0588967d58f5b53459e6fb37ba6e4b907afac97b754d694",
-      "completed_at_utc": "2026-11-06T21:58:52.180040+00:00",
+      "input_fingerprint": "b05e4393756665ffc64a9b38f155dc38bc29121288f94590480dafaac3502404",
+      "completed_at_utc": "2026-11-06T23:33:41.671658+00:00",
       "assistant_adapter": {
         "state": "configured_unqualified",
         "reason": "delivery_unverified",
@@ -94,8 +94,8 @@
     },
     "db": {
       "status": "passed",
-      "input_fingerprint": "e170d4ac12708e2fa0588967d58f5b53459e6fb37ba6e4b907afac97b754d694",
-      "completed_at_utc": "2026-11-06T21:57:30.735977+00:00",
+      "input_fingerprint": "b05e4393756665ffc64a9b38f155dc38bc29121288f94590480dafaac3502404",
+      "completed_at_utc": "2026-11-06T23:32:25.245086+00:00",
       "assistant_adapter": {
         "state": "configured_unqualified",
         "reason": "delivery_unverified",
@@ -113,8 +113,8 @@
     },
     "operations": {
       "status": "passed",
-      "input_fingerprint": "e170d4ac12708e2fa0588967d58f5b53459e6fb37ba6e4b907afac97b754d694",
-      "completed_at_utc": "2026-11-06T21:50:58.716108+00:00",
+      "input_fingerprint": "b05e4393756665ffc64a9b38f155dc38bc29121288f94590480dafaac3502404",
+      "completed_at_utc": "2026-11-06T23:25:58.168964+00:00",
       "assistant_adapter": {
         "state": "configured_unqualified",
         "reason": "delivery_unverified",
@@ -161,8 +161,8 @@
       "expected": "configuration, documents, rules and hook settings validate",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T22:00:14.314975+00:00",
-      "finished_at_utc": "2026-11-06T22:00:14.314975+00:00",
+      "started_at_utc": "2026-11-06T23:34:27.643458+00:00",
+      "finished_at_utc": "2026-11-06T23:34:27.643458+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -188,8 +188,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:59:51.339218+00:00",
-      "finished_at_utc": "2026-11-06T21:59:51.655191+00:00",
+      "started_at_utc": "2026-11-06T23:34:05.148287+00:00",
+      "finished_at_utc": "2026-11-06T23:34:05.460361+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -223,8 +223,8 @@
       "expected": "the harness fixtures pass, including unsafe hook input and rejected completion",
       "observed": "status passed, exit 0, 284 tests executed, 0 skipped",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:59:51.655213+00:00",
-      "finished_at_utc": "2026-11-06T22:00:14.183564+00:00",
+      "started_at_utc": "2026-11-06T23:34:05.460380+00:00",
+      "finished_at_utc": "2026-11-06T23:34:27.523048+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -250,8 +250,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:58:52.180040+00:00",
-      "finished_at_utc": "2026-11-06T21:58:52.180040+00:00",
+      "started_at_utc": "2026-11-06T23:33:41.671658+00:00",
+      "finished_at_utc": "2026-11-06T23:33:41.671658+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -277,8 +277,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:57:30.972003+00:00",
-      "finished_at_utc": "2026-11-06T21:57:31.317107+00:00",
+      "started_at_utc": "2026-11-06T23:32:25.486893+00:00",
+      "finished_at_utc": "2026-11-06T23:32:25.809063+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -310,8 +310,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0, 284 tests executed, 0 skipped",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:57:31.317127+00:00",
-      "finished_at_utc": "2026-11-06T21:57:53.387483+00:00",
+      "started_at_utc": "2026-11-06T23:32:25.809082+00:00",
+      "finished_at_utc": "2026-11-06T23:32:48.307887+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -338,8 +338,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:57:53.833209+00:00",
-      "finished_at_utc": "2026-11-06T21:57:53.891086+00:00",
+      "started_at_utc": "2026-11-06T23:32:48.765305+00:00",
+      "finished_at_utc": "2026-11-06T23:32:48.845131+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -367,8 +367,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:57:53.891166+00:00",
-      "finished_at_utc": "2026-11-06T21:57:54.001705+00:00",
+      "started_at_utc": "2026-11-06T23:32:48.845198+00:00",
+      "finished_at_utc": "2026-11-06T23:32:48.886660+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -393,8 +393,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:57:54.001823+00:00",
-      "finished_at_utc": "2026-11-06T21:57:54.096966+00:00",
+      "started_at_utc": "2026-11-06T23:32:48.886759+00:00",
+      "finished_at_utc": "2026-11-06T23:32:48.967062+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -420,8 +420,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:57:54.097068+00:00",
-      "finished_at_utc": "2026-11-06T21:57:54.110244+00:00",
+      "started_at_utc": "2026-11-06T23:32:48.967169+00:00",
+      "finished_at_utc": "2026-11-06T23:32:48.981560+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -445,8 +445,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:57:54.110337+00:00",
-      "finished_at_utc": "2026-11-06T21:57:55.183566+00:00",
+      "started_at_utc": "2026-11-06T23:32:48.981674+00:00",
+      "finished_at_utc": "2026-11-06T23:32:50.119259+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -470,8 +470,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:57:55.183659+00:00",
-      "finished_at_utc": "2026-11-06T21:58:06.771935+00:00",
+      "started_at_utc": "2026-11-06T23:32:50.119353+00:00",
+      "finished_at_utc": "2026-11-06T23:33:00.947615+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -500,8 +500,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:58:06.772024+00:00",
-      "finished_at_utc": "2026-11-06T21:58:06.996762+00:00",
+      "started_at_utc": "2026-11-06T23:33:00.947716+00:00",
+      "finished_at_utc": "2026-11-06T23:33:01.102491+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -529,8 +529,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:58:06.996852+00:00",
-      "finished_at_utc": "2026-11-06T21:58:07.079001+00:00",
+      "started_at_utc": "2026-11-06T23:33:01.102598+00:00",
+      "finished_at_utc": "2026-11-06T23:33:01.191285+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -559,8 +559,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:58:07.079090+00:00",
-      "finished_at_utc": "2026-11-06T21:58:16.006861+00:00",
+      "started_at_utc": "2026-11-06T23:33:01.191388+00:00",
+      "finished_at_utc": "2026-11-06T23:33:04.607060+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -589,8 +589,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:58:16.006950+00:00",
-      "finished_at_utc": "2026-11-06T21:58:16.808904+00:00",
+      "started_at_utc": "2026-11-06T23:33:04.607160+00:00",
+      "finished_at_utc": "2026-11-06T23:33:05.392992+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -619,8 +619,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:58:16.808995+00:00",
-      "finished_at_utc": "2026-11-06T21:58:17.189337+00:00",
+      "started_at_utc": "2026-11-06T23:33:05.393101+00:00",
+      "finished_at_utc": "2026-11-06T23:33:05.791025+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -649,8 +649,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:58:17.189418+00:00",
-      "finished_at_utc": "2026-11-06T21:58:18.263475+00:00",
+      "started_at_utc": "2026-11-06T23:33:05.791131+00:00",
+      "finished_at_utc": "2026-11-06T23:33:06.905269+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -679,8 +679,8 @@
       "expected": "next build succeeds",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:58:18.263545+00:00",
-      "finished_at_utc": "2026-11-06T21:58:21.220688+00:00",
+      "started_at_utc": "2026-11-06T23:33:06.905374+00:00",
+      "finished_at_utc": "2026-11-06T23:33:09.992420+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -706,8 +706,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:58:21.220788+00:00",
-      "finished_at_utc": "2026-11-06T21:58:22.762880+00:00",
+      "started_at_utc": "2026-11-06T23:33:09.992605+00:00",
+      "finished_at_utc": "2026-11-06T23:33:11.520786+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -733,8 +733,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:58:22.762986+00:00",
-      "finished_at_utc": "2026-11-06T21:58:23.109038+00:00",
+      "started_at_utc": "2026-11-06T23:33:11.520905+00:00",
+      "finished_at_utc": "2026-11-06T23:33:11.889322+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -760,8 +760,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:58:23.109142+00:00",
-      "finished_at_utc": "2026-11-06T21:58:23.254064+00:00",
+      "started_at_utc": "2026-11-06T23:33:11.889491+00:00",
+      "finished_at_utc": "2026-11-06T23:33:12.041097+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -788,8 +788,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:58:23.254178+00:00",
-      "finished_at_utc": "2026-11-06T21:58:23.401467+00:00",
+      "started_at_utc": "2026-11-06T23:33:12.041218+00:00",
+      "finished_at_utc": "2026-11-06T23:33:12.207301+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -814,8 +814,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:58:23.401550+00:00",
-      "finished_at_utc": "2026-11-06T21:58:44.231429+00:00",
+      "started_at_utc": "2026-11-06T23:33:12.207407+00:00",
+      "finished_at_utc": "2026-11-06T23:33:33.819075+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -842,8 +842,8 @@
       "expected": "every good fixture passes and every bad one fails with its marker",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:58:44.231540+00:00",
-      "finished_at_utc": "2026-11-06T21:58:51.831121+00:00",
+      "started_at_utc": "2026-11-06T23:33:33.819197+00:00",
+      "finished_at_utc": "2026-11-06T23:33:41.335299+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -874,8 +874,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0, 2 tests executed, 0 skipped",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:58:51.831224+00:00",
-      "finished_at_utc": "2026-11-06T21:58:52.012560+00:00",
+      "started_at_utc": "2026-11-06T23:33:41.335411+00:00",
+      "finished_at_utc": "2026-11-06T23:33:41.515078+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -901,8 +901,8 @@
       "expected": "the run installs and rewrites nothing",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:58:52.180040+00:00",
-      "finished_at_utc": "2026-11-06T21:58:52.180040+00:00",
+      "started_at_utc": "2026-11-06T23:33:41.671658+00:00",
+      "finished_at_utc": "2026-11-06T23:33:41.671658+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -928,8 +928,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:57:30.735977+00:00",
-      "finished_at_utc": "2026-11-06T21:57:30.735977+00:00",
+      "started_at_utc": "2026-11-06T23:32:25.245086+00:00",
+      "finished_at_utc": "2026-11-06T23:32:25.245086+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -955,8 +955,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:50:58.947860+00:00",
-      "finished_at_utc": "2026-11-06T21:50:59.268652+00:00",
+      "started_at_utc": "2026-11-06T23:25:58.395909+00:00",
+      "finished_at_utc": "2026-11-06T23:25:58.724237+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -988,8 +988,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0, 284 tests executed, 0 skipped",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:50:59.268684+00:00",
-      "finished_at_utc": "2026-11-06T21:51:22.014687+00:00",
+      "started_at_utc": "2026-11-06T23:25:58.724265+00:00",
+      "finished_at_utc": "2026-11-06T23:26:21.686413+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -1018,8 +1018,8 @@
       "expected": "all synthetic cases pass on a new disposable project, which is removed afterwards",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:51:22.577905+00:00",
-      "finished_at_utc": "2026-11-06T21:51:42.053877+00:00",
+      "started_at_utc": "2026-11-06T23:26:22.129815+00:00",
+      "finished_at_utc": "2026-11-06T23:26:40.068621+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -1045,8 +1045,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:51:42.053980+00:00",
-      "finished_at_utc": "2026-11-06T21:52:05.547534+00:00",
+      "started_at_utc": "2026-11-06T23:26:40.068730+00:00",
+      "finished_at_utc": "2026-11-06T23:27:03.363503+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -1073,8 +1073,8 @@
       "expected": "application migrations, seeds and the fixtures with a scripted model pass on a disposable stack",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:52:05.547675+00:00",
-      "finished_at_utc": "2026-11-06T21:52:48.007785+00:00",
+      "started_at_utc": "2026-11-06T23:27:03.363605+00:00",
+      "finished_at_utc": "2026-11-06T23:27:43.676483+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -1099,8 +1099,8 @@
       "expected": "19 of the 23 browser spec files pass on a disposable stack with a scripted worker, and each Playwright run exits 0",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:52:48.007874+00:00",
-      "finished_at_utc": "2026-11-06T21:57:02.283073+00:00",
+      "started_at_utc": "2026-11-06T23:27:43.676570+00:00",
+      "finished_at_utc": "2026-11-06T23:31:56.425600+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -1126,8 +1126,8 @@
       "expected": "the guarded persistent apply refuses every unsafe case on a disposable stack",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:57:02.283317+00:00",
-      "finished_at_utc": "2026-11-06T21:57:30.558684+00:00",
+      "started_at_utc": "2026-11-06T23:31:56.425729+00:00",
+      "finished_at_utc": "2026-11-06T23:32:25.094618+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -1153,8 +1153,8 @@
       "expected": "the run leaves the repository unchanged",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:57:30.735977+00:00",
-      "finished_at_utc": "2026-11-06T21:57:30.735977+00:00",
+      "started_at_utc": "2026-11-06T23:32:25.245086+00:00",
+      "finished_at_utc": "2026-11-06T23:32:25.245086+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -1180,8 +1180,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:50:58.716108+00:00",
-      "finished_at_utc": "2026-11-06T21:50:58.716108+00:00",
+      "started_at_utc": "2026-11-06T23:25:58.168964+00:00",
+      "finished_at_utc": "2026-11-06T23:25:58.168964+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -1207,8 +1207,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:46:36.850835+00:00",
-      "finished_at_utc": "2026-11-06T21:46:37.192413+00:00",
+      "started_at_utc": "2026-11-06T23:21:33.044020+00:00",
+      "finished_at_utc": "2026-11-06T23:21:33.383183+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -1240,8 +1240,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0, 284 tests executed, 0 skipped",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:46:37.192450+00:00",
-      "finished_at_utc": "2026-11-06T21:46:58.751389+00:00",
+      "started_at_utc": "2026-11-06T23:21:33.383216+00:00",
+      "finished_at_utc": "2026-11-06T23:21:56.080204+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -1266,8 +1266,8 @@
       "expected": "the operations runbook passes on a new disposable project with a scripted model",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:46:59.228047+00:00",
-      "finished_at_utc": "2026-11-06T21:48:24.957444+00:00",
+      "started_at_utc": "2026-11-06T23:21:56.545182+00:00",
+      "finished_at_utc": "2026-11-06T23:23:23.590128+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -1292,8 +1292,8 @@
       "expected": "backup and restore pass on a new disposable project",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:48:24.957549+00:00",
-      "finished_at_utc": "2026-11-06T21:50:04.297361+00:00",
+      "started_at_utc": "2026-11-06T23:23:23.590207+00:00",
+      "finished_at_utc": "2026-11-06T23:25:03.015106+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -1318,8 +1318,8 @@
       "expected": "an upgrade with data passes on a new disposable project",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:50:04.297503+00:00",
-      "finished_at_utc": "2026-11-06T21:50:58.542681+00:00",
+      "started_at_utc": "2026-11-06T23:25:03.015206+00:00",
+      "finished_at_utc": "2026-11-06T23:25:57.998040+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -1345,8 +1345,8 @@
       "expected": "the check passes",
       "observed": "status passed, exit 0",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:50:58.716108+00:00",
-      "finished_at_utc": "2026-11-06T21:50:58.716108+00:00",
+      "started_at_utc": "2026-11-06T23:25:58.168964+00:00",
+      "finished_at_utc": "2026-11-06T23:25:58.168964+00:00",
       "exit_code": 0,
       "artifacts": []
     },
@@ -1368,14 +1368,14 @@
       "expected": "a stale lock exits 2 and recovers; a killed run is cleaned up; arranged adapters stay inactive",
       "observed": "stale lock exit 2, then 0 after removal; killed run left 1 container and 1 volume, cleanup exit 0, then none; arranged unavailable gives inactive/unavailable, arranged 2.1.200 gives inactive/version_below_minimum; real client gives configured_unqualified/delivery_unverified; harness exit 0 in all three",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:35:28Z",
-      "finished_at_utc": "2026-11-06T21:41:24Z",
+      "started_at_utc": "2026-11-06T23:10:15Z",
+      "finished_at_utc": "2026-11-06T23:16:13Z",
       "exit_code": 0,
       "exercises_runbook": true,
       "artifacts": [
         {
           "path": ".checks/US-12.3/gate-0/exercise.txt",
-          "sha256": "281f1c58b5111020d9c8f5e38db2337e370678a4745b993c4559cad28873b7b8"
+          "sha256": "0cc20c945b4c7ec658b84ba8a5a97a6e0e577f981378869af21d3e5d498a569f"
         },
         {
           "path": ".checks/US-12.3/gate-0/exercise.sh",
@@ -1402,8 +1402,8 @@
       "expected": "exit 0 with no inherited credentials; exit 2 with tools missing",
       "observed": "env -i: operations, db, full, fast and harness exit 0; PATH=/usr/bin:/bin: full exit 2, status error",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:35:06Z",
-      "finished_at_utc": "2026-11-06T21:59:37Z",
+      "started_at_utc": "2026-11-06T23:09:51Z",
+      "finished_at_utc": "2026-11-06T23:34:27Z",
       "exit_code": 0,
       "artifacts": [
         {
@@ -1440,8 +1440,8 @@
       "expected": "a committed type fault fails fast with a clean Git tree; a skipped test fails harness",
       "observed": "fast exit 0 on the clean copy; after a committed fault exit 1 on mypy alone with 0 changed paths; corrected exit 0; arranged skip exit 1 with 284 executed, 1 skipped",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:41:24Z",
-      "finished_at_utc": "2026-11-06T21:45:01Z",
+      "started_at_utc": "2026-11-06T23:16:13Z",
+      "finished_at_utc": "2026-11-06T23:19:58Z",
       "exit_code": 0,
       "artifacts": [
         {
@@ -1473,17 +1473,17 @@
       "expected": "every case of the product worker passes, WORKER-INFERENCE-001",
       "observed": "exit 0, 50 of 50 cases, other Docker resources untouched, 45 before and after",
       "status": "passed",
-      "started_at_utc": "2026-11-06T21:45:01Z",
-      "finished_at_utc": "2026-11-06T21:46:36Z",
+      "started_at_utc": "2026-11-06T23:19:58Z",
+      "finished_at_utc": "2026-11-06T23:21:32Z",
       "exit_code": 0,
       "artifacts": [
         {
           "path": ".checks/US-12.3/gate-0/worker-inference.json",
-          "sha256": "7fd70b111bc87c1e520ad05977c0b3f6f334088bc5fd530c55025b924762ed4a"
+          "sha256": "2e6b8bb3372bc4a271b70d8dc8763969cec5c64b8c0d6468771afe93c3cdfa0f"
         },
         {
           "path": ".checks/US-12.3/gate-0/worker-inference.txt",
-          "sha256": "9e3182339b918f65e42244dac392487e01a043ec667a11859ca67627672b7189"
+          "sha256": "1c6ce907261633ee1dbd5f21892ff12bf894ede810abe298dc1cec5a39f02bc8"
         }
       ],
       "source": {
@@ -1494,7 +1494,7 @@
   "review": {
     "author_id": "main delivery session",
     "reviewer_id": "autobots-reviewer, separate read-only contexts",
-    "reviewed_fingerprint": "09ea61fbfa52c71dc51072d6b9f830ae4ee04fcdea779b17268d3fb836c5a878",
+    "reviewed_fingerprint": "05916d5ebab063469b0f9905a2a5d5a6160dbaaef07e3da5e49eb7cefd8249f4",
     "outcome": "approved",
     "findings": [
       {
@@ -1538,7 +1538,7 @@
         "disposition": "resolved"
       },
       {
-        "id": "F-6 to F-20, F2-4 to F2-9, F3-1 to F3-5",
+        "id": "F-6 to F-20, F2-4 to F2-9, F3-1 to F3-5, S-1 to S-6",
         "severity": "nonblocking",
         "disposition": "see summary"
       }

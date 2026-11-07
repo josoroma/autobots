@@ -295,9 +295,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-12.4#1 | Arrange two goals at once, which needs two claiming workers because one worker runs one step at a time, and rehearse that on a fake transport first. | DONE | US-12.4 |
 | US-12.4#2 | Run the workload once on Terra on a disposable stack, under the shared ledger, sampling the four resources. | DONE | US-12.4 |
 | US-12.4#3 | Record the result, spending and limits, and hand LM-A09's row to US-10.2's record. | DONE | US-12.4 |
-| US-12.5 | Third real Mac sleep | READY | EPIC-12 |
-| US-12.5#1 | Have the owner follow the runbook on a disposable stack with a scripted model. | TODO | US-12.5 |
-| US-12.5#2 | Record the report's observations with the fingerprint, and hand the LC-31 and LM-A07 rows to US-10.2's record. | TODO | US-12.5 |
+| US-12.5 | Third real Mac sleep | DONE | EPIC-12 |
+| US-12.5#1 | Have the owner follow the runbook on a disposable stack with a scripted model. | DONE | US-12.5 |
+| US-12.5#2 | Record the report's observations with the fingerprint, and hand the LC-31 and LM-A07 rows to US-10.2's record. | DONE | US-12.5 |
 | US-12.6 | The real install at the final code | READY | EPIC-12 |
 | US-12.6#1 | Back up the install, restore it to an isolated copy, and apply its pending migrations there first. | TODO | US-12.6 |
 | US-12.6#2 | Apply them to the install, start it on its own loopback ports, and record the other projects before and after. | TODO | US-12.6 |
@@ -3968,7 +3968,8 @@ Open Questions:
 
 ### US-12.5: Third real Mac sleep
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-12-5-third-real-mac-sleep/`
 
 As an owner
 I want this Mac put to sleep once more on the final code, following the runbook
@@ -4016,8 +4017,8 @@ Dependencies:
 - US-12.3
 
 Tasks:
-- [ ] Have the owner follow the runbook on a disposable stack with a scripted model.
-- [ ] Record the report's observations with the fingerprint, and hand the LC-31 and LM-A07 rows to US-10.2's record.
+- [x] Have the owner follow the runbook on a disposable stack with a scripted model.
+- [x] Record the report's observations with the fingerprint, and hand the LC-31 and LM-A07 rows to US-10.2's record.
 
 Open Questions:
 - None.

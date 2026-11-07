@@ -29,13 +29,13 @@ The final review of EPIC-12 and the repeated Gate 0, on 2026-11-06. Manifest: [g
 
 ## Results on these inputs
 
-Bound to one source fingerprint, in the manifest. A reviewer can't compute a hash, so I bound it to the tree round 3 read, and compared the two. `fast` also exited 0 under `env -i`, kept in the retained output and not in the manifest.
+Bound to one source fingerprint, in the manifest. A reviewer can't compute a hash, so I bound it to the tree round 4 read, and compared the two. `fast` also exited 0 under `env -i`, kept in the retained output and not in the manifest.
 
 | Check | Class, model transport | Result |
 |---|---|---|
 | `harness` | static and mock, none | exit 0, 284 harness tests |
 | `full` | static, mock and disposable | exit 0, 24 checks, including 548 Python tests and 32 browser tests from `qualify_web.py` |
-| `db` | disposable, mock | exit 0: `disposable_db` 44 cases, `supabase_stack` 18, `app_db` 449, `qualify_identity` 437, `qualify_persistent_apply` 29 |
+| `db` | disposable, mock | exit 0: `disposable_db` 44 cases, `supabase_stack` 18, `app_db` 449, `qualify_identity` 439, `qualify_persistent_apply` 29 |
 | `operations` | disposable, scripted model | exit 0: operations 69 cases, backup 50, upgrade 45 |
 | `qualify_worker_inference.py` | disposable, mock | exit 0, 50 of 50 cases. In no profile, so run here by hand |
 | Visual, [US-11.11](../US-11.11/summary.md) and [US-12.2](../US-12.2/summary.md) | real browser, disposable, scripted | 42 captures, no findings, measured again on this tree |
@@ -46,7 +46,7 @@ Hooks fired throughout this delivery. That's an observation, not qualification. 
 
 ## Dispositions
 
-Reports: [round 1](review-r1.md), [round 2](review-r2.md), [round 3](review-r3.md). Each was a fresh read-only context, and none ran anything.
+Reports: [round 1](review-r1.md), [round 2](review-r2.md), [round 3](review-r3.md), [round 4](review-r4.md). Each was a fresh read-only context, and none ran anything.
 
 | Finding | Outcome |
 |---|---|
@@ -60,18 +60,23 @@ Reports: [round 1](review-r1.md), [round 2](review-r2.md), [round 3](review-r3.m
 | F3-4 | Accepted: a workflow with no agent step can show the frozen model. The line below it says data goes only if an agent step runs |
 | F3-5 | Accepted: a stale docstring, which the record here corrects |
 
-Editing any of the last five would void this binding, so they stay as they are.
+| S-1 to S-6, from round 4 | Accepted, as editing them would void this binding again. S-1 and S-6 are limits. S-2 is met by the length of US-12.5's sleep. S-4's wording is corrected in round 4's report |
+
+Editing any of the accepted ones would void this binding, so they stay as they are.
+
+**Bound again.** US-12.5's real sleep failed on the first binding, on a cap I'd added at a reviewer's request. The fix voided it, as the story's scenario says, so round 4 and this Gate 0 replaced it.
 
 ## Failures, errors, skips and limitations
 
 - **Failures on the way, each resolved:**
   - Two `identity` runs failed on a build error, from a type I'd got wrong, and one on a label matching two elements.
+  - A real sleep failed on the first binding, in US-12.5, and no check here could have shown it.
   - The walk's first control couldn't break the page the way it claimed, so it was rewritten. Its first clean read raced the page loading, and now waits for it.
   - The stronger walk flagged the Settings radio group, which is how the platform treats one, so my check was corrected.
   - The worker qualifier's existing guard case had to learn to leave out the arranged control.
 - **Not exercised:**
   - Any live model call here. US-12.4 and US-12.6 are the live runs on this code.
-  - A real sleep on this code, which is US-12.5.
+  - A real sleep on this code, which US-12.5 does next.
   - Two workers at once, a lost lease and the network pause through the inference worker. US-12.4 is the first run of two workers.
 - **Limits:**
   - **The real install is stopped at migration 32,** until US-12.6.

@@ -123,16 +123,20 @@ async def main() -> None:
         check('a dropped connection leaves the keeper running, and still beating', 'alive, the lease back near 60 seconds', (keeper.done(), round(float(left))), not keeper.done() and float(left) > 30)
         keeper.cancel()
 
-        # More than has passed comes off as no more than has passed.
+        # A discount applied while the database's clock lags a wake, as Docker's does by half a minute.
         run = await admitted(db)
-        lease = await claim_run(db, run, worker_id='capped')
+        lease = await claim_run(db, run, worker_id='lagging')
         await db.execute('insert into app_private.run_usage (run_id) values (%s) on conflict do nothing', (run,))
         await begin_segment(db, run)
-        await asyncio.sleep(0.05)
-        started = (await (await db.execute('select segment_started_at from app_private.run_usage where run_id = %s', (run,))).fetchone())[0]
-        await discount_sleep(db, lease, 100_000)
-        moved, ahead = await (await db.execute('select segment_started_at > %s, segment_started_at > clock_timestamp() from app_private.run_usage where run_id = %s', (started, run))).fetchone()
-        check('a discount is capped at the time that has passed', 'the segment moved, and never into the future', (moved, ahead), moved is True and ahead is False)
+        await discount_sleep(db, lease, 600)
+        ahead = (await (await db.execute('select extract(epoch from segment_started_at - clock_timestamp()) from app_private.run_usage where run_id = %s', (run,))).fetchone())[0]
+        check('a discount stands though the clock has not caught up yet', 'the segment starts about 600 seconds ahead', round(float(ahead)), 590 < float(ahead) <= 600)
+        used = await active_seconds_used(db, run)
+        check('and meanwhile the active time reads zero, not negative', '0', used, used == 0)
+        # The clock now jumps by the whole sleep. Moving the segment back is the same thing, as only the difference counts.
+        await db.execute("update app_private.run_usage set segment_started_at = segment_started_at - interval '600 seconds' where run_id = %s", (run,))
+        used = await active_seconds_used(db, run)
+        check("the jump doesn't count the sleep as work", 'under 60 of 600 seconds', round(used, 1), used < 60)
 
         # With a long beat, only the beat forced after reconnecting can renew the lease in time.
         run = await admitted(db)

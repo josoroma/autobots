@@ -1,0 +1,623 @@
+{
+ "schema_version": "autobots.mac-sleep/v1",
+ "started_at_utc": "2026-11-06T22:38:35.316365+00:00",
+ "target_class": "disposable",
+ "model_transport": "scripted, over a fake HTTP transport",
+ "used_sigstop": false,
+ "timeline": [
+  {
+   "label": "running, before any sleep",
+   "at": "2026-11-06T22:39:01.220658+00:00",
+   "api": "running",
+   "status": "running",
+   "version": 2,
+   "stop_reason": null,
+   "calls": 1,
+   "reserved": 34560,
+   "charged": 0,
+   "uncertain": 0,
+   "receipts": 0,
+   "unknown_receipts": 0,
+   "saved_versions": 0,
+   "saved_paths": 0,
+   "published": 0,
+   "job": "claimed",
+   "attempts": 1,
+   "generation": 1
+  },
+  {
+   "label": "first read after waking",
+   "at": "2026-11-06T22:47:53.151575+00:00",
+   "api": "running",
+   "status": "running",
+   "version": 2,
+   "stop_reason": null,
+   "calls": 6,
+   "reserved": 34560,
+   "charged": 500,
+   "uncertain": 0,
+   "receipts": 5,
+   "unknown_receipts": 0,
+   "saved_versions": 4,
+   "saved_paths": 4,
+   "published": 0,
+   "job": "claimed",
+   "attempts": 1,
+   "generation": 1
+  },
+  {
+   "label": "status became running",
+   "at": "2026-11-06T22:47:56.401818+00:00",
+   "api": "running",
+   "status": "running",
+   "version": 2,
+   "stop_reason": null,
+   "calls": 6,
+   "reserved": 34560,
+   "charged": 500,
+   "uncertain": 0,
+   "receipts": 5,
+   "unknown_receipts": 0,
+   "saved_versions": 4,
+   "saved_paths": 4,
+   "published": 0,
+   "job": "claimed",
+   "attempts": 1,
+   "generation": 1
+  },
+  {
+   "label": "slept again for 541 seconds",
+   "at": "2026-11-06T22:57:25.874492+00:00",
+   "api": "running",
+   "status": "running",
+   "version": 2,
+   "stop_reason": null,
+   "calls": 7,
+   "reserved": 34560,
+   "charged": 600,
+   "uncertain": 0,
+   "receipts": 6,
+   "unknown_receipts": 0,
+   "saved_versions": 5,
+   "saved_paths": 5,
+   "published": 0,
+   "job": "claimed",
+   "attempts": 1,
+   "generation": 1
+  },
+  {
+   "label": "status became failed",
+   "at": "2026-11-06T23:03:49.957019+00:00",
+   "api": "failed",
+   "status": "failed",
+   "version": 3,
+   "stop_reason": "active_time_limit",
+   "calls": 19,
+   "reserved": 0,
+   "charged": 1900,
+   "uncertain": 0,
+   "receipts": 18,
+   "unknown_receipts": 0,
+   "saved_versions": 17,
+   "saved_paths": 17,
+   "published": 0,
+   "job": "done",
+   "attempts": 1,
+   "generation": 1
+  },
+  {
+   "label": "settled, or out of time",
+   "at": "2026-11-06T23:03:50.042770+00:00",
+   "api": "failed",
+   "status": "failed",
+   "version": 3,
+   "stop_reason": "active_time_limit",
+   "calls": 19,
+   "reserved": 0,
+   "charged": 1900,
+   "uncertain": 0,
+   "receipts": 18,
+   "unknown_receipts": 0,
+   "saved_versions": 17,
+   "saved_paths": 17,
+   "published": 0,
+   "job": "done",
+   "attempts": 1,
+   "generation": 1
+  }
+ ],
+ "not_established": [
+  "H1",
+  "product acceptance",
+  "a real provider across sleep",
+  "a persistent stack across sleep",
+  "Docker Desktop restarting"
+ ],
+ "run_id": "d6360677-fb32-440a-b04a-386ab5464fea",
+ "slept": true,
+ "sleep_seconds_by_clocks": 900.2,
+ "woke_at_utc": "2026-11-06T22:47:53.045099+00:00",
+ "before_sleep": {
+  "status": "running",
+  "version": 2,
+  "stop_reason": null,
+  "calls": 6,
+  "reserved": 34560,
+  "charged": 500,
+  "uncertain": 0,
+  "receipts": 5,
+  "unknown_receipts": 0,
+  "saved_versions": 4,
+  "saved_paths": 4,
+  "published": 0,
+  "job": "claimed",
+  "attempts": 1,
+  "generation": 1
+ },
+ "after_settled": {
+  "status": "failed",
+  "version": 3,
+  "stop_reason": "active_time_limit",
+  "calls": 19,
+  "reserved": 0,
+  "charged": 1900,
+  "uncertain": 0,
+  "receipts": 18,
+  "unknown_receipts": 0,
+  "saved_versions": 17,
+  "saved_paths": 17,
+  "published": 0,
+  "job": "done",
+  "attempts": 1,
+  "generation": 1
+ },
+ "api_status_at_end": "failed",
+ "verification": "",
+ "invocations": [
+  {
+   "attempt": 1,
+   "status": "succeeded",
+   "failure_class": null,
+   "reserved_micro_usd": 34560,
+   "charged_micro_usd": 100,
+   "reconciled": false
+  },
+  {
+   "attempt": 2,
+   "status": "succeeded",
+   "failure_class": null,
+   "reserved_micro_usd": 34560,
+   "charged_micro_usd": 100,
+   "reconciled": false
+  },
+  {
+   "attempt": 3,
+   "status": "succeeded",
+   "failure_class": null,
+   "reserved_micro_usd": 34560,
+   "charged_micro_usd": 100,
+   "reconciled": false
+  },
+  {
+   "attempt": 4,
+   "status": "succeeded",
+   "failure_class": null,
+   "reserved_micro_usd": 34560,
+   "charged_micro_usd": 100,
+   "reconciled": false
+  },
+  {
+   "attempt": 5,
+   "status": "succeeded",
+   "failure_class": null,
+   "reserved_micro_usd": 34560,
+   "charged_micro_usd": 100,
+   "reconciled": false
+  },
+  {
+   "attempt": 6,
+   "status": "succeeded",
+   "failure_class": null,
+   "reserved_micro_usd": 34560,
+   "charged_micro_usd": 100,
+   "reconciled": false
+  },
+  {
+   "attempt": 7,
+   "status": "succeeded",
+   "failure_class": null,
+   "reserved_micro_usd": 34560,
+   "charged_micro_usd": 100,
+   "reconciled": false
+  },
+  {
+   "attempt": 8,
+   "status": "succeeded",
+   "failure_class": null,
+   "reserved_micro_usd": 34560,
+   "charged_micro_usd": 100,
+   "reconciled": false
+  },
+  {
+   "attempt": 9,
+   "status": "succeeded",
+   "failure_class": null,
+   "reserved_micro_usd": 34560,
+   "charged_micro_usd": 100,
+   "reconciled": false
+  },
+  {
+   "attempt": 10,
+   "status": "succeeded",
+   "failure_class": null,
+   "reserved_micro_usd": 34560,
+   "charged_micro_usd": 100,
+   "reconciled": false
+  },
+  {
+   "attempt": 11,
+   "status": "succeeded",
+   "failure_class": null,
+   "reserved_micro_usd": 34560,
+   "charged_micro_usd": 100,
+   "reconciled": false
+  },
+  {
+   "attempt": 12,
+   "status": "succeeded",
+   "failure_class": null,
+   "reserved_micro_usd": 34560,
+   "charged_micro_usd": 100,
+   "reconciled": false
+  },
+  {
+   "attempt": 13,
+   "status": "succeeded",
+   "failure_class": null,
+   "reserved_micro_usd": 34560,
+   "charged_micro_usd": 100,
+   "reconciled": false
+  },
+  {
+   "attempt": 14,
+   "status": "succeeded",
+   "failure_class": null,
+   "reserved_micro_usd": 34560,
+   "charged_micro_usd": 100,
+   "reconciled": false
+  },
+  {
+   "attempt": 15,
+   "status": "succeeded",
+   "failure_class": null,
+   "reserved_micro_usd": 34560,
+   "charged_micro_usd": 100,
+   "reconciled": false
+  },
+  {
+   "attempt": 16,
+   "status": "succeeded",
+   "failure_class": null,
+   "reserved_micro_usd": 34560,
+   "charged_micro_usd": 100,
+   "reconciled": false
+  },
+  {
+   "attempt": 17,
+   "status": "succeeded",
+   "failure_class": null,
+   "reserved_micro_usd": 34560,
+   "charged_micro_usd": 100,
+   "reconciled": false
+  },
+  {
+   "attempt": 18,
+   "status": "succeeded",
+   "failure_class": null,
+   "reserved_micro_usd": 34560,
+   "charged_micro_usd": 100,
+   "reconciled": false
+  },
+  {
+   "attempt": 19,
+   "status": "succeeded",
+   "failure_class": null,
+   "reserved_micro_usd": 34560,
+   "charged_micro_usd": 100,
+   "reconciled": false
+  }
+ ],
+ "requests": [
+  {
+   "event": "call_started",
+   "step": 0,
+   "wall": 1794004741.159832,
+   "mono": 281223.47606875
+  },
+  {
+   "event": "call_replied",
+   "step": 0,
+   "wall": 1794004771.162314,
+   "mono": 281253.4784595,
+   "started_wall": 1794004741.159832
+  },
+  {
+   "event": "call_started",
+   "step": 1,
+   "wall": 1794004771.245599,
+   "mono": 281253.561743583
+  },
+  {
+   "event": "call_replied",
+   "step": 1,
+   "wall": 1794004801.2471292,
+   "mono": 281283.563182041,
+   "started_wall": 1794004771.245599
+  },
+  {
+   "event": "call_started",
+   "step": 2,
+   "wall": 1794004801.352343,
+   "mono": 281283.668395708
+  },
+  {
+   "event": "call_replied",
+   "step": 2,
+   "wall": 1794004831.353471,
+   "mono": 281313.669432583,
+   "started_wall": 1794004801.352343
+  },
+  {
+   "event": "call_started",
+   "step": 3,
+   "wall": 1794004831.441466,
+   "mono": 281313.757426
+  },
+  {
+   "event": "call_replied",
+   "step": 3,
+   "wall": 1794004861.443189,
+   "mono": 281343.7590585,
+   "started_wall": 1794004831.441466
+  },
+  {
+   "event": "call_started",
+   "step": 4,
+   "wall": 1794004861.544626,
+   "mono": 281343.860494833
+  },
+  {
+   "event": "call_replied",
+   "step": 4,
+   "wall": 1794004905.509907,
+   "mono": 281373.861968666,
+   "started_wall": 1794004861.544626
+  },
+  {
+   "event": "call_started",
+   "step": 5,
+   "wall": 1794004905.599968,
+   "mono": 281373.952029083
+  },
+  {
+   "event": "call_replied",
+   "step": 5,
+   "wall": 1794005294.578899,
+   "mono": 281403.95346975,
+   "started_wall": 1794004905.599968
+  },
+  {
+   "event": "call_started",
+   "step": 6,
+   "wall": 1794005294.650975,
+   "mono": 281404.025546208
+  },
+  {
+   "event": "call_replied",
+   "step": 6,
+   "wall": 1794005865.843362,
+   "mono": 281434.026943333,
+   "started_wall": 1794005294.650975
+  },
+  {
+   "event": "call_started",
+   "step": 7,
+   "wall": 1794005865.93964,
+   "mono": 281434.123226416
+  },
+  {
+   "event": "call_replied",
+   "step": 7,
+   "wall": 1794005895.940285,
+   "mono": 281464.124568833,
+   "started_wall": 1794005865.93964
+  },
+  {
+   "event": "call_started",
+   "step": 8,
+   "wall": 1794005896.001642,
+   "mono": 281464.185926125
+  },
+  {
+   "event": "call_replied",
+   "step": 8,
+   "wall": 1794005926.0030751,
+   "mono": 281494.1873955,
+   "started_wall": 1794005896.001642
+  },
+  {
+   "event": "call_started",
+   "step": 9,
+   "wall": 1794005926.124497,
+   "mono": 281494.308817625
+  },
+  {
+   "event": "call_replied",
+   "step": 9,
+   "wall": 1794005956.1261609,
+   "mono": 281524.310423416,
+   "started_wall": 1794005926.124497
+  },
+  {
+   "event": "call_started",
+   "step": 10,
+   "wall": 1794005956.1995761,
+   "mono": 281524.383837833
+  },
+  {
+   "event": "call_replied",
+   "step": 10,
+   "wall": 1794005986.200643,
+   "mono": 281554.384833875,
+   "started_wall": 1794005956.1995761
+  },
+  {
+   "event": "call_started",
+   "step": 11,
+   "wall": 1794005986.2579808,
+   "mono": 281554.44217175
+  },
+  {
+   "event": "call_replied",
+   "step": 11,
+   "wall": 1794006016.2591648,
+   "mono": 281584.443282083,
+   "started_wall": 1794005986.2579808
+  },
+  {
+   "event": "call_started",
+   "step": 12,
+   "wall": 1794006016.332879,
+   "mono": 281584.516995833
+  },
+  {
+   "event": "call_replied",
+   "step": 12,
+   "wall": 1794006046.334537,
+   "mono": 281614.518579708,
+   "started_wall": 1794006016.332879
+  },
+  {
+   "event": "call_started",
+   "step": 13,
+   "wall": 1794006046.405183,
+   "mono": 281614.5892255
+  },
+  {
+   "event": "call_replied",
+   "step": 13,
+   "wall": 1794006076.406249,
+   "mono": 281644.590218083,
+   "started_wall": 1794006046.405183
+  },
+  {
+   "event": "call_started",
+   "step": 14,
+   "wall": 1794006076.522047,
+   "mono": 281644.706015708
+  },
+  {
+   "event": "call_replied",
+   "step": 14,
+   "wall": 1794006106.523658,
+   "mono": 281674.707552458,
+   "started_wall": 1794006076.522047
+  },
+  {
+   "event": "call_started",
+   "step": 15,
+   "wall": 1794006106.6047301,
+   "mono": 281674.788624375
+  },
+  {
+   "event": "call_replied",
+   "step": 15,
+   "wall": 1794006136.6062,
+   "mono": 281704.790020166,
+   "started_wall": 1794006106.6047301
+  },
+  {
+   "event": "call_started",
+   "step": 16,
+   "wall": 1794006136.7190511,
+   "mono": 281704.902870541
+  },
+  {
+   "event": "call_replied",
+   "step": 16,
+   "wall": 1794006166.719836,
+   "mono": 281734.903815625,
+   "started_wall": 1794006136.7190511
+  },
+  {
+   "event": "call_started",
+   "step": 17,
+   "wall": 1794006166.767552,
+   "mono": 281734.951532125
+  },
+  {
+   "event": "call_replied",
+   "step": 17,
+   "wall": 1794006196.767974,
+   "mono": 281764.952051,
+   "started_wall": 1794006166.767552
+  },
+  {
+   "event": "call_started",
+   "step": 18,
+   "wall": 1794006196.884297,
+   "mono": 281765.068373791
+  },
+  {
+   "event": "call_replied",
+   "step": 18,
+   "wall": 1794006226.886042,
+   "mono": 281795.070071666,
+   "started_wall": 1794006196.884297
+  }
+ ],
+ "calls_across_the_sleep": [
+  {
+   "event": "call_replied",
+   "step": 5,
+   "wall": 1794005294.578899,
+   "mono": 281403.95346975,
+   "started_wall": 1794004905.599968
+  },
+  {
+   "event": "call_replied",
+   "step": 6,
+   "wall": 1794005865.843362,
+   "mono": 281434.026943333,
+   "started_wall": 1794005294.650975
+  }
+ ],
+ "refused_hosts": [],
+ "log_events": {
+  "worker.woke": 2,
+  "worker.step_failed": 0,
+  "worker.drain_cut_short": 0,
+  "lease_lost": 0,
+  "Traceback": 0
+ },
+ "power_log": [
+  "2026-11-06 16:41:22 -0600 Sleep               \tEntering Sleep state due to 'Software Sleep pid=455':TCPKeepAlive=active Using AC (Charge:100%) 16 secs",
+  "2026-11-06 16:41:23 -0600 Wake Requests       \t[process=dasd request=SleepService deltaSecs=1044 wakeAt=2026-11-06 16:58:48 info=\"com.apple.dasd:0:com.apple.MobileAccesso",
+  "2026-11-06 16:41:38 -0600 Wake                \tWake from Deep Idle [CDNVA] : due to MTP.DOCK.CHANNELS.AP0.IRQ RTP.multi-touch/HID Activity Using AC (Charge:100%) 8 secs",
+  "2026-11-06 16:41:46 -0600 Sleep               \tEntering DarkWake state due to 'Clamshell Sleep':TCPKeepAlive=active Using AC (Charge:100%)",
+  "2026-11-06 16:41:51 -0600 Sleep               \tEntering Sleep state due to 'Clamshell Sleep':TCPKeepAlive=active Using AC (Charge:100%) 361 secs",
+  "2026-11-06 16:41:53 -0600 Wake Requests       \t[process=dasd request=SleepService deltaSecs=924 wakeAt=2026-11-06 16:57:17 info=\"com.apple.dasd:0:com.apple.MobileAccessor",
+  "2026-11-06 16:47:52 -0600 Wake                \tWake from Deep Idle [CDNVA] : due to smc.sysState.Wake(0x70070000) lid SMC.OutboxNotEmpty nub-spmi-a0.0x59 RTP.multi-touch/",
+  "2026-11-06 16:48:20 -0600 Sleep               \tEntering Sleep state due to 'Software Sleep pid=455':TCPKeepAlive=active Using AC (Charge:100%) 543 secs",
+  "2026-11-06 16:48:22 -0600 Wake Requests       \t[process=dasd request=SleepService deltaSecs=981 wakeAt=2026-11-06 17:04:43 info=\"com.apple.dasd:0:com.apple.MobileAccessor",
+  "2026-11-06 16:57:23 -0600 Wake                \tWake from Deep Idle [CDNVA] : due to smc.sysState.Wake(0x70070000) pwrbtn SMC.OutboxNotEmpty nub-spmi-a0.0x59/UserActivity "
+ ],
+ "steps_sent_more_than_once": [],
+ "failures": [
+  "sleep_counted_as_work"
+ ],
+ "left_behind": "none",
+ "other_docker_unchanged": true,
+ "verdict": "failure_observed",
+ "finished_at_utc": "2026-11-06T23:03:57.206627+00:00"
+}
