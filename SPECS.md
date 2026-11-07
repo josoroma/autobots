@@ -387,11 +387,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.12#2 | Limit its action set to navigate, click links, scroll, read and extract, and enforce `allowed_domains`, `max_steps` and `max_seconds`. | TODO | US-14.12 |
 | US-14.12#3 | Grant it only through an Expert, and require a person's approval on every call, showing the task, start URL, allowed domains and limits. | TODO | US-14.12 |
 | US-14.12#4 | Cover the scenarios on a disposable stack with a scripted model. | TODO | US-14.12 |
-| US-14.13 | Isolated browser executor | READY | EPIC-14 |
-| US-14.13#1 | Start and remove one hardened container per call from the digest-pinned Playwright image, with CDP on loopback behind a per-session token and nothing of the worker's environment. | TODO | US-14.13 |
-| US-14.13#2 | Build the egress proxy sidecar locally, applying the URL guard to every request and connecting to the address it checked. | TODO | US-14.13 |
-| US-14.13#3 | Tie the executor to the attempt's lease, cancellation and time cap, with labelled containers and a sweeper. | TODO | US-14.13 |
-| US-14.13#4 | Qualify every refusal live on a disposable stack with a scripted model, and report qualified only after that check passes. | TODO | US-14.13 |
+| US-14.13 | Isolated browser executor | DONE | EPIC-14 |
+| US-14.13#1 | Start and remove one hardened container per call from the digest-pinned Playwright image, with CDP on loopback behind a per-session token and nothing of the worker's environment. | DONE | US-14.13 |
+| US-14.13#2 | Build the egress proxy sidecar locally, applying the URL guard to every request and connecting to the address it checked. | DONE | US-14.13 |
+| US-14.13#3 | Tie the executor to the attempt's lease, cancellation and time cap, with labelled containers and a sweeper. | DONE | US-14.13 |
+| US-14.13#4 | Qualify every refusal live on a disposable stack with a scripted model, and report qualified only after that check passes. | DONE | US-14.13 |
 | US-14.14 | Admitted model for browser-use | READY | EPIC-14 |
 | US-14.14#1 | Add `browser-use` pinned in `uv.lock`, with its dependency tree reviewed and recorded. | TODO | US-14.14 |
 | US-14.14#2 | Implement the adapter over the pinned version's chat-model protocol through model admission, reservations, receipts and the run's frozen `researcher` route. | TODO | US-14.14 |
@@ -5189,7 +5189,8 @@ Open Questions:
 
 ### US-14.13: Isolated browser executor
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-14-13-isolated-browser-executor/`
 
 As a workspace owner
 I want a browser that runs in a disposable container with no way to reach this Mac, its services, its files or its credentials
@@ -5232,10 +5233,10 @@ Dependencies:
 - US-14.8
 
 Tasks:
-- [ ] Start and remove one hardened container per call from the digest-pinned Playwright image, with CDP on loopback behind a per-session token and nothing of the worker's environment.
-- [ ] Build the egress proxy sidecar locally, applying the URL guard to every request and connecting to the address it checked.
-- [ ] Tie the executor to the attempt's lease, cancellation and time cap, with labelled containers and a sweeper.
-- [ ] Qualify every refusal live on a disposable stack with a scripted model, and report qualified only after that check passes.
+- [x] Start and remove one hardened container per call from the digest-pinned Playwright image, with CDP on loopback behind a per-session token and nothing of the worker's environment.
+- [x] Build the egress proxy sidecar locally, applying the URL guard to every request and connecting to the address it checked.
+- [x] Tie the executor to the attempt's lease, cancellation and time cap, with labelled containers and a sweeper.
+- [x] Qualify every refusal live on a disposable stack with a scripted model, and report qualified only after that check passes.
 
 Open Questions:
 - None.

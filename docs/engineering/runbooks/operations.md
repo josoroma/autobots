@@ -88,6 +88,31 @@ JINA_API_KEY=<for search_web and extract_website_content>
 
 Set them for both the worker and the API, since the API reports availability from its own environment, then restart both. Nothing checks a key against its provider automatically, because that costs a request: tests use fake transports even with a key present, and a live check is a separate task an owner authorizes and caps. A root run tree may make 20 metered tool calls; the next is denied `tool_budget_exceeded` before any request.
 
+## The browser executor
+
+The isolated browser executor ([Decision 0018](../decisions/0018-browser-executor.md), US-14.13) runs one disposable Chromium container per browsing call, behind an egress sidecar that is its only way out and the only door to its DevTools. Nothing uses it until `browse_goal` (US-14.12) exists, and that stays disabled until the executor is qualified at the current code.
+
+Build both images on this Mac. The browser image starts from the Playwright image pinned by digest, and the proxy from a Python image pinned by digest, so a build pulls them once:
+
+```sh
+docker build -t autobots-browser:local -f infra/browser/browser.Dockerfile infra/browser
+docker build -t autobots-egress:local -f infra/browser/proxy.Dockerfile services/agent/src/autobots/adapters
+```
+
+Then qualify it. This starts a disposable database, drives the browser with a scripted driver, never a model, and needs outbound network to `https://example.com/` (and `example.org` for the request cap), the only hosts it reaches:
+
+```sh
+python3.12 scripts/qualify_browser_executor.py
+```
+
+It writes `.checks/browser-executor/qualification.json`, bound to the image definitions and the proxy's code. The executor reports qualified only from a passing report at the current fingerprint, so rebuild and requalify after changing anything under `infra/browser/` or the executor's code. It's in no verification profile, since it needs network and images a check never builds.
+
+What a session is: a non-root container from the pinned image with all capabilities dropped, `no-new-privileges`, a read-only root, a 256 MiB `/tmp`, 1 CPU, 1 GiB, 256 processes and 300 seconds, on an internal network. The sidecar allows only `CONNECT` to port 443 of the hosts the call names, refuses any address that isn't public and connects to the one it checked, and caps requests and bytes. DevTools are published on `127.0.0.1` only, on a random port, behind a per-session token. Losing the lease, cancelling the run or reaching a cap removes the session; a sweeper removes containers labelled `autobots.browser` that a crashed worker left:
+
+```sh
+docker ps -a --filter label=autobots.browser=1
+```
+
 ## The GitHub issue connector
 
 The first consequential connector, by [Decision 0007](../decisions/0007-first-connector-github-issues.md). It creates an issue in one repository and does nothing else. An owner grants it per Expert, goals without an Expert don't get it, and each call waits for a person's approval.
