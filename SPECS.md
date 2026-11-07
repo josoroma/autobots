@@ -369,11 +369,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.8 | URL guard for tools that fetch | DONE | EPIC-14 |
 | US-14.8#1 | Add one shared guard with DNS checks on every answer, redirect revalidation, a limit of 3 redirects, and size and time caps. | DONE | US-14.8 |
 | US-14.8#2 | Cover the scenarios with a fake resolver and transport. | DONE | US-14.8 |
-| US-14.9 | Agent File Input, read_run_file v2, read_csv and store_remote_file | READY | EPIC-14 |
-| US-14.9#1 | Add the goal composer's attachment of text files to run inputs, through the BFF and API. | TODO | US-14.9 |
-| US-14.9#2 | Register `read_run_file` version 2 with media type and line paging, keeping saved grants on the version they pinned, and add `read_csv`. | TODO | US-14.9 |
-| US-14.9#3 | Add `store_remote_file` as a reversible internal write through the URL guard. | TODO | US-14.9 |
-| US-14.9#4 | Cover the scenarios, with browser specs for the composer and fake transports for remote storage. | TODO | US-14.9 |
+| US-14.9 | Agent File Input, read_run_file v2, read_csv and store_remote_file | DONE | EPIC-14 |
+| US-14.9#1 | Add the goal composer's attachment of text files to run inputs, through the BFF and API. | DONE | US-14.9 |
+| US-14.9#2 | Register `read_run_file` version 2 with media type and line paging, keeping saved grants on the version they pinned, and add `read_csv`. | DONE | US-14.9 |
+| US-14.9#3 | Add `store_remote_file` as a reversible internal write through the URL guard. | DONE | US-14.9 |
+| US-14.9#4 | Cover the scenarios, with browser specs for the composer and fake transports for remote storage. | DONE | US-14.9 |
 | US-14.10 | Market history and inflation rates | READY | EPIC-14 |
 | US-14.10#1 | Add `market_history` and `inflation_rates` as read-only plain `httpx` adapters with an injectable transport and recorded fixtures, with no new package. | TODO | US-14.10 |
 | US-14.10#2 | Cover the scenarios with fake transports only. | TODO | US-14.10 |
@@ -4952,7 +4952,8 @@ Open Questions:
 
 ### US-14.9: Agent File Input, read_run_file v2, read_csv and store_remote_file
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-14-9-agent-file-input-read/`
 
 As a goal's owner
 I want to attach text files to a goal, and give agents paged reading, CSV reading and guarded remote storage over run files
@@ -4990,10 +4991,10 @@ Dependencies:
 - US-14.8
 
 Tasks:
-- [ ] Add the goal composer's attachment of text files to run inputs, through the BFF and API.
-- [ ] Register `read_run_file` version 2 with media type and line paging, keeping saved grants on the version they pinned, and add `read_csv`.
-- [ ] Add `store_remote_file` as a reversible internal write through the URL guard.
-- [ ] Cover the scenarios, with browser specs for the composer and fake transports for remote storage.
+- [x] Add the goal composer's attachment of text files to run inputs, through the BFF and API.
+- [x] Register `read_run_file` version 2 with media type and line paging, keeping saved grants on the version they pinned, and add `read_csv`.
+- [x] Add `store_remote_file` as a reversible internal write through the URL guard.
+- [x] Cover the scenarios, with browser specs for the composer and fake transports for remote storage.
 
 Open Questions:
 - None.

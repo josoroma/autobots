@@ -2,18 +2,30 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from autobots.contracts.tools import TOOL_CONTRACT
 
+MAX_INPUT_BYTES = 1_048_576
+InputMediaType = Literal["text/plain", "text/markdown", "application/json", "text/csv"]
+
 
 class InputDocument(BaseModel):
-    """A controlled document given at admission. Tools can read it and can't change it."""
+    """A controlled document given at admission, or a file attached to a goal (FI-01). Tools can
+    read it and can't change it. Text only, at most 1 MiB."""
 
     model_config = TOOL_CONTRACT
 
     path: str = Field(pattern=r"^inputs/[A-Za-z0-9._-]{1,200}$")
-    content: str = Field(max_length=256_000)
+    content: str = Field(max_length=MAX_INPUT_BYTES)
+    media_type: InputMediaType = "text/plain"
+
+    @field_validator("content")
+    @classmethod
+    def _bounded_bytes(cls, value: str) -> str:
+        if len(value.encode()) > MAX_INPUT_BYTES:
+            raise ValueError("an input document is at most 1 MiB")
+        return value
 
 
 class RequiredArtifact(BaseModel):

@@ -205,7 +205,11 @@ async def admit_run(
             "continues": str(continues_run_id),
             "required": [item.model_dump() for item in required_artifacts],
             "expert": [str(binding.expert_id), binding.version] if binding else None,
-            "documents": [item.model_dump() for item in input_documents],
+            # The media type only when chosen, so a receipt from before that field still matches.
+            "documents": [
+                item.model_dump(exclude={"media_type"} if item.media_type == "text/plain" else None)
+                for item in input_documents
+            ],
             # Only when chosen, so a receipt from before this field still matches.
             **({"run_profile": run_profile} if run_profile else {}),
         }
@@ -260,12 +264,13 @@ async def admit_run(
             content = document.content
             await connection.execute(
                 "insert into app_private.run_files (run_id, path, version, content, sha256, "
-                "media_type, operation_id) values (%s, %s, 1, %s, %s, 'text/plain', %s)",
+                "media_type, operation_id) values (%s, %s, 1, %s, %s, %s, %s)",
                 (
                     run_id,
                     document.path,
                     content,
                     hashlib.sha256(content.encode()).hexdigest(),
+                    document.media_type,
                     f"input:{run_id}:{document.path}",
                 ),
             )

@@ -413,3 +413,103 @@ test("US-14.4: the workflow monitor shows tool uses under the node that made the
   await expect(page.locator('[data-node-tools="in"]')).toHaveCount(0);
   await noViolations(page);
 });
+
+function probe(
+  runId: string,
+): { path: string; media_type: string; bytes: number }[] {
+  const script = (process.env.AUTOBOTS_TEST_TOOL_HELPER ?? "").replace(
+    "tool_use_live.py",
+    "run_files_probe.py",
+  );
+  const printed = execFileSync(
+    process.env.AUTOBOTS_TEST_PYTHON ?? "",
+    [script, runId],
+    {
+      env: {
+        ...process.env,
+        AUTOBOTS_DATABASE_URL: process.env.AUTOBOTS_TEST_RUNTIME_URL ?? "",
+        PYTHONPATH: process.env.AUTOBOTS_TEST_PYTHONPATH ?? "",
+      },
+      encoding: "utf8",
+    },
+  );
+  return JSON.parse(printed.trim().split("\n").at(-1) ?? "[]");
+}
+
+test("US-14.9: up to five text files attach to a goal as run inputs, and the rest are refused", async ({
+  page,
+}) => {
+  await signIn(page, EMAIL_A, PASSWORD_A);
+  await admitted(page, `attach-${Date.now()}`);
+  await page.goto("/");
+  const input = page.getByLabel("Attach files");
+  const text = (name: string, mimeType: string, body: string) => ({
+    name,
+    mimeType,
+    buffer: Buffer.from(body),
+  });
+  await input.setInputFiles([
+    text("notes.txt", "text/plain", "plain notes"),
+    text("plan.md", "text/markdown", "# Plan"),
+    text("data.json", "application/json", '{"a": 1}'),
+    text("rates.csv", "text/csv", "day,rate\n2026-11-01,512.3\n"),
+    text("more notes.txt", "text/plain", "more"),
+  ]);
+  const attached = page.locator("[data-attached]");
+  await expect(attached).toHaveCount(5);
+  await expect(
+    page.locator('[data-attached="inputs/more-notes.txt"]'),
+  ).toContainText("text/plain");
+  const refusals = page.locator('[data-field="attach-refusals"]');
+  await input.setInputFiles([text("sixth.txt", "text/plain", "six")]);
+  await expect(refusals).toHaveText("sixth.txt: only 5 files can be attached.");
+  await expect(attached).toHaveCount(5);
+
+  await page.getByRole("button", { name: "Remove more notes.txt" }).click();
+  await expect(attached).toHaveCount(4);
+  await input.setInputFiles([
+    {
+      name: "big.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.alloc(1_048_577, 97),
+    },
+    text("report.pdf", "application/pdf", "%PDF-1.7"),
+  ]);
+  await expect(refusals).toContainText("big.txt: a file can be at most 1 MiB.");
+  await expect(refusals).toContainText(
+    "report.pdf: only plain text, markdown, JSON or CSV can be attached.",
+  );
+  await expect(attached).toHaveCount(4);
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(results.violations.map((violation) => violation.id)).toEqual([]);
+
+  await page
+    .getByRole("textbox", { name: "Goal" })
+    .fill("Summarize the attached files");
+  await page.getByRole("button", { name: "Run" }).click();
+  await page.getByRole("link", { name: "Open this run" }).click();
+  await expect(page).toHaveURL(/\/runs\/[0-9a-f-]{36}/);
+  const runId = page.url().split("/").at(-1) ?? "";
+  expect(probe(runId)).toEqual([
+    { path: "inputs/data.json", media_type: "application/json", bytes: 8 },
+    { path: "inputs/notes.txt", media_type: "text/plain", bytes: 11 },
+    { path: "inputs/plan.md", media_type: "text/markdown", bytes: 6 },
+    { path: "inputs/rates.csv", media_type: "text/csv", bytes: 26 },
+  ]);
+
+  // Attaching isn't a tool: the catalog's Files group is unchanged by it.
+  const catalog = await (await page.request.get("/api/v1/tools")).json();
+  const files = catalog.tools
+    .filter((tool: { group: string }) => tool.group === "files")
+    .map((tool: { tool_id: string }) => tool.tool_id)
+    .sort();
+  expect(files).toEqual([
+    "publish_artifact",
+    "read_csv",
+    "read_run_file",
+    "save_artifact",
+    "store_remote_file",
+  ]);
+});

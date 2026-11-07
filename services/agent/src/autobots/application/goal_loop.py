@@ -32,6 +32,7 @@ from autobots.adapters.loop_middleware import (
     ModelRoute,
     UnadmittedModelCall,
 )
+from autobots.adapters.remote_files import STORE_REMOTE_FILE
 from autobots.adapters.tavily import TAVILY_TOOLS
 from autobots.adapters.tool_middleware import GatewayMiddleware, visible_tools
 from autobots.application.approvals import expire_due
@@ -57,7 +58,13 @@ from autobots.application.tool_gateway import (
     ToolRegistry,
     ToolScope,
 )
-from autobots.application.tools import CALCULATE, READ_RUN_FILE, SAVE_ARTIFACT
+from autobots.application.tools import (
+    CALCULATE,
+    READ_CSV,
+    READ_RUN_FILE,
+    READ_RUN_FILE_V2,
+    SAVE_ARTIFACT,
+)
 from autobots.application.verification import verify_candidate
 from autobots.application.worker_leases import (
     DEFAULT_LEASE_SECONDS,
@@ -156,7 +163,10 @@ def loop_registry(
     tools = (
         CALCULATE,
         READ_RUN_FILE,
+        READ_RUN_FILE_V2,
+        READ_CSV,
         SAVE_ARTIFACT,
+        STORE_REMOTE_FILE,
         SEARCH_MEMORY,
         READ_OFFLOAD,
         PROPOSE_IMPROVEMENT,

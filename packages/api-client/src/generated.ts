@@ -1626,11 +1626,22 @@ export const schemas = {
   },
   "InputDocument": {
     "additionalProperties": false,
-    "description": "A controlled document given at admission. Tools can read it and can't change it.",
+    "description": "A controlled document given at admission, or a file attached to a goal (FI-01). Tools can\nread it and can't change it. Text only, at most 1 MiB.",
     "properties": {
       "content": {
-        "maxLength": 256000,
+        "maxLength": 1048576,
         "title": "Content",
+        "type": "string"
+      },
+      "media_type": {
+        "default": "text/plain",
+        "enum": [
+          "text/plain",
+          "text/markdown",
+          "application/json",
+          "text/csv"
+        ],
+        "title": "Media Type",
         "type": "string"
       },
       "path": {
@@ -5966,6 +5977,7 @@ export function parseHeldOutTask(value: unknown): HeldOutTask {
 
 export interface InputDocument {
   content: string;
+  media_type?: "text/plain" | "text/markdown" | "application/json" | "text/csv";
   path: string;
 }
 

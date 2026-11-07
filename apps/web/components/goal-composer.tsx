@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 
-import { Play, Sparkles } from "lucide-react";
+import { Paperclip, Play, Sparkles, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { RunDisclosure } from "@/components/run-disclosure";
@@ -15,7 +15,7 @@ import {
   INNER_BOX,
   IconTile,
 } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/field";
+import { Input, Textarea } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +30,40 @@ function storedDraft(): string {
   } catch {
     return "";
   }
+}
+
+// PRD-Tool-Catalog FI-01: up to five text files of at most 1 MiB, kept as run inputs. Nothing is
+// sent until Run is pressed, and the files go with that one request.
+const MAX_FILES = 5;
+const MAX_FILE_BYTES = 1_048_576;
+const MEDIA_TYPES: Record<string, string> = {
+  txt: "text/plain",
+  text: "text/plain",
+  md: "text/markdown",
+  markdown: "text/markdown",
+  json: "application/json",
+  csv: "text/csv",
+};
+
+type Attached = {
+  name: string;
+  path: string;
+  media_type: string;
+  content: string;
+};
+
+function inputPath(name: string, taken: readonly Attached[]): string {
+  const base =
+    name.replace(/[^A-Za-z0-9._-]/g, "-").replace(/^[.-]+/, "") || "file";
+  let candidate = `inputs/${base.slice(0, 180)}`;
+  for (
+    let count = 2;
+    taken.some((file) => file.path === candidate);
+    count += 1
+  ) {
+    candidate = `inputs/${count}-${base.slice(0, 176)}`;
+  }
+  return candidate;
 }
 
 type Outcome =
@@ -47,7 +81,37 @@ export function GoalComposer() {
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const [profile, setProfile] = useState("");
+  const [files, setFiles] = useState<readonly Attached[]>([]);
+  const [refusals, setRefusals] = useState<readonly string[]>([]);
   const draft = edited ?? restored;
+
+  async function attach(chosen: FileList | null): Promise<void> {
+    const kept = [...files];
+    const refused: string[] = [];
+    for (const file of Array.from(chosen ?? [])) {
+      const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+      const mediaType = MEDIA_TYPES[extension];
+      if (kept.length >= MAX_FILES) {
+        refused.push(`${file.name}: only ${MAX_FILES} files can be attached.`);
+      } else if (mediaType === undefined) {
+        refused.push(
+          `${file.name}: only plain text, markdown, JSON or CSV can be attached.`,
+        );
+      } else if (file.size > MAX_FILE_BYTES) {
+        refused.push(`${file.name}: a file can be at most 1 MiB.`);
+      } else {
+        const content = await file.text();
+        kept.push({
+          name: file.name,
+          path: inputPath(file.name, kept),
+          media_type: mediaType,
+          content,
+        });
+      }
+    }
+    setFiles(kept);
+    setRefusals(refused);
+  }
 
   function update(value: string): void {
     setEdited(value);
@@ -70,12 +134,23 @@ export function GoalComposer() {
       body: JSON.stringify({
         goal_text: draft,
         ...(profile === "" ? {} : { run_profile: profile }),
+        ...(files.length === 0
+          ? {}
+          : {
+              input_documents: files.map(({ path, content, media_type }) => ({
+                path,
+                content,
+                media_type,
+              })),
+            }),
       }),
     }).catch(() => null);
     if (reply?.ok === true) {
       const accepted = (await reply.json()) as { run_id: string };
       setRunId(accepted.run_id);
       setOutcome("queued");
+      setFiles([]);
+      setRefusals([]);
       return;
     }
     const failure = (await reply?.json().catch(() => null)) as {
@@ -108,8 +183,9 @@ export function GoalComposer() {
           </CardDescription>
         </div>
       </CardHeader>
-      {/* Document order stays goal, model choice, Run, so Tab never skips back. On wide screens the
-          disclosure sits beside the goal and Run sits at the bottom of the goal's column. */}
+      {/* Document order stays goal, model choice, attachments, Run, so Tab never skips back. On wide
+          screens the disclosure and attachments sit beside the goal and Run sits at the bottom of the
+          goal's column. */}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <div className="flex flex-col gap-2">
           <label htmlFor="goal" className="text-sm font-medium">
@@ -123,8 +199,69 @@ export function GoalComposer() {
             className="min-h-36 flex-1 resize-y"
           />
         </div>
-        <div className="lg:row-span-2">
+        <div className="flex flex-col gap-6 lg:row-span-2">
           <RunDisclosure chosen={profile} onChoose={setProfile} />
+          <div className="flex flex-col gap-2" data-field="attachments">
+            <label
+              htmlFor="attachments"
+              className="flex items-center gap-2 text-sm font-medium"
+            >
+              <Paperclip aria-hidden="true" className="size-4" />
+              Attach files
+            </label>
+            <Input
+              id="attachments"
+              type="file"
+              multiple
+              accept=".txt,.text,.md,.markdown,.json,.csv,text/plain,text/markdown,application/json,text/csv"
+              aria-describedby="attachments-help"
+              className="min-w-0 file:mr-3 file:border-0 file:bg-transparent file:font-medium"
+              onChange={(event) => {
+                void attach(event.target.files);
+                event.target.value = "";
+              }}
+            />
+            <p id="attachments-help" className="text-muted-foreground text-xs">
+              Up to {MAX_FILES} plain text, markdown, JSON or CSV files, 1 MiB
+              each. The run can read them under inputs/.
+            </p>
+            {files.length === 0 ? null : (
+              <ul className="space-y-1 text-sm" aria-label="Attached files">
+                {files.map((file) => (
+                  <li
+                    key={file.path}
+                    data-attached={file.path}
+                    className="flex items-center gap-2"
+                  >
+                    <code className="truncate">{file.path}</code>
+                    <span className="text-muted-foreground text-xs">
+                      {file.media_type}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="px-2 py-1"
+                      aria-label={`Remove ${file.name}`}
+                      onClick={() =>
+                        setFiles(
+                          files.filter((item) => item.path !== file.path),
+                        )
+                      }
+                    >
+                      <X aria-hidden="true" className="size-3.5" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div aria-live="polite" data-field="attach-refusals">
+              {refusals.map((reason) => (
+                <p key={reason} className="text-sm">
+                  {reason}
+                </p>
+              ))}
+            </div>
+          </div>
         </div>
         <Button
           onClick={() => void run()}

@@ -127,6 +127,13 @@ async def _follow(
                             raise UrlRefused("url_too_many_redirects")
                         current = urljoin(current, location)
                         continue
+                    # A name can answer public to the check and private to the connection. When
+                    # the connection says where it went, that address must pass too, before any
+                    # of the body is read.
+                    stream = reply.extensions.get("network_stream")
+                    peer = stream.get_extra_info("server_addr") if stream is not None else None
+                    if peer and not public(str(peer[0])):
+                        raise UrlRefused("url_host_refused")
                     body = bytearray()
                     declared = reply.headers.get("content-length")
                     if declared is not None and declared.isdigit() and int(declared) > max_bytes:

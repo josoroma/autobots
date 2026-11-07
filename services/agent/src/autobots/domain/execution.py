@@ -22,17 +22,20 @@ TOOL_VERSIONS: Mapping[str, int] = {
     "propose_plan": 1,
     "publish_artifact": 1,
     "read_offload": 1,
-    "read_run_file": 1,
+    "read_csv": 1,
+    "read_run_file": 2,
     "save_artifact": 1,
     "search_memory": 1,
     "search_web": 1,
+    "store_remote_file": 1,
     "tavily_crawl": 1,
     "tavily_extract": 1,
     "tavily_map": 1,
     "tavily_search": 1,
 }
 # (tool, recorded version, current version), only where old checkpoints keep their meaning.
-COMPATIBLE_TOOL_CHANGES: frozenset[tuple[str, int, int]] = frozenset()
+# read_run_file 1 stays registered, and a run that pinned it keeps calling it (US-14.9).
+COMPATIBLE_TOOL_CHANGES: frozenset[tuple[str, int, int]] = frozenset({("read_run_file", 1, 2)})
 
 INCOMPATIBLE = "incompatible_version"
 

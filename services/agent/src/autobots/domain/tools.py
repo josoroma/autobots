@@ -16,7 +16,9 @@ class OperationClass(StrEnum):
 PLAN_TOOLS = {"propose_plan": 1, "complete_task": 1, "read_offload": 1}
 GENERAL_TOOLS = {
     "calculate": 1,
-    "read_run_file": 1,
+    # Version 2 for new grants. Runs that pinned version 1 keep it, and it stays registered.
+    "read_run_file": 2,
+    "read_csv": 1,
     "save_artifact": 1,
     "publish_artifact": 1,
     "search_memory": 1,
@@ -35,6 +37,8 @@ EXPERT_TOOLS = {
     **GENERAL_TOOLS,
     "propose_improvement": 1,
     "create_github_issue": 1,
+    # It reaches the network, so only an owner's Expert grants it, never a plain goal.
+    "store_remote_file": 1,
     **PROVIDER_TOOLS,
 }
 LOOP_TOOL_GRANTS = {**PLAN_TOOLS, **GENERAL_TOOLS}

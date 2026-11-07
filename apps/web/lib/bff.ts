@@ -7,6 +7,15 @@ import { serverConfig } from "@/lib/server-config";
 import { accessToken } from "@/lib/session";
 
 const MAX_BODY_BYTES = 64 * 1024;
+// A goal may carry up to five attached text files of 1 MiB each (PRD-Tool-Catalog FI-01), which
+// JSON escaping can grow. Only run creation gets this; every other route keeps the small limit.
+const RUN_BODY_BYTES = 12 * 1024 * 1024;
+
+function bodyLimit(method: string, apiPath: string): number {
+  return method === "POST" && apiPath.split("?")[0] === "/v1/runs"
+    ? RUN_BODY_BYTES
+    : MAX_BODY_BYTES;
+}
 
 function safeError(
   status: number,
@@ -76,7 +85,7 @@ export async function forward(
       request.method === "GET" || request.method === "HEAD"
         ? null
         : await request.arrayBuffer();
-    if (body !== null && body.byteLength > MAX_BODY_BYTES) {
+    if (body !== null && body.byteLength > bodyLimit(request.method, apiPath)) {
       return safeError(413, "request_too_large", "This request is too large.");
     }
     const reply = await fetch(new URL(apiPath, config.apiUrl), {

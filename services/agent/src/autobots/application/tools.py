@@ -1,6 +1,10 @@
 """The narrow first tool set: a calculation, a read and an artifact save. Nothing else exists."""
 
+import csv
 import hashlib
+import io
+import re
+from typing import Literal
 
 from autobots.application.tool_gateway import (
     ToolContext,
@@ -12,8 +16,13 @@ from autobots.application.tool_gateway import (
 from autobots.contracts.tools import (
     CalculateInput,
     CalculateOutput,
+    CsvColumn,
+    ReadCsvInput,
+    ReadCsvOutput,
     ReadRunFileInput,
     ReadRunFileOutput,
+    ReadRunFileV2Input,
+    ReadRunFileV2Output,
     SaveArtifactInput,
     SaveArtifactOutput,
 )
@@ -57,21 +66,24 @@ async def _existing_save(
     return SaveArtifactOutput(path=arguments.path, version=row[0], sha256=row[1])
 
 
-async def _save(arguments: SaveArtifactInput, context: ToolContext) -> SaveArtifactOutput:
-    if arguments.path.startswith("inputs/"):
+async def write_run_file(
+    context: ToolContext, path: str, content: str, media_type: str
+) -> tuple[int, str]:
+    """A new version of a run file under this attempt's operation ID, fenced by the lease."""
+    if path.startswith("inputs/"):
         raise ToolFailed("inputs_read_only")
-    digest = hashlib.sha256(arguments.content.encode()).hexdigest()
+    digest = hashlib.sha256(content.encode()).hexdigest()
     async with context.connection.transaction():
         await hold_lease(context.connection, context.scope)
         # Serializes writers to this path, so two saves can't take one version.
         await context.connection.execute(
             "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
-            (f"{context.scope.run_id}|{arguments.path}",),
+            (f"{context.scope.run_id}|{path}",),
         )
         cursor = await context.connection.execute(
             "select coalesce(max(version), 0) + 1 from app_private.run_files "
             "where run_id = %s and path = %s",
-            (context.scope.run_id, arguments.path),
+            (context.scope.run_id, path),
         )
         version = (await cursor.fetchone())[0]
         await context.connection.execute(
@@ -79,15 +91,106 @@ async def _save(arguments: SaveArtifactInput, context: ToolContext) -> SaveArtif
             "media_type, operation_id) values (%s, %s, %s, %s, %s, %s, %s)",
             (
                 context.scope.run_id,
-                arguments.path,
+                path,
                 version,
-                arguments.content,
+                content,
                 digest,
-                arguments.media_type,
+                media_type,
                 context.operation_id,
             ),
         )
+    return version, digest
+
+
+async def _save(arguments: SaveArtifactInput, context: ToolContext) -> SaveArtifactOutput:
+    version, digest = await write_run_file(
+        context, arguments.path, arguments.content, arguments.media_type
+    )
     return SaveArtifactOutput(path=arguments.path, version=version, sha256=digest)
+
+
+# read_run_file version 2 returns at most this many characters, and says when it cut.
+READ_CHARACTERS = 200_000
+
+
+async def _latest(context: ToolContext, path: str) -> tuple[int, str, str, str]:
+    cursor = await context.connection.execute(
+        "select version, content, sha256, media_type from app_private.run_files "
+        "where run_id = %s and path = %s order by version desc limit 1",
+        (context.scope.run_id, path),
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        raise ToolFailed("file_not_found")
+    return row[0], row[1], row[2], row[3]
+
+
+async def _read_v2(arguments: ReadRunFileV2Input, context: ToolContext) -> ReadRunFileV2Output:
+    version, content, digest, media_type = await _latest(context, arguments.path)
+    lines = content.splitlines(keepends=True)
+    end = len(lines) if arguments.limit is None else arguments.offset + arguments.limit
+    chosen = "".join(lines[arguments.offset : end])
+    cut = chosen[:READ_CHARACTERS]
+    return ReadRunFileV2Output(
+        path=arguments.path,
+        version=version,
+        media_type=media_type,
+        sha256=digest,
+        content=cut,
+        offset=arguments.offset,
+        total_lines=len(lines),
+        truncated=end < len(lines) or len(cut) < len(chosen),
+    )
+
+
+def _inferred(
+    values: list[str],
+) -> Literal["integer", "number", "boolean", "date", "string", "empty"]:
+    present = [value.strip() for value in values if value.strip()]
+    if not present:
+        return "empty"
+    checks: tuple[tuple[Literal["integer", "number", "boolean", "date"], str], ...] = (
+        ("integer", r"[+-]?\d+"),
+        ("number", r"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?"),
+        ("boolean", r"(?i:true|false)"),
+        ("date", r"\d{4}-\d{2}-\d{2}"),
+    )
+    for name, pattern in checks:
+        if all(re.fullmatch(pattern, value) for value in present):
+            return name
+    return "string"
+
+
+async def _read_csv(arguments: ReadCsvInput, context: ToolContext) -> ReadCsvOutput:
+    version, content, _, _ = await _latest(context, arguments.path)
+    try:
+        parsed = list(csv.reader(io.StringIO(content), delimiter=arguments.delimiter, strict=True))
+    except csv.Error:
+        raise ToolFailed("csv_malformed") from None
+    parsed = [row for row in parsed if row]
+    if arguments.has_header and parsed:
+        header, data = parsed[0], parsed[1:]
+    else:
+        width = max((len(row) for row in parsed), default=0)
+        header, data = [f"column_{index + 1}" for index in range(width)], parsed
+    wanted = arguments.columns or header
+    if any(name not in header for name in wanted):
+        raise ToolFailed("csv_column_unknown")
+    keep = [header.index(name) for name in wanted]
+    rows = [[row[index] if index < len(row) else "" for index in keep] for row in data]
+    shown = rows[: arguments.max_rows]
+    columns = [
+        CsvColumn(name=name, inferred_type=_inferred([row[position] for row in rows]))
+        for position, name in enumerate(wanted)
+    ]
+    return ReadCsvOutput(
+        path=arguments.path,
+        version=version,
+        columns=columns,
+        rows=shown,
+        row_count=len(rows),
+        truncated=len(rows) > len(shown),
+    )
 
 
 CALCULATE = ToolDefinition(
@@ -120,6 +223,43 @@ READ_RUN_FILE = ToolDefinition(
     timeout_seconds=5.0,
     retries=1,
     resources=lambda arguments: (arguments.path,),
+)
+READ_RUN_FILE_V2 = ToolDefinition(
+    tool_id="read_run_file",
+    version=2,
+    title="File Read",
+    description=(
+        "Read a file belonging to this run, optionally from a line offset for a number of lines. "
+        "Says its media type, total lines and whether it was cut."
+    ),
+    input_model=ReadRunFileV2Input,
+    output_model=ReadRunFileV2Output,
+    operation_class=OperationClass.READ_ONLY,
+    handler=_read_v2,
+    timeout_seconds=5.0,
+    retries=1,
+    max_output_bytes=1_000_000,
+    resources=lambda arguments: (arguments.path,),
+    group=ToolGroup.FILES,
+    public_input_fields=("path", "offset", "limit"),
+    public_output_fields=("path", "version", "media_type", "sha256", "total_lines", "truncated"),
+)
+READ_CSV = ToolDefinition(
+    tool_id="read_csv",
+    version=1,
+    title="Read CSV",
+    description="Read a CSV file of this run as columns with inferred types and rows, bounded.",
+    input_model=ReadCsvInput,
+    output_model=ReadCsvOutput,
+    operation_class=OperationClass.READ_ONLY,
+    handler=_read_csv,
+    timeout_seconds=5.0,
+    retries=1,
+    max_output_bytes=1_000_000,
+    resources=lambda arguments: (arguments.path,),
+    group=ToolGroup.FILES,
+    public_input_fields=("path", "delimiter", "has_header", "max_rows", "columns"),
+    public_output_fields=("path", "version", "columns", "row_count", "truncated"),
 )
 SAVE_ARTIFACT = ToolDefinition(
     tool_id="save_artifact",

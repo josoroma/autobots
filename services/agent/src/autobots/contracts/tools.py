@@ -176,3 +176,75 @@ class ToolVersions(BaseModel):
 
     tool_id: str
     versions: list[ToolDescriptor]
+
+
+# US-14.9, PRD-Tool-Catalog "File tools". Text only; content never becomes a public field.
+TextMediaType = Literal["text/plain", "text/markdown", "application/json", "text/csv"]
+
+
+class ReadRunFileV2Input(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    path: str = Field(min_length=1, max_length=500)
+    offset: int = Field(default=0, ge=0, description="The first line to return, from 0.")
+    limit: int | None = Field(
+        default=None, ge=1, le=20_000, description="How many lines. Left out, to the end."
+    )
+
+
+class ReadRunFileV2Output(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    path: str
+    version: int
+    media_type: str
+    sha256: str
+    content: str
+    offset: int
+    total_lines: int
+    truncated: bool
+
+
+class ReadCsvInput(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    path: str = Field(min_length=1, max_length=500)
+    delimiter: Literal[",", ";", "\t", "|"] = ","
+    has_header: bool = True
+    max_rows: int = Field(default=100, ge=1, le=500)
+    columns: list[str] = Field(default_factory=list, max_length=50)
+
+
+class CsvColumn(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    name: str
+    inferred_type: Literal["integer", "number", "boolean", "date", "string", "empty"]
+
+
+class ReadCsvOutput(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    path: str
+    version: int
+    columns: list[CsvColumn]
+    rows: list[list[str]]
+    row_count: int
+    truncated: bool
+
+
+class StoreRemoteFileInput(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    url: str = Field(min_length=1, max_length=2048)
+    path: str = Field(min_length=1, max_length=500, pattern=r"^outputs/")
+
+
+class StoreRemoteFileOutput(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    path: str
+    version: int
+    sha256: str
+    size_bytes: int
+    media_type: TextMediaType
