@@ -44,11 +44,14 @@ class ProviderFailure(Exception):
         *,
         retry_after: float | None = None,
         accumulated_output: str = "",
+        reason: str | None = None,
     ) -> None:
         super().__init__(failure.value)
         self.failure = failure
         self.retry_after = retry_after
         self.accumulated_output = accumulated_output
+        # Which path ended a call that raised nothing of its own, for the log.
+        self.reason = reason
 
 
 def classify_status(status: int) -> FailureClass:

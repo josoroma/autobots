@@ -76,6 +76,8 @@ from autobots.operations.reasoning_trial import continuation_result  # noqa: E40
 from autobots.operations.worker import main  # noqa: E402
 
 RETRY_AFTER = 3
+# Reaches an exception's message, and must never reach a log.
+ARRANGED_REPLY_TEXT = 'arranged-reply-text-7f3a'
 REASONING_MARKER = 'ARRANGED-REASONING-MARKER'
 RETURNED: dict[str, dict[str, Any]] = {}
 CONTENT = '# Totals\n\nTotal: 42\n'
@@ -157,7 +159,9 @@ def handle(request: httpx.Request) -> httpx.Response:
         return httpx.Response(401, json={'error': {'code': 401, 'message': 'arranged rejection'}})
     if '[malformed]' in goal:
         # What the SDK refuses to parse though the provider answered: it may have been charged.
-        return httpx.Response(200, json={'error': {'code': 500, 'message': 'arranged'}})
+        return httpx.Response(200, json={'error': {'code': 500, 'message': ARRANGED_REPLY_TEXT}})
+    if '[dropped]' in goal:
+        raise httpx.RemoteProtocolError(ARRANGED_REPLY_TEXT)
     if '[limited]' in goal:
         return httpx.Response(429, json={'error': {'code': 429, 'message': 'arranged'}}, headers={'Retry-After': str(RETRY_AFTER)})
     usage = {'prompt_tokens': 5, 'completion_tokens': 7, 'total_tokens': 12, 'cost': 0.0001, 'completion_tokens_details': {'reasoning_tokens': 3}}

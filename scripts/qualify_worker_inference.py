@@ -335,8 +335,22 @@ def qualify(root: Path) -> int:
         cases.check('an unparseable success keeps its reservation and waits for a person', f'paused, uncertain_acceptance, 1 request, uncertain at {DEEPSEEK_WORST}',
                     f'{status(malformed)}, {stop_reason(malformed)}, {len(sent("malformed"))}, {ledger}',
                     paused and stop_reason(malformed) == 'uncertain_acceptance' and len(sent('malformed')) == 1 and f'/uncertain/uncertain_acceptance/2/{DEEPSEEK_WORST}/-' in ledger)
+        def why(run_id: str) -> list[dict]:
+            found = [json.loads(line) for path in logs.glob('*.log') for line in path.read_text(errors='replace').splitlines() if 'worker.call_uncertain' in line]
+            return [line for line in found if line.get('run', '').startswith(run_id[:8])]
+
+        events = why(malformed)
+        cases.check('the worker log says why, with a status', 'one event, status 200, ResponseValidationError', events,
+                    len(events) == 1 and events[0].get('status') == 200 and events[0].get('error_type', '').endswith('.ResponseValidationError') and events[0].get('invocation'))
         code, reply = resume(token_a, malformed)
         cases.check('it cannot resume until reconciled', '409 uncertain_model_call', f'{code} {reply[:80]}', code == 409 and 'uncertain_model_call' in reply)
+
+        # A connection dropped mid-reply, through the real SDK: no status, and it may have been charged.
+        dropped = admit(workspace_a, 'dropped')
+        paused = settled(dropped, 'paused')
+        events = why(dropped)
+        cases.check('a dropped reply pauses, and the worker log says why, with no status', 'paused, uncertain_acceptance, one event with no status', f'{status(dropped)}, {stop_reason(dropped)}, {events}',
+                    paused and stop_reason(dropped) == 'uncertain_acceptance' and len(events) == 1 and 'status' not in events[0] and events[0].get('error_type'))
 
         # Cut off twice: the one repair runs out, and the ledger shows why the run stopped.
         cutoff = admit(workspace_a, 'cutoff')
@@ -420,6 +434,7 @@ def qualify(root: Path) -> int:
         written = '\n'.join(path.read_text(errors='replace') for path in logs.glob('*.log'))
         planted = [key for key in (KEY_ONE, KEY_TWO, KEY_B, KEY_REJECTED, stack.runtime_password, service) if key in written]
         cases.check('no process log holds a key', 'none', len(planted), not planted)
+        cases.check('no process log holds a reply text that reached an exception', 'none', 'arranged-reply-text-7f3a' in written, 'arranged-reply-text-7f3a' not in written)
         cases.check('no process log holds reasoning metadata', 'none', 'ARRANGED-REASONING-MARKER' in written, 'ARRANGED-REASONING-MARKER' not in written)
         cases.check('no step failed in either worker', 'no worker.step_failed', 'worker.step_failed' in written, 'worker.step_failed' not in written)
         stable = fingerprint(root)

@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -28,6 +29,7 @@ from autobots.adapters.loop_middleware import (
     _finished,
     _retry_after,
     reply_facts,
+    uncertain_call_fields,
 )
 from autobots.adapters.models.catalog import (
     RESERVED_PROMPT_TOKENS,
@@ -76,6 +78,7 @@ from autobots.application.worker_inference import (
 from autobots.application.worker_leases import Lease
 from autobots.domain.models import MAX_OUTPUT_TOKENS, PROFILES, ModelProfileId, UnknownModelProfile
 from autobots.operations import worker
+from autobots.operations.logs import JsonFormatter
 from fake_openrouter import ARRANGED_KEY, DEEPSEEK_WIRE_ID, TERRA_WIRE_ID
 
 NOW = datetime.now(UTC)
@@ -556,6 +559,53 @@ def test_a_success_the_sdk_cant_parse_keeps_its_reservation() -> None:
     with pytest.raises(openrouter.errors.ResponseValidationError) as caught:
         invoke(model_over(handle))
     assert classify_status(caught.value.status_code) is FailureClass.UNCERTAIN_ACCEPTANCE
+
+
+def _logged(error: BaseException) -> str:
+    record = logging.LogRecord("autobots.worker", logging.WARNING, "", 0, "e", (), None)
+    record.fields = uncertain_call_fields(error)
+    return JsonFormatter().format(record)
+
+
+def test_an_uncertain_calls_log_names_types_and_status_and_no_reply_text() -> None:
+    """The reply's text really is in the exception, so its absence from the log means something."""
+    text = "arranged-reply-text-7f3a"
+
+    def handle(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"error": {"code": 500, "message": text}})
+
+    with pytest.raises(openrouter.errors.ResponseValidationError) as caught:
+        invoke(model_over(handle))
+    assert text in repr(caught.value)
+    line = json.loads(_logged(caught.value))
+    assert line["status"] == 200
+    assert line["error_type"].endswith(".ResponseValidationError")
+    assert text not in json.dumps(line)
+
+
+def test_an_exceptions_cause_is_named_and_neither_message_is_kept() -> None:
+    sentinel = "arranged-sentinel-91c2"
+    try:
+        try:
+            raise ValueError(sentinel)
+        except ValueError as cause:
+            raise RuntimeError(sentinel) from cause
+    except RuntimeError as error:
+        assert sentinel in str(error) and sentinel in str(error.__cause__)
+        written = _logged(error)
+    line = json.loads(written)
+    assert line["error_type"] == "builtins.RuntimeError"
+    assert line["cause_type"] == "builtins.ValueError"
+    assert "status" not in line
+    assert sentinel not in written
+
+
+def test_a_partial_streams_output_stays_out_of_its_fields() -> None:
+    sentinel = "arranged-partial-44d1"
+    fields = uncertain_call_fields(
+        ProviderFailure(FailureClass.PARTIAL_STREAM, accumulated_output=sentinel)
+    )
+    assert fields == {"error_type": "autobots.application.model_attempts.ProviderFailure"}
 
 
 def test_retry_after_is_read_from_a_real_sdk_error() -> None:

@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import json
+import logging
 import os
 import sys
 import time
@@ -33,6 +35,7 @@ from autobots.application.worker_leases import claim_next  # noqa: E402
 from autobots.contracts.plans import InputDocument, RequiredArtifact  # noqa: E402
 from autobots.domain.models import resolve_role_policy  # noqa: E402
 from autobots.domain.runs import Actor, RunCommand  # noqa: E402
+from autobots.operations.logs import JsonFormatter  # noqa: E402
 
 URL, BASE = os.environ['AUTOBOTS_DATABASE_URL'], os.environ['AUTOBOTS_STORAGE_BASE']
 SERVICE = SecretStr(os.environ['AUTOBOTS_STORAGE_SERVICE'])
@@ -243,7 +246,21 @@ async def main() -> None:
         except IdempotencyConflict:
             check('the same key with a different input is refused', 'conflict', 'conflict', True)
 
-        # A hung call is bounded, and a cancel doesn't wait for it.
+        # A hung call is bounded, and a cancel doesn't wait for it. Each says why in the worker's log.
+        written = io.StringIO()
+        capture = logging.StreamHandler(written)
+        capture.setFormatter(JsonFormatter())
+        logging.getLogger('autobots.worker').addHandler(capture)
+
+        def uncertain_events() -> list[dict]:
+            return [line for line in map(json.loads, written.getvalue().splitlines()) if line['event'] == 'worker.call_uncertain']
+
+        def one_new(seen: int, run_id: UUID) -> dict | None:
+            new = uncertain_events()[seen:]
+            short = str(run_id)[:8]
+            return new[0] if len(new) == 1 and new[0]['run'].startswith(short) and new[0].get('invocation') else None
+
+        seen = len(uncertain_events())
         def hang() -> AIMessage:
             time.sleep(4)
             return calls(SAVE)
@@ -254,6 +271,10 @@ async def main() -> None:
         result = await run_goal(db, URL, lease, Script(items=[hang], seen=[], bound=[]), LoopConfig(route=ROUTE, model_call_seconds=0.5))
         elapsed = time.monotonic() - started
         check('a hung model call is bounded and its outcome stays uncertain', 'uncertain_acceptance, paused, under 4s', (result.code, result.run_status, round(elapsed, 1)), result.code == 'uncertain_acceptance' and result.run_status == 'paused' and elapsed < 3.9)
+
+        event = one_new(seen, run)
+        check('and the log says it hit the call time limit', 'one event, reason call_time_limit', event, event is not None and event.get('reason') == 'call_time_limit' and 'error_type' in event)
+        seen = len(uncertain_events())
 
         run = await admit()
         lease = await claim_next(db, worker_id='hung-cancel', lease_seconds=120)
@@ -269,6 +290,41 @@ async def main() -> None:
         await canceller
         elapsed = time.monotonic() - started
         check('a cancel interrupts a hung call', 'cancelled, unknown outcome, under 4s', (result.run_status, result.code, round(elapsed, 1)), result.run_status == 'cancelled' and result.code == 'cancelled_with_unknown_outcomes' and elapsed < 3.9)
+
+        event = one_new(seen, run)
+        check('and the log says the run was interrupted', 'one event, reason run_interrupted', event, event is not None and event.get('reason') == 'run_interrupted')
+
+        # What was raised is named by type. A sentinel in a shape redaction doesn't know stays out.
+        sentinel = 'arranged-sentinel-91c2'
+
+        class Gateway(Exception):
+            status_code = 504
+
+        def with_cause() -> AIMessage:
+            try:
+                raise ValueError(sentinel)
+            except ValueError as cause:
+                raise RuntimeError(sentinel) from cause
+
+        def with_status() -> AIMessage:
+            raise Gateway(sentinel)
+
+        def partial() -> AIMessage:
+            raise ProviderFailure(FailureClass.PARTIAL_STREAM, accumulated_output=sentinel)
+
+        for name, item, wanted in (('no status, with a cause', with_cause, {'error_type': 'builtins.RuntimeError', 'cause_type': 'builtins.ValueError', 'failure': 'uncertain_acceptance'}),
+                                   ('a status', with_status, {'status': 504, 'failure': 'uncertain_acceptance'}),
+                                   ('a partial stream, arranged, as nothing raises one today', partial, {'error_type': 'autobots.application.model_attempts.ProviderFailure', 'failure': 'partial_stream'})):
+            seen = len(uncertain_events())
+            run = await admit()
+            lease = await claim_next(db, worker_id='named', lease_seconds=120)
+            result = await run_goal(db, URL, lease, Script(items=[item], seen=[], bound=[]), LoopConfig(route=ROUTE))
+            event = one_new(seen, run)
+            check(f'the log names the exception: {name}', str(wanted), (result.code, event),
+                  event is not None and all(event.get(key) == value for key, value in wanted.items()) and result.run_status == 'paused')
+        logging.getLogger('autobots.worker').removeHandler(capture)
+        check('no exception message, cause or partial output reached the log', 'absent, with 5 events read', (len(uncertain_events()), sentinel in written.getvalue()),
+              len(uncertain_events()) == 5 and sentinel not in written.getvalue())
 
         # Documents given at admission are read-only.
         document = InputDocument(path='inputs/data.md', content='apples: 4')

@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import math
 from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
@@ -39,6 +40,7 @@ from autobots.application.model_admission import (
     ReplyFacts,
 )
 from autobots.application.model_attempts import (
+    UNCERTAIN,
     FailureClass,
     ModelOutput,
     ProviderFailure,
@@ -50,6 +52,9 @@ from autobots.application.plans import PLAN_REJECTIONS
 from autobots.application.run_usage import LimitReached, RootLimits, active_seconds_used, consume
 from autobots.application.tool_gateway import ToolScope, ownership_refusal
 from autobots.contracts.plans import GoalSpec
+from autobots.operations.logs import log_event
+
+logger = logging.getLogger("autobots.worker")
 
 CHECK_SECONDS = 1.0
 INCOMPLETE_FINISHES = frozenset({"length", "error", "content_filter"})
@@ -225,6 +230,40 @@ def _failure_without_status(error: Exception) -> FailureClass:
     return FailureClass.UNCERTAIN_ACCEPTANCE
 
 
+def _type_name(error: BaseException) -> str:
+    return f"{type(error).__module__}.{type(error).__qualname__}"
+
+
+def uncertain_call_fields(error: BaseException) -> dict[str, Any]:
+    """Types and a status only. A message can carry a provider's reply or a connection string."""
+    fields: dict[str, Any] = {"error_type": _type_name(error)}
+    cause = error.__cause__ or error.__context__
+    if cause is not None:
+        fields["cause_type"] = _type_name(cause)
+    status = getattr(error, "status_code", None)
+    if isinstance(status, int):
+        fields["status"] = status
+    return fields
+
+
+def _log_uncertain(
+    invocation: UUID, run: UUID, failure: FailureClass, error: BaseException, reason: str | None
+) -> None:
+    """Why a call's outcome is unknown, so a person ruling on it has more than the class."""
+    fields = uncertain_call_fields(error)
+    if reason is not None:
+        fields["reason"] = reason
+    log_event(
+        logger,
+        "worker.call_uncertain",
+        logging.WARNING,
+        invocation=str(invocation),
+        run=str(run),
+        failure=failure.value,
+        **fields,
+    )
+
+
 class LoopMiddleware(AgentMiddleware[Any, Any]):
     def __init__(
         self,
@@ -290,14 +329,18 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
                 if done:
                     return task.result()
                 if loop.time() - started >= self._model_call_seconds:
-                    raise ProviderFailure(FailureClass.UNCERTAIN_ACCEPTANCE)
+                    raise ProviderFailure(
+                        FailureClass.UNCERTAIN_ACCEPTANCE, reason="call_time_limit"
+                    )
                 cursor = await self._connection.execute(
                     "select status from public.runs where id = %s", (self._scope.run_id,)
                 )
                 row = await cursor.fetchone()
                 if row is not None and row[0] in INTERRUPTING:
                     stopped.append("run_not_running")
-                    raise ProviderFailure(FailureClass.UNCERTAIN_ACCEPTANCE)
+                    raise ProviderFailure(
+                        FailureClass.UNCERTAIN_ACCEPTANCE, reason="run_interrupted"
+                    )
         finally:
             if not task.done():
                 task.cancel()
@@ -391,7 +434,15 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             invocation = _INVOCATION.set(ticket.invocation_id)
             try:
                 response = await self._bounded(handler, request, stopped)
-            except ProviderFailure:
+            except ProviderFailure as provider_failure:
+                if provider_failure.failure in UNCERTAIN:
+                    _log_uncertain(
+                        ticket.invocation_id,
+                        run_id,
+                        provider_failure.failure,
+                        provider_failure,
+                        provider_failure.reason,
+                    )
                 raise
             except Exception as error:
                 status = getattr(error, "status_code", None)
@@ -400,6 +451,8 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
                     if isinstance(status, int)
                     else _failure_without_status(error)
                 )
+                if failure in UNCERTAIN:
+                    _log_uncertain(ticket.invocation_id, run_id, failure, error, None)
                 raise ProviderFailure(failure, retry_after=_retry_after(error)) from None
             finally:
                 _INVOCATION.reset(invocation)

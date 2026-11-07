@@ -122,7 +122,7 @@ Story records are at `openspec/changes/archive/*-<story>-*/verification.md`, and
 | LM-A06 | Disposable, Browser | US-3.1, US-3.2, US-10.1, US-11.5, US-12.2, WORKER-INFERENCE-001 | Local non-AI use with no key: home, Settings, the run list, and a run's files |
 | LM-A07 | **Partial: the owner's** | US-4.7, US-9.1, US-11.10, US-12.5 | A real sleep on the final code came through clean, with a scripted model. Network loss and a real provider across a sleep weren't observed. See [item 2](#what-needs-the-owner) |
 | LM-A08 | Disposable, Live install | US-9.2, US-11.3, US-12.6 | Backup from the real install, restored to a disposable copy, its checks passing. Credential decryption ran on a disposable stack, with an arranged credential. Not to another machine |
-| LM-A09 | **Partial: the owner's** | US-2.1, US-2.4, US-10.1, US-12.4 | Resources measured with two calls at once, on short goals. One of five rounds paused a run with no recorded cause. See [item 1](#what-needs-the-owner) |
+| LM-A09 | **Partial, accepted** | US-2.1, US-2.4, US-10.1, US-12.4, US-12.7, Decision 0014 | Resources measured with two calls at once, on short goals. One of five rounds paused a run with no recorded cause, and that pause stays a limit by Decision 0014. US-12.7 now logs why a call's outcome is unknown, which explains the next one and doesn't fix it |
 
 ## DS: design system
 

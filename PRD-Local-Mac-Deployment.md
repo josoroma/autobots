@@ -114,7 +114,7 @@ Start infrastructure and wait for health; apply reviewed migrations with the mig
 
 Back up database contents/roles, Storage bytes, deployment/migration versions and the credential master key through a documented local process. Keep key backup separate from database ciphertext. A database-only backup does not contain artifact bytes. Demonstrate restoration into an isolated test instance and verify artifact hashes, Auth, run history and credential decryptability before declaring backup success.
 
-Mac sleep, Docker restart and network loss are expected interruptions. Recover jobs/checkpoints and reconcile unknown effects; do not duplicate a tool action or treat a dropped paid response as free. Without network/OpenRouter availability, the UI and stored data remain available but inference waits. Browser disconnect does not cancel the durable job. Stopping the Mac stops the application; this design makes no hosted uptime promise.
+Mac sleep, restarting this project's containers and network loss are expected interruptions (by [Decision 0014](docs/engineering/decisions/0014-release-limits-accepted.md), a restart of Docker itself or of the Mac is a stated limit, as it also stops other projects). Recover jobs/checkpoints and reconcile unknown effects; do not duplicate a tool action or treat a dropped paid response as free. Without network/OpenRouter availability, the UI and stored data remain available but inference waits. Browser disconnect does not cancel the durable job. Stopping the Mac stops the application; this design makes no hosted uptime promise.
 
 Collect logs and metrics locally with secret redaction. Begin with bounded containers/processes and measured resource limits; remote inference removes a local model-loading requirement, not the need to measure database, worker and sandbox memory. No host capacity result for the complete new stack exists yet.
 
@@ -125,7 +125,7 @@ Collect logs and metrics locally with secret redaction. Begin with bounded conta
 | LM-A01: Local topology | UI, workers, Auth, Postgres, Storage and logs resolve to this Mac; no hosted project/application service is required |
 | LM-A02: Published ports | Rendered Compose plus live listeners contain only approved loopback bindings; Studio authentication retained; direct DB verified |
 | LM-A03: Inference boundary | Every role/request targets only the two allowed OpenRouter models; no local model startup, SDK fallback or Studio assistant inference, even when unrelated provider/tracing variables exist in the host environment |
-| LM-A04: Persistence | Restart UI/worker/Docker and recover state/artifacts; ordinary stop/start preserves data |
+| LM-A04: Persistence | Restart UI/worker and this project's containers and recover state/artifacts; ordinary stop/start preserves data |
 | LM-A05: Authorization | Auth, workspace RLS, private buckets, private schemas and privileged-client separation pass negative tests |
 | LM-A06: Credentials | Environment and in-app setup pass; absent key blocks every inference path but preserves local non-AI use |
 | LM-A07: Recovery | Sleep/network loss and interrupted effects preserve truthful status, receipts and cost reservations |

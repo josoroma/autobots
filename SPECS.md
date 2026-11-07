@@ -76,6 +76,8 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
   - [US-12.4: Measure the two-call workload](#us-124-measure-the-two-call-workload)
   - [US-12.5: Third real Mac sleep](#us-125-third-real-mac-sleep)
   - [US-12.6: The real install at the final code](#us-126-the-real-install-at-the-final-code)
+  - [US-12.7: Record why a call's outcome is unknown](#us-127-record-why-a-calls-outcome-is-unknown)
+  - [US-12.8: Review and Gate 0 after the last decisions](#us-128-review-and-gate-0-after-the-last-decisions)
 - [EPIC-13: After release](#epic-13-after-release)
   - [US-13.1: Requester, scope snapshot and policy version on an approval request](#us-131-requester-scope-snapshot-and-policy-version-on-an-approval-request)
   - [US-13.2: Held-out replay before promotion](#us-132-held-out-replay-before-promotion)
@@ -219,7 +221,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-10.1 | Held-out task, policy and performance qualification | DONE | EPIC-10 |
 | US-10.1#1 | Run the held-out behavioral and policy/recovery suites without tuning on held-out data. | DONE | US-10.1 |
 | US-10.1#2 | Publish per-category outcomes, resource measurements and actual latency/cost evidence. | DONE | US-10.1 |
-| US-10.2 | Release traceability and evidence-based completion | IN PROGRESS | EPIC-10 |
+| US-10.2 | Release traceability and evidence-based completion | BLOCKED | EPIC-10 |
 | US-10.2#1 | Review full source-to-story-to-evidence coverage and resolve blocking findings. | TODO | US-10.2 |
 | US-10.2#2 | Publish exercised operating/user procedures and truthful release limitations. | TODO | US-10.2 |
 | EPIC-11 | Installable release readiness | — | — |
@@ -303,6 +305,16 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-12.6#2 | Apply them to the install, start it on its own loopback ports, and record the other projects before and after. | DONE | US-12.6 |
 | US-12.6#3 | Run one goal on Terra under the shared ledger, record the outcome and spending, and leave the worker's inference switch off. | DONE | US-12.6 |
 | US-12.6#4 | Hand the LM-A01, LM-A02, LM-A04 and LM-A08 rows to US-10.2's record. | DONE | US-12.6 |
+| US-12.7 | Record why a call's outcome is unknown | DONE | EPIC-12 |
+| US-12.7#1 | Write the event on each path in `loop_middleware.py` that ends a dispatched call as `uncertain_acceptance` or `partial_stream`, through the worker's structured log. | DONE | US-12.7 |
+| US-12.7#2 | Cover each path and the secret control with tests on a fake transport. | DONE | US-12.7 |
+| US-12.7#3 | Run it through the product's worker on a disposable stack, with no paid call. | DONE | US-12.7 |
+| US-12.7#4 | Add where to look to the operations runbook, and hand LM-A09's row to US-10.2's record. | DONE | US-12.7 |
+| US-12.8 | Review and Gate 0 after the last decisions | READY | EPIC-12 |
+| US-12.8#1 | Bind the revision's fingerprint, and run the independent review of everything since `05916d5e…`, including the corrected release record. | TODO | US-12.8 |
+| US-12.8#2 | Repeat Gate 0 and the harness runbook on that revision as US-12.3 did, including `qualify_worker_inference.py` by hand. | TODO | US-12.8 |
+| US-12.8#3 | Record a disposition for each finding, and publish evidence that `scripts/evidence.py` validates. | TODO | US-12.8 |
+| US-12.8#4 | Mark US-12.3's summary void, mark the hook behavior not qualified, and hand the fingerprint to US-10.2. | TODO | US-12.8 |
 | EPIC-13 | After release | — | — |
 | US-13.1 | Requester, scope snapshot and policy version on an approval request | BLOCKED | EPIC-13 |
 | US-13.1#1 | Persist the three fields with the approval request, by migration. | TODO | US-13.1 |
@@ -398,6 +410,8 @@ flowchart TD
     US_12_4["US-12.4: Measure the two-call workload"]
     US_12_5["US-12.5: Third real Mac sleep"]
     US_12_6["US-12.6: The real install at the final code"]
+    US_12_7["US-12.7: Record why a call&#x27;s outcome is unknown"]
+    US_12_8["US-12.8: Review and Gate 0 after the last decisions"]
   end
   subgraph EPIC_13["EPIC-13: After release"]
     US_13_1["US-13.1: Requester, scope snapshot and policy version on an approval request"]
@@ -509,6 +523,8 @@ flowchart TD
   US_12_4 -.-> US_10_2
   US_12_5 -.-> US_10_2
   US_12_6 -.-> US_10_2
+  US_12_7 -.-> US_10_2
+  US_12_8 -.-> US_10_2
   US_3_2 -.-> US_11_1
   US_3_4 -.-> US_11_1
   US_2_6 -.-> US_11_2
@@ -578,6 +594,7 @@ flowchart TD
   US_12_3 -.-> US_12_4
   US_12_3 -.-> US_12_5
   US_12_3 -.-> US_12_6
+  US_12_7 -.-> US_12_8
   US_5_3 -.-> US_13_1
   US_11_7 -.-> US_13_1
   EXT_US_13_1_1["External: The owner schedules this story after the release, by Decision 0013."]
@@ -1010,6 +1027,24 @@ flowchart TD
     US_12_6 --> T_12_6_3
     T_12_6_4["US-12.6#4: Hand the LM-A01, LM-A02, LM-A04 and LM-A08 rows to US-10.2&#x27;s record."]
     US_12_6 --> T_12_6_4
+    US_12_7["US-12.7: Record why a call&#x27;s outcome is unknown"]
+    T_12_7_1["US-12.7#1: Write the event on each path in `loop_middleware.py` that ends a dispatched call as `uncertain_acceptance` or `partial_stream`, through the worker&#x27;s structured log."]
+    US_12_7 --> T_12_7_1
+    T_12_7_2["US-12.7#2: Cover each path and the secret control with tests on a fake transport."]
+    US_12_7 --> T_12_7_2
+    T_12_7_3["US-12.7#3: Run it through the product&#x27;s worker on a disposable stack, with no paid call."]
+    US_12_7 --> T_12_7_3
+    T_12_7_4["US-12.7#4: Add where to look to the operations runbook, and hand LM-A09&#x27;s row to US-10.2&#x27;s record."]
+    US_12_7 --> T_12_7_4
+    US_12_8["US-12.8: Review and Gate 0 after the last decisions"]
+    T_12_8_1["US-12.8#1: Bind the revision&#x27;s fingerprint, and run the independent review of everything since `05916d5e…`, including the corrected release record."]
+    US_12_8 --> T_12_8_1
+    T_12_8_2["US-12.8#2: Repeat Gate 0 and the harness runbook on that revision as US-12.3 did, including `qualify_worker_inference.py` by hand."]
+    US_12_8 --> T_12_8_2
+    T_12_8_3["US-12.8#3: Record a disposition for each finding, and publish evidence that `scripts/evidence.py` validates."]
+    US_12_8 --> T_12_8_3
+    T_12_8_4["US-12.8#4: Mark US-12.3&#x27;s summary void, mark the hook behavior not qualified, and hand the fingerprint to US-10.2."]
+    US_12_8 --> T_12_8_4
   end
 ```
 
@@ -2937,8 +2972,7 @@ Open Questions:
 
 ### US-10.2: Release traceability and evidence-based completion
 
-Status: IN PROGRESS
-Change: `openspec/changes/us-10-2-release-traceability-evidence-based/`
+Status: BLOCKED
 
 As a product owner
 I want a complete requirement-to-evidence record
@@ -2977,6 +3011,8 @@ Dependencies:
 - US-12.4
 - US-12.5
 - US-12.6
+- US-12.7
+- US-12.8
 
 Tasks:
 - [ ] Review full source-to-story-to-evidence coverage and resolve blocking findings.
@@ -4084,6 +4120,166 @@ Tasks:
 - [x] Apply them to the install, start it on its own loopback ports, and record the other projects before and after.
 - [x] Run one goal on Terra under the shared ledger, record the outcome and spending, and leave the worker's inference switch off.
 - [x] Hand the LM-A01, LM-A02, LM-A04 and LM-A08 rows to US-10.2's record.
+
+Open Questions:
+- None.
+
+### US-12.7: Record why a call's outcome is unknown
+
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-12-7-record-why-call-outcome-unknown/`
+
+As an operator
+I want each model call that ends with an unknown outcome to say why in the worker's log
+So that the next pause like US-12.4's can be explained, where that one couldn't.
+
+Source:
+- [Decision 0014, record the cause now](docs/engineering/decisions/0014-release-limits-accepted.md#decision)
+- [Decision 0014, what this gives up](docs/engineering/decisions/0014-release-limits-accepted.md#what-this-gives-up)
+- [US-12.4's failed round](docs/engineering/evidence/US-12.4/summary.md#the-failed-round)
+- [US-10.2's item 1](docs/engineering/evidence/US-10.2/summary.md#what-needs-the-owner)
+- [Review finding RF-8](docs/engineering/evidence/US-10.2/review-r3.md#nonblocking)
+- [MP-08 partial SSE or uncertain acceptance](PRD-Model-Providers.md#mp-08-failure-and-recovery)
+- [MP-A11 log inspection](PRD-Model-Providers.md#mp-09-acceptance-evidence)
+- [PRD 12.2 structured logs and redaction](PRD-LangChain-Deep-Agents.md#122-logs-and-metrics)
+- [LC-18](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [LM-07 local logs with redaction](PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
+- [LM-A09](PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
+- [The uncertain pause in the runbook](docs/engineering/runbooks/operations.md#turning-on-inference)
+- [The runbook on logs](docs/engineering/runbooks/operations.md#reading-health)
+- [SP-018](docs/engineering/option-b-contract.md#sp-018--local-operations-and-runbooks)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Name the exception behind an uncertain call
+  Given a dispatched model call on a fake transport raises an exception classed as `uncertain_acceptance`, once with an HTTP status and once without one
+  When the call ends
+  Then `services/agent/src/autobots/adapters/loop_middleware.py` writes one structured worker log event naming the invocation, the run, the exception's type, its cause's type where it has a cause, and the HTTP status where there is one
+
+Scenario: Say which path had no exception
+  Given a dispatched call is still out when `_bounded` reaches the call time limit, and in a second case when the run's status becomes an interrupting one
+  When `_bounded` ends the call
+  Then one such event names the invocation and the run and says which of those two it was
+
+Scenario: Cover a partial stream that is arranged
+  Given nothing in the code raises `partial_stream` today, so a handler is arranged to raise it with accumulated output
+  When the call ends as `partial_stream`
+  Then one such event names the invocation, the run and the exception's type, its accumulated output isn't in the event, and the case is reported as arranged
+
+Scenario: Keep a secret out of the log
+  Given an exception whose message and whose cause's message hold a sentinel in a shape the log's redaction doesn't recognize, and a check that the raised exception really carries it
+  When the call ends as `uncertain_acceptance` on a fake transport
+  Then the sentinel, the exception's message, the request and reply text and the key are absent from the log
+
+Scenario: Observe it through the product's worker
+  Given a disposable stack, the product's own `worker.main` with no wrapper, a fake HTTP transport, an arranged reply whose text reaches the exception's message, and no paid call
+  When a goal's call ends as `uncertain_acceptance`
+  Then the worker's log holds one event for that invocation and run, with identifiers as the log's format cuts them, that text and the arranged key are nowhere in the log, the run pauses with its reservation held as before, and any path not run through the worker is reported as not run there
+
+Scenario: Change nothing else
+  Given this story's change
+  When it is compared with the code before it
+  Then there is no migration or column, and no change to a screen, a state, a charge or what a pause does, and the pause stays a stated limit that this explains and doesn't fix
+
+Scenario: Say where to look
+  Given an operator reconciling a run paused as `uncertain_acceptance`
+  When they read the operations runbook
+  Then it says which log holds the event and what the event names, and still sends them to OpenRouter's records for the charge
+```
+
+Dependencies:
+- None.
+
+Tasks:
+- [x] Write the event on each path in `loop_middleware.py` that ends a dispatched call as `uncertain_acceptance` or `partial_stream`, through the worker's structured log.
+- [x] Cover each path and the secret control with tests on a fake transport.
+- [x] Run it through the product's worker on a disposable stack, with no paid call.
+- [x] Add where to look to the operations runbook, and hand LM-A09's row to US-10.2's record.
+
+Open Questions:
+- None.
+
+### US-12.8: Review and Gate 0 after the last decisions
+
+Status: READY
+
+As an owner
+I want an independent review of what changed since US-12.3's binding, and Gate 0 repeated on that revision
+So that review and harness claims rest on the revision being released, now that Decision 0014 has voided that binding.
+
+Source:
+- [Decision 0014](docs/engineering/decisions/0014-release-limits-accepted.md#decision)
+- [Decision 0014, LM-07 and LM-A04 revised](docs/engineering/decisions/0014-release-limits-accepted.md#requirements-revised)
+- [US-12.3's bound fingerprint](docs/engineering/evidence/US-10.2/summary.md#revisions)
+- [What answering the owner's items voids](docs/engineering/evidence/US-10.2/summary.md#what-needs-the-owner)
+- [Review finding RF-4](docs/engineering/evidence/US-10.2/review-r3.md#blocking)
+- [The correction not read again](docs/engineering/evidence/US-10.2/review-r3.md#independent-read-of-the-release-record-third-version)
+- [US-12.3's Void a stale binding scenario](SPECS.md#us-123-final-review-and-gate-0-at-the-final-code)
+- [US-12.3's Gate 0](docs/engineering/evidence/US-12.3/summary.md#gate-0-by-dh-a-gate)
+- [US-12.3's results](docs/engineering/evidence/US-12.3/summary.md#results-on-these-inputs)
+- [US-12.3's mark on the hooks](docs/engineering/evidence/US-12.3/summary.md#mark-on-the-hooks)
+- [US-11.12's void notice](docs/engineering/evidence/US-11.12/summary.md#us-1112-evidence-summary-final-review-and-gate-0)
+- [Decision 0013, H1.3's records](docs/engineering/decisions/0013-release-closure.md#decision)
+- [Decision 0013, revised H1.3](docs/engineering/decisions/0013-release-closure.md#requirements-revised)
+- [H1.3](PRD-Development-Harness.md#dh-02-first-implementation-tasks)
+- [DH-W03](PRD-Development-Harness.md#dh-091-work-item-evidence-contract)
+- [Fingerprints](PRD-Development-Harness.md#dh-092-fingerprints-manifests-and-retained-artifacts)
+- [DH-A01 to DH-A16](PRD-Development-Harness.md#dh-10-acceptance-and-closure)
+- [Decision 0012](docs/engineering/decisions/0012-unqualified-hooks-in-h1.md#decision)
+- [LC-32 and LC-33](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [SP-002](docs/engineering/option-b-contract.md#sp-002--h1-prove-and-enable-the-baseline)
+- [SP-021](docs/engineering/option-b-contract.md#sp-021--completion-contract)
+- [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Review what changed and repeat Gate 0
+  Given Decision 0014, the LM-07 and LM-A04 revision and US-12.7's code bound to a new fingerprint, and a reviewer who did not author them
+  When the reviewer inspects everything changed since US-12.3's bound fingerprint `05916d5e…` in commit `70c5162`, and Gate 0's checks and the harness runbook are repeated on that revision as US-12.3 did, including `qualify_worker_inference.py` by hand
+  Then findings, dispositions and commands are recorded under docs/engineering/evidence/US-12.8/, scripts/evidence.py validates them and binds the new fingerprint, and the record leaves H1 and product acceptance to US-10.2's assessment
+
+Scenario: Read the correction left unread
+  Given review-r3 says the release record's correction wasn't read again, and that the review a new binding needs would read it
+  When this review runs
+  Then the reader reads that corrected record, and what it finds is recorded with the other findings
+
+Scenario: Say plainly what ran earlier
+  Given the live and real-sleep evidence of US-12.4, US-12.5 and US-12.6 ran before this binding
+  When the record is published
+  Then it says plainly that they ran at the earlier fingerprint, `05916d5e…` unless a record names an older one, lists the inputs that differ from it, which are expected to be only those changes, names any other evidence not repeated here, and says no paid call or persistent change was made, as Decision 0014 authorizes none
+
+Scenario: Carry the H1.3 baseline
+  Given H0 and H1 stories delivered under Decision 0003 with no DH-W record, and US-12.3's record that carried their baseline is void
+  When the record is published
+  Then it says it carries their baseline, as revised H1.3 allows, and doesn't claim H1 is met
+
+Scenario: Void a stale binding
+  Given a blocking finding is open, or a source the fingerprint covers changed after it was bound, which `scripts/evidence.py` decides and which leaves out `SPECS.md`, `CODEBASE.md` and evidence as records
+  When this story, or evidence resting on its fingerprint, is assessed
+  Then the binding is void until the finding is resolved, the affected scope is reviewed again and the fingerprint is bound anew
+
+Scenario: Mark the hook behavior not qualified
+  Given Claude's crash, timeout and Stop recursion hook behavior has not been qualified
+  When the Gate 0 report is published
+  Then it marks that behavior not qualified, and script fixtures are not reported as actual event delivery
+
+Scenario: Keep earlier records as history
+  Given US-12.3's and US-11.12's records describe their own fingerprints
+  When this binding replaces US-12.3's
+  Then both stay as history, and US-12.3's summary is marked void by this change the way US-11.12's was
+```
+
+Dependencies:
+- US-12.7
+
+Tasks:
+- [ ] Bind the revision's fingerprint, and run the independent review of everything since `05916d5e…`, including the corrected release record.
+- [ ] Repeat Gate 0 and the harness runbook on that revision as US-12.3 did, including `qualify_worker_inference.py` by hand.
+- [ ] Record a disposition for each finding, and publish evidence that `scripts/evidence.py` validates.
+- [ ] Mark US-12.3's summary void, mark the hook behavior not qualified, and hand the fingerprint to US-10.2.
 
 Open Questions:
 - None.
