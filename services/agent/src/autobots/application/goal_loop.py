@@ -39,6 +39,7 @@ from autobots.adapters.tool_middleware import GatewayMiddleware, visible_tools
 from autobots.application.approvals import expire_due
 from autobots.application.artifacts import publish_tool, reconcile_run
 from autobots.application.assignments import Delegation, assign_tool
+from autobots.application.code_tools import CODE_TOOLS
 from autobots.application.compaction import CompactionPolicy
 from autobots.application.improvements import PROPOSE_IMPROVEMENT
 from autobots.application.memory import READ_OFFLOAD, SEARCH_MEMORY
@@ -175,6 +176,7 @@ def loop_registry(
         *TAVILY_TOOLS,
         *JINA_TOOLS,
         *MARKET_TOOLS,
+        *CODE_TOOLS,
     )
     for tool in (*tools, *plan_tools(limits)):
         registry.register(tool)

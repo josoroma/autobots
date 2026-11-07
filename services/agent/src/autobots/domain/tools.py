@@ -41,6 +41,11 @@ EXPERT_TOOLS = {
     "create_github_issue": 1,
     # It reaches the network, so only an owner's Expert grants it, never a plain goal.
     "store_remote_file": 1,
+    # Code tools over the run's own files, for Experts that do code-shaped work (Decision 0017).
+    "search_files": 1,
+    "read_code_file": 1,
+    "write_code_file": 1,
+    "patch_code_file": 1,
     **PROVIDER_TOOLS,
 }
 LOOP_TOOL_GRANTS = {**PLAN_TOOLS, **GENERAL_TOOLS}

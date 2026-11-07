@@ -377,9 +377,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.10 | Market history and inflation rates | DONE | EPIC-14 |
 | US-14.10#1 | Add `market_history` and `inflation_rates` as read-only plain `httpx` adapters with an injectable transport and recorded fixtures, with no new package. | DONE | US-14.10 |
 | US-14.10#2 | Cover the scenarios with fake transports only. | DONE | US-14.10 |
-| US-14.11 | Code tools over run files | READY | EPIC-14 |
-| US-14.11#1 | Add `search_files`, `read_code_file`, `write_code_file` and `patch_code_file` over the run's files only, in pure Python, with names that never match the SDK's file tools. | TODO | US-14.11 |
-| US-14.11#2 | Cover the scenarios. | TODO | US-14.11 |
+| US-14.11 | Code tools over run files | DONE | EPIC-14 |
+| US-14.11#1 | Add `search_files`, `read_code_file`, `write_code_file` and `patch_code_file` over the run's files only, in pure Python, with names that never match the SDK's file tools. | DONE | US-14.11 |
+| US-14.11#2 | Cover the scenarios. | DONE | US-14.11 |
 | US-14.12 | Goal-driven browsing | BLOCKED | EPIC-14 |
 | US-14.12#1 | Once both are qualified, define the tool's contract by owner decision, then register it. | TODO | US-14.12 |
 
@@ -5046,7 +5046,8 @@ Open Questions:
 
 ### US-14.11: Code tools over run files
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-14-11-code-tools-over-run/`
 
 As a goal's owner
 I want to search, read, write and patch the run's own files with pure Python tools
@@ -5081,8 +5082,8 @@ Dependencies:
 - US-14.3
 
 Tasks:
-- [ ] Add `search_files`, `read_code_file`, `write_code_file` and `patch_code_file` over the run's files only, in pure Python, with names that never match the SDK's file tools.
-- [ ] Cover the scenarios.
+- [x] Add `search_files`, `read_code_file`, `write_code_file` and `patch_code_file` over the run's files only, in pure Python, with names that never match the SDK's file tools.
+- [x] Cover the scenarios.
 
 Open Questions:
 - None.

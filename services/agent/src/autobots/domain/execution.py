@@ -20,13 +20,16 @@ TOOL_VERSIONS: Mapping[str, int] = {
     "extract_website_content": 1,
     "inflation_rates": 1,
     "market_history": 1,
+    "patch_code_file": 1,
     "propose_improvement": 1,
     "propose_plan": 1,
     "publish_artifact": 1,
     "read_offload": 1,
+    "read_code_file": 1,
     "read_csv": 1,
     "read_run_file": 2,
     "save_artifact": 1,
+    "search_files": 1,
     "search_memory": 1,
     "search_web": 1,
     "store_remote_file": 1,
@@ -34,6 +37,7 @@ TOOL_VERSIONS: Mapping[str, int] = {
     "tavily_extract": 1,
     "tavily_map": 1,
     "tavily_search": 1,
+    "write_code_file": 1,
 }
 # (tool, recorded version, current version), only where old checkpoints keep their meaning.
 # read_run_file 1 stays registered, and a run that pinned it keeps calling it (US-14.9).

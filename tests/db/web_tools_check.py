@@ -16,6 +16,7 @@ import httpx
 import psycopg
 
 from autobots.adapters.jina import jina_tools
+from autobots.application.code_tools import CODE_TOOLS
 from autobots.adapters.market_data import market_tools
 from autobots.adapters.remote_files import store_remote_file_tool
 from autobots.application.tools import READ_CSV, READ_RUN_FILE, READ_RUN_FILE_V2
@@ -77,6 +78,8 @@ async def main() -> None:
     for tool in tavily_tools(httpx.MockTransport(tavily), environ={'TAVILY_API_KEY': 'tvly-fixtureDB0123456'}, resolver=resolve):
         registry.register(tool)
     for tool in jina_tools(httpx.MockTransport(jina), environ={'JINA_API_KEY': 'jina_fixtureDB0123456'}, resolver=resolve):
+        registry.register(tool)
+    for tool in CODE_TOOLS:
         registry.register(tool)
     for tool in market_tools(httpx.MockTransport(markets)):
         registry.register(tool)
@@ -233,6 +236,63 @@ async def main() -> None:
               (last[0].input_public, last[0].output_public) if last else None,
               bool(last) and last[0].input_public == {'countries': ['EMU'], 'start_year': 2024, 'end_year': 2024}
               and (last[0].output_public or {}).get('indicator') == 'FP.CPI.TOTL.ZG' and '2.36' not in last[0].model_dump_json())
+
+        # US-14.11: code tools over the run's own files.
+        await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
+        source = 'import os\n\ndef main():\n    return os.getcwd()\n' + 'y' * 700 + ' main\n'
+        admitted = await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='code tools', limit_micro_usd=1000,
+                                   policy=resolve_role_policy(), input_documents=(InputDocument(path='inputs/app.py', content=source),))
+        lease = await claim_next(db, worker_id='code-tools', lease_seconds=120)
+        assert lease is not None
+        other = await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='other run', limit_micro_usd=1000,
+                                policy=resolve_role_policy(), input_documents=(InputDocument(path='inputs/secret.py', content='def main(): pass\n'),))
+        grants = {'search_files': 1, 'read_code_file': 1, 'write_code_file': 1, 'patch_code_file': 1}
+        scope = ToolScope(WORKSPACE, admitted.run_id, lease.generation, grants, ('inputs', 'outputs'))
+        written = await gateway.execute(db, scope, 'write_code_file', {'path': 'outputs/app.py', 'content': 'x = 1\nx = 1\ny = 2\n'})
+        found = await gateway.execute(db, scope, 'search_files', {'pattern': r'def \w+|main', 'path': 'inputs/', 'file_glob': '*.py', 'context': 1})
+        out = found.output or {}
+        paths = {match['path'] for match in out.get('matches', [])}
+        lines = {match['line_number']: match['content'] for match in out.get('matches', [])}
+        check("search_files finds matches in this run's files only, with context and a 500-character line cap",
+              'app.py lines 3 and 5, line 5 cut to 500, no other run', (sorted(paths), sorted(lines), len(lines.get(5, ''))),
+              found.outcome.value == 'succeeded' and paths == {'inputs/app.py'} and sorted(lines) == [3, 5] and len(lines[5]) == 500
+              and out['matches'][0]['before'] == [''] and out['matches'][0]['after'] == ['    return os.getcwd()'])
+        counted = await gateway.execute(db, scope, 'search_files', {'pattern': 'x', 'output_mode': 'count'})
+        files = await gateway.execute(db, scope, 'search_files', {'pattern': 'app', 'target': 'files'})
+        bad = await gateway.execute(db, scope, 'search_files', {'pattern': '(unclosed'})
+        check('counts, file names and a bad pattern', '2 in outputs/app.py, both app.py files, invalid_pattern',
+              ((counted.output or {}).get('total_count'), (files.output or {}).get('files'), bad.code),
+              (counted.output or {}).get('total_count') == 2 and (files.output or {}).get('files') == ['inputs/app.py', 'outputs/app.py']
+              and bad.code == 'invalid_pattern')
+        read = await gateway.execute(db, scope, 'read_code_file', {'path': 'inputs/app.py', 'offset': 2, 'limit': 2})
+        check('read_code_file returns numbered lines with paging', 'lines 3 and 4 of 5, truncated',
+              (read.output or {}).get('lines'), (read.output or {}).get('lines') == [{'number': 3, 'text': 'def main():'}, {'number': 4, 'text': '    return os.getcwd()'}]
+              and (read.output or {}).get('total_lines') == 5 and (read.output or {}).get('truncated') is True)
+
+        async def versions() -> int:
+            return (await (await db.execute("select count(*) from app_private.run_files where run_id = %s and path = 'outputs/app.py'", (admitted.run_id,))).fetchone())[0]
+
+        before = await versions()
+        absent = await gateway.execute(db, scope, 'patch_code_file', {'path': 'outputs/app.py', 'old_string': 'z = 3', 'new_string': 'z = 4'})
+        ambiguous = await gateway.execute(db, scope, 'patch_code_file', {'path': 'outputs/app.py', 'old_string': 'x = 1', 'new_string': 'x = 9'})
+        middle = await versions()
+        exact = await gateway.execute(db, scope, 'patch_code_file', {'path': 'outputs/app.py', 'old_string': 'y = 2', 'new_string': 'y = 3'})
+        every = await gateway.execute(db, scope, 'patch_code_file', {'path': 'outputs/app.py', 'old_string': 'x = 1', 'new_string': 'x = 9', 'replace_all': True})
+        latest = (await (await db.execute("select content from app_private.run_files where run_id = %s and path = 'outputs/app.py' order by version desc limit 1", (admitted.run_id,))).fetchone())[0]
+        check('a patch is exact or writes nothing', 'old_string_not_found, old_string_ambiguous, no new version; then versions 2 and 3',
+              (absent.code, ambiguous.code, before, middle, (exact.output or {}).get('version'), (every.output or {}).get('replacements'), latest),
+              written.outcome.value == 'succeeded' and absent.code == 'old_string_not_found' and ambiguous.code == 'old_string_ambiguous'
+              and before == middle == 1 and (exact.output or {}).get('version') == 2 and (exact.output or {}).get('replacements') == 1
+              and (every.output or {}).get('version') == 3 and (every.output or {}).get('replacements') == 2 and latest == 'x = 9\nx = 9\ny = 3\n'
+              and len((exact.output or {}).get('sha256', '')) == 64)
+        outside = [await gateway.execute(db, scope, tool, arguments) for tool, arguments in (
+            ('write_code_file', {'path': 'inputs/app.py', 'content': 'evil'}),
+            ('write_code_file', {'path': '../etc/passwd', 'content': 'evil'}),
+            ('patch_code_file', {'path': 'inputs/app.py', 'old_string': 'os', 'new_string': 'sys'}))]
+        inputs = (await (await db.execute("select count(*) from app_private.run_files where run_id = %s and path like 'inputs/%%'", (admitted.run_id,))).fetchone())[0]
+        check('writes outside outputs/ are refused and nothing is written', 'invalid_arguments x3, inputs unchanged',
+              ([result.code for result in outside], inputs), [result.code for result in outside] == ['invalid_arguments'] * 3 and inputs == 1)
+        assert other.run_id != admitted.run_id
     print(json.dumps({'cases': cases}))
 
 

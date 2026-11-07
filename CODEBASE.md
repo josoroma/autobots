@@ -170,6 +170,7 @@ Layers under `services/agent/src/autobots/`:
 - **Jina tools (US-14.7, after the analyzed revision):** `adapters/jina.py` registers `search_web` and `extract_website_content` (reader mode, no model options), read-only and metered, Expert-grantable. Tested with fake transports only.
 - **File tools (US-14.9, after the analyzed revision):** the goal composer attaches up to 5 text files (1 MiB each) as typed run inputs. `read_run_file` version 2 (paging) is registered beside version 1, `read_csv` is a general tool, and `store_remote_file` (Expert-only) saves a guarded text download under `outputs/`.
 - **Market data (US-14.10, after the analyzed revision):** `adapters/market_data.py` registers `market_history` (Yahoo Finance's chart endpoint over `httpx`, no `yfinance`) and `inflation_rates` (World Bank `FP.CPI.TOTL.ZG` for CRI, USA, EMU), keyless and metered. Tested with fake transports only.
+- **Code tools (US-14.11, after the analyzed revision):** `application/code_tools.py` registers `search_files`, `read_code_file`, `write_code_file` and `patch_code_file` over the run's own files, pure Python, writes under `outputs/` only, Expert-grantable.
 - **Specialists:** `application/assignments.py` runs child runs synchronously, with scope intersected from the parent and spend counted on the root.
 - **Unknown effects:** these stay visible until a tool's readback or an owner's report resolves them.
 - **Workflows:** a typed subset, immutable versions, a run bound to version and hash, and insert-only emissions.
