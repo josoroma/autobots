@@ -44,6 +44,10 @@ from autobots.operations.logs import (
         "postgresql://autobots_runtime:hunter2@127.0.0.1:5432/postgres",
         "password=hunter2",
         "api_key: hunter2",
+        "tvly-fixtureKEY0123hunter2",
+        "jina_fixture0123hunter2",
+        "ghp_fixture0123456789abcdefhunter2",
+        "github_pat_fixture_0123456789abcdefhunter2",
     ],
 )
 def test_redact_removes_each_secret_shape(secret: str) -> None:

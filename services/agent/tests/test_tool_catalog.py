@@ -189,3 +189,45 @@ def test_a_configured_connector_can_be_granted() -> None:
     config = expand_groups(ExpertConfig(tool_groups=["connectors"]), environ)
     validate_config(config, environ)
     assert config.tools == ["create_github_issue"]
+
+
+# US-14.5: availability and a provider key's use make no request of their own. Sockets are blocked
+# here (conftest), so any connection would fail the test.
+
+
+def test_availability_with_a_real_looking_key_makes_no_request() -> None:
+    environ = {"GITHUB_TOKEN": "ghp_" + "a" * 36, "GITHUB_REPOSITORY": "owner/repo"}
+    github = next(
+        item for item in tool_catalog(environ).tools if item.tool_id == "create_github_issue"
+    )
+    assert github.availability == "available"
+
+
+@pytest.mark.asyncio
+async def test_a_provider_client_reads_its_key_per_attempt_and_only_uses_its_transport() -> None:
+    import httpx
+
+    from autobots.adapters.provider_http import provider_client, provider_key
+    from autobots.application.tool_gateway import ToolFailed
+    from autobots.domain.tool_catalog import KeyRequirement
+
+    requirement = KeyRequirement("tavily", ("TAVILY_API_KEY",))
+    with pytest.raises(ToolFailed) as missing:
+        provider_key(requirement, {"TAVILY_API_KEY": "  "})
+    assert str(missing.value) == "tavily_key_missing"
+    seen: list[str] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        seen.append(request.headers["authorization"])
+        return httpx.Response(200, json={})
+
+    key = provider_key(requirement, {"TAVILY_API_KEY": "tvly-fixture"})["TAVILY_API_KEY"]
+    async with provider_client(
+        "https://api.tavily.invalid",
+        {"Authorization": f"Bearer {key}"},
+        httpx.MockTransport(answer),
+    ) as client:
+        reply = await client.post("/search", json={})
+    assert reply.status_code == 200
+    assert seen == ["Bearer tvly-fixture"]
+    assert client.follow_redirects is False

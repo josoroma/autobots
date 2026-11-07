@@ -1,5 +1,6 @@
 """Run admission and user commands. A request records intent; a worker owns execution."""
 
+import os
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -31,6 +32,7 @@ from autobots.application.runs import (
     request_hash,
     store_receipt,
 )
+from autobots.application.tool_catalog import ToolsUnavailable, require_available
 from autobots.contracts.run_commands import (
     EffectEvidence,
     ModelCallReconciliation,
@@ -128,6 +130,16 @@ async def post_run(
             except ExpertRefused as error:
                 status_code = 404 if error.code.endswith("not_found") else 409
                 raise ApiError(status_code, error.code, "That routing isn't available.") from None
+            try:
+                # PK-02: only a run that grants an unavailable tool is refused, before it exists.
+                require_available(binding.tools, os.environ)
+            except ToolsUnavailable as refused:
+                raise ApiError(
+                    409,
+                    refused.code,
+                    "A tool this Expert grants is unavailable in this install. "
+                    "See Tools for what it needs.",
+                ) from None
         policy = resolve_role_policy(
             run_role_overrides=binding.role_bindings if binding else None,
             run_profile=body.run_profile.value if body.run_profile else None,

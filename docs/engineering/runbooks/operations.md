@@ -77,6 +77,17 @@ PYTHONPATH=services/agent/src services/agent/.venv/bin/python -m autobots.operat
 
 `survived` means unchanged in content and order. `lost` names what differed. `not_exercised` means the route returned nothing to preserve, or made no tool call. `not_run` means the cap stopped it. [The last result](../../../openspec/changes/archive/2026-11-06-us-11-2-reasoning-continuation-check/verification.md) is that Terra's encrypted item comes back with its `id` removed, by the pinned SDK, so LC-23 is partial on that route.
 
+## Tool-provider keys
+
+Tool providers are data services the worker calls as tools, not inference providers ([Decision 0017](../decisions/0017-tool-catalog.md#decision)). Each key is optional, read by the worker for each attempt from its environment, and stored nowhere. A missing key makes only that provider's tools unavailable: the Tools page says so with the variable to set, and a run or Expert version that grants one of them is refused `tool_unavailable` or `expert_tool_unavailable` before anything starts. Other runs are unaffected.
+
+```sh
+TAVILY_API_KEY=<for tavily_search, tavily_extract, tavily_map and tavily_crawl>
+JINA_API_KEY=<for search_web and extract_website_content>
+```
+
+Set them for both the worker and the API, since the API reports availability from its own environment, then restart both. Nothing checks a key against its provider automatically, because that costs a request: tests use fake transports even with a key present, and a live check is a separate task an owner authorizes and caps. A root run tree may make 20 metered tool calls; the next is denied `tool_budget_exceeded` before any request.
+
 ## The GitHub issue connector
 
 The first consequential connector, by [Decision 0007](../decisions/0007-first-connector-github-issues.md). It creates an issue in one repository and does nothing else. An owner grants it per Expert, goals without an Expert don't get it, and each call waits for a person's approval.
@@ -89,6 +100,8 @@ GITHUB_TOKEN=<a fine-grained token limited to that repository, with Issues read 
 ```
 
 The token is read for each attempt and stored nowhere. Without both, a call fails as `connector_not_configured` and sends nothing.
+
+**Use a token made for this, not your own.** `GITHUB_TOKEN` is also the name GitHub's own tools and CI read, so a broader developer token exported under that name in the worker's shell would be picked up by the connector without anyone choosing it ([Decision 0017](../decisions/0017-tool-catalog.md#conflicts-with-existing-rules), C8). Start the worker from a shell where the variable holds only the fine-grained token above.
 
 - **Refused by GitHub:** the call fails as `github_refused_<status>`, with that code on the receipt, and created nothing.
 - **Uncertain:** a lost reply or an unclear status records `unknown`. The connector looks for its marker in the newest 100 issues, for about 15 seconds because GitHub's list can lag a new issue, and only sends again if it never appears. An issue slower than that, or a repository busier than that, could be duplicated.

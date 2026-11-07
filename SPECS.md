@@ -355,11 +355,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.4#1 | Add Tools used to the run workspace from `tool.use.*` events and the listing. | DONE | US-14.4 |
 | US-14.4#2 | Add tool uses under node runs in the workflow monitor. | DONE | US-14.4 |
 | US-14.4#3 | Cover the scenarios in browser specs with axe. | DONE | US-14.4 |
-| US-14.5 | Tool-provider key readiness | READY | EPIC-14 |
-| US-14.5#1 | Read tool-provider keys from the worker's environment for each attempt and pass them only to the adapter's HTTP client, with no credential field in any tool input. | TODO | US-14.5 |
-| US-14.5#2 | Refuse a grant of an unavailable tool at run admission and at Expert save with a typed code. | TODO | US-14.5 |
-| US-14.5#3 | Add fake-key patterns to the secret scan. | TODO | US-14.5 |
-| US-14.5#4 | Document `TAVILY_API_KEY` and `JINA_API_KEY` in the operations runbook, and add Decision 0017 C8's warning that a broader developer token under `GITHUB_TOKEN` would be picked up. | TODO | US-14.5 |
+| US-14.5 | Tool-provider key readiness | DONE | EPIC-14 |
+| US-14.5#1 | Read tool-provider keys from the worker's environment for each attempt and pass them only to the adapter's HTTP client, with no credential field in any tool input. | DONE | US-14.5 |
+| US-14.5#2 | Refuse a grant of an unavailable tool at run admission and at Expert save with a typed code. | DONE | US-14.5 |
+| US-14.5#3 | Add fake-key patterns to the secret scan. | DONE | US-14.5 |
+| US-14.5#4 | Document `TAVILY_API_KEY` and `JINA_API_KEY` in the operations runbook, and add Decision 0017 C8's warning that a broader developer token under `GITHUB_TOKEN` would be picked up. | DONE | US-14.5 |
 | US-14.6 | Tavily search, extract, map and crawl | BLOCKED | EPIC-14 |
 | US-14.6#1 | Add `tavily_search`, `tavily_extract`, `tavily_map` and `tavily_crawl` as plain `httpx` adapters with an injectable transport, the PRD's schema ceilings and recorded fixtures. | TODO | US-14.6 |
 | US-14.6#2 | Cover the scenarios with fake transports only. | TODO | US-14.6 |
@@ -4767,7 +4767,8 @@ Open Questions:
 
 ### US-14.5: Tool-provider key readiness
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-14-5-tool-provider-key-readiness/`
 
 As a workspace owner
 I want each tool provider's key read in the worker for each attempt and shown only as available or not
@@ -4804,10 +4805,10 @@ Dependencies:
 - US-3.1
 
 Tasks:
-- [ ] Read tool-provider keys from the worker's environment for each attempt and pass them only to the adapter's HTTP client, with no credential field in any tool input.
-- [ ] Refuse a grant of an unavailable tool at run admission and at Expert save with a typed code.
-- [ ] Add fake-key patterns to the secret scan.
-- [ ] Document `TAVILY_API_KEY` and `JINA_API_KEY` in the operations runbook, and add Decision 0017 C8's warning that a broader developer token under `GITHUB_TOKEN` would be picked up.
+- [x] Read tool-provider keys from the worker's environment for each attempt and pass them only to the adapter's HTTP client, with no credential field in any tool input.
+- [x] Refuse a grant of an unavailable tool at run admission and at Expert save with a typed code.
+- [x] Add fake-key patterns to the secret scan.
+- [x] Document `TAVILY_API_KEY` and `JINA_API_KEY` in the operations runbook, and add Decision 0017 C8's warning that a broader developer token under `GITHUB_TOKEN` would be picked up.
 
 Open Questions:
 - None.

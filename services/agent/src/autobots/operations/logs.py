@@ -12,6 +12,11 @@ from typing import Any, TextIO
 _SECRET = re.compile(
     r"sk-or-[\w-]+"
     r"|sk-[A-Za-z0-9_-]{8,}"
+    # Tool providers' keys, Decision 0017: Tavily, Jina and GitHub tokens.
+    r"|tvly-[\w-]{8,}"
+    r"|jina_[A-Za-z0-9]{8,}"
+    r"|(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}"
+    r"|github_pat_[A-Za-z0-9_]{20,}"
     r"|(?i:bearer)\s+[\w.~+/=-]+"
     r"|eyJ[\w-]+\.[\w-]+\.[\w-]*"
     r"|\b(?:postgres(?:ql)?|https?)://[^\s/@]+:[^\s/@]+@\S+"

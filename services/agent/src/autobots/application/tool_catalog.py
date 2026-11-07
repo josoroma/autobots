@@ -6,7 +6,7 @@ Availability is computed per request from configuration and never stored.
 
 import hashlib
 import json
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any, cast
 
 from autobots.application.assignments import Delegation
@@ -261,3 +261,19 @@ def unavailable_tools(tool_ids: list[str], environ: Mapping[str, str]) -> list[s
         for item in latest(all_descriptors(environ))
         if item.tool_id in named and item.availability != ToolAvailability.AVAILABLE.value
     ]
+
+
+class ToolsUnavailable(Exception):
+    """A grant names a tool this install can't use now. Refused before any run exists (PK-02)."""
+
+    code = "tool_unavailable"
+
+    def __init__(self, tools: list[str]) -> None:
+        super().__init__(", ".join(tools))
+        self.tools = tools
+
+
+def require_available(tool_ids: Iterable[str], environ: Mapping[str, str]) -> None:
+    missing = unavailable_tools(list(tool_ids), environ)
+    if missing:
+        raise ToolsUnavailable(missing)

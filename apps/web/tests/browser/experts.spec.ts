@@ -415,3 +415,75 @@ test("US-14.2: a group grant is previewed, saved as explicit tools, and an unava
     expect((await refused.json()).code).toBe(code);
   }
 });
+
+test("US-14.5: a missing key refuses only a run or version that grants its tool", async ({
+  page,
+}) => {
+  // Arranged by tests/db/provider_key_check.py: Experts saved while the GitHub variables were set.
+  // This suite's API has none of them.
+  const keyedSession = process.env.AUTOBOTS_TEST_KEYED_SESSION ?? "";
+  const keyedExpert = process.env.AUTOBOTS_TEST_KEYED_EXPERT ?? "";
+  const plainSession = process.env.AUTOBOTS_TEST_PLAIN_SESSION ?? "";
+  const plainExpert = process.env.AUTOBOTS_TEST_PLAIN_EXPERT ?? "";
+  expect(keyedSession).not.toBe("");
+  await signIn(page, EMAIL_A, PASSWORD_A);
+  await saveKey(page);
+  await page.goto("/");
+  const before = await (await page.request.get("/api/v1/runs")).json();
+
+  const refused = await page.request.post("/api/v1/runs", {
+    headers: await write(page, crypto.randomUUID()),
+    data: {
+      goal_text: "File the issue",
+      session_id: keyedSession,
+      expert_id: keyedExpert,
+      limit_micro_usd: 1000,
+    },
+  });
+  expect(refused.status()).toBe(409);
+  expect((await refused.json()).code).toBe("tool_unavailable");
+  const after = await (await page.request.get("/api/v1/runs")).json();
+  expect(after.runs.length).toBe(before.runs.length);
+
+  const admitted = await page.request.post("/api/v1/runs", {
+    headers: await write(page, crypto.randomUUID()),
+    data: {
+      goal_text: "Add it up",
+      session_id: plainSession,
+      expert_id: plainExpert,
+      limit_micro_usd: 1000,
+    },
+  });
+  expect(admitted.status()).toBe(202);
+
+  // A version that no longer grants the connector saves, and one that still does is refused.
+  const kept = await page.request.post(
+    `/api/v1/experts/${keyedExpert}/versions`,
+    {
+      headers: await write(page, crypto.randomUUID()),
+      data: {
+        expected_version: 1,
+        config: { tools: ["calculate", "create_github_issue"] },
+      },
+    },
+  );
+  expect(kept.status()).toBe(422);
+  expect((await kept.json()).code).toBe("expert_tool_unavailable");
+  const dropped = await page.request.post(
+    `/api/v1/experts/${keyedExpert}/versions`,
+    {
+      headers: await write(page, crypto.randomUUID()),
+      data: { expected_version: 1, config: { tools: ["calculate"] } },
+    },
+  );
+  expect(dropped.status()).toBe(201);
+
+  const catalog = await (await page.request.get("/api/v1/tools")).json();
+  const missing = catalog.tools
+    .filter(
+      (tool: { availability: string }) => tool.availability === "key_missing",
+    )
+    .map((tool: { tool_id: string }) => tool.tool_id);
+  expect(missing).toEqual(["create_github_issue"]);
+  expect(JSON.stringify(catalog)).not.toContain("ghp_");
+});

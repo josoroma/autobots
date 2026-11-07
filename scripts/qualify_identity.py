@@ -165,6 +165,7 @@ def artifact_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port
                                          ('wake_check.py', [workspace_a], 'wake'),
                                          ('review_check.py', [workspace_a], 'review'),
                                          ('improvement_check.py', [workspace_a, workspace_b], 'improvement'),
+                                         ('provider_key_check.py', [workspace_a], 'provider key'),
                                          # Last, so no later check's cleanup ends the run it leaves claimed for the browser.
                                          ('tool_use_view_check.py', [workspace_a], 'tool-use view')):
         checked = subprocess.run([str(root / PYTHON), str(root / 'tests/db' / check_file), *arguments],

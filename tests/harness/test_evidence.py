@@ -230,6 +230,11 @@ class Completion(unittest.TestCase):
     def test_exercise_needs_a_passing_check_that_says_so(self):
         self.rejected('no passing check with a retained artifact', lambda d: d['checks'][0].update(exercises_runbook=False))
 
+    def test_tool_provider_keys_are_rejected(self):
+        for key in ('tvly-fixture0123456789', 'jina_fixture0123456789', 'ghp_fixture0123456789abcdefgh',
+                    'github_pat_fixture_0123456789abcdef'):
+            self.rejected('recognizable secret', lambda d, key=key: d['checks'][0].update(observed=key))
+
     def test_recognizable_secrets_are_rejected(self):
         self.rejected('recognizable secret', lambda d: d['checks'][0].update(observed='sk-or-v1-abcdefghijkl'))
         self.write_manifest(self.valid_manifest())

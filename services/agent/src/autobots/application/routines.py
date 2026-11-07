@@ -5,6 +5,7 @@ occurrence takes its version's frozen configuration, so an edit can't reach a ru
 """
 
 import logging
+import os
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 from types import SimpleNamespace
@@ -298,6 +299,13 @@ async def _admit(
     try:
         require_offered(policy.bindings.values())
     except ProfileNotOffered as refused:
+        raise RoutineRefused(refused.code) from None
+    from autobots.application.tool_catalog import ToolsUnavailable, require_available
+
+    try:
+        # PK-02: a missing key refuses this occurrence, before a run exists.
+        require_available(tools, os.environ)
+    except ToolsUnavailable as refused:
         raise RoutineRefused(refused.code) from None
     admitted = await admit_run(
         connection,

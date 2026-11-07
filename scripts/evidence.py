@@ -33,6 +33,9 @@ HASH = re.compile(r'[0-9a-f]{64}')
 WORK_ITEM_ID = re.compile(r'[A-Za-z0-9][A-Za-z0-9.-]*')
 PLACEHOLDER = '{{'
 SECRET_PATTERNS = (re.compile(r'sk-or-[A-Za-z0-9_-]{8,}'), re.compile(r'sk-ant-[A-Za-z0-9_-]{8,}'),
+                   # Tool providers' keys, Decision 0017: Tavily, Jina and GitHub tokens.
+                   re.compile(r'tvly-[A-Za-z0-9_-]{8,}'), re.compile(r'jina_[A-Za-z0-9]{8,}'),
+                   re.compile(r'(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}'), re.compile(r'github_pat_[A-Za-z0-9_]{20,}'),
                    re.compile(r'\b[A-Z][A-Z0-9_]*(?:API_KEY|SECRET|PASSWORD|TOKEN)=\S+'),
                    re.compile(r'-----BEGIN [A-Z ]*PRIVATE KEY-----'))
 # These change after verification by design. A runbook has its own revision hash.
