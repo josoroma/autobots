@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<title>06 · Workflows</title>
+<link rel="stylesheet" href="../../design/luma.css">
+<link rel="stylesheet" href="quiet.css">
+<link rel="stylesheet" href="studio.css">
+<script src="shell.js"></script>
+<style>
+.split { grid-template-columns: 1fr 460px; }
+.ver { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.panel { background-color: var(--soft); background-image: radial-gradient(color-mix(in oklch, var(--foreground) 12%, transparent) 1px, transparent 1px); background-size: 16px 16px; }
+.flow { margin: 18px 0 0; position: relative; }
+.node { position: relative; display: flex; align-items: center; gap: 12px; padding: 11px 13px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); box-shadow: var(--shadow); font-size: 13.5px; }
+.node .tile { width: 28px; height: 28px; border-radius: 8px; }
+.node small { display: block; color: var(--muted-foreground); font-size: 12px; }
+.node .mono-chip { margin-left: auto; }
+.node.gate { border-color: color-mix(in oklch, var(--attention) 38%, transparent); }
+.node.gate .tile { background: color-mix(in oklch, var(--attention) 16%, var(--card)); color: var(--attention); }
+.node.start { width: max-content; border-radius: 999px; padding: 7px 14px 7px 9px; }
+.node.start .tile { width: 22px; height: 22px; border-radius: 50%; background: var(--primary); color: var(--primary-foreground); }
+.link { width: 1.5px; height: 16px; background: var(--border); margin-left: 26px; }
+.execs .e { display: grid; grid-template-columns: 10px 1fr auto auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--border); font-size: 13px; }
+.execs .e span:nth-child(3), .execs .e span:nth-child(4) { color: var(--muted-foreground); font-size: 12.5px; }
+.vpick { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside data-active="workflows"></aside>
+  <main class="main">
+    <div class="split">
+      <div class="page">
+        <div class="ph">
+          <div><h1>Workflows</h1><p>Repeatable goals as steps. Runs use the published version; drafts change nothing until you publish them.</p></div>
+          <div class="actions"><span class="btn outline"><i data-i="spark" class="sm"></i>Generate from a run</span><span class="btn primary lg"><i data-i="plus"></i>New workflow</span></div>
+        </div>
+        <div class="toolbar">
+          <div class="seg"><span class="on">All <i class="n">6</i></span><span>Published <i class="n">4</i></span><span>Drafts <i class="n">2</i></span></div>
+          <span class="spacer"></span>
+          <div class="search"><i data-i="search" class="sm"></i>Search workflows<kbd>/</kbd></div>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>Workflow</th><th>Version</th><th class="r">Steps</th><th>Last execution</th><th class="r">Runs</th></tr></thead>
+          <tbody>
+            <tr class="sel"><td><span class="t">Weekly competitor brief</span><span class="s">Research analyst → Brief writer</span></td><td><span class="ver"><span class="pill ok sm">v3 published</span><span class="pill wait sm">v4 draft</span></span></td><td class="r num">5</td><td><span class="row"><i class="dot ok"></i>Succeeded · 2 h ago</span></td><td class="r num">23</td></tr>
+            <tr><td><span class="t">Monthly FX &amp; inflation note</span><span class="s">Market watcher → Brief writer</span></td><td><span class="ver"><span class="pill ok sm">v2 published</span></span></td><td class="r num">4</td><td><span class="row"><i class="dot ok"></i>Succeeded · Nov 1</span></td><td class="r num">5</td></tr>
+            <tr><td><span class="t">Nightly test triage</span><span class="s">Issue triager</span></td><td><span class="ver"><span class="pill ok sm">v6 published</span></span></td><td class="r num">4</td><td><span class="row" style="color:var(--attention)"><i class="dot wait"></i>Waiting for approval</span></td><td class="r num">41</td></tr>
+            <tr><td><span class="t">Interview synthesis</span><span class="s">Brief writer</span></td><td><span class="ver"><span class="pill ok sm">v1 published</span></span></td><td class="r num">3</td><td><span class="row"><i class="dot ok"></i>Succeeded · Nov 4</span></td><td class="r num">3</td></tr>
+            <tr><td><span class="t">Release notes from merged PRs</span><span class="s">Code maintainer → Brief writer</span></td><td><span class="ver"><span class="pill wait sm">v1 draft</span></span></td><td class="r num">4</td><td class="muted">Not published</td><td class="r num muted">0</td></tr>
+            <tr><td><span class="t">Vendor due diligence</span><span class="s">Coordinator · 3 Experts</span></td><td><span class="ver"><span class="pill wait sm">v1 draft</span></span></td><td class="r num">7</td><td class="muted">Not published</td><td class="r num muted">0</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <div class="row"><span class="section-label">Workflow</span><span class="spacer"></span><span class="btn icon"><i data-i="more"></i></span></div>
+        <h2>Weekly competitor brief</h2>
+        <div class="muted" style="font-size:12.5px">Compare Tallyboard and Plainview and publish a one-page brief.</div>
+        <div class="vpick"><div class="seg"><span class="on">v3 · published</span><span>v4 · draft</span></div><span class="muted" style="font-size:12px">Draft adds a pricing check</span></div>
+
+        <div class="flow">
+          <div class="node start"><span class="tile"><i data-i="play" class="sm"></i></span>Manual start</div>
+          <div class="link"></div>
+          <div class="node"><span class="tile"><i data-i="search" class="sm"></i></span><span>Gather sources<small>Research analyst · Sol</small></span><span class="mono-chip">search_web</span></div>
+          <div class="link"></div>
+          <div class="node"><span class="tile"><i data-i="list" class="sm"></i></span><span>Compare plans<small>Research analyst · Terra</small></span><span class="mono-chip">extract_website_content</span></div>
+          <div class="link"></div>
+          <div class="node"><span class="tile"><i data-i="pen" class="sm"></i></span><span>Write the brief<small>Brief writer · Terra</small></span><span class="mono-chip">save_artifact</span></div>
+          <div class="link"></div>
+          <div class="node gate"><span class="tile"><i data-i="shield" class="sm"></i></span><span>Approval gate<small>You review before it's published</small></span><span class="mono-chip">publish_artifact</span></div>
+        </div>
+
+        <div class="hr"></div>
+        <div class="row" style="margin-bottom:4px"><span class="section-label">Recent executions</span><span class="spacer"></span><span class="muted" style="font-size:12px">Budget US$0.60 each</span></div>
+        <div class="execs">
+          <div class="e"><i class="dot ok"></i><span>Nov 7 · v3</span><span class="num">US$0.31</span><span>4 m 12 s</span></div>
+          <div class="e"><i class="dot ok"></i><span>Oct 31 · v3</span><span class="num">US$0.28</span><span>3 m 50 s</span></div>
+        </div>
+        <div class="row" style="margin-top:16px;gap:8px"><span class="btn primary"><i data-i="play" class="sm"></i>Run v3</span><span class="btn outline"><i data-i="pen" class="sm"></i>Edit draft</span></div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

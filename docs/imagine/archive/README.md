@@ -1,6 +1,12 @@
 # Superseded visual concepts
 
-The active direction is the [quiet workbench gallery](../index.html), rendered from HTML on the exact Luma tokens. The [design contract](../../../PRD-Design-System.md) remains authoritative. Folders here are historical snapshots and don't define current requirements.
+The active direction is the [Studio gallery](../index.html), one screen per sidebar section, rendered from HTML on the exact Luma tokens. The [design contract](../../../PRD-Design-System.md) remains authoritative. Folders here are historical snapshots and don't define current requirements.
+
+## quiet-workbench-v1 (2026-11-07)
+
+Six HTML-rendered screens organized by user journey (start, follow, approve, result, models, workflow), in dark and light. Superseded the same day by the per-section Studio set. Moved here with its [gallery](quiet-workbench-v1/index.html), [notes](quiet-workbench-v1/README.md), [sources](quiet-workbench-v1/source/) and [hashes](quiet-workbench-v1/manifest.json). Relative links in its README, gallery and sources were updated for the new location, so its manifest hashes for the README, gallery, screen HTML and render script no longer match; the images, quiet.css and shell.js are unchanged.
+
+- [Home](quiet-workbench-v1/01-home.png) · [Run workspace](quiet-workbench-v1/02-run-workspace.png) · [Approval](quiet-workbench-v1/03-approval.png) · [Result](quiet-workbench-v1/04-result-evidence.png) · [Models](quiet-workbench-v1/05-model-settings.png) · [Workflow](quiet-workbench-v1/06-workflow.png)
 
 ## luma-dark-v1 (2026-11-04 to 2026-11-07)
 

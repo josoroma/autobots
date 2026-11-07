@@ -2,66 +2,93 @@
 <html lang="en" class="dark">
 <head>
 <meta charset="utf-8">
-<title>01 · Start with a goal</title>
+<title>01 · Home</title>
 <link rel="stylesheet" href="../../design/luma.css">
 <link rel="stylesheet" href="quiet.css">
+<link rel="stylesheet" href="studio.css">
 <script src="shell.js"></script>
 <style>
-.stage { flex: 1; display: flex; flex-direction: column; align-items: center; padding-top: 176px; overflow: hidden; }
-.col { width: 720px; }
-.hello { font-size: 40px; line-height: 1.15; text-align: center; margin: 0 0 30px; }
-.composer { border: 1px solid var(--input); border-radius: var(--radius-2xl); background: var(--card); box-shadow: var(--shadow); padding: 18px 18px 12px; }
-.composer p { margin: 0 0 30px; font-size: 16px; line-height: 1.55; }
-.caret { display: inline-block; width: 1.5px; height: 19px; background: var(--foreground); vertical-align: -3px; margin-left: 1px; }
-.composer .row { gap: 6px; }
-.send { width: 34px; height: 34px; border-radius: 50%; background: var(--primary); color: var(--primary-foreground); display: grid; place-items: center; }
+.stage { flex: 1; display: flex; flex-direction: column; align-items: center; padding-top: 108px; }
+.col { width: 780px; }
+.hello { font-size: 14px; color: var(--muted-foreground); display: flex; align-items: center; gap: 8px; justify-content: center; margin-bottom: 10px; }
+.hello .mark { width: 18px; height: 18px; border-radius: 6px; }
+.hello .mark svg { width: 11px; height: 11px; }
+h1.q { text-align: center; font: 400 44px/1.1 var(--serif); letter-spacing: -0.025em; margin: 0 0 30px; }
+.composer { border: 1px solid var(--input); border-radius: var(--radius-2xl); background: var(--card); box-shadow: var(--shadow-lg); padding: 18px 18px 12px; }
+.goal { font-size: 16px; line-height: 1.55; min-height: 74px; color: var(--foreground); }
+.goal .caret { display: inline-block; width: 1.5px; height: 19px; background: var(--link); vertical-align: -3px; margin-left: 1px; }
+.files { display: flex; gap: 8px; margin: 10px 0 14px; }
+.file { display: flex; align-items: center; gap: 10px; padding: 7px 12px 7px 9px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--soft); font-size: 13px; }
+.file .tile { width: 28px; height: 28px; border-radius: 7px; }
+.file small { display: block; font-size: 11.5px; color: var(--muted-foreground); }
+.bar { display: flex; align-items: center; gap: 6px; }
+.bar .chip { height: 32px; }
+.send { width: 36px; height: 36px; border-radius: 50%; background: var(--primary); color: var(--primary-foreground); display: grid; place-items: center; margin-left: auto; }
 .send svg { stroke-width: 2.25; }
-.model { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: var(--radius-md); font-size: 13px; color: var(--muted-foreground); }
-.model b { color: var(--foreground); font-weight: 500; }
-.note { display: flex; justify-content: center; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted-foreground); margin: 14px 0 26px; }
-.sugg { display: flex; justify-content: center; gap: 8px; }
-.recentwork { margin-top: 84px; }
-.recentwork .head { display: flex; align-items: baseline; padding: 0 2px 8px; }
-.rw { display: grid; grid-template-columns: 22px 1fr auto auto; align-items: center; gap: 12px; height: 50px; padding: 0 4px; border-top: 1px solid var(--border); }
-.rw .t { font-weight: 500; }
-.rw .meta { font-size: 13px; color: var(--muted-foreground); }
-.rw .when { width: 82px; text-align: right; font-size: 13px; color: var(--muted-foreground); }
+.disclose { display: flex; align-items: center; gap: 8px; justify-content: center; font-size: 12.5px; color: var(--muted-foreground); margin: 14px 0 0; }
+.disclose a { color: var(--foreground); text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 3px; }
+.uses { display: flex; gap: 8px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
+.uses .mono-chip { padding: 3px 8px; }
+.lower { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 64px; }
+.lh { display: flex; align-items: center; margin-bottom: 8px; }
+.lh .section-label { font-size: 12.5px; }
+.lh a { margin-left: auto; font-size: 12.5px; color: var(--muted-foreground); }
+.item { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid var(--border); font-size: 13.5px; }
+.item .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item small { color: var(--muted-foreground); font-size: 12.5px; white-space: nowrap; }
+.need { border: 1px solid color-mix(in oklch, var(--attention) 30%, transparent); background: color-mix(in oklch, var(--attention) 6%, transparent); border-radius: var(--radius-lg); padding: 4px 14px; }
+.need .item:first-child { border-top: 0; }
+.need .item + .item { border-top-color: color-mix(in oklch, var(--attention) 18%, transparent); }
+.need .btn { height: 28px; font-size: 12.5px; }
+.top-right { position: absolute; top: 18px; right: 22px; display: flex; gap: 8px; }
 </style>
 </head>
 <body>
 <div class="app">
   <aside data-active="home"></aside>
   <main class="main">
-    <div class="stage">
-      <div class="col">
-        <h1 class="hello serif">What should we work on?</h1>
-        <div class="composer">
-          <p>Compare Tallyboard and Plainview for a 12‑person product team. Use only their official docs and pricing pages, then recommend one.<span class="caret"></span></p>
-          <div class="row">
-            <span class="btn icon"><i data-i="plus"></i></span>
-            <span class="chip"><i data-i="experts" class="sm"></i>Research analyst</span>
-            <span class="chip"><i data-i="wallet" class="sm"></i>$1.00 limit</span>
-            <span class="spacer"></span>
-            <span class="model"><b>Terra</b> via OpenRouter <i data-i="down" class="sm"></i></span>
-            <span class="send"><i data-i="up"></i></span>
-          </div>
-        </div>
-        <div class="note"><i data-i="lock" class="sm"></i>Files and history stay on this Mac. Your goal and the context you select are sent to OpenRouter.</div>
-        <div class="sugg">
-          <span class="chip"><i data-i="list" class="sm"></i>Compare options</span>
-          <span class="chip"><i data-i="files" class="sm"></i>Summarize a folder</span>
-          <span class="chip"><i data-i="pen" class="sm"></i>Draft a report</span>
-          <span class="chip"><i data-i="workflows" class="sm"></i>Run a workflow</span>
-        </div>
+    <div class="top-right"><span class="chip"><i class="dot ok"></i>Python API · worker · database</span><span class="chip"><i data-i="cpu"></i>OpenRouter connected</span></div>
+    <div class="stage"><div class="col">
+      <div class="hello"><span class="mark"><i data-i="bolt"></i></span>Good afternoon, Josoroma</div>
+      <h1 class="q">What should we work on?</h1>
 
-        <div class="recentwork">
-          <div class="head"><span class="section-label">Recent work</span><span class="spacer"></span><span class="muted" style="font-size:13px">View all</span></div>
-          <div class="rw"><i class="dot ok" style="margin-left:7px"></i><span><span class="t">Q3 vendor shortlist</span> <span class="meta">· vendor-shortlist.md</span></span><span class="meta num">$0.31</span><span class="when">2h ago</span></div>
-          <div class="rw"><i class="dot wait" style="margin-left:7px"></i><span><span class="t">Release notes draft</span> <span class="meta">· waiting for your approval</span></span><span class="meta num">$0.12</span><span class="when">Yesterday</span></div>
-          <div class="rw"><i class="dot ok" style="margin-left:7px"></i><span><span class="t">Summarize /research/interviews</span> <span class="meta">· 14 files</span></span><span class="meta num">$0.22</span><span class="when">Tue</span></div>
+      <div class="composer">
+        <div class="goal">Compare the EUR → CRC exchange rate over the last twelve months with inflation in Costa Rica, the US and the euro area. Write a one-page brief the team can read in five minutes.<span class="caret"></span></div>
+        <div class="files">
+          <div class="file"><span class="tile"><i data-i="file" class="sm"></i></span><span>team-notes.md<small>Markdown · 4 KB · inputs/</small></span><i data-i="x" class="sm muted"></i></div>
+          <div class="file"><span class="tile"><i data-i="file" class="sm"></i></span><span>last-quarter.csv<small>CSV · 18 KB · inputs/</small></span><i data-i="x" class="sm muted"></i></div>
+        </div>
+        <div class="bar">
+          <span class="btn icon"><i data-i="clip"></i></span>
+          <span class="chip"><i data-i="experts"></i>Market watcher<i data-i="down" class="sm"></i></span>
+          <span class="chip"><i data-i="wallet"></i>Up to US$1.00<i data-i="down" class="sm"></i></span>
+          <span class="chip"><i data-i="cpu"></i>Workspace models<i data-i="down" class="sm"></i></span>
+          <span class="send"><i data-i="up"></i></span>
         </div>
       </div>
-    </div>
+
+      <div class="disclose"><i data-i="lock" class="sm"></i>Nothing is sent until you press Run. Then the goal, these files and tool outputs go to OpenRouter. <a>What's sent</a></div>
+      <div class="uses">
+        <span class="mono-chip">Terra · 13 roles</span><span class="mono-chip">Sol · researcher</span>
+        <span class="mono-chip">market_history</span><span class="mono-chip">inflation_rates</span><span class="mono-chip">calculate</span><span class="mono-chip">save_artifact</span>
+      </div>
+
+      <div class="lower">
+        <div>
+          <div class="lh"><span class="section-label">Needs you</span><a>Approvals →</a></div>
+          <div class="need">
+            <div class="item"><i class="dot wait"></i><span class="t">Create a GitHub issue · Triage flaky checkout tests</span><span class="btn outline">Review</span></div>
+            <div class="item"><i class="dot wait"></i><span class="t">Answer a question · Q3 vendor shortlist</span><span class="btn outline">Reply</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="lh"><span class="section-label">Recent runs</span><a>All runs →</a></div>
+          <div class="item"><i class="dot live"></i><span class="t">Tallyboard vs Plainview pricing</span><small>Running · step 3 of 5</small></div>
+          <div class="item"><i class="dot ok"></i><span class="t">Summarize interview notes</span><small>Succeeded · US$0.07</small></div>
+          <div class="item"><i class="dot ok"></i><span class="t">Weekly competitor brief</span><small>Succeeded · 2 h ago</small></div>
+        </div>
+      </div>
+    </div></div>
   </main>
 </div>
 </body>

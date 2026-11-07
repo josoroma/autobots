@@ -1,4 +1,4 @@
-// Render the concept screens to PNG in both themes.
+// Render the Studio concept screens to PNG in both themes.
 // Usage (repo root): node docs/imagine/source/render.mjs [screen-id ...]
 // Uses the web app's pinned Playwright (no install) and its cached Chromium.
 import { createRequire } from "node:module";

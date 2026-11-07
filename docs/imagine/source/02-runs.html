@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<title>02 · Runs</title>
+<link rel="stylesheet" href="../../design/luma.css">
+<link rel="stylesheet" href="quiet.css">
+<link rel="stylesheet" href="studio.css">
+<script src="shell.js"></script>
+<style>
+.split { grid-template-columns: 1fr 430px; }
+.state { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+.state.live { color: var(--link); }
+.state.wait { color: var(--attention); }
+.state.bad { color: var(--danger); }
+.model { font: 12px var(--mono); color: var(--muted-foreground); }
+.steps { list-style: none; margin: 14px 0 0; padding: 0; }
+.steps li { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: start; padding: 7px 0; font-size: 13.5px; }
+.steps li small { display: block; color: var(--muted-foreground); font-size: 12px; }
+.ck { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; margin-top: 1px; }
+.ck.done { background: color-mix(in oklch, var(--success) 18%, transparent); color: var(--success); }
+.ck.done svg { width: 11px; height: 11px; stroke-width: 2.5; }
+.ck.now { border: 2px solid var(--link); box-shadow: 0 0 0 3px color-mix(in oklch, var(--link) 18%, transparent); }
+.ck.todo { border: 1.5px dashed var(--muted-foreground); opacity: .7; }
+.steps li.todo { color: var(--muted-foreground); }
+.uses { font-size: 13px; }
+.uses .u { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+.uses .u .mono-chip { color: var(--foreground); }
+.uses .u span:last-child { margin-left: auto; color: var(--muted-foreground); font-size: 12px; }
+.spend { display: flex; align-items: baseline; gap: 6px; font-size: 13px; }
+.spend b { font: 400 24px var(--serif); }
+.foot { display: flex; gap: 8px; margin-top: 18px; }
+.pager { display: flex; align-items: center; gap: 10px; margin-top: 14px; font-size: 12.5px; color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside data-active="runs"></aside>
+  <main class="main">
+    <div class="split">
+      <div class="page">
+        <div class="ph">
+          <div><h1>Runs</h1><p>Every goal you've started on this Mac, from queued to finished. Terminal runs can't resume; start a similar one instead.</p></div>
+          <div class="actions"><span class="btn primary lg"><i data-i="plus"></i>New run</span></div>
+        </div>
+        <div class="toolbar">
+          <div class="seg"><span class="on">All <i class="n">24</i></span><span>Active <i class="n">3</i></span><span>Needs you <i class="n">2</i></span><span>Finished <i class="n">19</i></span></div>
+          <span class="spacer"></span>
+          <div class="search"><i data-i="search" class="sm"></i>Filter by goal or Expert<kbd>/</kbd></div>
+          <span class="btn outline"><i data-i="filter" class="sm"></i>Model</span>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>Goal</th><th>State</th><th>Models</th><th class="r">Spend</th><th class="r">Started</th></tr></thead>
+          <tbody>
+            <tr class="sel"><td><span class="t">EUR → CRC rate vs inflation brief</span><span class="s">Market watcher</span></td><td><span class="state live"><i class="dot live"></i>Running · 3 of 5</span></td><td><span class="model">Terra · Sol</span></td><td class="r num">≈ US$0.18</td><td class="r muted">2 min ago</td></tr>
+            <tr><td><span class="t">Triage flaky checkout tests</span><span class="s">Issue triager</span></td><td><span class="state wait"><i class="dot wait"></i>Waiting for approval</span></td><td><span class="model">Terra</span></td><td class="r num">≈ US$0.06</td><td class="r muted">14 min ago</td></tr>
+            <tr><td><span class="t">Q3 vendor shortlist</span><span class="s">Research analyst</span></td><td><span class="state wait"><i class="dot wait"></i>Waiting for input</span></td><td><span class="model">Sol</span></td><td class="r num">≈ US$0.22</td><td class="r muted">38 min ago</td></tr>
+            <tr><td><span class="t">Tallyboard vs Plainview pricing</span><span class="s">Coordinator session · 2 Experts</span></td><td><span class="state"><i class="dot idle"></i>Queued</span></td><td><span class="model">Terra</span></td><td class="r num muted">—</td><td class="r muted">40 min ago</td></tr>
+            <tr><td><span class="t">Summarize interview notes</span><span class="s">Brief writer</span></td><td><span class="state"><i class="dot ok"></i>Succeeded</span></td><td><span class="model">Terra</span></td><td class="r num">US$0.07</td><td class="r muted">1 h ago</td></tr>
+            <tr><td><span class="t">Weekly competitor brief</span><span class="s">Workflow · v3</span></td><td><span class="state"><i class="dot ok"></i>Succeeded</span></td><td><span class="model">Terra · Sol</span></td><td class="r num">US$0.31</td><td class="r muted">2 h ago</td></tr>
+            <tr><td><span class="t">Patch README install section</span><span class="s">Code maintainer</span></td><td><span class="state"><i class="dot idle"></i>Cancelled</span></td><td><span class="model">Terra</span></td><td class="r num">US$0.02</td><td class="r muted">Yesterday</td></tr>
+            <tr><td><span class="t">Map docs.plainview.example</span><span class="s">Research analyst</span></td><td><span class="state bad"><i class="dot bad"></i>Failed · tool budget</span></td><td><span class="model">Sol</span></td><td class="r num">US$0.44</td><td class="r muted">Yesterday</td></tr>
+            <tr><td><span class="t">Release notes draft</span><span class="s">Brief writer</span></td><td><span class="state"><i class="dot ok"></i>Succeeded</span></td><td><span class="model">Terra</span></td><td class="r num">US$0.05</td><td class="r muted">Nov 5</td></tr>
+          </tbody>
+        </table>
+        <div class="pager">Showing 9 of 24<span class="spacer"></span><span class="btn outline">Load more</span></div>
+      </div>
+
+      <div class="panel">
+        <div class="row"><span class="pill live"><i class="dot live"></i>Running</span><span class="spacer"></span><span class="btn icon"><i data-i="expand"></i></span><span class="btn icon"><i data-i="x"></i></span></div>
+        <h2>EUR → CRC rate vs inflation brief</h2>
+        <div class="muted" style="font-size:12.5px">Market watcher · started 2 min ago · run 7f3a</div>
+
+        <div class="hr"></div>
+        <div class="section-label">Plan</div>
+        <ul class="steps">
+          <li><span class="ck done"><i data-i="check"></i></span><span>Read team-notes.md and last-quarter.csv<small>read_run_file · read_csv</small></span><span class="muted num" style="font-size:12px">0:21</span></li>
+          <li><span class="ck done"><i data-i="check"></i></span><span>Fetch twelve months of EURCRC=X<small>market_history · Yahoo Finance</small></span><span class="muted num" style="font-size:12px">0:09</span></li>
+          <li><span class="ck now"></span><span>Pull annual inflation for CRI, USA, EMU<small>inflation_rates · World Bank</small></span><span style="color:var(--link);font-size:12px">now</span></li>
+          <li class="todo"><span class="ck todo"></span><span>Compare and compute real change</span><span></span></li>
+          <li class="todo"><span class="ck todo"></span><span>Write the one-page brief</span><span></span></li>
+        </ul>
+
+        <div class="hr"></div>
+        <div class="row" style="margin-bottom:10px"><span class="section-label">Spend</span><span class="spacer"></span><span class="muted" style="font-size:12px">Estimated while running</span></div>
+        <div class="spend"><b class="num">US$0.18</b><span class="muted">of US$1.00</span></div>
+        <div class="prog" style="margin-top:10px"><i style="width:18%"></i></div>
+        <div class="row muted" style="font-size:12px;margin-top:8px"><span>3 of 20 metered tool calls</span><span class="spacer"></span><span>21.4k tokens</span></div>
+
+        <div class="foot">
+          <span class="btn primary"><i data-i="arrowr" class="sm"></i>Open run</span>
+          <span class="btn outline"><i data-i="pause" class="sm"></i>Pause</span>
+          <span class="btn danger-text">Cancel</span>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

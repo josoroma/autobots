@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<title>04 · Approvals</title>
+<link rel="stylesheet" href="../../design/luma.css">
+<link rel="stylesheet" href="quiet.css">
+<link rel="stylesheet" href="studio.css">
+<script src="shell.js"></script>
+<style>
+.split { grid-template-columns: 400px 1fr; }
+.inbox { border-right: 1px solid var(--border); padding: 30px 0 0; display: flex; flex-direction: column; }
+.inbox .hd { padding: 0 20px 16px; }
+.inbox h1 { font: 400 28px/1.1 var(--serif); letter-spacing: -0.02em; margin: 0 0 14px; }
+.grp { font-size: 11.5px; font-weight: 550; letter-spacing: .02em; color: var(--muted-foreground); padding: 14px 20px 6px; }
+.req { display: grid; grid-template-columns: 10px 1fr auto; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--border); font-size: 13.5px; }
+.req .dot { margin-top: 6px; }
+.req b { font-weight: 550; display: block; }
+.req small { display: block; color: var(--muted-foreground); font-size: 12.5px; }
+.req .when { font-size: 12px; color: var(--muted-foreground); white-space: nowrap; }
+.req.sel { background: var(--soft-2); box-shadow: inset 2px 0 0 var(--attention); }
+.req.done { color: var(--muted-foreground); }
+.req.done b { color: color-mix(in oklch, var(--foreground) 75%, transparent); font-weight: 500; }
+.detail { padding: 30px 48px 0; overflow: hidden; }
+.dh { display: flex; align-items: flex-start; gap: 14px; }
+.dh .tile { width: 40px; height: 40px; border-radius: 11px; }
+.dh .tile svg { width: 20px; height: 20px; }
+.dh h2 { font: 400 26px/1.15 var(--serif); letter-spacing: -0.015em; margin: 0 0 6px; }
+.facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin: 22px 0 22px; border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.facts div { padding: 11px 14px; font-size: 13px; }
+.facts div + div { border-left: 1px solid var(--border); }
+.facts small { display: block; color: var(--muted-foreground); font-size: 12px; margin-bottom: 2px; }
+.exact { border: 1px solid var(--border); border-radius: var(--radius-xl); overflow: hidden; }
+.exact .bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--soft); font-size: 12.5px; }
+.exact .seg span { height: 24px; font-size: 12px; }
+.fields { display: grid; grid-template-columns: 110px 1fr; font-size: 13.5px; }
+.fields dt { color: var(--muted-foreground); padding: 10px 14px; border-bottom: 1px solid var(--border); font: 12.5px var(--mono); }
+.fields dd { margin: 0; padding: 10px 14px 10px 0; border-bottom: 1px solid var(--border); }
+.body-md { font-family: var(--serif); font-size: 15px; line-height: 1.55; color: color-mix(in oklch, var(--foreground) 88%, transparent); }
+.body-md p { margin: 0 0 8px; }
+.body-md code { font: 12.5px var(--mono); background: var(--soft-2); border-radius: 4px; padding: 1px 4px; }
+.body-md ul { margin: 0 0 6px; padding-left: 18px; }
+.decide { display: flex; align-items: center; gap: 10px; margin-top: 20px; }
+.decide .btn.lg { height: 40px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside data-active="approvals"></aside>
+  <main class="main">
+    <div class="split">
+      <div class="inbox">
+        <div class="hd"><h1>Approvals</h1><div class="seg"><span class="on">Waiting <i class="n">2</i></span><span>Decided <i class="n">14</i></span></div></div>
+        <div class="grp">Waiting</div>
+        <div class="req sel"><i class="dot wait"></i><span><b>Create a GitHub issue</b><small>Issue triager · Triage flaky checkout tests</small></span><span class="when">expires 18 min</span></div>
+        <div class="req"><i class="dot wait"></i><span><b>Create a GitHub issue</b><small>Issue triager · Nightly import errors</small></span><span class="when">expires 2 h</span></div>
+        <div class="grp">Earlier</div>
+        <div class="req done"><i class="dot ok"></i><span><b>Create a GitHub issue</b><small>Approved · Triage flaky checkout tests</small></span><span class="when">11:02</span></div>
+        <div class="req done"><i class="dot bad"></i><span><b>Create a GitHub issue</b><small>Rejected · run replanned</small></span><span class="when">Yesterday</span></div>
+        <div class="req done"><i class="dot idle"></i><span><b>Create a GitHub issue</b><small>Expired, so it was not approved</small></span><span class="when">Nov 5</span></div>
+      </div>
+
+      <div class="detail">
+        <div class="dh">
+          <span class="tile"><i data-i="git"></i></span>
+          <div style="flex:1"><h2>Create a GitHub issue in acme/tallyboard</h2>
+            <div class="row" style="gap:8px"><span class="mono-chip">create_github_issue · v1</span><span class="pill wait sm"><i data-i="shield" class="sm"></i>Every call waits for a person</span><span class="pill sm">Changes something outside</span></div></div>
+          <span class="btn icon"><i data-i="more"></i></span>
+        </div>
+
+        <div class="facts">
+          <div><small>Requested by</small>Expert · Issue triager</div>
+          <div><small>Run</small>Triage flaky checkout tests</div>
+          <div><small>For task</small>File one issue per distinct failure</div>
+          <div><small>Expires</small><span style="color:var(--attention)">in 18 min · 11:58</span></div>
+        </div>
+
+        <div class="exact">
+          <div class="bar"><b style="font-weight:550">Exact request</b><span class="muted">· sha256 9f3c…0e21 · 1.4 KB</span><span class="spacer"></span><div class="seg"><span class="on">Fields</span><span>JSON</span></div></div>
+          <dl class="fields" style="margin:0">
+            <dt>repository</dt><dd class="mono" style="font-size:13px">acme/tallyboard</dd>
+            <dt>title</dt><dd>Checkout test times out when the coupon service is slow</dd>
+            <dt>labels</dt><dd><span class="mono-chip on">flaky-test</span> <span class="mono-chip on">checkout</span></dd>
+            <dt style="border-bottom:0">body</dt><dd style="border-bottom:0" class="body-md">
+              <p><code>checkout.spec.ts › applies coupon</code> failed in 6 of the last 40 nightly runs, always after a 5 s wait on <code>/coupons/validate</code>.</p>
+              <ul><li>First seen Nov 2; no related code changes since Oct 30.</li><li>Passes locally with the coupon mock enabled.</li></ul>
+              <p>Suggested next step: raise the client timeout in the test, or stub the service.</p>
+            </dd>
+          </dl>
+        </div>
+
+        <div class="callout info" style="margin-top:16px"><i data-i="lock"></i><div><b style="font-weight:550">Approving releases only this exact request.</b> <span class="muted">If any field changes, it comes back here. Rejecting lets the run replan or fail; this request won't run.</span></div></div>
+
+        <div class="decide">
+          <span class="btn primary lg"><i data-i="check" class="sm"></i>Approve this request</span>
+          <span class="btn outline lg">Reject</span>
+          <span class="spacer"></span>
+          <span class="muted" style="font-size:12.5px">Approve <span class="kbd">⌘ ↵</span> · Reject <span class="kbd">⌘ ⌫</span> · Next <span class="kbd">J</span></span>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

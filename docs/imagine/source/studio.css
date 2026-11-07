@@ -1,0 +1,70 @@
+/*
+ * "Studio" concept: one screen per sidebar section of the current app.
+ * Layered on quiet.css (typography, radius steps, semantic aliases), which in turn
+ * consumes ../../design/luma.css unchanged. Nothing here redefines a Luma token.
+ */
+
+/* ---------- sidebar additions ---------- */
+.find { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px; margin: -4px 0 6px; border-radius: var(--radius-md); color: var(--muted-foreground); }
+.find kbd { margin-left: auto; font: 11.5px var(--sans); }
+.sidebar .side-label { padding: 16px 10px 4px; font-size: 11.5px; font-weight: 550; letter-spacing: .02em; }
+.side-health { margin-top: auto; display: flex; align-items: center; gap: 9px; padding: 8px 10px 12px; font-size: 12.5px; color: var(--muted-foreground); }
+.side-health + .side-foot { margin-top: 0; }
+
+/* ---------- page frame ---------- */
+.topbar { gap: 10px; }
+.topbar .title { font-weight: 550; }
+.body { flex: 1; min-height: 0; overflow: hidden; }
+.page { padding: 34px 40px 0; }
+.ph { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 22px; }
+.ph h1 { font: 400 32px/1.1 var(--serif); letter-spacing: -0.02em; margin: 0 0 6px; }
+.ph p { margin: 0; color: var(--muted-foreground); font-size: 14.5px; max-width: 640px; }
+.ph .actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+/* ---------- segmented control & toolbar ---------- */
+.seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: var(--radius-lg); background: var(--soft-2); }
+.seg span { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: var(--radius-md); font-size: 13px; color: var(--muted-foreground); white-space: nowrap; }
+.seg span.on { background: var(--background); color: var(--foreground); font-weight: 500; box-shadow: var(--shadow); }
+.dark .seg span.on { background: var(--accent); }
+.seg .n { font-size: 11.5px; color: var(--muted-foreground); }
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.search { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 11px; width: 280px; border: 1px solid var(--input); border-radius: var(--radius-lg); color: var(--muted-foreground); font-size: 13.5px; background: var(--background); }
+.search kbd { margin-left: auto; font: 11px var(--sans); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; }
+
+/* ---------- tables ---------- */
+.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13.5px; }
+.tbl th { text-align: left; font-weight: 500; font-size: 12.5px; color: var(--muted-foreground); padding: 0 12px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.tbl td { padding: 0 12px; height: 52px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.tbl tr.sel td { background: var(--soft-2); }
+.tbl tr.sel td:first-child { box-shadow: inset 2px 0 0 var(--link); }
+.tbl td.r, .tbl th.r { text-align: right; }
+.tbl .t { font-weight: 500; color: var(--foreground); }
+.tbl .s { display: block; font-size: 12px; color: var(--muted-foreground); margin-top: 1px; }
+
+/* ---------- side panel ---------- */
+.split { display: grid; height: 100%; min-height: 0; }
+.panel { border-left: 1px solid var(--border); background: var(--soft); padding: 24px 24px 0; overflow: hidden; }
+.panel h2 { font: 400 22px/1.2 var(--serif); letter-spacing: -0.015em; margin: 6px 0 4px; }
+.kv { display: grid; grid-template-columns: 112px 1fr; row-gap: 9px; column-gap: 12px; font-size: 13px; }
+.kv dt { color: var(--muted-foreground); }
+.kv dd { margin: 0; }
+.hr { height: 1px; background: var(--border); margin: 18px 0; }
+
+/* ---------- misc ---------- */
+.pill.bad { color: var(--danger); border-color: color-mix(in oklch, var(--danger) 32%, transparent); background: color-mix(in oklch, var(--danger) 8%, transparent); }
+.pill.sm { height: 21px; font-size: 11.5px; padding: 0 8px; }
+.dot.bad { background: var(--danger); }
+.mono-chip { font: 11.5px var(--mono); color: var(--muted-foreground); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
+.mono-chip.on { color: var(--foreground); }
+.monogram { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font: 500 16px var(--serif); flex: none; }
+.callout { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: var(--radius-lg); font-size: 13.5px; }
+.callout.wait { border: 1px solid color-mix(in oklch, var(--attention) 32%, transparent); background: color-mix(in oklch, var(--attention) 7%, transparent); }
+.callout.wait > svg { color: var(--attention); margin-top: 2px; }
+.callout.info { border: 1px solid var(--border); background: var(--soft); }
+.callout.info > svg { color: var(--muted-foreground); margin-top: 2px; }
+.prog { height: 4px; border-radius: 99px; background: var(--muted); overflow: hidden; }
+.prog i { display: block; height: 100%; background: var(--link); border-radius: inherit; }
+.toggle-sw { width: 34px; height: 20px; border-radius: 99px; background: var(--muted); position: relative; flex: none; }
+.toggle-sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--background); box-shadow: var(--shadow); }
+.toggle-sw.on { background: var(--link); }
+.toggle-sw.on::after { left: 16px; background: white; }

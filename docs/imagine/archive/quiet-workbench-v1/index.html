@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Imagine Autobots — Quiet workbench</title>
+<link rel="stylesheet" href="../../../design/luma.css">
+<link rel="stylesheet" href="source/quiet.css">
+<style>
+body { overflow: auto; font-size: 16px; line-height: 1.6; }
+a { color: var(--link); text-underline-offset: 4px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.wrap { width: min(1280px, calc(100% - 32px)); margin: auto; }
+header { padding: 48px 0 28px; }
+.top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.top .mark { width: 24px; height: 24px; }
+.top b { font: 500 19px var(--serif); }
+.toggle { margin-left: auto; display: inline-flex; border: 1px solid var(--border); border-radius: 999px; padding: 3px; gap: 2px; }
+.toggle button { font: 500 13px var(--sans); color: var(--muted-foreground); background: none; border: 0; border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+.toggle button[aria-pressed="true"] { background: var(--accent); color: var(--accent-foreground); }
+h1 { font: 400 clamp(36px, 5vw, 60px)/1.08 var(--serif); letter-spacing: -0.025em; margin: 48px 0 16px; max-width: 900px; }
+.intro { font-size: 18px; color: var(--muted-foreground); max-width: 720px; margin: 0 0 24px; }
+.principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius-xl); overflow: hidden; margin: 8px 0 56px; }
+.principles div { background: var(--background); padding: 16px 18px; font-size: 14px; color: var(--muted-foreground); }
+.principles b { display: block; color: var(--foreground); font-weight: 550; margin-bottom: 2px; }
+nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 40px; }
+nav a { text-decoration: none; color: var(--foreground); border: 1px solid var(--border); border-radius: 999px; padding: 5px 13px; font-size: 14px; }
+section { margin-bottom: 72px; scroll-margin-top: 24px; }
+.head { display: flex; align-items: end; gap: 24px; margin-bottom: 16px; }
+.eyebrow { font-size: 12.5px; color: var(--muted-foreground); }
+h2 { font: 400 32px/1.2 var(--serif); letter-spacing: -0.02em; margin: 2px 0 6px; }
+.cap { color: var(--muted-foreground); margin: 0; max-width: 760px; font-size: 15px; }
+.head a { margin-left: auto; white-space: nowrap; font-size: 14px; }
+figure { margin: 0; border: 1px solid var(--border); border-radius: var(--radius-xl); overflow: hidden; background: var(--card); }
+figure img { display: block; width: 100%; height: auto; }
+footer { border-top: 1px solid var(--border); padding: 28px 0 56px; font-size: 14px; color: var(--muted-foreground); }
+footer .links { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 10px; }
+@media (max-width: 700px) { .head { display: block; } .head a { display: inline-block; margin-top: 8px; } h1 { margin-top: 32px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header id="top">
+  <div class="top"><span class="mark"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2.5 4.5 13.5H12l-1 8 8.5-11H12z"/></svg></span><b>Autobots</b><span class="muted" style="font-size:14px">· concept gallery</span>
+    <div class="toggle" role="group" aria-label="Image theme"><button type="button" data-theme="dark" aria-pressed="true">Dark</button><button type="button" data-theme="light" aria-pressed="false">Light</button></div>
+  </div>
+  <h1>A quieter Autobots.</h1>
+  <p class="intro">Six screens redesigned around the work itself: a calm composer, a run that reads like a conversation beside its document, and results you can read before you audit. Built as HTML on the exact Luma tokens, shown in dark and light.</p>
+  <div class="principles">
+    <div><b>One loud thing per screen</b>Luma blue appears only on the next useful action and live state.</div>
+    <div><b>Reading type for results</b>A serif for headings and documents; system sans for interface.</div>
+    <div><b>Telemetry stays quiet</b>Cost, steps and activity are present but secondary to the artifact.</div>
+    <div><b>Honest states</b>Estimated vs reported cost, draft vs published, checks vs truth.</div>
+  </div>
+  <nav aria-label="Screens"><a href="#home">01 Start</a><a href="#run">02 Follow</a><a href="#approval">03 Approve</a><a href="#result">04 Result</a><a href="#models">05 Models</a><a href="#workflow">06 Workflow</a></nav>
+</header>
+
+<section id="home"><div class="head"><div><div class="eyebrow">01 · Home</div><h2>Start with a goal</h2><p class="cap">A centered composer with the expert, run limit and model inline. The disclosure about what leaves the Mac sits directly under it.</p></div><a href="01-home.png" data-full>Full size</a></div>
+<figure><img src="01-home.png" width="3200" height="2000" alt="Home: a serif prompt asking what to work on, a composer with research analyst, one dollar limit and Terra via OpenRouter, suggestion chips and three recent runs."></figure></section>
+
+<section id="run"><div class="head"><div><div class="eyebrow">02 · Run</div><h2>Follow the work</h2><p class="cap">The plan and sources read as a thread on the left; the document takes shape on the right. Spend and controls stay in the top bar.</p></div><a href="02-run-workspace.png" data-full>Full size</a></div>
+<figure><img src="02-run-workspace.png" width="3200" height="2000" alt="Run workspace: the goal, a five-step plan at step two with three sources, a collapsed activity line, and a draft comparison brief with placeholder rows still being written."></figure></section>
+
+<section id="approval"><div class="head"><div><div class="eyebrow">03 · Approval</div><h2>Review the exact change</h2><p class="cap">A focused dialog over the paused run shows the diff, the reason and the scope of what approving means.</p></div><a href="03-approval.png" data-full>Full size</a></div>
+<figure><img src="03-approval.png" width="3200" height="2000" alt="Approval dialog: replace protected file reports/q3-tools.md, a diff with four removed and five added lines, the run's reason, and Reject or Approve change."></figure></section>
+
+<section id="result"><div class="head"><div><div class="eyebrow">04 · Result</div><h2>Read the result, then its evidence</h2><p class="cap">The brief is set for reading. Checks, numbered sources and reported usage live in a quiet rail beside it.</p></div><a href="04-result-evidence.png" data-full>Full size</a></div>
+<figure><img src="04-result-evidence.png" width="3200" height="2000" alt="Completed brief with a recommendation callout and comparison table; a side rail shows five of six checks passed, four sources and reported cost of 31 cents."></figure></section>
+
+<section id="models"><div class="head"><div><div class="eyebrow">05 · Settings</div><h2>Connect OpenRouter</h2><p class="cap">Keyless state first: what still works, what saving does and doesn't do, and three separate statuses.</p></div><a href="05-model-settings.png" data-full>Full size</a></div>
+<figure><img src="05-model-settings.png" width="3200" height="2000" alt="Models settings: notice that model features are off, an empty key field with Save and validate, three status rows, Terra selected as default, DeepSeek not offered until qualified, and all 14 roles on Terra."></figure></section>
+
+<section id="workflow"><div class="head"><div><div class="eyebrow">06 · Workflow</div><h2>Make the task repeatable</h2><p class="cap">A vertical flow on a dotted canvas, an inspector for the selected step, and an explicit draft versus published version.</p></div><a href="06-workflow.png" data-full>Full size</a></div>
+<figure><img src="06-workflow.png" width="3200" height="2000" alt="Workflow editor: five steps from manual start to an approval gate, the compare step selected, an inspector with expert, instructions, inputs, model and budget, and a valid draft ready to publish as v4."></figure></section>
+
+<footer>
+  <p>Concept artwork with fictional sample data, not screenshots of the implemented app. The <a href="../../../../PRD-Design-System.md">design-system PRD</a> and <a href="../../../design/luma.css">exact tokens</a> remain authoritative.</p>
+  <div class="links"><a href="README.md">Design notes</a><a href="source/">HTML sources</a><a href="manifest.json">Manifest</a><a href="../README.md">Earlier concepts</a><a href="#top">Back to top ↑</a></div>
+</footer>
+</div>
+<script>
+(function () {
+  const buttons = document.querySelectorAll(".toggle button");
+  function apply(theme) {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    buttons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.theme === theme)));
+    document.querySelectorAll("img").forEach((img) => {
+      const base = img.getAttribute("src").replace(/-light\.png$/, ".png");
+      img.src = theme === "light" ? base.replace(/\.png$/, "-light.png") : base;
+    });
+    document.querySelectorAll("a[data-full]").forEach((a) => {
+      const base = a.getAttribute("href").replace(/-light\.png$/, ".png");
+      a.href = theme === "light" ? base.replace(/\.png$/, "-light.png") : base;
+    });
+  }
+  buttons.forEach((b) => b.addEventListener("click", () => apply(b.dataset.theme)));
+})();
+</script>
+</body>
+</html>

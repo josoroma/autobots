@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<title>08 · Settings</title>
+<link rel="stylesheet" href="../../design/luma.css">
+<link rel="stylesheet" href="quiet.css">
+<link rel="stylesheet" href="studio.css">
+<script src="shell.js"></script>
+<style>
+.wrap { flex: 1; display: grid; grid-template-columns: 230px 1fr; min-height: 0; }
+.subnav { padding: 38px 12px 0 24px; display: flex; flex-direction: column; gap: 2px; border-right: 1px solid var(--border); }
+.subnav .t { font: 400 26px var(--serif); letter-spacing: -0.015em; padding: 0 10px 18px; }
+.sn { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: var(--radius-md); color: var(--muted-foreground); font-size: 13.5px; }
+.sn.on { background: var(--accent); color: var(--accent-foreground); font-weight: 500; }
+.content { padding: 38px 0 0 48px; overflow: hidden; }
+.inner { width: 760px; }
+.content h2 { font: 400 22px var(--serif); letter-spacing: -0.01em; margin: 0 0 4px; }
+.content .lead { color: var(--muted-foreground); font-size: 13.5px; margin: 0 0 18px; }
+.sec { padding: 18px 0; border-top: 1px solid var(--border); display: grid; grid-template-columns: 260px 1fr; gap: 28px; align-items: start; }
+.sec h3 { margin: 0 0 3px; font-size: 14px; font-weight: 600; }
+.sec .d { font-size: 12.5px; color: var(--muted-foreground); line-height: 1.45; }
+.themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.th { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 6px; font-size: 13px; }
+.th.on { border-color: color-mix(in oklch, var(--link) 65%, transparent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--link) 14%, transparent); }
+.mini { height: 78px; border-radius: 7px; display: grid; grid-template-columns: 28% 1fr; overflow: hidden; margin-bottom: 7px; border: 1px solid var(--border); }
+.mini .s { padding: 7px 6px; display: flex; flex-direction: column; gap: 4px; }
+.mini .m { padding: 9px; display: flex; flex-direction: column; gap: 5px; }
+.mini i { display: block; height: 5px; border-radius: 9px; }
+.mini.light { background: #fff; } .mini.light .s { background: #f6f6f6; } .mini.light i { background: #e4e4e4; } .mini.light i.a { background: oklch(0.546 0.245 262.881); }
+.mini.dark { background: #111; } .mini.dark .s { background: #1d1d1d; } .mini.dark i { background: #333; } .mini.dark i.a { background: oklch(0.623 0.214 259.815); }
+.mini.sys { background: linear-gradient(110deg, #fff 50%, #111 50%); }
+.mini.sys .s { background: linear-gradient(110deg, #f6f6f6 50%, #1d1d1d 50%); } .mini.sys i { background: #888; opacity: .5; } .mini.sys i.a { background: oklch(0.588 0.23 262); opacity: 1; }
+.th .row { padding: 0 4px 2px; }
+.radio { width: 15px; height: 15px; border-radius: 50%; border: 1.5px solid var(--input); }
+.on .radio { border: 4.5px solid var(--link); }
+.line { display: flex; align-items: center; gap: 12px; font-size: 13.5px; }
+.line + .line { margin-top: 12px; }
+.line small { display: block; font-size: 12.5px; color: var(--muted-foreground); }
+.line .toggle-sw { margin-left: auto; }
+.sample { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--soft); }
+.sample .doc { font-size: 15px; }
+.sample .doc h1 { font-size: 20px; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside data-active="settings"></aside>
+  <main class="main">
+    <div class="wrap">
+      <nav class="subnav">
+        <div class="t">Settings</div>
+        <div class="sn on"><i data-i="palette"></i>Appearance</div>
+        <div class="sn"><i data-i="bell"></i>Notifications</div>
+        <div class="sn"><i data-i="user"></i>Account</div>
+        <div class="sn"><i data-i="lock"></i>Data on this Mac</div>
+        <div class="sn"><i data-i="code"></i>Keyboard</div>
+        <div class="side-label" style="padding:18px 10px 6px;font-size:11.5px;color:var(--muted-foreground);font-weight:550">Elsewhere</div>
+        <div class="sn"><i data-i="cpu"></i>Models<i data-i="ext" class="sm" style="margin-left:auto"></i></div>
+        <div class="sn"><i data-i="activity"></i>Operations<i data-i="ext" class="sm" style="margin-left:auto"></i></div>
+      </nav>
+      <div class="content"><div class="inner">
+        <h2>Appearance</h2>
+        <p class="lead">Stored in this browser. These change presentation only, never how runs behave.</p>
+
+        <div class="sec">
+          <div><h3>Theme</h3><div class="d">Match your Mac, or pick one.</div></div>
+          <div class="themes">
+            <div class="th"><div class="mini sys"><div class="s"><i class="a" style="width:70%"></i><i></i><i></i></div><div class="m"><i style="width:60%"></i><i></i><i style="width:80%"></i></div></div><div class="row"><span class="radio"></span>System</div></div>
+            <div class="th"><div class="mini light"><div class="s"><i class="a" style="width:70%"></i><i></i><i></i></div><div class="m"><i style="width:60%"></i><i></i><i style="width:80%"></i></div></div><div class="row"><span class="radio"></span>Light</div></div>
+            <div class="th on"><div class="mini dark"><div class="s"><i class="a" style="width:70%"></i><i></i><i></i></div><div class="m"><i style="width:60%"></i><i></i><i style="width:80%"></i></div></div><div class="row"><span class="radio"></span>Dark</div></div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div><h3>Reading</h3><div class="d">How results and briefs are set.</div></div>
+          <div>
+            <div class="line"><span>Serif for documents<small>Results read like a page, not a log.</small></span><span class="toggle-sw on"></span></div>
+            <div class="sample"><div class="doc"><h1>EUR → CRC, twelve months on</h1><p style="margin:0">The colón gained 4.1% against the euro while Costa Rica's inflation stayed under 1%, so the real change is larger than it looks.</p></div></div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div><h3>Density</h3><div class="d">Spacing in lists and tables.</div></div>
+          <div class="seg"><span class="on">Comfortable</span><span>Compact</span></div>
+        </div>
+
+        <div class="sec">
+          <div><h3>Motion</h3><div class="d">Live activity and streaming text.</div></div>
+          <div>
+            <div class="line"><span>Stream text as it's written<small>Off shows each step once it's complete.</small></span><span class="toggle-sw on"></span></div>
+            <div class="line"><span>Reduce motion<small>Follows your Mac's setting.</small></span><span class="toggle-sw"></span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

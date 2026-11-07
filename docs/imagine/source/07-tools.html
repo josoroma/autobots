@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<title>07 · Tools</title>
+<link rel="stylesheet" href="../../design/luma.css">
+<link rel="stylesheet" href="quiet.css">
+<link rel="stylesheet" href="studio.css">
+<script src="shell.js"></script>
+<style>
+.split { grid-template-columns: 1fr 440px; }
+.cols { display: grid; grid-template-columns: 188px 1fr; gap: 28px; }
+.groups { font-size: 13px; }
+.groups .g { display: flex; align-items: center; height: 30px; padding: 0 10px; border-radius: var(--radius-md); color: color-mix(in oklch, var(--foreground) 80%, transparent); }
+.groups .g span { margin-left: auto; color: var(--muted-foreground); font-size: 12px; }
+.groups .g.on { background: var(--accent); color: var(--accent-foreground); font-weight: 500; }
+.gh { display: flex; align-items: baseline; gap: 10px; margin: 16px 0 4px; }
+.gh:first-child { margin-top: 0; }
+.gh b { font-size: 13.5px; font-weight: 600; }
+.gh small { color: var(--muted-foreground); font-size: 12.5px; }
+.tool { display: grid; grid-template-columns: 30px 1fr auto; gap: 12px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 13.5px; }
+.tool .tile { width: 30px; height: 30px; border-radius: 8px; }
+.tool b { font-weight: 550; }
+.tool small { display: flex; gap: 8px; align-items: center; color: var(--muted-foreground); font-size: 12px; margin-top: 2px; }
+.tool small .mono { font-size: 11.5px; }
+.tool.sel { background: var(--soft-2); border-radius: var(--radius-lg); border-top-color: transparent; }
+.tool.sel + .tool { border-top-color: transparent; }
+.tool.off { opacity: .62; }
+.facts4 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+.fct { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 9px 11px; font-size: 13px; background: var(--background); }
+.fct small { display: flex; gap: 6px; align-items: center; color: var(--muted-foreground); font-size: 11.5px; margin-bottom: 2px; }
+pre.schema { margin: 8px 0 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--background); font: 12px/1.55 var(--mono); color: color-mix(in oklch, var(--foreground) 82%, transparent); overflow: hidden; }
+pre.schema .k { color: var(--link); }
+pre.schema .s { color: var(--success); }
+.granted { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.granted span { display: inline-flex; gap: 7px; align-items: center; font-size: 12.5px; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px 3px 4px; }
+.granted .monogram { width: 20px; height: 20px; font-size: 11px; border-radius: 50%; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside data-active="tools"></aside>
+  <main class="main">
+    <div class="split">
+      <div class="page">
+        <div class="ph">
+          <div><h1>Tools</h1><p>Every tool this install knows, granted or not. Seeing a tool here doesn't let anything call it: an Expert, goal or workflow has to grant it.</p></div>
+        </div>
+        <div class="toolbar">
+          <div class="search" style="width:320px"><i data-i="search" class="sm"></i>Filter tools<kbd>/</kbd></div>
+          <span class="btn outline">All providers<i data-i="down" class="sm"></i></span>
+          <span class="btn outline">Any availability<i data-i="down" class="sm"></i></span>
+          <span class="spacer"></span>
+          <span class="muted" style="font-size:12.5px">Grouped by what a tool does</span>
+        </div>
+        <div class="cols">
+          <div class="groups">
+            <div class="g">All groups</div>
+            <div class="g">Planning</div>
+            <div class="g">General</div>
+            <div class="g">Web search</div>
+            <div class="g">Website extraction</div>
+            <div class="g">Web crawling</div>
+            <div class="g">Files</div>
+            <div class="g on">Market data</div>
+            <div class="g">Autonomous browsing</div>
+            <div class="g">Code</div>
+            <div class="g">Connectors</div>
+            <div class="g">Delegation</div>
+            <div class="g">Learning</div>
+          </div>
+          <div>
+            <div class="gh"><b>Market data</b><small>Prices, exchange rates and inflation.</small></div>
+            <div class="tool sel"><span class="tile"><i data-i="chart" class="sm"></i></span><span><b>Market history</b><small><span class="mono">market_history</span>· Yahoo Finance · Leaves this Mac</small></span><span class="pill ok sm">Available</span></div>
+            <div class="tool"><span class="tile"><i data-i="chart" class="sm"></i></span><span><b>Inflation rates</b><small><span class="mono">inflation_rates</span>· World Bank · Leaves this Mac</small></span><span class="pill ok sm">Available</span></div>
+            <div class="gh"><b>Web search</b><small>Search the web through a tool provider.</small></div>
+            <div class="tool"><span class="tile"><i data-i="search" class="sm"></i></span><span><b>Search the web</b><small><span class="mono">search_web</span>· Jina · Metered by its provider</small></span><span class="pill ok sm">Available</span></div>
+            <div class="tool off"><span class="tile"><i data-i="search" class="sm"></i></span><span><b>Tavily search</b><small><span class="mono">tavily_search</span>· Tavily · Metered by its provider</small></span><span class="pill sm">Unavailable: key not set</span></div>
+            <div class="gh"><b>Connectors</b><small>Effects in an outside service, each approved.</small></div>
+            <div class="tool"><span class="tile"><i data-i="git" class="sm"></i></span><span><b>Create GitHub issue</b><small><span class="mono">create_github_issue</span>· GitHub · Changes something outside</small></span><span class="pill wait sm"><i data-i="shield" class="sm"></i>Every call waits</span></div>
+            <div class="gh"><b>General</b><small>Arithmetic, memory and saving files inside the run.</small></div>
+            <div class="tool"><span class="tile"><i data-i="bolt" class="sm"></i></span><span><b>Calculate</b><small><span class="mono">calculate</span>· Autobots, on this Mac · Stays on this Mac</small></span><span class="pill ok sm">Available</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="row"><span class="tile" style="width:34px;height:34px;border-radius:9px"><i data-i="chart"></i></span><span class="spacer"></span><span class="pill ok"><i class="dot ok"></i>Available</span></div>
+        <h2 style="margin-top:12px">Market history</h2>
+        <div class="row" style="gap:8px"><span class="mono-chip on">market_history</span><span class="muted" style="font-size:12.5px">version 1 · read only</span></div>
+        <p class="muted" style="font-size:13.5px;margin:12px 0 0">Daily closes for a Yahoo symbol, including currency pairs such as <span class="mono">EURCRC=X</span>. Unofficial data: outputs name the source and carry timestamps.</p>
+        <div class="facts4">
+          <div class="fct"><small><i data-i="globe" class="sm"></i>Network</small>Leaves this Mac</div>
+          <div class="fct"><small><i data-i="wallet" class="sm"></i>Cost</small>No provider charge</div>
+          <div class="fct"><small><i data-i="shield" class="sm"></i>Approval</small>Not needed</div>
+          <div class="fct"><small><i data-i="clock" class="sm"></i>Limits</small>Up to 10 years · 20 calls/run</div>
+        </div>
+        <div class="hr"></div>
+        <div class="section-label">Granted to</div>
+        <div class="granted"><span><i class="monogram m1" style="background:color-mix(in oklch,var(--chart-2) 18%,var(--card));color:var(--chart-2)">M</i>Market watcher</span><span><i class="monogram" style="background:color-mix(in oklch,var(--link) 18%,var(--card));color:var(--link)">R</i>Research analyst</span><span><i class="monogram" style="background:var(--soft-2)">W</i>Monthly FX note · v2</span></div>
+        <div class="hr"></div>
+        <div class="row"><span class="section-label">Input · JSON Schema</span><span class="spacer"></span><i data-i="copy" class="sm muted"></i></div>
+<pre class="schema">{
+  <span class="k">"symbol"</span>: {
+    "type": <span class="s">"string"</span>,
+    "pattern": <span class="s">"^[A-Z0-9.=^-]{1,20}$"</span>
+  },
+  <span class="k">"range"</span>: { "enum": [<span class="s">"1mo"</span>, <span class="s">"1y"</span>, <span class="s">"10y"</span>] },
+  <span class="k">"interval"</span>: { "enum": [<span class="s">"1d"</span>, <span class="s">"1wk"</span>] }
+}</pre>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

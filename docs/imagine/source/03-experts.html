@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<title>03 · Experts</title>
+<link rel="stylesheet" href="../../design/luma.css">
+<link rel="stylesheet" href="quiet.css">
+<link rel="stylesheet" href="studio.css">
+<script src="shell.js"></script>
+<style>
+.page { padding-right: 40px; height: 100%; position: relative; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.ex { position: relative; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--card); padding: 18px 18px 14px; display: flex; flex-direction: column; gap: 10px; min-height: 196px; }
+.ex.picked { border-color: color-mix(in oklch, var(--link) 60%, transparent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--link) 13%, transparent); }
+.ex .head { display: flex; gap: 12px; align-items: center; }
+.ex h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.ex .role { font: 11.5px var(--mono); color: var(--muted-foreground); }
+.ex p { margin: 0; font-size: 13.5px; color: var(--muted-foreground); line-height: 1.5; }
+.ex .tools { display: flex; flex-wrap: wrap; gap: 5px; }
+.ex .meta { margin-top: auto; display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted-foreground); padding-top: 10px; border-top: 1px solid var(--border); }
+.ex .meta .btn { height: 28px; font-size: 12.5px; margin-left: auto; }
+.check { position: absolute; top: 16px; right: 16px; width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--input); display: grid; place-items: center; }
+.picked .check { background: var(--link); border-color: var(--link); color: white; }
+.picked .check svg { width: 12px; height: 12px; stroke-width: 2.75; }
+.m1 { background: color-mix(in oklch, var(--chart-2) 18%, var(--card)); color: var(--chart-2); }
+.m2 { background: color-mix(in oklch, var(--link) 18%, var(--card)); color: var(--link); }
+.m3 { background: var(--soft-2); color: var(--foreground); }
+.m4 { background: color-mix(in oklch, var(--attention) 16%, var(--card)); color: var(--attention); }
+.new { border: 1.5px dashed var(--border); border-radius: var(--radius-xl); display: grid; place-items: center; text-align: center; color: var(--muted-foreground); font-size: 13.5px; min-height: 196px; }
+.new .plus { width: 36px; height: 36px; border-radius: 50%; background: var(--soft-2); display: grid; place-items: center; margin: 0 auto 10px; color: var(--foreground); }
+.dock { position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; padding: 10px 10px 10px 14px; border-radius: 999px; background: var(--popover); border: 1px solid var(--border); box-shadow: var(--shadow-lg); font-size: 13.5px; white-space: nowrap; }
+.dock .stack { display: flex; }
+.dock .stack .monogram { width: 28px; height: 28px; font-size: 13px; border-radius: 50%; border: 2px solid var(--popover); }
+.dock .stack .monogram + .monogram { margin-left: -8px; }
+.dock .btn { border-radius: 999px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside data-active="experts"></aside>
+  <main class="main">
+    <div class="body"><div class="page">
+      <div class="ph">
+        <div><h1>Experts</h1><p>Specialists with their own instructions, granted tools and model roles. Start one on its own, or pick several for a coordinator session.</p></div>
+        <div class="actions"><span class="btn outline"><i data-i="book" class="sm"></i>How Experts work</span><span class="btn primary lg"><i data-i="plus"></i>New Expert</span></div>
+      </div>
+      <div class="toolbar">
+        <div class="seg"><span class="on">All <i class="n">6</i></span><span>Can change things outside <i class="n">1</i></span><span>Read only <i class="n">5</i></span></div>
+        <span class="spacer"></span>
+        <div class="search"><i data-i="search" class="sm"></i>Search Experts<kbd>/</kbd></div>
+      </div>
+
+      <div class="grid">
+        <div class="ex picked"><span class="check"><i data-i="check"></i></span>
+          <div class="head"><span class="monogram m1">M</span><div><h3>Market watcher</h3><span class="role">executor · Terra</span></div></div>
+          <p>Tracks prices, exchange rates and inflation, and explains what moved and why it matters.</p>
+          <div class="tools"><span class="mono-chip">market_history</span><span class="mono-chip">inflation_rates</span><span class="mono-chip">calculate</span><span class="mono-chip">+2</span></div>
+          <div class="meta"><span>12 runs · last today</span><span class="btn outline">Start run</span></div>
+        </div>
+        <div class="ex picked"><span class="check"><i data-i="check"></i></span>
+          <div class="head"><span class="monogram m2">R</span><div><h3>Research analyst</h3><span class="role">researcher · Sol</span></div></div>
+          <p>Searches the web and reads sources carefully. Cites every claim and flags anything it couldn't confirm.</p>
+          <div class="tools"><span class="mono-chip">search_web</span><span class="mono-chip">extract_website_content</span><span class="mono-chip">+3</span></div>
+          <div class="meta"><span>31 runs · last 38 min ago</span><span class="btn outline">Start run</span></div>
+        </div>
+        <div class="ex"><span class="check"></span>
+          <div class="head"><span class="monogram m3">B</span><div><h3>Brief writer</h3><span class="role">summarizer · Terra</span></div></div>
+          <p>Turns findings into a short brief with a recommendation, a comparison table and numbered sources.</p>
+          <div class="tools"><span class="mono-chip">save_artifact</span><span class="mono-chip">publish_artifact</span><span class="mono-chip">read_run_file</span></div>
+          <div class="meta"><span>18 runs · last 1 h ago</span><span class="btn outline">Start run</span></div>
+        </div>
+        <div class="ex"><span class="check"></span>
+          <div class="head"><span class="monogram m4">I</span><div><h3>Issue triager</h3><span class="role">reviewer · Terra</span></div></div>
+          <p>Groups failing checks by cause and drafts one GitHub issue per distinct failure. Each issue waits for you.</p>
+          <div class="tools"><span class="mono-chip">read_csv</span><span class="mono-chip on" style="border-color:color-mix(in oklch,var(--attention) 40%,transparent)">create_github_issue</span></div>
+          <div class="meta"><span class="row" style="gap:6px;color:var(--attention)"><i data-i="shield" class="sm"></i>Approval on every issue</span><span class="btn outline">Start run</span></div>
+        </div>
+        <div class="ex"><span class="check"></span>
+          <div class="head"><span class="monogram m3">C</span><div><h3>Code maintainer</h3><span class="role">coder · Terra</span></div></div>
+          <p>Searches and edits the run's own files as code, with exact replacements you can review as a diff.</p>
+          <div class="tools"><span class="mono-chip">search_files</span><span class="mono-chip">read_code_file</span><span class="mono-chip">patch_code_file</span></div>
+          <div class="meta"><span>6 runs · last yesterday</span><span class="btn outline">Start run</span></div>
+        </div>
+        <div class="new"><div><span class="plus"><i data-i="plus"></i></span><b style="color:var(--foreground);font-weight:550">Create an Expert</b><br>Describe the job; we'll suggest tools and a role.</div></div>
+      </div>
+
+      <div class="dock">
+        <div class="stack"><span class="monogram m1">M</span><span class="monogram m2">R</span></div>
+        <span><b style="font-weight:550">2 Experts</b> <span class="muted">for a coordinator session</span></span>
+        <span class="btn">Clear</span>
+        <span class="btn primary">Start session<i data-i="arrowr" class="sm"></i></span>
+      </div>
+    </div></div>
+  </main>
+</div>
+</body>
+</html>

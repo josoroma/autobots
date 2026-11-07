@@ -1,8 +1,9 @@
 {
-  "work_item": "QUIET-001",
-  "generated_at": "2026-11-07T16:20:01+00:00",
-  "mode": "HTML/CSS rendered with Playwright 1.64.1 (apps/web pin) and cached Chrome for Testing",
-  "direction": "Quiet workbench",
+  "work_item": "STUDIO-001",
+  "generated_at": "2026-11-07T23:38:56+00:00",
+  "mode": "HTML/CSS rendered with Playwright (apps/web pin) and cached Chrome for Testing",
+  "direction": "Studio: one screen per sidebar section",
+  "basis": "Sections and wording from apps/web components, services/agent domain enums and Decisions 0017 and 0019; the live app at 127.0.0.1:3000 was signed out and showed only empty states",
   "viewport": {
     "width": 1600,
     "height": 1000,
@@ -16,7 +17,8 @@
   },
   "proposals_beyond_design_contract": [
     "serif display face for headings and documents",
-    "amber attention color"
+    "amber attention color",
+    "grouped sidebar navigation with search and a health line"
   ],
   "images": [
     {
@@ -24,122 +26,182 @@
       "theme": "light",
       "width": 3200,
       "height": 2000,
-      "bytes": 237024,
-      "sha256": "6ea761c88820162c73e699a18df203ce1f99deb9d554fe0ba4510bb06d6587f5"
+      "bytes": 316184,
+      "sha256": "1ef17b7c801c3bf7fc7d0bb0afed95859dbf09c7e7d7211f0572b3fdcd748fb9"
     },
     {
       "file": "01-home.png",
       "theme": "dark",
       "width": 3200,
       "height": 2000,
-      "bytes": 236920,
-      "sha256": "5f137128c1c48989d5e9e8c76eaa5a35dc46cf22ecd0d61c79fb3edc6f9b942b"
+      "bytes": 303397,
+      "sha256": "90d47585a9b688f2e92d1265f55d229d0d7952698a2a7332c7b35adc13cd370d"
     },
     {
-      "file": "02-run-workspace-light.png",
+      "file": "02-runs-light.png",
       "theme": "light",
       "width": 3200,
       "height": 2000,
-      "bytes": 427530,
-      "sha256": "b2592183b8e8e05eb2ffc392736147c1ed9a5ea1dd262d5b80b0a1642ed6d5ce"
+      "bytes": 440238,
+      "sha256": "0f63bae1655dc8a1bd6326681e8540a611ed8a9736f0fb8a367c08bfa9b4c014"
     },
     {
-      "file": "02-run-workspace.png",
+      "file": "02-runs.png",
       "theme": "dark",
       "width": 3200,
       "height": 2000,
-      "bytes": 428438,
-      "sha256": "49f22454f341593bb6d7668939d5219850e787703ca229640e6ea6556b1f087a"
+      "bytes": 441202,
+      "sha256": "78d5ddc401312450c1bb56c62174e9922127dc3b6af42f7c40519dd3950a9cf1"
     },
     {
-      "file": "03-approval-light.png",
+      "file": "03-experts-light.png",
       "theme": "light",
       "width": 3200,
       "height": 2000,
-      "bytes": 484778,
-      "sha256": "c0dfe635b587c58975ce9853c1397ff72d5ca2af7c5435c9cf139acec02e323b"
+      "bytes": 354819,
+      "sha256": "c3258bb051bba033bd9ed60398b13a40960aeeb90358f1e532a9fddde3b0eb3f"
     },
     {
-      "file": "03-approval.png",
+      "file": "03-experts.png",
       "theme": "dark",
       "width": 3200,
       "height": 2000,
-      "bytes": 474069,
-      "sha256": "75f4c5d425228fe5799dcf044e4e4077aff58fe794f608a8db0dc455fb93cb11"
+      "bytes": 348271,
+      "sha256": "f353fb00180e09891f842bb16be3493b4aa507be9e9c04c3a3c1e1f135ece65a"
     },
     {
-      "file": "04-result-evidence-light.png",
+      "file": "04-approvals-light.png",
       "theme": "light",
       "width": 3200,
       "height": 2000,
-      "bytes": 455222,
-      "sha256": "7e181a1dadb9950129d70c07c024ba1def7a02fada633a82ba39aa615500af26"
+      "bytes": 387323,
+      "sha256": "78eec8c8c51c79f6c7d4f07583368eda1b7936e021ebdbd91fc90ec6adc7a774"
     },
     {
-      "file": "04-result-evidence.png",
+      "file": "04-approvals.png",
       "theme": "dark",
       "width": 3200,
       "height": 2000,
-      "bytes": 459715,
-      "sha256": "bc36f1798d4df77ca121c744e6a120722d667bc88c365d5cff63bb6bcd53a00a"
+      "bytes": 390489,
+      "sha256": "6c9d7b1e51e5997f1035005f64d60db99a6776ca5dee1bc33e9f856f14061532"
     },
     {
-      "file": "05-model-settings-light.png",
+      "file": "05-operations-light.png",
       "theme": "light",
       "width": 3200,
       "height": 2000,
-      "bytes": 333639,
-      "sha256": "9b8063e14579e6630023a1da391a85b8209c4e66b4d65208df4e09b603aed7e8"
+      "bytes": 354983,
+      "sha256": "bfd47cb830918955d39df00eb680ad5269b2b815f528c060acd1335a7265345a"
     },
     {
-      "file": "05-model-settings.png",
+      "file": "05-operations.png",
       "theme": "dark",
       "width": 3200,
       "height": 2000,
-      "bytes": 336705,
-      "sha256": "d25e201dc144c195a0be8c50e22413cf9fc551520a3fbc0ac049a5d9364dbbd9"
+      "bytes": 356950,
+      "sha256": "b663b8080a6ee6c73d1c21764f815ea1e47c75e9c365ddff364af084468b629a"
     },
     {
-      "file": "06-workflow-light.png",
+      "file": "06-workflows-light.png",
       "theme": "light",
       "width": 3200,
       "height": 2000,
-      "bytes": 316648,
-      "sha256": "6d925795371962a3821211b027913c6db394490188512d7542f1a1f54850a257"
+      "bytes": 411409,
+      "sha256": "c18d8c6845206ea3c2a81210147ca1073b2ca8bdf95ded76a8a33b5af35f5a8e"
     },
     {
-      "file": "06-workflow.png",
+      "file": "06-workflows.png",
       "theme": "dark",
       "width": 3200,
       "height": 2000,
-      "bytes": 303811,
-      "sha256": "7559bf50eea61324ccf9ba5ed0a07b7f16e8aff10c404ffc1a61a152594d53cd"
+      "bytes": 401404,
+      "sha256": "250eb9af6d31242d5eca9f096847fcb8d7eff2693e759f4fb614de074751c2ee"
+    },
+    {
+      "file": "07-tools-light.png",
+      "theme": "light",
+      "width": 3200,
+      "height": 2000,
+      "bytes": 436612,
+      "sha256": "ec0e48d7c1756b41d13386af23a2deb89881a2478700ad1356faef62901907b8"
+    },
+    {
+      "file": "07-tools.png",
+      "theme": "dark",
+      "width": 3200,
+      "height": 2000,
+      "bytes": 439547,
+      "sha256": "1b281ba9e07e34867b687767c9507762e60802aeb4847587b398157872b7f340"
+    },
+    {
+      "file": "08-settings-light.png",
+      "theme": "light",
+      "width": 3200,
+      "height": 2000,
+      "bytes": 280560,
+      "sha256": "ec135f6c8a687702f050e30067fbc8dc175b363371d2c6a66f04a96336b67963"
+    },
+    {
+      "file": "08-settings.png",
+      "theme": "dark",
+      "width": 3200,
+      "height": 2000,
+      "bytes": 283886,
+      "sha256": "1854a0b3c9dde7c7f08ac6338adbf40d9a29fbbe86facad3cd37c3597f63f616"
+    },
+    {
+      "file": "09-models-light.png",
+      "theme": "light",
+      "width": 3200,
+      "height": 2000,
+      "bytes": 346599,
+      "sha256": "843abe682862f67e4ab4029e32d0f539e5a6ddc5dece3a50d3b74ee1315289e8"
+    },
+    {
+      "file": "09-models.png",
+      "theme": "dark",
+      "width": 3200,
+      "height": 2000,
+      "bytes": 357787,
+      "sha256": "e42aef9a973f9ce221d0626db7228677d3faa677324fcd5c8eb687e6c0ded0ba"
     }
   ],
   "sources": [
     {
       "file": "source/01-home.html",
-      "sha256": "7db2ca1b265106a9de71dcd723c49f8952d9ba7e08157b57beca49db81cbac7d"
+      "sha256": "675c019d4d671248919aa145afc1c5c1f973cd32a100aa6d3334962fdc4244e8"
     },
     {
-      "file": "source/02-run-workspace.html",
-      "sha256": "186c02aa44c2ac632609718d8643680618b652a60e78c4d962da40aeb14144d9"
+      "file": "source/02-runs.html",
+      "sha256": "6c0f9d0e58a4cd82604e877a12e265e7017ed0efd5514cb7f5499663c3a7713f"
     },
     {
-      "file": "source/03-approval.html",
-      "sha256": "7471208dcb0e7272b48b2a9732477d4b072e20a1d5a6546be0a40159b889c823"
+      "file": "source/03-experts.html",
+      "sha256": "eda278ed383935ee920b4e85c95760ef055b6451b65fd901b6d1280d0cd395c6"
     },
     {
-      "file": "source/04-result-evidence.html",
-      "sha256": "556aaa48c226808e67debd80cd3a6db426f86fc0ee2f6280627260dae43b95a2"
+      "file": "source/04-approvals.html",
+      "sha256": "6ce2d281985f3dca0e67e3f4d959db7ed0392a7145f3ec6205b758dbc416eb3d"
     },
     {
-      "file": "source/05-model-settings.html",
-      "sha256": "0de0b10e23dfdc0caa769dc17907b74dddeca6a085d92ea2f47ef2fdd85cd7d7"
+      "file": "source/05-operations.html",
+      "sha256": "a4ed3f4c4e27c3bacbad9a351eac1ec3e654665cdbe2499b18bc72324d659acc"
     },
     {
-      "file": "source/06-workflow.html",
-      "sha256": "eea78c6f1e2c4e09b989ada5dda0d687a1a4282b2f51932f777ac716b6ae8eeb"
+      "file": "source/06-workflows.html",
+      "sha256": "485573acaf6e4ec728d0fc6ada4424446794687ca13b118b93c30cb5a6499db1"
+    },
+    {
+      "file": "source/07-tools.html",
+      "sha256": "17b96c63d325f49cebfa11f5e61d2f38a40683a1be6dea302a71f69a7e4b6718"
+    },
+    {
+      "file": "source/08-settings.html",
+      "sha256": "ad709bd08d768754bccfb6f30e21608b27059e637970a9c95966d55f6497377e"
+    },
+    {
+      "file": "source/09-models.html",
+      "sha256": "55350574f5621a72ceb6189c43f69a4be15a6e3f1bc3ab352fc543a36e9b69b3"
     },
     {
       "file": "source/quiet.css",
@@ -147,30 +209,36 @@
     },
     {
       "file": "source/render.mjs",
-      "sha256": "1e15bbdb4b917fa3aa010cd3ac97ab6028cd877443e0c72fedc46c124772ee7a"
+      "sha256": "a10865ce4e4975c6ed4a6b7ba56f787a859458fc6ffc41810b142eb45a680c30"
     },
     {
       "file": "source/shell.js",
-      "sha256": "3d486696b67dc70b286178b2a6832b320825cafaf7f4fddd8fbe8cd8effe8a63"
+      "sha256": "7534e6033c23ad13398df5ca0321f59b3ad8498394038a75124aae6a0703f0c3"
+    },
+    {
+      "file": "source/studio.css",
+      "sha256": "8d8df3e6155aafb2c848b4a69c65cdad72bed78a9aa463728f71be741b8f18f5"
     }
   ],
   "supporting_files": [
     {
       "file": "README.md",
-      "sha256": "7ccb00053dbcbb606562525febc36d1f2d0f095feb2cc52e5c6ac6507dfb3cbb"
+      "sha256": "1c849c1592d2698d41d8c85070a58f9cbdf3bd3e42549c7feb82e4454392972d"
     },
     {
       "file": "index.html",
-      "sha256": "aaa89d3d27c52301c58a0a6d093bded463c79ad2737063a154c854e636becc40"
+      "sha256": "687207630ce48c6766efa878245a3eaecabc1b9a8067d6c48e9580b121c2427d"
     }
   ],
   "previous_concepts": [
+    "archive/quiet-workbench-v1/",
     "archive/luma-dark-v1/",
     "archive/warm-green-v1/"
   ],
   "limitations": [
-    "Fictional products, prices, dates and statuses",
+    "Sample products, counts, prices, dates and run histories",
     "Static mockups, not app components",
-    "Not checked for accessibility or contrast conformance"
+    "Not checked for accessibility or contrast conformance",
+    "Not compared against signed-in screens of the running app"
   ]
 }

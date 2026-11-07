@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<title>01 · Start with a goal</title>
+<link rel="stylesheet" href="../../../../design/luma.css">
+<link rel="stylesheet" href="quiet.css">
+<script src="shell.js"></script>
+<style>
+.stage { flex: 1; display: flex; flex-direction: column; align-items: center; padding-top: 176px; overflow: hidden; }
+.col { width: 720px; }
+.hello { font-size: 40px; line-height: 1.15; text-align: center; margin: 0 0 30px; }
+.composer { border: 1px solid var(--input); border-radius: var(--radius-2xl); background: var(--card); box-shadow: var(--shadow); padding: 18px 18px 12px; }
+.composer p { margin: 0 0 30px; font-size: 16px; line-height: 1.55; }
+.caret { display: inline-block; width: 1.5px; height: 19px; background: var(--foreground); vertical-align: -3px; margin-left: 1px; }
+.composer .row { gap: 6px; }
+.send { width: 34px; height: 34px; border-radius: 50%; background: var(--primary); color: var(--primary-foreground); display: grid; place-items: center; }
+.send svg { stroke-width: 2.25; }
+.model { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: var(--radius-md); font-size: 13px; color: var(--muted-foreground); }
+.model b { color: var(--foreground); font-weight: 500; }
+.note { display: flex; justify-content: center; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted-foreground); margin: 14px 0 26px; }
+.sugg { display: flex; justify-content: center; gap: 8px; }
+.recentwork { margin-top: 84px; }
+.recentwork .head { display: flex; align-items: baseline; padding: 0 2px 8px; }
+.rw { display: grid; grid-template-columns: 22px 1fr auto auto; align-items: center; gap: 12px; height: 50px; padding: 0 4px; border-top: 1px solid var(--border); }
+.rw .t { font-weight: 500; }
+.rw .meta { font-size: 13px; color: var(--muted-foreground); }
+.rw .when { width: 82px; text-align: right; font-size: 13px; color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside data-active="home"></aside>
+  <main class="main">
+    <div class="stage">
+      <div class="col">
+        <h1 class="hello serif">What should we work on?</h1>
+        <div class="composer">
+          <p>Compare Tallyboard and Plainview for a 12‑person product team. Use only their official docs and pricing pages, then recommend one.<span class="caret"></span></p>
+          <div class="row">
+            <span class="btn icon"><i data-i="plus"></i></span>
+            <span class="chip"><i data-i="experts" class="sm"></i>Research analyst</span>
+            <span class="chip"><i data-i="wallet" class="sm"></i>$1.00 limit</span>
+            <span class="spacer"></span>
+            <span class="model"><b>Terra</b> via OpenRouter <i data-i="down" class="sm"></i></span>
+            <span class="send"><i data-i="up"></i></span>
+          </div>
+        </div>
+        <div class="note"><i data-i="lock" class="sm"></i>Files and history stay on this Mac. Your goal and the context you select are sent to OpenRouter.</div>
+        <div class="sugg">
+          <span class="chip"><i data-i="list" class="sm"></i>Compare options</span>
+          <span class="chip"><i data-i="files" class="sm"></i>Summarize a folder</span>
+          <span class="chip"><i data-i="pen" class="sm"></i>Draft a report</span>
+          <span class="chip"><i data-i="workflows" class="sm"></i>Run a workflow</span>
+        </div>
+
+        <div class="recentwork">
+          <div class="head"><span class="section-label">Recent work</span><span class="spacer"></span><span class="muted" style="font-size:13px">View all</span></div>
+          <div class="rw"><i class="dot ok" style="margin-left:7px"></i><span><span class="t">Q3 vendor shortlist</span> <span class="meta">· vendor-shortlist.md</span></span><span class="meta num">$0.31</span><span class="when">2h ago</span></div>
+          <div class="rw"><i class="dot wait" style="margin-left:7px"></i><span><span class="t">Release notes draft</span> <span class="meta">· waiting for your approval</span></span><span class="meta num">$0.12</span><span class="when">Yesterday</span></div>
+          <div class="rw"><i class="dot ok" style="margin-left:7px"></i><span><span class="t">Summarize /research/interviews</span> <span class="meta">· 14 files</span></span><span class="meta num">$0.22</span><span class="when">Tue</span></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

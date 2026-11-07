@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<title>05 · Operations</title>
+<link rel="stylesheet" href="../../design/luma.css">
+<link rel="stylesheet" href="quiet.css">
+<link rel="stylesheet" href="studio.css">
+<script src="shell.js"></script>
+<style>
+.hero { display: flex; align-items: center; gap: 16px; padding: 18px 20px; border: 1px solid color-mix(in oklch, var(--success) 30%, transparent); background: color-mix(in oklch, var(--success) 6%, transparent); border-radius: var(--radius-xl); margin-bottom: 18px; }
+.pulse { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in oklch, var(--success) 16%, transparent); color: var(--success); }
+.pulse svg { stroke-width: 2.25; }
+.hero b { font: 400 21px var(--serif); letter-spacing: -0.01em; }
+.hero small { display: block; color: var(--muted-foreground); font-size: 13px; }
+.checks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius-xl); overflow: hidden; }
+.c { background: var(--background); padding: 15px 16px 16px; min-height: 108px; }
+.c .h { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 550; margin-bottom: 6px; }
+.c .h svg { color: var(--muted-foreground); }
+.c .h .dot { margin-left: auto; }
+.c p { margin: 0; font-size: 12.5px; color: var(--muted-foreground); line-height: 1.45; }
+.c .v { font-size: 12px; margin-top: 8px; color: color-mix(in oklch, var(--foreground) 80%, transparent); }
+.lower { display: grid; grid-template-columns: 1.25fr 1fr; gap: 18px; margin-top: 18px; }
+.box { border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 16px 18px; }
+.box .bh { display: flex; align-items: center; margin-bottom: 12px; }
+.box .bh b { font-weight: 600; font-size: 14px; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted-foreground); }
+.legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+.routes .r { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 9px 0; border-top: 1px solid var(--border); font-size: 13px; align-items: center; }
+.routes .r small { display: block; font-size: 12px; color: var(--muted-foreground); }
+.ret { display: grid; grid-template-columns: 1fr 120px; gap: 10px 14px; align-items: center; font-size: 13px; margin-top: 4px; }
+.ret .input { height: 34px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside data-active="operations"></aside>
+  <main class="main">
+    <div class="body"><div class="page">
+      <div class="ph">
+        <div><h1>Operations</h1><p>Health of the services on this Mac. Only the workspace owner sees this page, and it never calls a model.</p></div>
+        <div class="actions"><span class="muted" style="font-size:12.5px">Checked 12 s ago</span><span class="btn outline"><i data-i="refresh" class="sm"></i>Check again</span><span class="btn outline"><i data-i="book" class="sm"></i>Runbook</span></div>
+      </div>
+
+      <div class="hero"><span class="pulse"><i data-i="check"></i></span><div><b>Ready. New work can start.</b><small>8 of 8 checks pass · nothing is holding work · 1 worker running</small></div><span class="spacer"></span><span class="pill"><i data-i="lock" class="sm"></i>Loopback only · this Mac</span></div>
+
+      <div class="checks">
+        <div class="c"><div class="h"><i data-i="db" class="sm"></i>Database<i class="dot ok"></i></div><p>The database is answering.</p><div class="v num">p95 4 ms · local Docker</div></div>
+        <div class="c"><div class="h"><i data-i="list" class="sm"></i>Schema<i class="dot ok"></i></div><p>The schema has what this version needs.</p><div class="v num">42 migrations applied</div></div>
+        <div class="c"><div class="h"><i data-i="box" class="sm"></i>Storage<i class="dot ok"></i></div><p>Storage is answering.</p><div class="v num">Private buckets · 1.2 GB</div></div>
+        <div class="c"><div class="h"><i data-i="disk" class="sm"></i>Disk<i class="dot ok"></i></div><p>The disk has room.</p><div class="v num">182 GB free of 494 GB</div></div>
+        <div class="c"><div class="h"><i data-i="server" class="sm"></i>Worker<i class="dot ok"></i></div><p>1 worker running. No job has lost its worker.</p><div class="v num">2 jobs leased · 1 queued</div></div>
+        <div class="c"><div class="h"><i data-i="hourglass" class="sm"></i>Checkpoints<i class="dot ok"></i></div><p>The checkpoint adapter is qualified for this release.</p><div class="v num">Postgres saver · fenced</div></div>
+        <div class="c"><div class="h"><i data-i="pause" class="sm"></i>Holds<i class="dot ok"></i></div><p>Nothing is holding work.</p><div class="v">No restore pending release</div></div>
+        <div class="c"><div class="h"><i data-i="cloud" class="sm"></i>OpenRouter<i class="dot ok"></i></div><p>The catalog answered. That says nothing about your key or a model call.</p><div class="v num">Catalog fetched 11:42</div></div>
+      </div>
+
+      <div class="lower">
+        <div class="box">
+          <div class="bh"><b>Jobs · last 24 hours</b><span class="spacer"></span><div class="legend"><span><i style="background:var(--foreground);opacity:.75"></i>Succeeded</span><span><i style="background:var(--attention)"></i>Waited for you</span><span><i style="background:var(--danger)"></i>Failed</span></div></div>
+          <svg viewBox="0 0 600 250" width="100%" height="330" aria-hidden="true">
+            <g stroke="var(--border)" stroke-width="1"><line x1="0" y1="20" x2="600" y2="20"/><line x1="0" y1="110" x2="600" y2="110"/><line x1="0" y1="200" x2="600" y2="200"/></g>
+            <g id="bars"></g>
+            <g font-size="11" fill="var(--muted-foreground)" font-family="-apple-system, sans-serif"><text x="0" y="226">12:00</text><text x="138" y="226">18:00</text><text x="288" y="226">00:00</text><text x="438" y="226">06:00</text><text x="570" y="226">now</text></g>
+          </svg>
+        </div>
+        <div class="box">
+          <div class="bh"><b>Model routes</b><span class="spacer"></span><span class="muted" style="font-size:12px">Qualified live, within a cap</span></div>
+          <div class="routes">
+            <div class="r"><span>Terra<small class="mono">openai/gpt-6.1-terra · tested Nov 5, with limits</small></span><span class="pill ok sm">Qualified</span></div>
+            <div class="r"><span>Sol<small class="mono">openai/gpt-6.1-sol · tested Nov 7, with limits</small></span><span class="pill ok sm">Qualified</span></div>
+            <div class="r"><span>DeepSeek V4.1 Flash<small class="mono">deepseek/deepseek-v4.1-flash-1017</small></span><span class="pill sm">Not qualified</span></div>
+          </div>
+          <div class="hr" style="margin:12px 0"></div>
+          <div class="bh" style="margin-bottom:8px"><b>Retention</b><span class="spacer"></span><span class="btn outline" style="height:28px;font-size:12.5px">Save retention</span></div>
+          <div class="ret"><span class="muted">Run content window</span><div class="input"><span class="num">30</span><span class="spacer"></span><span class="muted">days</span></div><span class="muted">Retry keys</span><div class="input"><span class="num">7</span><span class="spacer"></span><span class="muted">days</span></div></div>
+        </div>
+      </div>
+    </div></div>
+  </main>
+</div>
+<script>
+  // deterministic sample bars: 48 half-hour buckets
+  const g = document.getElementById("bars"); let s = 7, out = "";
+  const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280;
+  for (let i = 0; i < 48; i++) {
+    const day = Math.sin((i / 48) * Math.PI * 2 - 1.2) * 0.5 + 0.55;
+    const ok = Math.round(3 + day * 120 * (0.6 + rnd() * 0.5));
+    const wait = rnd() > 0.78 ? 9 + Math.round(rnd() * 12) : 0;
+    const bad = rnd() > 0.93 ? 8 : 0;
+    const x = i * 12.5 + 1, w = 9; let y = 200;
+    out += `<rect x="${x}" y="${y - ok}" width="${w}" height="${ok}" rx="2" fill="var(--foreground)" opacity=".75"/>`; y -= ok + 2;
+    if (wait) { out += `<rect x="${x}" y="${y - wait}" width="${w}" height="${wait}" rx="2" fill="var(--attention)"/>`; y -= wait + 2; }
+    if (bad) out += `<rect x="${x}" y="${y - bad}" width="${w}" height="${bad}" rx="2" fill="var(--danger)"/>`;
+  }
+  g.innerHTML = out;
+</script>
+</body>
+</html>

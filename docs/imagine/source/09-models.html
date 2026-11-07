@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<title>09 · Models</title>
+<link rel="stylesheet" href="../../design/luma.css">
+<link rel="stylesheet" href="quiet.css">
+<link rel="stylesheet" href="studio.css">
+<script src="shell.js"></script>
+<style>
+.inner { width: 1080px; }
+.conn { display: grid; grid-template-columns: 1fr repeat(3, auto); gap: 0; align-items: stretch; border: 1px solid var(--border); border-radius: var(--radius-xl); margin-bottom: 26px; }
+.conn > div { padding: 14px 18px; font-size: 13px; }
+.conn > div + div { border-left: 1px solid var(--border); }
+.conn small { display: block; color: var(--muted-foreground); font-size: 12px; margin-bottom: 3px; }
+.conn .lead { display: flex; align-items: center; gap: 12px; }
+.or { width: 38px; height: 38px; border-radius: 10px; background: var(--soft-2); display: grid; place-items: center; }
+.sh { display: flex; align-items: baseline; gap: 10px; margin: 0 0 12px; }
+.sh b { font-size: 14px; font-weight: 600; }
+.sh small { color: var(--muted-foreground); font-size: 12.5px; }
+.profiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 28px; }
+.pf { border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 16px 18px; background: var(--card); display: flex; flex-direction: column; gap: 8px; }
+.pf.def { border-color: color-mix(in oklch, var(--link) 55%, transparent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--link) 12%, transparent); }
+.pf.off { background: transparent; }
+.pf .top { display: flex; align-items: center; gap: 8px; }
+.pf h3 { margin: 0; font: 400 22px var(--serif); letter-spacing: -0.01em; }
+.pf .mono { font-size: 11.5px; color: var(--muted-foreground); }
+.pf .price { display: flex; gap: 18px; font-size: 12.5px; color: var(--muted-foreground); padding-top: 8px; border-top: 1px solid var(--border); margin-top: 2px; }
+.pf .price b { display: block; color: var(--foreground); font-weight: 500; font-size: 14px; }
+.caps { display: flex; flex-wrap: wrap; gap: 5px; }
+.caps span { font-size: 11.5px; border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; color: var(--muted-foreground); display: inline-flex; gap: 4px; align-items: center; }
+.caps span.y { color: var(--foreground); }
+.caps span.y::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--success); }
+.caps span.n { text-decoration: line-through; text-decoration-color: color-mix(in oklch, var(--muted-foreground) 60%, transparent); }
+.roles { display: grid; grid-template-columns: repeat(2, 1fr); column-gap: 32px; }
+.rl { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--border); font-size: 13px; }
+.rl .mono { font-size: 12.5px; }
+.rl .sel { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px 0 10px; border: 1px solid var(--input); border-radius: var(--radius-md); font-size: 12.5px; }
+.rl .sel.over { border-color: color-mix(in oklch, var(--link) 50%, transparent); color: var(--link); }
+.rl .why { font-size: 11.5px; color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside data-active="models"></aside>
+  <main class="main">
+    <div class="body"><div class="page"><div class="inner">
+      <div class="ph">
+        <div><h1>Models</h1><p>Every model call goes through OpenRouter. New runs freeze this policy when they're admitted; runs already admitted keep theirs.</p></div>
+        <div class="actions"><span class="btn outline">Discard</span><span class="btn primary lg">Save policy</span></div>
+      </div>
+
+      <div class="conn">
+        <div class="lead"><span class="or"><i data-i="cpu"></i></span><div><b style="font-weight:600;font-size:14px">OpenRouter</b><div class="muted" style="font-size:12.5px">Stored for this workspace, encrypted on this Mac</div></div></div>
+        <div><small>Authentication</small><span class="row"><i class="dot ok"></i>The key authenticated</span></div>
+        <div><small>Catalog</small><span class="row"><i class="dot ok"></i>Fresh · 11:42</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><span class="btn outline"><i data-i="key" class="sm"></i>Replace key</span></div>
+      </div>
+
+      <div class="sh"><b>Approved profiles</b><small>Three, by owner decision. A profile is offered for new runs only once its route is qualified.</small></div>
+      <div class="profiles">
+        <div class="pf def">
+          <div class="top"><h3>Terra</h3><span class="pill live sm">Workspace default</span><span class="spacer"></span><span class="pill ok sm">Qualified</span></div>
+          <span class="mono">openai/gpt-6.1-terra</span>
+          <div class="caps"><span class="y">Text</span><span class="y">Tool calls</span><span class="y">Structured output</span><span class="y">Streaming</span></div>
+          <div class="price"><span><b class="num">US$1</b>input / 1M</span><span><b class="num">US$5</b>output / 1M</span><span><b>Nov 5</b>tested, with limits</span></div>
+        </div>
+        <div class="pf">
+          <div class="top"><h3>Sol</h3><span class="pill sm">researcher</span><span class="spacer"></span><span class="pill ok sm">Qualified</span></div>
+          <span class="mono">openai/gpt-6.1-sol</span>
+          <div class="caps"><span class="y">Text</span><span class="y">Tool calls</span><span class="y">Structured output</span><span class="y">Reasoning</span></div>
+          <div class="price"><span><b class="num">US$2</b>input / 1M</span><span><b class="num">US$10</b>output / 1M</span><span><b>Nov 7</b>tested, with limits</span></div>
+        </div>
+        <div class="pf off">
+          <div class="top"><h3 class="muted">DeepSeek V4.1 Flash</h3><span class="spacer"></span><span class="pill sm">Not qualified</span></div>
+          <span class="mono">deepseek/deepseek-v4.1-flash-1017</span>
+          <div class="caps"><span class="n">Tool calls</span><span class="n">Structured output</span><span>Not offered for new runs</span></div>
+          <div class="price"><span><b class="num">US$0.15</b>input / 1M</span><span><b class="num">US$0.60</b>output / 1M</span><span><b>—</b>no substitute</span></div>
+        </div>
+      </div>
+
+      <div class="sh"><b>Roles</b><small>13 of 14 roles follow the workspace default. Overrides apply to new runs only.</small><span class="spacer"></span><span class="btn" style="height:26px;font-size:12.5px;color:var(--muted-foreground)">Reset all</span></div>
+      <div class="roles">
+        <div class="rl"><span class="mono">coordinator</span><span class="sel">Default · Terra<i data-i="down" class="sm"></i></span></div>
+        <div class="rl"><span class="mono">reviewer</span><span class="sel">Default · Terra<i data-i="down" class="sm"></i></span></div>
+        <div class="rl"><span class="mono">router</span><span class="sel">Default · Terra<i data-i="down" class="sm"></i></span></div>
+        <div class="rl"><span class="mono">evaluator</span><span class="sel">Default · Terra<i data-i="down" class="sm"></i></span></div>
+        <div class="rl"><span class="mono">planner</span><span class="sel">Default · Terra<i data-i="down" class="sm"></i></span></div>
+        <div class="rl"><span class="mono">summarizer</span><span class="sel">Default · Terra<i data-i="down" class="sm"></i></span></div>
+        <div class="rl"><span class="mono">executor</span><span class="sel">Default · Terra<i data-i="down" class="sm"></i></span></div>
+        <div class="rl"><span class="mono">memory_curator</span><span class="sel">Default · Terra<i data-i="down" class="sm"></i></span></div>
+        <div class="rl"><span class="mono">researcher</span><span class="why">built-in default</span><span class="sel over">Sol<i data-i="down" class="sm"></i></span></div>
+        <div class="rl"><span class="mono">skill_learner</span><span class="sel">Default · Terra<i data-i="down" class="sm"></i></span></div>
+        <div class="rl"><span class="mono">coder</span><span class="sel">Default · Terra<i data-i="down" class="sm"></i></span></div>
+        <div class="rl"><span class="mono">tool_repair</span><span class="sel">Default · Terra<i data-i="down" class="sm"></i></span></div>
+      </div>
+      <div class="muted" style="font-size:12.5px;margin-top:10px">+ workflow_generator and general_purpose, both on the default</div>
+    </div></div></div>
+  </main>
+</div>
+</body>
+</html>

@@ -1,10 +1,10 @@
-// Shared shell for the "Quiet workbench" concept screens: theme, icon sprite,
+// Shared shell for the "Studio" concept screens: theme, icon sprite, grouped
 // sidebar and concept label. Theme comes from ?theme=light|dark (dark default).
 (function () {
   const theme = new URLSearchParams(location.search).get("theme") === "light" ? "light" : "dark";
   document.documentElement.classList.toggle("dark", theme === "dark");
   document.documentElement.style.colorScheme = theme;
-  window.QUIET_THEME = theme;
+  window.STUDIO_THEME = theme;
 
   const P = {
     home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5h4v5"/>',
@@ -53,6 +53,30 @@
     sliders: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
     palette: '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8h2.1A4.3 4.3 0 0 0 21 10.7C21 6.4 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10.5" cy="7" r="1"/><circle cx="15.5" cy="7.5" r="1"/>',
     db: '<ellipse cx="12" cy="5.5" rx="7.5" ry="2.5"/><path d="M4.5 5.5v13c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5v-13M4.5 12c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5"/>',
+    activity: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+    wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/>',
+    filter: '<path d="M4 5h16l-6 7.5V19l-4 1.5v-8z"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+    moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+    monitor: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+    bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+    user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6"/>',
+    branch: '<circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="8" r="2"/><path d="M6 7v10M18 10c0 4-4 4.5-12 7"/>',
+    grid: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
+    git: '<circle cx="12" cy="12" r="3"/><path d="M3 12h6M15 12h6"/>',
+    server: '<rect x="4" y="4" width="16" height="7" rx="1.5"/><rect x="4" y="13" width="16" height="7" rx="1.5"/><path d="M8 7.5h.01M8 16.5h.01"/>',
+    disk: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/>',
+    box: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>',
+    cloud: '<path d="M7 18a4.5 4.5 0 0 1-.5-9A6 6 0 0 1 18 8.5a4.5 4.5 0 0 1-.5 9.5z"/>',
+    hourglass: '<path d="M6 3h12M6 21h12M7 3c0 5 10 5 10 9s-10 4-10 9M17 3c0 5-10 5-10 9"/>',
+    code: '<path d="m8 7-5 5 5 5M16 7l5 5-5 5"/>',
+    chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    star: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+    book: '<path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H20v15H5.5A1.5 1.5 0 0 0 4 19.5z"/><path d="M4 19.5A1.5 1.5 0 0 0 5.5 21H20"/>',
+    calendar: '<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+    arrowr: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    sort: '<path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/>',
+    trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
   };
   window.icon = (name, cls = "") => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${P[name] || ""}</svg>`;
 
@@ -62,41 +86,33 @@
     });
   }
 
-  const NAV = [
-    ["home", "Home"], ["runs", "Runs"], ["experts", "Experts"],
-    ["workflows", "Workflows"], ["approvals", "Approvals"], ["files", "Files"],
-  ];
-  const RECENT = [
-    ["live", "Tallyboard vs Plainview", "run"],
-    ["ok", "Q3 vendor shortlist"],
-    ["ok", "Summarize /research/interviews"],
-    ["wait", "Release notes draft"],
-    ["idle", "Weekly competitor brief"],
+  // The nine sections of the current app, grouped by what the person is doing.
+  const GROUPS = [
+    [null, [["home", "home", "Home"], ["runs", "runs", "Runs"], ["approvals", "approvals", "Approvals", 2]]],
+    ["Build", [["experts", "experts", "Experts"], ["workflows", "workflows", "Workflows"], ["tools", "wrench", "Tools"]]],
+    ["System", [["operations", "activity", "Operations"], ["models", "cpu", "Models"], ["settings", "settings", "Settings"]]],
   ];
 
   function sidebar(el) {
     const active = el.dataset.active;
-    const current = el.dataset.current;
     el.classList.add("sidebar");
     el.innerHTML = `
       <div class="brand"><span class="mark">${icon("bolt")}</span><b>Autobots</b><span class="spacer"></span>${icon("panel")}</div>
       <div class="newrun">${icon("compose")}New run<kbd>⌘ N</kbd></div>
-      ${NAV.map(([k, label]) => `<div class="nav ${k === active ? "active" : ""}">${icon(k)}${label}${k === "approvals" ? '<span class="count">1</span>' : ""}</div>`).join("")}
-      <div class="side-label">Recent</div>
-      ${RECENT.map(([d, t, key]) => `<div class="recent ${key && key === current ? "current" : ""}"><i class="dot ${d}"></i><span>${t}</span></div>`).join("")}
-      <div class="side-foot"><div class="avatar">JO</div><div class="acct">Personal<small>${icon("laptop", "sm")}This Mac · local</small></div>${icon("settings")}</div>`;
+      <div class="find">${icon("search")}Search<kbd>⌘ K</kbd></div>
+      ${GROUPS.map(([label, items]) => `
+        ${label ? `<div class="side-label">${label}</div>` : ""}
+        ${items.map(([k, ic, text, n]) => `<div class="nav ${k === active ? "active" : ""}">${icon(ic)}${text}${n ? `<span class="count">${n}</span>` : ""}</div>`).join("")}`).join("")}
+      <div class="side-health"><i class="dot ok"></i><span>All local services ready</span></div>
+      <div class="side-foot"><div class="avatar">JO</div><div class="acct">Josoroma<small>${icon("laptop", "sm")}Owner · this Mac</small></div>${icon("more")}</div>`;
   }
 
   document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll("aside[data-active]").forEach(sidebar);
     expand(document);
-    if (!document.body.dataset.noTag) {
-      const tag = document.createElement("div");
-      tag.className = "concept";
-      tag.textContent = "Concept · sample data";
-      document.body.appendChild(tag);
-    }
-    document.querySelectorAll("iframe[data-src]").forEach((f) => { f.src = `${f.dataset.src}?theme=${theme}&embed=1`; });
-    if (new URLSearchParams(location.search).get("embed")) document.querySelector(".concept")?.remove();
+    const tag = document.createElement("div");
+    tag.className = "concept";
+    tag.textContent = "Concept · sample data";
+    document.body.appendChild(tag);
   });
 })();

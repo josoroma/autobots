@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Imagine Autobots — Quiet workbench</title>
+<title>Imagine Autobots — Studio</title>
 <link rel="stylesheet" href="../design/luma.css">
 <link rel="stylesheet" href="source/quiet.css">
 <style>
@@ -44,37 +44,46 @@ footer .links { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 10px; }
   <div class="top"><span class="mark"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2.5 4.5 13.5H12l-1 8 8.5-11H12z"/></svg></span><b>Autobots</b><span class="muted" style="font-size:14px">· concept gallery</span>
     <div class="toggle" role="group" aria-label="Image theme"><button type="button" data-theme="dark" aria-pressed="true">Dark</button><button type="button" data-theme="light" aria-pressed="false">Light</button></div>
   </div>
-  <h1>A quieter Autobots.</h1>
-  <p class="intro">Six screens redesigned around the work itself: a calm composer, a run that reads like a conversation beside its document, and results you can read before you audit. Built as HTML on the exact Luma tokens, shown in dark and light.</p>
+  <h1>Every section, redesigned.</h1>
+  <p class="intro">One screen for each of the nine sections in the current sidebar, imagined at the polish of the best AI products: a calm composer, tables that read at a glance, side panels instead of page hops, and reading type for anything you'll read. Built as HTML on the exact Luma tokens, in dark and light.</p>
   <div class="principles">
-    <div><b>One loud thing per screen</b>Luma blue appears only on the next useful action and live state.</div>
-    <div><b>Reading type for results</b>A serif for headings and documents; system sans for interface.</div>
-    <div><b>Telemetry stays quiet</b>Cost, steps and activity are present but secondary to the artifact.</div>
-    <div><b>Honest states</b>Estimated vs reported cost, draft vs published, checks vs truth.</div>
+    <div><b>Grouped navigation</b>Work, Build and System, with search, New run and live health in the sidebar.</div>
+    <div><b>List plus panel</b>Runs, Workflows and Tools keep the list in view while the panel shows detail.</div>
+    <div><b>The product's own words</b>States, checks and tool facts use the app's existing wording.</div>
+    <div><b>One loud thing per screen</b>Blue marks the next action and live state; amber means it needs you.</div>
   </div>
-  <nav aria-label="Screens"><a href="#home">01 Start</a><a href="#run">02 Follow</a><a href="#approval">03 Approve</a><a href="#result">04 Result</a><a href="#models">05 Models</a><a href="#workflow">06 Workflow</a></nav>
+  <nav aria-label="Screens"><a href="#home">01 Home</a><a href="#runs">02 Runs</a><a href="#experts">03 Experts</a><a href="#approvals">04 Approvals</a><a href="#operations">05 Operations</a><a href="#workflows">06 Workflows</a><a href="#tools">07 Tools</a><a href="#settings">08 Settings</a><a href="#models">09 Models</a></nav>
 </header>
 
-<section id="home"><div class="head"><div><div class="eyebrow">01 · Home</div><h2>Start with a goal</h2><p class="cap">A centered composer with the expert, run limit and model inline. The disclosure about what leaves the Mac sits directly under it.</p></div><a href="01-home.png" data-full>Full size</a></div>
-<figure><img src="01-home.png" width="3200" height="2000" alt="Home: a serif prompt asking what to work on, a composer with research analyst, one dollar limit and Terra via OpenRouter, suggestion chips and three recent runs."></figure></section>
+<section id="home"><div class="head"><div><div class="eyebrow">01 · Home</div><h2>Start with a goal</h2><p class="cap">A centered composer carries the Expert, budget and models inline, with attached files as chips. What the run would use and what leaves the Mac sit right under it; what needs you and recent runs come after.</p></div><a href="01-home.png" data-full>Full size</a></div>
+<figure><img src="01-home.png" width="3200" height="2000" alt="Home: a serif question, a composer with an EUR to CRC inflation goal, two attached files, Market watcher, a one dollar budget and workspace models, the tools and models it would use, two items needing approval or input and three recent runs."></figure></section>
 
-<section id="run"><div class="head"><div><div class="eyebrow">02 · Run</div><h2>Follow the work</h2><p class="cap">The plan and sources read as a thread on the left; the document takes shape on the right. Spend and controls stay in the top bar.</p></div><a href="02-run-workspace.png" data-full>Full size</a></div>
-<figure><img src="02-run-workspace.png" width="3200" height="2000" alt="Run workspace: the goal, a five-step plan at step two with three sources, a collapsed activity line, and a draft comparison brief with placeholder rows still being written."></figure></section>
+<section id="runs"><div class="head"><div><div class="eyebrow">02 · Runs</div><h2>Every run, one glance</h2><p class="cap">A filterable table with the canonical states in words and color, estimated versus reported spend, and a side panel showing the selected run's plan, spend meter and controls.</p></div><a href="02-runs.png" data-full>Full size</a></div>
+<figure><img src="02-runs.png" width="3200" height="2000" alt="Runs: tabs for all, active, needs you and finished; nine runs from running to failed; a side panel with a five-step plan at step three, eighteen cents of a one dollar budget and Open, Pause and Cancel."></figure></section>
 
-<section id="approval"><div class="head"><div><div class="eyebrow">03 · Approval</div><h2>Review the exact change</h2><p class="cap">A focused dialog over the paused run shows the diff, the reason and the scope of what approving means.</p></div><a href="03-approval.png" data-full>Full size</a></div>
-<figure><img src="03-approval.png" width="3200" height="2000" alt="Approval dialog: replace protected file reports/q3-tools.md, a diff with four removed and five added lines, the run's reason, and Reject or Approve change."></figure></section>
+<section id="experts"><div class="head"><div><div class="eyebrow">03 · Experts</div><h2>Specialists you can combine</h2><p class="cap">Cards show each Expert's role, model and granted tools. Pick several and a floating dock starts a coordinator session; Experts that change something outside say so on the card.</p></div><a href="03-experts.png" data-full>Full size</a></div>
+<figure><img src="03-experts.png" width="3200" height="2000" alt="Experts: five Expert cards with roles, models and tool chips, two selected, an Issue triager marked as needing approval on every issue, a create card, and a dock to start a coordinator session with two Experts."></figure></section>
 
-<section id="result"><div class="head"><div><div class="eyebrow">04 · Result</div><h2>Read the result, then its evidence</h2><p class="cap">The brief is set for reading. Checks, numbered sources and reported usage live in a quiet rail beside it.</p></div><a href="04-result-evidence.png" data-full>Full size</a></div>
-<figure><img src="04-result-evidence.png" width="3200" height="2000" alt="Completed brief with a recommendation callout and comparison table; a side rail shows five of six checks passed, four sources and reported cost of 31 cents."></figure></section>
+<section id="approvals"><div class="head"><div><div class="eyebrow">04 · Approvals</div><h2>Decide one exact request</h2><p class="cap">An inbox of waiting and decided requests beside the full request: who asked, for which run and task, when it expires, every field, and what approving releases.</p></div><a href="04-approvals.png" data-full>Full size</a></div>
+<figure><img src="04-approvals.png" width="3200" height="2000" alt="Approvals: two waiting GitHub issue requests and three earlier decisions; the selected request shows its requester, run, task and expiry, the exact repository, title, labels and body, and Approve or Reject."></figure></section>
 
-<section id="models"><div class="head"><div><div class="eyebrow">05 · Settings</div><h2>Connect OpenRouter</h2><p class="cap">Keyless state first: what still works, what saving does and doesn't do, and three separate statuses.</p></div><a href="05-model-settings.png" data-full>Full size</a></div>
-<figure><img src="05-model-settings.png" width="3200" height="2000" alt="Models settings: notice that model features are off, an empty key field with Save and validate, three status rows, Terra selected as default, DeepSeek not offered until qualified, and all 14 roles on Terra."></figure></section>
+<section id="operations"><div class="head"><div><div class="eyebrow">05 · Operations</div><h2>Health at a glance</h2><p class="cap">A one-line verdict, eight checks in the product's own wording, a day of jobs, the qualified model routes and retention, on one owner-only page that never calls a model.</p></div><a href="05-operations.png" data-full>Full size</a></div>
+<figure><img src="05-operations.png" width="3200" height="2000" alt="Operations: a ready banner, eight passing checks for database, schema, storage, disk, worker, checkpoints, holds and OpenRouter, a 24-hour jobs chart, model route qualification and retention settings."></figure></section>
 
-<section id="workflow"><div class="head"><div><div class="eyebrow">06 · Workflow</div><h2>Make the task repeatable</h2><p class="cap">A vertical flow on a dotted canvas, an inspector for the selected step, and an explicit draft versus published version.</p></div><a href="06-workflow.png" data-full>Full size</a></div>
-<figure><img src="06-workflow.png" width="3200" height="2000" alt="Workflow editor: five steps from manual start to an approval gate, the compare step selected, an inspector with expert, instructions, inputs, model and budget, and a valid draft ready to publish as v4."></figure></section>
+<section id="workflows"><div class="head"><div><div class="eyebrow">06 · Workflows</div><h2>Repeatable work, versioned</h2><p class="cap">Published and draft versions are explicit in the list. The side panel previews the published flow on a dotted canvas, its approval gate and recent executions.</p></div><a href="06-workflows.png" data-full>Full size</a></div>
+<figure><img src="06-workflows.png" width="3200" height="2000" alt="Workflows: six workflows with published and draft versions, steps, last execution and run counts; a side panel with a five-step flow ending in an approval gate, two recent executions and Run v3."></figure></section>
+
+<section id="tools"><div class="head"><div><div class="eyebrow">07 · Tools</div><h2>A catalog that explains itself</h2><p class="cap">Tools grouped by what they do, each with where data goes, cost, approval and availability. The detail panel adds limits, who it's granted to and its input schema.</p></div><a href="07-tools.png" data-full>Full size</a></div>
+<figure><img src="07-tools.png" width="3200" height="2000" alt="Tools: a group list with Market data selected, tool rows for market data, web search, connectors and general tools with availability badges, and a detail panel for market history with network, cost, approval, limits, grants and schema."></figure></section>
+
+<section id="settings"><div class="head"><div><div class="eyebrow">08 · Settings</div><h2>Presentation, kept separate</h2><p class="cap">Appearance with visual theme choices, reading type, density and motion. Models and Operations stay their own sections and are linked, not nested.</p></div><a href="08-settings.png" data-full>Full size</a></div>
+<figure><img src="08-settings.png" width="3200" height="2000" alt="Settings: a sub-navigation with Appearance selected, theme cards for system, light and dark, a serif reading toggle with a sample paragraph, density and motion settings."></figure></section>
+
+<section id="models"><div class="head"><div><div class="eyebrow">09 · Models</div><h2>Three profiles, one gateway</h2><p class="cap">The OpenRouter connection with separate statuses, the three approved profiles with capabilities, prices and qualification, and per-role overrides with the researcher on Sol.</p></div><a href="09-models.png" data-full>Full size</a></div>
+<figure><img src="09-models.png" width="3200" height="2000" alt="Models: OpenRouter authenticated with a fresh catalog, Terra as workspace default and qualified, Sol qualified for the researcher, DeepSeek V4.1 Flash not qualified and not offered, and fourteen roles with their models."></figure></section>
 
 <footer>
-  <p>Concept artwork with fictional sample data, not screenshots of the implemented app. The <a href="../../PRD-Design-System.md">design-system PRD</a> and <a href="../design/luma.css">exact tokens</a> remain authoritative.</p>
+  <p>Concept artwork with sample data, not screenshots of the implemented app. The <a href="../../PRD-Design-System.md">design-system PRD</a> and <a href="../design/luma.css">exact tokens</a> remain authoritative.</p>
   <div class="links"><a href="README.md">Design notes</a><a href="source/">HTML sources</a><a href="manifest.json">Manifest</a><a href="archive/README.md">Earlier concepts</a><a href="#top">Back to top ↑</a></div>
 </footer>
 </div>

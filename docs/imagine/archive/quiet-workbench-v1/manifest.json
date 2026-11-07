@@ -1,0 +1,176 @@
+{
+  "work_item": "QUIET-001",
+  "generated_at": "2026-11-07T16:20:01+00:00",
+  "mode": "HTML/CSS rendered with Playwright 1.64.1 (apps/web pin) and cached Chrome for Testing",
+  "direction": "Quiet workbench",
+  "viewport": {
+    "width": 1600,
+    "height": 1000,
+    "device_scale_factor": 2
+  },
+  "status": "design_concepts_with_sample_data",
+  "canonical_tokens": {
+    "file": "../design/luma.css",
+    "sha256": "cfe0b1e970fd0b87a11d069dd6c22b71745030c5ac908a793767cdc4a2f0103f",
+    "modified": false
+  },
+  "proposals_beyond_design_contract": [
+    "serif display face for headings and documents",
+    "amber attention color"
+  ],
+  "images": [
+    {
+      "file": "01-home-light.png",
+      "theme": "light",
+      "width": 3200,
+      "height": 2000,
+      "bytes": 237024,
+      "sha256": "6ea761c88820162c73e699a18df203ce1f99deb9d554fe0ba4510bb06d6587f5"
+    },
+    {
+      "file": "01-home.png",
+      "theme": "dark",
+      "width": 3200,
+      "height": 2000,
+      "bytes": 236920,
+      "sha256": "5f137128c1c48989d5e9e8c76eaa5a35dc46cf22ecd0d61c79fb3edc6f9b942b"
+    },
+    {
+      "file": "02-run-workspace-light.png",
+      "theme": "light",
+      "width": 3200,
+      "height": 2000,
+      "bytes": 427530,
+      "sha256": "b2592183b8e8e05eb2ffc392736147c1ed9a5ea1dd262d5b80b0a1642ed6d5ce"
+    },
+    {
+      "file": "02-run-workspace.png",
+      "theme": "dark",
+      "width": 3200,
+      "height": 2000,
+      "bytes": 428438,
+      "sha256": "49f22454f341593bb6d7668939d5219850e787703ca229640e6ea6556b1f087a"
+    },
+    {
+      "file": "03-approval-light.png",
+      "theme": "light",
+      "width": 3200,
+      "height": 2000,
+      "bytes": 484778,
+      "sha256": "c0dfe635b587c58975ce9853c1397ff72d5ca2af7c5435c9cf139acec02e323b"
+    },
+    {
+      "file": "03-approval.png",
+      "theme": "dark",
+      "width": 3200,
+      "height": 2000,
+      "bytes": 474069,
+      "sha256": "75f4c5d425228fe5799dcf044e4e4077aff58fe794f608a8db0dc455fb93cb11"
+    },
+    {
+      "file": "04-result-evidence-light.png",
+      "theme": "light",
+      "width": 3200,
+      "height": 2000,
+      "bytes": 455222,
+      "sha256": "7e181a1dadb9950129d70c07c024ba1def7a02fada633a82ba39aa615500af26"
+    },
+    {
+      "file": "04-result-evidence.png",
+      "theme": "dark",
+      "width": 3200,
+      "height": 2000,
+      "bytes": 459715,
+      "sha256": "bc36f1798d4df77ca121c744e6a120722d667bc88c365d5cff63bb6bcd53a00a"
+    },
+    {
+      "file": "05-model-settings-light.png",
+      "theme": "light",
+      "width": 3200,
+      "height": 2000,
+      "bytes": 333639,
+      "sha256": "9b8063e14579e6630023a1da391a85b8209c4e66b4d65208df4e09b603aed7e8"
+    },
+    {
+      "file": "05-model-settings.png",
+      "theme": "dark",
+      "width": 3200,
+      "height": 2000,
+      "bytes": 336705,
+      "sha256": "d25e201dc144c195a0be8c50e22413cf9fc551520a3fbc0ac049a5d9364dbbd9"
+    },
+    {
+      "file": "06-workflow-light.png",
+      "theme": "light",
+      "width": 3200,
+      "height": 2000,
+      "bytes": 316648,
+      "sha256": "6d925795371962a3821211b027913c6db394490188512d7542f1a1f54850a257"
+    },
+    {
+      "file": "06-workflow.png",
+      "theme": "dark",
+      "width": 3200,
+      "height": 2000,
+      "bytes": 303811,
+      "sha256": "7559bf50eea61324ccf9ba5ed0a07b7f16e8aff10c404ffc1a61a152594d53cd"
+    }
+  ],
+  "sources": [
+    {
+      "file": "source/01-home.html",
+      "sha256": "7db2ca1b265106a9de71dcd723c49f8952d9ba7e08157b57beca49db81cbac7d"
+    },
+    {
+      "file": "source/02-run-workspace.html",
+      "sha256": "186c02aa44c2ac632609718d8643680618b652a60e78c4d962da40aeb14144d9"
+    },
+    {
+      "file": "source/03-approval.html",
+      "sha256": "7471208dcb0e7272b48b2a9732477d4b072e20a1d5a6546be0a40159b889c823"
+    },
+    {
+      "file": "source/04-result-evidence.html",
+      "sha256": "556aaa48c226808e67debd80cd3a6db426f86fc0ee2f6280627260dae43b95a2"
+    },
+    {
+      "file": "source/05-model-settings.html",
+      "sha256": "0de0b10e23dfdc0caa769dc17907b74dddeca6a085d92ea2f47ef2fdd85cd7d7"
+    },
+    {
+      "file": "source/06-workflow.html",
+      "sha256": "eea78c6f1e2c4e09b989ada5dda0d687a1a4282b2f51932f777ac716b6ae8eeb"
+    },
+    {
+      "file": "source/quiet.css",
+      "sha256": "e5471a7369ca08ad825a160b452675aa836544b54c5a04318c8e6b6dfbdf5337"
+    },
+    {
+      "file": "source/render.mjs",
+      "sha256": "1e15bbdb4b917fa3aa010cd3ac97ab6028cd877443e0c72fedc46c124772ee7a"
+    },
+    {
+      "file": "source/shell.js",
+      "sha256": "3d486696b67dc70b286178b2a6832b320825cafaf7f4fddd8fbe8cd8effe8a63"
+    }
+  ],
+  "supporting_files": [
+    {
+      "file": "README.md",
+      "sha256": "7ccb00053dbcbb606562525febc36d1f2d0f095feb2cc52e5c6ac6507dfb3cbb"
+    },
+    {
+      "file": "index.html",
+      "sha256": "aaa89d3d27c52301c58a0a6d093bded463c79ad2737063a154c854e636becc40"
+    }
+  ],
+  "previous_concepts": [
+    "archive/luma-dark-v1/",
+    "archive/warm-green-v1/"
+  ],
+  "limitations": [
+    "Fictional products, prices, dates and statuses",
+    "Static mockups, not app components",
+    "Not checked for accessibility or contrast conformance"
+  ]
+}
