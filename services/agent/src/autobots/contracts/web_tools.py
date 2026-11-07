@@ -110,3 +110,37 @@ class TavilyCrawlOutput(WebOutput):
     base_url: str
     results: list[ExtractedPage]
     result_count: int
+
+
+class SearchWebInput(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    query: str = Field(min_length=1, max_length=400)
+    max_results: int = Field(default=5, ge=1, le=10)
+
+
+class WebSnippet(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    title: str
+    url: str
+    snippet: str
+
+
+class SearchWebOutput(WebOutput):
+    results: list[WebSnippet]
+    result_count: int
+
+
+class ExtractWebsiteInput(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    url: HttpsUrl = Field(min_length=1, max_length=2048)
+
+
+class ExtractWebsiteOutput(WebOutput):
+    url: str
+    title: str
+    content_markdown: str
+    links: list[str]
+    link_count: int

@@ -23,7 +23,14 @@ GENERAL_TOOLS = {
 }
 # Proposing an improvement changes nothing by itself, but a run only gets it if an owner chose that.
 # Tool-provider tools, Decision 0017. Each needs its provider's key, read per attempt.
-PROVIDER_TOOLS = {"tavily_search": 1, "tavily_extract": 1, "tavily_map": 1, "tavily_crawl": 1}
+PROVIDER_TOOLS = {
+    "tavily_search": 1,
+    "tavily_extract": 1,
+    "tavily_map": 1,
+    "tavily_crawl": 1,
+    "search_web": 1,
+    "extract_website_content": 1,
+}
 EXPERT_TOOLS = {
     **GENERAL_TOOLS,
     "propose_improvement": 1,

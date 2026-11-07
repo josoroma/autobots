@@ -363,9 +363,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.6 | Tavily search, extract, map and crawl | DONE | EPIC-14 |
 | US-14.6#1 | Add `tavily_search`, `tavily_extract`, `tavily_map` and `tavily_crawl` as plain `httpx` adapters with an injectable transport, the PRD's schema ceilings and recorded fixtures. | DONE | US-14.6 |
 | US-14.6#2 | Cover the scenarios with fake transports only. | DONE | US-14.6 |
-| US-14.7 | Jina Search The Web and Extract Website Content | READY | EPIC-14 |
-| US-14.7#1 | Add `search_web` and `extract_website_content` as plain `httpx` adapters with an injectable transport, schema ceilings and recorded fixtures. | TODO | US-14.7 |
-| US-14.7#2 | Cover the scenarios with fake transports only. | TODO | US-14.7 |
+| US-14.7 | Jina Search The Web and Extract Website Content | DONE | EPIC-14 |
+| US-14.7#1 | Add `search_web` and `extract_website_content` as plain `httpx` adapters with an injectable transport, schema ceilings and recorded fixtures. | DONE | US-14.7 |
+| US-14.7#2 | Cover the scenarios with fake transports only. | DONE | US-14.7 |
 | US-14.8 | URL guard for tools that fetch | DONE | EPIC-14 |
 | US-14.8#1 | Add one shared guard with DNS checks on every answer, redirect revalidation, a limit of 3 redirects, and size and time caps. | DONE | US-14.8 |
 | US-14.8#2 | Cover the scenarios with a fake resolver and transport. | DONE | US-14.8 |
@@ -4862,7 +4862,8 @@ Open Questions:
 
 ### US-14.7: Jina Search The Web and Extract Website Content
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-14-7-jina-search-web-extract/`
 
 As a goal's owner
 I want Search The Web and Extract Website Content backed by Jina
@@ -4900,8 +4901,8 @@ Dependencies:
 - US-14.8
 
 Tasks:
-- [ ] Add `search_web` and `extract_website_content` as plain `httpx` adapters with an injectable transport, schema ceilings and recorded fixtures.
-- [ ] Cover the scenarios with fake transports only.
+- [x] Add `search_web` and `extract_website_content` as plain `httpx` adapters with an injectable transport, schema ceilings and recorded fixtures.
+- [x] Cover the scenarios with fake transports only.
 
 Open Questions:
 - None.

@@ -24,6 +24,7 @@ from autobots.adapters.checkpoints import (
     is_stale_owner,
 )
 from autobots.adapters.github_issues import GITHUB_ISSUE
+from autobots.adapters.jina import JINA_TOOLS
 from autobots.adapters.loop_middleware import (
     AdmittedModel,
     LoopMiddleware,
@@ -161,6 +162,7 @@ def loop_registry(
         PROPOSE_IMPROVEMENT,
         GITHUB_ISSUE,
         *TAVILY_TOOLS,
+        *JINA_TOOLS,
     )
     for tool in (*tools, *plan_tools(limits)):
         registry.register(tool)
