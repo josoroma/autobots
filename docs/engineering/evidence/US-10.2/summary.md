@@ -7,13 +7,13 @@
 - **H0: supported, not separately assessed.** DH-A01 to DH-A16 and the US-1.x records support it, and a disposable copy bootstrapped from the toolchain script. `tests/toolchain`'s reproducibility tests, apart from the scope test, are in no profile.
 - **Product acceptance: supported by this record, with the limits the owner accepted.** Every LC, MP, LM and DS row has evidence or a decision, apart from undelivered design surfaces, as DS-03's row says. SP-021 asks for the full suites, so the partial rows stand on the owner's decisions and don't meet their text. PRD 13.1's stability target isn't met, and the owner accepted that as a limit. Product acceptance rests on small live evidence at an earlier fingerprint, on task quality that a person hasn't judged, and on no person new to the app having used it.
 
-Earlier versions of this record overclaimed, as [`review.md`](review.md), [`review-r2.md`](review-r2.md) and [`review-r3.md`](review-r3.md) set out. [US-12.8's review](../US-12.8/summary.md) read this version.
+Earlier versions of this record overclaimed, as [`review.md`](review.md), [`review-r2.md`](review-r2.md) and [`review-r3.md`](review-r3.md) set out. [US-12.8's review](../US-12.8/summary.md) read this version, found more, and approved it in its third round. Numbers from Gate 0 were filled in after that.
 
 ## Revisions
 
 | Source | Class | Revision |
 |---|---|---|
-| [US-12.8's Gate 0](../US-12.8/summary.md), and `qualify_worker_inference.py`, 56 cases | Mixed, as each row says | The bound fingerprint, in [its manifest](../US-12.8/gate-0.json) |
+| [US-12.8's Gate 0](../US-12.8/summary.md), and `qualify_worker_inference.py`, 55 cases | Mixed, as each row says | The bound fingerprint `51212ae1…`, committed in `45cacda`, in [its manifest](../US-12.8/gate-0.json). A reviewer can't compute a hash, so the coordinator bound it to the tree round 3 read, and compared the two |
 | [US-12.3's Gate 0](../US-12.3/summary.md) | Mixed | The earlier fingerprint `05916d5e…`, committed in `70c5162`. Its binding is void, and it's kept as history |
 | [US-11.11](../US-11.11/summary.md)'s 42 captures, and [US-12.2](../US-12.2/summary.md)'s walk | Browser, on a disposable stack | Measured on the earlier fingerprint and not repeated, as US-12.7 changed no screen. Their records bind a base commit and a hash of the screens, so the link to the fingerprint rests on the author's statement |
 | [US-12.6](../US-12.6/summary.md)'s real install and one goal | Live, install | The earlier fingerprint, by the author's statement and the timeline, as its report holds no hash. **The install is stopped, at migration 35 of 35** |

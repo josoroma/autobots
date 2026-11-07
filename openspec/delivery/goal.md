@@ -7,7 +7,7 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-12.8 |
+| Target | US-10.2 |
 | Kind | story |
 | Focus | - |
 | Status | ACTIVE |
@@ -19,16 +19,16 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-12.8 | us-12-8-review-gate-0-after | READY | Review and Gate 0 after the last decisions |
+| 1 | US-10.2 | us-10-2-release-traceability-evidence-based | READY | Release traceability and evidence-based completion |
 
 ## Next Action
 
 Action: select
-Story: US-12.8
-Change: us-12-8-review-gate-0-after
+Story: US-10.2
+Change: us-10-2-release-traceability-evidence-based
 Owner: main-session
-Command: openspec new change us-12-8-review-gate-0-after; set US-12.8 to IN PROGRESS with a Change: line
-Reason: US-12.8 is READY and has no OpenSpec change
+Command: openspec new change us-10-2-release-traceability-evidence-based; set US-10.2 to IN PROGRESS with a Change: line
+Reason: US-10.2 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

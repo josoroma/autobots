@@ -221,9 +221,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-10.1 | Held-out task, policy and performance qualification | DONE | EPIC-10 |
 | US-10.1#1 | Run the held-out behavioral and policy/recovery suites without tuning on held-out data. | DONE | US-10.1 |
 | US-10.1#2 | Publish per-category outcomes, resource measurements and actual latency/cost evidence. | DONE | US-10.1 |
-| US-10.2 | Release traceability and evidence-based completion | READY | EPIC-10 |
-| US-10.2#1 | Review full source-to-story-to-evidence coverage and resolve blocking findings. | TODO | US-10.2 |
-| US-10.2#2 | Publish exercised operating/user procedures and truthful release limitations. | TODO | US-10.2 |
+| US-10.2 | Release traceability and evidence-based completion | DONE | EPIC-10 |
+| US-10.2#1 | Review full source-to-story-to-evidence coverage and resolve blocking findings. | DONE | US-10.2 |
+| US-10.2#2 | Publish exercised operating/user procedures and truthful release limitations. | DONE | US-10.2 |
 | EPIC-11 | Installable release readiness | — | — |
 | US-11.1 | Truthful qualification status | DONE | EPIC-11 |
 | US-11.1#1 | Add the per-route qualification record and widen the qualification status contract, with regenerated clients. | DONE | US-11.1 |
@@ -2972,7 +2972,8 @@ Open Questions:
 
 ### US-10.2: Release traceability and evidence-based completion
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-10-2-release-traceability-evidence-based/`
 
 As a product owner
 I want a complete requirement-to-evidence record
@@ -3015,8 +3016,8 @@ Dependencies:
 - US-12.8
 
 Tasks:
-- [ ] Review full source-to-story-to-evidence coverage and resolve blocking findings.
-- [ ] Publish exercised operating/user procedures and truthful release limitations.
+- [x] Review full source-to-story-to-evidence coverage and resolve blocking findings.
+- [x] Publish exercised operating/user procedures and truthful release limitations.
 
 Open Questions:
 - None.
