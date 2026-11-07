@@ -4447,8 +4447,7 @@
               "jina",
               "yahoo_finance",
               "world_bank",
-              "github",
-              "browser_use"
+              "github"
             ],
             "title": "Provider",
             "type": "string"
@@ -9897,8 +9896,7 @@
                     "jina",
                     "yahoo_finance",
                     "world_bank",
-                    "github",
-                    "browser_use"
+                    "github"
                   ],
                   "type": "string"
                 },

@@ -47,6 +47,8 @@ EXPERT_TOOLS = {
     "write_code_file": 1,
     "patch_code_file": 1,
     **PROVIDER_TOOLS,
+    # Arbitrary execution in the isolated browser, only while it's qualified (US-14.12).
+    "browse_goal": 1,
 }
 LOOP_TOOL_GRANTS = {**PLAN_TOOLS, **GENERAL_TOOLS}
 # Only a coordinator session's runs get this, and an Expert's own configuration can't name it.

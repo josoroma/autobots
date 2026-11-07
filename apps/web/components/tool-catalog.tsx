@@ -24,7 +24,6 @@ const PROVIDERS: Record<string, string> = {
   yahoo_finance: "Yahoo Finance",
   world_bank: "World Bank",
   github: "GitHub",
-  browser_use: "browser-use",
 };
 
 const CLASSES: Record<string, string> = {
@@ -55,7 +54,7 @@ export function repair(tool: ToolDescriptor): string | null {
     return `Set ${names} in the worker's environment, then restart the worker and the API.`;
   }
   if (tool.availability_reason === "isolated_executor_not_qualified") {
-    return "Disabled until an isolated executor is qualified.";
+    return "Disabled until the isolated browser executor is qualified and turned on. See the operations runbook.";
   }
   if (tool.availability === "not_qualified") {
     return "Waits for its provider's qualification.";

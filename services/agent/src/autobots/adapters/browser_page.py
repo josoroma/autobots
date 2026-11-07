@@ -9,7 +9,13 @@ import asyncio
 from typing import Any
 
 from autobots.adapters.browser_executor import Cdp
-from autobots.application.browsing_loop import MAX_LINKS, TEXT_CHARS, Link, PageView
+from autobots.application.browsing_loop import (
+    MAX_LINKS,
+    TEXT_CHARS,
+    Link,
+    NavigationRefused,
+    PageView,
+)
 
 # Fixed, and returns plain values only. Links are absolute https URLs, deduplicated, in order.
 READER = f"""(() => {{
@@ -57,8 +63,11 @@ class CdpPage:
         return cls(cdp, attached["result"]["sessionId"], settle)
 
     async def go(self, url: str) -> None:
-        await self._cdp.send("Page.navigate", {"url": url}, self._session)
+        reply = await self._cdp.send("Page.navigate", {"url": url}, self._session)
         self._scrolled = 0
+        if reply.get("result", {}).get("errorText") or "error" in reply:
+            # Blocked by the request guard, or refused by the egress proxy.
+            raise NavigationRefused("navigation_refused")
         await asyncio.sleep(self._settle)
 
     async def scroll(self) -> None:

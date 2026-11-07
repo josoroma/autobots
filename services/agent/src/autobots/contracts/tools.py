@@ -85,9 +85,7 @@ ToolGroupName = Literal[
     "delegation",
     "learning",
 ]
-ToolProviderName = Literal[
-    "autobots", "tavily", "jina", "yahoo_finance", "world_bank", "github", "browser_use"
-]
+ToolProviderName = Literal["autobots", "tavily", "jina", "yahoo_finance", "world_bank", "github"]
 OperationClassName = Literal[
     "pure",
     "read_only",

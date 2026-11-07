@@ -384,12 +384,12 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.11 | Code tools over run files | DONE | EPIC-14 |
 | US-14.11#1 | Add `search_files`, `read_code_file`, `write_code_file` and `patch_code_file` over the run's files only, in pure Python, with names that never match the SDK's file tools. | DONE | US-14.11 |
 | US-14.11#2 | Cover the scenarios. | DONE | US-14.11 |
-| US-14.12 | Goal-driven browsing | READY | EPIC-14 |
-| US-14.12#1 | Register `browse_goal` as `arbitrary_execution` with its input and output schemas, limits and public fields, only while the executor reports qualified and the admitted browser model exists. | TODO | US-14.12 |
-| US-14.12#2 | Run each call through US-14.14's browsing loop, whose read-only actions are opening a numbered link, going to a URL, scrolling and finishing with a summary, and enforce `allowed_domains`, `max_steps` and `max_seconds`, ending the call on a refused action or an invalid answer. | TODO | US-14.12 |
-| US-14.12#3 | Set `browse_goal`'s provider to `autobots` and remove the `browser_use` provider value from the catalog, its Pydantic contract, the generated OpenAPI document and TypeScript client, and the Tools screen's provider labels, so the providers are exactly those TC-03 lists. | TODO | US-14.12 |
-| US-14.12#4 | Grant it only through an Expert, and require a person's approval on every call, showing the task, start URL, allowed domains and limits. | TODO | US-14.12 |
-| US-14.12#5 | Cover the scenarios on a disposable stack with a scripted model. | TODO | US-14.12 |
+| US-14.12 | Goal-driven browsing | DONE | EPIC-14 |
+| US-14.12#1 | Register `browse_goal` as `arbitrary_execution` with its input and output schemas, limits and public fields, only while the executor reports qualified and the admitted browser model exists. | DONE | US-14.12 |
+| US-14.12#2 | Run each call through US-14.14's browsing loop, whose read-only actions are opening a numbered link, going to a URL, scrolling and finishing with a summary, and enforce `allowed_domains`, `max_steps` and `max_seconds`, ending the call on a refused action or an invalid answer. | DONE | US-14.12 |
+| US-14.12#3 | Set `browse_goal`'s provider to `autobots` and remove the `browser_use` provider value from the catalog, its Pydantic contract, the generated OpenAPI document and TypeScript client, and the Tools screen's provider labels, so the providers are exactly those TC-03 lists. | DONE | US-14.12 |
+| US-14.12#4 | Grant it only through an Expert, and require a person's approval on every call, showing the task, start URL, allowed domains and limits. | DONE | US-14.12 |
+| US-14.12#5 | Cover the scenarios on a disposable stack with a scripted model. | DONE | US-14.12 |
 | US-14.13 | Isolated browser executor | DONE | EPIC-14 |
 | US-14.13#1 | Start and remove one hardened container per call from the digest-pinned Playwright image, with CDP on loopback behind a per-session token and nothing of the worker's environment. | DONE | US-14.13 |
 | US-14.13#2 | Build the egress proxy sidecar locally, applying the URL guard to every request and connecting to the address it checked. | DONE | US-14.13 |
@@ -407,7 +407,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.15#4 | List Sol in Settings as approved with its offering state, qualification and limits, and in every picker once it's offered. | DONE | US-14.15 |
 | US-14.15#5 | Run Sol's live route qualification once within the cap, and record it. | DONE | US-14.15 |
 | US-14.15#6 | Cover the refusal, resolution, frozen-run and removal scenarios offline and on a disposable stack with a fake transport. | DONE | US-14.15 |
-| US-14.16 | Live browse trial with Sol | BLOCKED | EPIC-14 |
+| US-14.16 | Live browse trial with Sol | READY | EPIC-14 |
 | US-14.16#1 | Add the trial runner, in no verification profile, reading the owner's key file in its own process and refusing a repeat without the owner's request. | TODO | US-14.16 |
 | US-14.16#2 | Run the trial once and record the redacted evidence: the summary's label, visited URLs, model calls, receipts, spend and the hosts the proxy connected to. | TODO | US-14.16 |
 
@@ -5173,7 +5173,8 @@ Open Questions:
 
 ### US-14.12: Goal-driven browsing
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-14-12-goal-driven-browsing/`
 
 As a goal's owner
 I want a read-only browsing tool that pursues a goal in an isolated browser
@@ -5225,11 +5226,11 @@ Dependencies:
 - US-14.14
 
 Tasks:
-- [ ] Register `browse_goal` as `arbitrary_execution` with its input and output schemas, limits and public fields, only while the executor reports qualified and the admitted browser model exists.
-- [ ] Run each call through US-14.14's browsing loop, whose read-only actions are opening a numbered link, going to a URL, scrolling and finishing with a summary, and enforce `allowed_domains`, `max_steps` and `max_seconds`, ending the call on a refused action or an invalid answer.
-- [ ] Set `browse_goal`'s provider to `autobots` and remove the `browser_use` provider value from the catalog, its Pydantic contract, the generated OpenAPI document and TypeScript client, and the Tools screen's provider labels, so the providers are exactly those TC-03 lists.
-- [ ] Grant it only through an Expert, and require a person's approval on every call, showing the task, start URL, allowed domains and limits.
-- [ ] Cover the scenarios on a disposable stack with a scripted model.
+- [x] Register `browse_goal` as `arbitrary_execution` with its input and output schemas, limits and public fields, only while the executor reports qualified and the admitted browser model exists.
+- [x] Run each call through US-14.14's browsing loop, whose read-only actions are opening a numbered link, going to a URL, scrolling and finishing with a summary, and enforce `allowed_domains`, `max_steps` and `max_seconds`, ending the call on a refused action or an invalid answer.
+- [x] Set `browse_goal`'s provider to `autobots` and remove the `browser_use` provider value from the catalog, its Pydantic contract, the generated OpenAPI document and TypeScript client, and the Tools screen's provider labels, so the providers are exactly those TC-03 lists.
+- [x] Grant it only through an Expert, and require a person's approval on every call, showing the task, start URL, allowed domains and limits.
+- [x] Cover the scenarios on a disposable stack with a scripted model.
 
 Open Questions:
 - None.
@@ -5406,7 +5407,7 @@ Open Questions:
 
 ### US-14.16: Live browse trial with Sol
 
-Status: BLOCKED
+Status: READY
 
 As a workspace owner
 I want one capped live browse with a real model

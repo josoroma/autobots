@@ -22,6 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from autobots.adapters.loop_middleware import AdmittedModel, LoopMiddleware, LoopStopped, ModelRoute
 from autobots.application.model_attempts import FailureClass
+from autobots.contracts.browsing import Stopped
 
 TEXT_CHARS = 6000
 MAX_LINKS = 60
@@ -63,6 +64,31 @@ class Page(Protocol):
     async def go(self, url: str) -> None: ...
 
     async def scroll(self) -> None: ...
+
+
+class NavigationRefused(Exception):
+    """The browser or its egress proxy refused a navigation the model chose (AB-03)."""
+
+
+# AB-03: an attempt to type, submit, sign in, upload or download is refused, not just invalid.
+WRITING = frozenset(
+    {
+        "type",
+        "type_text",
+        "input_text",
+        "fill",
+        "fill_form",
+        "press_key",
+        "submit",
+        "submit_form",
+        "click_button",
+        "sign_in",
+        "login",
+        "upload",
+        "upload_file",
+        "download",
+    }
+)
 
 
 class _Action(BaseModel):
@@ -122,7 +148,7 @@ class BrowseOutcome:
     visited: tuple[str, ...]
     steps: int
     model_calls: int
-    stopped: str
+    stopped: Stopped
 
 
 @dataclass
@@ -178,7 +204,7 @@ def _request(task: str, state: _State, view: PageView) -> list[BaseMessage]:
     ]
 
 
-def _outcome(state: _State, stopped: str, summary: str | None = None) -> BrowseOutcome:
+def _outcome(state: _State, stopped: Stopped, summary: str | None = None) -> BrowseOutcome:
     return BrowseOutcome(
         summary=(summary if summary is not None else state.notes)[:SUMMARY_CHARS],
         visited=tuple(dict.fromkeys(state.visited)),
@@ -208,7 +234,10 @@ async def browse(
     started = clock()
     if not permitted(start_url):
         return _outcome(state, "refused_action")
-    await page.go(start_url)
+    try:
+        await page.go(start_url)
+    except NavigationRefused:
+        return _outcome(state, "refused_action")
     while True:
         view = await page.view()
         state.visited.append(bare(view.url))
@@ -218,9 +247,11 @@ async def browse(
             return _outcome(state, "max_seconds")
         state.steps += 1
         state.calls += 1
-        chosen = action_of(await step(_request(task, state, view)))
+        reply = await step(_request(task, state, view))
+        chosen = action_of(reply)
         if chosen is None:
-            return _outcome(state, "invalid_action")
+            names = {str(call["name"]).lower() for call in reply.tool_calls}
+            return _outcome(state, "refused_action" if names & WRITING else "invalid_action")
         name, action = chosen
         if isinstance(action, Finish):
             return _outcome(state, "done", action.summary)
@@ -240,7 +271,10 @@ async def browse(
             state.history.append(f"{state.steps}. refused {bare(target)}")
             return _outcome(state, "refused_action")
         state.history.append(f"{state.steps}. {name} {bare(target)}")
-        await page.go(target)
+        try:
+            await page.go(target)
+        except NavigationRefused:
+            return _outcome(state, "refused_action")
 
 
 @dataclass(frozen=True)

@@ -7,7 +7,7 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-14.14 |
+| Target | US-14.12 |
 | Kind | story |
 | Focus | - |
 | Status | COMPLETE |
@@ -19,7 +19,7 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-14.14 | us-14-14-admitted-model-browser-use | DONE | Admitted model for the browsing loop |
+| 1 | US-14.12 | us-14-12-goal-driven-browsing | DONE | Goal-driven browsing |
 
 ## Next Action
 

@@ -90,7 +90,7 @@ Set them for both the worker and the API, since the API reports availability fro
 
 ## The browser executor
 
-The isolated browser executor ([Decision 0018](../decisions/0018-browser-executor.md), US-14.13) runs one disposable Chromium container per browsing call, behind an egress sidecar that is its only way out and the only door to its DevTools. Nothing uses it until `browse_goal` (US-14.12) exists, and that stays disabled until the executor is qualified at the current code.
+The isolated browser executor ([Decision 0018](../decisions/0018-browser-executor.md), US-14.13) runs one disposable Chromium container per browsing call, behind an egress sidecar that is its only way out and the only door to its DevTools. `browse_goal` uses it, and stays disabled until the executor is qualified at the current code and turned on (below).
 
 Build both images on this Mac. The browser image starts from the Playwright image pinned by digest, and the proxy from a Python image pinned by digest, so a build pulls them once:
 
@@ -112,6 +112,24 @@ What a session is: a non-root container from the pinned image with all capabilit
 ```sh
 docker ps -a --filter label=autobots.browser=1
 ```
+
+### Turning on `browse_goal`
+
+`browse_goal` (US-14.12, [Decision 0020](../decisions/0020-own-browsing-loop.md)) is Autobots' own read-only browsing loop on that executor. It's off until both are true: the executor is qualified as above, and the owner turns it on for the API and the worker:
+
+```sh
+AUTOBOTS_BROWSER_EXECUTOR=enabled
+```
+
+Then restart both. The Tools screen lists it as available, and an Expert can grant it. Plain goals and workflows can't, and a run with no Expert behind it is refused `expert_grant_required`. Every call waits for a person's approval, which shows its task, start URL, domains and limits, before any container starts. Each step is a paid model call on the run's `researcher` route, admitted against the run's budget, and the call counts as one metered tool call. Unset the variable, or let the qualification go stale, and it is disabled again at the next call.
+
+To check it end to end without a model, on a disposable database, against `https://example.com/`:
+
+```sh
+python3.12 scripts/qualify_browse_goal.py
+```
+
+It writes `.checks/browse-goal/check.json`. It's in no verification profile, for the same reason as the executor's.
 
 ## The GitHub issue connector
 

@@ -112,7 +112,7 @@ def test_three_steps_read_follow_a_link_and_finish() -> None:
     "reply",
     [
         AIMessage(content="I think it is for examples."),
-        act("type_text", text="hello"),
+        act("hover", target="x"),
         act("open_link", number=0),
         act("open_link", number=9),
         act("go_to", url="https://example.com/", surprise=True),
@@ -311,4 +311,35 @@ def test_the_cdp_page_reads_text_and_links_and_scrolls_its_window() -> None:
         params["expression"] == READER
         for method, params, _ in cdp.sent
         if method == "Runtime.evaluate"
+    )
+
+
+@pytest.mark.parametrize("name", ["type_text", "submit_form", "fill", "sign_in", "download"])
+def test_a_typing_or_submission_attempt_is_a_refused_action(name: str) -> None:
+    steps = Steps(
+        act("scroll", notes="read so far"), act(name, text="x"), act("finish", summary="no")
+    )
+    outcome = run(steps)
+    assert (outcome.stopped, outcome.summary, len(steps.seen)) == (
+        "refused_action",
+        "read so far",
+        2,
+    )
+
+
+def test_a_navigation_the_browser_refuses_ends_the_call() -> None:
+    from autobots.application.browsing_loop import NavigationRefused
+
+    class Refusing(Pages):
+        async def go(self, url: str) -> None:
+            if "iana" in url:
+                raise NavigationRefused("navigation_refused")
+            await super().go(url)
+
+    steps = Steps(act("open_link", number=1), act("finish", summary="no"))
+    outcome = run(steps, Refusing())
+    assert (outcome.stopped, outcome.visited, len(steps.seen)) == (
+        "refused_action",
+        ("https://example.com/",),
+        1,
     )

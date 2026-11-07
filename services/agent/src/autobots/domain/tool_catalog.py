@@ -50,7 +50,6 @@ class ToolProvider(StrEnum):
     YAHOO_FINANCE = "yahoo_finance"
     WORLD_BANK = "world_bank"
     GITHUB = "github"
-    BROWSER_USE = "browser_use"
 
 
 class CostClass(StrEnum):
@@ -134,15 +133,16 @@ class PlannedTool:
     reason: str
 
 
-# Decision 0017, C3 and C4.
+# Decision 0017 C3 and C4, and Decision 0020 L5. Listed this way only while unqualified.
 PLANNED_TOOLS: tuple[PlannedTool, ...] = (
     PlannedTool(
         tool_id="browse_goal",
         version=1,
         title="Goal-driven browsing",
-        description="Drive a browser toward a goal. Disabled until an isolated executor exists.",
+        description="Read websites in an isolated browser to pursue a task. Disabled until the "
+        "isolated executor is qualified.",
         group=ToolGroup.BROWSING,
-        provider=ToolProvider.BROWSER_USE,
+        provider=ToolProvider.AUTOBOTS,
         operation_class=OperationClass.ARBITRARY_EXECUTION,
         reason="isolated_executor_not_qualified",
     ),

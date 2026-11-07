@@ -295,8 +295,15 @@ def inference_from_environment(
         raise SystemExit(f"{INFERENCE_SWITCH} needs AUTOBOTS_SUPABASE_URL and the service key")
     if fetch_catalog is not None:
         context = replace(context, fetch_catalog=fetch_catalog)
+    from autobots.adapters.browser_executor import BrowserExecutor
+
+    # Used only while the executor reports qualified, which `bind` checks for each job.
     return InferenceSource(
-        database_url, context, CatalogCache(context.fetch_catalog), client_factory
+        database_url,
+        context,
+        CatalogCache(context.fetch_catalog),
+        client_factory,
+        browser=BrowserExecutor(),
     )
 
 

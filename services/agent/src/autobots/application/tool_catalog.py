@@ -58,8 +58,15 @@ async def _never(*_: Any) -> Any:  # pragma: no cover - the catalog never drives
 def catalog_registry() -> ToolRegistry:
     """Every tool any run can be granted, built as the worker builds it, without its resources."""
     delegation = Delegation(drive=_never, limits=RootLimits(), lease_seconds=0.0)
+    from autobots.application.browsing_tool import browse_tool, executor_ready
+
+    # AB-02: browse_goal is registered, and so described, only while its executor is qualified.
+    browsing = (browse_tool(None),) if executor_ready() else ()
     return loop_registry(
-        RootLimits(), object_store=object(), delegation=delegation, extra=(APPROVAL_GATE,)
+        RootLimits(),
+        object_store=object(),
+        delegation=delegation,
+        extra=(APPROVAL_GATE, *browsing),
     )
 
 
@@ -191,7 +198,10 @@ def all_descriptors(
 ) -> list[ToolDescriptor]:
     registry = registry or catalog_registry()
     described = [describe(tool, environ) for tool in registry.definitions()]
-    described += [describe_planned(tool) for tool in PLANNED_TOOLS]
+    registered = {item.tool_id for item in described}
+    described += [
+        describe_planned(tool) for tool in PLANNED_TOOLS if tool.tool_id not in registered
+    ]
     return sorted(described, key=lambda item: (item.tool_id, item.version))
 
 

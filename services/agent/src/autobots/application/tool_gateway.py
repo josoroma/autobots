@@ -99,6 +99,13 @@ class ToolDefinition:
     # Top-level fields a run's screens may show, TU-04. The default shows none.
     public_input_fields: tuple[str, ...] = ()
     public_output_fields: tuple[str, ...] = ()
+    # AB-02: an `arbitrary_execution` tool exists only while its executor reports qualified.
+    qualified: Callable[[], bool] | None = None
+    # Granted only through an Expert, so a run with no Expert behind it is refused (AB-02).
+    expert_only: bool = False
+
+    def executor_qualified(self) -> bool:
+        return self.qualified is not None and self.qualified()
 
 
 @dataclass(frozen=True)
@@ -125,7 +132,10 @@ class ToolRegistry:
     _tools: dict[tuple[str, int], ToolDefinition] = field(default_factory=dict)
 
     def register(self, tool: ToolDefinition) -> None:
-        if tool.operation_class is OperationClass.ARBITRARY_EXECUTION:
+        if (
+            tool.operation_class is OperationClass.ARBITRARY_EXECUTION
+            and not tool.executor_qualified()
+        ):
             raise ValueError("arbitrary execution stays disabled until an executor is qualified")
         if tool.operation_class in EFFECTFUL and tool.retries:
             raise ValueError("an effect is never retried blindly")
@@ -194,6 +204,16 @@ def _operation_id(scope: ToolScope, tool: ToolDefinition, parsed: BaseModel) -> 
 
 def _denied(code: str) -> ToolResult:
     return ToolResult(ToolOutcome.DENIED, code)
+
+
+async def _expert_behind(connection: Any, scope: ToolScope) -> bool:
+    """The run was admitted from an Expert's binding, the only place such a grant comes from."""
+    cursor = await connection.execute(
+        "select expert_id is not null from public.runs where id = %s and workspace_id = %s",
+        (scope.run_id, scope.workspace_id),
+    )
+    row = await cursor.fetchone()
+    return bool(row and row[0])
 
 
 async def ownership_refusal(connection: Any, scope: ToolScope) -> str | None:
@@ -268,7 +288,11 @@ class ToolGateway:
         tool = self.registry.get(name, version)
         if tool is None:
             return _denied("tool_not_registered")
-        if tool.operation_class is OperationClass.ARBITRARY_EXECUTION:
+        if (
+            tool.operation_class is OperationClass.ARBITRARY_EXECUTION
+            and not tool.executor_qualified()
+        ):
+            # Checked again here, as a qualification can be withdrawn while a worker runs.
             return _denied("capability_disabled")
         try:
             parsed = tool.input_model.model_validate(arguments)
@@ -279,12 +303,8 @@ class ToolGateway:
         refusal = await ownership_refusal(connection, scope)
         if refusal is not None:
             return _denied(refusal)
-        if tool.cost_class is CostClass.METERED_PROVIDER:
-            # Decision 0017 Q4: counted per root run tree, before any request leaves.
-            from autobots.application.tool_uses import admit_metered
-
-            if use is None or not await admit_metered(connection, scope, use):
-                return _denied("tool_budget_exceeded")
+        if tool.expert_only and not await _expert_behind(connection, scope):
+            return _denied("expert_grant_required")
         if tool.approval_required or (
             tool.operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE
         ):
@@ -308,6 +328,13 @@ class ToolGateway:
             )
             if code is not None:
                 return _denied(code)
+        if tool.cost_class is CostClass.METERED_PROVIDER:
+            # Decision 0017 Q4: counted per root run tree, before any request leaves. After
+            # approval, so a call waiting for a person isn't counted twice.
+            from autobots.application.tool_uses import admit_metered
+
+            if use is None or not await admit_metered(connection, scope, use):
+                return _denied("tool_budget_exceeded")
         if tool.operation_class in EFFECTFUL:
             return await self._effect(connection, scope, tool, parsed)
         return await self._read(connection, scope, tool, parsed)

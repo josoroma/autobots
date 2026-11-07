@@ -4448,8 +4448,7 @@ export const schemas = {
           "jina",
           "yahoo_finance",
           "world_bank",
-          "github",
-          "browser_use"
+          "github"
         ],
         "title": "Provider",
         "type": "string"
@@ -6739,7 +6738,7 @@ export interface ToolDescriptor {
   network: boolean;
   operation_class: "pure" | "read_only" | "reversible_internal_write" | "consequential_external_write" | "arbitrary_execution";
   output_schema: Record<string, unknown>;
-  provider: "autobots" | "tavily" | "jina" | "yahoo_finance" | "world_bank" | "github" | "browser_use";
+  provider: "autobots" | "tavily" | "jina" | "yahoo_finance" | "world_bank" | "github";
   registered: boolean;
   side_effects: "none" | "internal_write" | "external_write" | "arbitrary";
   title: string;

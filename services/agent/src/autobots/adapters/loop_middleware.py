@@ -77,7 +77,13 @@ STOPPING = frozenset(
 )
 _ADMITTED: ContextVar[bool] = ContextVar("autobots_model_call_admitted", default=False)
 _INVOCATION: ContextVar[UUID | None] = ContextVar("autobots_model_invocation", default=None)
+_MIDDLEWARE: ContextVar["LoopMiddleware | None"] = ContextVar("autobots_loop", default=None)
 REPAIR_NOTE = "Your last reply was cut off, so none of it was used. Reply again, more briefly."
+
+
+def current_middleware() -> "LoopMiddleware | None":
+    """The loop whose tool call is running, so a tool's own model calls go through its admission."""
+    return _MIDDLEWARE.get()
 
 
 def current_invocation() -> UUID | None:
@@ -291,6 +297,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
         self._compaction = compaction or CompactionPolicy()
         self._summary_route = summary_route
         self._lock = asyncio.Lock()
+        self._inner_stop: str | None = None
 
     async def _guard(self) -> float:
         """Before each new dispatch: still the owner, still running, and time left."""
@@ -533,8 +540,15 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
     async def admitted(
         self, request: Any, handler: Callable[[Any], Awaitable[Any]], route: ModelRoute
     ) -> tuple[Any, bool]:
-        """One admitted call on another of the run's frozen routes, as browsing makes them."""
-        return await self._with_slot(request, handler, route)
+        """One admitted call on another of the run's frozen routes, as browsing makes them.
+
+        A stop here stops the loop too, once the tool call that made it returns.
+        """
+        try:
+            return await self._with_slot(request, handler, route)
+        except LoopStopped as stopped:
+            self._inner_stop = stopped.code
+            raise
 
     async def awrap_model_call(self, request: Any, handler: Callable[[Any], Awaitable[Any]]) -> Any:
         await self._guard()
@@ -567,7 +581,14 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
                 )
             except LimitReached as reached:
                 raise LoopStopped(reached.code) from None
-            reply = await handler(request)
+            self._inner_stop = None
+            token = _MIDDLEWARE.set(self)
+            try:
+                reply = await handler(request)
+            finally:
+                _MIDDLEWARE.reset(token)
+            if self._inner_stop is not None:
+                raise LoopStopped(self._inner_stop)
             code = json.loads(reply.content).get("code")
             if code in STOPPING or code in {"lease_lost", "run_not_running"}:
                 raise LoopStopped(code)

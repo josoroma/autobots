@@ -176,7 +176,7 @@ def test_a_saved_expansion_does_not_follow_the_group() -> None:
         ({"tool_groups": ["files", "files"]}, "expert_tool_group_duplicated"),
         ({"tools": ["create_github_issue"]}, "expert_tool_unavailable"),
         ({"tool_groups": ["connectors"]}, "expert_tool_unavailable"),
-        ({"tools": ["browse_goal"]}, "expert_tool_not_available"),
+        ({"tools": ["browse_goal"]}, "expert_tool_unavailable"),
     ],
 )
 def test_an_unavailable_or_empty_grant_is_refused(config: dict[str, object], code: str) -> None:

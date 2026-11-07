@@ -76,7 +76,7 @@ test("unavailable tools say so in words, with their repair", async ({
   const browse = page.locator('[data-tool="browse_goal"]');
   await expect(browse).toContainText("Unavailable: disabled by policy");
   await expect(browse.locator('[data-field="repair"]')).toHaveText(
-    "Disabled until an isolated executor is qualified.",
+    "Disabled until the isolated browser executor is qualified and turned on. See the operations runbook.",
   );
 });
 

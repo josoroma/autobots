@@ -182,6 +182,8 @@ class InferenceSource:
     context: ProviderContext
     catalog: CatalogCache
     client_factory: Callable[[str], Any] | None = None
+    # The isolated browser executor, or None where browsing isn't offered (US-14.12).
+    browser: Any = None
 
     async def open_attempt(
         self,
@@ -290,7 +292,21 @@ class InferenceSource:
         rate, tier = await self._input_rate(profile)
         route = ModelRoute(ROLE.value, profile.id.value, profile.wire_id, worst_case, rate, tier)
         model = AttemptModel(self, lease.workspace_id, policy, reserved_micro_usd=worst_case)
-        return lambda: model, replace(config, route=route, refusal=refusal)
+        tools = config.tools + await self._browsing(connection, lease)
+        return lambda: model, replace(config, route=route, refusal=refusal, tools=tools)
+
+    async def _browsing(self, connection: Any, lease: Lease) -> tuple[Any, ...]:
+        """`browse_goal`, bound to this run's researcher route, while the executor is qualified."""
+        from autobots.application.browsing_tool import BrowsingRuntime, browse_tool, executor_ready
+
+        if self.browser is None or not executor_ready():
+            return ()
+        bound = await self.role_route(connection, lease, ModelRole.RESEARCHER)
+        if isinstance(bound, str):
+            _log_refusal("browsing", UnknownModelProfile(bound))
+            return ()
+        model, route = bound
+        return (browse_tool(BrowsingRuntime(self.browser, model, route)),)
 
     async def role_route(
         self, connection: Any, lease: Lease, role: ModelRole
