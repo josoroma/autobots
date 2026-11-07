@@ -1,55 +1,55 @@
-# Imagine Autobots
+# Imagine Autobots: quiet workbench
 
-Six **shadcn Luma dark** visual concepts for the user experience of the selected **Option B**: an app running on this Mac, with OpenRouter for model inference.
+Six redesigned interface concepts for the selected **Option B** app, each in dark (the default) and light. The direction borrows the restraint of the best current AI products: a calm centered composer, a run that reads like a conversation beside its document, serif reading type for results, and one accent per screen.
 
-**[Open the visual gallery](index.html)** · [Generation prompts](prompts.json) · [Artifact manifest](manifest.json)
+**[Open the visual gallery](index.html)** · [HTML sources](source/) · [Artifact manifest](manifest.json) · [Earlier concepts](archive/README.md)
 
-These are generated interface concepts with sample data, not screenshots of an implemented product. Names, dates, prices, references, progress and validation statuses are illustrative.
+These are concept screens with fictional sample data (Tallyboard and Plainview are invented products), not screenshots of the implemented app.
 
-## The experience
+## The screens
 
-| Screen | What the user can understand and do |
-| --- | --- |
-| [01 · Start with a goal](01-home.png) | Describe the desired outcome, choose the model and run budget, and start work. Expert cards make specialist roles approachable. |
-| [02 · Follow the work](02-run-workspace.png) | See the current plan, completed and pending steps, observable activity, an emerging artifact and estimated spend. Pause or cancel the run. |
-| [03 · Review the exact change](03-approval.png) | Compare an existing protected local report with a proposed replacement. Approve that specific change or reject it. |
-| [04 · Open the result and its evidence](04-result-evidence.png) | Read the completed brief, inspect attached sources and completion checks, download the artifact or start a similar new run. |
-| [05 · Connect OpenRouter](05-model-settings.png) | Enter a missing key, save and validate it, and distinguish authentication from model availability and runtime qualification. |
-| [06 · Make the task repeatable](06-workflow.png) | Arrange a reusable workflow, inspect a step, validate a draft and publish an exact version. |
+| Screen | Dark | Light | What changed from the previous set |
+| --- | --- | --- | --- |
+| 01 · Start with a goal | [01-home.png](01-home.png) | [light](01-home-light.png) | One centered composer with expert, limit and model inline; the OpenRouter disclosure sits right under it. Expert cards give way to suggestion chips. |
+| 02 · Follow the work | [02-run-workspace.png](02-run-workspace.png) | [light](02-run-workspace-light.png) | Plan, sources and activity read as a thread; the draft document is the main canvas, not a footer row. Spend moves to a thin meter in the top bar. |
+| 03 · Review the exact change | [03-approval.png](03-approval.png) | [light](03-approval-light.png) | A focused dialog over the paused run with a real unified diff, the run's reason and the scope of approval. |
+| 04 · Result and evidence | [04-result-evidence.png](04-result-evidence.png) | [light](04-result-evidence-light.png) | The brief is set for reading; checks, numbered sources and reported usage move to a quiet rail. |
+| 05 · Connect OpenRouter | [05-model-settings.png](05-model-settings.png) | [light](05-model-settings-light.png) | Settings with a sub-navigation. Keyless state, three separate statuses, Terra as default and DeepSeek not offered until qualified. |
+| 06 · Make the task repeatable | [06-workflow.png](06-workflow.png) | [light](06-workflow-light.png) | A vertical flow on a dotted canvas with an inspector; draft versus published version is explicit. |
 
-The example journey is: configure a key when needed → describe a comparison task → follow the work → resolve an approval only if policy requires it → inspect the result → optionally reuse the process as a workflow. The gallery presents the main experience first and setup fifth; this is not a prescribed onboarding order.
+## Design principles
 
-## Visual direction
+- **One loud thing per screen.** Luma blue (`--primary`, `--sidebar-primary`) marks only the next useful action, live state and links. Everything else is neutral.
+- **Reading type for results.** A system serif (New York, Iowan Old Style, Charter, Georgia) for page titles and documents; the system sans for the interface; monospace for paths, diffs and model IDs.
+- **Telemetry stays quiet.** Steps, activity and cost are always visible but never compete with the artifact.
+- **Honest states.** Estimated cost while running and reported cost after; draft versus published; checks that verify structure, not truth.
+- **Hairlines over boxes.** 1px `--border` separators and soft surfaces instead of nested cards; radius steps derive from `--radius`.
 
-The approved direction is **shadcn Luma, dark by default**, using the user's exact [light/dark tokens](../design/luma.css) and [design-system requirements](../../PRD-Design-System.md). Neutral near-black backgrounds, slightly raised dark cards, white text and blue primary actions replace the earlier warm-neutral/forest-green exploration. Green remains a chart/success/diff color rather than the primary-action brand.
+## Relation to the design contract
 
-A fresh visit is dark regardless of the OS setting. An explicit Light or Dark choice persists locally and is applied before paint in the planned app. The gallery presents six dark concepts; the CSS also defines the supported light theme. Generated raster colors approximate the palette, while the canonical CSS preserves exact OKLCH values, alpha and the 0.625rem radius.
+The screens consume [luma.css](../design/luma.css) unchanged. [quiet.css](source/quiet.css) only adds typography, radius steps derived from `--radius`, and semantic aliases: success is Luma's `--chart-3` (light) / `--chart-2` (dark), danger is `--destructive`, and attention is an added amber the palette doesn't define. Two choices go beyond what [PRD-Design-System.md](../../PRD-Design-System.md) states today, so they're proposals, not adopted requirements:
 
-The artifact and the next useful action take priority over telemetry. Activity describes observable events; it is not a transcript of private model reasoning. Cost labels distinguish estimates from reported usage. The persistent sidebar and core screen layouts remain consistent across the revised set.
+1. A serif display face for headings and documents.
+2. The amber attention color for pending approvals and drafts.
 
-The previous images and their provenance are retained as [superseded visual exploration](archive/README.md); they no longer define the app's appearance.
+Product semantics follow the current sources: Terra is the default for all 14 roles, DeepSeek isn't offered for new runs until qualified ([Decision 0013](../engineering/decisions/0013-release-closure.md)), saving a key never starts work, a completed run offers **Start similar run**, and approval covers one exact change.
 
-## Product alignment
+## Rendering
 
-- The app, its files and history live locally. Selected task context is sent to OpenRouter for inference; these screens do not imply offline AI.
-- DeepSeek V4.1 Flash is the workspace default and GPT-6 Astra is an explicit choice. Friendly screen labels map to the exact profiles in the model-provider PRD.
-- A missing key disables model features while local files, history, settings and drafts remain available. **Save & validate** does not start a task or establish runtime qualification.
-- The approval screen illustrates replacement of a protected existing file. It does not establish approval for every ordinary artifact write or select an external connector.
-- A completed run offers **Start similar run**, not resume. A workflow draft is separate from its published version and from a run.
-- Completion checks describe structure and attached evidence; they do not certify that every generated statement is true.
+Each PNG is a 1600×1000 viewport at 2× (3200×2000), rendered from the HTML in `source/` with the web app's pinned Playwright and a locally cached Chrome for Testing. Nothing is installed or downloaded.
 
-Layout, sample controls and placeholder content are design proposals. The [design-system PRD](../../PRD-Design-System.md) owns the theme. The other source specifications remain authoritative: [SPECS](../../SPECS.md), [Option B contract](../engineering/option-b-contract.md), [Next.js PRD](../../PRD-NextJS.md), [LangGraph / Deep Agents PRD](../../PRD-LangChain-Deep-Agents.md), [model providers](../../PRD-Model-Providers.md) and [local deployment](../../PRD-Local-Mac-Deployment.md).
+```sh
+node docs/imagine/source/render.mjs              # all screens, both themes
+node docs/imagine/source/render.mjs 02-run-workspace
+```
 
-## Generation and review
-
-Regenerated with the built-in image-generation tool, using the original layouts and the exact Luma dark tokens as references. The [prompt record](prompts.json) preserves the generation/edit instructions and theme source. These revisions preserve the reviewed progress, credential-disclosure and approval semantics.
-
-All six final images were visually inspected for hierarchy, readable primary actions, consistent navigation, appropriate model choices and clear concept labeling. Raster text can contain small typographic irregularities; implementation needs real accessible components, keyboard behavior and responsive layouts.
-
-See the [work record](../engineering/work-items/LUMA-001.md) and [verification evidence](../engineering/evidence/LUMA-001/summary.md) for scope and checks. No application acceptance criteria are marked complete by these images.
+Set `CHROME_PATH` to use a specific browser. The sources also open directly in a browser: append `?theme=light` for the light theme.
 
 ## Local viewing runbook
 
-1. Open `docs/imagine/index.html` in a browser, or open any PNG directly.
-2. Use the gallery navigation to jump between screens; click an image to view its full resolution.
-3. Keep the gallery beside its six PNG files and preserve the relative `../design/luma.css` file when sharing or moving it. It uses local assets, system fonts and no external scripts.
+1. Open `docs/imagine/index.html` in a browser. Use **Dark / Light** to switch every image.
+2. Keep the gallery beside its PNGs, `source/quiet.css` and `../design/luma.css` when moving or sharing it. It uses system fonts and no external scripts.
+
+## Earlier concepts
+
+The previous Luma-dark raster set is in [archive/luma-dark-v1](archive/luma-dark-v1/), and the original warm-green exploration in [archive/warm-green-v1](archive/warm-green-v1/).

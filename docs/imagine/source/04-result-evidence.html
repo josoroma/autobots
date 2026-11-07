@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<title>04 · Open the result and its evidence</title>
+<link rel="stylesheet" href="../../design/luma.css">
+<link rel="stylesheet" href="quiet.css">
+<script src="shell.js"></script>
+<style>
+.body { flex: 1; display: grid; grid-template-columns: 1fr 360px; min-height: 0; }
+.read { overflow: hidden; display: flex; justify-content: center; padding: 48px 40px 0; }
+.read .doc { width: 660px; }
+.doc h1 { font-size: 42px; margin-bottom: 10px; }
+.dek { font: 400 19px/1.45 var(--serif); color: var(--muted-foreground); margin: 0 0 18px; }
+.byline { display: flex; align-items: center; gap: 10px; font: 13px var(--sans); color: var(--muted-foreground); padding-bottom: 22px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+.callout { border-left: 2px solid var(--link); padding: 2px 0 2px 18px; margin: 0 0 20px; }
+.callout .k { font: 600 12px var(--sans); color: var(--link); letter-spacing: .02em; margin-bottom: 4px; }
+.callout p { font-size: 18px; line-height: 1.5; color: var(--foreground); margin: 0; }
+.rail { border-left: 1px solid var(--border); padding: 24px 22px; display: flex; flex-direction: column; gap: 26px; overflow: hidden; background: var(--soft); }
+.rail h3 { font: 600 12.5px var(--sans); margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+.rail h3 .muted { font-weight: 400; margin-left: auto; }
+.chk { display: grid; grid-template-columns: 18px 1fr; gap: 10px; font-size: 13.5px; padding: 5px 0; }
+.ic { width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; margin-top: 2px; }
+.ic.ok { background: color-mix(in oklch, var(--success) 18%, transparent); color: var(--success); }
+.ic.warn { background: color-mix(in oklch, var(--attention) 18%, transparent); color: var(--attention); }
+.ic svg { width: 10px; height: 10px; stroke-width: 3; }
+.chk small { display: block; color: var(--muted-foreground); font-size: 12.5px; }
+.srcrow { display: grid; grid-template-columns: 16px 22px 1fr; gap: 10px; align-items: center; font-size: 13px; padding: 6px 0; }
+.srcrow .n { font-size: 11.5px; color: var(--link); font-weight: 600; }
+.srcrow small { display: block; color: var(--muted-foreground); font-size: 12px; }
+.kv { display: grid; grid-template-columns: 1fr auto; row-gap: 7px; font-size: 13px; }
+.kv span:nth-child(odd) { color: var(--muted-foreground); }
+.fine { font-size: 12px; color: var(--muted-foreground); line-height: 1.45; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside data-active="runs" data-current="run"></aside>
+  <main class="main">
+    <header class="topbar">
+      <div class="crumbs"><span class="muted">Runs</span><span class="muted">/</span><b>Tallyboard vs Plainview</b></div>
+      <span class="pill ok"><i data-i="check" class="sm"></i>Completed</span>
+      <span class="spacer"></span>
+      <span class="btn icon"><i data-i="copy"></i></span>
+      <span class="btn outline"><i data-i="download" class="sm"></i>Download .md</span>
+      <span class="btn primary"><i data-i="refresh" class="sm"></i>Start similar run</span>
+    </header>
+    <div class="body">
+      <div class="read">
+        <article class="doc">
+          <h1>Tallyboard vs Plainview</h1>
+          <p class="dek">A one‑page recommendation for a 12‑person product team that plans in two‑week cycles.</p>
+          <div class="byline"><i data-i="file" class="sm"></i>comparison-brief.md<span>·</span>Nov 7<span>·</span>6 sources<span>·</span>4 min read</div>
+          <div class="callout"><div class="k">RECOMMENDATION</div><p>Choose Plainview at your next renewal. It costs about $24 more per month at 12 seats, but adds roadmap planning and SSO, which your team listed as must‑haves.<sup>3,5</sup></p></div>
+          <h2>How they compare</h2>
+          <table>
+            <tr><th style="width:28%">Criterion</th><th>Tallyboard</th><th>Plainview</th></tr>
+            <tr><td>Price, 12 seats</td><td>$96 / month, monthly billing<sup>1</sup></td><td>$120 / month, annual billing<sup>3</sup></td></tr>
+            <tr><td>Planning views</td><td>Board, list, timeline<sup>2</sup></td><td>Board, list, roadmap<sup>4</sup></td></tr>
+            <tr><td>Admin controls</td><td>Roles; SSO on Enterprise only<sup>2</sup></td><td>Roles and SSO on every plan<sup>5</sup></td></tr>
+          </table>
+          <h2>Trade‑offs</h2>
+          <p>Tallyboard is cheaper and month‑to‑month, which matters if headcount is uncertain. Plainview's annual commitment is the main risk; its export covers projects and comments but not attachments.<sup>6</sup></p>
+        </article>
+      </div>
+      <aside class="rail">
+        <section>
+          <h3>Completion checks <span class="muted">5 of 6 passed</span></h3>
+          <div class="chk"><span class="ic ok"><i data-i="check"></i></span><span>All five sections present</span></div>
+          <div class="chk"><span class="ic ok"><i data-i="check"></i></span><span>Every price cites a source</span></div>
+          <div class="chk"><span class="ic ok"><i data-i="check"></i></span><span>Recommendation states its trade‑offs</span></div>
+          <div class="chk"><span class="ic ok"><i data-i="check"></i></span><span>Only official domains used</span></div>
+          <div class="chk"><span class="ic ok"><i data-i="check"></i></span><span>Fits on one page</span></div>
+          <div class="chk"><span class="ic warn"><i data-i="alert"></i></span><span>Sources dated within 90 days<small>1 of 6 pages shows no date</small></span></div>
+        </section>
+        <section>
+          <h3>Sources <span class="muted">6</span></h3>
+          <div class="srcrow"><span class="n">1</span><span class="tile">T</span><span>Pricing<small>tallyboard.example/pricing</small></span></div>
+          <div class="srcrow"><span class="n">2</span><span class="tile">T</span><span>Admin guide<small>docs.tallyboard.example/admin</small></span></div>
+          <div class="srcrow"><span class="n">3</span><span class="tile">P</span><span>Plans &amp; pricing<small>plainview.example/pricing</small></span></div>
+          <div class="srcrow"><span class="n">4</span><span class="tile">P</span><span>Roadmaps<small>help.plainview.example/roadmaps</small></span></div>
+          <div class="muted" style="font-size:12.5px;padding-top:4px">Show 2 more</div>
+        </section>
+        <section>
+          <h3>Run</h3>
+          <div class="kv num"><span>Cost</span><span>$0.31 reported</span><span>Tokens</span><span>41.2k</span><span>Duration</span><span>6m 12s</span><span>Model</span><span>Terra via OpenRouter</span></div>
+        </section>
+        <p class="fine">Checks confirm structure and attached evidence. They don't certify that every statement is true.</p>
+      </aside>
+    </div>
+  </main>
+</div>
+</body>
+</html>

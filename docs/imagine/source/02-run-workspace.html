@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<title>02 · Follow the work</title>
+<link rel="stylesheet" href="../../design/luma.css">
+<link rel="stylesheet" href="quiet.css">
+<script src="shell.js"></script>
+<style>
+.split { flex: 1; display: grid; grid-template-columns: 560px 1fr; min-height: 0; }
+.thread { display: flex; flex-direction: column; border-right: 1px solid var(--border); min-height: 0; }
+.scroll { flex: 1; overflow: hidden; padding: 28px 32px 0; display: flex; flex-direction: column; gap: 22px; }
+.you { align-self: flex-end; max-width: 420px; background: var(--soft-2); border-radius: var(--radius-2xl); border-bottom-right-radius: 6px; padding: 12px 16px; font-size: 14.5px; }
+.who { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted-foreground); margin-bottom: 8px; }
+.who .mark { width: 20px; height: 20px; border-radius: 6px; }
+.who b { color: var(--foreground); font-weight: 550; }
+.say { font-size: 14.5px; line-height: 1.6; margin: 0 0 14px; }
+.plan { border: 1px solid var(--border); border-radius: var(--radius-xl); overflow: hidden; }
+.plan-h { display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.plan-h b { font-weight: 600; }
+.step { display: grid; grid-template-columns: 20px 1fr auto; gap: 12px; padding: 10px 14px; align-items: start; }
+.step + .step { border-top: 1px solid var(--border); }
+.st { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; margin-top: 1px; }
+.st.done { background: var(--success); color: var(--background); }
+.st.done svg { width: 11px; height: 11px; stroke-width: 3; }
+.st.now { border: 2px solid var(--link); border-right-color: transparent; }
+.st.todo { border: 1.5px dashed color-mix(in oklch, var(--muted-foreground) 70%, transparent); }
+.step .t { font-weight: 500; }
+.step.pending .t { color: var(--muted-foreground); font-weight: 400; }
+.step .d { font-size: 13px; color: var(--muted-foreground); }
+.src { display: flex; align-items: center; gap: 9px; margin-top: 8px; font-size: 13px; }
+.src .host { color: var(--muted-foreground); }
+.src .state { margin-left: auto; font-size: 12px; color: var(--muted-foreground); }
+.activity { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted-foreground); padding: 2px 2px; }
+.activity b { color: var(--foreground); font-weight: 500; }
+.dock { padding: 16px 24px 18px; }
+.mini { display: flex; align-items: center; gap: 10px; border: 1px solid var(--input); border-radius: var(--radius-2xl); padding: 8px 8px 8px 16px; background: var(--card); color: var(--muted-foreground); }
+.mini .go { width: 30px; height: 30px; border-radius: 50%; background: var(--muted); color: var(--muted-foreground); display: grid; place-items: center; margin-left: auto; }
+.foot { display: flex; gap: 6px; justify-content: center; font-size: 12px; color: var(--muted-foreground); margin-top: 9px; }
+
+.canvas { background: var(--soft); display: flex; flex-direction: column; min-height: 0; padding: 18px 22px 0; }
+.paper { flex: 1; background: var(--card); border: 1px solid var(--border); border-bottom: none; border-radius: var(--radius-xl) var(--radius-xl) 0 0; display: flex; flex-direction: column; min-height: 0; box-shadow: var(--shadow); }
+.paper-h { display: flex; align-items: center; gap: 10px; height: 50px; padding: 0 10px 0 18px; border-bottom: 1px solid var(--border); }
+.paper-h b { font-weight: 550; }
+.paper .doc { padding: 40px 72px; overflow: hidden; }
+.writing { display: inline-block; width: 7px; height: 16px; background: var(--link); border-radius: 2px; vertical-align: -2px; margin-left: 2px; opacity: .85; }
+.pending-sec { display: flex; flex-direction: column; gap: 9px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside data-active="runs" data-current="run"></aside>
+  <main class="main">
+    <header class="topbar">
+      <div class="crumbs"><span class="muted">Runs</span><span class="muted">/</span><b>Tallyboard vs Plainview</b></div>
+      <span class="pill live"><i class="dot live" style="box-shadow:none"></i>Running · step 2 of 5</span>
+      <span class="spacer"></span>
+      <span class="row muted num" style="font-size:13px;gap:10px">$0.18 estimated <span class="meter"><i style="width:18%"></i></span> $1.00</span>
+      <span class="sep"></span>
+      <span class="btn outline"><i data-i="pause" class="sm"></i>Pause</span>
+      <span class="btn">Cancel</span>
+      <span class="btn icon"><i data-i="more"></i></span>
+    </header>
+    <div class="split">
+      <section class="thread">
+        <div class="scroll">
+          <div class="you">Compare Tallyboard and Plainview for a 12‑person product team. Use only their official docs and pricing pages, then recommend one.</div>
+          <div>
+            <div class="who"><span class="mark"><i data-i="bolt"></i></span><b>Research analyst</b> · Terra · 10:22</div>
+            <p class="say">I'll score both against five criteria that matter for a team your size, read only official sources, and write a one‑page brief with citations.</p>
+            <div class="plan">
+              <div class="plan-h"><b>Plan</b><span class="muted">v1</span><span class="spacer"></span><span class="muted num">1 of 5 done</span></div>
+              <div class="step"><span class="st done"><i data-i="check"></i></span><div><div class="t">Define comparison criteria</div><div class="d">Seats, planning views, integrations, admin controls, price.</div></div><span class="muted num" style="font-size:12px">0:41</span></div>
+              <div class="step"><span class="st now"></span><div><div class="t">Gather official sources</div><div class="d">Reading pricing and product documentation.</div>
+                <div class="src"><span class="tile">T</span>Pricing<span class="host">tallyboard.example</span><span class="state">Read</span></div>
+                <div class="src"><span class="tile">T</span>Admin guide<span class="host">docs.tallyboard.example</span><span class="state">Read</span></div>
+                <div class="src"><span class="tile">P</span>Plans &amp; pricing<span class="host">plainview.example</span><span class="state" style="color:var(--link)">Reading…</span></div>
+              </div><span class="muted num" style="font-size:12px">1:12</span></div>
+              <div class="step pending"><span class="st todo"></span><div class="t">Compare the options</div><span></span></div>
+              <div class="step pending"><span class="st todo"></span><div class="t">Write the brief</div><span></span></div>
+              <div class="step pending"><span class="st todo"></span><div class="t">Check sections and citations</div><span></span></div>
+            </div>
+          </div>
+          <div class="activity"><i data-i="clock" class="sm"></i><b>Activity</b> · 6 events · last at 10:28, opened plainview.example/pricing<span class="spacer"></span><i data-i="down" class="sm"></i></div>
+        </div>
+        <div class="dock">
+          <div class="mini"><i data-i="plus"></i>Add context or steer this run…<span class="go"><i data-i="up" class="sm"></i></span></div>
+          <div class="foot">Terra via OpenRouter · cost is estimated until usage is reported</div>
+        </div>
+      </section>
+      <section class="canvas">
+        <div class="paper">
+          <div class="paper-h"><i data-i="file" class="muted"></i><b>comparison-brief.md</b><span class="pill wait">Draft · updating</span><span class="spacer"></span><span class="btn icon"><i data-i="copy"></i></span><span class="btn icon"><i data-i="download"></i></span><span class="btn icon"><i data-i="expand"></i></span></div>
+          <article class="doc">
+            <h1>Tallyboard vs Plainview</h1>
+            <p class="muted" style="font:13px var(--sans);margin-bottom:22px">A recommendation for a 12‑person product team · 2 of 5 sections drafted</p>
+            <h2>Criteria</h2>
+            <p>Five criteria, weighted for a small team that plans in two‑week cycles: per‑seat price at 12 seats, planning views, native integrations, admin and permission controls, and data export.</p>
+            <h2>What each offers</h2>
+            <table>
+              <tr><th style="width:30%">Criterion</th><th>Tallyboard</th><th>Plainview</th></tr>
+              <tr><td>Price, 12 seats</td><td>$8 per seat, monthly<sup>1</sup></td><td>$10 per seat; annual only<sup>3</sup></td></tr>
+              <tr><td>Planning views</td><td>Board, list, timeline<sup>2</sup></td><td>Board, list, roadmap<span class="writing"></span></td></tr>
+              <tr><td>Integrations</td><td><div class="skel" style="width:70%;margin-top:6px"></div></td><td><div class="skel" style="width:55%;margin-top:6px"></div></td></tr>
+              <tr><td>Admin controls</td><td><div class="skel" style="width:60%;margin-top:6px"></div></td><td><div class="skel" style="width:76%;margin-top:6px"></div></td></tr>
+            </table>
+            <h2 class="muted" style="color:var(--muted-foreground)">Recommendation</h2>
+            <div class="pending-sec"><div class="skel" style="width:96%"></div><div class="skel" style="width:88%"></div><div class="skel" style="width:62%"></div></div>
+          </article>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</body>
+</html>

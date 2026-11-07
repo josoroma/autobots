@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Imagine Autobots — Luma dark concepts</title>
+<link rel="stylesheet" href="../../../design/luma.css">
+<style>
+:root { --canvas:var(--background); --surface:var(--card); --ink:var(--foreground); --copy-muted:var(--muted-foreground); --link:var(--sidebar-primary); --line:var(--border); }
+* { box-sizing:border-box; }
+html { scroll-behavior:smooth; scroll-padding-top:2rem; }
+body { margin:0; background:var(--canvas); color:var(--ink); font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+a { color:var(--link); text-underline-offset:4px; }
+a:focus-visible { outline:3px solid var(--link); outline-offset:6px; }
+.wrap { width:min(1400px, calc(100% - 64px)); margin:auto; }
+header { padding:56px 0 42px; }
+.topline { display:flex; align-items:center; justify-content:space-between; gap:24px; }
+.wordmark { font-size:20px; font-weight:750; display:flex; align-items:center; gap:12px; }
+.mark { width:23px; height:23px; border-radius:5px; background:var(--primary); box-shadow:7px 7px 0 var(--secondary); margin-right:8px; }
+.tag { border:1px solid var(--line); border-radius:999px; padding:6px 13px; font-size:13px; color:var(--copy-muted); }
+h1 { max-width:930px; font-size:clamp(42px,5.7vw,76px); letter-spacing:-.055em; line-height:1.06; margin:46px 0 22px; font-weight:700; }
+.intro { max-width:720px; font-size:20px; color:var(--copy-muted); margin:0; }
+nav { display:flex; flex-wrap:wrap; gap:10px; margin-top:30px; }
+nav a { border:1px solid var(--line); background:var(--surface); padding:8px 14px; border-radius:999px; text-decoration:none; font-size:14px; }
+nav a:hover { border-color:var(--link); background:var(--accent); }
+.direction { display:flex; flex-wrap:wrap; gap:12px 30px; padding:22px 0; margin-bottom:32px; border-block:1px solid var(--line); font-size:14px; color:var(--copy-muted); }
+.direction span { display:flex; align-items:center; gap:8px; }
+.swatch { width:12px; height:12px; background:var(--link); border-radius:50%; }
+section { margin-bottom:70px; }
+.heading { display:flex; justify-content:space-between; align-items:end; gap:24px; margin-bottom:19px; }
+.eyebrow { font-size:12px; text-transform:uppercase; letter-spacing:.12em; color:var(--link); font-weight:700; }
+h2 { margin:5px 0 8px; font-size:clamp(25px,3vw,36px); letter-spacing:-.035em; line-height:1.2; }
+.caption { max-width:760px; color:var(--copy-muted); margin:0; }
+.full { white-space:nowrap; font-size:14px; }
+figure { margin:0; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; }
+figure a { display:block; }
+figure img { display:block; width:100%; height:auto; }
+figcaption { padding:12px 20px; font-size:13px; color:var(--copy-muted); border-top:1px solid var(--line); }
+footer { border-top:1px solid var(--line); padding:28px 0 48px; color:var(--copy-muted); font-size:14px; }
+footer p { max-width:850px; }
+.links { display:flex; flex-wrap:wrap; gap:20px; }
+@media (max-width:700px) {
+ .wrap { width:calc(100% - 32px); }
+ header { padding-top:28px; }
+ .topline { align-items:start; }
+ .tag { max-width:150px; font-size:11px; }
+ h1 { margin-top:36px; }
+ .intro { font-size:18px; }
+ .heading { display:block; }
+ .full { display:inline-block; margin-top:12px; }
+ section { margin-bottom:46px; }
+ figure { border-radius:8px; }
+}
+@media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header id="top">
+ <div class="topline"><div class="wordmark"><span class="mark" aria-hidden="true"></span>Autobots</div><span class="tag">Luma · Dark default</span></div>
+ <h1>A clear place for your agents to work.</h1>
+ <p class="intro">Imagine a calm workspace on your Mac: give a goal, follow the work, make the decisions that matter, and leave with a result you can inspect.</p>
+ <nav aria-label="Concept screens">
+  <a href="#01-home">1. Home</a>
+  <a href="#02-run-workspace">2. Run workspace</a>
+  <a href="#03-approval">3. Approval</a>
+  <a href="#04-result-evidence">4. Result</a>
+  <a href="#05-model-settings">5. Models</a>
+  <a href="#06-workflow">6. Workflow</a>
+ </nav>
+</header>
+<div class="direction"><span><i class="swatch" aria-hidden="true"></i>Neutral dark + Luma blue</span><span>Local workspace · OpenRouter inference</span><span>Six desktop concepts</span></div>
+<main>
+<section id="01-home" aria-labelledby="01-home-title">
+ <div class="heading"><div><div class="eyebrow">01 / Goal → plan</div><h2 id="01-home-title">Start with a goal</h2><p class="caption">Describe an outcome, choose a model and set the run budget. The home screen gives the user a clear place to begin.</p></div><a class="full" href="01-home.png">Full resolution ↗</a></div>
+ <figure><a href="01-home.png" aria-label="Open full-resolution start with a goal concept"><img src="01-home.png" width="1586" height="992" fetchpriority="high" decoding="async" alt="Autobots concept: start with a goal. Describe an outcome, choose a model and set the run budget. The home screen gives the user a clear place to begin."></a><figcaption>Proposed interface · Fictional content and status · Click to inspect the full image</figcaption></figure>
+</section>
+<section id="02-run-workspace" aria-labelledby="02-run-workspace-title">
+ <div class="heading"><div><div class="eyebrow">02 / Plan → action</div><h2 id="02-run-workspace-title">Follow the work</h2><p class="caption">A visible plan and an activity timeline make progress understandable. The emerging artifact, estimated spend and run controls stay within reach.</p></div><a class="full" href="02-run-workspace.png">Full resolution ↗</a></div>
+ <figure><a href="02-run-workspace.png" aria-label="Open full-resolution follow the work concept"><img src="02-run-workspace.png" width="1586" height="992" loading="lazy" decoding="async" alt="Autobots concept: follow the work. A visible plan and an activity timeline make progress understandable. The emerging artifact, estimated spend and run controls stay within reach."></a><figcaption>Proposed interface · Fictional content and status · Click to inspect the full image</figcaption></figure>
+</section>
+<section id="03-approval" aria-labelledby="03-approval-title">
+ <div class="heading"><div><div class="eyebrow">03 / Action → decision</div><h2 id="03-approval-title">Review the exact change</h2><p class="caption">An illustrative protected-file replacement shows the current version, the proposed version and the scope of the decision.</p></div><a class="full" href="03-approval.png">Full resolution ↗</a></div>
+ <figure><a href="03-approval.png" aria-label="Open full-resolution review the exact change concept"><img src="03-approval.png" width="1586" height="992" loading="lazy" decoding="async" alt="Autobots concept: review the exact change. An illustrative protected-file replacement shows the current version, the proposed version and the scope of the decision."></a><figcaption>Proposed interface · Fictional content and status · Click to inspect the full image</figcaption></figure>
+</section>
+<section id="04-result-evidence" aria-labelledby="04-result-evidence-title">
+ <div class="heading"><div><div class="eyebrow">04 / Work → result</div><h2 id="04-result-evidence-title">Open the result and its evidence</h2><p class="caption">The completed brief is the focus. Sources, completion checks and reported usage sit beside the result.</p></div><a class="full" href="04-result-evidence.png">Full resolution ↗</a></div>
+ <figure><a href="04-result-evidence.png" aria-label="Open full-resolution open the result and its evidence concept"><img src="04-result-evidence.png" width="1585" height="992" loading="lazy" decoding="async" alt="Autobots concept: open the result and its evidence. The completed brief is the focus. Sources, completion checks and reported usage sit beside the result."></a><figcaption>Proposed interface · Fictional content and status · Click to inspect the full image</figcaption></figure>
+</section>
+<section id="05-model-settings" aria-labelledby="05-model-settings-title">
+ <div class="heading"><div><div class="eyebrow">05 / Setup → readiness</div><h2 id="05-model-settings-title">Connect OpenRouter</h2><p class="caption">A calm missing-key state explains what is needed. Saving a key, validating authentication and qualifying a model are distinct.</p></div><a class="full" href="05-model-settings.png">Full resolution ↗</a></div>
+ <figure><a href="05-model-settings.png" aria-label="Open full-resolution connect openrouter concept"><img src="05-model-settings.png" width="1585" height="992" loading="lazy" decoding="async" alt="Autobots concept: connect openrouter. A calm missing-key state explains what is needed. Saving a key, validating authentication and qualifying a model are distinct."></a><figcaption>Proposed interface · Fictional content and status · Click to inspect the full image</figcaption></figure>
+</section>
+<section id="06-workflow" aria-labelledby="06-workflow-title">
+ <div class="heading"><div><div class="eyebrow">06 / Task → workflow</div><h2 id="06-workflow-title">Make the task repeatable</h2><p class="caption">A readable workflow canvas turns a repeatable task into a versioned process, with draft validation and publishing as separate actions.</p></div><a class="full" href="06-workflow.png">Full resolution ↗</a></div>
+ <figure><a href="06-workflow.png" aria-label="Open full-resolution make the task repeatable concept"><img src="06-workflow.png" width="1585" height="992" loading="lazy" decoding="async" alt="Autobots concept: make the task repeatable. A readable workflow canvas turns a repeatable task into a versioned process, with draft validation and publishing as separate actions."></a><figcaption>Proposed interface · Fictional content and status · Click to inspect the full image</figcaption></figure>
+</section>
+</main>
+<footer>
+ <p>Generated design concepts for the selected Next.js + LangGraph / Deep Agents architecture. Dark is the product default; the exact light/dark CSS is documented separately. These images explore the experience; they are not screenshots of a running app. The PRDs and SPECS remain the source of product requirements.</p>
+ <div class="links"><a href="README.md">Design notes</a><a href="prompts.json">Generation prompts</a><a href="manifest.json">Artifact manifest</a><a href="../../../../SPECS.md">Specifications</a><a href="../../../../PRD-Design-System.md">Design system</a><a href="../../../design/luma.css">Exact tokens</a><a href="../README.md">Earlier concepts</a><a href="#top">Back to top ↑</a></div>
+</footer>
+</div>
+</body>
+</html>

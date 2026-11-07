@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<title>06 · Make the task repeatable</title>
+<link rel="stylesheet" href="../../design/luma.css">
+<link rel="stylesheet" href="quiet.css">
+<script src="shell.js"></script>
+<style>
+.body { flex: 1; display: grid; grid-template-columns: 1fr 380px; min-height: 0; }
+.board { position: relative; overflow: hidden; background-color: var(--soft); background-image: radial-gradient(color-mix(in oklch, var(--foreground) 14%, transparent) 1px, transparent 1px); background-size: 20px 20px; display: flex; flex-direction: column; align-items: center; padding-top: 44px; }
+.node { width: 340px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 12px 14px; display: grid; grid-template-columns: 30px 1fr auto; gap: 12px; align-items: center; box-shadow: var(--shadow); }
+.node .tile { width: 30px; height: 30px; border-radius: 9px; }
+.node b { font-weight: 550; display: block; }
+.node small { color: var(--muted-foreground); font-size: 12.5px; }
+.node.sel { border-color: var(--link); box-shadow: 0 0 0 3px color-mix(in oklch, var(--link) 18%, transparent), var(--shadow); }
+.node.gate .tile { background: color-mix(in oklch, var(--attention) 16%, transparent); color: var(--attention); }
+.node.start .tile { background: var(--primary); color: var(--primary-foreground); }
+.edge { width: 1.5px; height: 22px; background: color-mix(in oklch, var(--foreground) 22%, transparent); position: relative; }
+.add { width: 20px; height: 20px; border-radius: 50%; background: var(--background); border: 1px solid var(--border); display: grid; place-items: center; color: var(--muted-foreground); }
+.add svg { width: 12px; height: 12px; }
+.zoom { position: absolute; left: 16px; bottom: 16px; display: flex; gap: 2px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 3px; box-shadow: var(--shadow); font-size: 12.5px; align-items: center; }
+.zoom span { padding: 0 8px; color: var(--muted-foreground); }
+.insp { border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+.insp-h { padding: 20px 22px 16px; border-bottom: 1px solid var(--border); }
+.insp-h .k { font-size: 12px; color: var(--muted-foreground); }
+.insp-h h2 { font-size: 22px; margin: 2px 0 0; }
+.fields { padding: 18px 22px; display: flex; flex-direction: column; gap: 16px; overflow: hidden; }
+.f label { display: block; font-size: 12.5px; font-weight: 550; margin-bottom: 6px; }
+.f .input { height: 36px; font-size: 13.5px; }
+.ta { border: 1px solid var(--input); border-radius: var(--radius-lg); padding: 10px 12px; font-size: 13.5px; line-height: 1.5; min-height: 96px; background: var(--background); }
+.ta .var { font-family: var(--mono); font-size: 12px; background: color-mix(in oklch, var(--link) 14%, transparent); color: var(--link); padding: 1px 5px; border-radius: 5px; }
+.hint { font-size: 12px; color: var(--muted-foreground); margin-top: 6px; }
+.valid { margin: auto 22px 0; padding: 12px 14px; border-radius: var(--radius-lg); background: color-mix(in oklch, var(--success) 9%, transparent); border: 1px solid color-mix(in oklch, var(--success) 26%, transparent); font-size: 13px; display: flex; gap: 10px; align-items: center; }
+.valid svg { color: var(--success); }
+.pubnote { padding: 12px 22px 52px; font-size: 12.5px; color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside data-active="workflows"></aside>
+  <main class="main">
+    <header class="topbar">
+      <div class="crumbs"><span class="muted">Workflows</span><span class="muted">/</span><b>Weekly competitor brief</b></div>
+      <span class="pill wait">Draft</span>
+      <span class="muted" style="font-size:13px">v3 published · Oct 30</span>
+      <span class="spacer"></span>
+      <span class="btn">History</span>
+      <span class="btn outline"><i data-i="checkc" class="sm"></i>Validate</span>
+      <span class="btn primary">Publish v4</span>
+    </header>
+    <div class="body">
+      <div class="board">
+        <div class="node start"><span class="tile"><i data-i="play" class="sm"></i></span><span><b>Start manually</b><small>Inputs: competitors, team size</small></span><i data-i="more" class="muted"></i></div>
+        <div class="edge"></div><div class="add"><i data-i="plus"></i></div><div class="edge"></div>
+        <div class="node"><span class="tile"><i data-i="globe" class="sm"></i></span><span><b>Gather official sources</b><small>Research analyst · up to 8 pages</small></span><i data-i="more" class="muted"></i></div>
+        <div class="edge"></div><div class="add"><i data-i="plus"></i></div><div class="edge"></div>
+        <div class="node sel"><span class="tile"><i data-i="list" class="sm"></i></span><span><b>Compare the options</b><small>Analyst · $0.40 max</small></span><i data-i="more" class="muted"></i></div>
+        <div class="edge"></div><div class="add"><i data-i="plus"></i></div><div class="edge"></div>
+        <div class="node"><span class="tile"><i data-i="pen" class="sm"></i></span><span><b>Write the brief</b><small>Writer · comparison-brief.md</small></span><i data-i="more" class="muted"></i></div>
+        <div class="edge"></div><div class="add"><i data-i="plus"></i></div><div class="edge"></div>
+        <div class="node gate"><span class="tile"><i data-i="gate" class="sm"></i></span><span><b>Approval if a report is replaced</b><small>Only for protected files</small></span><i data-i="more" class="muted"></i></div>
+        <div class="zoom"><span class="btn icon" style="width:26px;height:26px">−</span><span class="num">100%</span><span class="btn icon" style="width:26px;height:26px">+</span></div>
+      </div>
+      <aside class="insp">
+        <div class="insp-h"><div class="k">Step 3 of 5</div><h2 class="serif">Compare the options</h2></div>
+        <div class="fields">
+          <div class="f"><label>Expert</label><div class="input"><span class="tile" style="width:20px;height:20px">A</span>Analyst<span class="spacer"></span><i data-i="down" class="sm muted"></i></div></div>
+          <div class="f"><label>Instructions</label><div class="ta">Score each of <span class="var">competitors</span> against the criteria from step 1 for a team of <span class="var">team_size</span>. Cite a source for every price.</div></div>
+          <div class="f"><label>Uses</label><div class="row" style="flex-wrap:wrap;gap:6px"><span class="chip" style="height:26px;font-size:12.5px"><i data-i="globe" class="sm"></i>Sources from step 2</span><span class="chip" style="height:26px;font-size:12.5px"><i data-i="list" class="sm"></i>Criteria</span></div></div>
+          <div class="f"><label>Model</label><div class="input" style="color:var(--muted-foreground)">Workspace default · <span style="color:var(--foreground)">Terra</span><span class="spacer"></span><i data-i="down" class="sm"></i></div><div class="hint">Frozen per run when it starts.</div></div>
+          <div class="f"><label>Step budget</label><div class="input num">$0.40</div></div>
+        </div>
+        <div class="valid"><i data-i="checkc"></i><span>Draft is valid · checked 2 min ago</span></div>
+        <div class="pubnote">Publishing creates v4. Runs already using v3 keep v3.</div>
+      </aside>
+    </div>
+  </main>
+</div>
+</body>
+</html>
