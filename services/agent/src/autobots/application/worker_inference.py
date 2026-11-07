@@ -116,9 +116,11 @@ def frozen_policy(snapshot: Mapping[str, Any] | None) -> RolePolicy:
     return RolePolicy(int((snapshot or {}).get("version", 0)), policy)
 
 
-def prepared(policy: RolePolicy, catalog: CatalogSnapshot) -> tuple[PreparedAttempt, int]:
+def prepared(
+    policy: RolePolicy, catalog: CatalogSnapshot, role: ModelRole = ROLE
+) -> tuple[PreparedAttempt, int]:
     """Fresh exact mapping, options and tools, and the most one call is reserved for."""
-    attempt = prepare_attempt(policy, ROLE, catalog, options=OPTIONS)
+    attempt = prepare_attempt(policy, role, catalog, options=OPTIONS)
     entry = validated_entry(attempt.profile, catalog, datetime.now(UTC))
     if "tools" not in entry.supported_parameters:
         raise UnsupportedRequestOption("this model's catalog entry does not support tools")
@@ -136,8 +138,10 @@ class AttemptModel:
         tools: Any = None,
         tool_options: Mapping[str, Any] | None = None,
         reserved_micro_usd: int | None = None,
+        role: ModelRole = ROLE,
     ) -> None:
         self._source = source
+        self._role = role
         self._workspace_id = workspace_id
         self._policy = policy
         self._reserved = reserved_micro_usd
@@ -146,12 +150,18 @@ class AttemptModel:
 
     def bind_tools(self, tools: Any, **options: Any) -> "AttemptModel":
         return AttemptModel(
-            self._source, self._workspace_id, self._policy, tools, options, self._reserved
+            self._source,
+            self._workspace_id,
+            self._policy,
+            tools,
+            options,
+            self._reserved,
+            self._role,
         )
 
     async def ainvoke(self, messages: Any, stop: Any = None, **kwargs: Any) -> Any:
         client, used = await self._source.open_attempt(
-            self._workspace_id, self._policy, reserved_micro_usd=self._reserved
+            self._workspace_id, self._policy, reserved_micro_usd=self._reserved, role=self._role
         )
         target = client
         if self._tools is not None:
@@ -174,11 +184,15 @@ class InferenceSource:
     client_factory: Callable[[str], Any] | None = None
 
     async def open_attempt(
-        self, workspace_id: UUID, policy: RolePolicy, reserved_micro_usd: int | None = None
+        self,
+        workspace_id: UUID,
+        policy: RolePolicy,
+        reserved_micro_usd: int | None = None,
+        role: ModelRole = ROLE,
     ) -> tuple[Any, CredentialReference]:
         """Inside the attempt. Every refusal here is before sending, and classed as such."""
         try:
-            attempt, fresh_worst = prepared(policy, await self.catalog.current())
+            attempt, fresh_worst = prepared(policy, await self.catalog.current(), role)
             if reserved_micro_usd is not None and fresh_worst > reserved_micro_usd:
                 # The price rose during this job, so its reservation no longer covers a call.
                 raise CostUnavailable("this call would cost more than was reserved")
@@ -277,6 +291,38 @@ class InferenceSource:
         route = ModelRoute(ROLE.value, profile.id.value, profile.wire_id, worst_case, rate, tier)
         model = AttemptModel(self, lease.workspace_id, policy, reserved_micro_usd=worst_case)
         return lambda: model, replace(config, route=route, refusal=refusal)
+
+    async def role_route(
+        self, connection: Any, lease: Lease, role: ModelRole
+    ) -> tuple[AttemptModel, ModelRoute] | str:
+        """Another role of the same run, as its frozen policy binds it, or why it can't be used.
+
+        Browsing calls the `researcher` route this way (Decision 0020 L3). Each call it makes is
+        still admitted by the loop's middleware, on this route and the run's budget.
+        """
+        cursor = await connection.execute(
+            "select policy_snapshot from public.runs where id = %s", (lease.run_id,)
+        )
+        snapshot = (await cursor.fetchone())[0]
+        try:
+            policy = frozen_policy(snapshot)
+            profile = policy.profile_for(role)
+        except (UnknownModelProfile, KeyError, ValueError):
+            return "route_not_bound"
+        try:
+            worst_case = prepared(policy, await self.catalog.current(), role)[1]
+        except UnsupportedRequestOption as unsupported:
+            return unsupported.code
+        except ModelUnavailable:
+            return FailureClass.MODEL_UNAVAILABLE.value
+        except CostUnavailable as refused:
+            return refused.code
+        rate, tier = await self._input_rate(profile)
+        route = ModelRoute(role.value, profile.id.value, profile.wire_id, worst_case, rate, tier)
+        model = AttemptModel(
+            self, lease.workspace_id, policy, reserved_micro_usd=worst_case, role=role
+        )
+        return model, route
 
 
 def _no_model() -> Any:

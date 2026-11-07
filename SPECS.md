@@ -95,7 +95,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
   - [US-14.11: Code tools over run files](#us-1411-code-tools-over-run-files)
   - [US-14.12: Goal-driven browsing](#us-1412-goal-driven-browsing)
   - [US-14.13: Isolated browser executor](#us-1413-isolated-browser-executor)
-  - [US-14.14: Admitted model for browser-use](#us-1414-admitted-model-for-browser-use)
+  - [US-14.14: Admitted model for the browsing loop](#us-1414-admitted-model-for-the-browsing-loop)
   - [US-14.15: Sol profile and route qualification](#us-1415-sol-profile-and-route-qualification)
   - [US-14.16: Live browse trial with Sol](#us-1416-live-browse-trial-with-sol)
 
@@ -384,21 +384,22 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.11 | Code tools over run files | DONE | EPIC-14 |
 | US-14.11#1 | Add `search_files`, `read_code_file`, `write_code_file` and `patch_code_file` over the run's files only, in pure Python, with names that never match the SDK's file tools. | DONE | US-14.11 |
 | US-14.11#2 | Cover the scenarios. | DONE | US-14.11 |
-| US-14.12 | Goal-driven browsing | BLOCKED | EPIC-14 |
+| US-14.12 | Goal-driven browsing | READY | EPIC-14 |
 | US-14.12#1 | Register `browse_goal` as `arbitrary_execution` with its input and output schemas, limits and public fields, only while the executor reports qualified and the admitted browser model exists. | TODO | US-14.12 |
-| US-14.12#2 | Limit its action set to navigate, click links, scroll, read and extract, and enforce `allowed_domains`, `max_steps` and `max_seconds`. | TODO | US-14.12 |
-| US-14.12#3 | Grant it only through an Expert, and require a person's approval on every call, showing the task, start URL, allowed domains and limits. | TODO | US-14.12 |
-| US-14.12#4 | Cover the scenarios on a disposable stack with a scripted model. | TODO | US-14.12 |
+| US-14.12#2 | Run each call through US-14.14's browsing loop, whose read-only actions are opening a numbered link, going to a URL, scrolling and finishing with a summary, and enforce `allowed_domains`, `max_steps` and `max_seconds`, ending the call on a refused action or an invalid answer. | TODO | US-14.12 |
+| US-14.12#3 | Set `browse_goal`'s provider to `autobots` and remove the `browser_use` provider value from the catalog, its Pydantic contract, the generated OpenAPI document and TypeScript client, and the Tools screen's provider labels, so the providers are exactly those TC-03 lists. | TODO | US-14.12 |
+| US-14.12#4 | Grant it only through an Expert, and require a person's approval on every call, showing the task, start URL, allowed domains and limits. | TODO | US-14.12 |
+| US-14.12#5 | Cover the scenarios on a disposable stack with a scripted model. | TODO | US-14.12 |
 | US-14.13 | Isolated browser executor | DONE | EPIC-14 |
 | US-14.13#1 | Start and remove one hardened container per call from the digest-pinned Playwright image, with CDP on loopback behind a per-session token and nothing of the worker's environment. | DONE | US-14.13 |
 | US-14.13#2 | Build the egress proxy sidecar locally, applying the URL guard to every request and connecting to the address it checked. | DONE | US-14.13 |
 | US-14.13#3 | Tie the executor to the attempt's lease, cancellation and time cap, with labelled containers and a sweeper. | DONE | US-14.13 |
 | US-14.13#4 | Qualify every refusal live on a disposable stack with a scripted model, and report qualified only after that check passes. | DONE | US-14.13 |
-| US-14.14 | Admitted model for browser-use | READY | EPIC-14 |
-| US-14.14#1 | Drop the unused `langchain-mcp-adapters` pin and add `browser-use==0.13.14` pinned in `uv.lock`, with its dependency tree reviewed and recorded, and update US-1.3's toolchain record (`docs/engineering/runbooks/toolchains.md`, `services/agent/tests/test_environment.py`, `tests/toolchain/test_manifests.py`). | TODO | US-14.14 |
-| US-14.14#2 | Switch off browser-use's telemetry and cloud sync before it is imported, and prove offline that no telemetry client is created. | TODO | US-14.14 |
-| US-14.14#3 | Implement the adapter over the pinned version's chat-model protocol through model admission, reservations, receipts and the run's frozen `researcher` route. | TODO | US-14.14 |
-| US-14.14#4 | Cover the scenarios offline with a scripted model. | TODO | US-14.14 |
+| US-14.14 | Admitted model for the browsing loop | DONE | EPIC-14 |
+| US-14.14#1 | Implement the browsing loop in the worker over the isolated executor's CDP session with the locked `websockets` client, showing the model each page's URL, title, a cut of its readable text and its numbered links. No package is added or removed, and `langchain-mcp-adapters` stays. | DONE | US-14.14 |
+| US-14.14#2 | Route every step through model admission on the run's frozen `researcher` route, with a reservation, an invocation ticket and receipt, the run's budget and `model_calls`, and the shared transport. The loop has no model client of its own. | DONE | US-14.14 |
+| US-14.14#3 | Define the four read-only actions as typed tools, required on every step. Refuse a route whose catalog entry lacks tool support with a typed code before anything is sent, and end the call on an answer that isn't one valid action. | DONE | US-14.14 |
+| US-14.14#4 | Cover the scenarios offline with a scripted model. | DONE | US-14.14 |
 | US-14.15 | Sol profile and route qualification | DONE | EPIC-14 |
 | US-14.15#1 | Add `openrouter_sol` to the domain's approved profiles, not offered for new runs until its route is qualified, with Sol as the `researcher` role's built-in default once offered, and regenerated clients if a public contract changes. | DONE | US-14.15 |
 | US-14.15#2 | Add a migration widening every profile check to include `openrouter_sol` and seeding its `model_profiles` row. | DONE | US-14.15 |
@@ -518,7 +519,7 @@ flowchart TD
     US_14_11["US-14.11: Code tools over run files"]
     US_14_12["US-14.12: Goal-driven browsing"]
     US_14_13["US-14.13: Isolated browser executor"]
-    US_14_14["US-14.14: Admitted model for browser-use"]
+    US_14_14["US-14.14: Admitted model for the browsing loop"]
     US_14_15["US-14.15: Sol profile and route qualification"]
     US_14_16["US-14.16: Live browse trial with Sol"]
   end
@@ -732,6 +733,7 @@ flowchart TD
   US_14_3 -.-> US_14_13
   US_14_8 -.-> US_14_13
   US_3_3 -.-> US_14_14
+  US_14_13 -.-> US_14_14
   US_3_4 -.-> US_14_15
   US_11_6 -.-> US_14_15
   US_12_1 -.-> US_14_15
@@ -1282,12 +1284,14 @@ flowchart TD
     US_14_12["US-14.12: Goal-driven browsing"]
     T_14_12_1["US-14.12#1: Register `browse_goal` as `arbitrary_execution` with its input and output schemas, limits and public fields, only while the executor reports qualified and the admitted browser model exists."]
     US_14_12 --> T_14_12_1
-    T_14_12_2["US-14.12#2: Limit its action set to navigate, click links, scroll, read and extract, and enforce `allowed_domains`, `max_steps` and `max_seconds`."]
+    T_14_12_2["US-14.12#2: Run each call through US-14.14&#x27;s browsing loop, whose read-only actions are opening a numbered link, going to a URL, scrolling and finishing with a summary, and enforce `allowed_domains`, `max_steps` and `max_seconds`, ending the call on a refused action or an invalid answer."]
     US_14_12 --> T_14_12_2
-    T_14_12_3["US-14.12#3: Grant it only through an Expert, and require a person&#x27;s approval on every call, showing the task, start URL, allowed domains and limits."]
+    T_14_12_3["US-14.12#3: Set `browse_goal`&#x27;s provider to `autobots` and remove the `browser_use` provider value from the catalog, its Pydantic contract, the generated OpenAPI document and TypeScript client, and the Tools screen&#x27;s provider labels, so the providers are exactly those TC-03 lists."]
     US_14_12 --> T_14_12_3
-    T_14_12_4["US-14.12#4: Cover the scenarios on a disposable stack with a scripted model."]
+    T_14_12_4["US-14.12#4: Grant it only through an Expert, and require a person&#x27;s approval on every call, showing the task, start URL, allowed domains and limits."]
     US_14_12 --> T_14_12_4
+    T_14_12_5["US-14.12#5: Cover the scenarios on a disposable stack with a scripted model."]
+    US_14_12 --> T_14_12_5
     US_14_13["US-14.13: Isolated browser executor"]
     T_14_13_1["US-14.13#1: Start and remove one hardened container per call from the digest-pinned Playwright image, with CDP on loopback behind a per-session token and nothing of the worker&#x27;s environment."]
     US_14_13 --> T_14_13_1
@@ -1297,12 +1301,12 @@ flowchart TD
     US_14_13 --> T_14_13_3
     T_14_13_4["US-14.13#4: Qualify every refusal live on a disposable stack with a scripted model, and report qualified only after that check passes."]
     US_14_13 --> T_14_13_4
-    US_14_14["US-14.14: Admitted model for browser-use"]
-    T_14_14_1["US-14.14#1: Drop the unused `langchain-mcp-adapters` pin and add `browser-use==0.13.14` pinned in `uv.lock`, with its dependency tree reviewed and recorded, and update US-1.3&#x27;s toolchain record (`docs/engineering/runbooks/toolchains.md`, `services/agent/tests/test_environment.py`, `tests/toolchain/test_manifests.py`)."]
+    US_14_14["US-14.14: Admitted model for the browsing loop"]
+    T_14_14_1["US-14.14#1: Implement the browsing loop in the worker over the isolated executor&#x27;s CDP session with the locked `websockets` client, showing the model each page&#x27;s URL, title, a cut of its readable text and its numbered links. No package is added or removed, and `langchain-mcp-adapters` stays."]
     US_14_14 --> T_14_14_1
-    T_14_14_2["US-14.14#2: Switch off browser-use&#x27;s telemetry and cloud sync before it is imported, and prove offline that no telemetry client is created."]
+    T_14_14_2["US-14.14#2: Route every step through model admission on the run&#x27;s frozen `researcher` route, with a reservation, an invocation ticket and receipt, the run&#x27;s budget and `model_calls`, and the shared transport. The loop has no model client of its own."]
     US_14_14 --> T_14_14_2
-    T_14_14_3["US-14.14#3: Implement the adapter over the pinned version&#x27;s chat-model protocol through model admission, reservations, receipts and the run&#x27;s frozen `researcher` route."]
+    T_14_14_3["US-14.14#3: Define the four read-only actions as typed tools, required on every step. Refuse a route whose catalog entry lacks tool support with a typed code before anything is sent, and end the call on an answer that isn&#x27;t one valid action."]
     US_14_14 --> T_14_14_3
     T_14_14_4["US-14.14#4: Cover the scenarios offline with a scripted model."]
     US_14_14 --> T_14_14_4
@@ -5169,7 +5173,7 @@ Open Questions:
 
 ### US-14.12: Goal-driven browsing
 
-Status: BLOCKED
+Status: READY
 
 As a goal's owner
 I want a read-only browsing tool that pursues a goal in an isolated browser
@@ -5177,6 +5181,8 @@ So that a run can read sites through a browser within allowed domains, with a pe
 
 Source:
 - [Autonomous browsing](PRD-Tool-Catalog.md#autonomous-browsing)
+- [Catalog contract, TC-03](PRD-Tool-Catalog.md#catalog-contract)
+- [Decision 0020, L2, L5 and L6](docs/engineering/decisions/0020-own-browsing-loop.md#decision)
 - [Decision 0018, B5 and B6](docs/engineering/decisions/0018-browser-executor.md#decision)
 - [Decision 0018, the qualification host](docs/engineering/decisions/0018-browser-executor.md#the-qualification-host)
 - [Decision 0018, a refused action ends the call](docs/engineering/decisions/0018-browser-executor.md#a-refused-action-ends-the-call)
@@ -5196,10 +5202,10 @@ Scenario: A read-only browse is summarised and recorded
   When it browses from the qualification host https://example.com/ with allowed_domains example.com until the model reports done
   Then it returns a summary labelled third-party and cut to the shared text budget, visited URLs without query or fragment, steps, model_calls and stopped set to done, and one metered tool use records only start_url, allowed_domains, max_steps, stopped, steps and the count of visited URLs, with each step counted as the run's model spend
 
-Scenario: Outside its domains, a submission and its limits
+Scenario: Outside its domains, a submission, an invalid answer and its limits
   Given an approved browse_goal call on the same disposable stack with a scripted model
-  When the model navigates outside allowed_domains, attempts typing or a form submission, or runs past max_steps or max_seconds
-  Then a refused navigation or submission ends the call at once with stopped set to refused_action, nothing is submitted and no further step is taken, a submission that gets past the action set is refused by the egress proxy and ends the call the same way, the output keeps the summary so far and the URLs visited, and reaching max_steps or max_seconds stops the call with stopped set to max_steps or max_seconds
+  When the model navigates outside allowed_domains, attempts typing or a form submission, answers with something other than one valid action, or runs past max_steps or max_seconds
+  Then a refused navigation or submission ends the call at once with stopped set to refused_action, nothing is submitted and no further step is taken, a submission that gets past the action set is refused by the egress proxy and ends the call the same way, an answer that isn't one valid action ends the call with stopped set to invalid_action, the output keeps the summary so far and the URLs visited, and reaching max_steps or max_seconds stops the call with stopped set to max_steps or max_seconds
 
 Scenario: Granted only through an Expert, approved on every call
   Given a run that grants browse_goal other than through an Expert, and a run whose Expert grants it
@@ -5209,7 +5215,7 @@ Scenario: Granted only through an Expert, approved on every call
 Scenario: Stays disabled while unqualified
   Given the executor reports not qualified, or the admitted browser model is absent
   When the catalog is read or a grant names browse_goal
-  Then browse_goal reads disabled_by_policy with its repair, it isn't registered, and the grant is refused with a typed code
+  Then browse_goal reads disabled_by_policy with its repair and provider autobots, it isn't registered, the grant is refused with a typed code, and the catalog's providers are only those TC-03 lists
 ```
 
 Dependencies:
@@ -5220,7 +5226,8 @@ Dependencies:
 
 Tasks:
 - [ ] Register `browse_goal` as `arbitrary_execution` with its input and output schemas, limits and public fields, only while the executor reports qualified and the admitted browser model exists.
-- [ ] Limit its action set to navigate, click links, scroll, read and extract, and enforce `allowed_domains`, `max_steps` and `max_seconds`.
+- [ ] Run each call through US-14.14's browsing loop, whose read-only actions are opening a numbered link, going to a URL, scrolling and finishing with a summary, and enforce `allowed_domains`, `max_steps` and `max_seconds`, ending the call on a refused action or an invalid answer.
+- [ ] Set `browse_goal`'s provider to `autobots` and remove the `browser_use` provider value from the catalog, its Pydantic contract, the generated OpenAPI document and TypeScript client, and the Tools screen's provider labels, so the providers are exactly those TC-03 lists.
 - [ ] Grant it only through an Expert, and require a person's approval on every call, showing the task, start URL, allowed domains and limits.
 - [ ] Cover the scenarios on a disposable stack with a scripted model.
 
@@ -5281,19 +5288,19 @@ Tasks:
 Open Questions:
 - None.
 
-### US-14.14: Admitted model for browser-use
+### US-14.14: Admitted model for the browsing loop
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-14-14-admitted-model-browser-use/`
 
 As a workspace owner
-I want every model call a browsing tool makes to be an admitted call of its run
-So that browsing spends only within the run's budget, on an approved profile, with receipts.
+I want a read-only browsing loop whose every step is an admitted call of its run
+So that browsing spends only within the run's budget, on an approved profile, with receipts, and needs no package outside the lock.
 
 Source:
 - [Admitted browser model](PRD-Tool-Catalog.md#admitted-browser-model)
-- [Decision 0018, B4 and B7](docs/engineering/decisions/0018-browser-executor.md#decision)
-- [Decision 0019, S5](docs/engineering/decisions/0019-sol-profile-and-browser-use.md#decision)
-- [Decision 0017, C4](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
+- [Decision 0020, L1 to L4 and L6](docs/engineering/decisions/0020-own-browsing-loop.md#decision)
+- [Decision 0018, B4](docs/engineering/decisions/0018-browser-executor.md#decision)
 - [SP-006](docs/engineering/option-b-contract.md#sp-006--approved-model-profiles)
 - [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
 
@@ -5301,39 +5308,40 @@ Acceptance Criteria:
 
 ```gherkin
 Scenario: Each step is an admitted call
-  Given browser-use pinned in uv.lock, its agent loop in the worker, and a scripted model behind the adapter, offline
-  When the agent takes three steps
-  Then each step's call has a reservation, an invocation ticket and receipt, and the run's frozen researcher route on an approved OpenRouter profile over the shared transport, and its spend is settled into the run's model calls and spend
+  Given the browsing loop in the worker with a scripted model and scripted pages, offline
+  When the loop takes three steps, opening a numbered link, scrolling and finishing with a summary
+  Then each step shows the model the page's URL, title, a cut of its readable text and its numbered links, each step's call has a reservation, an invocation ticket and receipt, and the run's frozen researcher route on an approved OpenRouter profile over the shared transport, its spend is settled into the run's model calls and spend, and the loop ends with the model's summary
 
 Scenario: An uncertain outcome follows the existing rules
-  Given a scripted call through the adapter whose outcome is uncertain
-  When the adapter records it
+  Given a scripted step call through admission whose outcome is uncertain
+  When the loop records it
   Then its receipt and reservation stay pending reconciliation and it is not redispatched
 
 Scenario: No other model path
-  Given the browser-use agent in the worker
-  When a model call is made outside the adapter, or a call is made with the run's budget exhausted
-  Then browser-use's own model clients were never constructed, the outside call fails as unadmitted, the exhausted budget refuses the call before it is sent, and neither reaches the transport
+  Given the browsing loop in the worker
+  When a model call is made outside admission, or a step is attempted with the run's budget exhausted
+  Then the loop has no model client of its own, the outside call fails as unadmitted, the exhausted budget refuses the call before it is sent, and neither reaches the transport
 
-Scenario: Telemetry and cloud sync stay off
-  Given the worker switching off browser-use's telemetry and cloud sync before it imports browser-use, offline
-  When browser-use is imported and the agent takes a step with a scripted model
-  Then its telemetry and cloud sync read off, and no telemetry client is created
+Scenario: Actions are required tool calls, refused on a route lacking tool support
+  Given a route whose catalog entry supports tools and a route whose catalog entry doesn't
+  When the loop requests a step on each
+  Then the first offers exactly the actions open a numbered link, go to a URL, scroll and finish with a summary, as tools with typed arguments and a tool call required, and the second is refused with a typed code before anything is sent
 
-Scenario: Structured actions are enforced or refused
-  Given a route that enforces structured output and a route that doesn't
-  When the agent requests its typed actions on each
-  Then the first requests them as the route's structured output, and the second is refused with a typed code before it is sent
+Scenario: An answer that isn't one valid action ends the call
+  Given a scripted model that answers a step with no tool call, more than one tool call, an action outside the fixed set, or arguments that don't fit the action's type
+  When the loop reads the answer
+  Then the call ends with stopped set to invalid_action, keeping the notes so far, and no further step is requested
 ```
 
 Dependencies:
 - US-3.3
+- US-14.13
 
 Tasks:
-- [ ] Drop the unused `langchain-mcp-adapters` pin and add `browser-use==0.13.14` pinned in `uv.lock`, with its dependency tree reviewed and recorded, and update US-1.3's toolchain record (`docs/engineering/runbooks/toolchains.md`, `services/agent/tests/test_environment.py`, `tests/toolchain/test_manifests.py`).
-- [ ] Switch off browser-use's telemetry and cloud sync before it is imported, and prove offline that no telemetry client is created.
-- [ ] Implement the adapter over the pinned version's chat-model protocol through model admission, reservations, receipts and the run's frozen `researcher` route.
-- [ ] Cover the scenarios offline with a scripted model.
+- [x] Implement the browsing loop in the worker over the isolated executor's CDP session with the locked `websockets` client, showing the model each page's URL, title, a cut of its readable text and its numbered links. No package is added or removed, and `langchain-mcp-adapters` stays.
+- [x] Route every step through model admission on the run's frozen `researcher` route, with a reservation, an invocation ticket and receipt, the run's budget and `model_calls`, and the shared transport. The loop has no model client of its own.
+- [x] Define the four read-only actions as typed tools, required on every step. Refuse a route whose catalog entry lacks tool support with a typed code before anything is sent, and end the call on an answer that isn't one valid action.
+- [x] Cover the scenarios offline with a scripted model.
 
 Open Questions:
 - None.
@@ -5407,6 +5415,7 @@ So that browsing on Sol is seen working once from start to finish, and not only 
 Source:
 - [Decision 0019, S6](docs/engineering/decisions/0019-sol-profile-and-browser-use.md#decision)
 - [Decision 0019, what this doesn't establish](docs/engineering/decisions/0019-sol-profile-and-browser-use.md#what-this-doesnt-establish)
+- [Decision 0020, L3 to L5](docs/engineering/decisions/0020-own-browsing-loop.md#decision)
 - [Decision 0018, B8](docs/engineering/decisions/0018-browser-executor.md#decision)
 - [Decision 0018, the qualification host](docs/engineering/decisions/0018-browser-executor.md#the-qualification-host)
 - [Autonomous browsing](PRD-Tool-Catalog.md#autonomous-browsing)

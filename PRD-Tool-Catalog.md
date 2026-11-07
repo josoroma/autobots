@@ -13,7 +13,7 @@ Everything in PRD §9 still applies: grants pin versions, discovery never grants
 
 **TC-02. Descriptor.** Each `(tool_id, version)` has a descriptor with: `tool_id` (snake_case, `^[a-z][a-z0-9_]{2,63}$`), `version`, `title`, `description` (the text the model sees), `group`, `provider`, `operation_class`, `side_effects` (derived from the class), `network`, `cost_class` (`free_local` or `metered_provider`), an optional owner-maintained `cost_note`, an optional `key_requirement` naming the credential and its environment **variable name**, `approval` (`never`, `always`), `input_schema` and `output_schema` (JSON Schema from the Pydantic models), flattened `fields` (path, direction, type, required, description, constraints, public), `limits` (timeout, retries, output bytes), `grantable_to` (`goal`, `expert`, `workflow_node`, `coordinator`), and `availability` with a typed `availability_reason`.
 
-**TC-03. Groups.** `planning`, `general`, `web_search`, `web_extraction`, `web_crawling`, `files`, `market_data`, `browsing`, `code`, `connectors`, `delegation`, `learning`. One group per tool. Providers: `autobots`, `tavily`, `jina`, `yahoo_finance`, `world_bank`, `github`, `browser_use`.
+**TC-03. Groups.** `planning`, `general`, `web_search`, `web_extraction`, `web_crawling`, `files`, `market_data`, `browsing`, `code`, `connectors`, `delegation`, `learning`. One group per tool. Providers: `autobots`, `tavily`, `jina`, `yahoo_finance`, `world_bank`, `github`.
 
 **TC-04. Availability.** `available`, `key_missing`, `disabled_by_policy` or `not_qualified`, computed per request from the worker-facing configuration and never stored. It shows whether a key is set, never its value, prefix, length or hash.
 
@@ -136,19 +136,19 @@ By [Decision 0018](docs/engineering/decisions/0018-browser-executor.md) B1 to B3
 
 ## Admitted browser model
 
-By Decision 0018 B4 and B7.
+By Decision 0018 B4 and Decision 0020, which replaced browser-use with Autobots' own browsing loop.
 
-**BM-01.** browser-use's agent loop runs in the worker. Its model is an adapter implementing browser-use's chat-model protocol, and each call is an admitted call of the run: a reservation, an invocation ticket and receipt, the run's frozen `researcher` route on an approved OpenRouter profile, the shared transport, and settled spend. Uncertain outcomes follow the existing rules.
+**BM-01.** The browsing loop runs in the worker over the isolated browser executor. Each step shows the model the current page as text (its URL, title, a cut of its readable text and its numbered links) and is one admitted call of the run: a reservation, an invocation ticket and receipt, the run's frozen `researcher` route on an approved OpenRouter profile, the shared transport, and settled spend. Uncertain outcomes follow the existing rules.
 
-**BM-02.** browser-use's own model clients are never constructed. A model call outside the adapter fails as unadmitted, and an exhausted budget refuses the call before it is sent.
+**BM-02.** The loop has no model client of its own. A call made outside admission fails as unadmitted, and an exhausted budget refuses the call before it is sent.
 
-**BM-03.** browser-use's typed actions are requested as the route's structured output where the route enforces it; otherwise the call is refused with a typed code before it is sent.
+**BM-03.** The model answers each step with exactly one action, as a required tool call with typed arguments: open a numbered link, go to a URL, scroll, or finish with a summary. A route whose catalog entry lacks tool support is refused with a typed code before anything is sent, and an answer that isn't one valid action ends the call.
 
-**BM-04.** `browser-use` is pinned in `uv.lock`, and the adapter is tested offline against that version's protocol with a scripted model.
+**BM-04.** No package is added for it: the loop drives the executor over CDP with the locked `websockets` client, and it is tested offline with a scripted model.
 
 ## Autonomous browsing
 
-`browse_goal` (browser-use) stays `disabled_by_policy` and unregistered until the isolated browser executor is qualified and the admitted browser model exists (Decision 0017 C3 and C4). Then, by Decision 0018 B5 and B6:
+`browse_goal` (Autobots' browsing loop) stays `disabled_by_policy` and unregistered until the isolated browser executor is qualified and the admitted browser model exists (Decision 0017 C3 and C4). Then, by Decision 0018 B5 and B6:
 
 | Input | Constraint |
 |---|---|
@@ -158,7 +158,7 @@ By Decision 0018 B4 and B7.
 | `max_steps` | 1 to 20, default 10 |
 | `max_seconds` | 10 to 300, default 120 |
 
-Output: `summary` (labelled third-party, cut to the shared text budget), `visited` (URLs without query or fragment), `steps`, `model_calls`, and `stopped` (`done`, `max_steps`, `max_seconds`, `refused_action` or `cancelled`). Public fields: `start_url`, `allowed_domains`, `max_steps`, `stopped`, `steps` and the count of visited URLs, never the summary or page text.
+Output: `summary` (labelled third-party, cut to the shared text budget), `visited` (URLs without query or fragment), `steps`, `model_calls`, and `stopped` (`done`, `max_steps`, `max_seconds`, `refused_action`, `invalid_action` or `cancelled`; `invalid_action` by Decision 0020 L6). Public fields: `start_url`, `allowed_domains`, `max_steps`, `stopped`, `steps` and the count of visited URLs, never the summary or page text.
 
 **AB-01.** It reads only: navigate, click links, scroll, read and extract. Typing, form submission, sign-in, upload and download are not in its action set, and the egress proxy refuses a submission that gets through.
 

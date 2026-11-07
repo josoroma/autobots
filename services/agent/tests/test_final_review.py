@@ -212,7 +212,9 @@ def test_each_attempt_passes_its_reservation_on() -> None:
     seen: list[int | None] = []
 
     class Source:
-        async def open_attempt(self, _: Any, __: Any, reserved_micro_usd: int | None = None) -> Any:
+        async def open_attempt(
+            self, _: Any, __: Any, reserved_micro_usd: int | None = None, **___: Any
+        ) -> Any:
             seen.append(reserved_micro_usd)
             raise ProviderFailure(FailureClass.COST_UNAVAILABLE)
 

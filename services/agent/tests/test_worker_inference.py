@@ -76,7 +76,13 @@ from autobots.application.worker_inference import (
     prepared,
 )
 from autobots.application.worker_leases import Lease
-from autobots.domain.models import MAX_OUTPUT_TOKENS, PROFILES, ModelProfileId, UnknownModelProfile
+from autobots.domain.models import (
+    MAX_OUTPUT_TOKENS,
+    PROFILES,
+    ModelProfileId,
+    ModelRole,
+    UnknownModelProfile,
+)
 from autobots.operations import worker
 from autobots.operations.logs import JsonFormatter, redact
 from fake_openrouter import ARRANGED_KEY, DEEPSEEK_WIRE_ID, TERRA_WIRE_ID
@@ -309,7 +315,7 @@ class ScriptedKeys:
 
     async def open_attempt(self, workspace_id: Any, policy: Any, **_kwargs: Any) -> Any:
         try:
-            attempt, _ = prepared(policy, await self.catalog.current())
+            attempt, _ = prepared(policy, await self.catalog.current(), _kwargs.get("role", ROLE))
         except ModelUnavailable:
             raise ProviderFailure(FailureClass.MODEL_UNAVAILABLE) from None
         key = self.keys.pop(0)
@@ -1068,3 +1074,70 @@ def test_both_steps_run_and_either_one_counts_as_work() -> None:
     assert calls == ["first", "second"]
     assert asyncio.run(run_both(True, False)) is True
     assert asyncio.run(run_both(False, False)) is False
+
+
+def _role_route(value: Any, *drop: str) -> Any:
+    async def fetch() -> dict[str, Any]:
+        return catalog_payload(*drop)
+
+    source = InferenceSource("postgresql://unused", _context(fetch), CatalogCache(fetch))
+    return asyncio.run(source.role_route(Rows(value), lease(), ModelRole.RESEARCHER))
+
+
+def test_browsing_binds_the_runs_frozen_researcher_route() -> None:
+    frozen = {
+        **snapshot(DEEPSEEK.id.value),
+        "bindings": {"executor": DEEPSEEK.id.value, "researcher": TERRA.id.value},
+    }
+    model, route = _role_route(frozen)
+    assert (route.role, route.profile, route.wire_id) == (
+        "researcher",
+        TERRA.id.value,
+        TERRA_WIRE_ID,
+    )
+    assert route.worst_case_micro_usd > 0 and model._role is ModelRole.RESEARCHER
+
+
+def test_a_researcher_route_without_tools_is_refused_before_anything_is_sent() -> None:
+    frozen = {
+        "version": 1,
+        "bindings": {"executor": DEEPSEEK.id.value, "researcher": TERRA.id.value},
+    }
+    assert _role_route(frozen, "tools") == "unsupported_request_option"
+
+
+def test_a_run_without_a_researcher_binding_has_no_browsing_route() -> None:
+    assert _role_route(snapshot()) == "route_not_bound"
+
+
+def test_a_browsing_step_reaches_the_transport_on_the_researcher_route_with_tools_required() -> (
+    None
+):
+    from autobots.adapters import loop_middleware
+    from autobots.application.browsing_loop import ACTION_TOOLS, admitted_steps
+
+    fake = Fake()
+    policy = frozen_policy(
+        {"version": 1, "bindings": {"executor": DEEPSEEK.id.value, "researcher": TERRA.id.value}}
+    )
+    model = AttemptModel(
+        source_with(fake, [ARRANGED_KEY]), uuid4(), policy, role=ModelRole.RESEARCHER
+    )
+
+    class Admits:
+        async def admitted(self, request: Any, handler: Any, route: Any) -> Any:
+            token = loop_middleware._ADMITTED.set(True)
+            try:
+                return await handler(request), True
+            finally:
+                loop_middleware._ADMITTED.reset(token)
+
+    step = admitted_steps(Admits(), model, "route")  # type: ignore[arg-type]
+    asyncio.run(step([HumanMessage("read")]))
+    body = fake.bodies[0]
+    assert body["model"] == TERRA_WIRE_ID
+    assert [item["function"]["name"] for item in body["tools"]] == [
+        item["function"]["name"] for item in ACTION_TOOLS
+    ]
+    assert body["tool_choice"] == "required"
+    assert body["provider"] == {"require_parameters": True, "allow_fallbacks": False}

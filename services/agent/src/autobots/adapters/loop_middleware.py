@@ -530,6 +530,12 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             except AdmissionRefused as refused:
                 raise LoopStopped(refused.code) from None
 
+    async def admitted(
+        self, request: Any, handler: Callable[[Any], Awaitable[Any]], route: ModelRoute
+    ) -> tuple[Any, bool]:
+        """One admitted call on another of the run's frozen routes, as browsing makes them."""
+        return await self._with_slot(request, handler, route)
+
     async def awrap_model_call(self, request: Any, handler: Callable[[Any], Awaitable[Any]]) -> Any:
         await self._guard()
         try:
