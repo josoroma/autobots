@@ -5139,6 +5139,7 @@ Source:
 - [Autonomous browsing](PRD-Tool-Catalog.md#autonomous-browsing)
 - [Decision 0018, B5 and B6](docs/engineering/decisions/0018-browser-executor.md#decision)
 - [Decision 0018, the qualification host](docs/engineering/decisions/0018-browser-executor.md#the-qualification-host)
+- [Decision 0018, a refused action ends the call](docs/engineering/decisions/0018-browser-executor.md#a-refused-action-ends-the-call)
 - [Decision 0017, C3 and C4](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
 - [Decision 0017, Q9](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
 - [Tool-use record](PRD-Tool-Catalog.md#tool-use-record)
@@ -5158,7 +5159,7 @@ Scenario: A read-only browse is summarised and recorded
 Scenario: Outside its domains, a submission and its limits
   Given an approved browse_goal call on the same disposable stack with a scripted model
   When the model navigates outside allowed_domains, attempts typing or a form submission, or runs past max_steps or max_seconds
-  Then the navigation and the submission are refused and nothing is submitted, a submission that gets past the action set is refused by the egress proxy, and reaching max_steps or max_seconds stops the call with stopped set to max_steps or max_seconds
+  Then a refused navigation or submission ends the call at once with stopped set to refused_action, nothing is submitted and no further step is taken, a submission that gets past the action set is refused by the egress proxy and ends the call the same way, the output keeps the summary so far and the URLs visited, and reaching max_steps or max_seconds stops the call with stopped set to max_steps or max_seconds
 
 Scenario: Granted only through an Expert, approved on every call
   Given a run that grants browse_goal other than through an Expert, and a run whose Expert grants it
@@ -5184,7 +5185,7 @@ Tasks:
 - [ ] Cover the scenarios on a disposable stack with a scripted model.
 
 Open Questions:
-- Does a refused navigation or submission end the call with `stopped: refused_action`, or does the agent carry on? The PRD lists the value but doesn't say when it is set.
+- None.
 
 ### US-14.13: Isolated browser executor
 

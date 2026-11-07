@@ -21,6 +21,10 @@
 
 **Added 2026-11-07, by the owner's answer "Use a public host"** to US-14.13's open question. The live check that an admitted request gets through uses real outbound network to one named public host: **`https://example.com/`**, the IANA-reserved example domain, with `https://example.org/` as the fallback if it doesn't answer. Only that host is requested for the positive case, with a `GET` and no credentials, and the URL guard is applied to it exactly as to any other: there is no test-only exception. Every refusal case still targets local or private destinations. A check run without network access reports the positive case as not observed, so the executor isn't reported qualified from it.
 
+## A refused action ends the call
+
+**Added 2026-11-07, by the owner's answer "End the call"** to US-14.12's open question. When `browse_goal` refuses an action, whether a navigation outside `allowed_domains`, a typing or submission action, or a request the egress proxy refuses, the call ends at once with `stopped: refused_action`. Nothing more is requested and no further model step is taken. The output still carries the summary so far, the URLs visited before the refusal, and the steps and model calls used, and the tool use records the outcome. A page's own subresource the proxy refuses, such as a script on a private address, isn't an action the agent chose, so it is refused and counted without ending the call.
+
 ## Requirements revised
 
 - PRD-Tool-Catalog gains [Isolated browser executor](../../../PRD-Tool-Catalog.md#isolated-browser-executor) and [Admitted browser model](../../../PRD-Tool-Catalog.md#admitted-browser-model). [Autonomous browsing](../../../PRD-Tool-Catalog.md#autonomous-browsing) gains `browse_goal`'s contract.

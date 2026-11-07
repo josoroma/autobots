@@ -162,4 +162,6 @@ Output: `summary` (labelled third-party, cut to the shared text budget), `visite
 
 **AB-01.** It reads only: navigate, click links, scroll, read and extract. Typing, form submission, sign-in, upload and download are not in its action set, and the egress proxy refuses a submission that gets through.
 
+**AB-03.** A refused action ends the call at once with `stopped: refused_action`: a navigation outside `allowed_domains`, a typing or submission action, or a request the egress proxy refuses for an action the agent chose. Nothing more is requested and no further model step is taken; the output keeps the summary so far, the URLs visited and the steps used. A page's own subresource the proxy refuses is counted and doesn't end the call (Decision 0018).
+
 **AB-02.** It stays `arbitrary_execution`. The registry admits that class only for a tool whose executor reports qualified. It is granted only through an Expert, every call waits for a person's approval, it counts as one metered call, and each of its steps counts as the run's model spend.
