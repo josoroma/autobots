@@ -192,7 +192,7 @@ export function ApprovalsPanel() {
             </p>
             <pre
               tabIndex={0}
-              className="bg-muted max-h-96 overflow-auto rounded-md p-3 text-sm break-words whitespace-pre-wrap"
+              className="bg-muted max-h-96 overflow-auto rounded-2xl p-3 text-sm break-words whitespace-pre-wrap"
             >
               {approval.arguments}
             </pre>

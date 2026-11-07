@@ -326,7 +326,7 @@ def test_the_qualifier_reports_a_failed_readback_and_still_closes_the_issue(
 
 
 def test_a_reviewer_sees_the_configured_repository_and_not_a_models_choice() -> None:
-    configured = github_issue_tool(environ={"AUTOBOTS_GITHUB_ISSUES_REPOSITORY": "owner/name"})
+    configured = github_issue_tool(environ={"GITHUB_REPOSITORY": "owner/name"})
     assert configured.resource_target(object()) == "GitHub repository owner/name"
-    unset = github_issue_tool(environ={"AUTOBOTS_GITHUB_ISSUES_REPOSITORY": "not a repository"})
+    unset = github_issue_tool(environ={"GITHUB_REPOSITORY": "not a repository"})
     assert unset.resource_target(object()) is None

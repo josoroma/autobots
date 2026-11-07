@@ -1,15 +1,21 @@
+import { ChevronsUpDown } from "lucide-react";
 import type { ComponentProps } from "react";
 
 import { cn } from "@/lib/utils";
 
 // Every form control in the app, DS-03: `input`, `border` and `ring`, with visible keyboard focus. Focus
 // itself comes from `:focus-visible` in globals.css. `data-slot` lets a check tell these from a raw control.
+// Luma shapes: single-line controls are pills on a muted fill; a textarea keeps a large, non-pill radius.
 const CONTROL =
-  "bg-background text-foreground border-input control-boundary block w-full rounded-md border px-3 py-2 text-sm disabled:opacity-60";
+  "bg-muted text-foreground border-input control-boundary block w-full border px-3 py-2 text-sm disabled:opacity-60";
 
 export function Input({ className, ...props }: ComponentProps<"input">) {
   return (
-    <input data-slot="input" className={cn(CONTROL, className)} {...props} />
+    <input
+      data-slot="input"
+      className={cn(CONTROL, "rounded-4xl", className)}
+      {...props}
+    />
   );
 }
 
@@ -17,15 +23,26 @@ export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
   return (
     <textarea
       data-slot="textarea"
-      className={cn(CONTROL, className)}
+      className={cn(CONTROL, "rounded-2xl", className)}
       {...props}
     />
   );
 }
 
+// The native element keeps its own menu, keyboard and form behavior; only its trigger is drawn here.
 export function Select({ className, ...props }: ComponentProps<"select">) {
   return (
-    <select data-slot="select" className={cn(CONTROL, className)} {...props} />
+    <span className="relative block">
+      <select
+        data-slot="select"
+        className={cn(CONTROL, "appearance-none rounded-4xl pr-9", className)}
+        {...props}
+      />
+      <ChevronsUpDown
+        aria-hidden="true"
+        className="text-muted-foreground pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2"
+      />
+    </span>
   );
 }
 

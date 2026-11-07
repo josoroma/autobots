@@ -4,17 +4,21 @@ import { useRef } from "react";
 
 import { Button } from "@/components/ui/button";
 
-export function AboutServices() {
+export function AboutServices({ className }: { className?: string }) {
   const dialog = useRef<HTMLDialogElement>(null);
   return (
     <>
-      <Button variant="secondary" onClick={() => dialog.current?.showModal()}>
+      <Button
+        variant="secondary"
+        className={className}
+        onClick={() => dialog.current?.showModal()}
+      >
         About local services
       </Button>
       <dialog
         ref={dialog}
         aria-labelledby="about-services-title"
-        className="bg-popover text-popover-foreground border-border m-auto max-w-md space-y-3 rounded-lg border p-6 backdrop:bg-black/50"
+        className="bg-popover text-popover-foreground border-border m-auto max-w-md space-y-3 rounded-4xl border p-6 backdrop:bg-black/50"
       >
         <h2 id="about-services-title" className="text-lg font-medium">
           About local services

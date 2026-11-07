@@ -23,8 +23,8 @@ from autobots.contracts.tools import CreateGithubIssueInput, CreateGithubIssueOu
 from autobots.domain.tools import OperationClass
 
 API_URL = "https://api.github.com"
-REPOSITORY_VARIABLE = "AUTOBOTS_GITHUB_ISSUES_REPOSITORY"
-TOKEN_VARIABLE = "AUTOBOTS_GITHUB_ISSUES_TOKEN"
+REPOSITORY_VARIABLE = "GITHUB_REPOSITORY"
+TOKEN_VARIABLE = "GITHUB_TOKEN"
 TOOL_ID = "create_github_issue"
 _REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 # GitHub answered, and nothing was created. Anything else unclear stays uncertain.

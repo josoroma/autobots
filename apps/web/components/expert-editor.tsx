@@ -173,8 +173,6 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
       </p>
     );
   }
-  const inputClass =
-    "bg-background border-input block w-full rounded-md border px-3 py-2 text-sm";
   return (
     <>
       <Card aria-labelledby="config-heading" className="space-y-3">
@@ -192,7 +190,6 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
               onChange={(event) =>
                 setDraft({ ...draft, purpose: event.target.value })
               }
-              className={inputClass}
             />
           </div>
           <div className="space-y-1">
@@ -206,7 +203,6 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
               onChange={(event) =>
                 setDraft({ ...draft, instructions: event.target.value })
               }
-              className={inputClass}
             />
           </div>
           <fieldset className="space-y-1">
@@ -239,7 +235,6 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
               onChange={(event) =>
                 setDraft({ ...draft, executor: event.target.value })
               }
-              className={inputClass}
             >
               {PROFILES.map((profile) => (
                 <option key={profile.id} value={profile.id}>

@@ -84,8 +84,8 @@ The first consequential connector, by [Decision 0007](../decisions/0007-first-co
 Set both for the worker:
 
 ```sh
-AUTOBOTS_GITHUB_ISSUES_REPOSITORY=owner/name
-AUTOBOTS_GITHUB_ISSUES_TOKEN=<a fine-grained token limited to that repository, with Issues read and write>
+GITHUB_REPOSITORY=owner/name
+GITHUB_TOKEN=<a fine-grained token limited to that repository, with Issues read and write>
 ```
 
 The token is read for each attempt and stored nowhere. Without both, a call fails as `connector_not_configured` and sends nothing.

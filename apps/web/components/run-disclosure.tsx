@@ -6,8 +6,14 @@ import {
   type ModelList,
   type ModelPolicyState,
 } from "@autobots/api-client";
+import { Info, Lock, Send, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
+
+import { INNER_BOX } from "@/components/ui/card";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { Select } from "@/components/ui/field";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 // MP-07. Every screen that creates a run shows this, and reading it starts nothing.
 const EXECUTOR = "executor";
@@ -87,14 +93,17 @@ export function RunDisclosure({
     usesModel && bindings.some((binding) => notOffered(binding.profile));
   // An Expert's binding outranks the workspace and a run's own choice, and a session pins its version.
   const fromExpert = Object.values(roleOverrides ?? {}).some(notOffered);
+  // The model, roles and summarizer note appear only once the choice is read and allowed.
+  const showModel = !failed && executor !== undefined && !refused;
 
+  const budget = (budgetMicroUsd / MICRO_USD).toFixed(2);
+
+  // Each sentence below keeps its exact words, which product rules and tests read. Spans only arrange
+  // them: an uppercase label, a larger figure, and hidden punctuation that keeps the sentence whole.
   return (
-    <div
-      data-field="disclosure"
-      className="bg-muted space-y-2 rounded-md p-3 text-sm"
-    >
+    <div data-field="disclosure" className="flex flex-col gap-4 text-sm">
       {onChoose === undefined || models === null ? null : (
-        <div className="space-y-1">
+        <div className="flex flex-col gap-2">
           <label htmlFor="run-model" className="font-medium">
             Model for this run
           </label>
@@ -115,55 +124,121 @@ export function RunDisclosure({
         </div>
       )}
       {failed ? (
-        <p data-disclosure="models-unavailable">
-          The models this run would use can&apos;t be read right now. It would
-          use the workspace setting, as Settings shows it.
+        <p
+          data-disclosure="models-unavailable"
+          className={cn(INNER_BOX, "flex items-start gap-2")}
+        >
+          <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          <span>
+            The models this run would use can&apos;t be read right now. It would
+            use the workspace setting, as Settings shows it.
+          </span>
         </p>
       ) : executor === undefined ? (
-        <p>Loading what this run would use.</p>
-      ) : refused ? (
-        <p data-disclosure="not-offered" role="alert">
-          A saved model choice here isn&apos;t offered for new runs until
-          it&apos;s qualified, so pressing Run would start nothing.{" "}
-          {fromExpert
-            ? "It's in this Expert's saved version, so settings won't change it. Save a new revision of the Expert, without it, and start a new session."
-            : "Change it in settings."}
+        <p className="text-muted-foreground">
+          Loading what this run would use.
         </p>
-      ) : (
-        <>
-          <p data-disclosure="model">
-            Model: {canonical(executor.profile)}, through OpenRouter.
+      ) : refused ? (
+        <p
+          data-disclosure="not-offered"
+          role="alert"
+          className="border-destructive/50 flex items-start gap-2 rounded-2xl border p-3"
+        >
+          <TriangleAlert
+            aria-hidden="true"
+            className="text-destructive mt-0.5 size-4 shrink-0"
+          />
+          <span>
+            A saved model choice here isn&apos;t offered for new runs until
+            it&apos;s qualified, so pressing Run would start nothing.{" "}
+            {fromExpert
+              ? "It's in this Expert's saved version, so settings won't change it. Save a new revision of the Expert, without it, and start a new session."
+              : "Change it in settings."}
+          </span>
+        </p>
+      ) : null}
+      <div className={cn("grid gap-3", showModel && "sm:grid-cols-2")}>
+        {showModel && executor !== undefined ? (
+          <p
+            data-disclosure="model"
+            className={cn(INNER_BOX, "flex flex-col gap-1")}
+          >
+            <Eyebrow>
+              Model<span className="sr-only">:</span>
+            </Eyebrow>{" "}
+            <span className="font-medium wrap-anywhere">
+              {canonical(executor.profile)}
+            </span>
+            <span className="sr-only">,</span>{" "}
+            <span className="text-muted-foreground">through OpenRouter.</span>
           </p>
-          <details>
-            <summary>Roles, of which only the executor dispatches</summary>
-            <ul data-disclosure="roles" className="mt-1 space-y-1">
+        ) : null}
+        <p
+          data-disclosure="budget"
+          className={cn(INNER_BOX, "flex flex-col gap-1")}
+        >
+          <Eyebrow>
+            Budget<span className="sr-only">:</span>
+          </Eyebrow>{" "}
+          <span>
+            <span className="text-muted-foreground">up to</span>{" "}
+            <span className="text-2xl font-semibold tabular-nums">
+              US${budget}
+            </span>
+          </span>{" "}
+          <span className="text-muted-foreground">for this run.</span>
+        </p>
+      </div>
+      {showModel ? (
+        <>
+          <details className={INNER_BOX}>
+            <summary className="cursor-pointer font-medium">
+              Roles, of which only the executor dispatches
+            </summary>
+            <ul data-disclosure="roles" className="mt-2 space-y-1">
               {bindings.map((binding) => (
-                <li key={binding.role}>
+                <li key={binding.role} className="wrap-anywhere">
                   {binding.role}: {canonical(binding.profile)}
                 </li>
               ))}
             </ul>
           </details>
           {bindings.find((binding) => binding.role === "summarizer")
-            ?.profile !== executor.profile ? (
-            <p data-disclosure="summarizer">
-              The summarizer differs from the executor, so this run would pause
-              with route_not_bound if it needs compaction, and resuming
-              wouldn&apos;t clear that.
+            ?.profile !== executor?.profile ? (
+            <p data-disclosure="summarizer" className="flex items-start gap-2">
+              <TriangleAlert
+                aria-hidden="true"
+                className="mt-0.5 size-4 shrink-0"
+              />
+              <span>
+                The summarizer differs from the executor, so this run would
+                pause with route_not_bound if it needs compaction, and resuming
+                wouldn&apos;t clear that.
+              </span>
             </p>
           ) : null}
         </>
-      )}
-      <p data-disclosure="budget">
-        Budget: up to US${(budgetMicroUsd / MICRO_USD).toFixed(2)} for this run.
+      ) : null}
+      <Separator />
+      <p
+        data-disclosure="data"
+        className="text-muted-foreground flex items-start gap-2"
+      >
+        <Send aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+        <span>
+          Sent to OpenRouter{sendsOnlyIfAgent ? ", if an agent step runs" : ""}:
+          selected instructions, conversation and context excerpts, retrieved
+          material, tool outputs and required protocol metadata. App records
+          stay on this Mac.
+        </span>
       </p>
-      <p data-disclosure="data">
-        Sent to OpenRouter{sendsOnlyIfAgent ? ", if an agent step runs" : ""}:
-        selected instructions, conversation and context excerpts, retrieved
-        material, tool outputs and required protocol metadata. App records stay
-        on this Mac.
+      <p
+        data-disclosure="consent"
+        className="flex items-center gap-2 font-medium"
+      >
+        <Lock aria-hidden="true" className="size-4 shrink-0" />
+        <span>Nothing is sent until you press Run.</span>
       </p>
-      <p data-disclosure="consent">Nothing is sent until you press Run.</p>
     </div>
   );
 }

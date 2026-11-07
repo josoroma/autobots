@@ -3,11 +3,21 @@
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 
+import { Play, Sparkles } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { RunDisclosure } from "@/components/run-disclosure";
-import { Card } from "@/components/ui/card";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  INNER_BOX,
+  IconTile,
+} from "@/components/ui/card";
 import { Textarea } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { cn } from "@/lib/utils";
 
 // The draft and choice survive setup in this tab only. Opening or restoring them never starts anything:
 // the one admission below happens only when Run is pressed. No credential is ever kept here.
@@ -88,25 +98,49 @@ export function GoalComposer() {
   }
 
   return (
-    <Card aria-labelledby="composer-heading" className="space-y-3">
-      <h2 id="composer-heading" className="text-lg font-medium">
-        New goal
-      </h2>
-      <label htmlFor="goal" className="text-sm font-medium">
-        Goal
-      </label>
-      <Textarea
-        id="goal"
-        value={draft}
-        onChange={(event) => update(event.target.value)}
-        rows={3}
-      />
-      <RunDisclosure chosen={profile} onChoose={setProfile} />
-      <Button onClick={() => void run()} disabled={draft.trim() === ""}>
-        Run
-      </Button>
+    <Card aria-labelledby="composer-heading" className="flex flex-col gap-6">
+      <CardHeader>
+        <IconTile icon={Sparkles} />
+        <div className="min-w-0 flex-1 space-y-1">
+          <CardTitle id="composer-heading">New goal</CardTitle>
+          <CardDescription>
+            Describe the work, check what it would use, then press Run.
+          </CardDescription>
+        </div>
+      </CardHeader>
+      {/* Document order stays goal, model choice, Run, so Tab never skips back. On wide screens the
+          disclosure sits beside the goal and Run sits at the bottom of the goal's column. */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+        <div className="flex flex-col gap-2">
+          <label htmlFor="goal" className="text-sm font-medium">
+            Goal
+          </label>
+          <Textarea
+            id="goal"
+            value={draft}
+            onChange={(event) => update(event.target.value)}
+            rows={6}
+            className="min-h-36 flex-1 resize-y"
+          />
+        </div>
+        <div className="lg:row-span-2">
+          <RunDisclosure chosen={profile} onChoose={setProfile} />
+        </div>
+        <Button
+          onClick={() => void run()}
+          disabled={draft.trim() === ""}
+          className="w-full lg:self-end"
+        >
+          <Play aria-hidden="true" className="size-4" />
+          Run
+        </Button>
+      </div>
       {outcome === null ? null : (
-        <p role="alert" data-outcome={outcome} className="text-sm">
+        <p
+          role="alert"
+          data-outcome={outcome}
+          className={cn(INNER_BOX, "text-sm")}
+        >
           {outcome === "credentials_required" ? (
             <>
               Model-backed work needs an OpenRouter key. Your draft is kept.{" "}
