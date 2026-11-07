@@ -10,7 +10,7 @@ markers are preserved across refreshes.
 | Target | US-14.13 |
 | Kind | story |
 | Focus | - |
-| Status | ACTIVE |
+| Status | COMPLETE |
 | Reason | - |
 | Started | 2026-11-07 |
 | Updated | 2026-11-07 |
@@ -19,16 +19,16 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-14.13 | us-14-13-isolated-browser-executor | READY | Isolated browser executor |
+| 1 | US-14.13 | us-14-13-isolated-browser-executor | DONE | Isolated browser executor |
 
 ## Next Action
 
-Action: select
-Story: US-14.13
-Change: us-14-13-isolated-browser-executor
+Action: complete
+Story: -
+Change: -
 Owner: main-session
-Command: openspec new change us-14-13-isolated-browser-executor; set US-14.13 to IN PROGRESS with a Change: line
-Reason: US-14.13 is READY and has no OpenSpec change
+Command: none — every story in the goal is DONE
+Reason: all 1 story/stories are DONE
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.
