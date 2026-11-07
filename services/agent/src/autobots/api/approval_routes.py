@@ -20,7 +20,9 @@ from autobots.application.runs import IdempotencyConflict
 from autobots.contracts.approvals import (
     ApprovalDecision,
     ApprovalList,
+    ApprovalRequester,
     ApprovalResult,
+    ApprovalScope,
     ApprovalView,
 )
 
@@ -35,10 +37,27 @@ def _pool(request: Request) -> Any:
     return pool
 
 
+def _requester(row: dict[str, Any], viewer: UUID) -> ApprovalRequester | None:
+    """None only for a request saved before US-13.1, which always stores the agent now."""
+    agent = row["requested_by_agent"]
+    if agent is None:
+        return None
+    person = row["requested_by"]
+    return ApprovalRequester(
+        person_id=person,
+        person_is_viewer=person is not None and person == viewer,
+        agent=agent["kind"],
+        expert_id=agent.get("id"),
+        expert_version=agent.get("version"),
+        expert_name=row["expert_name"] if agent["kind"] == "expert" else None,
+    )
+
+
 @router.get("/approvals", operation_id="listApprovals", response_model=ApprovalList)
 async def get_approvals(
     request: Request,
     workspace: Annotated[UUID, Depends(current_workspace)],
+    user: Annotated[UUID, Depends(current_user)],
     status: Annotated[
         Literal["pending", "approved", "rejected", "expired", "withdrawn"], Query()
     ] = "pending",
@@ -64,6 +83,12 @@ async def get_approvals(
                 expires_at=row["expires_at"].isoformat(),
                 policy_reason=row["policy_reason"],
                 resource_target=row["resource_target"],
+                requester=_requester(row, user),
+                scope_snapshot=None
+                if row["scope_snapshot"] is None
+                else ApprovalScope.model_validate(row["scope_snapshot"]),
+                policy_version=row["policy_version"],
+                policy_rule=row["policy_rule"],
             )
             for row in rows
         ],

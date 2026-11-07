@@ -19,6 +19,50 @@ const MESSAGES: Record<string, string> = {
     "The run isn't waiting for this decision. Resume it first.",
 };
 
+const NOT_RECORDED = "not recorded, as this request is older than that record.";
+
+// Decision 0015: who started the run, and which agent proposed the call.
+function requesterText(approval: ApprovalView): string {
+  const requester = approval.requester;
+  if (requester === null) {
+    return NOT_RECORDED;
+  }
+  const person =
+    requester.person_id === null
+      ? "no person is recorded for this run"
+      : requester.person_is_viewer
+        ? "you started this run"
+        : `member ${requester.person_id} started this run`;
+  const agent =
+    requester.agent === "coordinator"
+      ? "the coordinator proposed it"
+      : `Expert ${requester.expert_name === null ? requester.expert_id : `"${requester.expert_name}"`}, version ${requester.expert_version}, proposed it`;
+  return `${person}, and ${agent}.`;
+}
+
+function scopeText(approval: ApprovalView): string {
+  const scope = approval.scope_snapshot;
+  if (scope === null) {
+    return NOT_RECORDED;
+  }
+  const tools = Object.entries(scope.tools)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, version]) => `${name} version ${version}`);
+  const paths = scope.paths.length === 0 ? "none" : scope.paths.join(", ");
+  return `tools ${tools.length === 0 ? "none" : tools.join(", ")}; paths ${paths}.`;
+}
+
+function policyText(approval: ApprovalView): string {
+  if (approval.policy_version === null) {
+    return NOT_RECORDED;
+  }
+  const rule =
+    approval.policy_rule === null
+      ? ""
+      : `, rule ${approval.policy_rule.replaceAll("_", " ")}`;
+  return `${approval.policy_version}${rule}.`;
+}
+
 export function ApprovalsPanel() {
   const [approvals, setApprovals] = useState<readonly ApprovalView[] | null>(
     null,
@@ -133,6 +177,15 @@ export function ApprovalsPanel() {
               Target:{" "}
               {approval.resource_target ??
                 "not recorded. Read the exact request below."}
+            </p>
+            <p data-approval-requester="true" className="text-sm">
+              Requested by: {requesterText(approval)}
+            </p>
+            <p data-approval-scope="true" className="text-sm break-words">
+              Scope when asked: {scopeText(approval)}
+            </p>
+            <p data-approval-policy="true" className="text-sm">
+              Policy version: {policyText(approval)}
             </p>
             <p className="text-sm">
               Effect: {approval.operation_class.replaceAll("_", " ")}

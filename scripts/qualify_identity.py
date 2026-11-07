@@ -177,6 +177,17 @@ def artifact_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port
             extra_env.update(output.get('browser_env', {}))
             for case in output['cases']:
                 cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+    # US-13.1: an older request, arranged as the migration finds one. Only the superuser bypasses the trigger.
+    legacy = extra_env.get('AUTOBOTS_TEST_APPROVAL_LEGACY')
+    if legacy:
+        cleared = stack.sql("begin;\nset local session_replication_role = replica;\n"
+                            "update public.approval_requests set policy_reason = null, resource_target = null, requested_by = null, requested_by_agent = null, "
+                            f"scope_snapshot = null, policy_version = null, policy_rule = null where id = '{legacy}';\ncommit;\n")
+        cases.check('an older request is arranged with nothing recorded', 'exit 0', f'exit {cleared.returncode}', cleared.returncode == 0)
+        for column, filled_in in (('requested_by_agent', '{"kind": "coordinator"}'), ('scope_snapshot', '{"tools": {}, "paths": []}'), ('policy_version', 'approval-policy/1')):
+            filled = stack.runtime(f"update public.approval_requests set {column} = '{filled_in}' where id = '{legacy}';\n")
+            cases.check(f"an older request's {column} can't be filled in", 'refused as immutable', filled.stderr.strip()[-120:],
+                        filled.returncode != 0 and 'immutable' in filled.stderr)
     # Arranged for the run workspace: text a model wrote, a raw framework event, and lost history.
     loop_run, gap_run = report.get('loop_run', ''), report.get('run_id', '')
     arranged = stack.runtime(

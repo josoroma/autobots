@@ -107,6 +107,80 @@ export const schemas = {
     "title": "ApprovalRequested",
     "type": "object"
   },
+  "ApprovalRequester": {
+    "additionalProperties": false,
+    "description": "Who asked, Decision 0015. Only the Expert's ID and version were stored with the request.",
+    "properties": {
+      "agent": {
+        "enum": [
+          "expert",
+          "coordinator"
+        ],
+        "title": "Agent",
+        "type": "string"
+      },
+      "expert_id": {
+        "anyOf": [
+          {
+            "format": "uuid",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Expert Id"
+      },
+      "expert_name": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Expert Name"
+      },
+      "expert_version": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Expert Version"
+      },
+      "person_id": {
+        "anyOf": [
+          {
+            "format": "uuid",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Person Id"
+      },
+      "person_is_viewer": {
+        "title": "Person Is Viewer",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "person_id",
+      "person_is_viewer",
+      "agent",
+      "expert_id",
+      "expert_version",
+      "expert_name"
+    ],
+    "title": "ApprovalRequester",
+    "type": "object"
+  },
   "ApprovalResult": {
     "additionalProperties": false,
     "properties": {
@@ -136,6 +210,32 @@ export const schemas = {
       "replayed"
     ],
     "title": "ApprovalResult",
+    "type": "object"
+  },
+  "ApprovalScope": {
+    "additionalProperties": false,
+    "description": "The grants the request was made under. They hash to the scope it's checked against.",
+    "properties": {
+      "paths": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Paths",
+        "type": "array"
+      },
+      "tools": {
+        "additionalProperties": {
+          "type": "integer"
+        },
+        "title": "Tools",
+        "type": "object"
+      }
+    },
+    "required": [
+      "tools",
+      "paths"
+    ],
+    "title": "ApprovalScope",
     "type": "object"
   },
   "ApprovalView": {
@@ -178,6 +278,42 @@ export const schemas = {
         ],
         "title": "Policy Reason"
       },
+      "policy_rule": {
+        "anyOf": [
+          {
+            "enum": [
+              "consequential_external_write",
+              "tool_marked"
+            ],
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Policy Rule"
+      },
+      "policy_version": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Policy Version"
+      },
+      "requester": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ApprovalRequester"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
       "resource_target": {
         "anyOf": [
           {
@@ -193,6 +329,16 @@ export const schemas = {
         "format": "uuid",
         "title": "Run Id",
         "type": "string"
+      },
+      "scope_snapshot": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ApprovalScope"
+          },
+          {
+            "type": "null"
+          }
+        ]
       },
       "status": {
         "title": "Status",
@@ -219,7 +365,11 @@ export const schemas = {
       "status",
       "expires_at",
       "policy_reason",
-      "resource_target"
+      "resource_target",
+      "requester",
+      "scope_snapshot",
+      "policy_version",
+      "policy_rule"
     ],
     "title": "ApprovalView",
     "type": "object"
@@ -4372,6 +4522,19 @@ export function parseApprovalRequested(value: unknown): ApprovalRequested {
   return parseWith(schemas, "ApprovalRequested", value) as ApprovalRequested;
 }
 
+export interface ApprovalRequester {
+  agent: "expert" | "coordinator";
+  expert_id: string | null;
+  expert_name: string | null;
+  expert_version: number | null;
+  person_id: string | null;
+  person_is_viewer: boolean;
+}
+
+export function parseApprovalRequester(value: unknown): ApprovalRequester {
+  return parseWith(schemas, "ApprovalRequester", value) as ApprovalRequester;
+}
+
 export interface ApprovalResult {
   approval_id: string;
   replayed: boolean;
@@ -4383,6 +4546,15 @@ export function parseApprovalResult(value: unknown): ApprovalResult {
   return parseWith(schemas, "ApprovalResult", value) as ApprovalResult;
 }
 
+export interface ApprovalScope {
+  paths: string[];
+  tools: Record<string, unknown>;
+}
+
+export function parseApprovalScope(value: unknown): ApprovalScope {
+  return parseWith(schemas, "ApprovalScope", value) as ApprovalScope;
+}
+
 export interface ApprovalView {
   argument_hash: string;
   arguments: string;
@@ -4391,8 +4563,12 @@ export interface ApprovalView {
   id: string;
   operation_class: string;
   policy_reason: string | null;
+  policy_rule: "consequential_external_write" | "tool_marked" | null;
+  policy_version: string | null;
+  requester: ApprovalRequester | null;
   resource_target: string | null;
   run_id: string;
+  scope_snapshot: ApprovalScope | null;
   status: string;
   tool_id: string;
   tool_version: number;

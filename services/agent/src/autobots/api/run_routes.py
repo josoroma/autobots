@@ -145,6 +145,7 @@ async def post_run(
                 connection,
                 workspace_id=workspace_id,
                 actor_id=user_id,
+                started_by=user_id,
                 idempotency_key=idempotency_key,
                 goal_text=body.goal_text,
                 limit_micro_usd=body.limit_micro_usd,

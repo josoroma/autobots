@@ -316,9 +316,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-12.8#3 | Record a disposition for each finding, and publish evidence that `scripts/evidence.py` validates. | DONE | US-12.8 |
 | US-12.8#4 | Mark US-12.3's summary void, mark the hook behavior not qualified, and hand the fingerprint to US-10.2. | DONE | US-12.8 |
 | EPIC-13 | After release | — | — |
-| US-13.1 | Requester, scope snapshot and policy version on an approval request | BLOCKED | EPIC-13 |
-| US-13.1#1 | Persist the three fields with the approval request, by migration. | TODO | US-13.1 |
-| US-13.1#2 | Return them in the approval view as the owner decides, and cover both scenarios on a disposable stack. | TODO | US-13.1 |
+| US-13.1 | Requester, scope snapshot and policy version on an approval request | DONE | EPIC-13 |
+| US-13.1#1 | Persist the three fields with the approval request, by migration, recording who started a run at admission, as Decision 0015 defines them. | DONE | US-13.1 |
+| US-13.1#2 | Return them in the approval view as the owner decides, and cover both scenarios on a disposable stack. | DONE | US-13.1 |
 | US-13.2 | Held-out replay before promotion | BLOCKED | EPIC-13 |
 | US-13.2#1 | Add the held-out replay to the promotion path, in place of the reviewer's text checks. | TODO | US-13.2 |
 | US-13.2#2 | Cover both scenarios, with a scripted model unless a paid replay is separately authorized. | TODO | US-13.2 |
@@ -597,8 +597,6 @@ flowchart TD
   US_12_7 -.-> US_12_8
   US_5_3 -.-> US_13_1
   US_11_7 -.-> US_13_1
-  EXT_US_13_1_1["External: The owner schedules this story after the release, by Decision 0013."]
-  EXT_US_13_1_1 -.-> US_13_1
   US_8_2 -.-> US_13_2
   EXT_US_13_2_1["External: The owner schedules this story after the release, by Decision 0013."]
   EXT_US_13_2_1 -.-> US_13_2
@@ -1052,7 +1050,7 @@ flowchart TD
 flowchart TD
   subgraph EPIC_13["EPIC-13 tasks"]
     US_13_1["US-13.1: Requester, scope snapshot and policy version on an approval request"]
-    T_13_1_1["US-13.1#1: Persist the three fields with the approval request, by migration."]
+    T_13_1_1["US-13.1#1: Persist the three fields with the approval request, by migration, recording who started a run at admission, as Decision 0015 defines them."]
     US_13_1 --> T_13_1_1
     T_13_1_2["US-13.1#2: Return them in the approval view as the owner decides, and cover both scenarios on a disposable stack."]
     US_13_1 --> T_13_1_2
@@ -4292,7 +4290,8 @@ Post-release, by Decision 0013, and not a dependency of US-10.2. Each story wait
 
 ### US-13.1: Requester, scope snapshot and policy version on an approval request
 
-Status: BLOCKED
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-13-1-requester-scope-snapshot-policy/`
 
 As a reviewer
 I want an approval request to record who asked, under what scope and under which policy version
@@ -4300,6 +4299,7 @@ So that PRD 9.2's approval contract is complete.
 
 Source:
 - [Decision 0013, review items marked later](docs/engineering/decisions/0013-release-closure.md#decision)
+- [Decision 0015, the four answers and scheduling](docs/engineering/decisions/0015-approval-request-fields.md#decision)
 - [LC-10's row](docs/engineering/evidence/US-10.2/summary.md#lc-product-requirements)
 - [N-22, N-24 and N-25](docs/engineering/evidence/US-11.12/review-r1-open-findings.md#table-1-minors)
 - [PRD 9.2 approval request](PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
@@ -4324,17 +4324,13 @@ Scenario: Don't invent what wasn't recorded
 Dependencies:
 - US-5.3
 - US-11.7
-- External: The owner schedules this story after the release, by Decision 0013.
 
 Tasks:
-- [ ] Persist the three fields with the approval request, by migration.
-- [ ] Return them in the approval view as the owner decides, and cover both scenarios on a disposable stack.
+- [x] Persist the three fields with the approval request, by migration, recording who started a run at admission, as Decision 0015 defines them.
+- [x] Return them in the approval view as the owner decides, and cover both scenarios on a disposable stack.
 
 Open Questions:
-- Who is the requester when a model proposes the action: the person who started the run, the Expert, or both?
-- What does the scope snapshot hold, given that a hash is stored and checked today?
-- Which versioned policy does the policy version name, given that a request records only the policy's reason text today?
-- Does the inbox show these fields, given that PRD 12.1's inbox doesn't list them?
+- None.
 
 ### US-13.2: Held-out replay before promotion
 

@@ -209,6 +209,7 @@ async def post_execution(
                 connection,
                 workspace_id=workspace,
                 actor_id=user,
+                started_by=user,
                 workflow_id=workflow_id,
                 idempotency_key=key,
                 version=body.version,

@@ -9,6 +9,30 @@ from autobots.contracts.primitives import Identifier
 VIEW = ConfigDict(extra="forbid", frozen=True)
 
 
+class ApprovalRequester(BaseModel):
+    """Who asked, Decision 0015. Only the Expert's ID and version were stored with the request."""
+
+    model_config = VIEW
+
+    # The person who started the run. Empty when no person did, or the run predates this record.
+    person_id: Identifier | None
+    person_is_viewer: bool
+    agent: Literal["expert", "coordinator"]
+    expert_id: Identifier | None
+    expert_version: int | None
+    # Read when the view loads, so a rename since the request shows the current name.
+    expert_name: str | None
+
+
+class ApprovalScope(BaseModel):
+    """The grants the request was made under. They hash to the scope it's checked against."""
+
+    model_config = VIEW
+
+    tools: dict[str, int]
+    paths: list[str]
+
+
 class ApprovalView(BaseModel):
     """What a reviewer decides on. The hash they saw comes back with the decision."""
 
@@ -27,6 +51,11 @@ class ApprovalView(BaseModel):
     # Empty on a request saved before these were recorded. They're never filled in afterward.
     policy_reason: str | None
     resource_target: str | None
+    # Empty on a request saved before US-13.1, and never filled in afterward.
+    requester: ApprovalRequester | None
+    scope_snapshot: ApprovalScope | None
+    policy_version: str | None
+    policy_rule: Literal["consequential_external_write", "tool_marked"] | None
 
 
 class ApprovalList(BaseModel):

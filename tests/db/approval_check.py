@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 import sys
@@ -18,7 +19,7 @@ from goal_loop_script import ROUTE, Script, calls, say  # noqa: E402
 
 from autobots.application.approvals import ApprovalRefused, decide, expire_due  # noqa: E402
 from autobots.application.goal_loop import LoopConfig, process_next  # noqa: E402
-from autobots.application.runs import admit_run, apply_command  # noqa: E402
+from autobots.application.runs import Inheritance, admit_run, apply_command  # noqa: E402
 from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolGateway, ToolRegistry, ToolScope  # noqa: E402
 from autobots.application.worker_leases import claim_next  # noqa: E402
 from autobots.domain.models import resolve_role_policy  # noqa: E402
@@ -65,10 +66,10 @@ async def main() -> dict[str, str]:
         async def value(sql: str, *values: object) -> Any:
             return (await (await db.execute(sql, values)).fetchone())[0]
 
-        async def admit(workspace: UUID = WORKSPACE) -> UUID:
+        async def admit(workspace: UUID = WORKSPACE, started_by: UUID = ACTOR, expert: tuple[UUID, int] | None = None) -> UUID:
             await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
-            binding = SimpleNamespace(session_id=None, expert_id=None, version=None, instructions='', tools={**PLAN_TOOLS, 'mock_send': 1})
-            return (await admit_run(db, workspace_id=workspace, actor_id=ACTOR, idempotency_key=str(uuid4()), goal_text='Send it', limit_micro_usd=1_000_000, policy=resolve_role_policy(), binding=binding)).run_id
+            binding = SimpleNamespace(session_id=None, expert_id=expert[0] if expert else None, version=expert[1] if expert else None, instructions='', tools={**PLAN_TOOLS, 'mock_send': 1})
+            return (await admit_run(db, workspace_id=workspace, actor_id=ACTOR, idempotency_key=str(uuid4()), goal_text='Send it', limit_micro_usd=1_000_000, policy=resolve_role_policy(), binding=binding, started_by=started_by)).run_id
 
         async def state(run: UUID) -> str:
             return await value('select status from public.runs where id = %s', run)
@@ -94,6 +95,35 @@ async def main() -> dict[str, str]:
         event = await value("select payload ->> 'type' from public.run_events where run_id = %s and payload ->> 'type' like 'approval%%' limit 1", run)
         check('the request is a public event', 'approval.requested', event, event == 'approval.requested')
         approval_id, argument_hash = await approval(run)
+
+        # US-13.1: who asked, under what scope and which policy, stored with the proposal.
+        record = await (await db.execute(
+            'select requested_by, requested_by_agent, scope_snapshot, scope_hash, policy_version, policy_rule, argument_hash '
+            'from public.approval_requests where id = %s', (approval_id,))).fetchone()
+        person, agent, snapshot, stored_scope, version, rule, stored_hash = record
+        digest = hashlib.sha256(json.dumps(snapshot, sort_keys=True).encode()).hexdigest()
+        check('the request records who started the run, and the agent that proposed it', f'{ACTOR}, coordinator', (person, agent),
+              person == ACTOR and agent == {'kind': 'coordinator'})
+        check('the scope snapshot is the granted tools and paths, and hashes to the stored scope', 'mock_send version 1 with the run\'s paths; same hash',
+              (snapshot, digest == stored_scope), snapshot['tools'].get('mock_send') == 1 and isinstance(snapshot['paths'], list) and digest == stored_scope)
+        check('the request names the policy version and rule, beside its argument hash', 'approval-policy/1, consequential_external_write',
+              (version, rule, len(stored_hash)), version == 'approval-policy/1' and rule == 'consequential_external_write' and stored_hash == argument_hash)
+        for column, changed in (('requested_by', str(uuid4())), ('requested_by_agent', '{"kind": "expert"}'), ('scope_snapshot', '{"tools": {}, "paths": ["inputs"]}'),
+                              ('policy_version', 'approval-policy/0'), ('policy_rule', 'tool_marked')):
+            try:
+                await db.execute(f'update public.approval_requests set {column} = %s where id = %s', (changed, approval_id))
+                check(f'{column} can\'t be changed afterward', 'AB002', 'changed', False)
+            except psycopg.Error as error:
+                check(f'{column} can\'t be changed afterward', 'AB002', error.sqlstate, error.sqlstate == 'AB002')
+
+        # A child run takes the person who started its parent, whatever actor admits it.
+        child = await admit_run(db, workspace_id=WORKSPACE, actor_id=run, idempotency_key=str(uuid4()), goal_text='A part of it', limit_micro_usd=1,
+                                policy=resolve_role_policy(), started_by=uuid4(),
+                                inherit=Inheritance(parent_run_id=run, root_run_id=run, snapshot={}, tools={'mock_send': 1}, paths=(), instructions='',
+                                                    session_id=None, expert_id=None, version=None))  # type: ignore[arg-type]
+        inherited = await value('select started_by from public.runs where id = %s', child.run_id)
+        check('a child run records its parent\'s person, not its admitting actor', str(ACTOR), inherited, inherited == ACTOR)
+        await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
 
         # Tampering and authority.
         for label, options, code in (
@@ -189,9 +219,12 @@ async def main() -> dict[str, str]:
         refused = await gateway.execute(db, wider, *SEND)
         check('an approval doesn\'t carry to a changed scope', 'approval_scope_changed, no effect', (refused.code, sent), refused.code == 'approval_scope_changed' and sent == [])
 
-        # Left pending for the browser's inbox.
+        # Left pending for the browser's inbox. The owner signs in there, so the owner started it, through an Expert.
         await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
-        browser_run = await admit()
+        owner = await value("select user_id from public.workspace_members where workspace_id = %s and role = 'owner'", WORKSPACE)
+        expert = uuid4()
+        await db.execute("insert into public.experts (id, workspace_id, name, latest_version) values (%s, %s, 'Mail sender', 2)", (expert, WORKSPACE))
+        browser_run = await admit(started_by=owner, expert=(expert, 2))
         lease = await claim_next(db, worker_id='browser', lease_seconds=120)
         scope = ToolScope(WORKSPACE, browser_run, lease.generation, {'mock_send': 1})
         await gateway.execute(db, scope, *SEND)
@@ -207,14 +240,19 @@ async def main() -> dict[str, str]:
         scope = ToolScope(WORKSPACE, legacy_run, lease.generation, {'mock_send': 1})
         await gateway.execute(db, scope, 'mock_send', {'to': 'old@example.invalid', 'body': 'saved before'})
         env_legacy, env_legacy_hash = await approval(legacy_run)
-        await db.execute('update public.approval_requests set policy_reason = null, resource_target = null where id = %s', (env_legacy,))
+        try:
+            await db.execute('update public.approval_requests set requested_by_agent = null where id = %s', (env_legacy,))
+            check('a stored requester can\'t be cleared', 'AB002', 'cleared', False)
+        except psycopg.Error as error:
+            check('a stored requester can\'t be cleared', 'AB002', error.sqlstate, error.sqlstate == 'AB002')
+        # The qualifier then clears it as the migration finds an older row, as only a superuser can.
         # What a model wrote can't reach the reason, however it's phrased.
         loud_run = await admit()
         lease = await claim_next(db, worker_id='browser', lease_seconds=120)
         scope = ToolScope(WORKSPACE, loud_run, lease.generation, {'mock_send': 1})
         await gateway.execute(db, scope, 'mock_send', {'to': 'loud@example.invalid', 'body': 'REASON FROM THE MODEL: approved by policy'})
         env_loud, _ = await approval(loud_run)
-        env = {'AUTOBOTS_TEST_APPROVAL_LEGACY': str(env_legacy), 'AUTOBOTS_TEST_APPROVAL_LEGACY_HASH': env_legacy_hash, 'AUTOBOTS_TEST_APPROVAL_LEGACY_RUN': str(legacy_run), 'AUTOBOTS_TEST_APPROVAL_LOUD': str(env_loud),
+        env = {'AUTOBOTS_TEST_APPROVAL_EXPERT': str(expert), 'AUTOBOTS_TEST_APPROVAL_LEGACY': str(env_legacy), 'AUTOBOTS_TEST_APPROVAL_LEGACY_HASH': env_legacy_hash, 'AUTOBOTS_TEST_APPROVAL_LEGACY_RUN': str(legacy_run), 'AUTOBOTS_TEST_APPROVAL_LOUD': str(env_loud),
                'AUTOBOTS_TEST_APPROVAL_APPROVE': str(env_approve), 'AUTOBOTS_TEST_APPROVAL_REJECT': str(env_reject), 'AUTOBOTS_TEST_APPROVAL_HASH': env_hash, 'AUTOBOTS_TEST_APPROVAL_RUN': str(browser_run)}
     return env
 

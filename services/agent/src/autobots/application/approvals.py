@@ -46,9 +46,21 @@ class DecisionResult:
     replayed: bool
 
 
+def scope_snapshot(tools: Any, paths: Any) -> dict[str, Any]:
+    """The grants a request was made under, stored whole with it, Decision 0015."""
+    return {"tools": dict(tools), "paths": list(paths)}
+
+
 def scope_hash(tools: Any, paths: Any) -> str:
-    encoded = json.dumps({"tools": dict(tools), "paths": list(paths)}, sort_keys=True)
+    encoded = json.dumps(scope_snapshot(tools, paths), sort_keys=True)
     return hashlib.sha256(encoded.encode()).hexdigest()
+
+
+def requesting_agent(expert_id: UUID | None, expert_version: int | None) -> dict[str, Any]:
+    """The Expert the run belongs to, or the coordinator when it has none, Decision 0015."""
+    if expert_id is None:
+        return {"kind": "coordinator"}
+    return {"kind": "expert", "id": str(expert_id), "version": expert_version}
 
 
 async def _version(connection: Any, run_id: UUID) -> int:
@@ -87,6 +99,9 @@ async def approval_gate(
     current_scope_hash: str,
     policy_reason: str,
     resource_target: str | None,
+    scope: dict[str, Any] | None = None,
+    policy_version: str | None = None,
+    policy_rule: str | None = None,
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
 ) -> str | None:
     """None releases the operation. Any code means no effect, and says why."""
@@ -99,11 +114,18 @@ async def approval_gate(
         row = await cursor.fetchone()
         if row is None:
             approval_id = uuid4()
+            # Who asked is read from the run in this transaction, never from the call.
+            cursor = await connection.execute(
+                "select started_by, expert_id, expert_version from public.runs where id = %s",
+                (run_id,),
+            )
+            started_by, expert_id, expert_version = await cursor.fetchone()
             await connection.execute(
                 "insert into public.approval_requests (id, workspace_id, run_id, operation_id, "
                 "tool_id, tool_version, operation_class, argument_hash, arguments, scope_hash, "
-                "policy_reason, resource_target, expires_at) "
-                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
+                "policy_reason, resource_target, requested_by, requested_by_agent, "
+                "scope_snapshot, policy_version, policy_rule, expires_at) "
+                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
                 "clock_timestamp() + make_interval(secs => %s))",
                 (
                     approval_id,
@@ -118,6 +140,11 @@ async def approval_gate(
                     current_scope_hash,
                     policy_reason,
                     resource_target,
+                    started_by,
+                    json.dumps(requesting_agent(expert_id, expert_version)),
+                    None if scope is None else json.dumps(scope),
+                    policy_version,
+                    policy_rule,
                     ttl_seconds,
                 ),
             )
@@ -285,10 +312,13 @@ async def decide(
 
 async def list_approvals(connection: Any, workspace_id: UUID, status: str) -> list[dict[str, Any]]:
     cursor = await connection.execute(
-        "select id, run_id, tool_id, tool_version, operation_class, argument_hash, "
-        "arguments::text, status, expires_at, policy_reason, resource_target "
-        "from public.approval_requests "
-        "where workspace_id = %s and status = %s order by created_at desc limit 200",
+        "select a.id, a.run_id, a.tool_id, a.tool_version, a.operation_class, a.argument_hash, "
+        "a.arguments::text, a.status, a.expires_at, a.policy_reason, a.resource_target, "
+        "a.requested_by, a.requested_by_agent, a.scope_snapshot, a.policy_version, "
+        "a.policy_rule, e.name "
+        "from public.approval_requests a left join public.experts e "
+        "on e.id = (a.requested_by_agent ->> 'id')::uuid and e.workspace_id = a.workspace_id "
+        "where a.workspace_id = %s and a.status = %s order by a.created_at desc limit 200",
         (workspace_id, status),
     )
     names = (
@@ -303,5 +333,11 @@ async def list_approvals(connection: Any, workspace_id: UUID, status: str) -> li
         "expires_at",
         "policy_reason",
         "resource_target",
+        "requested_by",
+        "requested_by_agent",
+        "scope_snapshot",
+        "policy_version",
+        "policy_rule",
+        "expert_name",
     )
     return [dict(zip(names, row, strict=True)) for row in await cursor.fetchall()]

@@ -183,8 +183,13 @@ async def admit_run(
     binding: Any = None,
     inherit: Inheritance | None = None,
     run_profile: str | None = None,
+    started_by: UUID | None = None,
 ) -> AdmissionResult:
-    """Run, job and first event commit together. A repeat returns the original result."""
+    """Run, job and first event commit together. A repeat returns the original result.
+
+    `started_by` is the person who started it, never `actor_id`, which can be a routine or a parent
+    run. A child takes its parent's, and a routine's run has none, Decision 0015.
+    """
     if inherit is not None:
         binding = inherit
     if goal_text is None:
@@ -225,8 +230,9 @@ async def admit_run(
         await connection.execute(
             "insert into public.runs (id, workspace_id, status, limit_micro_usd, goal_text, "
             "goal_summary, version, policy_snapshot, continues_run_id, session_id, expert_id, "
-            "expert_version, parent_run_id, root_run_id, execution_contract) "
-            "values (%s, %s, %s, %s, %s, %s, 1, %s, %s, %s, %s, %s, %s, %s, %s)",
+            "expert_version, parent_run_id, root_run_id, execution_contract, started_by) "
+            "values (%s, %s, %s, %s, %s, %s, 1, %s, %s, %s, %s, %s, %s, %s, %s, "
+            "coalesce(%s, (select started_by from public.runs where id = %s)))",
             (
                 run_id,
                 workspace_id,
@@ -242,6 +248,8 @@ async def admit_run(
                 inherit.parent_run_id if inherit else None,
                 inherit.root_run_id if inherit else None,
                 json.dumps(current_contract()),
+                None if inherit else started_by,
+                inherit.parent_run_id if inherit else None,
             ),
         )
         await connection.execute(

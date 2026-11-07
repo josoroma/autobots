@@ -35,6 +35,10 @@ REQUIRED_RELATIONS = (
 REQUIRED_COLUMNS = (
     ("public.approval_requests", "policy_reason"),
     ("public.approval_requests", "resource_target"),
+    ("public.approval_requests", "requested_by_agent"),
+    ("public.approval_requests", "scope_snapshot"),
+    ("public.approval_requests", "policy_version"),
+    ("public.runs", "started_by"),
     ("app_private.tool_receipts", "failure_code"),
     ("app_private.model_invocations", "finish_reason"),
     ("app_private.model_invocations", "charge_source"),

@@ -202,6 +202,7 @@ async def create_execution(
     policy: RolePolicy | None = None,
     limit_micro_usd: int = DEFAULT_LIMIT_MICRO_USD,
     tools: list[str] | None = None,
+    started_by: UUID | None = None,
 ) -> ExecutionBinding:
     """An execution always names one exact version and hash. Later versions don't reach it."""
     cursor = await connection.execute(
@@ -254,6 +255,7 @@ async def create_execution(
                 connection,
                 workspace_id=workspace_id,
                 actor_id=actor_id,
+                started_by=started_by,
                 idempotency_key=f"workflow:{execution_id}",
                 goal_text=f"Workflow {name}, version {version}",
                 limit_micro_usd=limit_micro_usd,

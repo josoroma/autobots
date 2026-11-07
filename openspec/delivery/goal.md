@@ -7,19 +7,19 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-10.2 |
+| Target | US-13.1 |
 | Kind | story |
 | Focus | - |
 | Status | COMPLETE |
 | Reason | - |
-| Started | 2026-11-06 |
-| Updated | 2026-11-06 |
+| Started | 2026-11-07 |
+| Updated | 2026-11-07 |
 
 ## Stories
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-10.2 | us-10-2-release-traceability-evidence-based | DONE | Release traceability and evidence-based completion |
+| 1 | US-13.1 | us-13-1-requester-scope-snapshot-policy | DONE | Requester, scope snapshot and policy version on an approval request |
 
 ## Next Action
 

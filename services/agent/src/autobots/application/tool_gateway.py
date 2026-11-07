@@ -10,7 +10,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ValidationError
 
-from autobots.application.approvals import approval_gate, scope_hash
+from autobots.application.approvals import approval_gate, scope_hash, scope_snapshot
 from autobots.application.runs import LeaseLost
 from autobots.domain.runs import RunStatus
 from autobots.domain.tools import EFFECTFUL, OperationClass, ToolOutcome, path_granted
@@ -147,6 +147,18 @@ def _hash(arguments: BaseModel) -> str:
     return hashlib.sha256(encoded.encode()).hexdigest()
 
 
+# Decision 0015. Change it whenever `_approval_rule`, `_approval_reason` or the condition that asks
+# for approval changes, so a request names the rules it was held under. A unit test pins it.
+APPROVAL_POLICY_VERSION = "approval-policy/1"
+
+
+def _approval_rule(tool: ToolDefinition) -> str:
+    """Which of the policy's rules held this call."""
+    if tool.operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE:
+        return "consequential_external_write"
+    return "tool_marked"
+
+
 def _approval_reason(tool: ToolDefinition) -> str:
     """Fixed text from this tool's policy, so nothing a model wrote can reach it."""
     if tool.approval_reason is not None:
@@ -256,6 +268,9 @@ class ToolGateway:
                 current_scope_hash=scope_hash(scope.tools, scope.paths),
                 policy_reason=_approval_reason(tool),
                 resource_target=tool.resource_target(parsed),
+                scope=scope_snapshot(scope.tools, scope.paths),
+                policy_version=APPROVAL_POLICY_VERSION,
+                policy_rule=_approval_rule(tool),
             )
             if code is not None:
                 return _denied(code)

@@ -18,6 +18,11 @@ export interface ApprovalRequestsRow {
   created_at: string;
   policy_reason: string | null;
   resource_target: string | null;
+  requested_by: string | null;
+  requested_by_agent: unknown | null;
+  scope_snapshot: unknown | null;
+  policy_version: string | null;
+  policy_rule: string | null;
 }
 
 export interface ArtifactsRow {
@@ -170,6 +175,7 @@ export interface RunsRow {
   root_run_id: string | null;
   content_purged_at: string | null;
   execution_contract: unknown | null;
+  started_by: string | null;
 }
 
 export interface SessionsRow {
