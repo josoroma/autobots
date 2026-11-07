@@ -4816,6 +4816,17 @@
             "title": "Input Public",
             "type": "object"
           },
+          "instance_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instance Key"
+          },
           "operation_id": {
             "anyOf": [
               {
@@ -4974,7 +4985,8 @@
           "input_digest",
           "output_bytes",
           "operation_id",
-          "provider_units"
+          "provider_units",
+          "instance_key"
         ],
         "title": "ToolUseView",
         "type": "object"

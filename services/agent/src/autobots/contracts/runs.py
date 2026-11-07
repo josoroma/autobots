@@ -166,6 +166,8 @@ class ToolUseView(BaseModel):
     output_bytes: int | None
     operation_id: str | None
     provider_units: float | None
+    # The workflow node instance that made it, when one did (TV-02).
+    instance_key: str | None
 
 
 class ToolUseList(BaseModel):

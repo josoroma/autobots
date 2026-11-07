@@ -4817,6 +4817,17 @@ export const schemas = {
         "title": "Input Public",
         "type": "object"
       },
+      "instance_key": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Instance Key"
+      },
       "operation_id": {
         "anyOf": [
           {
@@ -4975,7 +4986,8 @@ export const schemas = {
       "input_digest",
       "output_bytes",
       "operation_id",
-      "provider_units"
+      "provider_units",
+      "instance_key"
     ],
     "title": "ToolUseView",
     "type": "object"
@@ -6794,6 +6806,7 @@ export interface ToolUseView {
   id: number;
   input_digest: string;
   input_public: Record<string, unknown>;
+  instance_key: string | null;
   operation_id: string | null;
   outcome: "succeeded" | "failed" | "unknown" | "denied" | null;
   output_bytes: number | null;

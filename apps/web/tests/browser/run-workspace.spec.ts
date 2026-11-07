@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
@@ -7,6 +9,9 @@ const EMAIL_B = process.env.AUTOBOTS_TEST_OWNER_B_EMAIL ?? "";
 const PASSWORD_B = process.env.AUTOBOTS_TEST_OWNER_B_PASSWORD ?? "";
 const LOOP_RUN = process.env.AUTOBOTS_TEST_LOOP_RUN ?? "";
 const GAP_RUN = process.env.AUTOBOTS_TEST_ARTIFACT_RUN ?? "";
+// US-14.4, arranged by tests/db/tool_use_view_check.py.
+const TOOL_RUN = process.env.AUTOBOTS_TEST_TOOL_RUN ?? "";
+const TOOL_EXECUTION = process.env.AUTOBOTS_TEST_TOOL_EXECUTION ?? "";
 
 async function signIn(
   page: Page,
@@ -296,4 +301,115 @@ test("a signed-out stream is refused, and Run links to the new run", async ({
   ).toHaveText("Open what I started");
   // The settings spec, which runs after this one, expects no key.
   await disconnectKey(page);
+});
+
+async function noViolations(page: Page): Promise<void> {
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(results.violations.map((violation) => violation.id)).toEqual([]);
+}
+
+test("US-14.4: tool uses show live, once each and in order, and again after a reload", async ({
+  page,
+}) => {
+  expect(TOOL_RUN).not.toBe("");
+  await signIn(page, EMAIL_A, PASSWORD_A);
+  await page.goto(`/runs/${TOOL_RUN}`);
+  const section = page.getByRole("region", { name: "Tools used" });
+  const rows = section.locator("[data-tool-use]");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toHaveAttribute("data-tool-id", "calculate");
+  await expect(rows.nth(0).locator('[data-field="task"]')).toHaveText(
+    "Add the totals",
+  );
+  await expect(rows.nth(0).locator('[data-field="inputs"]')).toHaveText(
+    "operation: sum",
+  );
+  await expect(rows.nth(0).locator('[data-field="result"]')).toHaveText(
+    "result: 3",
+  );
+  await expect(rows.nth(0).locator('[data-field="outcome"]')).toHaveText(
+    "Succeeded",
+  );
+  await expect(rows.nth(1)).toHaveAttribute("data-tool-id", "publish_artifact");
+  await expect(rows.nth(1).locator('[data-field="task"]')).toHaveText(
+    "No plan task",
+  );
+  await expect(rows.nth(1).locator('[data-field="outcome"]')).toHaveText(
+    "Denied: tool not granted",
+  );
+  await expect(page.locator("[data-connection]")).toHaveAttribute(
+    "data-connection",
+    "live",
+    { timeout: 15_000 },
+  );
+
+  // A worker's call while the page watches, through the same gateway.
+  const made = execFileSync(
+    process.env.AUTOBOTS_TEST_PYTHON ?? "",
+    [
+      process.env.AUTOBOTS_TEST_TOOL_HELPER ?? "",
+      TOOL_RUN,
+      process.env.AUTOBOTS_TEST_TOOL_GENERATION ?? "",
+      process.env.AUTOBOTS_TEST_TOOL_WORKSPACE ?? "",
+    ],
+    {
+      env: {
+        ...process.env,
+        AUTOBOTS_DATABASE_URL: process.env.AUTOBOTS_TEST_RUNTIME_URL ?? "",
+        PYTHONPATH: process.env.AUTOBOTS_TEST_PYTHONPATH ?? "",
+      },
+      encoding: "utf8",
+    },
+  );
+  expect(JSON.parse(made.trim().split("\n").at(-1) ?? "{}").outcome).toBe(
+    "succeeded",
+  );
+  await expect(rows).toHaveCount(3, { timeout: 15_000 });
+  const third = rows.nth(2);
+  await expect(third).toHaveAttribute("data-tool-id", "save_artifact");
+  await expect(third.locator('[data-field="task"]')).toHaveText(
+    "Save the note",
+  );
+  await expect(third.locator('[data-field="inputs"]')).toHaveText(
+    "path: outputs/live.md; media_type: text/markdown",
+  );
+  await expect(third.locator('[data-field="outcome"]')).toHaveText("Succeeded");
+  await expect(page.locator('[data-field="tool-announcement"]')).toHaveText(
+    "save_artifact: Succeeded. 3 tool uses.",
+  );
+  await expect(
+    page.locator('[data-field="tool-announcement"]'),
+  ).toHaveAttribute("aria-live", "polite");
+  expect(await page.content()).not.toContain("written live");
+  await noViolations(page);
+
+  await page.reload();
+  await expect(rows).toHaveCount(3);
+  const ids = await rows.evaluateAll((items) =>
+    items.map((item) => Number(item.getAttribute("data-tool-use"))),
+  );
+  expect(ids).toEqual([...ids].sort((a, b) => a - b));
+  expect(new Set(ids).size).toBe(3);
+  await expect(
+    section.getByRole("columnheader", { name: "Plan task" }),
+  ).toBeVisible();
+});
+
+test("US-14.4: the workflow monitor shows tool uses under the node that made them", async ({
+  page,
+}) => {
+  expect(TOOL_EXECUTION).not.toBe("");
+  await signIn(page, EMAIL_A, PASSWORD_A);
+  await page.goto(`/workflow-executions/${TOOL_EXECUTION}`);
+  const read = page.locator('[data-node-tools="read"]');
+  await expect(read.getByRole("heading", { name: "Node read" })).toBeVisible();
+  await expect(read.locator('[data-tool-id="read_run_file"]')).toHaveCount(1);
+  await expect(read.locator("[data-tool-use]")).toHaveCount(1);
+  const save = page.locator('[data-node-tools="save"]');
+  await expect(save.locator('[data-tool-id="save_artifact"]')).toHaveCount(1);
+  await expect(save.locator('[data-tool-id="read_run_file"]')).toHaveCount(0);
+  await expect(page.locator('[data-node-tools="in"]')).toHaveCount(0);
+  await noViolations(page);
 });

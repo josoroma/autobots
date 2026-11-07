@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 
 import { ContinueRun } from "@/components/continue-run";
 import { RunControls } from "@/components/run-controls";
+import { ToolsUsed } from "@/components/tool-uses";
 import { Card } from "@/components/ui/card";
 import { UnknownEffects } from "@/components/unknown-effects";
 
@@ -376,6 +377,14 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
           </>
         )}
       </Card>
+      <ToolsUsed
+        runId={runId}
+        version={
+          [...events.values()].filter((event) =>
+            event.payload.type.startsWith("tool.use."),
+          ).length
+        }
+      />
       {snapshot.unknown_operations.length === 0 ? null : (
         <Card aria-labelledby="unknown-heading" className="space-y-2">
           <h2 id="unknown-heading" className="text-lg font-medium">

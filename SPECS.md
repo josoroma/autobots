@@ -351,10 +351,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.3#3 | Add the two event types to the typed union, the generated client and the consumer in the same change that emits them, with the consumer ignoring unknown types. | DONE | US-14.3 |
 | US-14.3#4 | Count metered calls per root run tree and deny the 21st before any request. | DONE | US-14.3 |
 | US-14.3#5 | Add `GET /v1/runs/{run_id}/tool-uses`, cursor-paginated across the run tree, and cover the scenarios on a disposable stack. | DONE | US-14.3 |
-| US-14.4 | Tool use on run and flow screens | READY | EPIC-14 |
-| US-14.4#1 | Add Tools used to the run workspace from `tool.use.*` events and the listing. | TODO | US-14.4 |
-| US-14.4#2 | Add tool uses under node runs in the workflow monitor. | TODO | US-14.4 |
-| US-14.4#3 | Cover the scenarios in browser specs with axe. | TODO | US-14.4 |
+| US-14.4 | Tool use on run and flow screens | DONE | EPIC-14 |
+| US-14.4#1 | Add Tools used to the run workspace from `tool.use.*` events and the listing. | DONE | US-14.4 |
+| US-14.4#2 | Add tool uses under node runs in the workflow monitor. | DONE | US-14.4 |
+| US-14.4#3 | Cover the scenarios in browser specs with axe. | DONE | US-14.4 |
 | US-14.5 | Tool-provider key readiness | READY | EPIC-14 |
 | US-14.5#1 | Read tool-provider keys from the worker's environment for each attempt and pass them only to the adapter's HTTP client, with no credential field in any tool input. | TODO | US-14.5 |
 | US-14.5#2 | Refuse a grant of an unavailable tool at run admission and at Expert save with a typed code. | TODO | US-14.5 |
@@ -4722,7 +4722,8 @@ Open Questions:
 
 ### US-14.4: Tool use on run and flow screens
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-14-4-tool-use-run-flow/`
 
 As a run's owner
 I want the run workspace and the workflow monitor to show the tools used, when, for which task and with what result
@@ -4757,9 +4758,9 @@ Dependencies:
 - US-14.3
 
 Tasks:
-- [ ] Add Tools used to the run workspace from `tool.use.*` events and the listing.
-- [ ] Add tool uses under node runs in the workflow monitor.
-- [ ] Cover the scenarios in browser specs with axe.
+- [x] Add Tools used to the run workspace from `tool.use.*` events and the listing.
+- [x] Add tool uses under node runs in the workflow monitor.
+- [x] Cover the scenarios in browser specs with axe.
 
 Open Questions:
 - None.

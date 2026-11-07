@@ -79,8 +79,9 @@ function useLoaded<T>(path: string, parse: (value: unknown) => T) {
     { kind: "loading" } | { kind: "unavailable" } | { kind: "ready"; value: T }
   >({ kind: "loading" });
   useEffect(() => {
+    const controller = new AbortController();
     let active = true;
-    fetch(path, { cache: "no-store" })
+    fetch(path, { cache: "no-store", signal: controller.signal })
       .then(async (reply) => {
         if (!active) return;
         if (!reply.ok) {
@@ -94,6 +95,7 @@ function useLoaded<T>(path: string, parse: (value: unknown) => T) {
       });
     return () => {
       active = false;
+      controller.abort();
     };
   }, [path, parse]);
   return state;

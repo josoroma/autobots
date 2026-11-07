@@ -113,9 +113,9 @@ async def begin_use(
             cursor = await connection.execute(
                 "insert into app_private.tool_uses (run_id, root_run_id, workspace_id, "
                 "sequence_in_run, tool_id, tool_version, tool_group, provider, cost_class, "
-                "plan_version, task_id, input_digest, input_public, generation) "
+                "plan_version, task_id, input_digest, input_public, generation, instance_key) "
                 "select %s, %s, %s, coalesce(max(sequence_in_run), 0) + 1, %s, %s, %s, %s, %s, "
-                "%s, %s, %s, %s, %s from app_private.tool_uses where run_id = %s "
+                "%s, %s, %s, %s, %s, %s from app_private.tool_uses where run_id = %s "
                 "returning id",
                 (
                     scope.run_id,
@@ -131,6 +131,7 @@ async def begin_use(
                     input_digest(arguments),
                     json.dumps(public_projection(parsed, tool.public_input_fields if tool else ())),
                     scope.generation,
+                    scope.instance,
                     scope.run_id,
                 ),
             )
@@ -258,7 +259,7 @@ async def list_tool_uses(
         "u.requested_at, u.finished_at, "
         "(extract(epoch from u.finished_at - u.requested_at) * 1000)::bigint, "
         "u.outcome, u.code, u.input_public, u.output_public, u.input_digest, u.output_bytes, "
-        "u.operation_id, u.provider_units "
+        "u.operation_id, u.provider_units, u.instance_key "
         f"from app_private.tool_uses u where u.workspace_id = %s and u.id > %s and {column} = %s "
         "order by u.id limit %s",
         (workspace_id, after, run_id, limit + 1),
@@ -287,6 +288,7 @@ async def list_tool_uses(
             output_bytes=item[18],
             operation_id=item[19],
             provider_units=float(item[20]) if item[20] is not None else None,
+            instance_key=item[21],
         )
         for item in rows[:limit]
     ]

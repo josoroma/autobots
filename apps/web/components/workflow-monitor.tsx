@@ -4,6 +4,7 @@ import { parseExecutionView, type ExecutionView } from "@autobots/api-client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { ToolUseTable, useToolUses } from "@/components/tool-uses";
 import { Card } from "@/components/ui/card";
 
 const POLL_MS = 1000;
@@ -26,6 +27,8 @@ export function WorkflowMonitor({ executionId }: { executionId: string }) {
   const [state, setState] = useState<"live" | "reconnecting" | "unavailable">(
     "live",
   );
+  // Each saved state read again also reads the tool uses again (TV-02).
+  const [loads, setLoads] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -51,6 +54,7 @@ export function WorkflowMonitor({ executionId }: { executionId: string }) {
           setState("reconnecting");
         } else {
           setView(next);
+          setLoads((count) => count + 1);
           setState("live");
           if (TERMINAL.has(next.run_status)) return;
         }
@@ -135,6 +139,11 @@ export function WorkflowMonitor({ executionId }: { executionId: string }) {
           </tbody>
         </table>
       </Card>
+      <NodeToolUses
+        runId={view.run_id}
+        version={loads}
+        instances={view.instances.map((instance) => instance.key)}
+      />
       <Card aria-labelledby="emissions-heading" className="space-y-2">
         <h2 id="emissions-heading" className="text-lg font-medium">
           Output emissions
@@ -159,5 +168,74 @@ export function WorkflowMonitor({ executionId }: { executionId: string }) {
         )}
       </Card>
     </>
+  );
+}
+
+/** Tool uses under the node instance that made them. Nodes share their execution's run. */
+function NodeToolUses({
+  runId,
+  version,
+  instances,
+}: {
+  runId: string;
+  version: number;
+  instances: readonly string[];
+}) {
+  const { uses, failed } = useToolUses(runId, version);
+  const keys = [
+    ...instances.filter((key) => uses?.some((use) => use.instance_key === key)),
+  ];
+  const outside = (uses ?? []).filter(
+    (use) => use.instance_key === null || !instances.includes(use.instance_key),
+  );
+  return (
+    <Card aria-labelledby="node-tools-heading" className="space-y-3">
+      <h2 id="node-tools-heading" className="text-lg font-medium">
+        Tool uses by node
+      </h2>
+      {failed && uses === null ? (
+        <p role="alert" className="text-sm">
+          Tool uses aren&apos;t available right now.
+        </p>
+      ) : uses === null ? (
+        <p className="text-sm">Loading tool uses.</p>
+      ) : uses.length === 0 ? (
+        <p className="text-sm">No node has used a tool yet.</p>
+      ) : (
+        <>
+          {keys.map((key) => (
+            <section
+              key={key}
+              aria-labelledby={`node-tools-${key}`}
+              data-node-tools={key}
+              className="space-y-1"
+            >
+              <h3 id={`node-tools-${key}`} className="text-sm font-medium">
+                Node {key}
+              </h3>
+              <ToolUseTable
+                uses={uses.filter((use) => use.instance_key === key)}
+                caption={`Tools node ${key} used, in order`}
+              />
+            </section>
+          ))}
+          {outside.length === 0 ? null : (
+            <section
+              aria-labelledby="node-tools-outside"
+              data-node-tools="outside"
+              className="space-y-1"
+            >
+              <h3 id="node-tools-outside" className="text-sm font-medium">
+                Outside any node
+              </h3>
+              <ToolUseTable
+                uses={outside}
+                caption="Tools used outside a node, in order"
+              />
+            </section>
+          )}
+        </>
+      )}
+    </Card>
   );
 }

@@ -7,6 +7,7 @@ import {
   type Browser,
   type BrowserContext,
   type Page,
+  type Request,
 } from "@playwright/test";
 
 // US-11.11: every named surface in both themes, on the final screens. Its name puts it with the slice
@@ -765,10 +766,36 @@ test("every named surface is captured in both themes, with measured contrast and
     await keySetup.close();
     for (const surface of surfaces(ids)) {
       const page = await contexts[surface.context].newPage();
+      // What is still in flight, so a page that never settles names its request.
+      const pending = new Set<Request>();
+      let requested = 0;
+      page.on("request", (request) => {
+        requested += 1;
+        pending.add(request);
+      });
+      page.on("requestfinished", (request) => pending.delete(request));
+      page.on("requestfailed", (request) => pending.delete(request));
       if (surface.arrange) await surface.arrange(page);
       await page.goto(surface.path);
       await surface.ready(page);
-      if (!surface.arrange) await page.waitForLoadState("networkidle");
+      if (!surface.arrange) {
+        await page
+          .waitForLoadState("networkidle", { timeout: 60_000 })
+          .catch(async (error: Error) => {
+            const connection = await page
+              .locator("[data-connection]")
+              .first()
+              .getAttribute("data-connection")
+              .catch(() => null);
+            throw new Error(
+              `${surface.name} (${theme}) never settled after ${requested} requests, connection ${connection}, open: ${[
+                ...pending,
+              ]
+                .map((request) => `${request.method()} ${request.url()}`)
+                .join(", ")}. ${error.message}`,
+            );
+          });
+      }
       await expect(page.locator("html")).toHaveClass(new RegExp(theme));
       results.push(await measure(page, surface, theme));
       await page.close();
