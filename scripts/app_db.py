@@ -358,6 +358,15 @@ def tool_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
     else:
         for case in json.loads(used.stdout.strip().splitlines()[-1])['cases']:
             cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+    # US-14.6 onward: provider tools through the gateway and the record, with fake transports.
+    web = subprocess.run([str(root / 'services/agent/.venv/bin/python'), str(root / 'tests/db/web_tools_check.py'), WORKSPACE_A],
+                         env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
+                         capture_output=True, text=True, timeout=180, check=False, cwd=root)
+    if web.returncode:
+        cases.check('the web tools check ran', 'exit 0', f'exit {web.returncode}: {web.stderr.strip()[-700:]}', False)
+    else:
+        for case in json.loads(web.stdout.strip().splitlines()[-1])['cases']:
+            cases.check(case['id'], case['expected'], case['observed'], case['passed'])
     cases.denied('authenticated cannot read tool uses', stack.as_role('authenticated', USER_A, 'select * from app_private.tool_uses'), 'permission denied')
     cases.denied('anon cannot read tool uses', stack.as_role('anon', USER_A, 'select * from app_private.tool_uses'), 'permission denied')
     cases.denied('the runtime role cannot delete tool uses', stack.runtime('delete from app_private.tool_uses;\n'), 'permission denied')

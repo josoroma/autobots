@@ -24,6 +24,10 @@ TOOL_VERSIONS: Mapping[str, int] = {
     "read_run_file": 1,
     "save_artifact": 1,
     "search_memory": 1,
+    "tavily_crawl": 1,
+    "tavily_extract": 1,
+    "tavily_map": 1,
+    "tavily_search": 1,
 }
 # (tool, recorded version, current version), only where old checkpoints keep their meaning.
 COMPATIBLE_TOOL_CHANGES: frozenset[tuple[str, int, int]] = frozenset()

@@ -40,3 +40,28 @@ def provider_client(
         follow_redirects=False,
         trust_env=False,
     )
+
+
+def failure_for(credential: str, status: int) -> ToolFailed:
+    """A provider's refusal as a typed code. Its body never reaches the model."""
+    if status == 429:
+        return ToolFailed("rate_limited")
+    if status in (401, 403):
+        return ToolFailed(f"{credential}_key_refused")
+    if 400 <= status < 500:
+        return ToolFailed(f"provider_refused_{status}")
+    return ToolFailed("provider_unavailable")
+
+
+# Characters of third-party text a web tool returns in all, shared among its results. The tool's
+# byte cap stays well above it, so the cut, not the gateway, decides and the output says so.
+TEXT_BUDGET = 100_000
+
+
+def fit(texts: list[str], budget: int = TEXT_BUDGET) -> tuple[list[str], bool]:
+    """Each text cut to an equal share of the budget, and whether any was cut."""
+    if not texts:
+        return [], False
+    share = max(budget // len(texts), 1)
+    cut = [text[:share] for text in texts]
+    return cut, any(len(text) > share for text in texts)

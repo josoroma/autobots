@@ -360,9 +360,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.5#2 | Refuse a grant of an unavailable tool at run admission and at Expert save with a typed code. | DONE | US-14.5 |
 | US-14.5#3 | Add fake-key patterns to the secret scan. | DONE | US-14.5 |
 | US-14.5#4 | Document `TAVILY_API_KEY` and `JINA_API_KEY` in the operations runbook, and add Decision 0017 C8's warning that a broader developer token under `GITHUB_TOKEN` would be picked up. | DONE | US-14.5 |
-| US-14.6 | Tavily search, extract, map and crawl | READY | EPIC-14 |
-| US-14.6#1 | Add `tavily_search`, `tavily_extract`, `tavily_map` and `tavily_crawl` as plain `httpx` adapters with an injectable transport, the PRD's schema ceilings and recorded fixtures. | TODO | US-14.6 |
-| US-14.6#2 | Cover the scenarios with fake transports only. | TODO | US-14.6 |
+| US-14.6 | Tavily search, extract, map and crawl | DONE | EPIC-14 |
+| US-14.6#1 | Add `tavily_search`, `tavily_extract`, `tavily_map` and `tavily_crawl` as plain `httpx` adapters with an injectable transport, the PRD's schema ceilings and recorded fixtures. | DONE | US-14.6 |
+| US-14.6#2 | Cover the scenarios with fake transports only. | DONE | US-14.6 |
 | US-14.7 | Jina Search The Web and Extract Website Content | READY | EPIC-14 |
 | US-14.7#1 | Add `search_web` and `extract_website_content` as plain `httpx` adapters with an injectable transport, schema ceilings and recorded fixtures. | TODO | US-14.7 |
 | US-14.7#2 | Cover the scenarios with fake transports only. | TODO | US-14.7 |
@@ -4815,7 +4815,8 @@ Open Questions:
 
 ### US-14.6: Tavily search, extract, map and crawl
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-14-6-tavily-search-extract-map/`
 
 As a goal's owner
 I want Tavily's four operations as bounded read-only tools
@@ -4853,8 +4854,8 @@ Dependencies:
 - US-14.8
 
 Tasks:
-- [ ] Add `tavily_search`, `tavily_extract`, `tavily_map` and `tavily_crawl` as plain `httpx` adapters with an injectable transport, the PRD's schema ceilings and recorded fixtures.
-- [ ] Cover the scenarios with fake transports only.
+- [x] Add `tavily_search`, `tavily_extract`, `tavily_map` and `tavily_crawl` as plain `httpx` adapters with an injectable transport, the PRD's schema ceilings and recorded fixtures.
+- [x] Cover the scenarios with fake transports only.
 
 Open Questions:
 - None.

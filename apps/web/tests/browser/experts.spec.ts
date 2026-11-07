@@ -478,12 +478,27 @@ test("US-14.5: a missing key refuses only a run or version that grants its tool"
   );
   expect(dropped.status()).toBe(201);
 
+  // No provider key is set for this suite's API, so exactly the keyed tools read key_missing, and
+  // every tool needing no key is unaffected.
   const catalog = await (await page.request.get("/api/v1/tools")).json();
-  const missing = catalog.tools
-    .filter(
-      (tool: { availability: string }) => tool.availability === "key_missing",
-    )
-    .map((tool: { tool_id: string }) => tool.tool_id);
-  expect(missing).toEqual(["create_github_issue"]);
+  type Tool = {
+    tool_id: string;
+    availability: string;
+    key_requirement: { credential: string } | null;
+  };
+  const tools = catalog.tools as Tool[];
+  const missing = tools
+    .filter((tool) => tool.availability === "key_missing")
+    .map((tool) => tool.tool_id)
+    .sort();
+  const keyed = tools
+    .filter((tool) => tool.key_requirement !== null)
+    .map((tool) => tool.tool_id)
+    .sort();
+  expect(missing).toContain("create_github_issue");
+  expect(missing).toEqual(keyed);
+  for (const tool of tools.filter((item) => item.key_requirement === null)) {
+    expect(["available", "disabled_by_policy"]).toContain(tool.availability);
+  }
   expect(JSON.stringify(catalog)).not.toContain("ghp_");
 });

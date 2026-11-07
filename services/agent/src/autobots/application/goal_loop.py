@@ -31,6 +31,7 @@ from autobots.adapters.loop_middleware import (
     ModelRoute,
     UnadmittedModelCall,
 )
+from autobots.adapters.tavily import TAVILY_TOOLS
 from autobots.adapters.tool_middleware import GatewayMiddleware, visible_tools
 from autobots.application.approvals import expire_due
 from autobots.application.artifacts import publish_tool, reconcile_run
@@ -159,6 +160,7 @@ def loop_registry(
         READ_OFFLOAD,
         PROPOSE_IMPROVEMENT,
         GITHUB_ISSUE,
+        *TAVILY_TOOLS,
     )
     for tool in (*tools, *plan_tools(limits)):
         registry.register(tool)

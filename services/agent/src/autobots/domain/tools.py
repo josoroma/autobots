@@ -11,8 +11,8 @@ class OperationClass(StrEnum):
     ARBITRARY_EXECUTION = "arbitrary_execution"
 
 
-# The plan tools come with any loop. An Expert chooses among the rest, and nothing here can reach
-# the host or the network.
+# The plan tools come with any loop. An Expert chooses among the rest. General tools can't reach
+# the host or the network; provider tools reach only their provider, through the URL guard.
 PLAN_TOOLS = {"propose_plan": 1, "complete_task": 1, "read_offload": 1}
 GENERAL_TOOLS = {
     "calculate": 1,
@@ -22,7 +22,14 @@ GENERAL_TOOLS = {
     "search_memory": 1,
 }
 # Proposing an improvement changes nothing by itself, but a run only gets it if an owner chose that.
-EXPERT_TOOLS = {**GENERAL_TOOLS, "propose_improvement": 1, "create_github_issue": 1}
+# Tool-provider tools, Decision 0017. Each needs its provider's key, read per attempt.
+PROVIDER_TOOLS = {"tavily_search": 1, "tavily_extract": 1, "tavily_map": 1, "tavily_crawl": 1}
+EXPERT_TOOLS = {
+    **GENERAL_TOOLS,
+    "propose_improvement": 1,
+    "create_github_issue": 1,
+    **PROVIDER_TOOLS,
+}
 LOOP_TOOL_GRANTS = {**PLAN_TOOLS, **GENERAL_TOOLS}
 # Only a coordinator session's runs get this, and an Expert's own configuration can't name it.
 DELEGATION_TOOL = "assign_specialist"
