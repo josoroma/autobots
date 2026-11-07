@@ -10,7 +10,7 @@ markers are preserved across refreshes.
 | Target | US-10.2 |
 | Kind | story |
 | Focus | - |
-| Status | ACTIVE |
+| Status | COMPLETE |
 | Reason | - |
 | Started | 2026-11-06 |
 | Updated | 2026-11-06 |
@@ -19,16 +19,16 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-10.2 | us-10-2-release-traceability-evidence-based | READY | Release traceability and evidence-based completion |
+| 1 | US-10.2 | us-10-2-release-traceability-evidence-based | DONE | Release traceability and evidence-based completion |
 
 ## Next Action
 
-Action: select
-Story: US-10.2
-Change: us-10-2-release-traceability-evidence-based
+Action: complete
+Story: -
+Change: -
 Owner: main-session
-Command: openspec new change us-10-2-release-traceability-evidence-based; set US-10.2 to IN PROGRESS with a Change: line
-Reason: US-10.2 is READY and has no OpenSpec change
+Command: none — every story in the goal is DONE
+Reason: all 1 story/stories are DONE
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.
