@@ -1,12 +1,12 @@
 # US-12.4: the two-call workload
 
-**Class: live, on disposable stacks.** Real OpenRouter calls on Terra, through the product's API and two `worker.main` processes, at US-12.3's bound code: report fingerprint `ef94d413…`, source fingerprint `09ea61fb…`. This doesn't establish H1 or product acceptance, a persistent stack, or responsiveness under load.
+**Class: live, on disposable stacks.** Real OpenRouter calls on Terra, through the product's API and two `worker.main` processes. Rounds 1 to 4 ran at US-12.3's first binding, source fingerprint `09ea61fb…`. US-12.5's fix voided it, so round 5 ran at the binding that replaced it, `05916d5e…`. This doesn't establish H1 or product acceptance, a persistent stack, or responsiveness under load.
 
-**Result: not cleanly stable.** Three rounds were stable. In the first, one goal's first call paused as `uncertain_acceptance`, and I never found why. Seven of eight goals succeeded and passed verification. LM-A09 stays partial, and the owner is told.
+**Result: not cleanly stable.** Four rounds were stable. In the first, one goal's first call paused as `uncertain_acceptance`, and I never found why. Nine of ten goals succeeded and passed verification. LM-A09 stays partial, and the owner is told.
 
 ## What ran
 
-Two goals at once, each with a required artifact, in one workspace. The story asked for one run. The first run's pause had no recorded cause, so I ran three more to catch one, under the same cap, and none recurred.
+Two goals at once, each with a required artifact, in one workspace. The story asked for one run. The first run's pause had no recorded cause, so I ran three more to catch one, under the same cap, and none recurred. Round 5 repeats it at the rebound fingerprint.
 
 | Round | Result | Goals | Calls | Calls overlapped for | Workload | Reported charges |
 |---|---|---|---|---|---|---|
@@ -14,19 +14,20 @@ Two goals at once, each with a required artifact, in one workspace. The story as
 | 2 | Stable | both `succeeded` | 11 | 10.5 s | 18.8 s | US$0.011215 |
 | 3 | Stable | both `succeeded` | 12 | 14.9 s | 23.4 s | US$0.011997 |
 | 4 | Stable | both `succeeded` | 11 | 13.7 s | 18.4 s | US$0.011638 |
+| 5, after US-12.5's fix | Stable | both `succeeded` | 11 | 12.0 s | 18.5 s | US$0.011363 |
 
-Each round's samples are in `round-N.json`. Rounds 2 to 4 ran `logging_worker.py`, which is the product's worker with one logging wrapper added, so they aren't quite the product's entry point. Round 1 ran the product's.
+Each round's samples are in `round-N.json`. Rounds 2 to 5 ran `logging_worker.py`, which is the product's worker with one logging wrapper added, so they aren't quite the product's entry point. Round 1 ran the product's.
 
 ## The failed round
 
 - **What happened:** the run's first call ended after 1.3 seconds, and the run paused with `uncertain_acceptance`, holding its reservation. Nothing crashed, no status was false, and no worker step failed. The run did what the product says it does with a call that may have been charged.
 - **It probably wasn't charged:** key usage rose by US$0.005416 in that round, against US$0.005415 for the other run's reported charges. So that call seems to have cost nothing, and may never have been sent. This rests on one reading 60 seconds later.
-- **The cause is unknown.** The product records only the class, and anything without a status counts as uncertain. It could be the SDK refusing a reply, as WI-7 feared, or something before sending. Three more rounds with the exception logged didn't reproduce it.
+- **The cause is unknown.** The product records only the class, and anything without a status counts as uncertain. It could be the SDK refusing a reply, as WI-7 feared, or something before sending. Four more rounds with the exception logged didn't reproduce it.
 - **What it means for a person:** a run can pause asking them to look up a charge that may not exist, with nothing saying why. That's safe with money and costly in attention. Recording the exception's type would need a source change, which would void US-12.3's binding, so it's left for the owner.
 
 ## Resources
 
-Peaks, sampled every few seconds, across all rounds. Rounds 2 to 4 have only 4 or 5 samples each, as their workloads were short, so these are coarse.
+Peaks, sampled every few seconds, across rounds 1 to 4, and round 5 is close to them. Docker's peak there was 23.9% and 808.5 MiB. Rounds 2 to 5 have only 4 or 5 samples each, as their workloads were short, so these are coarse.
 
 | | Peak CPU | Peak memory | Peak TCP connections |
 |---|---|---|---|
@@ -41,11 +42,11 @@ Disk used grew by 18 to 34 MB across a round, and the database by 400 to 480 KB.
 
 | | |
 |---|---|
-| Reported charges, four rounds | US$0.040265 |
-| Key usage | `0.864570985` to `0.904834135`, a rise of US$0.040263 |
-| Shared ledger | **US$0.298439 of US$1** |
+| Reported charges, five rounds | US$0.051628 |
+| Key usage | `0.864570985` to `0.916198135`, a rise of US$0.051627 |
+| Shared ledger, after round 5 | **US$0.309802 of US$1** |
 
-The ledger is higher than what was spent because it still holds round 1's whole US$0.25 budget: a run that isn't finished could spend again on resume, by the rule the install goal follows. That stack has since been removed, so it can't, and nothing was released by hand. Rounds 2 to 4 used a US$0.10 limit each, to leave room for US-12.6.
+The ledger is higher than what was spent because it still holds round 1's whole US$0.25 budget: a run that isn't finished could spend again on resume, by the rule the install goal follows. That stack has since been removed, so it can't, and nothing was released by hand. Rounds 2 to 5 used a US$0.10 limit each, to leave room for US-12.6.
 
 The key is in no durable row or log, by the runner's scan, which covers the OpenRouter key only. Other Docker resources were unchanged, and no stack was left behind.
 

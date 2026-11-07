@@ -1,0 +1,405 @@
+{
+ "schema_version": "autobots.two-call-workload/v1",
+ "started_at_utc": "2026-11-07T00:04:34.453537+00:00",
+ "input_fingerprint": "f6a71912fba59e278b3e466c9a23db6d2860b3652d4cd297e566051a70ad4640",
+ "target_class": "disposable",
+ "model_transport": "live OpenRouter",
+ "limit_micro_usd_each": 100000,
+ "samples": [
+  {
+   "seconds": 0.0,
+   "api": {
+    "cpu_percent": 0.0,
+    "rss_kb": 154640,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 116368,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 11.2,
+    "rss_kb": 26896,
+    "tcp_connections": 0
+   },
+   "worker_2": {
+    "cpu_percent": 10.6,
+    "rss_kb": 34064,
+    "tcp_connections": 0
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 14.6,
+    "memory_mib": 800.6
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 22,
+   "database_kb": 13235,
+   "disk_used_kb": 400729640
+  },
+  {
+   "seconds": 5.2,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 157728,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 116704,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 0.0,
+    "rss_kb": 160080,
+    "tcp_connections": 5
+   },
+   "worker_2": {
+    "cpu_percent": 1.9,
+    "rss_kb": 159872,
+    "tcp_connections": 6
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 11.0,
+    "memory_mib": 802.1
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 22,
+   "database_kb": 13339,
+   "disk_used_kb": 400733696
+  },
+  {
+   "seconds": 10.3,
+   "api": {
+    "cpu_percent": 0.0,
+    "rss_kb": 161008,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 116912,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 6.5,
+    "rss_kb": 163344,
+    "tcp_connections": 7
+   },
+   "worker_2": {
+    "cpu_percent": 14.2,
+    "rss_kb": 162816,
+    "tcp_connections": 7
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 16.8,
+    "memory_mib": 804.4
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 22,
+   "database_kb": 13539,
+   "disk_used_kb": 400733908
+  },
+  {
+   "seconds": 15.5,
+   "api": {
+    "cpu_percent": 0.1,
+    "rss_kb": 162576,
+    "tcp_connections": 3
+   },
+   "ui": {
+    "cpu_percent": 0.0,
+    "rss_kb": 117136,
+    "tcp_connections": 1
+   },
+   "worker_1": {
+    "cpu_percent": 4.5,
+    "rss_kb": 169136,
+    "tcp_connections": 7
+   },
+   "worker_2": {
+    "cpu_percent": 1.3,
+    "rss_kb": 166496,
+    "tcp_connections": 6
+   },
+   "docker": {
+    "containers": 8,
+    "unhealthy": [],
+    "cpu_percent": 23.9,
+    "memory_mib": 808.5
+   },
+   "api_healthy": true,
+   "ui_healthy": true,
+   "database_connections": 18,
+   "database_kb": 13707,
+   "disk_used_kb": 400750444
+  }
+ ],
+ "problems": [],
+ "not_established": [
+  "H1",
+  "product acceptance",
+  "a persistent stack",
+  "responsiveness under load",
+  "more than this one workload"
+ ],
+ "key_usage_before_usd": 0.904834135,
+ "runs": [
+  "3e7d9d43-5386-4086-ad52-8bd7dc889aa9",
+  "63c02d64-198b-4828-b034-cd6e14871012"
+ ],
+ "workload_seconds": 18.5,
+ "calls": [
+  {
+   "run_id": "63c02d64-198b-4828-b034-cd6e14871012",
+   "attempt": 1,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 1281,
+   "start": 1794009902.508823,
+   "end": 1794009905.331398
+  },
+  {
+   "run_id": "3e7d9d43-5386-4086-ad52-8bd7dc889aa9",
+   "attempt": 1,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 1586,
+   "start": 1794009903.16076,
+   "end": 1794009906.065724
+  },
+  {
+   "run_id": "63c02d64-198b-4828-b034-cd6e14871012",
+   "attempt": 2,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 2348,
+   "start": 1794009905.378541,
+   "end": 1794009909.392438
+  },
+  {
+   "run_id": "3e7d9d43-5386-4086-ad52-8bd7dc889aa9",
+   "attempt": 2,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 2230,
+   "start": 1794009906.096665,
+   "end": 1794009909.172659
+  },
+  {
+   "run_id": "3e7d9d43-5386-4086-ad52-8bd7dc889aa9",
+   "attempt": 3,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 730,
+   "start": 1794009909.18979,
+   "end": 1794009910.954422
+  },
+  {
+   "run_id": "63c02d64-198b-4828-b034-cd6e14871012",
+   "attempt": 3,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 581,
+   "start": 1794009909.42231,
+   "end": 1794009911.101246
+  },
+  {
+   "run_id": "3e7d9d43-5386-4086-ad52-8bd7dc889aa9",
+   "attempt": 4,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 378,
+   "start": 1794009910.973981,
+   "end": 1794009912.604561
+  },
+  {
+   "run_id": "63c02d64-198b-4828-b034-cd6e14871012",
+   "attempt": 4,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 800,
+   "start": 1794009911.166518,
+   "end": 1794009913.680365
+  },
+  {
+   "run_id": "3e7d9d43-5386-4086-ad52-8bd7dc889aa9",
+   "attempt": 5,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "tool_calls",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 695,
+   "start": 1794009912.658467,
+   "end": 1794009914.843737
+  },
+  {
+   "run_id": "63c02d64-198b-4828-b034-cd6e14871012",
+   "attempt": 5,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "stop",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 384,
+   "start": 1794009913.72642,
+   "end": 1794009915.521461
+  },
+  {
+   "run_id": "3e7d9d43-5386-4086-ad52-8bd7dc889aa9",
+   "attempt": 6,
+   "role": "executor",
+   "profile": "openrouter_terra",
+   "wire_id": "openai/gpt-6.1-terra",
+   "status": "succeeded",
+   "failure_class": null,
+   "finish_reason": "stop",
+   "reserved_micro_usd": 42560,
+   "charged_micro_usd": 350,
+   "start": 1794009914.885656,
+   "end": 1794009916.31092
+  }
+ ],
+ "calls_overlap_seconds": 12.01,
+ "worker_of_each_run": [
+  {
+   "run_id": "63c02d64-198b-4828-b034-cd6e14871012",
+   "lease_owner": null,
+   "generation": 1,
+   "status": "done"
+  },
+  {
+   "run_id": "3e7d9d43-5386-4086-ad52-8bd7dc889aa9",
+   "lease_owner": null,
+   "generation": 1,
+   "status": "done"
+  }
+ ],
+ "final_status": {
+  "3e7d9d43-5386-4086-ad52-8bd7dc889aa9": "succeeded",
+  "63c02d64-198b-4828-b034-cd6e14871012": "succeeded"
+ },
+ "stop_reasons": [
+  {
+   "run_id": "63c02d64-198b-4828-b034-cd6e14871012",
+   "stop_reason": null,
+   "model_calls": 5
+  },
+  {
+   "run_id": "3e7d9d43-5386-4086-ad52-8bd7dc889aa9",
+   "stop_reason": null,
+   "model_calls": 6
+  }
+ ],
+ "uncertain_causes": [],
+ "charged_micro_usd": {
+  "3e7d9d43-5386-4086-ad52-8bd7dc889aa9": 5969,
+  "63c02d64-198b-4828-b034-cd6e14871012": 5394
+ },
+ "verifications": [
+  {
+   "run_id": "63c02d64-198b-4828-b034-cd6e14871012",
+   "passed": true,
+   "unmet": []
+  },
+  {
+   "run_id": "3e7d9d43-5386-4086-ad52-8bd7dc889aa9",
+   "passed": true,
+   "unmet": []
+  }
+ ],
+ "step_failures_in_logs": 0,
+ "worker_1_exit": 0,
+ "worker_2_exit": 0,
+ "key_found": {
+  "durable_rows": 0,
+  "log_files": 0
+ },
+ "peaks": {
+  "api": {
+   "cpu_percent": 0.1,
+   "rss_kb": 162576,
+   "tcp_connections": 3
+  },
+  "ui": {
+   "cpu_percent": 0.0,
+   "rss_kb": 117136,
+   "tcp_connections": 1
+  },
+  "worker_1": {
+   "cpu_percent": 11.2,
+   "rss_kb": 169136,
+   "tcp_connections": 7
+  },
+  "worker_2": {
+   "cpu_percent": 14.2,
+   "rss_kb": 166496,
+   "tcp_connections": 7
+  },
+  "docker": {
+   "cpu_percent": 23.9,
+   "memory_mib": 808.5
+  },
+  "database_connections": 22
+ },
+ "disk_growth_kb": 20804,
+ "database_growth_kb": 472,
+ "left_behind": "none",
+ "other_docker_unchanged": true,
+ "shared_ledger_committed_micro_usd": 309802,
+ "key_usage_after_usd": 0.916198135,
+ "verdict": "stable"
+}

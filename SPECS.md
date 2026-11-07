@@ -219,7 +219,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-10.1 | Held-out task, policy and performance qualification | DONE | EPIC-10 |
 | US-10.1#1 | Run the held-out behavioral and policy/recovery suites without tuning on held-out data. | DONE | US-10.1 |
 | US-10.1#2 | Publish per-category outcomes, resource measurements and actual latency/cost evidence. | DONE | US-10.1 |
-| US-10.2 | Release traceability and evidence-based completion | BLOCKED | EPIC-10 |
+| US-10.2 | Release traceability and evidence-based completion | READY | EPIC-10 |
 | US-10.2#1 | Review full source-to-story-to-evidence coverage and resolve blocking findings. | TODO | US-10.2 |
 | US-10.2#2 | Publish exercised operating/user procedures and truthful release limitations. | TODO | US-10.2 |
 | EPIC-11 | Installable release readiness | — | — |
@@ -298,11 +298,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-12.5 | Third real Mac sleep | DONE | EPIC-12 |
 | US-12.5#1 | Have the owner follow the runbook on a disposable stack with a scripted model. | DONE | US-12.5 |
 | US-12.5#2 | Record the report's observations with the fingerprint, and hand the LC-31 and LM-A07 rows to US-10.2's record. | DONE | US-12.5 |
-| US-12.6 | The real install at the final code | READY | EPIC-12 |
-| US-12.6#1 | Back up the install, restore it to an isolated copy, and apply its pending migrations there first. | TODO | US-12.6 |
-| US-12.6#2 | Apply them to the install, start it on its own loopback ports, and record the other projects before and after. | TODO | US-12.6 |
-| US-12.6#3 | Run one goal on Terra under the shared ledger, record the outcome and spending, and leave the worker's inference switch off. | TODO | US-12.6 |
-| US-12.6#4 | Hand the LM-A01, LM-A02, LM-A04 and LM-A08 rows to US-10.2's record. | TODO | US-12.6 |
+| US-12.6 | The real install at the final code | DONE | EPIC-12 |
+| US-12.6#1 | Back up the install, restore it to an isolated copy, and apply its pending migrations there first. | DONE | US-12.6 |
+| US-12.6#2 | Apply them to the install, start it on its own loopback ports, and record the other projects before and after. | DONE | US-12.6 |
+| US-12.6#3 | Run one goal on Terra under the shared ledger, record the outcome and spending, and leave the worker's inference switch off. | DONE | US-12.6 |
+| US-12.6#4 | Hand the LM-A01, LM-A02, LM-A04 and LM-A08 rows to US-10.2's record. | DONE | US-12.6 |
 | EPIC-13 | After release | — | — |
 | US-13.1 | Requester, scope snapshot and policy version on an approval request | BLOCKED | EPIC-13 |
 | US-13.1#1 | Persist the three fields with the approval request, by migration. | TODO | US-13.1 |
@@ -2937,7 +2937,7 @@ Open Questions:
 
 ### US-10.2: Release traceability and evidence-based completion
 
-Status: BLOCKED
+Status: READY
 
 As a product owner
 I want a complete requirement-to-evidence record
@@ -4025,7 +4025,8 @@ Open Questions:
 
 ### US-12.6: The real install at the final code
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-12-6-real-install-final-code/`
 
 As an owner
 I want the real install backed up, migrated and running one real goal on the final code
@@ -4084,10 +4085,10 @@ Dependencies:
 - US-12.3
 
 Tasks:
-- [ ] Back up the install, restore it to an isolated copy, and apply its pending migrations there first.
-- [ ] Apply them to the install, start it on its own loopback ports, and record the other projects before and after.
-- [ ] Run one goal on Terra under the shared ledger, record the outcome and spending, and leave the worker's inference switch off.
-- [ ] Hand the LM-A01, LM-A02, LM-A04 and LM-A08 rows to US-10.2's record.
+- [x] Back up the install, restore it to an isolated copy, and apply its pending migrations there first.
+- [x] Apply them to the install, start it on its own loopback ports, and record the other projects before and after.
+- [x] Run one goal on Terra under the shared ledger, record the outcome and spending, and leave the worker's inference switch off.
+- [x] Hand the LM-A01, LM-A02, LM-A04 and LM-A08 rows to US-10.2's record.
 
 Open Questions:
 - None.

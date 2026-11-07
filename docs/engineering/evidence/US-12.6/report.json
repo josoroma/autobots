@@ -1,0 +1,218 @@
+{
+ "schema_version": "autobots.install-at-final-code/v1",
+ "started_at_utc": "2026-11-07T00:08:35.810550+00:00",
+ "steps": [
+  {
+   "step": "up",
+   "exit": 0,
+   "seconds": 16.2,
+   "output": "{\"status\": \"started\", \"project\": \"autobots-install\"}"
+  },
+  {
+   "step": "backup",
+   "exit": 0,
+   "seconds": 19.3,
+   "output": "{\"status\": \"backed_up\", \"components\": [\"configuration\", \"volume:db-config\", \"volume:db-data\", \"volume:edge-functions\", \"volume:snippets\", \"volume:storage-data\"]}"
+  },
+  {
+   "step": "restore to an isolated copy",
+   "exit": 0,
+   "seconds": 24.5,
+   "output": "{\"project\": \"autobots-disposable-ed85f795\", \"gateway_port\": 55400, \"db_port\": 55401, \"volumes\": [\"autobots-disposable-ed85f795_db-config\", \"autobots-disposable-ed85f795_db-data\", \"autobots-disposable-ed85f795_edge-functions\", \"autobots-disposable-ed85f795_snippets\", \"autobots-disposable-ed85f795_sto"
+  },
+  {
+   "step": "verify the copy",
+   "exit": 0,
+   "seconds": 0.4,
+   "output": "w_execution.sql', '20261105000020_routines.sql', '20261105000021_memory.sql', '20261105000022_improvements.sql', '20261105000023_operations.sql', '20261105000024_installation_holds.sql', '20261105000025_execution_contracts.sql', '20261105000026_terra_replaces_astra.sql', '20261105000027_retention_an"
+  },
+  {
+   "step": "apply on the restored copy first",
+   "exit": 0,
+   "seconds": 0.7,
+   "output": "{\"status\": \"applied\", \"project\": \"autobots-disposable-ed85f795\", \"applied\": [\"20261106000033_approval_reason_target.sql\", \"20261106000034_route_limits_from_review.sql\", \"20261106000035_charge_source.sql\"], \"already_applied\": 32}"
+  },
+  {
+   "step": "remove the copy",
+   "exit": 0,
+   "seconds": 1.0,
+   "output": "PASS: cleanup on autobots-disposable-ed85f795."
+  },
+  {
+   "step": "apply on the install",
+   "exit": 0,
+   "seconds": 0.7,
+   "output": "{\"status\": \"applied\", \"project\": \"autobots-install\", \"applied\": [\"20261106000033_approval_reason_target.sql\", \"20261106000034_route_limits_from_review.sql\", \"20261106000035_charge_source.sql\"], \"already_applied\": 32}"
+  },
+  {
+   "step": "read readiness",
+   "exit": 0,
+   "seconds": 0.8,
+   "output": "{\"ready\": true, \"scope\": \"workspace\", \"conditions\": [[\"database\", \"ok\", \"database_ready\"], [\"schema\", \"ok\", \"schema_ready\"], [\"hold\", \"ok\", \"no_hold\"], [\"adapter\", \"ok\", \"adapter_qualified\"], [\"storage\", \"ok\", \"storage_ready\"], [\"disk\", \"ok\", \"disk_ready\"], [\"queue\", \"ok\", \"queue_ready\"], [\"worker\","
+  },
+  {
+   "step": "one goal on Terra",
+   "exit": 0,
+   "seconds": 82.4,
+   "output": ""
+  }
+ ],
+ "others_before": 32,
+ "pending_migrations_expected": [
+  "20261106000033_approval_reason_target.sql",
+  "20261106000034_route_limits_from_review.sql",
+  "20261106000035_charge_source.sql"
+ ],
+ "facts_before": {
+  "users": 1,
+  "workspaces": 1,
+  "runs": 1,
+  "succeeded": 1,
+  "artifacts": 1,
+  "checkpoints": 15,
+  "events": 5,
+  "invocations": 6,
+  "history": 33
+ },
+ "facts_after_apply": {
+  "users": 1,
+  "workspaces": 1,
+  "runs": 1,
+  "succeeded": 1,
+  "artifacts": 1,
+  "checkpoints": 15,
+  "events": 5,
+  "invocations": 6,
+  "history": 36
+ },
+ "status_before_goal": {
+  "ready": true,
+  "scope": "workspace",
+  "conditions": [
+   [
+    "database",
+    "ok",
+    "database_ready"
+   ],
+   [
+    "schema",
+    "ok",
+    "schema_ready"
+   ],
+   [
+    "hold",
+    "ok",
+    "no_hold"
+   ],
+   [
+    "adapter",
+    "ok",
+    "adapter_qualified"
+   ],
+   [
+    "storage",
+    "ok",
+    "storage_ready"
+   ],
+   [
+    "disk",
+    "ok",
+    "disk_ready"
+   ],
+   [
+    "queue",
+    "ok",
+    "queue_ready"
+   ],
+   [
+    "worker",
+    "degraded",
+    "worker_absent"
+   ]
+  ],
+  "backup": {
+   "backup_age_hours": 0
+  }
+ },
+ "listeners": {
+  "gateway": [
+   "127.0.0.1:55321"
+  ],
+  "database": [
+   "127.0.0.1:55322"
+  ],
+  "api": [
+   "127.0.0.1:8001"
+  ],
+  "web": [
+   "127.0.0.1:3000"
+  ]
+ },
+ "goal": {
+  "schema_version": "autobots.install-goal/v1",
+  "started_at_utc": "2026-11-07T00:09:48.682485+00:00",
+  "project": "autobots-install",
+  "model_transport": "live OpenRouter",
+  "limit_micro_usd": 250000,
+  "goal": "Write a short Markdown report named report.md comparing SQLite and PostgreSQL for a single-user desktop note-taking app. Give exactly three trade-offs and a one-sentence recommendation, in under 150 words. Its last line must be exactly: Trade-offs covered: 3",
+  "required_artifacts": [
+   {
+    "name": "report.md",
+    "must_contain": [
+     "Trade-offs covered: 3"
+    ]
+   }
+  ],
+  "not_established": [
+   "H1",
+   "product acceptance",
+   "task quality beyond this goal"
+  ],
+  "key_usage_before_usd": 0.916198135,
+  "admission": 202,
+  "run_id": "ffb8b184-f5ce-4993-b3f5-193438de2c43",
+  "worker_exit": 0,
+  "timeline": [
+   {
+    "seconds": 0.1,
+    "status": "queued"
+   },
+   {
+    "seconds": 3.3,
+    "status": "running"
+   },
+   {
+    "seconds": 16.2,
+    "status": "succeeded"
+   }
+  ],
+  "status": "succeeded",
+  "stop_reason": "none",
+  "verification": "true []",
+  "published": "report.md 7c9ce89c5b11e7309351ba6ae445bc82be555a54b94c1850b072bb12e50d3d6d 630",
+  "calls": "6",
+  "route": "openrouter_terra openai/gpt-6.1-terra",
+  "committed_micro_usd": 5848,
+  "calls_without_a_reported_charge": 0,
+  "shared_ledger_committed_micro_usd": 315650,
+  "workers_claiming_inference_afterward": "0",
+  "key_usage_after_usd": 0.922047135,
+  "key_found": {
+   "durable_rows": 0,
+   "log_files": 0
+  }
+ },
+ "facts_after_goal": {
+  "users": 1,
+  "workspaces": 1,
+  "runs": 2,
+  "succeeded": 2,
+  "artifacts": 2,
+  "checkpoints": 30,
+  "events": 10,
+  "invocations": 12,
+  "history": 36
+ },
+ "other_docker_unchanged": true,
+ "finished_at_utc": "2026-11-07T00:11:10.829781+00:00"
+}
