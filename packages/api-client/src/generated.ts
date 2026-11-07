@@ -3397,6 +3397,12 @@ export const schemas = {
           },
           {
             "$ref": "#/components/schemas/EffectReconciled"
+          },
+          {
+            "$ref": "#/components/schemas/ToolUseStarted"
+          },
+          {
+            "$ref": "#/components/schemas/ToolUseCompleted"
           }
         ],
         "title": "Payload"
@@ -4559,6 +4565,419 @@ export const schemas = {
       "max_output_bytes"
     ],
     "title": "ToolLimits",
+    "type": "object"
+  },
+  "ToolUseCompleted": {
+    "additionalProperties": false,
+    "properties": {
+      "code": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Code"
+      },
+      "duration_ms": {
+        "minimum": 0,
+        "title": "Duration Ms",
+        "type": "integer"
+      },
+      "operation_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Operation Id"
+      },
+      "outcome": {
+        "enum": [
+          "succeeded",
+          "failed",
+          "unknown",
+          "denied"
+        ],
+        "title": "Outcome",
+        "type": "string"
+      },
+      "tool_id": {
+        "title": "Tool Id",
+        "type": "string"
+      },
+      "tool_use_id": {
+        "maximum": 9007199254740991,
+        "minimum": 1,
+        "title": "Tool Use Id",
+        "type": "integer"
+      },
+      "tool_version": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Tool Version"
+      },
+      "type": {
+        "const": "tool.use.completed",
+        "title": "Type",
+        "type": "string"
+      }
+    },
+    "required": [
+      "type",
+      "tool_use_id",
+      "tool_id",
+      "tool_version",
+      "outcome",
+      "code",
+      "duration_ms",
+      "operation_id"
+    ],
+    "title": "ToolUseCompleted",
+    "type": "object"
+  },
+  "ToolUseList": {
+    "additionalProperties": false,
+    "properties": {
+      "next_cursor": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Next Cursor"
+      },
+      "run_id": {
+        "format": "uuid",
+        "title": "Run Id",
+        "type": "string"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "uses": {
+        "items": {
+          "$ref": "#/components/schemas/ToolUseView"
+        },
+        "title": "Uses",
+        "type": "array"
+      }
+    },
+    "required": [
+      "schema_version",
+      "run_id",
+      "uses",
+      "next_cursor"
+    ],
+    "title": "ToolUseList",
+    "type": "object"
+  },
+  "ToolUseStarted": {
+    "additionalProperties": false,
+    "description": "Identifiers only. Public fields come from the tool-use listing, never the stream (TU-03).",
+    "properties": {
+      "group": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Group"
+      },
+      "task_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Task Id"
+      },
+      "tool_id": {
+        "title": "Tool Id",
+        "type": "string"
+      },
+      "tool_use_id": {
+        "maximum": 9007199254740991,
+        "minimum": 1,
+        "title": "Tool Use Id",
+        "type": "integer"
+      },
+      "tool_version": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Tool Version"
+      },
+      "type": {
+        "const": "tool.use.started",
+        "title": "Type",
+        "type": "string"
+      }
+    },
+    "required": [
+      "type",
+      "tool_use_id",
+      "tool_id",
+      "tool_version",
+      "group",
+      "task_id"
+    ],
+    "title": "ToolUseStarted",
+    "type": "object"
+  },
+  "ToolUseView": {
+    "additionalProperties": false,
+    "description": "One dispatch: when, why (the plan task), for what (public fields, digests, sizes), how.",
+    "properties": {
+      "code": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Code"
+      },
+      "duration_ms": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Duration Ms"
+      },
+      "finished_at": {
+        "anyOf": [
+          {
+            "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Finished At"
+      },
+      "group": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Group"
+      },
+      "id": {
+        "maximum": 9007199254740991.0,
+        "minimum": 1.0,
+        "title": "Id",
+        "type": "integer"
+      },
+      "input_digest": {
+        "title": "Input Digest",
+        "type": "string"
+      },
+      "input_public": {
+        "additionalProperties": true,
+        "title": "Input Public",
+        "type": "object"
+      },
+      "operation_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Operation Id"
+      },
+      "outcome": {
+        "anyOf": [
+          {
+            "enum": [
+              "succeeded",
+              "failed",
+              "unknown",
+              "denied"
+            ],
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Outcome"
+      },
+      "output_bytes": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Output Bytes"
+      },
+      "output_public": {
+        "anyOf": [
+          {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Output Public"
+      },
+      "plan_version": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Plan Version"
+      },
+      "provider": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Provider"
+      },
+      "provider_units": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Provider Units"
+      },
+      "requested_at": {
+        "format": "date-time",
+        "pattern": "^.+(Z|[+-]00:00)$",
+        "title": "Requested At",
+        "type": "string"
+      },
+      "run_id": {
+        "format": "uuid",
+        "title": "Run Id",
+        "type": "string"
+      },
+      "sequence_in_run": {
+        "title": "Sequence In Run",
+        "type": "integer"
+      },
+      "task_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Task Id"
+      },
+      "task_title": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Task Title"
+      },
+      "tool_id": {
+        "title": "Tool Id",
+        "type": "string"
+      },
+      "tool_version": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Tool Version"
+      }
+    },
+    "required": [
+      "id",
+      "run_id",
+      "sequence_in_run",
+      "tool_id",
+      "tool_version",
+      "group",
+      "provider",
+      "plan_version",
+      "task_id",
+      "task_title",
+      "requested_at",
+      "finished_at",
+      "duration_ms",
+      "outcome",
+      "code",
+      "input_public",
+      "output_public",
+      "input_digest",
+      "output_bytes",
+      "operation_id",
+      "provider_units"
+    ],
+    "title": "ToolUseView",
     "type": "object"
   },
   "ToolVersions": {
@@ -6045,7 +6464,7 @@ export function parseRunCommandResult(value: unknown): RunCommandResult {
 export interface RunEvent {
   causal_ids: string[];
   occurred_at: string;
-  payload: RunStatusChanged | ArtifactPublished | ArtifactMissing | ApprovalRequested | ApprovalDecided | EffectReconciled;
+  payload: RunStatusChanged | ArtifactPublished | ArtifactMissing | ApprovalRequested | ApprovalDecided | EffectReconciled | ToolUseStarted | ToolUseCompleted;
   run_id: string;
   schema_version: 1;
   sequence: number;
@@ -6326,6 +6745,73 @@ export interface ToolLimits {
 
 export function parseToolLimits(value: unknown): ToolLimits {
   return parseWith(schemas, "ToolLimits", value) as ToolLimits;
+}
+
+export interface ToolUseCompleted {
+  code: string | null;
+  duration_ms: number;
+  operation_id: string | null;
+  outcome: "succeeded" | "failed" | "unknown" | "denied";
+  tool_id: string;
+  tool_use_id: number;
+  tool_version: number | null;
+  type: "tool.use.completed";
+}
+
+export function parseToolUseCompleted(value: unknown): ToolUseCompleted {
+  return parseWith(schemas, "ToolUseCompleted", value) as ToolUseCompleted;
+}
+
+export interface ToolUseList {
+  next_cursor: number | null;
+  run_id: string;
+  schema_version: 1;
+  uses: ToolUseView[];
+}
+
+export function parseToolUseList(value: unknown): ToolUseList {
+  return parseWith(schemas, "ToolUseList", value) as ToolUseList;
+}
+
+export interface ToolUseStarted {
+  group: string | null;
+  task_id: string | null;
+  tool_id: string;
+  tool_use_id: number;
+  tool_version: number | null;
+  type: "tool.use.started";
+}
+
+export function parseToolUseStarted(value: unknown): ToolUseStarted {
+  return parseWith(schemas, "ToolUseStarted", value) as ToolUseStarted;
+}
+
+export interface ToolUseView {
+  code: string | null;
+  duration_ms: number | null;
+  finished_at: string | null;
+  group: string | null;
+  id: number;
+  input_digest: string;
+  input_public: Record<string, unknown>;
+  operation_id: string | null;
+  outcome: "succeeded" | "failed" | "unknown" | "denied" | null;
+  output_bytes: number | null;
+  output_public: Record<string, unknown> | null;
+  plan_version: number | null;
+  provider: string | null;
+  provider_units: number | null;
+  requested_at: string;
+  run_id: string;
+  sequence_in_run: number;
+  task_id: string | null;
+  task_title: string | null;
+  tool_id: string;
+  tool_version: number | null;
+}
+
+export function parseToolUseView(value: unknown): ToolUseView {
+  return parseWith(schemas, "ToolUseView", value) as ToolUseView;
 }
 
 export interface ToolVersions {
@@ -6637,6 +7123,10 @@ export async function pauseRun(options: ClientOptions, run_id: string, body: Run
 
 export async function resumeRun(options: ClientOptions, run_id: string, body: RunCommandRequest): Promise<RunCommandResult> {
   return parseRunCommandResult(await requestJson(options, "POST", `/v1/runs/${encodeURIComponent(run_id)}/resume`, body));
+}
+
+export async function listRunToolUses(options: ClientOptions, run_id: string): Promise<ToolUseList> {
+  return parseToolUseList(await requestJson(options, "GET", `/v1/runs/${encodeURIComponent(run_id)}/tool-uses`));
 }
 
 export async function getRunWorkspace(options: ClientOptions, run_id: string): Promise<RunWorkspace> {

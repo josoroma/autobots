@@ -345,13 +345,13 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.2#1 | Add the Tools sidebar entry and the `/tools` list and `/tools/{tool_id}` detail pages through the BFF and the generated client, with the raw JSON Schema in a disclosure. | DONE | US-14.2 |
 | US-14.2#2 | Add group selection, an expansion preview and refusal of unavailable tools to the Expert editor, and record both the pairs and the groups on save, by migration where the schema needs it. | DONE | US-14.2 |
 | US-14.2#3 | Cover the scenarios in browser specs with axe. | DONE | US-14.2 |
-| US-14.3 | Durable tool-use record and events | READY | EPIC-14 |
-| US-14.3#1 | Add the private tool-use table by migration, with no PostgREST, Realtime or browser access and under workspace retention, and write it from the gateway for every dispatch, fenced by lease generation. | TODO | US-14.3 |
-| US-14.3#2 | Add per-definition public fields, defaulting to none, applied after the tool's own redaction. | TODO | US-14.3 |
-| US-14.3#3 | Add the two event types to the typed union, the generated client and the consumer in the same change that emits them, with the consumer ignoring unknown types. | TODO | US-14.3 |
-| US-14.3#4 | Count metered calls per root run tree and deny the 21st before any request. | TODO | US-14.3 |
-| US-14.3#5 | Add `GET /v1/runs/{run_id}/tool-uses`, cursor-paginated across the run tree, and cover the scenarios on a disposable stack. | TODO | US-14.3 |
-| US-14.4 | Tool use on run and flow screens | BLOCKED | EPIC-14 |
+| US-14.3 | Durable tool-use record and events | DONE | EPIC-14 |
+| US-14.3#1 | Add the private tool-use table by migration, with no PostgREST, Realtime or browser access and under workspace retention, and write it from the gateway for every dispatch, fenced by lease generation. | DONE | US-14.3 |
+| US-14.3#2 | Add per-definition public fields, defaulting to none, applied after the tool's own redaction. | DONE | US-14.3 |
+| US-14.3#3 | Add the two event types to the typed union, the generated client and the consumer in the same change that emits them, with the consumer ignoring unknown types. | DONE | US-14.3 |
+| US-14.3#4 | Count metered calls per root run tree and deny the 21st before any request. | DONE | US-14.3 |
+| US-14.3#5 | Add `GET /v1/runs/{run_id}/tool-uses`, cursor-paginated across the run tree, and cover the scenarios on a disposable stack. | DONE | US-14.3 |
+| US-14.4 | Tool use on run and flow screens | READY | EPIC-14 |
 | US-14.4#1 | Add Tools used to the run workspace from `tool.use.*` events and the listing. | TODO | US-14.4 |
 | US-14.4#2 | Add tool uses under node runs in the workflow monitor. | TODO | US-14.4 |
 | US-14.4#3 | Cover the scenarios in browser specs with axe. | TODO | US-14.4 |
@@ -377,7 +377,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.10 | Market history and inflation rates | BLOCKED | EPIC-14 |
 | US-14.10#1 | Add `market_history` and `inflation_rates` as read-only plain `httpx` adapters with an injectable transport and recorded fixtures, with no new package. | TODO | US-14.10 |
 | US-14.10#2 | Cover the scenarios with fake transports only. | TODO | US-14.10 |
-| US-14.11 | Code tools over run files | BLOCKED | EPIC-14 |
+| US-14.11 | Code tools over run files | READY | EPIC-14 |
 | US-14.11#1 | Add `search_files`, `read_code_file`, `write_code_file` and `patch_code_file` over the run's files only, in pure Python, with names that never match the SDK's file tools. | TODO | US-14.11 |
 | US-14.11#2 | Cover the scenarios. | TODO | US-14.11 |
 | US-14.12 | Goal-driven browsing | BLOCKED | EPIC-14 |
@@ -4667,7 +4667,8 @@ Open Questions:
 
 ### US-14.3: Durable tool-use record and events
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-14-3-durable-tool-use-record/`
 
 As a run's owner
 I want every tool dispatch recorded with when, why, what it used and produced, and its outcome
@@ -4710,18 +4711,18 @@ Dependencies:
 - US-4.6
 
 Tasks:
-- [ ] Add the private tool-use table by migration, with no PostgREST, Realtime or browser access and under workspace retention, and write it from the gateway for every dispatch, fenced by lease generation.
-- [ ] Add per-definition public fields, defaulting to none, applied after the tool's own redaction.
-- [ ] Add the two event types to the typed union, the generated client and the consumer in the same change that emits them, with the consumer ignoring unknown types.
-- [ ] Count metered calls per root run tree and deny the 21st before any request.
-- [ ] Add `GET /v1/runs/{run_id}/tool-uses`, cursor-paginated across the run tree, and cover the scenarios on a disposable stack.
+- [x] Add the private tool-use table by migration, with no PostgREST, Realtime or browser access and under workspace retention, and write it from the gateway for every dispatch, fenced by lease generation.
+- [x] Add per-definition public fields, defaulting to none, applied after the tool's own redaction.
+- [x] Add the two event types to the typed union, the generated client and the consumer in the same change that emits them, with the consumer ignoring unknown types.
+- [x] Count metered calls per root run tree and deny the 21st before any request.
+- [x] Add `GET /v1/runs/{run_id}/tool-uses`, cursor-paginated across the run tree, and cover the scenarios on a disposable stack.
 
 Open Questions:
 - None.
 
 ### US-14.4: Tool use on run and flow screens
 
-Status: BLOCKED
+Status: READY
 
 As a run's owner
 I want the run workspace and the workflow monitor to show the tools used, when, for which task and with what result
@@ -5038,7 +5039,7 @@ Open Questions:
 
 ### US-14.11: Code tools over run files
 
-Status: BLOCKED
+Status: READY
 
 As a goal's owner
 I want to search, read, write and patch the run's own files with pure Python tools

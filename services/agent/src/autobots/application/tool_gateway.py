@@ -248,6 +248,19 @@ class ToolGateway:
     async def execute(
         self, connection: Any, scope: ToolScope, name: str, arguments: Any
     ) -> ToolResult:
+        """Every dispatch is recorded, denials included, before and after it runs (TU-01). A worker
+        that lost its lease records nothing, and is refused below as before."""
+        from autobots.application.tool_uses import begin_use, complete_use
+
+        use = await begin_use(connection, scope, self.registry, name, arguments)
+        result = await self._dispatch(connection, scope, name, arguments, use)
+        if use is not None:
+            await complete_use(connection, scope, self.registry, use, name, result)
+        return result
+
+    async def _dispatch(
+        self, connection: Any, scope: ToolScope, name: str, arguments: Any, use: int | None
+    ) -> ToolResult:
         """Refused before any effect: ungranted, unqualified, invalid, out of scope or unowned."""
         version = scope.tools.get(name)
         if version is None:
@@ -266,6 +279,12 @@ class ToolGateway:
         refusal = await ownership_refusal(connection, scope)
         if refusal is not None:
             return _denied(refusal)
+        if tool.cost_class is CostClass.METERED_PROVIDER:
+            # Decision 0017 Q4: counted per root run tree, before any request leaves.
+            from autobots.application.tool_uses import admit_metered
+
+            if use is None or not await admit_metered(connection, scope, use):
+                return _denied("tool_budget_exceeded")
         if tool.approval_required or (
             tool.operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE
         ):

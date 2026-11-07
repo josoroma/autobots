@@ -19,7 +19,9 @@ from autobots.application.run_projection import (
     read_workspace,
 )
 from autobots.application.runs import RunNotFound
+from autobots.application.tool_uses import list_tool_uses
 from autobots.contracts.run_workspace import EventPage, RunInspector, RunList, RunWorkspace
+from autobots.contracts.runs import ToolUseList
 from autobots.domain.runs import TERMINAL, RunStatus
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
@@ -75,6 +77,22 @@ async def get_inspector(run_id: UUID, request: Request, workspace_id: Workspace)
             return await read_inspector(connection, workspace_id, run_id)
         except RunNotFound:
             raise _not_found() from None
+
+
+@router.get("/runs/{run_id}/tool-uses", operation_id="listRunToolUses", response_model=ToolUseList)
+async def get_tool_uses(
+    run_id: UUID,
+    request: Request,
+    workspace_id: Workspace,
+    after: Cursor = 0,
+    limit: Annotated[int, Query(ge=1, le=200)] = 100,
+) -> ToolUseList:
+    """PRD-Tool-Catalog TU-07: the run's tree when it's a root, in order. Public fields only."""
+    async with _pool(request).connection() as connection:
+        found = await list_tool_uses(connection, workspace_id, run_id, after=after, limit=limit)
+    if found is None:
+        raise _not_found()
+    return found
 
 
 async def _frames(

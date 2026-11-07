@@ -1,6 +1,6 @@
 """The initial public slice. Lease, checkpoint and credential fields are deliberately absent."""
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -85,6 +85,32 @@ class EffectReconciled(BaseModel):
     outcome: Literal["delivered", "not_delivered"]
 
 
+class ToolUseStarted(BaseModel):
+    """Identifiers only. Public fields come from the tool-use listing, never the stream (TU-03)."""
+
+    model_config = STRICT_CONTRACT
+
+    type: Literal["tool.use.started"]
+    tool_use_id: Sequence
+    tool_id: str
+    tool_version: int | None
+    group: str | None
+    task_id: str | None
+
+
+class ToolUseCompleted(BaseModel):
+    model_config = STRICT_CONTRACT
+
+    type: Literal["tool.use.completed"]
+    tool_use_id: Sequence
+    tool_id: str
+    tool_version: int | None
+    outcome: Literal["succeeded", "failed", "unknown", "denied"]
+    code: str | None
+    duration_ms: int = Field(ge=0)
+    operation_id: str | None
+
+
 class RunEvent(BaseModel):
     """The sanitized public envelope from SP-011. Payloads are typed, so nothing raw can pass."""
 
@@ -102,6 +128,8 @@ class RunEvent(BaseModel):
         | ApprovalRequested
         | ApprovalDecided
         | EffectReconciled
+        | ToolUseStarted
+        | ToolUseCompleted
     )
 
 
@@ -110,3 +138,40 @@ class ErrorResponse(BaseModel):
 
     code: str = Field(min_length=1, max_length=100)
     message: str = Field(min_length=1, max_length=2000)
+
+
+class ToolUseView(BaseModel):
+    """One dispatch: when, why (the plan task), for what (public fields, digests, sizes), how."""
+
+    model_config = STRICT_CONTRACT
+
+    id: Sequence
+    run_id: Identifier
+    sequence_in_run: int
+    tool_id: str
+    tool_version: int | None
+    group: str | None
+    provider: str | None
+    plan_version: int | None
+    task_id: str | None
+    task_title: str | None
+    requested_at: UtcTimestamp
+    finished_at: UtcTimestamp | None
+    duration_ms: int | None
+    outcome: Literal["succeeded", "failed", "unknown", "denied"] | None
+    code: str | None
+    input_public: dict[str, Any]
+    output_public: dict[str, Any] | None
+    input_digest: str
+    output_bytes: int | None
+    operation_id: str | None
+    provider_units: float | None
+
+
+class ToolUseList(BaseModel):
+    model_config = STRICT_CONTRACT
+
+    schema_version: Literal[1]
+    run_id: Identifier
+    uses: list[ToolUseView]
+    next_cursor: int | None

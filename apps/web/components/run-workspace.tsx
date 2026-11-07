@@ -53,9 +53,24 @@ function describe(event: RunEvent): string {
   if (payload.type === "approval.decided") {
     return `Approval ${payload.decision}`;
   }
+  if (payload.type === "tool.use.started") {
+    return `Tool ${payload.tool_id} started`;
+  }
+  if (payload.type === "tool.use.completed") {
+    return `Tool ${payload.tool_id} ${payload.outcome}${payload.code ? ` (${payload.code})` : ""}`;
+  }
   return payload.type === "artifact.published"
     ? `Artifact ${payload.name} published`
     : `Artifact ${payload.name} is missing`;
+}
+
+// Decision 0017 Q13: an event type this page doesn't know is skipped, never an error.
+function known(raw: unknown): RunEvent | null {
+  try {
+    return parseRunEvent(raw);
+  } catch {
+    return null;
+  }
 }
 
 export function RunWorkspaceView({ runId }: { runId: string }) {
@@ -107,8 +122,8 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
       source = new EventSource(`${base}/events/stream?after=${cursor}`);
       source.onopen = () => setConnection("live");
       source.addEventListener("run", (message) => {
-        const event = parseRunEvent(JSON.parse(message.data as string));
-        if (event.sequence <= cursor) return;
+        const event = known(JSON.parse(message.data as string));
+        if (event === null || event.sequence <= cursor) return;
         add([event]);
         void refresh();
       });
@@ -150,10 +165,15 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
           retry();
           return;
         }
-        const page = parseEventPage(await reply.json());
+        const raw = (await reply.json()) as { events?: unknown[] };
+        const page = parseEventPage({ ...raw, events: [] });
         if (closed) return;
         if (page.gap) setGap(true);
-        add(page.events);
+        add(
+          (raw.events ?? [])
+            .map(known)
+            .filter((event): event is RunEvent => event !== null),
+        );
         if (page.next_cursor === cursor) break;
         cursor = page.next_cursor;
       }

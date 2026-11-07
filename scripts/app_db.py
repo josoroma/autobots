@@ -349,6 +349,18 @@ def tool_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
         return
     for case in json.loads(result.stdout.strip().splitlines()[-1])['cases']:
         cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+    # US-14.3: every dispatch is recorded, projected and fenced.
+    used = subprocess.run([str(root / 'services/agent/.venv/bin/python'), str(root / 'tests/db/tool_use_check.py'), WORKSPACE_A],
+                          env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
+                          capture_output=True, text=True, timeout=180, check=False, cwd=root)
+    if used.returncode:
+        cases.check('the tool-use check ran', 'exit 0', f'exit {used.returncode}: {used.stderr.strip()[-700:]}', False)
+    else:
+        for case in json.loads(used.stdout.strip().splitlines()[-1])['cases']:
+            cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+    cases.denied('authenticated cannot read tool uses', stack.as_role('authenticated', USER_A, 'select * from app_private.tool_uses'), 'permission denied')
+    cases.denied('anon cannot read tool uses', stack.as_role('anon', USER_A, 'select * from app_private.tool_uses'), 'permission denied')
+    cases.denied('the runtime role cannot delete tool uses', stack.runtime('delete from app_private.tool_uses;\n'), 'permission denied')
     cases.denied('authenticated cannot read receipts', stack.as_role('authenticated', USER_A, 'select * from app_private.tool_receipts'), 'permission denied')
     cases.denied('the runtime role cannot rewrite run files', stack.runtime("update app_private.run_files set content = 'x';\n"), 'permission denied')
 
