@@ -713,6 +713,16 @@ export const schemas = {
         ],
         "title": "Regression Results"
       },
+      "replay": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ReplayView"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
       "status": {
         "title": "Status",
         "type": "string"
@@ -724,7 +734,8 @@ export const schemas = {
       "key",
       "content",
       "status",
-      "regression_results"
+      "regression_results",
+      "replay"
     ],
     "title": "CandidateView",
     "type": "object"
@@ -1506,6 +1517,33 @@ export const schemas = {
       }
     },
     "title": "HTTPValidationError",
+    "type": "object"
+  },
+  "HeldOutTask": {
+    "additionalProperties": false,
+    "description": "A goal the owner wrote, with what it must meet. It must not be one the proposal came from.",
+    "properties": {
+      "criteria": {
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 10,
+        "minItems": 1,
+        "title": "Criteria",
+        "type": "array"
+      },
+      "goal_text": {
+        "maxLength": 2000,
+        "minLength": 1,
+        "title": "Goal Text",
+        "type": "string"
+      }
+    },
+    "required": [
+      "goal_text",
+      "criteria"
+    ],
+    "title": "HeldOutTask",
     "type": "object"
   },
   "InputDocument": {
@@ -2469,22 +2507,104 @@ export const schemas = {
   },
   "RegressionRun": {
     "additionalProperties": false,
-    "description": "The reviewer's own checks. A proposal's suggested cases aren't counted.",
+    "description": "The reviewer's own checks. A proposal's suggested cases aren't counted.\n\nOptional since US-13.2: a case can fail a proposal, and only a held-out replay passes one.",
     "properties": {
       "cases": {
         "items": {
           "$ref": "#/components/schemas/RegressionCase"
         },
         "maxItems": 20,
-        "minItems": 1,
         "title": "Cases",
         "type": "array"
       }
     },
-    "required": [
-      "cases"
-    ],
     "title": "RegressionRun",
+    "type": "object"
+  },
+  "ReplayRequest": {
+    "additionalProperties": false,
+    "description": "Each task is a run with the proposal applied, spending up to the limit, Decision 0016.",
+    "properties": {
+      "limit_micro_usd": {
+        "maximum": 9007199254740991.0,
+        "minimum": 0.0,
+        "title": "Limit Micro Usd",
+        "type": "integer"
+      },
+      "tasks": {
+        "items": {
+          "$ref": "#/components/schemas/HeldOutTask"
+        },
+        "maxItems": 10,
+        "minItems": 1,
+        "title": "Tasks",
+        "type": "array"
+      }
+    },
+    "required": [
+      "tasks",
+      "limit_micro_usd"
+    ],
+    "title": "ReplayRequest",
+    "type": "object"
+  },
+  "ReplayRunView": {
+    "additionalProperties": false,
+    "properties": {
+      "goal_text": {
+        "title": "Goal Text",
+        "type": "string"
+      },
+      "run_id": {
+        "format": "uuid",
+        "title": "Run Id",
+        "type": "string"
+      },
+      "status": {
+        "title": "Status",
+        "type": "string"
+      }
+    },
+    "required": [
+      "run_id",
+      "goal_text",
+      "status"
+    ],
+    "title": "ReplayRunView",
+    "type": "object"
+  },
+  "ReplayView": {
+    "additionalProperties": false,
+    "description": "The latest held-out replay, Decision 0016. Its state is read from its runs.",
+    "properties": {
+      "id": {
+        "format": "uuid",
+        "title": "Id",
+        "type": "string"
+      },
+      "runs": {
+        "items": {
+          "$ref": "#/components/schemas/ReplayRunView"
+        },
+        "title": "Runs",
+        "type": "array"
+      },
+      "state": {
+        "enum": [
+          "running",
+          "passed",
+          "failed"
+        ],
+        "title": "State",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "state",
+      "runs"
+    ],
+    "title": "ReplayView",
     "type": "object"
   },
   "RequiredArtifact": {
@@ -4687,6 +4807,7 @@ export interface CandidateView {
   key: string;
   kind: string;
   regression_results: Record<string, unknown> | null;
+  replay: ReplayView | null;
   status: string;
 }
 
@@ -4948,6 +5069,15 @@ export function parseHTTPValidationError(value: unknown): HTTPValidationError {
   return parseWith(schemas, "HTTPValidationError", value) as HTTPValidationError;
 }
 
+export interface HeldOutTask {
+  criteria: string[];
+  goal_text: string;
+}
+
+export function parseHeldOutTask(value: unknown): HeldOutTask {
+  return parseWith(schemas, "HeldOutTask", value) as HeldOutTask;
+}
+
 export interface InputDocument {
   content: string;
   path: string;
@@ -5207,11 +5337,40 @@ export function parseRegressionCase(value: unknown): RegressionCase {
 }
 
 export interface RegressionRun {
-  cases: RegressionCase[];
+  cases?: RegressionCase[];
 }
 
 export function parseRegressionRun(value: unknown): RegressionRun {
   return parseWith(schemas, "RegressionRun", value) as RegressionRun;
+}
+
+export interface ReplayRequest {
+  limit_micro_usd: number;
+  tasks: HeldOutTask[];
+}
+
+export function parseReplayRequest(value: unknown): ReplayRequest {
+  return parseWith(schemas, "ReplayRequest", value) as ReplayRequest;
+}
+
+export interface ReplayRunView {
+  goal_text: string;
+  run_id: string;
+  status: string;
+}
+
+export function parseReplayRunView(value: unknown): ReplayRunView {
+  return parseWith(schemas, "ReplayRunView", value) as ReplayRunView;
+}
+
+export interface ReplayView {
+  id: string;
+  runs: ReplayRunView[];
+  state: "running" | "passed" | "failed";
+}
+
+export function parseReplayView(value: unknown): ReplayView {
+  return parseWith(schemas, "ReplayView", value) as ReplayView;
 }
 
 export interface RequiredArtifact {
@@ -5840,6 +5999,10 @@ export async function decideImprovement(options: ClientOptions, candidate_id: st
 
 export async function runImprovementRegression(options: ClientOptions, candidate_id: string, body: RegressionRun): Promise<CandidateList> {
   return parseCandidateList(await requestJson(options, "POST", `/v1/improvements/${encodeURIComponent(candidate_id)}/regression`, body));
+}
+
+export async function replayImprovement(options: ClientOptions, candidate_id: string, body: ReplayRequest): Promise<CandidateList> {
+  return parseCandidateList(await requestJson(options, "POST", `/v1/improvements/${encodeURIComponent(candidate_id)}/replay`, body));
 }
 
 export async function rollbackKnowledge(options: ClientOptions, body: RollbackRequest): Promise<KnowledgeHead> {

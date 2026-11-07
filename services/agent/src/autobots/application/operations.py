@@ -28,6 +28,8 @@ REQUIRED_RELATIONS = (
     "app_private.workspace_retention",
     "app_private.worker_heartbeats",
     "app_private.installation_holds",
+    "app_private.improvement_replays",
+    "app_private.improvement_replay_runs",
     "agent_runtime.adapter_qualifications",
     "agent_runtime.route_qualifications",
 )

@@ -63,16 +63,39 @@ async def search(
     run_id: UUID | None = None,
     expert_id: UUID | None = None,
     for_run: bool = False,
+    replay: tuple[UUID, str, str] | None = None,
 ) -> list[SearchHit]:
-    """Lexical only. `websearch_to_tsquery` takes any text, so a query can't be malformed."""
+    """Lexical only. `websearch_to_tsquery` takes any text, so a query can't be malformed.
+
+    `replay` is a memory proposal under a held-out replay, as (candidate, key, content). It stands
+    in for that key's active version, in this search alone, Decision 0016.
+    """
     hits: list[SearchHit] = []
+    replaced = replay[1] if replay else None
+    if replay is not None:
+        cursor = await connection.execute(
+            "select ts_headline('english', %s, q, %s) from websearch_to_tsquery('english', %s) q "
+            "where to_tsvector('english', %s) @@ q",
+            (replay[2], _HEADLINE, query, f"{replay[1]} {replay[2]}"),
+        )
+        found = await cursor.fetchone()
+        if found is not None:
+            hits.append(
+                SearchHit(
+                    kind="memory",
+                    title=public_text(replay[1]),
+                    snippet=public_text(found[0]),
+                    source={"kind": "proposal", "key": replay[1], "candidate_id": str(replay[0])},
+                )
+            )
     cursor = await connection.execute(
         "select id, title, ts_headline('english', content, q, %s), source, created_at "
         "from public.memory_items, websearch_to_tsquery('english', %s) q "
         "where workspace_id = %s and search @@ q and retired_at is null "
         "and (not %s or expert_id is null or expert_id = %s) "
+        "and (%s::text is null or key is distinct from %s) "
         "order by ts_rank(search, q) desc limit %s",
-        (_HEADLINE, query, workspace_id, for_run, expert_id, MAX_HITS),
+        (_HEADLINE, query, workspace_id, for_run, expert_id, replaced, replaced, MAX_HITS),
     )
     for row in await cursor.fetchall():
         hits.append(
@@ -117,6 +140,15 @@ async def _search_tool(arguments: SearchMemory, context: ToolContext) -> SearchR
         "select expert_id from public.runs where id = %s", (context.scope.run_id,)
     )
     expert = await cursor.fetchone()
+    # A run of a memory proposal's held-out replay finds the proposal in place of the active key.
+    cursor = await context.connection.execute(
+        "select c.id, c.key, c.content from app_private.improvement_replay_runs rr "
+        "join app_private.improvement_replays r on r.id = rr.replay_id "
+        "join public.improvement_candidates c on c.id = r.candidate_id "
+        "where rr.run_id = %s and c.kind = 'memory'",
+        (context.scope.run_id,),
+    )
+    replay = await cursor.fetchone()
     hits = await search(
         context.connection,
         context.scope.workspace_id,
@@ -124,6 +156,7 @@ async def _search_tool(arguments: SearchMemory, context: ToolContext) -> SearchR
         run_id=context.scope.run_id,
         expert_id=expert[0] if expert else None,
         for_run=True,
+        replay=(replay[0], replay[1], replay[2]) if replay else None,
     )
     return SearchResults(hits=hits)
 

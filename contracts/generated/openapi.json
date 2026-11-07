@@ -712,6 +712,16 @@
             ],
             "title": "Regression Results"
           },
+          "replay": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplayView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -723,7 +733,8 @@
           "key",
           "content",
           "status",
-          "regression_results"
+          "regression_results",
+          "replay"
         ],
         "title": "CandidateView",
         "type": "object"
@@ -1505,6 +1516,33 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HeldOutTask": {
+        "additionalProperties": false,
+        "description": "A goal the owner wrote, with what it must meet. It must not be one the proposal came from.",
+        "properties": {
+          "criteria": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Criteria",
+            "type": "array"
+          },
+          "goal_text": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Goal Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "goal_text",
+          "criteria"
+        ],
+        "title": "HeldOutTask",
         "type": "object"
       },
       "InputDocument": {
@@ -2468,22 +2506,104 @@
       },
       "RegressionRun": {
         "additionalProperties": false,
-        "description": "The reviewer's own checks. A proposal's suggested cases aren't counted.",
+        "description": "The reviewer's own checks. A proposal's suggested cases aren't counted.\n\nOptional since US-13.2: a case can fail a proposal, and only a held-out replay passes one.",
         "properties": {
           "cases": {
             "items": {
               "$ref": "#/components/schemas/RegressionCase"
             },
             "maxItems": 20,
-            "minItems": 1,
             "title": "Cases",
             "type": "array"
           }
         },
-        "required": [
-          "cases"
-        ],
         "title": "RegressionRun",
+        "type": "object"
+      },
+      "ReplayRequest": {
+        "additionalProperties": false,
+        "description": "Each task is a run with the proposal applied, spending up to the limit, Decision 0016.",
+        "properties": {
+          "limit_micro_usd": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
+            "title": "Limit Micro Usd",
+            "type": "integer"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/HeldOutTask"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Tasks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tasks",
+          "limit_micro_usd"
+        ],
+        "title": "ReplayRequest",
+        "type": "object"
+      },
+      "ReplayRunView": {
+        "additionalProperties": false,
+        "properties": {
+          "goal_text": {
+            "title": "Goal Text",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "goal_text",
+          "status"
+        ],
+        "title": "ReplayRunView",
+        "type": "object"
+      },
+      "ReplayView": {
+        "additionalProperties": false,
+        "description": "The latest held-out replay, Decision 0016. Its state is read from its runs.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/ReplayRunView"
+            },
+            "title": "Runs",
+            "type": "array"
+          },
+          "state": {
+            "enum": [
+              "running",
+              "passed",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "runs"
+        ],
+        "title": "ReplayView",
         "type": "object"
       },
       "RequiredArtifact": {
@@ -5392,6 +5512,117 @@
           }
         },
         "summary": "Post Regression"
+      }
+    },
+    "/v1/improvements/{candidate_id}/replay": {
+      "post": {
+        "description": "Held-out tasks run as ordinary runs, each up to the limit. Requesting authorizes that.",
+        "operationId": "replayImprovement",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "candidate_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Candidate Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplayRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Replay"
       }
     },
     "/v1/knowledge/rollback": {

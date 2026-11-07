@@ -7,7 +7,7 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-13.1 |
+| Target | US-13.2 |
 | Kind | story |
 | Focus | - |
 | Status | COMPLETE |
@@ -19,7 +19,7 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-13.1 | us-13-1-requester-scope-snapshot-policy | DONE | Requester, scope snapshot and policy version on an approval request |
+| 1 | US-13.2 | us-13-2-held-out-replay-before | DONE | Held-out replay before promotion |
 
 ## Next Action
 

@@ -27,6 +27,7 @@ def test_the_schema_builds_without_any_connection() -> None:
         "/v1/operations/retention/apply",
         "/v1/improvements/{candidate_id}/decision",
         "/v1/improvements/{candidate_id}/regression",
+        "/v1/improvements/{candidate_id}/replay",
         "/v1/knowledge/rollback",
         "/v1/memory",
         "/v1/memory/search",

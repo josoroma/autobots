@@ -10,13 +10,15 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from pydantic import SecretStr
 
 sys.path.insert(0, str(Path(__file__).parent))
 from goal_loop_script import ROUTE, Script, calls, say  # noqa: E402
 
+from autobots.adapters.object_storage import SupabaseObjectStore  # noqa: E402
 from autobots.application.experts import create_expert, create_session, resolve_binding  # noqa: E402
 from autobots.application.goal_loop import LoopConfig, process_next  # noqa: E402
-from autobots.application.improvements import ImprovementRefused, decide, propose, rollback, run_regression  # noqa: E402
+from autobots.application.improvements import ImprovementRefused, decide, propose, replay_state, request_replay, rollback, run_regression  # noqa: E402
 from autobots.application.memory import search  # noqa: E402
 from autobots.application.runs import admit_run  # noqa: E402
 from autobots.contracts.experts import ExpertConfig, SessionExpert  # noqa: E402
@@ -24,6 +26,8 @@ from autobots.contracts.improvements import EvidenceRef, ImprovementProposal, Re
 from autobots.domain.models import resolve_role_policy  # noqa: E402
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
+# A replay run is verified like any other, which reads its artifacts back from Storage.
+STORE = SupabaseObjectStore(os.environ['AUTOBOTS_STORAGE_BASE'], SecretStr(os.environ['AUTOBOTS_STORAGE_SERVICE']))
 WORKSPACE, OTHER = UUID(sys.argv[1]), UUID(sys.argv[2])
 PROPOSING_RUN = uuid4()
 UNDO_WORD = f'qz{uuid4().hex[:10]}'
@@ -51,6 +55,39 @@ async def main() -> None:
 
         run = await evidence_run()
 
+        # US-13.2: a held-out replay, driven by a scripted model. No provider is involved.
+        replay_plan = ('propose_plan', {'tasks': [{'id': 'r', 'title': 'Answer', 'criteria': ['c1'], 'expected_evidence': 'a file'}]})
+        replay_save = ('save_artifact', {'path': 'outputs/answer.md', 'content': 'answer'})
+        replay_publish = ('publish_artifact', {'path': 'outputs/answer.md', 'version': 1})
+        replay_done = ('complete_task', {'task_id': 'r', 'evidence': [{'kind': 'artifact', 'reference': 'outputs/answer.md'}], 'summary': 'answered'})
+
+        def passing(*first: Any) -> list[Any]:
+            return [*first, calls(replay_plan), calls(replay_save), calls(replay_publish), calls(replay_done), say('done')]
+
+        async def replay(candidate: UUID, goals: tuple[str, ...] = ('A held-out task',), workspace: UUID = WORKSPACE) -> UUID:
+            await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
+            return await request_replay(db, workspace_id=workspace, candidate_id=candidate, actor_id=ACTOR, idempotency_key=str(uuid4()),
+                                        tasks=[{'goal_text': goal, 'criteria': ['Answer it']} for goal in goals], limit_micro_usd=1_000_000, policy=resolve_role_policy())
+
+        async def drive(items: list[Any]) -> Script:
+            model = Script(items=list(items), seen=[], bound=[])
+            await process_next(db, URL, 'replay', lambda: model, LoopConfig(route=ROUTE, object_store=STORE, sleep=lambda _: asyncio.sleep(0)))
+            return model
+
+        async def replayed(candidate: UUID, *first: Any) -> Script:
+            await replay(candidate)
+            return await drive(passing(*first))
+
+        def searched(model: Script) -> list[dict[str, Any]]:
+            return [json.loads(item.content) for messages in model.seen for item in messages if item.type == 'tool' and item.name == 'search_memory']
+
+        async def refused(candidate: UUID) -> str:
+            try:
+                await decide(db, WORKSPACE, candidate, ACTOR, 'promote')
+                return 'promoted'
+            except ImprovementRefused as error:
+                return error.code
+
         def proposal(key: str, content: str, *, kind: str = 'memory', evidence: list[UUID] | None = None, must: str | None = None) -> ImprovementProposal:
             chosen = [run] if evidence is None else evidence
             return ImprovementProposal(kind=kind, key=key, content=content, evidence=[EvidenceRef(kind='run', id=str(item)) for item in chosen], regression_cases=[RegressionCase(must_contain=must or content[:10])])
@@ -68,15 +105,57 @@ async def main() -> None:
         check('regression checks evidence, cases and claims', 'no failures', results, results['failures'] == [])
         found = await search(db, WORKSPACE, 'Thursdays')
         check('passing regression still changes nothing', 'no hits', len(found), found == [])
+
+        # Refuse without a passing replay: none was run, so the reviewer's text checks can't pass it alone.
+        code = await refused(candidate)
+        head = await (await db.execute("select active_version from public.knowledge_heads where workspace_id = %s and kind = 'memory' and key = 'deploy-window'", (WORKSPACE,))).fetchone()
+        check('passing the text checks alone is refused with no replay', 'replay_required, nothing active', (code, head), code == 'replay_required' and head is None)
+        try:
+            await replay(candidate, goals=('Evidence',))
+            check('a held-out task drawn from the proposal\'s evidence is refused', 'task_drawn_from_proposal', 'admitted', False)
+        except ImprovementRefused as error:
+            check('a held-out task drawn from the proposal\'s evidence is refused', 'task_drawn_from_proposal', error.code, error.code == 'task_drawn_from_proposal')
+        try:
+            await replay(candidate, workspace=OTHER)
+            check('another workspace can\'t replay it', 'candidate_not_found', 'admitted', False)
+        except ImprovementRefused as error:
+            check('another workspace can\'t replay it', 'candidate_not_found', error.code, error.code == 'candidate_not_found')
+        await replay(candidate, goals=('When do deploys happen?',))
+        code = await refused(candidate)
+        check('a replay still running can\'t pass it', 'replay_running', code, code == 'replay_running')
+        model = await drive(passing(calls(('search_memory', {'query': 'deploys Thursdays'}))))
+        hits = searched(model)[-1]['output']['hits']
+        check('the replay run finds the proposal, as if promoted', 'a proposal hit with its text', [hit['source'] for hit in hits],
+              any(hit['source'].get('kind') == 'proposal' and 'Thursdays' in hit['snippet'] for hit in hits))
+        outside = await search(db, WORKSPACE, 'Thursdays', for_run=True)
+        check('and nothing outside the replay does', 'no hits', len(outside), outside == [])
+        state = await replay_state(db, candidate)
+        check('every held-out run succeeded, so the replay passed', 'passed, 1 run succeeded', state, state is not None and state.state == 'passed' and [item.status for item in state.runs] == ['succeeded'])
         outcome = await decide(db, WORKSPACE, candidate, ACTOR, 'promote')
         found = await search(db, WORKSPACE, 'Thursdays')
         check('a review promotes it as a new version', 'promoted, found', (outcome, [hit.source.get('version') for hit in found]), outcome == 'promoted' and found[0].source['version'] == 1)
         provenance = await value("select provenance from public.knowledge_versions where candidate_id = %s", candidate)
-        check('with provenance back to its evidence and reviewer', 'the run, the reviewer', provenance['reviewed_by'] == str(ACTOR), provenance['evidence'][0]['id'] == str(run) and provenance['reviewed_by'] == str(ACTOR) and provenance['source']['run_id'] == str(PROPOSING_RUN))
+        check('with provenance back to its evidence, reviewer and replay', 'the run, the reviewer, the replay', provenance, provenance['evidence'][0]['id'] == str(run) and provenance['reviewed_by'] == str(ACTOR) and provenance['source']['run_id'] == str(PROPOSING_RUN) and provenance['replay_id'] == str(state.id))
 
         # A new version, and rollback.
         second = await propose(db, WORKSPACE, proposal('deploy-window', 'Deploys moved to Mondays at noon.', must='Mondays'), {'kind': 'run', 'run_id': str(PROPOSING_RUN)})
         await reviewed(second)
+        await replay(second)
+        failed = await drive([calls(('search_memory', {'query': 'deploys'})), say('I give up')])
+        hits = searched(failed)[-1]['output']['hits']
+        check('a replay of a new version finds it in place of the active one', 'Mondays, not Thursdays', [hit['snippet'] for hit in hits],
+              any('Mondays' in hit['snippet'] for hit in hits) and not any('Thursdays' in hit['snippet'] for hit in hits))
+        state = await replay_state(db, second)
+        code = await refused(second)
+        active = (len(await search(db, WORKSPACE, 'Thursdays')), len(await search(db, WORKSPACE, 'Mondays')))
+        check('a failed replay refuses promotion with its reason', 'replay_failed, a run failed', (code, state.state if state else None, [item.status for item in state.runs] if state else None),
+              code == 'replay_failed' and state is not None and state.state == 'failed' and state.runs[0].status == 'failed')
+        check('and the active version is unchanged', 'Thursdays still found, Mondays not', active, active == (1, 0))
+        undone = await rollback(db, WORKSPACE, 'memory', 'deploy-window', 0)
+        restored = await rollback(db, WORKSPACE, 'memory', 'deploy-window', 1)
+        check('and rollback still works', 'none, then version 1 again', (undone.active_version, restored.active_version, len(await search(db, WORKSPACE, 'Thursdays'))),
+              undone.active_version is None and restored.active_version == 1 and len(await search(db, WORKSPACE, 'Thursdays')) == 1)
+        await replayed(second)
         await decide(db, WORKSPACE, second, ACTOR, 'promote')
         now_found = await search(db, WORKSPACE, 'Mondays')
         old_found = await search(db, WORKSPACE, 'Thursdays')
@@ -131,6 +210,10 @@ async def main() -> None:
         # A promoted skill informs a run, and changes no permission or model.
         skill = await propose(db, WORKSPACE, proposal('report-style', 'Write reports in short sections.', kind='skill', must='short sections'), {'kind': 'run'})
         await reviewed(skill)
+        skilled = await replayed(skill)
+        opening = ' '.join(str(item.content) for item in skilled.seen[0])
+        check('a skill replay carries the proposal as reference in its run alone', 'short sections, marked as reference', 'short sections' in opening,
+              'short sections' in opening and 'can\'t change your tools' in opening)
         await decide(db, WORKSPACE, skill, ACTOR, 'promote')
         expert = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='i-e', name='Skilled', config=ExpertConfig(tools=['calculate'], skills=['report-style'], instructions='Base.'))
         session = await create_session(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='i-s', kind='direct', experts=[SessionExpert(expert_id=expert.id)])
@@ -141,6 +224,7 @@ async def main() -> None:
         admitted = (await admit_run(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), goal_text='Frozen', limit_micro_usd=1_000_000, policy=resolve_role_policy(), binding=bound)).run_id
         replacement = await propose(db, WORKSPACE, proposal('report-style', 'Write reports as long essays.', kind='skill', must='long essays'), {'kind': 'run'})
         await reviewed(replacement)
+        await replayed(replacement)
         await decide(db, WORKSPACE, replacement, ACTOR, 'promote')
         spec = await value('select spec from app_private.goal_specs where run_id = %s', admitted)
         check('a run already admitted keeps the skill it started with', 'short sections', 'short sections' in spec['instructions'], 'short sections' in spec['instructions'] and 'long essays' not in spec['instructions'])
@@ -181,14 +265,17 @@ async def main() -> None:
         # Regression isn't graded by the proposer, and a first promotion can be undone.
         unchecked = await propose(db, WORKSPACE, proposal('no-review', 'Deploys on Fridays.', must='Fridays'), {'kind': 'test'})
         results = await run_regression(db, WORKSPACE, unchecked)
-        check("a proposer's own cases don't pass regression", 'regression_cases_required', results['failures'], 'regression_cases_required' in results['failures'] and results['proposer_cases_ignored'] == 1)
-        results = await reviewed(unchecked, [{'must_contain': 'Mondays'}])
+        code = await refused(unchecked)
+        check("a proposer's own cases are ignored, and only a replay can pass it", 'ignored, replay_required', (results, code), results['proposer_cases_ignored'] == 1 and results['cases'] == 0 and code == 'replay_required')
+        failing = await propose(db, WORKSPACE, proposal('no-review-case', 'Deploys on Fridays.'), {'kind': 'test'})
+        results = await reviewed(failing, [{'must_contain': 'Mondays'}])
         check("a reviewer's case can fail it", 'case_failed', results['failures'], any(item.startswith('case_failed') for item in results['failures']))
         own = await propose(db, WORKSPACE, proposal('own-evidence', 'Deploys on Fridays.'), {'kind': 'model', 'run_id': str(run)})
         results = await reviewed(own, [{'must_contain': 'Fridays'}])
         check('a run cannot cite itself as evidence', 'evidence_is_its_own_run', results['failures'], 'evidence_is_its_own_run' in results['failures'])
         first_time = await propose(db, WORKSPACE, proposal('undo-first', f'Undo this {UNDO_WORD} later.'), {'kind': 'test'})
         await reviewed(first_time, [{'must_contain': UNDO_WORD}])
+        await replayed(first_time)
         await decide(db, WORKSPACE, first_time, ACTOR, 'promote')
         found = await search(db, WORKSPACE, UNDO_WORD)
         head = await rollback(db, WORKSPACE, 'memory', 'undo-first', 0)

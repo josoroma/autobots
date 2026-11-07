@@ -319,9 +319,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-13.1 | Requester, scope snapshot and policy version on an approval request | DONE | EPIC-13 |
 | US-13.1#1 | Persist the three fields with the approval request, by migration, recording who started a run at admission, as Decision 0015 defines them. | DONE | US-13.1 |
 | US-13.1#2 | Return them in the approval view as the owner decides, and cover both scenarios on a disposable stack. | DONE | US-13.1 |
-| US-13.2 | Held-out replay before promotion | BLOCKED | EPIC-13 |
-| US-13.2#1 | Add the held-out replay to the promotion path, in place of the reviewer's text checks. | TODO | US-13.2 |
-| US-13.2#2 | Cover both scenarios, with a scripted model unless a paid replay is separately authorized. | TODO | US-13.2 |
+| US-13.2 | Held-out replay before promotion | DONE | EPIC-13 |
+| US-13.2#1 | Add the held-out replay to the promotion path, in place of the reviewer's text checks, as Decision 0016 defines it. | DONE | US-13.2 |
+| US-13.2#2 | Cover both scenarios, with a scripted model unless a paid replay is separately authorized. | DONE | US-13.2 |
 
 ## Dependency Diagram
 
@@ -598,8 +598,6 @@ flowchart TD
   US_5_3 -.-> US_13_1
   US_11_7 -.-> US_13_1
   US_8_2 -.-> US_13_2
-  EXT_US_13_2_1["External: The owner schedules this story after the release, by Decision 0013."]
-  EXT_US_13_2_1 -.-> US_13_2
 ```
 
 ```mermaid
@@ -1055,7 +1053,7 @@ flowchart TD
     T_13_1_2["US-13.1#2: Return them in the approval view as the owner decides, and cover both scenarios on a disposable stack."]
     US_13_1 --> T_13_1_2
     US_13_2["US-13.2: Held-out replay before promotion"]
-    T_13_2_1["US-13.2#1: Add the held-out replay to the promotion path, in place of the reviewer&#x27;s text checks."]
+    T_13_2_1["US-13.2#1: Add the held-out replay to the promotion path, in place of the reviewer&#x27;s text checks, as Decision 0016 defines it."]
     US_13_2 --> T_13_2_1
     T_13_2_2["US-13.2#2: Cover both scenarios, with a scripted model unless a paid replay is separately authorized."]
     US_13_2 --> T_13_2_2
@@ -4334,7 +4332,8 @@ Open Questions:
 
 ### US-13.2: Held-out replay before promotion
 
-Status: BLOCKED
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-13-2-held-out-replay-before/`
 
 As a specialist owner
 I want a real held-out replay before a memory or skill is promoted
@@ -4342,6 +4341,7 @@ So that a text match can't pass a promotion a replay would catch.
 
 Source:
 - [Decision 0013, review items marked later](docs/engineering/decisions/0013-release-closure.md#decision)
+- [Decision 0016, the three answers and scheduling](docs/engineering/decisions/0016-held-out-replay.md#decision)
 - [Decision 0011, M33](docs/engineering/decisions/0011-review-dispositions.md#decision)
 - [What Decision 0011 gives up](docs/engineering/decisions/0011-review-dispositions.md#what-this-gives-up)
 - [N-new-2's disposition](docs/engineering/evidence/US-11.12/summary.md#found-by-this-review)
@@ -4367,13 +4367,10 @@ Scenario: Refuse without a passing replay
 
 Dependencies:
 - US-8.2
-- External: The owner schedules this story after the release, by Decision 0013.
 
 Tasks:
-- [ ] Add the held-out replay to the promotion path, in place of the reviewer's text checks.
-- [ ] Cover both scenarios, with a scripted model unless a paid replay is separately authorized.
+- [x] Add the held-out replay to the promotion path, in place of the reviewer's text checks, as Decision 0016 defines it.
+- [x] Cover both scenarios, with a scripted model unless a paid replay is separately authorized.
 
 Open Questions:
-- Which held-out tasks does a replay use, and who keeps them apart from what a proposal is drawn from?
-- Does a replay use a real model? If so, who authorizes its spending, since Decision 0013's spending covers nothing else?
-- What result counts as passing?
+- None.

@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from autobots.contracts.primitives import Identifier
+from autobots.contracts.primitives import Identifier, MicroUsd
 from autobots.contracts.tools import TOOL_CONTRACT
 
 VIEW = ConfigDict(extra="forbid", frozen=True)
@@ -42,6 +42,24 @@ class ProposalAccepted(BaseModel):
     status: str
 
 
+class ReplayRunView(BaseModel):
+    model_config = VIEW
+
+    run_id: Identifier
+    goal_text: str
+    status: str
+
+
+class ReplayView(BaseModel):
+    """The latest held-out replay, Decision 0016. Its state is read from its runs."""
+
+    model_config = VIEW
+
+    id: Identifier
+    state: Literal["running", "passed", "failed"]
+    runs: list[ReplayRunView]
+
+
 class CandidateView(BaseModel):
     model_config = VIEW
 
@@ -51,6 +69,8 @@ class CandidateView(BaseModel):
     content: str
     status: str
     regression_results: dict[str, object] | None
+    # Promotion needs this to have passed. None means no replay was requested.
+    replay: ReplayView | None
 
 
 class CandidateList(BaseModel):
@@ -85,8 +105,29 @@ class RollbackRequest(BaseModel):
 
 
 class RegressionRun(BaseModel):
-    """The reviewer's own checks. A proposal's suggested cases aren't counted."""
+    """The reviewer's own checks. A proposal's suggested cases aren't counted.
+
+    Optional since US-13.2: a case can fail a proposal, and only a held-out replay passes one.
+    """
 
     model_config = VIEW
 
-    cases: list[RegressionCase] = Field(min_length=1, max_length=20)
+    cases: list[RegressionCase] = Field(default_factory=list, max_length=20)
+
+
+class HeldOutTask(BaseModel):
+    """A goal the owner wrote, with what it must meet. It must not be one the proposal came from."""
+
+    model_config = VIEW
+
+    goal_text: str = Field(min_length=1, max_length=2000)
+    criteria: list[str] = Field(min_length=1, max_length=10)
+
+
+class ReplayRequest(BaseModel):
+    """Each task is a run with the proposal applied, spending up to the limit, Decision 0016."""
+
+    model_config = VIEW
+
+    tasks: list[HeldOutTask] = Field(min_length=1, max_length=10)
+    limit_micro_usd: MicroUsd = Field(ge=1)

@@ -163,7 +163,8 @@ def artifact_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port
                                          ('major_check.py', [workspace_a, workspace_b], 'major'),
                                          ('connector_check.py', [workspace_a], 'connector'),
                                          ('wake_check.py', [workspace_a], 'wake'),
-                                         ('review_check.py', [workspace_a], 'review')):
+                                         ('review_check.py', [workspace_a], 'review'),
+                                         ('improvement_check.py', [workspace_a, workspace_b], 'improvement')):
         checked = subprocess.run([str(root / PYTHON), str(root / 'tests/db' / check_file), *arguments],
                                  env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'AUTOBOTS_STORAGE_BASE': base, 'AUTOBOTS_STORAGE_SERVICE': stack.values['SERVICE_ROLE_KEY'],
                                       'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},

@@ -459,20 +459,8 @@ def memory_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> Non
 
 
 def improvement_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
-    """Regression, review, promotion, rollback and untrusted text through the runtime role."""
-    url = f'postgresql://autobots_runtime:{stack.runtime_password}@127.0.0.1:{db_port}/postgres'
-    other = 'b0000000-0000-4000-8000-000000000002'
-    result = subprocess.run([str(root / 'services/agent/.venv/bin/python'), str(root / 'tests/db/improvement_check.py'), WORKSPACE_A, other],
-                            env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
-                            capture_output=True, text=True, timeout=180, check=False)
-    if result.returncode:
-        (root / '.checks/app_db').mkdir(parents=True, exist_ok=True)
-        (root / '.checks/app_db/improvement_check.err').write_text(result.stderr)
-        cases.check('the improvement check ran', 'exit 0', f'exit {result.returncode}: {result.stderr.strip()[-380:]}', False)
-        if not result.stdout.strip():
-            return
-    for case in json.loads(result.stdout.strip().splitlines()[-1])['cases']:
-        cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+    """Who can read proposals. Promotion now needs a held-out replay, whose runs are verified from
+    Storage, so `tests/db/improvement_check.py` runs in `scripts/qualify_identity.py` (US-13.2)."""
     cases.denied('anonymous cannot read proposals', stack.as_role('anon', None, 'select * from public.improvement_candidates'), 'permission denied')
 
 
