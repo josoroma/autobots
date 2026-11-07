@@ -94,6 +94,8 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
   - [US-14.10: Market history and inflation rates](#us-1410-market-history-and-inflation-rates)
   - [US-14.11: Code tools over run files](#us-1411-code-tools-over-run-files)
   - [US-14.12: Goal-driven browsing](#us-1412-goal-driven-browsing)
+  - [US-14.13: Isolated browser executor](#us-1413-isolated-browser-executor)
+  - [US-14.14: Admitted model for browser-use](#us-1414-admitted-model-for-browser-use)
 
 ## Work Item Status
 
@@ -381,7 +383,19 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.11#1 | Add `search_files`, `read_code_file`, `write_code_file` and `patch_code_file` over the run's files only, in pure Python, with names that never match the SDK's file tools. | DONE | US-14.11 |
 | US-14.11#2 | Cover the scenarios. | DONE | US-14.11 |
 | US-14.12 | Goal-driven browsing | BLOCKED | EPIC-14 |
-| US-14.12#1 | Once both are qualified, define the tool's contract by owner decision, then register it. | TODO | US-14.12 |
+| US-14.12#1 | Register `browse_goal` as `arbitrary_execution` with its input and output schemas, limits and public fields, only while the executor reports qualified and the admitted browser model exists. | TODO | US-14.12 |
+| US-14.12#2 | Limit its action set to navigate, click links, scroll, read and extract, and enforce `allowed_domains`, `max_steps` and `max_seconds`. | TODO | US-14.12 |
+| US-14.12#3 | Grant it only through an Expert, and require a person's approval on every call, showing the task, start URL, allowed domains and limits. | TODO | US-14.12 |
+| US-14.12#4 | Cover the scenarios on a disposable stack with a scripted model. | TODO | US-14.12 |
+| US-14.13 | Isolated browser executor | BLOCKED | EPIC-14 |
+| US-14.13#1 | Start and remove one hardened container per call from the digest-pinned Playwright image, with CDP on loopback behind a per-session token and nothing of the worker's environment. | TODO | US-14.13 |
+| US-14.13#2 | Build the egress proxy sidecar locally, applying the URL guard to every request and connecting to the address it checked. | TODO | US-14.13 |
+| US-14.13#3 | Tie the executor to the attempt's lease, cancellation and time cap, with labelled containers and a sweeper. | TODO | US-14.13 |
+| US-14.13#4 | Qualify every refusal live on a disposable stack with a scripted model, and report qualified only after that check passes. | TODO | US-14.13 |
+| US-14.14 | Admitted model for browser-use | READY | EPIC-14 |
+| US-14.14#1 | Add `browser-use` pinned in `uv.lock`, with its dependency tree reviewed and recorded. | TODO | US-14.14 |
+| US-14.14#2 | Implement the adapter over the pinned version's chat-model protocol through model admission, reservations, receipts and the run's frozen `researcher` route. | TODO | US-14.14 |
+| US-14.14#3 | Cover the scenarios offline with a scripted model. | TODO | US-14.14 |
 
 ## Dependency Diagram
 
@@ -490,6 +504,8 @@ flowchart TD
     US_14_10["US-14.10: Market history and inflation rates"]
     US_14_11["US-14.11: Code tools over run files"]
     US_14_12["US-14.12: Goal-driven browsing"]
+    US_14_13["US-14.13: Isolated browser executor"]
+    US_14_14["US-14.14: Admitted model for browser-use"]
   end
   US_1_1 -.-> US_1_2
   US_1_1 -.-> US_1_3
@@ -696,10 +712,11 @@ flowchart TD
   US_14_3 -.-> US_14_11
   US_14_3 -.-> US_14_12
   US_14_8 -.-> US_14_12
-  EXT_US_14_12_1["External: An isolated-executor story, not yet written, is delivered and qualified (Decision 0017 C3)."]
-  EXT_US_14_12_1 -.-> US_14_12
-  EXT_US_14_12_2["External: An adapter that routes browser-use&#x27;s model calls through the admitted OpenRouter profiles, not yet written, is delivered and qualified (Decision 0017 C4)."]
-  EXT_US_14_12_2 -.-> US_14_12
+  US_14_13 -.-> US_14_12
+  US_14_14 -.-> US_14_12
+  US_14_3 -.-> US_14_13
+  US_14_8 -.-> US_14_13
+  US_3_3 -.-> US_14_14
 ```
 
 ```mermaid
@@ -1243,8 +1260,30 @@ flowchart TD
     T_14_11_2["US-14.11#2: Cover the scenarios."]
     US_14_11 --> T_14_11_2
     US_14_12["US-14.12: Goal-driven browsing"]
-    T_14_12_1["US-14.12#1: Once both are qualified, define the tool&#x27;s contract by owner decision, then register it."]
+    T_14_12_1["US-14.12#1: Register `browse_goal` as `arbitrary_execution` with its input and output schemas, limits and public fields, only while the executor reports qualified and the admitted browser model exists."]
     US_14_12 --> T_14_12_1
+    T_14_12_2["US-14.12#2: Limit its action set to navigate, click links, scroll, read and extract, and enforce `allowed_domains`, `max_steps` and `max_seconds`."]
+    US_14_12 --> T_14_12_2
+    T_14_12_3["US-14.12#3: Grant it only through an Expert, and require a person&#x27;s approval on every call, showing the task, start URL, allowed domains and limits."]
+    US_14_12 --> T_14_12_3
+    T_14_12_4["US-14.12#4: Cover the scenarios on a disposable stack with a scripted model."]
+    US_14_12 --> T_14_12_4
+    US_14_13["US-14.13: Isolated browser executor"]
+    T_14_13_1["US-14.13#1: Start and remove one hardened container per call from the digest-pinned Playwright image, with CDP on loopback behind a per-session token and nothing of the worker&#x27;s environment."]
+    US_14_13 --> T_14_13_1
+    T_14_13_2["US-14.13#2: Build the egress proxy sidecar locally, applying the URL guard to every request and connecting to the address it checked."]
+    US_14_13 --> T_14_13_2
+    T_14_13_3["US-14.13#3: Tie the executor to the attempt&#x27;s lease, cancellation and time cap, with labelled containers and a sweeper."]
+    US_14_13 --> T_14_13_3
+    T_14_13_4["US-14.13#4: Qualify every refusal live on a disposable stack with a scripted model, and report qualified only after that check passes."]
+    US_14_13 --> T_14_13_4
+    US_14_14["US-14.14: Admitted model for browser-use"]
+    T_14_14_1["US-14.14#1: Add `browser-use` pinned in `uv.lock`, with its dependency tree reviewed and recorded."]
+    US_14_14 --> T_14_14_1
+    T_14_14_2["US-14.14#2: Implement the adapter over the pinned version&#x27;s chat-model protocol through model admission, reservations, receipts and the run&#x27;s frozen `researcher` route."]
+    US_14_14 --> T_14_14_2
+    T_14_14_3["US-14.14#3: Cover the scenarios offline with a scripted model."]
+    US_14_14 --> T_14_14_3
   end
 ```
 
@@ -5093,21 +5132,40 @@ Open Questions:
 Status: BLOCKED
 
 As a goal's owner
-I want a browsing tool that pursues a goal in a browser
-So that a run can use sites that need interaction.
+I want a read-only browsing tool that pursues a goal in an isolated browser
+So that a run can read sites through a browser within allowed domains, with a person approving each call.
 
 Source:
 - [Autonomous browsing](PRD-Tool-Catalog.md#autonomous-browsing)
+- [Decision 0018, B5 and B6](docs/engineering/decisions/0018-browser-executor.md#decision)
 - [Decision 0017, C3 and C4](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
 - [Decision 0017, Q9](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
+- [Tool-use record](PRD-Tool-Catalog.md#tool-use-record)
 - [Tool contract](PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [Approval contract and replay](PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
 - [SP-005](docs/engineering/option-b-contract.md#sp-005--local-services-and-isolation)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
 
 Acceptance Criteria:
 
 ```gherkin
-Scenario: Stays disabled until qualified
-  Given no isolated executor and no admitted-model adapter are qualified
+Scenario: A read-only browse is summarised and recorded
+  Given a qualified executor and the admitted browser model on a disposable stack, a scripted model, an Expert granting browse_goal and an approved call
+  When it browses from a guarded start_url within its allowed_domains until the model reports done
+  Then it returns a summary labelled third-party and cut to the shared text budget, visited URLs without query or fragment, steps, model_calls and stopped set to done, and one metered tool use records only start_url, allowed_domains, max_steps, stopped, steps and the count of visited URLs, with each step counted as the run's model spend
+
+Scenario: Outside its domains, a submission and its limits
+  Given an approved browse_goal call on the same disposable stack with a scripted model
+  When the model navigates outside allowed_domains, attempts typing or a form submission, or runs past max_steps or max_seconds
+  Then the navigation and the submission are refused and nothing is submitted, a submission that gets past the action set is refused by the egress proxy, and reaching max_steps or max_seconds stops the call with stopped set to max_steps or max_seconds
+
+Scenario: Granted only through an Expert, approved on every call
+  Given a run that grants browse_goal other than through an Expert, and a run whose Expert grants it
+  When each proposes a browse_goal call
+  Then the first is refused with a typed code, and the second waits for a person's approval showing the task, start_url, allowed_domains and limits, with no container started and no model call made until it is approved
+
+Scenario: Stays disabled while unqualified
+  Given the executor reports not qualified, or the admitted browser model is absent
   When the catalog is read or a grant names browse_goal
   Then browse_goal reads disabled_by_policy with its repair, it isn't registered, and the grant is refused with a typed code
 ```
@@ -5115,13 +5173,117 @@ Scenario: Stays disabled until qualified
 Dependencies:
 - US-14.3
 - US-14.8
-- External: An isolated-executor story, not yet written, is delivered and qualified (Decision 0017 C3).
-- External: An adapter that routes browser-use's model calls through the admitted OpenRouter profiles, not yet written, is delivered and qualified (Decision 0017 C4).
+- US-14.13
+- US-14.14
 
 Tasks:
-- [ ] Once both are qualified, define the tool's contract by owner decision, then register it.
+- [ ] Register `browse_goal` as `arbitrary_execution` with its input and output schemas, limits and public fields, only while the executor reports qualified and the admitted browser model exists.
+- [ ] Limit its action set to navigate, click links, scroll, read and extract, and enforce `allowed_domains`, `max_steps` and `max_seconds`.
+- [ ] Grant it only through an Expert, and require a person's approval on every call, showing the task, start URL, allowed domains and limits.
+- [ ] Cover the scenarios on a disposable stack with a scripted model.
 
 Open Questions:
-- What are browse_goal's input and output schemas, step and time limits, and public fields?
-- How does the URL guard apply to in-browser navigation and subresources?
-- Which admitted model profile does it use, and how do its model calls count against the run's budget?
+- Which page does a live browse read: a named public host reached over real outbound network, or a test-only exception to the URL guard for a page on the disposable stack? (The same question as US-14.13's; Decision 0018 B8 doesn't settle it.)
+- Does a refused navigation or submission end the call with `stopped: refused_action`, or does the agent carry on? The PRD lists the value but doesn't say when it is set.
+
+### US-14.13: Isolated browser executor
+
+Status: BLOCKED
+
+As a workspace owner
+I want a browser that runs in a disposable container with no way to reach this Mac, its services, its files or its credentials
+So that a browsing tool can read the web without arbitrary access.
+
+Source:
+- [Isolated browser executor](PRD-Tool-Catalog.md#isolated-browser-executor)
+- [Decision 0018, B1 to B3 and B8](docs/engineering/decisions/0018-browser-executor.md#decision)
+- [Tool contract](PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [Filesystem and execution boundaries](PRD-LangChain-Deep-Agents.md#93-filesystem-and-execution-boundaries)
+- [SP-005](docs/engineering/option-b-contract.md#sp-005--local-services-and-isolation)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: The browser can't reach this Mac or a private network
+  Given an executor on a disposable stack whose browser a scripted model drives
+  When the browser requests, directly or through a redirect, subresource or WebSocket upgrade, the API's or Supabase's loopback ports, the Docker host, a private address, the metadata address, a public name resolving to loopback, a file:// URL, a download, a non-GET request with a body, or more bytes or requests than the per-call cap
+  Then each is refused by the egress proxy or the browser, the proxy's log names hosts without paths or queries, and a request the URL guard admits connects to the address the proxy checked
+
+Scenario: Nothing of the host enters the container
+  Given an executor started by a worker that holds model and provider keys and a database URL
+  When the browser container and its CDP endpoint are inspected
+  Then it runs the digest-pinned Playwright image as a non-root user with all capabilities dropped, no-new-privileges, a read-only root, a 256 MiB tmpfs and caps of 1 CPU, 1 GiB memory and 256 processes, with no bind mount, volume, Docker socket, key or database URL, only the internal network behind the egress proxy, and CDP published on 127.0.0.1 on a random port that refuses a connection without the session token
+
+Scenario: Bounded and owned by one attempt
+  Given a browsing call in progress whose containers are labelled with its run and generation
+  When it exceeds its memory or process cap, reaches 300 seconds, the run is cancelled, or the worker loses its lease
+  Then the CDP session closes and its containers are removed, and a sweeper removes the labelled containers a crashed worker left
+
+Scenario: Qualified only after the live check
+  Given the executor's live qualification check on a disposable stack with a scripted model
+  When any refusal it lists is not observed, and then when every one is observed
+  Then the executor reports not qualified in the first case, and qualified only in the second
+```
+
+Dependencies:
+- US-14.3
+- US-14.8
+
+Tasks:
+- [ ] Start and remove one hardened container per call from the digest-pinned Playwright image, with CDP on loopback behind a per-session token and nothing of the worker's environment.
+- [ ] Build the egress proxy sidecar locally, applying the URL guard to every request and connecting to the address it checked.
+- [ ] Tie the executor to the attempt's lease, cancellation and time cap, with labelled containers and a sweeper.
+- [ ] Qualify every refusal live on a disposable stack with a scripted model, and report qualified only after that check passes.
+
+Open Questions:
+- To show live that a request the URL guard admits gets through, the check must reach a page the guard admits: `https` on a public address. May the qualification use real outbound network to a named public host, and which one, or should a test-only exception let the proxy admit a page on the disposable stack? Decision 0018 B8 doesn't say.
+
+### US-14.14: Admitted model for browser-use
+
+Status: READY
+
+As a workspace owner
+I want every model call a browsing tool makes to be an admitted call of its run
+So that browsing spends only within the run's budget, on an approved profile, with receipts.
+
+Source:
+- [Admitted browser model](PRD-Tool-Catalog.md#admitted-browser-model)
+- [Decision 0018, B4 and B7](docs/engineering/decisions/0018-browser-executor.md#decision)
+- [Decision 0017, C4](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
+- [SP-006](docs/engineering/option-b-contract.md#sp-006--exactly-two-model-profiles)
+- [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Each step is an admitted call
+  Given browser-use pinned in uv.lock, its agent loop in the worker, and a scripted model behind the adapter, offline
+  When the agent takes three steps
+  Then each step's call has a reservation, an invocation ticket and receipt, and the run's frozen researcher route on an approved OpenRouter profile over the shared transport, and its spend is settled into the run's model calls and spend
+
+Scenario: An uncertain outcome follows the existing rules
+  Given a scripted call through the adapter whose outcome is uncertain
+  When the adapter records it
+  Then its receipt and reservation stay pending reconciliation and it is not redispatched
+
+Scenario: No other model path
+  Given the browser-use agent in the worker
+  When a model call is made outside the adapter, or a call is made with the run's budget exhausted
+  Then browser-use's own model clients were never constructed, the outside call fails as unadmitted, the exhausted budget refuses the call before it is sent, and neither reaches the transport
+
+Scenario: Structured actions are enforced or refused
+  Given a route that enforces structured output and a route that doesn't
+  When the agent requests its typed actions on each
+  Then the first requests them as the route's structured output, and the second is refused with a typed code before it is sent
+```
+
+Dependencies:
+- US-3.3
+
+Tasks:
+- [ ] Add `browser-use` pinned in `uv.lock`, with its dependency tree reviewed and recorded.
+- [ ] Implement the adapter over the pinned version's chat-model protocol through model admission, reservations, receipts and the run's frozen `researcher` route.
+- [ ] Cover the scenarios offline with a scripted model.
+
+Open Questions:
+- None.

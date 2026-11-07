@@ -1,6 +1,6 @@
 # Plan: isolated browser executor, admitted browser model, and goal-driven browsing
 
-**Date:** 2026-11-07. **Status:** draft for the owner. Nothing here is approved, implemented or in `SPECS.md`.
+**Date:** 2026-11-07. **Status:** approved by the owner as [Decision 0018](../engineering/decisions/0018-browser-executor.md), and superseded as a source by [PRD-Tool-Catalog.md](../../PRD-Tool-Catalog.md#isolated-browser-executor). Kept as the reasoning behind them.
 
 This drafts the two prerequisites [US-14.12](../../SPECS.md#us-1412-goal-driven-browsing) is blocked on, by [Decision 0017](../engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules) C3 and C4, and proposes answers to US-14.12's three open questions. Like [the tool-catalog plan](tool-catalog.md), it is input for a decision and a PRD addition, not a backlog edit. [Section 8](#8-draft-stories-in-specs-style) holds the stories in SPECS style, ready for ingestion once the owner approves.
 

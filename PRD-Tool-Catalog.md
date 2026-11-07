@@ -120,6 +120,46 @@ Over the run's own files only, pure Python, no shell and no binary.
 
 A match line is capped at 500 characters. A pattern that doesn't compile is `invalid_pattern`. A patch whose `old_string` is absent, or ambiguous without `replace_all`, fails with a typed code and writes nothing.
 
+## Isolated browser executor
+
+By [Decision 0018](docs/engineering/decisions/0018-browser-executor.md) B1 to B3.
+
+**BX-01. Container.** One disposable container per browsing call, from the official Playwright image pinned by digest: non-root, all capabilities dropped, `no-new-privileges`, a read-only root, a 256 MiB `tmpfs` for profile and cache, and no bind mount, volume or Docker socket. Its environment holds nothing of the worker's: no model or provider key, no database URL. Caps: 1 CPU, 1 GiB memory, 256 processes, 300 seconds.
+
+**BX-02. Network.** The container sits on an internal network whose only way out is an egress proxy. Its CDP port is published on `127.0.0.1` only, on a random port, behind a per-session token.
+
+**BX-03. Egress proxy.** A sidecar applies the URL guard to every request the browser makes, subresources, redirects and WebSocket upgrades included: `https` only, every DNS answer public, and a connection to the address it checked, so a rebinding name can't reach a private address. It refuses loopback, private, link-local, carrier-grade NAT, metadata and multicast destinations, caps bytes and requests per call, and refuses non-`GET` requests that carry a body. It logs hosts, not paths or queries.
+
+**BX-04. Ownership.** An executor belongs to one attempt. Losing the lease, cancelling the run, or reaching the time cap closes the CDP session and removes the containers. Containers are labelled with the run and generation, and a sweeper removes any a crashed worker left.
+
+**BX-05. Qualification.** The executor reports qualified only after a live check on a disposable stack shows every refusal: the API's and Supabase's loopback ports, the Docker host, a private address, the metadata address, a public name resolving to loopback, a `file://` URL, a download, the memory and process caps, and removal after a cancel.
+
+## Admitted browser model
+
+By Decision 0018 B4 and B7.
+
+**BM-01.** browser-use's agent loop runs in the worker. Its model is an adapter implementing browser-use's chat-model protocol, and each call is an admitted call of the run: a reservation, an invocation ticket and receipt, the run's frozen `researcher` route on an approved OpenRouter profile, the shared transport, and settled spend. Uncertain outcomes follow the existing rules.
+
+**BM-02.** browser-use's own model clients are never constructed. A model call outside the adapter fails as unadmitted, and an exhausted budget refuses the call before it is sent.
+
+**BM-03.** browser-use's typed actions are requested as the route's structured output where the route enforces it; otherwise the call is refused with a typed code before it is sent.
+
+**BM-04.** `browser-use` is pinned in `uv.lock`, and the adapter is tested offline against that version's protocol with a scripted model.
+
 ## Autonomous browsing
 
-`browse_goal` (browser-use) is catalogued as `disabled_by_policy` and never registered, until an isolated executor and an admitted-model adapter are qualified (Decision 0017, C3 and C4).
+`browse_goal` (browser-use) stays `disabled_by_policy` and unregistered until the isolated browser executor is qualified and the admitted browser model exists (Decision 0017 C3 and C4). Then, by Decision 0018 B5 and B6:
+
+| Input | Constraint |
+|---|---|
+| `task` | 1 to 2000 characters |
+| `start_url` | A guarded `https` URL |
+| `allowed_domains` | 1 to 10 domains; navigation outside them is refused for that call |
+| `max_steps` | 1 to 20, default 10 |
+| `max_seconds` | 10 to 300, default 120 |
+
+Output: `summary` (labelled third-party, cut to the shared text budget), `visited` (URLs without query or fragment), `steps`, `model_calls`, and `stopped` (`done`, `max_steps`, `max_seconds`, `refused_action` or `cancelled`). Public fields: `start_url`, `allowed_domains`, `max_steps`, `stopped`, `steps` and the count of visited URLs, never the summary or page text.
+
+**AB-01.** It reads only: navigate, click links, scroll, read and extract. Typing, form submission, sign-in, upload and download are not in its action set, and the egress proxy refuses a submission that gets through.
+
+**AB-02.** It stays `arbitrary_execution`. The registry admits that class only for a tool whose executor reports qualified. It is granted only through an Expert, every call waits for a person's approval, it counts as one metered call, and each of its steps counts as the run's model spend.
