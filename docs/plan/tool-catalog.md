@@ -1,6 +1,6 @@
 # Plan: tool catalog, tool-use record and Tools page
 
-**Date:** 2026-11-07. **Status:** proposal only. Nothing here is implemented, approved or in `SPECS.md`.
+**Date:** 2026-11-07. **Status:** superseded as a source by [PRD-Tool-Catalog.md](../../PRD-Tool-Catalog.md) and [Decision 0017](../engineering/decisions/0017-tool-catalog.md), which answer its open questions. Kept as the reasoning behind them.
 
 This plan is not a requirement source. `AGENTS.md` and `.claude/rules/delivery.md` say backlog intent comes from approved PRDs and owner decisions, ingested through `autobots-spec-ingest`. `CODEBASE.md` describes what exists, not what should exist. So the EPIC drafted in [section 12](#12-draft-epic-in-specs-style) is input for a PRD addition. It is not a backlog edit.
 

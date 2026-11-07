@@ -11,7 +11,8 @@
     "providers": "PRD-Model-Providers.md",
     "deployment": "PRD-Local-Mac-Deployment.md",
     "research": "PRD-AutoGPT.md",
-    "comparison": "PRD-Comparison-Recommendation.md"
+    "comparison": "PRD-Comparison-Recommendation.md",
+    "tools": "PRD-Tool-Catalog.md"
   },
   "upstream": {
     "repository": "https://github.com/josoroma/OhMyOrch",

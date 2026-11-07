@@ -81,6 +81,19 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 - [EPIC-13: After release](#epic-13-after-release)
   - [US-13.1: Requester, scope snapshot and policy version on an approval request](#us-131-requester-scope-snapshot-and-policy-version-on-an-approval-request)
   - [US-13.2: Held-out replay before promotion](#us-132-held-out-replay-before-promotion)
+- [EPIC-14: Tool catalog and tool-use record](#epic-14-tool-catalog-and-tool-use-record)
+  - [US-14.1: Tool catalog API derived from the registry](#us-141-tool-catalog-api-derived-from-the-registry)
+  - [US-14.2: Tools page and grants by group](#us-142-tools-page-and-grants-by-group)
+  - [US-14.3: Durable tool-use record and events](#us-143-durable-tool-use-record-and-events)
+  - [US-14.4: Tool use on run and flow screens](#us-144-tool-use-on-run-and-flow-screens)
+  - [US-14.5: Tool-provider key readiness](#us-145-tool-provider-key-readiness)
+  - [US-14.6: Tavily search, extract, map and crawl](#us-146-tavily-search-extract-map-and-crawl)
+  - [US-14.7: Jina Search The Web and Extract Website Content](#us-147-jina-search-the-web-and-extract-website-content)
+  - [US-14.8: URL guard for tools that fetch](#us-148-url-guard-for-tools-that-fetch)
+  - [US-14.9: Agent File Input, read_run_file v2, read_csv and store_remote_file](#us-149-agent-file-input-read_run_file-v2-read_csv-and-store_remote_file)
+  - [US-14.10: Market history and inflation rates](#us-1410-market-history-and-inflation-rates)
+  - [US-14.11: Code tools over run files](#us-1411-code-tools-over-run-files)
+  - [US-14.12: Goal-driven browsing](#us-1412-goal-driven-browsing)
 
 ## Work Item Status
 
@@ -322,6 +335,53 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-13.2 | Held-out replay before promotion | DONE | EPIC-13 |
 | US-13.2#1 | Add the held-out replay to the promotion path, in place of the reviewer's text checks, as Decision 0016 defines it. | DONE | US-13.2 |
 | US-13.2#2 | Cover both scenarios, with a scripted model unless a paid replay is separately authorized. | DONE | US-13.2 |
+| EPIC-14 | Tool catalog and tool-use record | — | — |
+| US-14.1 | Tool catalog API derived from the registry | READY | EPIC-14 |
+| US-14.1#1 | Add the descriptive fields to tool definitions and derive the descriptors from the registry, including flattened fields, limits and grantable_to, with the planned browse_goal descriptor as disabled_by_policy and never registered. | TODO | US-14.1 |
+| US-14.1#2 | Compute availability and its typed reason per request from the worker-facing configuration, never stored. | TODO | US-14.1 |
+| US-14.1#3 | Add `GET /v1/tools`, `/v1/tools/{tool_id}` and `/v1/tools/{tool_id}/versions/{version}` with schema_version, catalog_digest and filters, behind the existing checks and the BFF, then regenerate OpenAPI and the TypeScript client. | TODO | US-14.1 |
+| US-14.1#4 | Test registry–catalog parity, agent-view filtering and secret absence. | TODO | US-14.1 |
+| US-14.2 | Tools page and grants by group | BLOCKED | EPIC-14 |
+| US-14.2#1 | Add the Tools sidebar entry and the `/tools` list and `/tools/{tool_id}` detail pages through the BFF and the generated client, with the raw JSON Schema in a disclosure. | TODO | US-14.2 |
+| US-14.2#2 | Add group selection, an expansion preview and refusal of unavailable tools to the Expert editor, and record both the pairs and the groups on save, by migration where the schema needs it. | TODO | US-14.2 |
+| US-14.2#3 | Cover the scenarios in browser specs with axe. | TODO | US-14.2 |
+| US-14.3 | Durable tool-use record and events | BLOCKED | EPIC-14 |
+| US-14.3#1 | Add the private tool-use table by migration, with no PostgREST, Realtime or browser access and under workspace retention, and write it from the gateway for every dispatch, fenced by lease generation. | TODO | US-14.3 |
+| US-14.3#2 | Add per-definition public fields, defaulting to none, applied after the tool's own redaction. | TODO | US-14.3 |
+| US-14.3#3 | Add the two event types to the typed union, the generated client and the consumer in the same change that emits them, with the consumer ignoring unknown types. | TODO | US-14.3 |
+| US-14.3#4 | Count metered calls per root run tree and deny the 21st before any request. | TODO | US-14.3 |
+| US-14.3#5 | Add `GET /v1/runs/{run_id}/tool-uses`, cursor-paginated across the run tree, and cover the scenarios on a disposable stack. | TODO | US-14.3 |
+| US-14.4 | Tool use on run and flow screens | BLOCKED | EPIC-14 |
+| US-14.4#1 | Add Tools used to the run workspace from `tool.use.*` events and the listing. | TODO | US-14.4 |
+| US-14.4#2 | Add tool uses under node runs in the workflow monitor. | TODO | US-14.4 |
+| US-14.4#3 | Cover the scenarios in browser specs with axe. | TODO | US-14.4 |
+| US-14.5 | Tool-provider key readiness | BLOCKED | EPIC-14 |
+| US-14.5#1 | Read tool-provider keys from the worker's environment for each attempt and pass them only to the adapter's HTTP client, with no credential field in any tool input. | TODO | US-14.5 |
+| US-14.5#2 | Refuse a grant of an unavailable tool at run admission and at Expert save with a typed code. | TODO | US-14.5 |
+| US-14.5#3 | Add fake-key patterns to the secret scan. | TODO | US-14.5 |
+| US-14.5#4 | Document `TAVILY_API_KEY` and `JINA_API_KEY` in the operations runbook, and add Decision 0017 C8's warning that a broader developer token under `GITHUB_TOKEN` would be picked up. | TODO | US-14.5 |
+| US-14.6 | Tavily search, extract, map and crawl | BLOCKED | EPIC-14 |
+| US-14.6#1 | Add `tavily_search`, `tavily_extract`, `tavily_map` and `tavily_crawl` as plain `httpx` adapters with an injectable transport, the PRD's schema ceilings and recorded fixtures. | TODO | US-14.6 |
+| US-14.6#2 | Cover the scenarios with fake transports only. | TODO | US-14.6 |
+| US-14.7 | Jina Search The Web and Extract Website Content | BLOCKED | EPIC-14 |
+| US-14.7#1 | Add `search_web` and `extract_website_content` as plain `httpx` adapters with an injectable transport, schema ceilings and recorded fixtures. | TODO | US-14.7 |
+| US-14.7#2 | Cover the scenarios with fake transports only. | TODO | US-14.7 |
+| US-14.8 | URL guard for tools that fetch | BLOCKED | EPIC-14 |
+| US-14.8#1 | Add one shared guard with DNS checks on every answer, redirect revalidation, a limit of 3 redirects, and size and time caps. | TODO | US-14.8 |
+| US-14.8#2 | Cover the scenarios with a fake resolver and transport. | TODO | US-14.8 |
+| US-14.9 | Agent File Input, read_run_file v2, read_csv and store_remote_file | BLOCKED | EPIC-14 |
+| US-14.9#1 | Add the goal composer's attachment of text files to run inputs, through the BFF and API. | TODO | US-14.9 |
+| US-14.9#2 | Register `read_run_file` version 2 with media type and line paging, keeping saved grants on the version they pinned, and add `read_csv`. | TODO | US-14.9 |
+| US-14.9#3 | Add `store_remote_file` as a reversible internal write through the URL guard. | TODO | US-14.9 |
+| US-14.9#4 | Cover the scenarios, with browser specs for the composer and fake transports for remote storage. | TODO | US-14.9 |
+| US-14.10 | Market history and inflation rates | BLOCKED | EPIC-14 |
+| US-14.10#1 | Add `market_history` and `inflation_rates` as read-only plain `httpx` adapters with an injectable transport and recorded fixtures, with no new package. | TODO | US-14.10 |
+| US-14.10#2 | Cover the scenarios with fake transports only. | TODO | US-14.10 |
+| US-14.11 | Code tools over run files | BLOCKED | EPIC-14 |
+| US-14.11#1 | Add `search_files`, `read_code_file`, `write_code_file` and `patch_code_file` over the run's files only, in pure Python, with names that never match the SDK's file tools. | TODO | US-14.11 |
+| US-14.11#2 | Cover the scenarios. | TODO | US-14.11 |
+| US-14.12 | Goal-driven browsing | BLOCKED | EPIC-14 |
+| US-14.12#1 | Once both are qualified, define the tool's contract by owner decision, then register it. | TODO | US-14.12 |
 
 ## Dependency Diagram
 
@@ -416,6 +476,20 @@ flowchart TD
   subgraph EPIC_13["EPIC-13: After release"]
     US_13_1["US-13.1: Requester, scope snapshot and policy version on an approval request"]
     US_13_2["US-13.2: Held-out replay before promotion"]
+  end
+  subgraph EPIC_14["EPIC-14: Tool catalog and tool-use record"]
+    US_14_1["US-14.1: Tool catalog API derived from the registry"]
+    US_14_2["US-14.2: Tools page and grants by group"]
+    US_14_3["US-14.3: Durable tool-use record and events"]
+    US_14_4["US-14.4: Tool use on run and flow screens"]
+    US_14_5["US-14.5: Tool-provider key readiness"]
+    US_14_6["US-14.6: Tavily search, extract, map and crawl"]
+    US_14_7["US-14.7: Jina Search The Web and Extract Website Content"]
+    US_14_8["US-14.8: URL guard for tools that fetch"]
+    US_14_9["US-14.9: Agent File Input, read_run_file v2, read_csv and store_remote_file"]
+    US_14_10["US-14.10: Market history and inflation rates"]
+    US_14_11["US-14.11: Code tools over run files"]
+    US_14_12["US-14.12: Goal-driven browsing"]
   end
   US_1_1 -.-> US_1_2
   US_1_1 -.-> US_1_3
@@ -598,6 +672,34 @@ flowchart TD
   US_5_3 -.-> US_13_1
   US_11_7 -.-> US_13_1
   US_8_2 -.-> US_13_2
+  US_4_4 -.-> US_14_1
+  US_2_2 -.-> US_14_1
+  US_14_1 -.-> US_14_2
+  US_5_1 -.-> US_14_2
+  US_14_1 -.-> US_14_3
+  US_4_2 -.-> US_14_3
+  US_4_6 -.-> US_14_3
+  US_14_3 -.-> US_14_4
+  US_14_1 -.-> US_14_5
+  US_3_1 -.-> US_14_5
+  US_14_3 -.-> US_14_6
+  US_14_5 -.-> US_14_6
+  US_14_8 -.-> US_14_6
+  US_14_3 -.-> US_14_7
+  US_14_5 -.-> US_14_7
+  US_14_8 -.-> US_14_7
+  US_14_1 -.-> US_14_8
+  US_14_3 -.-> US_14_9
+  US_14_8 -.-> US_14_9
+  US_14_3 -.-> US_14_10
+  US_14_8 -.-> US_14_10
+  US_14_3 -.-> US_14_11
+  US_14_3 -.-> US_14_12
+  US_14_8 -.-> US_14_12
+  EXT_US_14_12_1["External: An isolated-executor story, not yet written, is delivered and qualified (Decision 0017 C3)."]
+  EXT_US_14_12_1 -.-> US_14_12
+  EXT_US_14_12_2["External: An adapter that routes browser-use&#x27;s model calls through the admitted OpenRouter profiles, not yet written, is delivered and qualified (Decision 0017 C4)."]
+  EXT_US_14_12_2 -.-> US_14_12
 ```
 
 ```mermaid
@@ -1057,6 +1159,92 @@ flowchart TD
     US_13_2 --> T_13_2_1
     T_13_2_2["US-13.2#2: Cover both scenarios, with a scripted model unless a paid replay is separately authorized."]
     US_13_2 --> T_13_2_2
+  end
+```
+
+```mermaid
+flowchart TD
+  subgraph EPIC_14["EPIC-14 tasks"]
+    US_14_1["US-14.1: Tool catalog API derived from the registry"]
+    T_14_1_1["US-14.1#1: Add the descriptive fields to tool definitions and derive the descriptors from the registry, including flattened fields, limits and grantable_to, with the planned browse_goal descriptor as disabled_by_policy and never registered."]
+    US_14_1 --> T_14_1_1
+    T_14_1_2["US-14.1#2: Compute availability and its typed reason per request from the worker-facing configuration, never stored."]
+    US_14_1 --> T_14_1_2
+    T_14_1_3["US-14.1#3: Add `GET /v1/tools`, `/v1/tools/{tool_id}` and `/v1/tools/{tool_id}/versions/{version}` with schema_version, catalog_digest and filters, behind the existing checks and the BFF, then regenerate OpenAPI and the TypeScript client."]
+    US_14_1 --> T_14_1_3
+    T_14_1_4["US-14.1#4: Test registry–catalog parity, agent-view filtering and secret absence."]
+    US_14_1 --> T_14_1_4
+    US_14_2["US-14.2: Tools page and grants by group"]
+    T_14_2_1["US-14.2#1: Add the Tools sidebar entry and the `/tools` list and `/tools/{tool_id}` detail pages through the BFF and the generated client, with the raw JSON Schema in a disclosure."]
+    US_14_2 --> T_14_2_1
+    T_14_2_2["US-14.2#2: Add group selection, an expansion preview and refusal of unavailable tools to the Expert editor, and record both the pairs and the groups on save, by migration where the schema needs it."]
+    US_14_2 --> T_14_2_2
+    T_14_2_3["US-14.2#3: Cover the scenarios in browser specs with axe."]
+    US_14_2 --> T_14_2_3
+    US_14_3["US-14.3: Durable tool-use record and events"]
+    T_14_3_1["US-14.3#1: Add the private tool-use table by migration, with no PostgREST, Realtime or browser access and under workspace retention, and write it from the gateway for every dispatch, fenced by lease generation."]
+    US_14_3 --> T_14_3_1
+    T_14_3_2["US-14.3#2: Add per-definition public fields, defaulting to none, applied after the tool&#x27;s own redaction."]
+    US_14_3 --> T_14_3_2
+    T_14_3_3["US-14.3#3: Add the two event types to the typed union, the generated client and the consumer in the same change that emits them, with the consumer ignoring unknown types."]
+    US_14_3 --> T_14_3_3
+    T_14_3_4["US-14.3#4: Count metered calls per root run tree and deny the 21st before any request."]
+    US_14_3 --> T_14_3_4
+    T_14_3_5["US-14.3#5: Add `GET /v1/runs/{run_id}/tool-uses`, cursor-paginated across the run tree, and cover the scenarios on a disposable stack."]
+    US_14_3 --> T_14_3_5
+    US_14_4["US-14.4: Tool use on run and flow screens"]
+    T_14_4_1["US-14.4#1: Add Tools used to the run workspace from `tool.use.*` events and the listing."]
+    US_14_4 --> T_14_4_1
+    T_14_4_2["US-14.4#2: Add tool uses under node runs in the workflow monitor."]
+    US_14_4 --> T_14_4_2
+    T_14_4_3["US-14.4#3: Cover the scenarios in browser specs with axe."]
+    US_14_4 --> T_14_4_3
+    US_14_5["US-14.5: Tool-provider key readiness"]
+    T_14_5_1["US-14.5#1: Read tool-provider keys from the worker&#x27;s environment for each attempt and pass them only to the adapter&#x27;s HTTP client, with no credential field in any tool input."]
+    US_14_5 --> T_14_5_1
+    T_14_5_2["US-14.5#2: Refuse a grant of an unavailable tool at run admission and at Expert save with a typed code."]
+    US_14_5 --> T_14_5_2
+    T_14_5_3["US-14.5#3: Add fake-key patterns to the secret scan."]
+    US_14_5 --> T_14_5_3
+    T_14_5_4["US-14.5#4: Document `TAVILY_API_KEY` and `JINA_API_KEY` in the operations runbook, and add Decision 0017 C8&#x27;s warning that a broader developer token under `GITHUB_TOKEN` would be picked up."]
+    US_14_5 --> T_14_5_4
+    US_14_6["US-14.6: Tavily search, extract, map and crawl"]
+    T_14_6_1["US-14.6#1: Add `tavily_search`, `tavily_extract`, `tavily_map` and `tavily_crawl` as plain `httpx` adapters with an injectable transport, the PRD&#x27;s schema ceilings and recorded fixtures."]
+    US_14_6 --> T_14_6_1
+    T_14_6_2["US-14.6#2: Cover the scenarios with fake transports only."]
+    US_14_6 --> T_14_6_2
+    US_14_7["US-14.7: Jina Search The Web and Extract Website Content"]
+    T_14_7_1["US-14.7#1: Add `search_web` and `extract_website_content` as plain `httpx` adapters with an injectable transport, schema ceilings and recorded fixtures."]
+    US_14_7 --> T_14_7_1
+    T_14_7_2["US-14.7#2: Cover the scenarios with fake transports only."]
+    US_14_7 --> T_14_7_2
+    US_14_8["US-14.8: URL guard for tools that fetch"]
+    T_14_8_1["US-14.8#1: Add one shared guard with DNS checks on every answer, redirect revalidation, a limit of 3 redirects, and size and time caps."]
+    US_14_8 --> T_14_8_1
+    T_14_8_2["US-14.8#2: Cover the scenarios with a fake resolver and transport."]
+    US_14_8 --> T_14_8_2
+    US_14_9["US-14.9: Agent File Input, read_run_file v2, read_csv and store_remote_file"]
+    T_14_9_1["US-14.9#1: Add the goal composer&#x27;s attachment of text files to run inputs, through the BFF and API."]
+    US_14_9 --> T_14_9_1
+    T_14_9_2["US-14.9#2: Register `read_run_file` version 2 with media type and line paging, keeping saved grants on the version they pinned, and add `read_csv`."]
+    US_14_9 --> T_14_9_2
+    T_14_9_3["US-14.9#3: Add `store_remote_file` as a reversible internal write through the URL guard."]
+    US_14_9 --> T_14_9_3
+    T_14_9_4["US-14.9#4: Cover the scenarios, with browser specs for the composer and fake transports for remote storage."]
+    US_14_9 --> T_14_9_4
+    US_14_10["US-14.10: Market history and inflation rates"]
+    T_14_10_1["US-14.10#1: Add `market_history` and `inflation_rates` as read-only plain `httpx` adapters with an injectable transport and recorded fixtures, with no new package."]
+    US_14_10 --> T_14_10_1
+    T_14_10_2["US-14.10#2: Cover the scenarios with fake transports only."]
+    US_14_10 --> T_14_10_2
+    US_14_11["US-14.11: Code tools over run files"]
+    T_14_11_1["US-14.11#1: Add `search_files`, `read_code_file`, `write_code_file` and `patch_code_file` over the run&#x27;s files only, in pure Python, with names that never match the SDK&#x27;s file tools."]
+    US_14_11 --> T_14_11_1
+    T_14_11_2["US-14.11#2: Cover the scenarios."]
+    US_14_11 --> T_14_11_2
+    US_14_12["US-14.12: Goal-driven browsing"]
+    T_14_12_1["US-14.12#1: Once both are qualified, define the tool&#x27;s contract by owner decision, then register it."]
+    US_14_12 --> T_14_12_1
   end
 ```
 
@@ -4374,3 +4562,555 @@ Tasks:
 
 Open Questions:
 - None.
+
+# EPIC-14: Tool catalog and tool-use record
+
+Scheduled now by [Decision 0017](docs/engineering/decisions/0017-tool-catalog.md#decision), independent of EPIC-13, and sourced from [PRD-Tool-Catalog.md](PRD-Tool-Catalog.md#catalog-contract). The order is catalog, record and readiness first, then the URL guard, then one provider at a time. Every provider-tool scenario runs against a fake transport, even when a real key is present. No story in this epic shows that a provider works live, and neither H1 nor product acceptance follows from it ([what Decision 0017 doesn't establish](docs/engineering/decisions/0017-tool-catalog.md#what-this-doesnt-establish)). Live qualification of a provider is a separate task with a cap the owner sets.
+
+### US-14.1: Tool catalog API derived from the registry
+
+Status: READY
+
+As a developer or agent author
+I want one versioned catalog of every registered tool with its schemas, group, provider, classes and availability
+So that tools can be discovered and granted without reading the code.
+
+Source:
+- [Catalog contract, TC-01 to TC-05](PRD-Tool-Catalog.md#catalog-contract)
+- [Autonomous browsing, catalogued as disabled](PRD-Tool-Catalog.md#autonomous-browsing)
+- [Decision 0017, Q10: registry–catalog parity stays exact](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
+- [Tool contract](PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+
+Codebase Context:
+- [Current tools and receipts](CODEBASE.md#current-capabilities): describes the registry before the analyzed revision. It is not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: The catalog matches the registry
+  Given the tools registered in this build
+  When a workspace member requests the tool catalog through the BFF
+  Then every registered tool ID and version appears exactly once with its descriptor, schemas, group, provider, classes and availability, browse_goal appears only as disabled_by_policy, and no other unregistered tool appears
+
+Scenario: Discovery doesn't grant
+  Given a run whose scope doesn't grant a catalogued tool
+  When the model is shown its tools
+  Then the ungranted tool is absent from the agent view, and a call naming it is denied before any effect
+
+Scenario: No secret in the catalog
+  Given a fake value is set for a tool's key requirement
+  When the catalog and that tool's version are read
+  Then the response names only the variable and an availability state, never the value, a prefix, its length or a hash
+```
+
+Dependencies:
+- US-4.4
+- US-2.2
+
+Tasks:
+- [ ] Add the descriptive fields to tool definitions and derive the descriptors from the registry, including flattened fields, limits and grantable_to, with the planned browse_goal descriptor as disabled_by_policy and never registered.
+- [ ] Compute availability and its typed reason per request from the worker-facing configuration, never stored.
+- [ ] Add `GET /v1/tools`, `/v1/tools/{tool_id}` and `/v1/tools/{tool_id}/versions/{version}` with schema_version, catalog_digest and filters, behind the existing checks and the BFF, then regenerate OpenAPI and the TypeScript client.
+- [ ] Test registry–catalog parity, agent-view filtering and secret absence.
+
+Open Questions:
+- None.
+
+### US-14.2: Tools page and grants by group
+
+Status: BLOCKED
+
+As a workspace owner
+I want a Tools page before Settings that shows each tool's inputs, outputs, types and availability, and an Expert editor that grants tools singly or by group
+So that I can see what an agent may use and choose it precisely.
+
+Source:
+- [Tools screen, TS-01 to TS-04](PRD-Tool-Catalog.md#tools-screen)
+- [Grants by group, TC-06](PRD-Tool-Catalog.md#catalog-contract)
+- [Decision 0017, C9 and C10](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
+- [Required screens](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Browse tools by group
+  Given the catalog holds tools in several groups
+  When the owner opens Tools from the sidebar entry placed directly before Settings
+  Then tools appear by group with their classes and availability, the filters are kept in the URL, and a tool's detail lists every registered version and its input and output fields with type, required flag, constraints and whether they are public
+
+Scenario: Show unavailable tools honestly
+  Given a tool whose key is missing or which is disabled_by_policy
+  When it is listed or opened
+  Then it reads as unavailable in text, not by color alone, with its typed reason and repair
+
+Scenario: A group grant stays explicit
+  Given an owner grants a group to an Expert version in the editor
+  When the expansion is previewed and the version is saved
+  Then the version records the expanded tool versions and the groups they came from, a tool added to the group later doesn't change it, and a grant naming an unavailable tool is refused with a typed code
+```
+
+Dependencies:
+- US-14.1
+- US-5.1
+
+Tasks:
+- [ ] Add the Tools sidebar entry and the `/tools` list and `/tools/{tool_id}` detail pages through the BFF and the generated client, with the raw JSON Schema in a disclosure.
+- [ ] Add group selection, an expansion preview and refusal of unavailable tools to the Expert editor, and record both the pairs and the groups on save, by migration where the schema needs it.
+- [ ] Cover the scenarios in browser specs with axe.
+
+Open Questions:
+- None.
+
+### US-14.3: Durable tool-use record and events
+
+Status: BLOCKED
+
+As a run's owner
+I want every tool dispatch recorded with when, why, what it used and produced, and its outcome
+So that I can see which tools a run used and for which plan task.
+
+Source:
+- [Tool-use record, TU-01 to TU-07](PRD-Tool-Catalog.md#tool-use-record)
+- [Decision 0017, Q3, Q4 and Q13](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
+- [Public event envelope](PRD-LangChain-Deep-Agents.md#113-public-event-envelope)
+- [Tool contract](PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [SP-011](docs/engineering/option-b-contract.md#sp-011--plans-graph-state-and-events)
+- [SP-012](docs/engineering/option-b-contract.md#sp-012--durable-job-ownership-and-recovery)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+
+Codebase Context:
+- [Current tools and receipts](CODEBASE.md#current-capabilities): receipts stay the effect ledger.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Record every dispatch
+  Given a run that calls a pure, a read-only and an effectful tool, and has one call denied
+  When the calls finish and the run's tool uses are listed
+  Then each dispatch has exactly one private tool-use row with tool, version, group, plan task, database times, outcome and typed code, the effectful one carries its receipt's operation ID, and the listing returns them in order with the task's title
+
+Scenario: Public projection and events
+  Given a tool whose definition marks some fields public, and a fake key configured
+  When its use is streamed as tool.use.started and tool.use.completed and then listed
+  Then the events carry identifiers, outcome, code and duration only at schema_version 1, the listing shows only public fields, URLs without query or fragment, and digests and sizes for content, and the fake key appears in no row, event, receipt, checkpoint or log line
+
+Scenario: Fenced and budgeted
+  Given a worker that has lost its lease, and separately a root run tree that has already made 20 metered tool calls against a fake transport
+  When each attempts another tool call
+  Then the first can't record a tool use, and the second is denied with tool_budget_exceeded before any request
+```
+
+Dependencies:
+- US-14.1
+- US-4.2
+- US-4.6
+
+Tasks:
+- [ ] Add the private tool-use table by migration, with no PostgREST, Realtime or browser access and under workspace retention, and write it from the gateway for every dispatch, fenced by lease generation.
+- [ ] Add per-definition public fields, defaulting to none, applied after the tool's own redaction.
+- [ ] Add the two event types to the typed union, the generated client and the consumer in the same change that emits them, with the consumer ignoring unknown types.
+- [ ] Count metered calls per root run tree and deny the 21st before any request.
+- [ ] Add `GET /v1/runs/{run_id}/tool-uses`, cursor-paginated across the run tree, and cover the scenarios on a disposable stack.
+
+Open Questions:
+- None.
+
+### US-14.4: Tool use on run and flow screens
+
+Status: BLOCKED
+
+As a run's owner
+I want the run workspace and the workflow monitor to show the tools used, when, for which task and with what result
+So that a run's outcome can be traced to the tools behind it.
+
+Source:
+- [Tool-use views, TV-01 to TV-03](PRD-Tool-Catalog.md#tool-use-views)
+- [Decision 0017, C10](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
+- [Required screens](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Live and reloaded tool use
+  Given a running run that calls tools
+  When the owner watches its workspace, then reloads it
+  Then Tools used shows each use once, in order, with time and duration, tool and group, the plan task's title, public inputs, outputs or digests, and outcome
+
+Scenario: Flow view
+  Given a workflow execution whose nodes call tools
+  When the workflow monitor is opened
+  Then each tool use appears under the run of the node that made it
+
+Scenario: Accessible list
+  Given the Tools used list is open
+  When a new use arrives
+  Then it is announced politely, the list keeps heading and table semantics, and axe reports no violations
+```
+
+Dependencies:
+- US-14.3
+
+Tasks:
+- [ ] Add Tools used to the run workspace from `tool.use.*` events and the listing.
+- [ ] Add tool uses under node runs in the workflow monitor.
+- [ ] Cover the scenarios in browser specs with axe.
+
+Open Questions:
+- None.
+
+### US-14.5: Tool-provider key readiness
+
+Status: BLOCKED
+
+As a workspace owner
+I want each tool provider's key read in the worker for each attempt and shown only as available or not
+So that tools work when configured and no key leaks when they aren't.
+
+Source:
+- [Provider keys, PK-01 to PK-03](PRD-Tool-Catalog.md#provider-keys)
+- [Decision 0017, C1, C5 and C8](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
+- [Decision 0017, Q1](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
+- [Decision 0007, credential](docs/engineering/decisions/0007-first-connector-github-issues.md#decision)
+- [SP-007](docs/engineering/option-b-contract.md#sp-007--credentials-and-configuration-ux)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: A missing key disables only its provider's tools
+  Given one tool provider's key is not set in the worker's environment
+  When a run or Expert version that grants none of its tools is admitted or saved, and another that grants one is requested
+  Then the first is unaffected, the second is refused with a typed code before any dispatch, and only that provider's tools read key_missing
+
+Scenario: A key stays out of durable state
+  Given a fake key set for a tool provider
+  When its tools run against a fake transport
+  Then the key reaches only the adapter's HTTP client, and a scan finds it in no scope, checkpoint, graph state, prompt, schema, event, tool-use row, receipt, log line or evidence
+
+Scenario: No automatic live key check
+  Given a real key may be present in the environment
+  When availability is computed and the tests run
+  Then no request leaves for the provider, and availability reports only whether the key is set
+```
+
+Dependencies:
+- US-14.1
+- US-3.1
+
+Tasks:
+- [ ] Read tool-provider keys from the worker's environment for each attempt and pass them only to the adapter's HTTP client, with no credential field in any tool input.
+- [ ] Refuse a grant of an unavailable tool at run admission and at Expert save with a typed code.
+- [ ] Add fake-key patterns to the secret scan.
+- [ ] Document `TAVILY_API_KEY` and `JINA_API_KEY` in the operations runbook, and add Decision 0017 C8's warning that a broader developer token under `GITHUB_TOKEN` would be picked up.
+
+Open Questions:
+- None.
+
+### US-14.6: Tavily search, extract, map and crawl
+
+Status: BLOCKED
+
+As a goal's owner
+I want Tavily's four operations as bounded read-only tools
+So that a run can search, extract and crawl the web through one recorded and guarded path.
+
+Source:
+- [Web tools](PRD-Tool-Catalog.md#web-tools)
+- [URL guard](PRD-Tool-Catalog.md#url-guard)
+- [Provider keys](PRD-Tool-Catalog.md#provider-keys)
+- [Decision 0017, C1, C2, C5 and C12](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Bounded calls against a fake transport
+  Given a granted Tavily tool, a fake key and a fake transport
+  When the model calls it with an argument beyond a schema ceiling, and then with allowed arguments
+  Then the first is refused before any request, and the second returns validated output labelled third-party, truncated at max_output_bytes with a notice, and recorded as a tool use
+
+Scenario: No provider-side inference
+  Given any Tavily tool call against a fake transport
+  When its request is built
+  Then include_answer, auto_parameters and natural-language instructions are absent or off, and no tool schema offers them
+
+Scenario: URLs pass the guard
+  Given tavily_extract, tavily_map or tavily_crawl named with a URL the guard refuses
+  When it is called against a fake transport
+  Then it fails with the guard's typed code and the transport receives no request
+```
+
+Dependencies:
+- US-14.3
+- US-14.5
+- US-14.8
+
+Tasks:
+- [ ] Add `tavily_search`, `tavily_extract`, `tavily_map` and `tavily_crawl` as plain `httpx` adapters with an injectable transport, the PRD's schema ceilings and recorded fixtures.
+- [ ] Cover the scenarios with fake transports only.
+
+Open Questions:
+- None.
+
+### US-14.7: Jina Search The Web and Extract Website Content
+
+Status: BLOCKED
+
+As a goal's owner
+I want Search The Web and Extract Website Content backed by Jina
+So that a run can search and read pages through one recorded and guarded path.
+
+Source:
+- [Web tools](PRD-Tool-Catalog.md#web-tools)
+- [URL guard](PRD-Tool-Catalog.md#url-guard)
+- [Provider keys](PRD-Tool-Catalog.md#provider-keys)
+- [Decision 0017, C2 and C5](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
+- [Decision 0017, Q2](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Search against a fake transport
+  Given a granted search_web tool, a fake key and a fake s.jina.ai transport
+  When the model searches with max_results within 10
+  Then it returns validated results with title, URL and snippet, labelled third-party and recorded as a tool use, and a request beyond the ceiling is refused before any request
+
+Scenario: Extract in reader mode without provider inference
+  Given a granted extract_website_content tool and a fake r.jina.ai transport
+  When it is called with a URL the guard admits
+  Then the request uses reader mode with no model-based reader option, and the output is the URL, markdown labelled third-party and truncated at max_output_bytes with a notice, and links
+
+Scenario: URLs pass the guard
+  Given extract_website_content named with a URL the guard refuses
+  When it is called against a fake transport
+  Then it fails with the guard's typed code and the transport receives no request
+```
+
+Dependencies:
+- US-14.3
+- US-14.5
+- US-14.8
+
+Tasks:
+- [ ] Add `search_web` and `extract_website_content` as plain `httpx` adapters with an injectable transport, schema ceilings and recorded fixtures.
+- [ ] Cover the scenarios with fake transports only.
+
+Open Questions:
+- None.
+
+### US-14.8: URL guard for tools that fetch
+
+Status: BLOCKED
+
+As a workspace owner
+I want every URL a tool fetches, or sends to a provider, to pass one guard
+So that no tool can reach loopback services, private networks or cloud metadata.
+
+Source:
+- [URL guard, UG-01](PRD-Tool-Catalog.md#url-guard)
+- [Decision 0017, C6](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
+- [SP-005](docs/engineering/option-b-contract.md#sp-005--local-services-and-isolation)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Refuse unsafe URLs before any request
+  Given a URL that isn't https, carries userinfo, exceeds the length bound, or has any DNS answer that is loopback, private, link-local, carrier-grade NAT, multicast, reserved, unspecified or cloud metadata
+  When a tool submits it to the guard with a fake resolver and transport
+  Then it is refused with a typed code and no request is sent
+
+Scenario: Revalidate every redirect
+  Given a fake transport that redirects
+  When the guarded fetch follows it
+  Then each target is revalidated, an unsafe target is refused, and a fourth redirect is refused with a typed code
+
+Scenario: Cap size and time
+  Given a fake response larger than the size cap or slower than the time cap
+  When it is fetched through the guard
+  Then the fetch stops with a typed code
+```
+
+Dependencies:
+- US-14.1
+
+Tasks:
+- [ ] Add one shared guard with DNS checks on every answer, redirect revalidation, a limit of 3 redirects, and size and time caps.
+- [ ] Cover the scenarios with a fake resolver and transport.
+
+Open Questions:
+- None.
+
+### US-14.9: Agent File Input, read_run_file v2, read_csv and store_remote_file
+
+Status: BLOCKED
+
+As a goal's owner
+I want to attach text files to a goal, and give agents paged reading, CSV reading and guarded remote storage over run files
+So that a run can work from my files and from fetched text without arbitrary access.
+
+Source:
+- [File tools and FI-01](PRD-Tool-Catalog.md#file-tools)
+- [URL guard](PRD-Tool-Catalog.md#url-guard)
+- [Tool-use record, TU-04](PRD-Tool-Catalog.md#tool-use-record)
+- [Decision 0017, Q10 and Q11](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
+- [Tool contract](PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Attach files to a goal
+  Given the goal composer
+  When the owner attaches up to 5 plain text, markdown, JSON or CSV files of at most 1 MiB each, and then tries a sixth file, a larger file or another type
+  Then the accepted files become run inputs under inputs/ with their media type, the others are refused with a reason, and no catalog tool is added
+
+Scenario: Read run files in pages
+  Given a run with a text file and a CSV under inputs/
+  When read_run_file version 2 is called with an offset and limit, and read_csv with max_rows within 500
+  Then they return the requested lines with media type, version, sha256, total lines and a truncation flag, and columns with inferred types, rows and a truncation flag, and the tool-use record keeps only digests and sizes of the content
+
+Scenario: Store a remote file through the guard
+  Given store_remote_file and a fake transport
+  When it is asked to store a guarded text URL under outputs/, then a refused URL, a non-text type, a body over 1 MiB or a path outside outputs/
+  Then the first returns path, version, sha256, size and media type, and each of the others is refused with a typed code and writes nothing
+```
+
+Dependencies:
+- US-14.3
+- US-14.8
+
+Tasks:
+- [ ] Add the goal composer's attachment of text files to run inputs, through the BFF and API.
+- [ ] Register `read_run_file` version 2 with media type and line paging, keeping saved grants on the version they pinned, and add `read_csv`.
+- [ ] Add `store_remote_file` as a reversible internal write through the URL guard.
+- [ ] Cover the scenarios, with browser specs for the composer and fake transports for remote storage.
+
+Open Questions:
+- None.
+
+### US-14.10: Market history and inflation rates
+
+Status: BLOCKED
+
+As a goal's owner
+I want price history from Yahoo Finance's chart endpoint and annual inflation from the World Bank
+So that a run can compare markets and inflation with named, timestamped sources.
+
+Source:
+- [Market data](PRD-Tool-Catalog.md#market-data)
+- [Tool-use record, TU-06](PRD-Tool-Catalog.md#tool-use-record)
+- [Decision 0017, C11 and C12](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
+- [Decision 0017, Q4 to Q7](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Price history from a fake chart endpoint
+  Given a granted market_history tool and a fake transport
+  When it is called with up to 5 symbols matching the pattern, an allowed period and interval
+  Then each symbol returns dated rows with close-to-close pct_change whose first row is null, its currency, a source named as unofficial and retrieved_at, and invalid symbols or values outside the allowed sets are refused before any request
+
+Scenario: Typed failures and no crosses
+  Given a fake transport that reports an unknown symbol, an outage or a rate limit
+  When market_history is called
+  Then it fails as symbol_not_found, provider_unavailable or rate_limited, and computes no cross rate
+
+Scenario: Annual inflation from a fake World Bank transport
+  Given a granted inflation_rates tool and a fake transport
+  When it is called for CRI, USA or EMU over a year range
+  Then it returns annual inflation_pct rows with indicator FP.CPI.TOTL.ZG and the source, refuses any other country before a request, and counts as a metered call under the run tree's limit of 20
+```
+
+Dependencies:
+- US-14.3
+- US-14.8
+
+Tasks:
+- [ ] Add `market_history` and `inflation_rates` as read-only plain `httpx` adapters with an injectable transport and recorded fixtures, with no new package.
+- [ ] Cover the scenarios with fake transports only.
+
+Open Questions:
+- None.
+
+### US-14.11: Code tools over run files
+
+Status: BLOCKED
+
+As a goal's owner
+I want to search, read, write and patch the run's own files with pure Python tools
+So that a run can work on code-like text without a shell, a binary or access outside its files.
+
+Source:
+- [Code tools](PRD-Tool-Catalog.md#code-tools)
+- [Decision 0017, C7](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
+- [Decision 0017, Q8](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
+- [Tool contract](PRD-LangChain-Deep-Agents.md#91-tool-contract)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Search run files
+  Given a run with files
+  When search_files is called with a regex, a path prefix, a glob, an output mode and limits within the ceilings
+  Then it returns matches, files or a count from the run's files only, caps each match line at 500 characters, flags truncation, and an uncompilable pattern fails as invalid_pattern
+
+Scenario: Patch exactly or not at all
+  Given a file under outputs/
+  When patch_code_file is called with an absent old_string, or an ambiguous one without replace_all, and then with an exact one
+  Then the first two fail with a typed code and write nothing, and the last returns the new version, sha256 and number of replacements
+
+Scenario: Writes stay under outputs/
+  Given write_code_file or patch_code_file
+  When the path is outside outputs/
+  Then the call is refused with a typed code and nothing is written
+```
+
+Dependencies:
+- US-14.3
+
+Tasks:
+- [ ] Add `search_files`, `read_code_file`, `write_code_file` and `patch_code_file` over the run's files only, in pure Python, with names that never match the SDK's file tools.
+- [ ] Cover the scenarios.
+
+Open Questions:
+- None.
+
+### US-14.12: Goal-driven browsing
+
+Status: BLOCKED
+
+As a goal's owner
+I want a browsing tool that pursues a goal in a browser
+So that a run can use sites that need interaction.
+
+Source:
+- [Autonomous browsing](PRD-Tool-Catalog.md#autonomous-browsing)
+- [Decision 0017, C3 and C4](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
+- [Decision 0017, Q9](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
+- [Tool contract](PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [SP-005](docs/engineering/option-b-contract.md#sp-005--local-services-and-isolation)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Stays disabled until qualified
+  Given no isolated executor and no admitted-model adapter are qualified
+  When the catalog is read or a grant names browse_goal
+  Then browse_goal reads disabled_by_policy with its repair, it isn't registered, and the grant is refused with a typed code
+```
+
+Dependencies:
+- US-14.3
+- US-14.8
+- External: An isolated-executor story, not yet written, is delivered and qualified (Decision 0017 C3).
+- External: An adapter that routes browser-use's model calls through the admitted OpenRouter profiles, not yet written, is delivered and qualified (Decision 0017 C4).
+
+Tasks:
+- [ ] Once both are qualified, define the tool's contract by owner decision, then register it.
+
+Open Questions:
+- What are browse_goal's input and output schemas, step and time limits, and public fields?
+- How does the URL guard apply to in-browser navigation and subresources?
+- Which admitted model profile does it use, and how do its model calls count against the run's budget?
