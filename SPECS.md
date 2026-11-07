@@ -221,7 +221,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-10.1 | Held-out task, policy and performance qualification | DONE | EPIC-10 |
 | US-10.1#1 | Run the held-out behavioral and policy/recovery suites without tuning on held-out data. | DONE | US-10.1 |
 | US-10.1#2 | Publish per-category outcomes, resource measurements and actual latency/cost evidence. | DONE | US-10.1 |
-| US-10.2 | Release traceability and evidence-based completion | BLOCKED | EPIC-10 |
+| US-10.2 | Release traceability and evidence-based completion | READY | EPIC-10 |
 | US-10.2#1 | Review full source-to-story-to-evidence coverage and resolve blocking findings. | TODO | US-10.2 |
 | US-10.2#2 | Publish exercised operating/user procedures and truthful release limitations. | TODO | US-10.2 |
 | EPIC-11 | Installable release readiness | — | — |
@@ -310,11 +310,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-12.7#2 | Cover each path and the secret control with tests on a fake transport. | DONE | US-12.7 |
 | US-12.7#3 | Run it through the product's worker on a disposable stack, with no paid call. | DONE | US-12.7 |
 | US-12.7#4 | Add where to look to the operations runbook, and hand LM-A09's row to US-10.2's record. | DONE | US-12.7 |
-| US-12.8 | Review and Gate 0 after the last decisions | READY | EPIC-12 |
-| US-12.8#1 | Bind the revision's fingerprint, and run the independent review of everything since `05916d5e…`, including the corrected release record. | TODO | US-12.8 |
-| US-12.8#2 | Repeat Gate 0 and the harness runbook on that revision as US-12.3 did, including `qualify_worker_inference.py` by hand. | TODO | US-12.8 |
-| US-12.8#3 | Record a disposition for each finding, and publish evidence that `scripts/evidence.py` validates. | TODO | US-12.8 |
-| US-12.8#4 | Mark US-12.3's summary void, mark the hook behavior not qualified, and hand the fingerprint to US-10.2. | TODO | US-12.8 |
+| US-12.8 | Review and Gate 0 after the last decisions | DONE | EPIC-12 |
+| US-12.8#1 | Bind the revision's fingerprint, and run the independent review of everything since `05916d5e…`, including the corrected release record. | DONE | US-12.8 |
+| US-12.8#2 | Repeat Gate 0 and the harness runbook on that revision as US-12.3 did, including `qualify_worker_inference.py` by hand. | DONE | US-12.8 |
+| US-12.8#3 | Record a disposition for each finding, and publish evidence that `scripts/evidence.py` validates. | DONE | US-12.8 |
+| US-12.8#4 | Mark US-12.3's summary void, mark the hook behavior not qualified, and hand the fingerprint to US-10.2. | DONE | US-12.8 |
 | EPIC-13 | After release | — | — |
 | US-13.1 | Requester, scope snapshot and policy version on an approval request | BLOCKED | EPIC-13 |
 | US-13.1#1 | Persist the three fields with the approval request, by migration. | TODO | US-13.1 |
@@ -2972,7 +2972,7 @@ Open Questions:
 
 ### US-10.2: Release traceability and evidence-based completion
 
-Status: BLOCKED
+Status: READY
 
 As a product owner
 I want a complete requirement-to-evidence record
@@ -4203,7 +4203,8 @@ Open Questions:
 
 ### US-12.8: Review and Gate 0 after the last decisions
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-06-us-12-8-review-gate-0-last-decisions/`
 
 As an owner
 I want an independent review of what changed since US-12.3's binding, and Gate 0 repeated on that revision
@@ -4276,10 +4277,10 @@ Dependencies:
 - US-12.7
 
 Tasks:
-- [ ] Bind the revision's fingerprint, and run the independent review of everything since `05916d5e…`, including the corrected release record.
-- [ ] Repeat Gate 0 and the harness runbook on that revision as US-12.3 did, including `qualify_worker_inference.py` by hand.
-- [ ] Record a disposition for each finding, and publish evidence that `scripts/evidence.py` validates.
-- [ ] Mark US-12.3's summary void, mark the hook behavior not qualified, and hand the fingerprint to US-10.2.
+- [x] Bind the revision's fingerprint, and run the independent review of everything since `05916d5e…`, including the corrected release record.
+- [x] Repeat Gate 0 and the harness runbook on that revision as US-12.3 did, including `qualify_worker_inference.py` by hand.
+- [x] Record a disposition for each finding, and publish evidence that `scripts/evidence.py` validates.
+- [x] Mark US-12.3's summary void, mark the hook behavior not qualified, and hand the fingerprint to US-10.2.
 
 Open Questions:
 - None.

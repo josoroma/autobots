@@ -78,7 +78,7 @@ from autobots.application.worker_inference import (
 from autobots.application.worker_leases import Lease
 from autobots.domain.models import MAX_OUTPUT_TOKENS, PROFILES, ModelProfileId, UnknownModelProfile
 from autobots.operations import worker
-from autobots.operations.logs import JsonFormatter
+from autobots.operations.logs import JsonFormatter, redact
 from fake_openrouter import ARRANGED_KEY, DEEPSEEK_WIRE_ID, TERRA_WIRE_ID
 
 NOW = datetime.now(UTC)
@@ -576,10 +576,13 @@ def test_an_uncertain_calls_log_names_types_and_status_and_no_reply_text() -> No
 
     with pytest.raises(openrouter.errors.ResponseValidationError) as caught:
         invoke(model_over(handle))
+    # In what the exception holds, its body. Its `str()` embeds a shortened validation error.
     assert text in repr(caught.value)
+    assert redact(text) == text
     line = json.loads(_logged(caught.value))
     assert line["status"] == 200
     assert line["error_type"].endswith(".ResponseValidationError")
+    assert line["cause_type"].endswith("ValidationError")
     assert text not in json.dumps(line)
 
 
@@ -592,12 +595,38 @@ def test_an_exceptions_cause_is_named_and_neither_message_is_kept() -> None:
             raise RuntimeError(sentinel) from cause
     except RuntimeError as error:
         assert sentinel in str(error) and sentinel in str(error.__cause__)
+        assert redact(sentinel) == sentinel
         written = _logged(error)
     line = json.loads(written)
     assert line["error_type"] == "builtins.RuntimeError"
     assert line["cause_type"] == "builtins.ValueError"
     assert "status" not in line
     assert sentinel not in written
+
+
+def test_an_exception_raised_while_handling_another_names_that_one() -> None:
+    try:
+        try:
+            raise ValueError("arranged")
+        except ValueError:
+            raise RuntimeError("arranged")  # noqa: B904
+    except RuntimeError as error:
+        assert uncertain_call_fields(error)["cause_type"] == "builtins.ValueError"
+
+
+def test_a_cause_set_outside_any_handler_is_named() -> None:
+    # `__context__` is empty here, so reading only that would lose the cause.
+    error = RuntimeError("arranged")
+    error.__cause__ = ValueError("arranged")
+    assert error.__context__ is None
+    assert uncertain_call_fields(error)["cause_type"] == "builtins.ValueError"
+
+
+def test_a_status_that_is_no_number_isnt_reported_as_one() -> None:
+    class Odd(Exception):
+        status_code = "504"
+
+    assert uncertain_call_fields(Odd("arranged")).get("status") is None
 
 
 def test_a_partial_streams_output_stays_out_of_its_fields() -> None:

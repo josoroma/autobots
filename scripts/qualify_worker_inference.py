@@ -341,16 +341,19 @@ def qualify(root: Path) -> int:
 
         events = why(malformed)
         cases.check('the worker log says why, with a status', 'one event, status 200, ResponseValidationError', events,
-                    len(events) == 1 and events[0].get('status') == 200 and events[0].get('error_type', '').endswith('.ResponseValidationError') and events[0].get('invocation'))
+                    len(events) == 1 and events[0].get('status') == 200 and events[0].get('error_type', '').endswith('.ResponseValidationError')
+                    and events[0].get('invocation', '').startswith(ops.sql(f"select id::text from app_private.model_invocations where run_id = '{malformed}' and status = 'uncertain';")[:8] or 'none'))
         code, reply = resume(token_a, malformed)
         cases.check('it cannot resume until reconciled', '409 uncertain_model_call', f'{code} {reply[:80]}', code == 409 and 'uncertain_model_call' in reply)
 
-        # A connection dropped mid-reply, through the real SDK: no status, and it may have been charged.
+        # A connection dropped before a reply, under the real SDK: no status, and it may have been charged.
         dropped = admit(workspace_a, 'dropped')
         paused = settled(dropped, 'paused')
         events = why(dropped)
-        cases.check('a dropped reply pauses, and the worker log says why, with no status', 'paused, uncertain_acceptance, one event with no status', f'{status(dropped)}, {stop_reason(dropped)}, {events}',
-                    paused and stop_reason(dropped) == 'uncertain_acceptance' and len(events) == 1 and 'status' not in events[0] and events[0].get('error_type'))
+        cases.check('a connection dropped before a reply pauses, with its reservation held, and the worker log says why', f'paused, uncertain_acceptance, 1 request, uncertain at {DEEPSEEK_WORST}, one event with no status',
+                    f'{status(dropped)}, {stop_reason(dropped)}, {len(sent("dropped"))}, {invocations(dropped)}, {events}',
+                    paused and stop_reason(dropped) == 'uncertain_acceptance' and len(sent('dropped')) == 1 and f'/uncertain/uncertain_acceptance/2/{DEEPSEEK_WORST}/-' in invocations(dropped)
+                    and len(events) == 1 and 'status' not in events[0] and events[0].get('error_type') == 'httpx.RemoteProtocolError')
 
         # Cut off twice: the one repair runs out, and the ledger shows why the run stopped.
         cutoff = admit(workspace_a, 'cutoff')
@@ -373,7 +376,9 @@ def qualify(root: Path) -> int:
         cases.check('a refused attempt releases its reservation', 'failed_before_acceptance, charged 0', ledger, ledger.endswith('/0') and 'failed_before_acceptance/rate_limited' in ledger)
 
         # Each workspace's runs used only that workspace's keys, across every run that sent anything.
-        used_a = {call['key'] for tag in ('happy', 'other', 'rotated', 'malformed', 'limited') for call in sent(tag)}
+        quiet = {tag: why(run_id) for tag, run_id in (('missing', missing), ('rejected', rejected), ('limited', limited))}
+        cases.check('a failure that is known logs no uncertain event', 'none for a missing key, a rejected key or a rate limit', quiet, not any(quiet.values()))
+        used_a = {call['key'] for tag in ('happy', 'other', 'rotated', 'malformed', 'dropped', 'limited') for call in sent(tag)}
         used_b = {call['key'] for tag in ('missing', 'rejected') for call in sent(tag)}
         cases.check("one workspace's key never served another's run", 'A used its two keys, B its two', f'{len(used_a)} and {len(used_b)} keys',
                     used_a == {key_id(KEY_ONE), key_id(KEY_TWO)} and used_b == {key_id(KEY_B), key_id(KEY_REJECTED)})
@@ -422,7 +427,7 @@ def qualify(root: Path) -> int:
         cases.check('the second worker stops cleanly too', 'exit 0', exited(second, 40), second.returncode == 0)
 
         # Across every run and process: nothing durable or logged holds a key, and nothing left loopback.
-        runs = "'" + "','".join((happy, other, rotated, missing, rejected, malformed, limited, cancelling, verifying, unreadable)) + "'"
+        runs = "'" + "','".join((happy, other, rotated, missing, rejected, malformed, dropped, limited, cancelling, verifying, unreadable)) + "'"
         blobs = ops.sql(f"select (select count(*) from agent_runtime.checkpoint_blobs where thread_id in ({runs})) || '/' || "
                         f"(select count(*) from agent_runtime.checkpoint_blobs where thread_id in ({runs}) and encode(blob, 'escape') like '%arranged-%') || '/' || "
                         f"(select count(*) from agent_runtime.checkpoint_writes where thread_id in ({runs}) and encode(blob, 'escape') like '%arranged-%');")
@@ -435,6 +440,7 @@ def qualify(root: Path) -> int:
         planted = [key for key in (KEY_ONE, KEY_TWO, KEY_B, KEY_REJECTED, stack.runtime_password, service) if key in written]
         cases.check('no process log holds a key', 'none', len(planted), not planted)
         cases.check('no process log holds a reply text that reached an exception', 'none', 'arranged-reply-text-7f3a' in written, 'arranged-reply-text-7f3a' not in written)
+        cases.check('no process log holds a request', 'no goal text', 'Write the report [' in written, 'Write the report [' not in written)
         cases.check('no process log holds reasoning metadata', 'none', 'ARRANGED-REASONING-MARKER' in written, 'ARRANGED-REASONING-MARKER' not in written)
         cases.check('no step failed in either worker', 'no worker.step_failed', 'worker.step_failed' in written, 'worker.step_failed' not in written)
         stable = fingerprint(root)

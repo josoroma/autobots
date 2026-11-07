@@ -25,6 +25,12 @@ Checks: `fast` exit 0, `db` exit 0, with identity at 445 cases and `app_db` at 4
 - **`charge_not_reported`, `cancelled_after_dispatch` and a call left by a cut drain don't take these paths,** so they get no event. The runbook's text is in the `uncertain_acceptance` row only.
 - **Other uncertain statuses:** a 408 or 524 goes down the same path as the 504 case, and wasn't run separately.
 
+## Corrected by US-12.8's review
+
+- **Keep a secret out of the log:** the reply's text is in the exception's body, shown by `repr`. Its `str()` embeds a shortened validation error, which isn't asserted. Request text was absent only by the field allow-list when this was first scored, and the qualifier now checks a goal's text too.
+- **A dropped connection is before any reply,** at the fake transport, not mid-body.
+- **Added tests for gaps the review found:** a known failure logs no event at either call site, an invocation matches its ledger row, a cause and a context each on their own, a status that's no number, through the real loop, and redaction leaving the sentinels alone.
+
 ## Not exercised
 
 Nothing live. This doesn't explain US-12.4's round 1, which it can't reach, and the event hasn't yet caught a real pause.

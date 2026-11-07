@@ -23,6 +23,11 @@ IDs stay, and each requirement's text is edited to match.
 
 - **LM-07 and LM-A04:** a restart means this project's containers. A restart of Docker itself or of the Mac is a stated limit.
 
+Recorded by the delivery session, and not chosen by the owner:
+
+- **Older text:** `PRD-Comparison-Recommendation.md` still says Docker restart. It's the rationale for Option B, and it reads under this decision without being rewritten.
+- **Not revised:** PRD 13.1's stability target. It isn't met or changed, and the pause stays a stated limit against it.
+
 ## What this gives up
 
 - **A person can still be asked to rule on a charge that may not exist.** They'd find the cause in a log, not on the screen.

@@ -35,7 +35,7 @@ from autobots.application.worker_leases import claim_next  # noqa: E402
 from autobots.contracts.plans import InputDocument, RequiredArtifact  # noqa: E402
 from autobots.domain.models import resolve_role_policy  # noqa: E402
 from autobots.domain.runs import Actor, RunCommand  # noqa: E402
-from autobots.operations.logs import JsonFormatter  # noqa: E402
+from autobots.operations.logs import JsonFormatter, redact  # noqa: E402
 
 URL, BASE = os.environ['AUTOBOTS_DATABASE_URL'], os.environ['AUTOBOTS_STORAGE_BASE']
 SERVICE = SecretStr(os.environ['AUTOBOTS_STORAGE_SERVICE'])
@@ -312,19 +312,39 @@ async def main() -> None:
         def partial() -> AIMessage:
             raise ProviderFailure(FailureClass.PARTIAL_STREAM, accumulated_output=sentinel)
 
+        class OddStatus(Exception):
+            status_code = '504'
+
+        def odd_status() -> AIMessage:
+            raise OddStatus(sentinel)
+
+        def known() -> AIMessage:
+            raise ProviderFailure(FailureClass.INVALID_CREDENTIAL)
+
         for name, item, wanted in (('no status, with a cause', with_cause, {'error_type': 'builtins.RuntimeError', 'cause_type': 'builtins.ValueError', 'failure': 'uncertain_acceptance'}),
                                    ('a status', with_status, {'status': 504, 'failure': 'uncertain_acceptance'}),
-                                   ('a partial stream, arranged, as nothing raises one today', partial, {'error_type': 'autobots.application.model_attempts.ProviderFailure', 'failure': 'partial_stream'})):
+                                   ('a partial stream, arranged, as nothing raises one today', partial, {'error_type': 'autobots.application.model_attempts.ProviderFailure', 'failure': 'partial_stream'}),
+                                   ('a status that is no number, so none is reported', odd_status, {'status': None, 'failure': 'uncertain_acceptance'})):
             seen = len(uncertain_events())
             run = await admit()
             lease = await claim_next(db, worker_id='named', lease_seconds=120)
             result = await run_goal(db, URL, lease, Script(items=[item], seen=[], bound=[]), LoopConfig(route=ROUTE))
             event = one_new(seen, run)
+            row = await (await db.execute("select id::text from app_private.model_invocations where run_id = %s and status = 'uncertain'", (run,))).fetchone()
             check(f'the log names the exception: {name}', str(wanted), (result.code, event),
-                  event is not None and all(event.get(key) == value for key, value in wanted.items()) and result.run_status == 'paused')
+                  event is not None and all(event.get(key) == value for key, value in wanted.items()) and result.run_status == 'paused'
+                  and row is not None and event['invocation'].startswith(row[0][:8]))
+
+        # A failure that is known, from inside the handler: it was never sent, so nothing is uncertain.
+        seen = len(uncertain_events())
+        run = await admit()
+        lease = await claim_next(db, worker_id='known', lease_seconds=120)
+        result = await run_goal(db, URL, lease, Script(items=[known], seen=[], bound=[]), LoopConfig(route=ROUTE))
+        check('a known failure from inside the call logs no uncertain event', 'invalid_credential, paused, no new event', (result.code, result.run_status, len(uncertain_events()) - seen),
+              result.code == 'invalid_credential' and result.run_status == 'paused' and len(uncertain_events()) == seen)
         logging.getLogger('autobots.worker').removeHandler(capture)
-        check('no exception message, cause or partial output reached the log', 'absent, with 5 events read', (len(uncertain_events()), sentinel in written.getvalue()),
-              len(uncertain_events()) == 5 and sentinel not in written.getvalue())
+        check('no exception message, cause or partial output reached the log', 'absent, with 6 events read, and redaction leaves the sentinel alone', (len(uncertain_events()), sentinel in written.getvalue()),
+              len(uncertain_events()) == 6 and sentinel not in written.getvalue() and redact(sentinel) == sentinel)
 
         # Documents given at admission are read-only.
         document = InputDocument(path='inputs/data.md', content='apples: 4')

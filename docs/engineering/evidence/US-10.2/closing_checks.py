@@ -46,6 +46,11 @@ def bodies_of(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
 
 
+def held(ops: Ops, run_id: str) -> str:
+    return ops.sql("select coalesce(sum(reserved_micro_usd) filter (where status in ('reserved', 'dispatched', 'uncertain') and reconciled_at is null), 0) "
+                   f"from app_private.model_invocations where root_run_id = '{run_id}' or run_id = '{run_id}';")
+
+
 def start_run(port: int, internal: str, token: str, goal: str) -> str:
     code, reply = api_call(port, internal, token, 'POST', '/v1/runs', json.dumps({'goal_text': goal, 'limit_micro_usd': LIMIT}).encode(),
                            {'Idempotency-Key': secrets.token_hex(8)})
@@ -80,11 +85,13 @@ def cancel_while_running(ops: Ops, port: int, token: str, bodies: Path) -> dict:
         samples.append({'number': number, 'cancelled_during_call': target, 'answer': code, 'answered_status': json.loads(reply).get('status') if code < 300 else None,
                         'acknowledged_ms': round(seconds * 1000, 1), 'final': final, 'settled': settled,
                         'calls_sent_after_the_answer': sum(at > acknowledged_at for at in sent), 'calls_sent': len(sent),
-                        'reserved_after': ops.sql(f"select reserved_micro_usd from public.runs where id = '{run_id}';")})
+                        'reserved_after': held(ops, run_id),
+                        'stop_reason': ops.sql(f"select stop_reason from app_private.run_usage where run_id = '{run_id}';")})
         if seconds >= 1:
             problems.append(f'run {number}: acknowledged in {seconds:.3f} s')
-        if samples[-1]['reserved_after'] != '0':
-            problems.append(f"run {number}: {samples[-1]['reserved_after']!r} still reserved")
+        # The product's own figure. A call the cancel interrupted may have been charged, so it stays held.
+        if samples[-1]['reserved_after'] == '0':
+            problems.append(f'run {number}: a call in flight was cancelled, and nothing stayed reserved for it')
         if final != 'cancelled':
             problems.append(f'run {number}: ended {final}')
         if samples[-1]['calls_sent_after_the_answer']:

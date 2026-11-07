@@ -1,7 +1,7 @@
 {
   "schema_version": "autobots.us-10-2-closing-checks/v1",
-  "started_at_utc": "2026-11-07T00:46:43.050571+00:00",
-  "source_fingerprint": "05916d5ebab063469b0f9905a2a5d5a6160dbaaef07e3da5e49eb7cefd8249f4",
+  "started_at_utc": "2026-11-07T02:21:53.165831+00:00",
+  "source_fingerprint": "51212ae1cb91c6150d2579be6ad91107251876741ddc3322ffbb73b6bf61b1e0",
   "target_class": "disposable",
   "model_transport": "fake transport under the real SDK",
   "spending": "none",
@@ -13,8 +13,8 @@
     "a cut between the browser and the web app"
   ],
   "stream_cut": {
-    "run_id": "21806afa-e713-4a0c-99d2-c9ea6007fb54",
-    "cuts_with_events_still_to_come": 5,
+    "run_id": "4e8f4f3b-14d3-4bde-ab25-2d459c82747b",
+    "cuts_with_events_still_to_come": 4,
     "events_delivered": 5,
     "events_stored": 5,
     "in_order_no_gap_no_duplicate": true,
@@ -28,36 +28,39 @@
         "cancelled_during_call": 1,
         "answer": 200,
         "answered_status": "cancelling",
-        "acknowledged_ms": 11.2,
+        "acknowledged_ms": 10.3,
         "final": "cancelled",
         "settled": true,
         "calls_sent_after_the_answer": 0,
         "calls_sent": 1,
-        "reserved_after": "0"
+        "reserved_after": "34560",
+        "stop_reason": "cancelled_with_unknown_outcomes"
       },
       {
         "number": 1,
         "cancelled_during_call": 2,
         "answer": 200,
         "answered_status": "cancelling",
-        "acknowledged_ms": 8.8,
+        "acknowledged_ms": 10.6,
         "final": "cancelled",
         "settled": true,
         "calls_sent_after_the_answer": 0,
         "calls_sent": 2,
-        "reserved_after": "0"
+        "reserved_after": "34560",
+        "stop_reason": "cancelled_with_unknown_outcomes"
       },
       {
         "number": 2,
         "cancelled_during_call": 3,
         "answer": 200,
         "answered_status": "cancelling",
-        "acknowledged_ms": 9.3,
+        "acknowledged_ms": 10.0,
         "final": "cancelled",
         "settled": true,
         "calls_sent_after_the_answer": 0,
         "calls_sent": 3,
-        "reserved_after": "0"
+        "reserved_after": "34560",
+        "stop_reason": "cancelled_with_unknown_outcomes"
       },
       {
         "number": 3,
@@ -69,79 +72,86 @@
         "settled": true,
         "calls_sent_after_the_answer": 0,
         "calls_sent": 1,
-        "reserved_after": "0"
+        "reserved_after": "34560",
+        "stop_reason": "cancelled_with_unknown_outcomes"
       },
       {
         "number": 4,
         "cancelled_during_call": 2,
         "answer": 200,
         "answered_status": "cancelling",
-        "acknowledged_ms": 11.2,
+        "acknowledged_ms": 12.7,
         "final": "cancelled",
         "settled": true,
         "calls_sent_after_the_answer": 0,
         "calls_sent": 2,
-        "reserved_after": "0"
+        "reserved_after": "34560",
+        "stop_reason": "cancelled_with_unknown_outcomes"
       },
       {
         "number": 5,
         "cancelled_during_call": 3,
         "answer": 200,
         "answered_status": "cancelling",
-        "acknowledged_ms": 12.1,
+        "acknowledged_ms": 13.5,
         "final": "cancelled",
         "settled": true,
         "calls_sent_after_the_answer": 0,
         "calls_sent": 3,
-        "reserved_after": "0"
+        "reserved_after": "34560",
+        "stop_reason": "cancelled_with_unknown_outcomes"
       },
       {
         "number": 6,
         "cancelled_during_call": 1,
         "answer": 200,
         "answered_status": "cancelling",
-        "acknowledged_ms": 9.4,
+        "acknowledged_ms": 12.7,
         "final": "cancelled",
         "settled": true,
         "calls_sent_after_the_answer": 0,
         "calls_sent": 1,
-        "reserved_after": "0"
+        "reserved_after": "34560",
+        "stop_reason": "cancelled_with_unknown_outcomes"
       },
       {
         "number": 7,
         "cancelled_during_call": 2,
         "answer": 200,
         "answered_status": "cancelling",
-        "acknowledged_ms": 9.7,
+        "acknowledged_ms": 10.1,
         "final": "cancelled",
         "settled": true,
         "calls_sent_after_the_answer": 0,
         "calls_sent": 2,
-        "reserved_after": "0"
+        "reserved_after": "34560",
+        "stop_reason": "cancelled_with_unknown_outcomes"
       },
       {
         "number": 8,
         "cancelled_during_call": 3,
         "answer": 200,
         "answered_status": "cancelling",
-        "acknowledged_ms": 9.1,
+        "acknowledged_ms": 10.2,
         "final": "cancelled",
         "settled": true,
         "calls_sent_after_the_answer": 0,
         "calls_sent": 3,
-        "reserved_after": "0"
+        "reserved_after": "34560",
+        "stop_reason": "cancelled_with_unknown_outcomes"
       },
       {
         "number": 9,
         "cancelled_during_call": 1,
         "answer": 200,
         "answered_status": "cancelling",
-        "acknowledged_ms": 10.4,
+        "acknowledged_ms": 9.7,
         "final": "cancelled",
         "settled": true,
         "calls_sent_after_the_answer": 0,
         "calls_sent": 1,
-        "reserved_after": "0"
+        "reserved_after": "34560",
+        "stop_reason": "cancelled_with_unknown_outcomes"
       },
       {
         "number": 10,
@@ -153,23 +163,25 @@
         "settled": true,
         "calls_sent_after_the_answer": 0,
         "calls_sent": 2,
-        "reserved_after": "0"
+        "reserved_after": "34560",
+        "stop_reason": "cancelled_with_unknown_outcomes"
       },
       {
         "number": 11,
         "cancelled_during_call": 3,
         "answer": 200,
         "answered_status": "cancelling",
-        "acknowledged_ms": 10.1,
+        "acknowledged_ms": 11.5,
         "final": "cancelled",
         "settled": true,
         "calls_sent_after_the_answer": 0,
         "calls_sent": 3,
-        "reserved_after": "0"
+        "reserved_after": "34560",
+        "stop_reason": "cancelled_with_unknown_outcomes"
       }
     ],
-    "most_ms": 12.1,
-    "median_ms": 10.1,
+    "most_ms": 13.5,
+    "median_ms": 10.4,
     "problems": []
   },
   "worker_exit": 0,
@@ -179,9 +191,9 @@
       "prompts_sent": 148440,
       "request_headers_without_authorization": 7540,
       "events": 4200,
-      "application_rows": 244024,
+      "application_rows": 243976,
       "stored_objects": 8704,
-      "logs": 884
+      "logs": 4604
     },
     "secrets_checked": [
       "dashboard_password",
@@ -275,7 +287,7 @@
   },
   "left_behind": "none",
   "other_docker_unchanged": true,
-  "finished_at_utc": "2026-11-07T00:48:44.891766+00:00",
+  "finished_at_utc": "2026-11-07T02:23:56.046858+00:00",
   "problems": [],
   "verdict": "held"
 }

@@ -2,6 +2,8 @@
 
 The final review of EPIC-12 and the repeated Gate 0, on 2026-11-06. Manifest: [gate-0.json](gate-0.json). Raw reports are in ignored `.checks`, and the results here stand without them.
 
+**Replaced by [US-12.8's Gate 0](../US-12.8/summary.md).** Decision 0014 and US-12.7 voided this binding, so this describes its own fingerprint only.
+
 **Result:** every portable gate below has passing evidence at its stated level, and DH-A03 stays partial by Decision 0012. **Nothing here is live, no real model call was made, and the real install wasn't touched.** This leaves H1 and product acceptance to US-10.2, and establishes neither. Later source changes void this binding, as `scripts/evidence.py` decides, which leaves out `SPECS.md`, `CODEBASE.md` and evidence as records.
 
 **The H0 and H1 baseline:** US-1.3 to US-1.7 have no DH-W record, under Decision 0003. This record carries their baseline, as H1.3 now allows by [Decision 0013](../../decisions/0013-release-closure.md).
