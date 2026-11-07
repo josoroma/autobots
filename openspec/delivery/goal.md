@@ -7,7 +7,7 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-14.12 |
+| Target | US-14.16 |
 | Kind | story |
 | Focus | - |
 | Status | COMPLETE |
@@ -19,7 +19,7 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-14.12 | us-14-12-goal-driven-browsing | DONE | Goal-driven browsing |
+| 1 | US-14.16 | us-14-16-live-browse-trial-sol | DONE | Live browse trial with Sol |
 
 ## Next Action
 

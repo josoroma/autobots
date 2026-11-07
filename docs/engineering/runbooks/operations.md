@@ -131,6 +131,14 @@ python3.12 scripts/qualify_browse_goal.py
 
 It writes `.checks/browse-goal/check.json`. It's in no verification profile, for the same reason as the executor's.
 
+The one live trial with a real model (US-14.16, [Decision 0019](../decisions/0019-sol-profile-and-browser-use.md) S6) ran on 2026-11-07. It browsed from `https://example.com/` within `example.com` and `iana.org` on Sol, under a US$1 run budget. The trial's own process read only `OPENROUTER_API_KEY` from the key file:
+
+```sh
+python3.12 scripts/browse_trial.py --key-file .env
+```
+
+Its record is `.checks/browse-trial/result.json`. Started again, it refuses before anything starts. A repeat needs the owner's request, given as `--owner-requested-repeat`.
+
 ## The GitHub issue connector
 
 The first consequential connector, by [Decision 0007](../decisions/0007-first-connector-github-issues.md). It creates an issue in one repository and does nothing else. An owner grants it per Expert, goals without an Expert don't get it, and each call waits for a person's approval.

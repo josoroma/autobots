@@ -407,9 +407,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.15#4 | List Sol in Settings as approved with its offering state, qualification and limits, and in every picker once it's offered. | DONE | US-14.15 |
 | US-14.15#5 | Run Sol's live route qualification once within the cap, and record it. | DONE | US-14.15 |
 | US-14.15#6 | Cover the refusal, resolution, frozen-run and removal scenarios offline and on a disposable stack with a fake transport. | DONE | US-14.15 |
-| US-14.16 | Live browse trial with Sol | READY | EPIC-14 |
-| US-14.16#1 | Add the trial runner, in no verification profile, reading the owner's key file in its own process and refusing a repeat without the owner's request. | TODO | US-14.16 |
-| US-14.16#2 | Run the trial once and record the redacted evidence: the summary's label, visited URLs, model calls, receipts, spend and the hosts the proxy connected to. | TODO | US-14.16 |
+| US-14.16 | Live browse trial with Sol | DONE | EPIC-14 |
+| US-14.16#1 | Add the trial runner, in no verification profile, reading the owner's key file in its own process and refusing a repeat without the owner's request. | DONE | US-14.16 |
+| US-14.16#2 | Run the trial once and record the redacted evidence: the summary's label, visited URLs, model calls, receipts, spend and the hosts the proxy connected to. | DONE | US-14.16 |
 
 ## Dependency Diagram
 
@@ -5407,7 +5407,8 @@ Open Questions:
 
 ### US-14.16: Live browse trial with Sol
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-14-16-live-browse-trial-sol/`
 
 As a workspace owner
 I want one capped live browse with a real model
@@ -5442,8 +5443,8 @@ Dependencies:
 - US-14.15
 
 Tasks:
-- [ ] Add the trial runner, in no verification profile, reading the owner's key file in its own process and refusing a repeat without the owner's request.
-- [ ] Run the trial once and record the redacted evidence: the summary's label, visited URLs, model calls, receipts, spend and the hosts the proxy connected to.
+- [x] Add the trial runner, in no verification profile, reading the owner's key file in its own process and refusing a repeat without the owner's request.
+- [x] Run the trial once and record the redacted evidence: the summary's label, visited URLs, model calls, receipts, spend and the hosts the proxy connected to.
 
 Open Questions:
 - None.
