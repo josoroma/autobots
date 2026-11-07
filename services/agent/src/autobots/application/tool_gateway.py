@@ -275,7 +275,11 @@ class ToolGateway:
         use = await begin_use(connection, scope, self.registry, name, arguments)
         result = await self._dispatch(connection, scope, name, arguments, use)
         if use is not None:
-            await complete_use(connection, scope, self.registry, use, name, result)
+            # A call now waiting for a person released the lease in its own approval gate.
+            waiting = result.code == "approval_pending"
+            await complete_use(
+                connection, scope, self.registry, use, name, result, fenced=not waiting
+            )
         return result
 
     async def _dispatch(

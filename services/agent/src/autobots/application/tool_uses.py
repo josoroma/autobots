@@ -186,8 +186,13 @@ async def complete_use(
     use_id: int,
     name: str,
     result: ToolResult,
+    fenced: bool = True,
 ) -> None:
-    """The outcome, by database time, with a completed event. A lost lease leaves it open."""
+    """The outcome, by database time, with a completed event. A lost lease leaves it open.
+
+    `fenced=False` is for the one case where this worker released the lease itself: a call that
+    now waits for a person. Only this generation's own open row can still be completed.
+    """
     version = scope.tools.get(name)
     tool = registry.get(name, version) if version is not None else None
     output = result.output
@@ -197,7 +202,8 @@ async def complete_use(
     output_bytes = len(json.dumps(output).encode()) if output is not None else None
     try:
         async with connection.transaction():
-            await hold_lease(connection, scope)
+            if fenced:
+                await hold_lease(connection, scope)
             cursor = await connection.execute(
                 "update app_private.tool_uses set outcome = %s, code = %s, "
                 "finished_at = clock_timestamp(), output_public = %s, output_bytes = %s, "

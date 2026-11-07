@@ -105,6 +105,10 @@ async def main() -> None:
         # Approval first, then exactly one effect, and a repeat comes from the receipt.
         pending = await gateway.execute(db, scope, TOOL_ID, issue('first'))
         check('a call waits for approval, with nothing sent', 'approval_pending, 0 requests', (pending.code, len(github.posts)), pending.code == 'approval_pending' and not github.posts)
+        waiting = await (await db.execute("select outcome, code, finished_at is not null from app_private.tool_uses where run_id = %s order by sequence_in_run desc limit 1", (run,))).fetchone()
+        completed = await value("select count(*) from public.run_events where run_id = %s and payload->>'type' = 'tool.use.completed' and payload->>'code' = 'approval_pending'", run)
+        check('the waiting call is recorded as finished, denied approval_pending, with its completed event', "('denied', 'approval_pending', True), 1 event",
+              (waiting, completed), waiting == ('denied', 'approval_pending', True) and completed == 1)
         await approve(run)
         scope = await resumed(run)
         done = await gateway.execute(db, scope, TOOL_ID, issue('first'))
