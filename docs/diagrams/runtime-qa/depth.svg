@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="600" viewBox="0 0 960 600" role="img" aria-labelledby="depth-title depth-desc" id="depth-root"><title id="depth-title">Depth counts delegation edges</title><desc id="depth-desc">A coordinator root can delegate to specialists at depth one, which can delegate to grandchildren at depth two. Grandchildren cannot delegate. This is a possible tree accumulated over time, not simultaneous execution: no more than two assignments may be open and there are at most four total descendants. Every run shares the root budgets.</desc><defs>
+      <style>#depth-root { --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.488 0.243 264.376);
+  --primary-foreground: oklch(0.97 0.014 254.604);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.845 0.143 164.978);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.596 0.145 163.225);
+  --chart-4: oklch(0.508 0.118 165.612);
+  --chart-5: oklch(0.432 0.095 166.913);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.546 0.245 262.881);
+  --sidebar-primary-foreground: oklch(0.97 0.014 254.604);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0); }
+      #depth-root { --paper:var(--background); --ink:var(--foreground); --soft:var(--muted-foreground); --focus:var(--primary); --font-sans:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; --font-mono:ui-monospace,"SFMono-Regular",Consolas,monospace; --font-serif:Georgia,"Times New Roman",serif; }
+      #depth-root { color: var(--ink); font-family: var(--font-sans); }
+      #depth-root .diagram-container { width:100%; overflow-x:auto; }
+      #depth-root .paper { fill:var(--paper); }
+      #depth-root .node { fill:var(--paper); stroke:var(--soft); stroke-width:1; }
+      #depth-root .focal { fill:var(--primary-foreground); stroke:var(--focus); stroke-width:1.5; }
+      #depth-root .node-name { font-family:var(--font-sans); font-size:12px; font-weight:600; fill:var(--ink); text-anchor:middle; }
+      #depth-root .sub { font-family:var(--font-mono); font-size:9px; fill:var(--soft); text-anchor:middle; }
+      #depth-root .focal-sub { fill:var(--ink); }
+      #depth-root .heading { font-family:var(--font-serif); font-size:28px; fill:var(--ink); }
+      #depth-root .svg-eyebrow { font-family:var(--font-mono); font-size:8px; letter-spacing:1.2px; fill:var(--soft); }
+      #depth-root .note { font-family:var(--font-sans); font-size:11px; fill:var(--soft); }
+      #depth-root .label { font-family:var(--font-mono); font-size:8px; fill:var(--soft); text-anchor:middle; }
+      #depth-root .edge { fill:none; stroke:var(--soft); stroke-width:1; }
+      #depth-root .accent-edge { fill:none; stroke:var(--focus); stroke-width:1.5; }
+      #depth-root .lifeline { fill:none; stroke:var(--border); stroke-width:1; stroke-dasharray:4 4; }
+      #depth-root .return { stroke-dasharray:5 4; }
+      #depth-root .rule { stroke:var(--border); stroke-width:1; }
+      @media print {
+#depth-root .diagram-container { overflow-x:visible; }
+}</style><marker id="depth-depth-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--soft)"/></marker><marker id="depth-depth-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--focus)"/></marker><marker id="depth-depth-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--focus)"/></marker></defs><rect width="960" height="600" class="paper"/><text x="40" y="28" class="svg-eyebrow">AUTOBOTS / RUNTIME Q&amp;A</text><text x="40" y="64" class="heading">Depth counts delegation edges</text><text x="40" y="88" class="note">Root 0 → child 1 → grandchild 2. Depth does not count model/tool cycles.</text><path d="M 448 192 V 216 Q 448 224 440 224 H 296 Q 288 224 288 232 V 264" class="edge" marker-end="url(#depth-depth-arrow)"/><path d="M 512 192 V 232 Q 512 240 520 240 H 664 Q 672 240 672 248 V 264" class="edge" marker-end="url(#depth-depth-arrow)"/><path d="M 256 328 V 344 Q 256 352 248 352 H 200 Q 192 352 192 360 V 400" class="edge" marker-end="url(#depth-depth-arrow)"/><path d="M 320 328 V 368 Q 320 376 328 376 H 376 Q 384 376 384 384 V 400" class="edge" marker-end="url(#depth-depth-arrow)"/><rect x="392" y="128" width="176" height="64" rx="6" class="focal"/><text x="480" y="155" class="node-name">Root run</text><text x="480" y="173" class="sub focal-sub">depth 0</text><rect x="200" y="264" width="176" height="64" rx="6" class="node"/><text x="288" y="291" class="node-name">Specialist A</text><text x="288" y="309" class="sub">depth 1 · may delegate</text><rect x="584" y="264" width="176" height="64" rx="6" class="node"/><text x="672" y="291" class="node-name">Specialist B</text><text x="672" y="309" class="sub">depth 1 · may delegate</text><rect x="104" y="400" width="176" height="64" rx="6" class="node"/><text x="192" y="427" class="node-name">Specialist A1</text><text x="192" y="445" class="sub">depth 2 · no delegation</text><rect x="296" y="400" width="176" height="64" rx="6" class="node"/><text x="384" y="427" class="node-name">Specialist A2</text><text x="384" y="445" class="sub">depth 2 · no delegation</text><text x="584" y="412" class="note">Four descendants total in this example.</text><text x="584" y="436" class="note">A depth-3 assignment is refused.</text><text x="584" y="460" class="note">At most two assignments may be open.</text><text x="40" y="516" class="note">All descendants share the root’s 24 model attempts, 40 tool dispatches and one repair allowance.</text><line x1="40" y1="552" x2="920" y2="552" class="rule"/><text x="40" y="576" class="note">Tree: ancestry accumulated over time, not a parallel-execution schedule. Children get narrowed tools and file paths.</text></svg>

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="600" viewBox="0 0 960 600" role="img" aria-labelledby="loop-title loop-desc" id="loop-root"><title id="loop-title">The model / tool cycle</title><desc id="loop-desc">The model receives a goal, history and granted schemas. Tool calls pass the bounds and gateway, then their results feed another model request. A reply without tools checks the recorded plan and verifies published artifacts before success. Incomplete plans fail. Limits, waits and loss of ownership may stop dispatch; no automatic verification repair is shown.</desc><defs>
+      <style>#loop-root { --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.488 0.243 264.376);
+  --primary-foreground: oklch(0.97 0.014 254.604);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.845 0.143 164.978);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.596 0.145 163.225);
+  --chart-4: oklch(0.508 0.118 165.612);
+  --chart-5: oklch(0.432 0.095 166.913);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.546 0.245 262.881);
+  --sidebar-primary-foreground: oklch(0.97 0.014 254.604);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0); }
+      #loop-root { --paper:var(--background); --ink:var(--foreground); --soft:var(--muted-foreground); --focus:var(--primary); --font-sans:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; --font-mono:ui-monospace,"SFMono-Regular",Consolas,monospace; --font-serif:Georgia,"Times New Roman",serif; }
+      #loop-root { color: var(--ink); font-family: var(--font-sans); }
+      #loop-root .diagram-container { width:100%; overflow-x:auto; }
+      #loop-root .paper { fill:var(--paper); }
+      #loop-root .node { fill:var(--paper); stroke:var(--soft); stroke-width:1; }
+      #loop-root .focal { fill:var(--primary-foreground); stroke:var(--focus); stroke-width:1.5; }
+      #loop-root .node-name { font-family:var(--font-sans); font-size:12px; font-weight:600; fill:var(--ink); text-anchor:middle; }
+      #loop-root .sub { font-family:var(--font-mono); font-size:9px; fill:var(--soft); text-anchor:middle; }
+      #loop-root .focal-sub { fill:var(--ink); }
+      #loop-root .heading { font-family:var(--font-serif); font-size:28px; fill:var(--ink); }
+      #loop-root .svg-eyebrow { font-family:var(--font-mono); font-size:8px; letter-spacing:1.2px; fill:var(--soft); }
+      #loop-root .note { font-family:var(--font-sans); font-size:11px; fill:var(--soft); }
+      #loop-root .label { font-family:var(--font-mono); font-size:8px; fill:var(--soft); text-anchor:middle; }
+      #loop-root .edge { fill:none; stroke:var(--soft); stroke-width:1; }
+      #loop-root .accent-edge { fill:none; stroke:var(--focus); stroke-width:1.5; }
+      #loop-root .lifeline { fill:none; stroke:var(--border); stroke-width:1; stroke-dasharray:4 4; }
+      #loop-root .return { stroke-dasharray:5 4; }
+      #loop-root .rule { stroke:var(--border); stroke-width:1; }
+      @media print {
+#loop-root .diagram-container { overflow-x:visible; }
+}</style><marker id="loop-loop-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--soft)"/></marker><marker id="loop-loop-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--focus)"/></marker><marker id="loop-loop-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--focus)"/></marker></defs><rect width="960" height="600" class="paper"/><text x="40" y="28" class="svg-eyebrow">AUTOBOTS / RUNTIME Q&amp;A</text><text x="40" y="64" class="heading">The model / tool cycle</text><text x="40" y="88" class="note">A complete reply either proposes tools or ends the inner stage.</text><path d="M 208 192 V 220" class="edge" marker-end="url(#loop-loop-arrow)"/><path d="M 320 264 H 520" class="edge" marker-end="url(#loop-loop-arrow)"/><path d="M 640 296 V 348" class="edge" marker-end="url(#loop-loop-arrow)"/><path d="M 760 380 H 824 Q 832 380 832 372 V 160 Q 832 152 824 152 H 320" class="edge return" marker-end="url(#loop-loop-arrow)"/><path d="M 208 308 V 348" class="edge" marker-end="url(#loop-loop-arrow)"/><path d="M 208 412 V 456" class="edge" marker-end="url(#loop-loop-arrow)"/><path d="M 320 488 H 520" class="edge" marker-end="url(#loop-loop-arrow)"/><rect x="374" y="243" width="92" height="12" class="paper"/><text x="420" y="252" class="label">YES: TOOLS</text><rect x="224" y="319" width="80" height="12" class="paper"/><text x="264" y="328" class="label">NO TOOLS</text><rect x="214" y="427" width="100" height="12" class="paper"/><text x="264" y="436" class="label">PLAN COMPLETE</text><rect x="380" y="467" width="80" height="12" class="paper"/><text x="420" y="476" class="label">CHECKS</text><rect x="590" y="131" width="100" height="12" class="paper"/><text x="640" y="140" class="label">NEXT CYCLE</text><rect x="96" y="128" width="224" height="64" rx="6" class="focal"/><text x="208" y="155" class="node-name">Ask the model</text><text x="208" y="173" class="sub focal-sub">goal + history + allowed schemas</text><polygon points="208 220,320 264,208 308,96 264" class="node"/><text x="208" y="268" class="node-name">Tool calls?</text><rect x="520" y="232" width="240" height="64" rx="6" class="node"/><text x="640" y="259" class="node-name">Validate and execute</text><text x="640" y="277" class="sub">bounds → gateway → handler</text><rect x="520" y="348" width="240" height="64" rx="6" class="node"/><text x="640" y="375" class="node-name">Return tool results</text><text x="640" y="393" class="sub">observations feed the next request</text><rect x="96" y="348" width="224" height="64" rx="6" class="node"/><text x="208" y="375" class="node-name">Check recorded plan</text><text x="208" y="393" class="sub">missing or incomplete → failed</text><rect x="96" y="456" width="224" height="64" rx="6" class="node"/><text x="208" y="483" class="node-name">Verify candidate</text><text x="208" y="501" class="sub">published artifacts + evidence</text><rect x="520" y="456" width="240" height="64" rx="20" class="node"/><text x="640" y="483" class="node-name">Succeeded or failed</text><text x="640" y="501" class="sub">application commits the verdict</text><line x1="40" y1="552" x2="920" y2="552" class="rule"/><text x="40" y="576" class="note">Solid arrows: forward work. Dashed arrow: results return to the model. Guards apply before every dispatch.</text></svg>

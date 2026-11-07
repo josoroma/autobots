@@ -1,0 +1,598 @@
+{
+  "schema_version": "autobots.work-evidence/v1",
+  "template": false,
+  "work_item_id": "DOC-QA-001",
+  "evidence_id": "2026-11-05-doc-qa",
+  "requirement_ids": [
+    "DOC-QA-001",
+    "DH-W04",
+    "DH-W05"
+  ],
+  "fingerprint": {
+    "source_manifest_sha256": "8e115dbbb75dbce77c9a095a65de7f0b26a75b01c5f612cb6c0403411e7869f9",
+    "nonsecret_config_sha256": "c40ee46d6a00ed62e3cc523dfdfa0285e9db81165cee4b65c62bc8e31ac5e3a9",
+    "lockfiles_sha256": {
+      "pnpm-lock.yaml": "e5d81f0de510d71360270717edf5dfffc959570da0d93d87115af4c6468b877e",
+      "services/agent/uv.lock": "73e4eae80394a7dc73a3cf6a2cf6776bcc141a58958ef72be90aff320bd811d9"
+    },
+    "generated_contracts_sha256": "1953dbfefa63c20d8a6f9648c2bbb787d80107f01e3601c20a4917e8c6c61e50",
+    "verifier_sha256": "8932bf10678d4db759a74649af4cdedd5ea12c68c205a89b575a6768cb511e3b"
+  },
+  "tool_versions": {
+    "report_python": "3.12.16",
+    "node": {
+      "pin": "22.23.2",
+      "selected": "22.23.2",
+      "through_package_script": "v22.23.2"
+    },
+    "pnpm": {
+      "pin": "12.16.1",
+      "through_corepack": "12.16.1"
+    },
+    "corepack": "0.34.6",
+    "python": {
+      "pin": "3.12.16",
+      "selected": "3.12.16"
+    },
+    "uv": {
+      "pin": "0.13.6",
+      "selected": "0.13.6"
+    }
+  },
+  "reports": {
+    "harness": {
+      "status": "passed",
+      "input_fingerprint": "4fbae2b8e0eae77f3f1f9caff3d3e6593bba09296bf14f799a26b61e92c03da9",
+      "completed_at_utc": "2026-11-06T02:07:38.996605+00:00",
+      "assistant_adapter": {
+        "state": "configured_unqualified",
+        "reason": "delivery_unverified",
+        "minimum_version": "2.1.295",
+        "model_route": "not_checked",
+        "observed_version": "2.1.314"
+      },
+      "not_tested": [
+        "application",
+        "Claude event delivery",
+        "Supabase",
+        "Docker",
+        "OpenRouter inference",
+        "complete H0/H1"
+      ],
+      "scope": "Project configuration, backlog structure and deterministic harness fixtures only"
+    }
+  },
+  "checks": [
+    {
+      "id": "harness.project_configuration",
+      "source": {
+        "kind": "report",
+        "profile": "harness",
+        "check": "project_configuration"
+      },
+      "requirement_ids": [
+        "DH-W04"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "scripts/verify.py",
+        "--profile",
+        "harness"
+      ],
+      "cwd": ".",
+      "target_ref": "harness profile, this repository",
+      "expected": "Repository configuration is valid.",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T02:07:38.996605+00:00",
+      "finished_at_utc": "2026-11-06T02:07:38.996605+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "harness.backlog_validation",
+      "source": {
+        "kind": "report",
+        "profile": "harness",
+        "check": "backlog_validation"
+      },
+      "requirement_ids": [
+        "DH-W04"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "/opt/homebrew/opt/python@3.12/bin/python3.12",
+        "scripts/specs.py",
+        "validate"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "harness profile, this repository",
+      "expected": "Backlog structure and source locations are valid.",
+      "observed": "status passed, exit 0",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T02:07:23.615262+00:00",
+      "finished_at_utc": "2026-11-06T02:07:23.838869+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "harness.harness_behavior_tests",
+      "source": {
+        "kind": "report",
+        "profile": "harness",
+        "check": "harness_behavior_tests"
+      },
+      "requirement_ids": [
+        "DH-W04"
+      ],
+      "verification_class": "mock",
+      "model_transport": "none",
+      "command_argv": [
+        "/opt/homebrew/opt/python@3.12/bin/python3.12",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests/harness",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "cwd": "/Users/josoroma/sites/autobots",
+      "target_ref": "harness profile, this repository",
+      "expected": "Deterministic harness fixtures pass without skipped tests.",
+      "observed": "status passed, exit 0, 216 tests executed, 0 skipped",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T02:07:23.838893+00:00",
+      "finished_at_utc": "2026-11-06T02:07:38.832336+00:00",
+      "exit_code": 0,
+      "artifacts": []
+    },
+    {
+      "id": "runbook.specs-validation",
+      "requirement_ids": [
+        "DH-W05"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "python3.12",
+        "scripts/specs.py",
+        "validate"
+      ],
+      "cwd": ".",
+      "target_ref": "Autobots local documentation working tree; no running application",
+      "expected": "Existing runbook backlog validation passes.",
+      "observed": "PASS: 10 epics, 42 stories, 86 tasks; exit 0.",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T02:07:23.234154+00:00",
+      "finished_at_utc": "2026-11-06T02:07:23.451140+00:00",
+      "exit_code": 0,
+      "artifacts": [
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/repository-checks.json",
+          "sha256": "8a55dc34aa7d42974d92c7d26f9a6355692a2b32e3bafeca218155ff1e4c3acd"
+        },
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/specs-validation.log",
+          "sha256": "43d7b7f7b918884bb12718b9cad590a93242c18216f4611c3608890e780e7013"
+        }
+      ],
+      "exercises_runbook": true,
+      "source": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "documentation.links-and-fingerprint",
+      "requirement_ids": [
+        "DOC-QA-001"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "python3.12",
+        ".checks/DOC-QA-001/2026-11-05-doc-qa/check-doc-links.py"
+      ],
+      "cwd": ".",
+      "target_ref": "Autobots local documentation working tree; no running application",
+      "expected": "All local links/anchors resolve and final document files are inventoried.",
+      "observed": "92 local links/anchors passed; independent reviewer confirmed the same documentation digest.",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T02:07:49.106250+00:00",
+      "finished_at_utc": "2026-11-06T02:07:49.112336+00:00",
+      "exit_code": 0,
+      "artifacts": [
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/doc-links.json",
+          "sha256": "d28c6773ee9f52c6d1a698afb82d9cfd371f0468e7aacae482cac882d0ed4f31"
+        },
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/check-doc-links.py",
+          "sha256": "40595d520fce8f382b401dcfb64c3dbc3d2c737fc23b741a7018fc33bf2cfada"
+        },
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/review.json",
+          "sha256": "cb277e429d40bdd7d93c1c977b192286b7d552eb908e94925a2078b519a7f23e"
+        }
+      ],
+      "exercises_runbook": false,
+      "source": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "diagrams.static-1",
+      "requirement_ids": [
+        "DOC-QA-001"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "/opt/homebrew/opt/python@3.12/bin/python3.12",
+        ".checks/diagram-design-source/skills/diagram-design/scripts/self_check.py",
+        "docs/diagrams/runtime-qa/loop.html"
+      ],
+      "cwd": ".",
+      "target_ref": "Autobots local documentation working tree; no running application",
+      "expected": "Upstream diagram check passes.",
+      "observed": "Exit 0: OK docs/diagrams/runtime-qa/loop.html",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T02:07:20.572331+00:00",
+      "finished_at_utc": "2026-11-06T02:07:20.624256+00:00",
+      "exit_code": 0,
+      "artifacts": [
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/diagram-checks.json",
+          "sha256": "72fbbcfba3b27d70b234b00960b80c80e1d8d2eb9853043dc926130ea21ae8ad"
+        },
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/check-diagrams.py",
+          "sha256": "d7732a941ba9232abe9cb3fca84f7a3bc14e51a6fedd59c31eab72ee1b563cdb"
+        }
+      ],
+      "exercises_runbook": false,
+      "source": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "diagrams.static-2",
+      "requirement_ids": [
+        "DOC-QA-001"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "/opt/homebrew/opt/python@3.12/bin/python3.12",
+        ".checks/diagram-design-source/scripts/verify-geometry.py",
+        "docs/diagrams/runtime-qa/loop.html"
+      ],
+      "cwd": ".",
+      "target_ref": "Autobots local documentation working tree; no running application",
+      "expected": "Upstream diagram check passes.",
+      "observed": "Exit 0: Summary: 1 file(s) checked, 0 finding(s).",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T02:07:20.624454+00:00",
+      "finished_at_utc": "2026-11-06T02:07:20.668443+00:00",
+      "exit_code": 0,
+      "artifacts": [
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/diagram-checks.json",
+          "sha256": "72fbbcfba3b27d70b234b00960b80c80e1d8d2eb9853043dc926130ea21ae8ad"
+        },
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/check-diagrams.py",
+          "sha256": "d7732a941ba9232abe9cb3fca84f7a3bc14e51a6fedd59c31eab72ee1b563cdb"
+        }
+      ],
+      "exercises_runbook": false,
+      "source": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "diagrams.static-3",
+      "requirement_ids": [
+        "DOC-QA-001"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "/opt/homebrew/opt/python@3.12/bin/python3.12",
+        ".checks/diagram-design-source/skills/diagram-design/scripts/self_check.py",
+        "docs/diagrams/runtime-qa/depth.html"
+      ],
+      "cwd": ".",
+      "target_ref": "Autobots local documentation working tree; no running application",
+      "expected": "Upstream diagram check passes.",
+      "observed": "Exit 0: OK docs/diagrams/runtime-qa/depth.html",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T02:07:20.669178+00:00",
+      "finished_at_utc": "2026-11-06T02:07:20.713894+00:00",
+      "exit_code": 0,
+      "artifacts": [
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/diagram-checks.json",
+          "sha256": "72fbbcfba3b27d70b234b00960b80c80e1d8d2eb9853043dc926130ea21ae8ad"
+        },
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/check-diagrams.py",
+          "sha256": "d7732a941ba9232abe9cb3fca84f7a3bc14e51a6fedd59c31eab72ee1b563cdb"
+        }
+      ],
+      "exercises_runbook": false,
+      "source": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "diagrams.static-4",
+      "requirement_ids": [
+        "DOC-QA-001"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "/opt/homebrew/opt/python@3.12/bin/python3.12",
+        ".checks/diagram-design-source/scripts/verify-geometry.py",
+        "docs/diagrams/runtime-qa/depth.html"
+      ],
+      "cwd": ".",
+      "target_ref": "Autobots local documentation working tree; no running application",
+      "expected": "Upstream diagram check passes.",
+      "observed": "Exit 0: Summary: 1 file(s) checked, 0 finding(s).",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T02:07:20.714004+00:00",
+      "finished_at_utc": "2026-11-06T02:07:20.752634+00:00",
+      "exit_code": 0,
+      "artifacts": [
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/diagram-checks.json",
+          "sha256": "72fbbcfba3b27d70b234b00960b80c80e1d8d2eb9853043dc926130ea21ae8ad"
+        },
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/check-diagrams.py",
+          "sha256": "d7732a941ba9232abe9cb3fca84f7a3bc14e51a6fedd59c31eab72ee1b563cdb"
+        }
+      ],
+      "exercises_runbook": false,
+      "source": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "diagrams.static-5",
+      "requirement_ids": [
+        "DOC-QA-001"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "/opt/homebrew/opt/python@3.12/bin/python3.12",
+        ".checks/diagram-design-source/skills/diagram-design/scripts/self_check.py",
+        "docs/diagrams/runtime-qa/tool-call.html"
+      ],
+      "cwd": ".",
+      "target_ref": "Autobots local documentation working tree; no running application",
+      "expected": "Upstream diagram check passes.",
+      "observed": "Exit 0: OK docs/diagrams/runtime-qa/tool-call.html",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T02:07:20.753385+00:00",
+      "finished_at_utc": "2026-11-06T02:07:20.794692+00:00",
+      "exit_code": 0,
+      "artifacts": [
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/diagram-checks.json",
+          "sha256": "72fbbcfba3b27d70b234b00960b80c80e1d8d2eb9853043dc926130ea21ae8ad"
+        },
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/check-diagrams.py",
+          "sha256": "d7732a941ba9232abe9cb3fca84f7a3bc14e51a6fedd59c31eab72ee1b563cdb"
+        }
+      ],
+      "exercises_runbook": false,
+      "source": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "diagrams.static-6",
+      "requirement_ids": [
+        "DOC-QA-001"
+      ],
+      "verification_class": "static",
+      "model_transport": "none",
+      "command_argv": [
+        "/opt/homebrew/opt/python@3.12/bin/python3.12",
+        ".checks/diagram-design-source/scripts/verify-geometry.py",
+        "docs/diagrams/runtime-qa/tool-call.html"
+      ],
+      "cwd": ".",
+      "target_ref": "Autobots local documentation working tree; no running application",
+      "expected": "Upstream diagram check passes.",
+      "observed": "Exit 0: Summary: 1 file(s) checked, 0 finding(s).",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T02:07:20.794789+00:00",
+      "finished_at_utc": "2026-11-06T02:07:20.831978+00:00",
+      "exit_code": 0,
+      "artifacts": [
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/diagram-checks.json",
+          "sha256": "72fbbcfba3b27d70b234b00960b80c80e1d8d2eb9853043dc926130ea21ae8ad"
+        },
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/check-diagrams.py",
+          "sha256": "d7732a941ba9232abe9cb3fca84f7a3bc14e51a6fedd59c31eab72ee1b563cdb"
+        }
+      ],
+      "exercises_runbook": false,
+      "source": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "diagrams.browser",
+      "requirement_ids": [
+        "DOC-QA-001"
+      ],
+      "verification_class": "local_runtime",
+      "model_transport": "none",
+      "command_argv": [
+        "node",
+        ".checks/DOC-QA-001/2026-11-05-doc-qa/render-diagrams.cjs"
+      ],
+      "cwd": ".",
+      "target_ref": "Autobots local documentation working tree; no running application",
+      "expected": "Desktop/mobile and SVG image rendering succeeds without external requests.",
+      "observed": "All three figures loaded; SVG natural dimensions 960x600; mobile local scrolling without page overflow; no external requests. Parent and reviewer visually inspected exports.",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T02:08:50.089697+00:00",
+      "finished_at_utc": "2026-11-06T02:08:55.696058+00:00",
+      "exit_code": 0,
+      "artifacts": [
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/browser-command.json",
+          "sha256": "1ff21d59405ca1079b3dca133008c6ae2463426f7a7457f8428577b954781145"
+        },
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/diagram-render.json",
+          "sha256": "5900945afa7e19f60c8d6380c9f807f511bac17ca7112f081e0968cc2a743cb6"
+        },
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/render-diagrams.cjs",
+          "sha256": "498f440886e96661ceb22e8fcac0e0c534d42f75775223a2fd28c06a05614514"
+        },
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/loop-export.png",
+          "sha256": "f8a2ca1ab0d80b2069cb2d4066ed60a8646f31480b8abc81369c9c6bb35ea825"
+        },
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/depth-export.png",
+          "sha256": "eb7e0bc76b58d07b2bf21b29dc71fa570a432b957188756a7ffac9c1e8db6273"
+        },
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/tool-call-export.png",
+          "sha256": "717e8c56baaab3769ecfdf114b061935baa3a6973ca403aac265453d8936785a"
+        },
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/loop-mobile.png",
+          "sha256": "a4f113dc8e3a53e311cfcfa7217078e25862a4526e5a2877468a376cdad35372"
+        },
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/depth-mobile.png",
+          "sha256": "290a640b9c533ebf2da622fc65e70d758a5e7a0c62d28163c92e1b46d1d48382"
+        },
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/tool-call-mobile.png",
+          "sha256": "b82cca59968cf628ff89559826ee8627b2b8e193fd9a4b0f7d53aed40ca49959"
+        }
+      ],
+      "exercises_runbook": false,
+      "source": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "diagrams.contrast",
+      "requirement_ids": [
+        "DOC-QA-001"
+      ],
+      "verification_class": "local_runtime",
+      "model_transport": "none",
+      "command_argv": [
+        "node",
+        ".checks/DOC-QA-001/2026-11-05-doc-qa/check-contrast.cjs"
+      ],
+      "cwd": ".",
+      "target_ref": "Autobots local documentation working tree; no running application",
+      "expected": "Measured SVG text contrast reaches 4.5:1.",
+      "observed": "All three figures passed; minimum 4.741667181590045:1.",
+      "status": "passed",
+      "started_at_utc": "2026-11-06T02:07:06.410Z",
+      "finished_at_utc": "2026-11-06T02:07:10.708Z",
+      "exit_code": 0,
+      "artifacts": [
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/diagram-contrast.json",
+          "sha256": "7946443adc4dbdd9ed6b013a4bc6d761d45a66152fa4d28e2ea3adb0dc18cbd9"
+        },
+        {
+          "path": ".checks/DOC-QA-001/2026-11-05-doc-qa/check-contrast.cjs",
+          "sha256": "4cfb14ba7847d90162924749f1e52c5d0c862cf5d7bd908d13f6d981e4ea3d1f"
+        }
+      ],
+      "exercises_runbook": false,
+      "source": {
+        "kind": "manual"
+      }
+    }
+  ],
+  "review": {
+    "author_id": "/root; /root/qa_diagrams",
+    "reviewer_id": "/root/qa_review",
+    "reviewed_fingerprint": "8e115dbbb75dbce77c9a095a65de7f0b26a75b01c5f612cb6c0403411e7869f9",
+    "outcome": "approved",
+    "findings": [
+      {
+        "id": "R1",
+        "severity": "nonblocking",
+        "disposition": "resolved",
+        "detail": "Corrected operation_identity() label to _operation_id()."
+      },
+      {
+        "id": "R2",
+        "severity": "nonblocking",
+        "disposition": "resolved",
+        "detail": "Corrected validate_workflow() label to validate_graph()."
+      },
+      {
+        "id": "R3",
+        "severity": "nonblocking",
+        "disposition": "resolved",
+        "detail": "Narrowed lease-loss write prohibition to execution/checkpoint writes; late receipt reconciliation remains possible."
+      }
+    ],
+    "documentation_manifest_sha256": "68171d832bb4c7cb605ab94c7c1841efd772bd9f9636b2147146c9d9934ca6ac"
+  },
+  "runbook": {
+    "path": "docs/engineering/runbooks/development-harness.md",
+    "exercised_evidence_ids": [
+      "2026-11-05-doc-qa"
+    ],
+    "revision_sha256": "2da3a1fba2501d7b26089e72734e77407547eeafe5ac41e4091855d70a21df64"
+  },
+  "raw_artifacts": {
+    "local_root": ".checks/DOC-QA-001/2026-11-05-doc-qa/",
+    "availability": "available",
+    "retention": "Keep raw reports, scripts and screenshots through review and acceptance; record deletion/unavailability later. No secrets or user datasets retained."
+  },
+  "documentation_inputs": {
+    "manifest_sha256": "68171d832bb4c7cb605ab94c7c1841efd772bd9f9636b2147146c9d9934ca6ac",
+    "files": {
+      "README-QA.md": "e410476e63416d03063e526b4c5f8b59fb88f533839f2c24d9063c88c297b2fc",
+      "docs/diagrams/runtime-qa/LICENSE-diagram-design.txt": "bb7e12e91fecef43024111123ff784cec6c485585561d8b552557c0173b3ed29",
+      "docs/diagrams/runtime-qa/README.md": "939bf7f9701402e27679cf3c0a68956ba9b8f8a5195f5e52bbab9e3050d9a779",
+      "docs/diagrams/runtime-qa/depth.html": "9e34756e2c1841867de6dba0eed3592f8101e301fcc6be9ff1cfaa94c1b85365",
+      "docs/diagrams/runtime-qa/depth.svg": "26728e3671499d5c1b92566c4a9544f5fd67051940d6b07d43a1eba812511efe",
+      "docs/diagrams/runtime-qa/loop.html": "4a369518630330856b8c84c7d98c7174a417c565ab110311c6472e935ea441d5",
+      "docs/diagrams/runtime-qa/loop.svg": "8c3b3a42c080c1ff818289128ac9f20e4234cd747ef939152982e3cb146eeb53",
+      "docs/diagrams/runtime-qa/tool-call.html": "7e5573343722eca16409462982c632f60819401353489eb71537cd4d85fc3e0e",
+      "docs/diagrams/runtime-qa/tool-call.svg": "71b58df0a0d1f33b8ec62859a5e39c8bdc4ddbfbbc26c16204fce74b7cf5ebbc"
+    },
+    "freshness_scope": "Supplemental manually verified inventory; rerun check-doc-links.py and independent review after documentation edits. Generic evidence.py freshness does not cover these paths."
+  },
+  "diagram_design_source": {
+    "repository": "https://github.com/cathrynlavery/diagram-design",
+    "revision": "f24d98b05e2d7a5e68c2dedfe46e5b7173f50118",
+    "files": {
+      "docs/design/luma.css": "cfe0b1e970fd0b87a11d069dd6c22b71745030c5ac908a793767cdc4a2f0103f",
+      ".checks/diagram-design-source/skills/diagram-design/SKILL.md": "83fd5aa46965ce2b14bd42ade80c065a4e17a9f83d2a9f4f275b47cd45d72666",
+      ".checks/diagram-design-source/skills/diagram-design/scripts/self_check.py": "444851f6e53f83d50920381df17cdd5f1b7a23cfba9c0ddda27786d78e53e2de",
+      ".checks/diagram-design-source/skills/diagram-design/scripts/export_svg.py": "03e88d277386e2c9f48d9fcfc6a9f8e5e818a8949ac8ec458ac569e8ff4bc8ad",
+      ".checks/diagram-design-source/scripts/verify-geometry.py": "33fb89edbdc8b9cf625a388ba47147bf46ec9e8ae84b7110e240de165732001f"
+    }
+  }
+}
