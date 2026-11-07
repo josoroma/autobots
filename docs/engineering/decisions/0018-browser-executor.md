@@ -13,9 +13,13 @@
 | **B5. Allowed actions** | Read only: navigate, click links, scroll, read and extract. No typing, form submission, sign-in, upload or download. Typing and submitting need their own decision, with approval per action |
 | **B6. Approval** | Every `browse_goal` call waits for a person, who sees the task, start URL, allowed domains and limits |
 | **B7. Dependency** | `browser-use` is added, pinned in `uv.lock`, by US-14.14, with its dependency tree reviewed. The adapter is tested against that version's own model protocol |
-| **B8. Live checks** | Only the executor's isolation is checked live, on a disposable stack, with a scripted model. A run with a real model is a separate task the owner authorizes and caps |
+| **B8. Live checks** | Only the executor's isolation is checked live, on a disposable stack, with a scripted model, reaching only the qualification host below for the case that must succeed. A run with a real model is a separate task the owner authorizes and caps |
 
 **The shape:** browser-use's agent loop runs in the worker, so every model call is an admitted call of the run. The browser runs in a disposable container driven over CDP, published on loopback only behind a per-session token. The container has no key, no host path and no inherited environment.
+
+## The qualification host
+
+**Added 2026-11-07, by the owner's answer "Use a public host"** to US-14.13's open question. The live check that an admitted request gets through uses real outbound network to one named public host: **`https://example.com/`**, the IANA-reserved example domain, with `https://example.org/` as the fallback if it doesn't answer. Only that host is requested for the positive case, with a `GET` and no credentials, and the URL guard is applied to it exactly as to any other: there is no test-only exception. Every refusal case still targets local or private destinations. A check run without network access reports the positive case as not observed, so the executor isn't reported qualified from it.
 
 ## Requirements revised
 

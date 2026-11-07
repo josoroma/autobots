@@ -132,7 +132,7 @@ By [Decision 0018](docs/engineering/decisions/0018-browser-executor.md) B1 to B3
 
 **BX-04. Ownership.** An executor belongs to one attempt. Losing the lease, cancelling the run, or reaching the time cap closes the CDP session and removes the containers. Containers are labelled with the run and generation, and a sweeper removes any a crashed worker left.
 
-**BX-05. Qualification.** The executor reports qualified only after a live check on a disposable stack shows every refusal: the API's and Supabase's loopback ports, the Docker host, a private address, the metadata address, a public name resolving to loopback, a `file://` URL, a download, the memory and process caps, and removal after a cancel.
+**BX-05. Qualification.** The executor reports qualified only after a live check on a disposable stack shows that a `GET` to the qualification host, `https://example.com/` (Decision 0018), loads through the proxy connected to the address it checked, and shows every refusal: the API's and Supabase's loopback ports, the Docker host, a private address, the metadata address, a public name resolving to loopback, a `file://` URL, a download, the memory and process caps, and removal after a cancel.
 
 ## Admitted browser model
 

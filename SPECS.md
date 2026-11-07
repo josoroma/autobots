@@ -387,7 +387,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.12#2 | Limit its action set to navigate, click links, scroll, read and extract, and enforce `allowed_domains`, `max_steps` and `max_seconds`. | TODO | US-14.12 |
 | US-14.12#3 | Grant it only through an Expert, and require a person's approval on every call, showing the task, start URL, allowed domains and limits. | TODO | US-14.12 |
 | US-14.12#4 | Cover the scenarios on a disposable stack with a scripted model. | TODO | US-14.12 |
-| US-14.13 | Isolated browser executor | BLOCKED | EPIC-14 |
+| US-14.13 | Isolated browser executor | READY | EPIC-14 |
 | US-14.13#1 | Start and remove one hardened container per call from the digest-pinned Playwright image, with CDP on loopback behind a per-session token and nothing of the worker's environment. | TODO | US-14.13 |
 | US-14.13#2 | Build the egress proxy sidecar locally, applying the URL guard to every request and connecting to the address it checked. | TODO | US-14.13 |
 | US-14.13#3 | Tie the executor to the attempt's lease, cancellation and time cap, with labelled containers and a sweeper. | TODO | US-14.13 |
@@ -5138,6 +5138,7 @@ So that a run can read sites through a browser within allowed domains, with a pe
 Source:
 - [Autonomous browsing](PRD-Tool-Catalog.md#autonomous-browsing)
 - [Decision 0018, B5 and B6](docs/engineering/decisions/0018-browser-executor.md#decision)
+- [Decision 0018, the qualification host](docs/engineering/decisions/0018-browser-executor.md#the-qualification-host)
 - [Decision 0017, C3 and C4](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
 - [Decision 0017, Q9](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
 - [Tool-use record](PRD-Tool-Catalog.md#tool-use-record)
@@ -5151,7 +5152,7 @@ Acceptance Criteria:
 ```gherkin
 Scenario: A read-only browse is summarised and recorded
   Given a qualified executor and the admitted browser model on a disposable stack, a scripted model, an Expert granting browse_goal and an approved call
-  When it browses from a guarded start_url within its allowed_domains until the model reports done
+  When it browses from the qualification host https://example.com/ with allowed_domains example.com until the model reports done
   Then it returns a summary labelled third-party and cut to the shared text budget, visited URLs without query or fragment, steps, model_calls and stopped set to done, and one metered tool use records only start_url, allowed_domains, max_steps, stopped, steps and the count of visited URLs, with each step counted as the run's model spend
 
 Scenario: Outside its domains, a submission and its limits
@@ -5183,12 +5184,11 @@ Tasks:
 - [ ] Cover the scenarios on a disposable stack with a scripted model.
 
 Open Questions:
-- Which page does a live browse read: a named public host reached over real outbound network, or a test-only exception to the URL guard for a page on the disposable stack? (The same question as US-14.13's; Decision 0018 B8 doesn't settle it.)
 - Does a refused navigation or submission end the call with `stopped: refused_action`, or does the agent carry on? The PRD lists the value but doesn't say when it is set.
 
 ### US-14.13: Isolated browser executor
 
-Status: BLOCKED
+Status: READY
 
 As a workspace owner
 I want a browser that runs in a disposable container with no way to reach this Mac, its services, its files or its credentials
@@ -5197,6 +5197,7 @@ So that a browsing tool can read the web without arbitrary access.
 Source:
 - [Isolated browser executor](PRD-Tool-Catalog.md#isolated-browser-executor)
 - [Decision 0018, B1 to B3 and B8](docs/engineering/decisions/0018-browser-executor.md#decision)
+- [Decision 0018, the qualification host](docs/engineering/decisions/0018-browser-executor.md#the-qualification-host)
 - [Tool contract](PRD-LangChain-Deep-Agents.md#91-tool-contract)
 - [Filesystem and execution boundaries](PRD-LangChain-Deep-Agents.md#93-filesystem-and-execution-boundaries)
 - [SP-005](docs/engineering/option-b-contract.md#sp-005--local-services-and-isolation)
@@ -5207,7 +5208,7 @@ Acceptance Criteria:
 Scenario: The browser can't reach this Mac or a private network
   Given an executor on a disposable stack whose browser a scripted model drives
   When the browser requests, directly or through a redirect, subresource or WebSocket upgrade, the API's or Supabase's loopback ports, the Docker host, a private address, the metadata address, a public name resolving to loopback, a file:// URL, a download, a non-GET request with a body, or more bytes or requests than the per-call cap
-  Then each is refused by the egress proxy or the browser, the proxy's log names hosts without paths or queries, and a request the URL guard admits connects to the address the proxy checked
+  Then each is refused by the egress proxy or the browser, the proxy's log names hosts without paths or queries, and a GET to the qualification host https://example.com/, which the URL guard admits, loads through the proxy connected to the address it checked
 
 Scenario: Nothing of the host enters the container
   Given an executor started by a worker that holds model and provider keys and a database URL
@@ -5236,7 +5237,7 @@ Tasks:
 - [ ] Qualify every refusal live on a disposable stack with a scripted model, and report qualified only after that check passes.
 
 Open Questions:
-- To show live that a request the URL guard admits gets through, the check must reach a page the guard admits: `https` on a public address. May the qualification use real outbound network to a named public host, and which one, or should a test-only exception let the proxy admit a page on the disposable stack? Decision 0018 B8 doesn't say.
+- None.
 
 ### US-14.14: Admitted model for browser-use
 
