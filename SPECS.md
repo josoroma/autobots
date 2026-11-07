@@ -399,13 +399,13 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.14#2 | Switch off browser-use's telemetry and cloud sync before it is imported, and prove offline that no telemetry client is created. | TODO | US-14.14 |
 | US-14.14#3 | Implement the adapter over the pinned version's chat-model protocol through model admission, reservations, receipts and the run's frozen `researcher` route. | TODO | US-14.14 |
 | US-14.14#4 | Cover the scenarios offline with a scripted model. | TODO | US-14.14 |
-| US-14.15 | Sol profile and route qualification | READY | EPIC-14 |
-| US-14.15#1 | Add `openrouter_sol` to the domain's approved profiles, not offered for new runs until its route is qualified, with Sol as the `researcher` role's built-in default once offered, and regenerated clients if a public contract changes. | TODO | US-14.15 |
-| US-14.15#2 | Add a migration widening every profile check to include `openrouter_sol` and seeding its `model_profiles` row. | TODO | US-14.15 |
-| US-14.15#3 | Add Sol's route entry and its authorized US$1.20 cap to the route qualification runner. | TODO | US-14.15 |
-| US-14.15#4 | List Sol in Settings as approved with its offering state, qualification and limits, and in every picker once it's offered. | TODO | US-14.15 |
-| US-14.15#5 | Run Sol's live route qualification once within the cap, and record it. | TODO | US-14.15 |
-| US-14.15#6 | Cover the refusal, resolution, frozen-run and removal scenarios offline and on a disposable stack with a fake transport. | TODO | US-14.15 |
+| US-14.15 | Sol profile and route qualification | DONE | EPIC-14 |
+| US-14.15#1 | Add `openrouter_sol` to the domain's approved profiles, not offered for new runs until its route is qualified, with Sol as the `researcher` role's built-in default once offered, and regenerated clients if a public contract changes. | DONE | US-14.15 |
+| US-14.15#2 | Add a migration widening every profile check to include `openrouter_sol` and seeding its `model_profiles` row. | DONE | US-14.15 |
+| US-14.15#3 | Add Sol's route entry and its authorized US$1.20 cap to the route qualification runner. | DONE | US-14.15 |
+| US-14.15#4 | List Sol in Settings as approved with its offering state, qualification and limits, and in every picker once it's offered. | DONE | US-14.15 |
+| US-14.15#5 | Run Sol's live route qualification once within the cap, and record it. | DONE | US-14.15 |
+| US-14.15#6 | Cover the refusal, resolution, frozen-run and removal scenarios offline and on a disposable stack with a fake transport. | DONE | US-14.15 |
 | US-14.16 | Live browse trial with Sol | BLOCKED | EPIC-14 |
 | US-14.16#1 | Add the trial runner, in no verification profile, reading the owner's key file in its own process and refusing a repeat without the owner's request. | TODO | US-14.16 |
 | US-14.16#2 | Run the trial once and record the redacted evidence: the summary's label, visited URLs, model calls, receipts, spend and the hosts the proxy connected to. | TODO | US-14.16 |
@@ -5340,7 +5340,8 @@ Open Questions:
 
 ### US-14.15: Sol profile and route qualification
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-14-15-sol-profile-route-qualification/`
 
 As a workspace owner
 I want Sol approved for the researcher role, and offered only once its route is qualified
@@ -5385,12 +5386,12 @@ Dependencies:
 - US-12.1
 
 Tasks:
-- [ ] Add `openrouter_sol` to the domain's approved profiles, not offered for new runs until its route is qualified, with Sol as the `researcher` role's built-in default once offered, and regenerated clients if a public contract changes.
-- [ ] Add a migration widening every profile check to include `openrouter_sol` and seeding its `model_profiles` row.
-- [ ] Add Sol's route entry and its authorized US$1.20 cap to the route qualification runner.
-- [ ] List Sol in Settings as approved with its offering state, qualification and limits, and in every picker once it's offered.
-- [ ] Run Sol's live route qualification once within the cap, and record it.
-- [ ] Cover the refusal, resolution, frozen-run and removal scenarios offline and on a disposable stack with a fake transport.
+- [x] Add `openrouter_sol` to the domain's approved profiles, not offered for new runs until its route is qualified, with Sol as the `researcher` role's built-in default once offered, and regenerated clients if a public contract changes.
+- [x] Add a migration widening every profile check to include `openrouter_sol` and seeding its `model_profiles` row.
+- [x] Add Sol's route entry and its authorized US$1.20 cap to the route qualification runner.
+- [x] List Sol in Settings as approved with its offering state, qualification and limits, and in every picker once it's offered.
+- [x] Run Sol's live route qualification once within the cap, and record it.
+- [x] Cover the refusal, resolution, frozen-run and removal scenarios offline and on a disposable stack with a fake transport.
 
 Open Questions:
 - None.

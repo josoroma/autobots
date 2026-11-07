@@ -76,13 +76,14 @@ def healthy_catalog(at: datetime = NOW) -> CatalogSnapshot:
     )
 
 
-def test_exactly_two_profiles_with_their_identities() -> None:
+def test_exactly_three_profiles_with_their_identities() -> None:
     assert {key.value: (p.canonical_id, p.wire_id) for key, p in PROFILES.items()} == {
         "openrouter_deepseek_flash": (
             "deepseek/deepseek-v4.1-flash-20261017",
             "deepseek/deepseek-v4.1-flash-1017",
         ),
         "openrouter_terra": ("openai/gpt-6.1-terra-20261026", "openai/gpt-6.1-terra"),
+        "openrouter_sol": ("openai/gpt-6.1-sol-20260929", "openai/gpt-6.1-sol"),
     }
     assert DEFAULT_PROFILE is TERRA
 
@@ -94,9 +95,13 @@ def test_a_workspace_that_chose_deepseek_keeps_it() -> None:
 
 
 def test_a_new_workspace_binds_all_14_roles_to_terra() -> None:
+    """Every role but researcher, which binds to Sol now that Sol is offered (Decision 0019)."""
     policy = resolve_role_policy()
     assert {role.value for role in policy.bindings} == ROLES_FROM_PRD
-    assert set(policy.bindings.values()) == {TERRA}
+    assert {role for role, bound in policy.bindings.items() if bound is not TERRA} == {
+        ModelRole.RESEARCHER
+    }
+    assert policy.bindings[ModelRole.RESEARCHER] is ModelProfileId.SOL
 
 
 def test_the_documented_precedence() -> None:
@@ -390,3 +395,47 @@ def test_a_snapshot_frozen_on_the_retired_profile_doesnt_become_another_model() 
     snapshot = {"bindings": {role.value: "openrouter_astra" for role in ModelRole}}
     with pytest.raises(UnknownModelProfile):
         frozen_policy(snapshot)
+
+
+# US-14.15, Decision 0019: Sol is approved, offered only once its route is qualified, and then the
+# researcher role's built-in default, behind every explicit choice.
+SOL = ModelProfileId.SOL
+
+
+def test_sol_is_refused_for_new_runs_by_name_until_offered(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import autobots.domain.models as models
+
+    # As before its route was qualified.
+    monkeypatch.setattr(models, "OFFERED_FOR_NEW_RUNS", frozenset({TERRA}))
+    with pytest.raises(models.ProfileNotOffered) as refused:
+        models.require_offered([TERRA, SOL])
+    assert refused.value.code == "model_not_offered"
+    assert str(refused.value) == "Sol isn't offered for new runs until its route is qualified."
+    with pytest.raises(models.ProfileNotOffered) as deepseek:
+        models.require_offered([DEEPSEEK])
+    assert str(deepseek.value) == "DeepSeek isn't offered for new runs until it's qualified."
+    # Not offered, so nothing resolves to it by default.
+    assert resolve_role_policy().bindings[ModelRole.RESEARCHER] is TERRA
+
+
+def test_once_offered_researcher_defaults_to_sol_behind_every_choice(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import autobots.domain.models as models
+
+    monkeypatch.setattr(models, "OFFERED_FOR_NEW_RUNS", frozenset({TERRA, SOL}))
+    researcher = ModelRole.RESEARCHER
+    plain = resolve_role_policy()
+    assert plain.bindings[researcher] is SOL
+    assert {role for role, profile in plain.bindings.items() if profile is SOL} == {researcher}
+    for arguments in (
+        {"run_role_overrides": {"researcher": "openrouter_terra"}},
+        {"run_profile": "openrouter_terra"},
+        {"workspace_role_overrides": {"researcher": "openrouter_terra"}},
+        {"workspace_default": "openrouter_terra"},
+    ):
+        assert resolve_role_policy(**arguments).bindings[researcher] is TERRA, arguments
+    assert resolve_role_policy(run_profile="openrouter_sol").bindings[ModelRole.CODER] is SOL
+    models.require_offered([SOL])

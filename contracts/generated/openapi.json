@@ -2274,7 +2274,8 @@
       "ModelProfileId": {
         "enum": [
           "openrouter_deepseek_flash",
-          "openrouter_terra"
+          "openrouter_terra",
+          "openrouter_sol"
         ],
         "title": "ModelProfileId",
         "type": "string"

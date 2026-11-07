@@ -192,7 +192,18 @@ test("a catalog outage does not undo an authentication-valid save, and is shown 
   const models = await (await page.request.get("/api/models")).json();
   expect(
     models.models.map((model: { profile: string }) => model.profile).sort(),
-  ).toEqual(["openrouter_deepseek_flash", "openrouter_terra"]);
+  ).toEqual([
+    "openrouter_deepseek_flash",
+    "openrouter_sol",
+    "openrouter_terra",
+  ]);
+  // US-14.15: Sol is approved, listed and, its route qualified, offered.
+  await expect(
+    page.locator('[data-approved-model="openrouter_sol"]'),
+  ).toContainText("gpt-6.1-sol");
+  await expect(
+    page.locator('[data-approved-model="openrouter_sol"]'),
+  ).not.toContainText("not offered");
   expect(
     models.models.every((model: { available: boolean }) => model.available),
   ).toBe(true);

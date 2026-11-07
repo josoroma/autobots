@@ -179,8 +179,8 @@ def seed_cases(stack: AppStack, cases: Cases, root: Path) -> None:
     cases.check('a second seed run changes nothing', 'same rows', f'{before} then {after}',
                 first.returncode == 0 and second.returncode == 0 and before == after and len(before) == 32)
     profiles = rows(stack, "select string_agg(profile_id || '=' || wire_id, ',' order by profile_id) from public.model_profiles;")
-    cases.check('reference rows are the two approved profiles', 'exactly SP-006', profiles,
-                profiles == 'openrouter_deepseek_flash=deepseek/deepseek-v4.1-flash-1017,openrouter_terra=openai/gpt-6.1-terra')
+    cases.check('reference rows are the three approved profiles', 'exactly SP-006', profiles,
+                profiles == 'openrouter_deepseek_flash=deepseek/deepseek-v4.1-flash-1017,openrouter_sol=openai/gpt-6.1-sol,openrouter_terra=openai/gpt-6.1-terra')
     edited = stack.runtime("update public.model_profiles set label = 'My label' where profile_id = 'openrouter_terra';")
     seed(stack, root)
     label = rows(stack, "select label from public.model_profiles where profile_id = 'openrouter_terra';")
@@ -357,6 +357,15 @@ def tool_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
         cases.check('the tool-use check ran', 'exit 0', f'exit {used.returncode}: {used.stderr.strip()[-700:]}', False)
     else:
         for case in json.loads(used.stdout.strip().splitlines()[-1])['cases']:
+            cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+    # US-14.15: Sol's rows, researcher's resolution and frozen runs.
+    sol = subprocess.run([str(root / 'services/agent/.venv/bin/python'), str(root / 'tests/db/sol_profile_check.py'), WORKSPACE_A],
+                         env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
+                         capture_output=True, text=True, timeout=180, check=False, cwd=root)
+    if sol.returncode:
+        cases.check('the Sol profile check ran', 'exit 0', f'exit {sol.returncode}: {sol.stderr.strip()[-700:]}', False)
+    else:
+        for case in json.loads(sol.stdout.strip().splitlines()[-1])['cases']:
             cases.check(case['id'], case['expected'], case['observed'], case['passed'])
     # US-14.6 onward: provider tools through the gateway and the record, with fake transports.
     web = subprocess.run([str(root / 'services/agent/.venv/bin/python'), str(root / 'tests/db/web_tools_check.py'), WORKSPACE_A],

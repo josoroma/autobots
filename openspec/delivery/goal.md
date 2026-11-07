@@ -7,7 +7,7 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-14.13 |
+| Target | US-14.15 |
 | Kind | story |
 | Focus | - |
 | Status | COMPLETE |
@@ -19,7 +19,7 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-14.13 | us-14-13-isolated-browser-executor | DONE | Isolated browser executor |
+| 1 | US-14.15 | us-14-15-sol-profile-route-qualification | DONE | Sol profile and route qualification |
 
 ## Next Action
 

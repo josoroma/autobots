@@ -18,6 +18,7 @@ import { csrfFetch } from "@/lib/csrf-fetch";
 const PROFILES = [
   { id: "", label: "Workspace setting" },
   { id: "openrouter_terra", label: "Terra" },
+  { id: "openrouter_sol", label: "Sol" },
 ];
 
 type Draft = {

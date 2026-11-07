@@ -40,10 +40,14 @@ WORKFLOW_TOOLS = {**LOOP_TOOL_GRANTS, DELEGATION_TOOL: 1, "workflow_approval": 1
 
 
 class WorkflowRefused(Exception):
-    def __init__(self, code: str, errors: list[GraphError] | None = None) -> None:
+    def __init__(
+        self, code: str, errors: list[GraphError] | None = None, reason: str | None = None
+    ) -> None:
         super().__init__(code)
         self.code = code
         self.errors = errors or []
+        # A reason safe to show, such as which model isn't offered.
+        self.reason = reason
 
 
 def _plain(graph: WorkflowGraph) -> dict[str, Any]:
@@ -241,7 +245,7 @@ async def create_execution(
                     try:
                         require_offered(policy.bindings.values())
                     except ProfileNotOffered as refused:
-                        raise WorkflowRefused(refused.code) from None
+                        raise WorkflowRefused(refused.code, reason=str(refused)) from None
             granted = (
                 WORKFLOW_TOOLS
                 if tools is None

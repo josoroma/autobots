@@ -172,7 +172,7 @@ print(hashlib.sha256(json.dumps(rows, default=str, sort_keys=True).encode()).hex
         policy = ops.sql(f"select default_profile || '/' || (role_overrides ->> 'planner') || '/' || coalesce(role_overrides ->> 'coder', 'none') from app_private.model_policies where workspace_id = '{workspace}';")
         cases.check('a retired choice returns to the default, and no one moves to a model they did not choose (Decision 0004)', 'deepseek default, planner kept, coder cleared', policy, policy == 'openrouter_deepseek_flash/openrouter_deepseek_flash/none')
         profile_rows = ops.sql("select string_agg(profile_id, ',' order by profile_id) from public.model_profiles;")
-        cases.check('the approved profiles are DeepSeek and Terra', 'exactly two', profile_rows, profile_rows == 'openrouter_deepseek_flash,openrouter_terra')
+        cases.check('the approved profiles are DeepSeek, Sol and Terra (Decision 0019)', 'exactly three', profile_rows, profile_rows == 'openrouter_deepseek_flash,openrouter_sol,openrouter_terra')
         ready = wait(lambda: json.loads(api_call(api_port, ops.internal, token)[1])['ready'] is True, 30)
         cases.check('readiness returns once the schema has caught up', 'ready', ready, ready)
         kept = ops.sql(f"select count(*) from agent_runtime.checkpoints c join public.runs r on r.checkpoint_thread_id = c.thread_id where r.id = '{interrupted}';")

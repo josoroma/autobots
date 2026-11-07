@@ -65,7 +65,7 @@ def _error(error: WorkflowRefused | IdempotencyConflict) -> ApiError:
         codes = ", ".join(sorted({item.code for item in error.errors}))
         return ApiError(422, error.code, f"That isn't valid: {codes}.")
     if error.code == NOT_OFFERED_CODE:
-        return ApiError(409, error.code, NOT_OFFERED_MESSAGE)
+        return ApiError(409, error.code, getattr(error, "reason", None) or NOT_OFFERED_MESSAGE)
     return ApiError(409, error.code, "That conflicts with what is saved. Reload and try again.")
 
 

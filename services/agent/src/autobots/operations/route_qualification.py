@@ -56,6 +56,7 @@ ROUTES = {
         {"reasoning": {"effort": "low"}},
     ),
     "openai_gpt_6_1_terra": Route("openai/gpt-6.1-terra", "openai/gpt-6.1-terra-20261026"),
+    "openai_gpt_6_1_sol": Route("openai/gpt-6.1-sol", "openai/gpt-6.1-sol-20260929"),
 }
 # What the owner approved, in micro-USD. Another route or a higher figure is a reviewed code change.
 # The last two share one ledger, so together they can't pass that cap.
@@ -63,6 +64,8 @@ AUTHORIZED_CAPS = {
     "openrouter_deepseek_flash": 500_000,
     "deepseek_low_reasoning": 600_000,
     "openai_gpt_6_1_terra": 1_200_000,
+    # Decision 0019 S4.
+    "openai_gpt_6_1_sol": 1_200_000,
 }
 CONTEXT_TOKENS = 8_192
 OUTPUT_TOKENS = 512
