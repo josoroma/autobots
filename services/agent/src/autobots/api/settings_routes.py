@@ -12,6 +12,7 @@ from autobots.application.credentials.store import (
     CredentialMissing,
     CredentialStorageUnavailable,
 )
+from autobots.application.model_admission import remaining_daily_micro_usd
 from autobots.application.provider_settings import (
     EnvironmentManaged,
     InvalidKey,
@@ -29,6 +30,7 @@ from autobots.contracts.settings import (
     ModelPolicyUpdate,
     ProviderStatus,
     RunIntentCheck,
+    budget_range,
 )
 from autobots.domain.models import (
     ProfileNotOffered,
@@ -311,4 +313,13 @@ async def check_run_intent(
             require_offered(policy.bindings.values())
         except ProfileNotOffered as refused:
             code = refused.code
-    return RunIntentCheck(schema_version=1, ready=code == "ready", code=code)  # type: ignore[arg-type]
+    budget = None
+    if pool is not None:
+        async with pool.connection() as connection:
+            budget = budget_range(await remaining_daily_micro_usd(connection, workspace_id))
+    return RunIntentCheck(
+        schema_version=1,
+        ready=code == "ready",
+        code=code,  # type: ignore[arg-type]
+        budget=budget,
+    )

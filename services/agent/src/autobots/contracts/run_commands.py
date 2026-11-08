@@ -22,6 +22,9 @@ class RunRequest(BaseModel):
     # Left out, a continued run repeats the earlier run's stored goal. Otherwise required.
     goal_text: str | None = Field(default=None, min_length=1, max_length=20000)
     limit_micro_usd: MicroUsd = 1_000_000
+    # A person's chosen budget, Decision 0022 D11: US$0.25 to US$5.00 in US$0.25 steps and not
+    # above what's left of the daily cap. It becomes the run's frozen limit. Not with a limit.
+    budget_micro_usd: MicroUsd | None = None
     # One approved model for this run alone. An unknown value is refused, and no run starts.
     run_profile: ModelProfileId | None = None
     acceptance_criteria: list[str] = Field(default_factory=list, max_length=20)

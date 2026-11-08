@@ -478,12 +478,12 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.8#2 | Add a Reset all write that clears role overrides under the expected version. | DONE | US-15.8 |
 | US-15.8#3 | Render the facts, sources, Discard, Reset all and the summary on Models, and the binding source in the run's role map. | DONE | US-15.8 |
 | US-15.8#4 | Cover the scenarios with a fake catalog on a disposable stack and in browser specs with axe. | DONE | US-15.8 |
-| US-15.9 | Composer chips, run preview and budget | READY | EPIC-15 |
-| US-15.9#1 | Add the allowed budget range and the remaining daily cap to run intent, and the profiles by role and the default tool grants to a preview, in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.9 |
-| US-15.9#2 | Validate and freeze a chosen budget at admission, refusing values outside US$0.25–5.00, off the US$0.25 step or above the remaining daily cap. | TODO | US-15.9 |
-| US-15.9#3 | Forward intent, preview and budget through the BFF. | TODO | US-15.9 |
-| US-15.9#4 | Add the Expert, budget and models chips, the preview chips and the file chips to Home's composer. | TODO | US-15.9 |
-| US-15.9#5 | Cover the scenarios on a disposable stack with a fake transport and in browser specs with axe. | TODO | US-15.9 |
+| US-15.9 | Composer chips, run preview and budget | DONE | EPIC-15 |
+| US-15.9#1 | Add the allowed budget range and the remaining daily cap to run intent, and the profiles by role and the default tool grants to a preview, in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | DONE | US-15.9 |
+| US-15.9#2 | Validate and freeze a chosen budget at admission, refusing values outside US$0.25–5.00, off the US$0.25 step or above the remaining daily cap. | DONE | US-15.9 |
+| US-15.9#3 | Forward intent, preview and budget through the BFF. | DONE | US-15.9 |
+| US-15.9#4 | Add the Expert, budget and models chips, the preview chips and the file chips to Home's composer. | DONE | US-15.9 |
+| US-15.9#5 | Cover the scenarios on a disposable stack with a fake transport and in browser specs with axe. | DONE | US-15.9 |
 | US-15.10 | Home greeting, Needs you and recent runs | READY | EPIC-15 |
 | US-15.10#1 | Render the greeting from the workspace's timezone and the display name. | TODO | US-15.10 |
 | US-15.10#2 | Render Needs you from pending approvals and the run list's Needs you group, and Recent runs from the run list. | TODO | US-15.10 |
@@ -6381,7 +6381,8 @@ Open Questions:
 
 ### US-15.9: Composer chips, run preview and budget
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-15-9-composer-chips-run-preview/`
 
 As a goal's owner
 I want to choose an Expert, a budget and models from chips, and see which profiles and tools the run would use before I press Run
@@ -6432,11 +6433,11 @@ Dependencies:
 - US-3.3
 
 Tasks:
-- [ ] Add the allowed budget range and the remaining daily cap to run intent, and the profiles by role and the default tool grants to a preview, in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
-- [ ] Validate and freeze a chosen budget at admission, refusing values outside US$0.25–5.00, off the US$0.25 step or above the remaining daily cap.
-- [ ] Forward intent, preview and budget through the BFF.
-- [ ] Add the Expert, budget and models chips, the preview chips and the file chips to Home's composer.
-- [ ] Cover the scenarios on a disposable stack with a fake transport and in browser specs with axe.
+- [x] Add the allowed budget range and the remaining daily cap to run intent, and the profiles by role and the default tool grants to a preview, in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
+- [x] Validate and freeze a chosen budget at admission, refusing values outside US$0.25–5.00, off the US$0.25 step or above the remaining daily cap.
+- [x] Forward intent, preview and budget through the BFF.
+- [x] Add the Expert, budget and models chips, the preview chips and the file chips to Home's composer.
+- [x] Cover the scenarios on a disposable stack with a fake transport and in browser specs with axe.
 
 Open Questions:
 - None.

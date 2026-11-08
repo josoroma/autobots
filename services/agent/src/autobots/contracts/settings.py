@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from autobots.contracts.models import EffectiveRolePolicy
 from autobots.contracts.primitives import STRICT_CONTRACT, Identifier
+from autobots.domain.budgets import budget_choices
 from autobots.domain.models import ModelProfileId
 
 AuthStatus = Literal["missing", "configured", "invalid", "unavailable"]
@@ -107,6 +108,30 @@ class ModelPolicyState(BaseModel):
     policy: EffectiveRolePolicy
 
 
+class BudgetRange(BaseModel):
+    """US$0.25 to US$5.00 in US$0.25 steps, never above what's left of the daily cap (D11)."""
+
+    model_config = STRICT_CONTRACT
+
+    min_micro_usd: int
+    # Below `min_micro_usd` when nothing is left today, so no budget can be chosen.
+    max_micro_usd: int
+    step_micro_usd: int
+    default_micro_usd: int
+    remaining_daily_micro_usd: int
+
+
+def budget_range(remaining_daily: int) -> BudgetRange:
+    choices = budget_choices(remaining_daily)
+    return BudgetRange(
+        min_micro_usd=choices.lowest,
+        max_micro_usd=choices.highest,
+        step_micro_usd=choices.step,
+        default_micro_usd=choices.default,
+        remaining_daily_micro_usd=choices.remaining_daily,
+    )
+
+
 class RunIntentCheck(BaseModel):
     """Whether model-backed work could proceed. It creates no run and calls no model."""
 
@@ -121,3 +146,28 @@ class RunIntentCheck(BaseModel):
         "credential_invalid",
         "credential_unavailable",
     ]
+    # The budgets a person may choose now, D11. None when spend can't be read.
+    budget: BudgetRange | None = None
+
+
+class PreviewProfile(BaseModel):
+    """One profile and the roles that would resolve to it, HM-03."""
+
+    model_config = STRICT_CONTRACT
+
+    profile: ModelProfileId
+    label: str
+    canonical_id: str
+    roles: list[str]
+
+
+class RunPreview(BaseModel):
+    """What a run would use, read before Run. It creates nothing and calls no model."""
+
+    model_config = STRICT_CONTRACT
+
+    schema_version: Literal[1]
+    budget: BudgetRange | None
+    profiles: list[PreviewProfile]
+    # The tools the run would be granted, without the plan tools every goal run has.
+    tools: list[str]

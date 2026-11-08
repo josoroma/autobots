@@ -9,6 +9,8 @@ from uuid import UUID, uuid4
 ACTIVE = ("reserved", "dispatched")
 # What still counts against a budget, in full, because its cost isn't settled.
 OUTSTANDING = ("reserved", "dispatched", "uncertain")
+# The ledger's column default, for a workspace whose limits row doesn't exist yet.
+DEFAULT_DAILY_LIMIT_MICRO_USD = 5_000_000
 WARNING_PERCENT = 80
 
 
@@ -288,3 +290,25 @@ class ModelAdmission:
         )
         if await cursor.fetchone() is None:
             raise ValueError("this attempt is not awaiting reconciliation")
+
+
+async def remaining_daily_micro_usd(
+    connection: Any, workspace_id: UUID, *, at: datetime | None = None
+) -> int:
+    """What's left of the workspace's UTC-day cap, counted as `admit` counts it: outstanding
+    reservations plus reported charges. Reading it reserves nothing."""
+    day = (at or datetime.now(UTC)).astimezone(UTC).date()
+    cursor = await connection.execute(
+        "select daily_limit_micro_usd from app_private.model_spend_limits where workspace_id = %s",
+        (workspace_id,),
+    )
+    row = await cursor.fetchone()
+    limit = int(row[0]) if row else DEFAULT_DAILY_LIMIT_MICRO_USD
+    cursor = await connection.execute(
+        "select coalesce(sum(case when status = any(%(outstanding)s) then reserved_micro_usd "
+        "else coalesce(charged_micro_usd, 0) end), 0) from app_private.model_invocations "
+        "where workspace_id = %(workspace)s and spend_day = %(day)s",
+        {"outstanding": list(OUTSTANDING), "workspace": workspace_id, "day": day},
+    )
+    used = await cursor.fetchone()
+    return limit - int(used[0] if used else 0)

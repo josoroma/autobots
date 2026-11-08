@@ -743,6 +743,41 @@ export const schemas = {
     "title": "BudgetCounters",
     "type": "object"
   },
+  "BudgetRange": {
+    "additionalProperties": false,
+    "description": "US$0.25 to US$5.00 in US$0.25 steps, never above what's left of the daily cap (D11).",
+    "properties": {
+      "default_micro_usd": {
+        "title": "Default Micro Usd",
+        "type": "integer"
+      },
+      "max_micro_usd": {
+        "title": "Max Micro Usd",
+        "type": "integer"
+      },
+      "min_micro_usd": {
+        "title": "Min Micro Usd",
+        "type": "integer"
+      },
+      "remaining_daily_micro_usd": {
+        "title": "Remaining Daily Micro Usd",
+        "type": "integer"
+      },
+      "step_micro_usd": {
+        "title": "Step Micro Usd",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "min_micro_usd",
+      "max_micro_usd",
+      "step_micro_usd",
+      "default_micro_usd",
+      "remaining_daily_micro_usd"
+    ],
+    "title": "BudgetRange",
+    "type": "object"
+  },
   "CandidateDecision": {
     "additionalProperties": false,
     "properties": {
@@ -2723,6 +2758,38 @@ export const schemas = {
     "title": "PlanSummary",
     "type": "object"
   },
+  "PreviewProfile": {
+    "additionalProperties": false,
+    "description": "One profile and the roles that would resolve to it, HM-03.",
+    "properties": {
+      "canonical_id": {
+        "title": "Canonical Id",
+        "type": "string"
+      },
+      "label": {
+        "title": "Label",
+        "type": "string"
+      },
+      "profile": {
+        "$ref": "#/components/schemas/ModelProfileId"
+      },
+      "roles": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Roles",
+        "type": "array"
+      }
+    },
+    "required": [
+      "profile",
+      "label",
+      "canonical_id",
+      "roles"
+    ],
+    "title": "PreviewProfile",
+    "type": "object"
+  },
   "ProfileUpdate": {
     "additionalProperties": false,
     "description": "A new display name. The route checks 1 to 60 characters after trimming.",
@@ -3895,6 +3962,16 @@ export const schemas = {
     "additionalProperties": false,
     "description": "Whether model-backed work could proceed. It creates no run and calls no model.",
     "properties": {
+      "budget": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/BudgetRange"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
       "code": {
         "enum": [
           "ready",
@@ -4099,6 +4176,49 @@ export const schemas = {
     "title": "RunListItem",
     "type": "object"
   },
+  "RunPreview": {
+    "additionalProperties": false,
+    "description": "What a run would use, read before Run. It creates nothing and calls no model.",
+    "properties": {
+      "budget": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/BudgetRange"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "profiles": {
+        "items": {
+          "$ref": "#/components/schemas/PreviewProfile"
+        },
+        "title": "Profiles",
+        "type": "array"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "tools": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Tools",
+        "type": "array"
+      }
+    },
+    "required": [
+      "schema_version",
+      "budget",
+      "profiles",
+      "tools"
+    ],
+    "title": "RunPreview",
+    "type": "object"
+  },
   "RunRequest": {
     "additionalProperties": false,
     "description": "Not strict, since a UUID arrives here as a JSON string.",
@@ -4110,6 +4230,19 @@ export const schemas = {
         "maxItems": 20,
         "title": "Acceptance Criteria",
         "type": "array"
+      },
+      "budget_micro_usd": {
+        "anyOf": [
+          {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Budget Micro Usd"
       },
       "continues_run_id": {
         "anyOf": [
@@ -6284,6 +6417,18 @@ export function parseBudgetCounters(value: unknown): BudgetCounters {
   return parseWith(schemas, "BudgetCounters", value) as BudgetCounters;
 }
 
+export interface BudgetRange {
+  default_micro_usd: number;
+  max_micro_usd: number;
+  min_micro_usd: number;
+  remaining_daily_micro_usd: number;
+  step_micro_usd: number;
+}
+
+export function parseBudgetRange(value: unknown): BudgetRange {
+  return parseWith(schemas, "BudgetRange", value) as BudgetRange;
+}
+
 export interface CandidateDecision {
   decision: "promote" | "reject";
 }
@@ -6853,6 +6998,17 @@ export function parsePlanSummary(value: unknown): PlanSummary {
   return parseWith(schemas, "PlanSummary", value) as PlanSummary;
 }
 
+export interface PreviewProfile {
+  canonical_id: string;
+  label: string;
+  profile: ModelProfileId;
+  roles: string[];
+}
+
+export function parsePreviewProfile(value: unknown): PreviewProfile {
+  return parseWith(schemas, "PreviewProfile", value) as PreviewProfile;
+}
+
 export interface ProfileUpdate {
   display_name: string;
 }
@@ -7208,6 +7364,7 @@ export function parseRunInspector(value: unknown): RunInspector {
 }
 
 export interface RunIntentCheck {
+  budget?: BudgetRange | null;
   code: "ready" | "model_not_offered" | "credentials_required" | "credential_invalid" | "credential_unavailable";
   ready: boolean;
   schema_version: 1;
@@ -7253,8 +7410,20 @@ export function parseRunListItem(value: unknown): RunListItem {
   return parseWith(schemas, "RunListItem", value) as RunListItem;
 }
 
+export interface RunPreview {
+  budget: BudgetRange | null;
+  profiles: PreviewProfile[];
+  schema_version: 1;
+  tools: string[];
+}
+
+export function parseRunPreview(value: unknown): RunPreview {
+  return parseWith(schemas, "RunPreview", value) as RunPreview;
+}
+
 export interface RunRequest {
   acceptance_criteria?: string[];
+  budget_micro_usd?: number | null;
   continues_run_id?: string | null;
   expert_id?: string | null;
   expert_version?: number | null;
@@ -7846,6 +8015,10 @@ export async function setRoutineEnabled(options: ClientOptions, routine_id: stri
 
 export async function addRoutineVersion(options: ClientOptions, routine_id: string, body: RoutineRevision): Promise<RoutineView> {
   return parseRoutineView(await requestJson(options, "POST", `/v1/routines/${encodeURIComponent(routine_id)}/versions`, body));
+}
+
+export async function previewRun(options: ClientOptions): Promise<RunPreview> {
+  return parseRunPreview(await requestJson(options, "GET", `/v1/run-preview`));
 }
 
 export async function listRuns(options: ClientOptions): Promise<RunList> {

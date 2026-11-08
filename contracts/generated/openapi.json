@@ -742,6 +742,41 @@
         "title": "BudgetCounters",
         "type": "object"
       },
+      "BudgetRange": {
+        "additionalProperties": false,
+        "description": "US$0.25 to US$5.00 in US$0.25 steps, never above what's left of the daily cap (D11).",
+        "properties": {
+          "default_micro_usd": {
+            "title": "Default Micro Usd",
+            "type": "integer"
+          },
+          "max_micro_usd": {
+            "title": "Max Micro Usd",
+            "type": "integer"
+          },
+          "min_micro_usd": {
+            "title": "Min Micro Usd",
+            "type": "integer"
+          },
+          "remaining_daily_micro_usd": {
+            "title": "Remaining Daily Micro Usd",
+            "type": "integer"
+          },
+          "step_micro_usd": {
+            "title": "Step Micro Usd",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "min_micro_usd",
+          "max_micro_usd",
+          "step_micro_usd",
+          "default_micro_usd",
+          "remaining_daily_micro_usd"
+        ],
+        "title": "BudgetRange",
+        "type": "object"
+      },
       "CandidateDecision": {
         "additionalProperties": false,
         "properties": {
@@ -2722,6 +2757,38 @@
         "title": "PlanSummary",
         "type": "object"
       },
+      "PreviewProfile": {
+        "additionalProperties": false,
+        "description": "One profile and the roles that would resolve to it, HM-03.",
+        "properties": {
+          "canonical_id": {
+            "title": "Canonical Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ModelProfileId"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "profile",
+          "label",
+          "canonical_id",
+          "roles"
+        ],
+        "title": "PreviewProfile",
+        "type": "object"
+      },
       "ProfileUpdate": {
         "additionalProperties": false,
         "description": "A new display name. The route checks 1 to 60 characters after trimming.",
@@ -3894,6 +3961,16 @@
         "additionalProperties": false,
         "description": "Whether model-backed work could proceed. It creates no run and calls no model.",
         "properties": {
+          "budget": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BudgetRange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "code": {
             "enum": [
               "ready",
@@ -4098,6 +4175,49 @@
         "title": "RunListItem",
         "type": "object"
       },
+      "RunPreview": {
+        "additionalProperties": false,
+        "description": "What a run would use, read before Run. It creates nothing and calls no model.",
+        "properties": {
+          "budget": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BudgetRange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewProfile"
+            },
+            "title": "Profiles",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "schema_version",
+          "budget",
+          "profiles",
+          "tools"
+        ],
+        "title": "RunPreview",
+        "type": "object"
+      },
       "RunRequest": {
         "additionalProperties": false,
         "description": "Not strict, since a UUID arrives here as a JSON string.",
@@ -4109,6 +4229,19 @@
             "maxItems": 20,
             "title": "Acceptance Criteria",
             "type": "array"
+          },
+          "budget_micro_usd": {
+            "anyOf": [
+              {
+                "maximum": 9007199254740991.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Micro Usd"
           },
           "continues_run_id": {
             "anyOf": [
@@ -8464,6 +8597,119 @@
           }
         },
         "summary": "Post Version"
+      }
+    },
+    "/v1/run-preview": {
+      "get": {
+        "description": "HM-03: the profiles each role would resolve to, the tools and the budgets, as admission\nwould see them now. It creates nothing and calls no model.",
+        "operationId": "previewRun",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "run_profile",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ModelProfileId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Profile"
+            }
+          },
+          {
+            "in": "query",
+            "name": "expert_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Expert Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunPreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Run"
       }
     },
     "/v1/runs": {

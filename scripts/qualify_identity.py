@@ -228,6 +228,8 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
     # The arranged installation key. Only workspace B is granted it, so A exercises the app store.
     (config_root / '.env.local').write_text('OPENROUTER_API_KEY=sk-or-valid-arranged-installation\\n')
     stack.sql(f"insert into app_private.installation_credential_grants values ('{workspace_b}');\\n")
+    if artifacts.get('AUTOBOTS_TEST_COMPOSER_WORKSPACE'):
+        stack.sql(f"insert into app_private.installation_credential_grants values ('{artifacts['AUTOBOTS_TEST_COMPOSER_WORKSPACE']}');\\n")
     upstream_log = root / '.checks/identity/upstream.log'
     upstream_log.parent.mkdir(parents=True, exist_ok=True)
     upstream_log.write_text('')
@@ -267,7 +269,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
                                      'AUTOBOTS_TEST_SERVICE_KEY': stack.values['SERVICE_ROLE_KEY'], 'AUTOBOTS_WEB_REPORT': str(report),
                                      'AUTOBOTS_WEB_OUTPUT': str(root / '.checks/identity/results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots),
                                      'AUTOBOTS_TEST_VISUAL_DIR': str(root / '.checks/identity/visual')}
-        result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'browser/operations', 'approvals', 'effects', 'experts', 'models', 'identity', 'settings', 'runs', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
+        result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'browser/operations', 'approvals', 'effects', 'experts', 'models', 'composer', 'identity', 'settings', 'runs', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
                                 env=browser_env)
         # A real restart, then Settings reads the stored records. Then one is removed, under the same key.
         stop(processes[0])
@@ -492,6 +494,23 @@ def qualify(root: Path) -> int:
                     (sources['sources'].get('executor'), sources['sources'].get('coder'), sources['sources'].get('researcher'))
                     == ('run_override', 'workspace_override', 'builtin_default'))
         artifacts = {**artifacts, 'AUTOBOTS_TEST_MODELS_EMAIL': email_i, 'AUTOBOTS_TEST_MODELS_PASSWORD': password_i, 'AUTOBOTS_TEST_MODELS_RUN': sources['run_id']}
+        # US-15.9, arranged: an owner whose workspace uses the installation key and has US$2.10 left of its
+        # daily cap, as US$2.90 was charged today, with one Expert for the composer's Expert chip.
+        email_j, password_j = 'composer-j@example.invalid', secrets.token_urlsafe(24)
+        composer = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_j, password_j)
+        composed, spent_run, helper = composer['workspace_id'], '66666666-6666-4666-8666-000000000001', '66666666-6666-4666-8666-000000000002'
+        arranged_spend = stack.runtime(
+            f"insert into public.runs (id, workspace_id, status, goal_summary, limit_micro_usd, policy_snapshot) values "
+            f"('{spent_run}', '{composed}', 'succeeded', 'Spent earlier today', 5000000, '{{}}');\n"
+            "insert into app_private.model_invocations (id, workspace_id, root_run_id, run_id, role, profile, wire_id, attempt, spend_day, "
+            "reserved_micro_usd, charged_micro_usd, status) values "
+            f"(gen_random_uuid(), '{composed}', '{spent_run}', '{spent_run}', 'executor', 'openrouter_terra', 'w', 1, (now() at time zone 'utc')::date, 0, 2900000, 'succeeded');\n"
+            f"insert into public.experts (id, workspace_id, name, latest_version) values ('{helper}', '{composed}', 'Composer helper', 1);\n"
+            f"insert into public.expert_versions (expert_id, version, config, created_by) values ('{helper}', 1, "
+            f"'{{\"tools\": [\"calculate\", \"read_csv\"], \"role_bindings\": {{\"executor\": \"openrouter_sol\"}}}}', '{composer['user_id']}');\n")
+        cases.check('the composer workspace is arranged', 'exit 0', f'exit {arranged_spend.returncode}: {arranged_spend.stderr[-200:]}', arranged_spend.returncode == 0)
+        artifacts = {**artifacts, 'AUTOBOTS_TEST_COMPOSER_EMAIL': email_j, 'AUTOBOTS_TEST_COMPOSER_PASSWORD': password_j,
+                     'AUTOBOTS_TEST_COMPOSER_WORKSPACE': composed, 'AUTOBOTS_TEST_COMPOSER_EXPERT': helper}
         # Its own workspace with no key, as the one above asserts that it holds exactly one run.
         email_e, password_e = 'owner-e@example.invalid', secrets.token_urlsafe(24)
         owner_e = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_e, password_e)

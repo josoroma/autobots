@@ -1,12 +1,23 @@
 "use client";
 
+import {
+  parseExpertList,
+  parseModelList,
+  parseRunPreview,
+  type ExpertList,
+  type ModelList,
+  type RunPreview,
+} from "@autobots/api-client";
 import Link from "next/link";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { FileText, Paperclip, Play, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { RunDisclosure } from "@/components/run-disclosure";
+import {
+  DEFAULT_BUDGET_MICRO_USD,
+  RunDisclosure,
+} from "@/components/run-disclosure";
 import {
   Card,
   CardDescription,
@@ -14,7 +25,7 @@ import {
   CardTitle,
   INNER_BOX,
 } from "@/components/ui/card";
-import { Input, Textarea } from "@/components/ui/field";
+import { Input, Select, Textarea } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
 
@@ -49,7 +60,29 @@ type Attached = {
   path: string;
   media_type: string;
   content: string;
+  size: number;
 };
+
+// HM-02: a file chip shows its size in bytes, KB or MB.
+function fileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1_048_576) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1_048_576).toFixed(1)} MB`;
+}
+
+function dollars(micro: number): string {
+  return `US$${(micro / 1_000_000).toFixed(2)}`;
+}
+
+// Chips read as one row of compact, labelled native selects (Decision 0021: no box shadows).
+// A chip wraps its label above the select when narrow, and the select shrinks to the row, so nothing
+// scrolls sideways at 400% zoom. The select keeps its own right padding for the chevron.
+const CHIP =
+  "flex min-w-0 max-w-full flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px]";
+const CHIP_CONTROL = "min-w-0 max-w-full";
+const CHIP_SELECT =
+  "h-8 w-auto max-w-full truncate rounded-full py-0 pl-3 text-[13px] leading-8";
+const NO_EXPERT = "";
 
 function inputPath(name: string, taken: readonly Attached[]): string {
   const base =
@@ -72,7 +105,9 @@ type Outcome =
   | "credential_unavailable"
   | "model_refused"
   | "error"
-  | "model_not_offered";
+  | "model_not_offered"
+  | "budget_refused"
+  | "session_failed";
 
 export function GoalComposer() {
   const restored = useSyncExternalStore(subscribe, storedDraft, () => "");
@@ -82,7 +117,89 @@ export function GoalComposer() {
   const [profile, setProfile] = useState("");
   const [files, setFiles] = useState<readonly Attached[]>([]);
   const [refusals, setRefusals] = useState<readonly string[]>([]);
+  const [expertId, setExpertId] = useState(NO_EXPERT);
+  const [chosenBudget, setChosenBudget] = useState<number | null>(null);
+  const [experts, setExperts] = useState<ExpertList | null>(null);
+  const [models, setModels] = useState<ModelList | null>(null);
+  const [preview, setPreview] = useState<RunPreview | null>(null);
+  const [previewFailed, setPreviewFailed] = useState(false);
+  const [refusal, setRefusal] = useState<string | null>(null);
   const draft = edited ?? restored;
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      fetch("/api/v1/experts", { cache: "no-store" }),
+      fetch("/api/models", { cache: "no-store" }),
+    ])
+      .then(async ([expertReply, modelReply]) => {
+        if (!active) return;
+        if (expertReply.ok) {
+          setExperts(parseExpertList(await expertReply.json()));
+        } else {
+          await expertReply.text();
+        }
+        if (modelReply.ok) {
+          setModels(parseModelList(await modelReply.json()));
+        } else {
+          await modelReply.text();
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // HM-03: what the run would use, from the server, for the current choices. Reading it starts nothing.
+  useEffect(() => {
+    let active = true;
+    const query = new URLSearchParams();
+    if (profile !== "") query.set("run_profile", profile);
+    if (expertId !== NO_EXPERT) query.set("expert_id", expertId);
+    const suffix = query.toString();
+    fetch(`/api/v1/run-preview${suffix === "" ? "" : `?${suffix}`}`, {
+      cache: "no-store",
+    })
+      .then(async (reply) => {
+        if (!active) return;
+        if (!reply.ok) {
+          await reply.text();
+          setPreviewFailed(true);
+          return;
+        }
+        setPreview(parseRunPreview(await reply.json()));
+        setPreviewFailed(false);
+      })
+      .catch(() => {
+        if (active) setPreviewFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [profile, expertId]);
+
+  const range = preview?.budget ?? null;
+  const budgetSteps: number[] = [];
+  if (range !== null) {
+    for (
+      let value = range.min_micro_usd;
+      value <= range.max_micro_usd;
+      value += range.step_micro_usd
+    ) {
+      budgetSteps.push(value);
+    }
+  }
+  const budgetLeft = range === null || budgetSteps.length > 0;
+  // The default until a choice is made, and never a value the server no longer offers.
+  const budget =
+    chosenBudget !== null && budgetSteps.includes(chosenBudget)
+      ? chosenBudget
+      : (range?.default_micro_usd ?? DEFAULT_BUDGET_MICRO_USD);
+  const expert = experts?.experts.find((item) => item.id === expertId) ?? null;
+  const expertBindings = expert?.versions.find(
+    (version) => version.version === expert.latest_version,
+  )?.config.role_bindings;
 
   async function attach(chosen: FileList | null): Promise<void> {
     const kept = [...files];
@@ -105,6 +222,7 @@ export function GoalComposer() {
           path: inputPath(file.name, kept),
           media_type: mediaType,
           content,
+          size: file.size,
         });
       }
     }
@@ -121,8 +239,37 @@ export function GoalComposer() {
     }
   }
 
+  // HM-02: with an Expert, a direct session starts first and the run belongs to it.
+  async function startSession(): Promise<string | null> {
+    const reply = await csrfFetch("/api/v1/sessions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": crypto.randomUUID(),
+      },
+      body: JSON.stringify({
+        kind: "direct",
+        experts: [{ expert_id: expertId }],
+      }),
+    }).catch(() => null);
+    if (reply?.ok !== true) {
+      await reply?.text().catch(() => null);
+      return null;
+    }
+    return ((await reply.json()) as { id: string }).id;
+  }
+
   async function run(): Promise<void> {
     setOutcome(null);
+    setRefusal(null);
+    let sessionId: string | null = null;
+    if (expertId !== NO_EXPERT) {
+      sessionId = await startSession();
+      if (sessionId === null) {
+        setOutcome("session_failed");
+        return;
+      }
+    }
     // One key per press, so a retried request admits one run and each new press is a new intent.
     const reply = await csrfFetch("/api/v1/runs", {
       method: "POST",
@@ -132,6 +279,8 @@ export function GoalComposer() {
       },
       body: JSON.stringify({
         goal_text: draft,
+        budget_micro_usd: budget,
+        ...(sessionId === null ? {} : { session_id: sessionId }),
         ...(profile === "" ? {} : { run_profile: profile }),
         ...(files.length === 0
           ? {}
@@ -154,7 +303,13 @@ export function GoalComposer() {
     }
     const failure = (await reply?.json().catch(() => null)) as {
       code?: string;
+      message?: string;
     } | null;
+    if (failure?.code?.startsWith("budget_") === true) {
+      setRefusal(failure.message ?? "That budget can't be used.");
+      setOutcome("budget_refused");
+      return;
+    }
     if (failure?.code === "model_not_offered") {
       setOutcome("model_not_offered");
       return;
@@ -186,8 +341,8 @@ export function GoalComposer() {
           </CardDescription>
         </div>
       </CardHeader>
-      {/* Document order stays goal, model choice, attachments, Run, and the card reads top to bottom in
-          that order, so Tab never climbs: the writing area, what the run would use, files, then Run. */}
+      {/* Document order stays goal, chips (model, Expert, budget), what the run would use, attachments,
+          Run, and the card reads top to bottom in that order, so Tab never climbs. */}
       <div className="flex flex-col gap-1 px-5 pt-4 pb-4">
         <label
           htmlFor="goal"
@@ -203,8 +358,140 @@ export function GoalComposer() {
           className="min-h-28 resize-y rounded-none border-transparent bg-transparent px-0 text-base leading-relaxed dark:bg-transparent"
         />
       </div>
-      <div className="border-t px-5 py-4">
-        <RunDisclosure chosen={profile} onChoose={setProfile} />
+      <div
+        role="group"
+        aria-label="Run options"
+        data-field="composer-chips"
+        className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t px-5 py-3"
+      >
+        <div className={CHIP} data-chip="models">
+          <label htmlFor="run-model" className="text-muted-foreground">
+            Model for this run
+          </label>
+          <div className={CHIP_CONTROL}>
+            <Select
+              id="run-model"
+              value={profile}
+              onChange={(event) => setProfile(event.target.value)}
+              className={CHIP_SELECT}
+            >
+              <option value="">The workspace setting</option>
+              {(models?.models ?? [])
+                .filter((model) => model.offered)
+                .map((model) => (
+                  <option key={model.profile} value={model.profile}>
+                    {model.canonical_id}
+                  </option>
+                ))}
+            </Select>
+          </div>
+        </div>
+        <div className={CHIP} data-chip="expert">
+          <label htmlFor="run-expert" className="text-muted-foreground">
+            Expert
+          </label>
+          <div className={CHIP_CONTROL}>
+            <Select
+              id="run-expert"
+              value={expertId}
+              onChange={(event) => setExpertId(event.target.value)}
+              className={CHIP_SELECT}
+            >
+              <option value={NO_EXPERT}>No Expert, a goal run</option>
+              {(experts?.experts ?? []).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
+        <div className={CHIP} data-chip="budget">
+          <label htmlFor="run-budget" className="text-muted-foreground">
+            Budget
+          </label>
+          <div className={CHIP_CONTROL}>
+            <Select
+              id="run-budget"
+              value={budgetLeft ? String(budget) : ""}
+              disabled={!budgetLeft}
+              onChange={(event) => setChosenBudget(Number(event.target.value))}
+              className={cn(CHIP_SELECT, "tabular-nums")}
+            >
+              {range === null ? (
+                <option value={String(budget)}>{dollars(budget)}</option>
+              ) : budgetLeft ? (
+                budgetSteps.map((value) => (
+                  <option key={value} value={String(value)}>
+                    {dollars(value)}
+                  </option>
+                ))
+              ) : (
+                <option value="">Nothing left today</option>
+              )}
+            </Select>
+          </div>
+        </div>
+        {range === null ? null : (
+          <p
+            data-field="daily-left"
+            className="text-muted-foreground text-[12.5px] tabular-nums"
+          >
+            {dollars(Math.max(range.remaining_daily_micro_usd, 0))} left of
+            today&apos;s cap
+          </p>
+        )}
+      </div>
+      <div className="flex flex-col gap-3 border-t px-5 py-4">
+        <RunDisclosure
+          chosen={profile}
+          roleOverrides={expertBindings}
+          budgetMicroUsd={budget}
+        />
+        <div data-field="preview" className="flex flex-col gap-2 text-[13px]">
+          {previewFailed ? (
+            <p className="text-muted-foreground">
+              What this run would use can&apos;t be read right now.
+            </p>
+          ) : preview === null ? (
+            <p className="text-muted-foreground">Loading what it would use.</p>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-muted-foreground mr-1">Models</span>
+                <ul className="flex flex-wrap gap-1.5" aria-label="Models">
+                  {preview.profiles.map((item) => (
+                    <li
+                      key={item.profile}
+                      data-preview-profile={item.profile}
+                      title={item.roles.join(", ")}
+                      className="border-border rounded-full border px-2.5 py-0.5"
+                    >
+                      {item.label} ·{" "}
+                      {item.roles.length === 1
+                        ? item.roles[0]
+                        : `${item.roles.length} roles`}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-muted-foreground mr-1">Tools</span>
+                <ul className="flex flex-wrap gap-1.5" aria-label="Tools">
+                  {preview.tools.map((tool) => (
+                    <li
+                      key={tool}
+                      data-preview-tool={tool}
+                      className="border-border rounded-full border px-2.5 py-0.5 font-mono text-[12px]"
+                    >
+                      {tool}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          )}
+        </div>
       </div>
       <div
         className="flex flex-col gap-2 border-t px-5 pt-4"
@@ -251,9 +538,15 @@ export function GoalComposer() {
                   <FileText className="size-3.5" />
                 </span>
                 <span className="flex min-w-0 flex-col">
-                  <code className="truncate">{file.path}</code>
+                  <span data-field="file-name" className="truncate font-medium">
+                    {file.name}
+                  </span>
                   <span className="text-muted-foreground truncate text-[11.5px]">
-                    {file.media_type}
+                    <span data-field="file-type">{file.media_type}</span>
+                    {" · "}
+                    <span data-field="file-size" className="tabular-nums">
+                      {fileSize(file.size)}
+                    </span>
                   </span>
                 </span>
                 <Button
@@ -283,7 +576,7 @@ export function GoalComposer() {
       <div className="flex justify-end px-5 pt-2 pb-4">
         <Button
           onClick={() => void run()}
-          disabled={draft.trim() === ""}
+          disabled={draft.trim() === "" || !budgetLeft}
           size="lg"
           className="rounded-full px-5"
         >
@@ -321,6 +614,10 @@ export function GoalComposer() {
                 Change it in settings
               </Link>
             </>
+          ) : outcome === "budget_refused" ? (
+            <>{refusal} No run started. Your draft is kept.</>
+          ) : outcome === "session_failed" ? (
+            "The Expert's session could not be started, so no run started. Your draft is kept."
           ) : outcome === "model_refused" ? (
             "That model or request isn't approved, so no run started. Your draft is kept."
           ) : outcome === "queued" ? (

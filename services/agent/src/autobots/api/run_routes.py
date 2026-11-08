@@ -12,7 +12,7 @@ from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, provider_settings, require_owner
 from autobots.application.experts import ExpertRefused, resolve_binding
 from autobots.application.goal_loop import execution_block
-from autobots.application.model_admission import ModelAdmission
+from autobots.application.model_admission import ModelAdmission, remaining_daily_micro_usd
 from autobots.application.provider_settings import ProviderSettings
 from autobots.application.reconciliation import (
     ReconciliationRefused,
@@ -33,6 +33,7 @@ from autobots.application.runs import (
     store_receipt,
 )
 from autobots.application.tool_catalog import ToolsUnavailable, require_available
+from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.run_commands import (
     EffectEvidence,
     ModelCallReconciliation,
@@ -44,13 +45,18 @@ from autobots.contracts.run_commands import (
     RunRequest,
 )
 from autobots.contracts.runs import RunSummary
+from autobots.contracts.settings import PreviewProfile, RunPreview, budget_range
+from autobots.domain.budgets import BudgetRefused, require_budget
 from autobots.domain.models import (
+    PROFILES,
+    ModelProfileId,
     ProfileNotOffered,
     is_offered,
     require_offered,
     resolve_role_policy,
 )
 from autobots.domain.runs import Actor, CommandRefused, RunCommand
+from autobots.domain.tools import LOOP_TOOL_GRANTS, PLAN_TOOLS
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 Key = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)]
@@ -83,6 +89,83 @@ def as_api_error(error: Exception) -> ApiError:
     raise error
 
 
+BUDGET_MESSAGES = {
+    "budget_out_of_range": "Choose a budget from US$0.25 to US$5.00.",
+    "budget_off_step": "Choose a budget in steps of US$0.25.",
+    "budget_above_daily_cap": "That budget is more than what's left of today's spending cap.",
+}
+
+
+def budget_error(code: str) -> ApiError:
+    return ApiError(409 if code == "budget_above_daily_cap" else 422, code, BUDGET_MESSAGES[code])
+
+
+PROFILE_LABELS = {
+    ModelProfileId.DEEPSEEK_FLASH: "DeepSeek",
+    ModelProfileId.TERRA: "Terra",
+    ModelProfileId.SOL: "Sol",
+}
+
+
+@router.get("/run-preview", operation_id="previewRun", response_model=RunPreview)
+async def preview_run(
+    request: Request,
+    workspace_id: Annotated[UUID, Depends(current_workspace)],
+    run_profile: ModelProfileId | None = None,
+    expert_id: UUID | None = None,
+) -> RunPreview:
+    """HM-03: the profiles each role would resolve to, the tools and the budgets, as admission
+    would see them now. It creates nothing and calls no model."""
+    async with _pool(request).connection() as connection:
+        row = await (
+            await connection.execute(
+                "select default_profile, role_overrides from app_private.model_policies "
+                "where workspace_id = %s",
+                (workspace_id,),
+            )
+        ).fetchone()
+        role_bindings: dict[str, str] | None = None
+        tools = sorted(tool for tool in LOOP_TOOL_GRANTS if tool not in PLAN_TOOLS)
+        if expert_id is not None:
+            found = await (
+                await connection.execute(
+                    "select v.config from public.experts e join public.expert_versions v "
+                    "on v.expert_id = e.id and v.version = e.latest_version "
+                    "where e.id = %s and e.workspace_id = %s",
+                    (expert_id, workspace_id),
+                )
+            ).fetchone()
+            if found is None:
+                raise ApiError(404, "expert_not_found", "That Expert is not available.")
+            config = ExpertConfig.model_validate(found[0])
+            role_bindings = {role: profile.value for role, profile in config.role_bindings.items()}
+            tools = sorted(config.tools)
+        remaining = await remaining_daily_micro_usd(connection, workspace_id)
+    policy = resolve_role_policy(
+        run_role_overrides=role_bindings,
+        run_profile=run_profile.value if run_profile else None,
+        workspace_default=row[0] if row else None,
+        workspace_role_overrides=row[1] if row else None,
+    )
+    grouped: dict[ModelProfileId, list[str]] = {}
+    for role, profile in policy.bindings.items():
+        grouped.setdefault(profile, []).append(role.value)
+    return RunPreview(
+        schema_version=1,
+        budget=budget_range(remaining),
+        profiles=[
+            PreviewProfile(
+                profile=profile,
+                label=PROFILE_LABELS[profile],
+                canonical_id=PROFILES[profile].canonical_id,
+                roles=roles,
+            )
+            for profile, roles in sorted(grouped.items(), key=lambda item: -len(item[1]))
+        ],
+        tools=tools,
+    )
+
+
 @router.post(
     "/runs",
     operation_id="admitRun",
@@ -100,6 +183,17 @@ async def post_run(
 ) -> RunAccepted:
     if body.session_id is None and (body.expert_id is not None or body.expert_version is not None):
         raise ApiError(422, "session_required", "An Expert is chosen through a session.")
+    limit = body.limit_micro_usd
+    if body.budget_micro_usd is not None:
+        if "limit_micro_usd" in body.model_fields_set:
+            raise ApiError(422, "budget_conflict", "Choose a budget or a limit, not both.")
+        async with _pool(request).connection() as connection:
+            remaining = await remaining_daily_micro_usd(connection, workspace_id)
+        try:
+            require_budget(body.budget_micro_usd, remaining)
+        except BudgetRefused as refused:
+            raise budget_error(refused.code) from None
+        limit = body.budget_micro_usd
     code = await settings.run_intent(workspace_id)
     if code != "ready":
         raise ApiError(409, code, "Model-backed work needs a usable OpenRouter key.")
@@ -160,7 +254,7 @@ async def post_run(
                 started_by=user_id,
                 idempotency_key=idempotency_key,
                 goal_text=body.goal_text,
-                limit_micro_usd=body.limit_micro_usd,
+                limit_micro_usd=limit,
                 acceptance_criteria=tuple(body.acceptance_criteria),
                 continues_run_id=body.continues_run_id,
                 required_artifacts=tuple(body.required_artifacts),
