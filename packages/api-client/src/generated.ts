@@ -1695,6 +1695,32 @@ export const schemas = {
     "title": "FrozenBinding",
     "type": "object"
   },
+  "GrantedTo": {
+    "additionalProperties": false,
+    "description": "An Expert or a published workflow that grants a tool, with the version that does.",
+    "properties": {
+      "id": {
+        "format": "uuid",
+        "title": "Id",
+        "type": "string"
+      },
+      "name": {
+        "title": "Name",
+        "type": "string"
+      },
+      "version": {
+        "title": "Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "version"
+    ],
+    "title": "GrantedTo",
+    "type": "object"
+  },
   "HTTPValidationError": {
     "properties": {
       "detail": {
@@ -4949,6 +4975,43 @@ export const schemas = {
     "title": "ToolDescriptor",
     "type": "object"
   },
+  "ToolGrants": {
+    "additionalProperties": false,
+    "description": "PRD-Studio TL-02: latest Expert versions, and published workflows through agent steps.",
+    "properties": {
+      "experts": {
+        "items": {
+          "$ref": "#/components/schemas/GrantedTo"
+        },
+        "title": "Experts",
+        "type": "array"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "tool_id": {
+        "title": "Tool Id",
+        "type": "string"
+      },
+      "workflows": {
+        "items": {
+          "$ref": "#/components/schemas/GrantedTo"
+        },
+        "title": "Workflows",
+        "type": "array"
+      }
+    },
+    "required": [
+      "schema_version",
+      "tool_id",
+      "experts",
+      "workflows"
+    ],
+    "title": "ToolGrants",
+    "type": "object"
+  },
   "ToolGroupDescriptor": {
     "additionalProperties": false,
     "properties": {
@@ -6417,6 +6480,16 @@ export function parseFrozenBinding(value: unknown): FrozenBinding {
   return parseWith(schemas, "FrozenBinding", value) as FrozenBinding;
 }
 
+export interface GrantedTo {
+  id: string;
+  name: string;
+  version: number;
+}
+
+export function parseGrantedTo(value: unknown): GrantedTo {
+  return parseWith(schemas, "GrantedTo", value) as GrantedTo;
+}
+
 export interface HTTPValidationError {
   detail?: ValidationError[];
 }
@@ -7296,6 +7369,17 @@ export function parseToolDescriptor(value: unknown): ToolDescriptor {
   return parseWith(schemas, "ToolDescriptor", value) as ToolDescriptor;
 }
 
+export interface ToolGrants {
+  experts: GrantedTo[];
+  schema_version: 1;
+  tool_id: string;
+  workflows: GrantedTo[];
+}
+
+export function parseToolGrants(value: unknown): ToolGrants {
+  return parseWith(schemas, "ToolGrants", value) as ToolGrants;
+}
+
 export interface ToolGroupDescriptor {
   description: string;
   group: "planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning";
@@ -7762,6 +7846,10 @@ export async function listTools(options: ClientOptions): Promise<ToolCatalog> {
 
 export async function getToolVersions(options: ClientOptions, tool_id: string): Promise<ToolVersions> {
   return parseToolVersions(await requestJson(options, "GET", `/v1/tools/${encodeURIComponent(tool_id)}`));
+}
+
+export async function getToolGrants(options: ClientOptions, tool_id: string): Promise<ToolGrants> {
+  return parseToolGrants(await requestJson(options, "GET", `/v1/tools/${encodeURIComponent(tool_id)}/grants`));
 }
 
 export async function getToolVersion(options: ClientOptions, tool_id: string, version: string): Promise<ToolDescriptor> {

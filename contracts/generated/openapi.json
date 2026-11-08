@@ -1694,6 +1694,32 @@
         "title": "FrozenBinding",
         "type": "object"
       },
+      "GrantedTo": {
+        "additionalProperties": false,
+        "description": "An Expert or a published workflow that grants a tool, with the version that does.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "version"
+        ],
+        "title": "GrantedTo",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -4946,6 +4972,43 @@
           "availability_reason"
         ],
         "title": "ToolDescriptor",
+        "type": "object"
+      },
+      "ToolGrants": {
+        "additionalProperties": false,
+        "description": "PRD-Studio TL-02: latest Expert versions, and published workflows through agent steps.",
+        "properties": {
+          "experts": {
+            "items": {
+              "$ref": "#/components/schemas/GrantedTo"
+            },
+            "title": "Experts",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "tool_id": {
+            "title": "Tool Id",
+            "type": "string"
+          },
+          "workflows": {
+            "items": {
+              "$ref": "#/components/schemas/GrantedTo"
+            },
+            "title": "Workflows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "schema_version",
+          "tool_id",
+          "experts",
+          "workflows"
+        ],
+        "title": "ToolGrants",
         "type": "object"
       },
       "ToolGroupDescriptor": {
@@ -10881,6 +10944,94 @@
           }
         },
         "summary": "Get Tool"
+      }
+    },
+    "/v1/tools/{tool_id}/grants": {
+      "get": {
+        "operationId": "getToolGrants",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tool_id",
+            "required": true,
+            "schema": {
+              "title": "Tool Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolGrants"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Tool Grants"
       }
     },
     "/v1/tools/{tool_id}/versions/{version}": {

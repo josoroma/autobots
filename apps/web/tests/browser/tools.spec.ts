@@ -144,3 +144,48 @@ test("a tool's detail lists its versions and every field", async ({ page }) => {
   );
   await expect(page.getByText("Unavailable: key not set")).toBeVisible();
 });
+
+// US-15.7: group counts, a text filter in the URL, the side panel and Copy schema.
+test("group counts, text filter, side panel and Copy schema", async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await signedIn(page, "/tools");
+  for (const section of await page.locator("[data-group]").all()) {
+    const rows = await section.locator("[data-tool]").count();
+    await expect(section.locator('[data-field="count"]')).toHaveText(
+      `${rows} ${rows === 1 ? "tool" : "tools"}`,
+    );
+  }
+  await page.getByRole("searchbox", { name: "Search" }).fill("calculate");
+  await expect(page).toHaveURL(/[?&]q=calculate/);
+  await expect(page.locator("[data-tool]")).toHaveCount(1);
+  await expect(page.locator('[data-tool="calculate"]')).toBeVisible();
+
+  await page
+    .locator('[data-tool="calculate"]')
+    .getByRole("link", { name: "Calculate" })
+    .click();
+  await expect(page).toHaveURL(/[?&]tool=calculate/);
+  await expect(page).toHaveURL(/[?&]q=calculate/);
+  const panel = page.locator('[data-panel="calculate"]');
+  await expect(panel.getByRole("heading", { name: "Calculate" })).toBeVisible();
+  await expect(
+    panel.getByRole("link", { name: "Open as a page" }),
+  ).toHaveAttribute("href", "/tools/calculate");
+
+  await panel.getByRole("button", { name: "Copy schema" }).click();
+  await expect(panel.locator('[data-message="copied"]')).toHaveText(
+    "Copied the input schema of version 1.",
+  );
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  const version = await (
+    await page.request.get("/api/v1/tools/calculate/versions/1")
+  ).json();
+  expect(JSON.parse(copied)).toEqual(version.input_schema);
+  await noViolations(page);
+
+  await page.goto("/tools/calculate");
+  await expect(page.getByRole("heading", { name: "Calculate" })).toBeVisible();
+});

@@ -4,16 +4,19 @@ import os
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from autobots.api.errors import ApiError
 from autobots.api.security import require_internal
 from autobots.api.settings_routes import current_workspace
 from autobots.application.tool_catalog import all_descriptors, tool_catalog
+from autobots.application.tool_grants import tool_grants
 from autobots.contracts.tools import (
     AvailabilityName,
+    GrantedTo,
     ToolCatalog,
     ToolDescriptor,
+    ToolGrants,
     ToolGroupName,
     ToolProviderName,
     ToolVersions,
@@ -55,3 +58,19 @@ async def get_tool_version(tool_id: str, version: int, _: Member) -> ToolDescrip
         if item.version == version:
             return item
     raise ApiError(404, "tool_version_not_found", "That tool version isn't in the catalog.")
+
+
+@router.get("/tools/{tool_id}/grants", operation_id="getToolGrants", response_model=ToolGrants)
+async def get_tool_grants(tool_id: str, request: Request, workspace: Member) -> ToolGrants:
+    _versions(tool_id)
+    pool = request.app.state.pool
+    if pool is None:
+        raise ApiError(503, "service_unavailable", "The database is unavailable.")
+    async with pool.connection() as connection:
+        experts, workflows = await tool_grants(connection, workspace, tool_id)
+    return ToolGrants(
+        schema_version=1,
+        tool_id=tool_id,
+        experts=[GrantedTo(id=i, name=n, version=v) for i, n, v in experts],
+        workflows=[GrantedTo(id=i, name=n, version=v) for i, n, v in workflows],
+    )

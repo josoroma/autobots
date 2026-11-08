@@ -1,6 +1,7 @@
 """Versioned input and output contracts for the narrow tool set."""
 
 from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -246,3 +247,24 @@ class StoreRemoteFileOutput(BaseModel):
     sha256: str
     size_bytes: int
     media_type: TextMediaType
+
+
+class GrantedTo(BaseModel):
+    """An Expert or a published workflow that grants a tool, with the version that does."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: UUID
+    name: str
+    version: int
+
+
+class ToolGrants(BaseModel):
+    """PRD-Studio TL-02: latest Expert versions, and published workflows through agent steps."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal[1]
+    tool_id: str
+    experts: list[GrantedTo]
+    workflows: list[GrantedTo]

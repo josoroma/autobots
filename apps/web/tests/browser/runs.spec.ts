@@ -296,15 +296,26 @@ test("status tabs, filters, paging and estimated spend on Runs", async ({
   );
 
   await tab("all").click();
+  const searched = page.waitForResponse((reply) =>
+    reply.url().includes("q=fully+reported"),
+  );
   await page
     .getByPlaceholder("Filter by goal or Expert")
     .fill("fully reported");
+  await searched;
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toHaveAttribute("data-run", REPORTED);
   await expect(tab("all")).toHaveText("All 1");
 
   await page.getByPlaceholder("Filter by goal or Expert").fill("");
+  // Wait for the filtered page itself, so a row left from the text filter can't satisfy the count.
+  const filtered = page.waitForResponse(
+    (reply) =>
+      reply.url().includes("profile=openrouter_sol") &&
+      !reply.url().includes("q="),
+  );
   await page.getByLabel("Model").selectOption("openrouter_sol");
+  await filtered;
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toHaveAttribute("data-run", HELD);
   await expect(

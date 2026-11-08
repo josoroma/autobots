@@ -71,6 +71,7 @@ def test_the_schema_builds_without_any_connection() -> None:
         "/v1/settings/model-providers/openrouter/validate",
         "/v1/tools",
         "/v1/tools/{tool_id}",
+        "/v1/tools/{tool_id}/grants",
         "/v1/tools/{tool_id}/versions/{version}",
         "/v1/workspaces/{workspace_id}",
     }

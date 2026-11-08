@@ -469,10 +469,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.6#1 | Add each Expert's run count and last run time to the Expert read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | DONE | US-15.6 |
 | US-15.6#2 | Render the card facts, Start run, the approval note, the filters with counts and the search on Experts. | DONE | US-15.6 |
 | US-15.6#3 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.6 |
-| US-15.7 | Tools side panel, Granted to and Copy schema | READY | EPIC-15 |
-| US-15.7#1 | Derive Granted to from the latest Expert versions and the agent steps of published workflows in the application layer, and expose it in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.7 |
-| US-15.7#2 | Render the group list with counts, the text filter, the side panel and Copy schema, keeping `/tools/{tool_id}`. | TODO | US-15.7 |
-| US-15.7#3 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.7 |
+| US-15.7 | Tools side panel, Granted to and Copy schema | DONE | EPIC-15 |
+| US-15.7#1 | Derive Granted to from the latest Expert versions and the agent steps of published workflows in the application layer, and expose it in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | DONE | US-15.7 |
+| US-15.7#2 | Render the group list with counts, the text filter, the side panel and Copy schema, keeping `/tools/{tool_id}`. | DONE | US-15.7 |
+| US-15.7#3 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.7 |
 | US-15.8 | Model catalog facts, binding source and form actions | READY | EPIC-15 |
 | US-15.8#1 | Add catalog prices per 1M tokens, supported parameters, the fetch time and each role binding's source to the model read models in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.8 |
 | US-15.8#2 | Add a Reset all write that clears role overrides under the expected version. | TODO | US-15.8 |
@@ -6284,7 +6284,8 @@ Open Questions:
 
 ### US-15.7: Tools side panel, Granted to and Copy schema
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-15-7-tools-side-panel-granted/`
 
 As a workspace member
 I want the tool list grouped with counts, each tool's detail beside it with who it's granted to, and its input schema one press away
@@ -6322,9 +6323,9 @@ Dependencies:
 - US-6.1
 
 Tasks:
-- [ ] Derive Granted to from the latest Expert versions and the agent steps of published workflows in the application layer, and expose it in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
-- [ ] Render the group list with counts, the text filter, the side panel and Copy schema, keeping `/tools/{tool_id}`.
-- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+- [x] Derive Granted to from the latest Expert versions and the agent steps of published workflows in the application layer, and expose it in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
+- [x] Render the group list with counts, the text filter, the side panel and Copy schema, keeping `/tools/{tool_id}`.
+- [x] Cover the scenarios on a disposable stack and in browser specs with axe.
 
 Open Questions:
 - None.

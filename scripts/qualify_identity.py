@@ -461,6 +461,21 @@ def qualify(root: Path) -> int:
             + "insert into public.runs (id, workspace_id, status, goal_summary, limit_micro_usd, expert_id, created_at) "
               f"select gen_random_uuid(), '{curated}', 'succeeded', 'Watch ' || n, 1000000, '{expert_rows[0][0]}', now() - make_interval(mins => 10 * n) "
               "from generate_series(1, 3) n;\n")
+
+        # US-15.7, arranged: an Expert that granted read_csv only in an older version, and a published
+        # workflow whose agent step uses Issue triager, which grants read_csv now.
+        old_granter, flow = '55555555-5555-4555-8555-000000000004', '55555555-5555-4555-8555-000000000005'
+        graph = ('{"nodes": [{"id": "start", "block": "input", "version": 1, "config": {}}, '
+                 f'{{"id": "triage", "block": "agent", "version": 1, "config": {{"expert_id": "{expert_rows[1][0]}"}}}}, '
+                 '{"id": "done", "block": "output", "version": 1, "config": {}}], "links": []}')
+        stack.runtime(
+            f"insert into public.experts (id, workspace_id, name, latest_version) values ('{old_granter}', '{curated}', 'Old granter', 2);\n"
+            f"insert into public.expert_versions (expert_id, version, config, created_by) values "
+            f"('{old_granter}', 1, '{{\"tools\": [\"read_csv\"]}}', '{curator['user_id']}'), "
+            f"('{old_granter}', 2, '{{\"tools\": [\"calculate\"]}}', '{curator['user_id']}');\n"
+            f"insert into public.workflows (id, workspace_id, name, latest_version) values ('{flow}', '{curated}', 'Nightly triage', 1);\n"
+            f"insert into public.workflow_versions (workflow_id, version, graph, graph_hash, block_versions, source, created_by) "
+            f"values ('{flow}', 1, '{graph}', 'arranged', '{{}}', 'user', '{curator['user_id']}');\n")
         artifacts = {**artifacts, 'AUTOBOTS_TEST_EXPERTS_EMAIL': email_h, 'AUTOBOTS_TEST_EXPERTS_PASSWORD': password_h}
         # Its own workspace with no key, as the one above asserts that it holds exactly one run.
         email_e, password_e = 'owner-e@example.invalid', secrets.token_urlsafe(24)

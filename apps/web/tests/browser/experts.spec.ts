@@ -505,7 +505,7 @@ test("US-14.5: a missing key refuses only a run or version that grants its tool"
   expect(JSON.stringify(catalog)).not.toContain("ghp_");
 });
 
-// US-15.6: three Experts arranged by SQL in their own workspace (scripts/qualify_identity.py).
+// US-15.6: Experts arranged by SQL (four, with US-15.7's older-version grant) in their own workspace (scripts/qualify_identity.py).
 const EXPERTS_EMAIL = process.env.AUTOBOTS_TEST_EXPERTS_EMAIL ?? "";
 const EXPERTS_PASSWORD = process.env.AUTOBOTS_TEST_EXPERTS_PASSWORD ?? "";
 
@@ -521,9 +521,9 @@ test("Expert cards show their facts, filters and the approval note", async ({
   await signIn(page, EXPERTS_EMAIL, EXPERTS_PASSWORD);
   await page.goto("/experts");
   const filter = (id: string) => page.locator(`[data-filter="${id}"]`);
-  await expect(filter("all")).toHaveText("All 3");
+  await expect(filter("all")).toHaveText("All 4");
   await expect(filter("outside")).toHaveText("Can change things outside 1");
-  await expect(filter("read_only")).toHaveText("Read only 2");
+  await expect(filter("read_only")).toHaveText("Read only 3");
 
   const watcher = cardOf(page, "Market watcher");
   await expect(watcher.locator('[data-field="role"]')).toHaveText(
@@ -555,7 +555,11 @@ test("Expert cards show their facts, filters and the approval note", async ({
   await filter("outside").click();
   expect(await names()).toEqual(["Issue triager"]);
   await filter("read_only").click();
-  expect((await names()).sort()).toEqual(["Brief writer", "Market watcher"]);
+  expect((await names()).sort()).toEqual([
+    "Brief writer",
+    "Market watcher",
+    "Old granter",
+  ]);
   await filter("all").click();
   await page.getByPlaceholder("Search Experts").fill("brief");
   expect(await names()).toEqual(["Brief writer"]);
@@ -576,4 +580,35 @@ test("Start run opens run creation with the disclosure, and sends nothing", asyn
   );
   const after = (await (await page.request.get("/api/v1/runs")).json()).total;
   expect(after).toBe(before);
+});
+
+// US-15.7: who a tool is granted to, from the latest Expert versions and published workflows.
+test("a tool's detail lists who it's granted to now", async ({ page }) => {
+  await signIn(page, EXPERTS_EMAIL, EXPERTS_PASSWORD);
+  await page.goto("/tools?tool=read_csv");
+  const panel = page.locator('[data-panel="read_csv"]');
+  const granted = panel.locator('[data-field="granted-to"]');
+  await expect(
+    granted.getByRole("link", { name: "Expert Market watcher, version 1" }),
+  ).toBeVisible();
+  await expect(
+    granted.getByRole("link", { name: "Expert Issue triager, version 1" }),
+  ).toBeVisible();
+  await expect(
+    granted.getByRole("link", { name: "Workflow Nightly triage, version 1" }),
+  ).toBeVisible();
+  await expect(granted).not.toContainText("Old granter");
+  const grants = await (
+    await page.request.get("/api/v1/tools/read_csv/grants")
+  ).json();
+  expect(
+    grants.experts.map((item: { name: string }) => item.name).sort(),
+  ).toEqual(["Issue triager", "Market watcher"]);
+  expect(grants.workflows.map((item: { name: string }) => item.name)).toEqual([
+    "Nightly triage",
+  ]);
+  const axe = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(axe.violations.map((item) => item.id)).toEqual([]);
 });

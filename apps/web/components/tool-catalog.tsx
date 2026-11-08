@@ -2,6 +2,7 @@
 
 import {
   parseToolCatalog,
+  parseToolGrants,
   parseToolVersions,
   type ToolCatalog,
   type ToolDescriptor,
@@ -34,7 +35,8 @@ import { type ReactNode, useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, IconTile } from "@/components/ui/card";
-import { Select } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
+import { Input, Select } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 
 // PRD-Tool-Catalog TS-01 to TS-03. Every state is said in words; a badge never stands for one alone.
@@ -150,6 +152,8 @@ export function ToolCatalogPanel() {
   const group = params.get("group") ?? "";
   const availability = params.get("availability") ?? "";
   const provider = params.get("provider") ?? "";
+  const query = (params.get("q") ?? "").trim().toLowerCase();
+  const selected = params.get("tool");
   const state = useLoaded("/api/v1/tools", parseToolCatalog);
 
   function choose(name: string, value: string): void {
@@ -180,8 +184,24 @@ export function ToolCatalogPanel() {
     (tool) =>
       (group === "" || tool.group === group) &&
       (availability === "" || tool.availability === availability) &&
-      (provider === "" || tool.provider === provider),
+      (provider === "" || tool.provider === provider) &&
+      (query === "" ||
+        `${tool.title} ${tool.tool_id} ${tool.description}`
+          .toLowerCase()
+          .includes(query)),
   );
+  // PRD-Studio TL-01: the detail opens beside the list, and the URL keeps it.
+  function panelHref(toolId: string): string {
+    const next = new URLSearchParams(params.toString());
+    next.set("tool", toolId);
+    return `${pathname}?${next.toString()}`;
+  }
+  function closeHref(): string {
+    const next = new URLSearchParams(params.toString());
+    next.delete("tool");
+    const rest = next.toString();
+    return rest === "" ? pathname : `${pathname}?${rest}`;
+  }
   const providers = [...new Set(catalog.tools.map((tool) => tool.provider))];
   return (
     <div className="space-y-5">
@@ -191,6 +211,16 @@ export function ToolCatalogPanel() {
           className="flex flex-wrap items-center gap-x-4 gap-y-2"
           onSubmit={(event) => event.preventDefault()}
         >
+          <label className={TOOLBAR_LABEL}>
+            <span>Search</span>
+            <Input
+              type="search"
+              defaultValue={params.get("q") ?? ""}
+              onChange={(event) => choose("q", event.target.value.trim())}
+              placeholder="Name, ID or description"
+              className="h-8 w-full sm:w-56"
+            />
+          </label>
           <label className={TOOLBAR_LABEL}>
             <span>Group</span>
             <Select
@@ -248,89 +278,134 @@ export function ToolCatalogPanel() {
           .
         </p>
       </div>
-      {catalog.groups
-        .filter((item) => shown.some((tool) => tool.group === item.group))
-        .map((item) => {
-          const Icon = GROUP_ICONS[item.group] ?? Wrench;
-          return (
-            <section
-              key={item.group}
-              aria-labelledby={`group-${item.group}`}
-              data-group={item.group}
-            >
-              <div className="mb-1 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
-                <h2
-                  id={`group-${item.group}`}
-                  className="text-[13.5px] font-semibold"
+      <div
+        className={cn(
+          "grid gap-6",
+          selected !== null && "lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]",
+        )}
+      >
+        <div className="min-w-0 space-y-5">
+          {catalog.groups
+            .filter((item) => shown.some((tool) => tool.group === item.group))
+            .map((item) => {
+              const inGroup = shown.filter((tool) => tool.group === item.group);
+              const Icon = GROUP_ICONS[item.group] ?? Wrench;
+              return (
+                <section
+                  key={item.group}
+                  aria-labelledby={`group-${item.group}`}
+                  data-group={item.group}
                 >
-                  {item.title}
-                </h2>
-                <p className="text-muted-foreground text-[12.5px]">
-                  {item.description}
-                </p>
-              </div>
-              <ul>
-                {shown
-                  .filter((tool) => tool.group === item.group)
-                  .map((tool) => {
-                    const fix = repair(tool);
-                    return (
-                      <li
-                        key={tool.tool_id}
-                        data-tool={tool.tool_id}
-                        className="border-border grid grid-cols-[30px_minmax(0,1fr)] items-start gap-x-3 gap-y-2 border-t px-3 py-2.5 sm:grid-cols-[30px_minmax(0,1fr)_auto]"
-                      >
-                        <IconTile
-                          icon={Icon}
-                          className="mt-0.5 size-[30px] rounded-lg"
-                        />
-                        <div className="min-w-0 space-y-1">
-                          <Link
-                            href={`/tools/${encodeURIComponent(tool.tool_id)}`}
-                            className="text-[13.5px] font-semibold underline-offset-4 hover:underline"
+                  <div className="mb-1 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+                    <h2
+                      id={`group-${item.group}`}
+                      className="text-[13.5px] font-semibold"
+                    >
+                      {item.title}
+                    </h2>
+                    <span
+                      data-field="count"
+                      className="text-muted-foreground text-[12.5px] tabular-nums"
+                    >
+                      {inGroup.length} {inGroup.length === 1 ? "tool" : "tools"}
+                    </span>
+                    <p className="text-muted-foreground text-[12.5px]">
+                      {item.description}
+                    </p>
+                  </div>
+                  <ul>
+                    {shown
+                      .filter((tool) => tool.group === item.group)
+                      .map((tool) => {
+                        const fix = repair(tool);
+                        return (
+                          <li
+                            key={tool.tool_id}
+                            data-tool={tool.tool_id}
+                            className="border-border grid grid-cols-[30px_minmax(0,1fr)] items-start gap-x-3 gap-y-2 border-t px-3 py-2.5 sm:grid-cols-[30px_minmax(0,1fr)_auto]"
                           >
-                            {tool.title}
-                          </Link>
-                          <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-                            <code className="font-mono text-[11.5px]">
-                              {tool.tool_id} v{tool.version}
-                            </code>
-                            <span>
-                              · {PROVIDERS[tool.provider] ?? tool.provider} ·{" "}
-                              {CLASSES[tool.operation_class] ??
-                                tool.operation_class}{" "}
-                              ·{" "}
-                              {tool.network
-                                ? "Leaves this Mac"
-                                : "Stays on this Mac"}{" "}
-                              · {COSTS[tool.cost_class] ?? tool.cost_class}
-                            </span>
-                          </p>
-                          <p className="text-[13px] leading-relaxed">
-                            {tool.description}
-                          </p>
-                          {fix === null ? null : (
-                            <p className="text-[13px]" data-field="repair">
-                              {fix}
-                            </p>
-                          )}
-                        </div>
-                        <div className="col-start-2 flex flex-wrap items-center gap-1.5 sm:col-start-3 sm:flex-col sm:items-end">
-                          <Availability tool={tool} />
-                          {tool.approval === "always" ? (
-                            <Badge variant="attention">
-                              <ShieldAlert aria-hidden="true" />
-                              Every call waits for a person
-                            </Badge>
-                          ) : null}
-                        </div>
-                      </li>
-                    );
-                  })}
-              </ul>
-            </section>
-          );
-        })}
+                            <IconTile
+                              icon={Icon}
+                              className="mt-0.5 size-[30px] rounded-lg"
+                            />
+                            <div className="min-w-0 space-y-1">
+                              <Link
+                                href={panelHref(tool.tool_id)}
+                                scroll={false}
+                                aria-current={
+                                  selected === tool.tool_id ? "true" : undefined
+                                }
+                                className="text-[13.5px] font-semibold underline-offset-4 hover:underline"
+                              >
+                                {tool.title}
+                              </Link>
+                              <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                                <code className="font-mono text-[11.5px]">
+                                  {tool.tool_id} v{tool.version}
+                                </code>
+                                <span>
+                                  · {PROVIDERS[tool.provider] ?? tool.provider}{" "}
+                                  ·{" "}
+                                  {CLASSES[tool.operation_class] ??
+                                    tool.operation_class}{" "}
+                                  ·{" "}
+                                  {tool.network
+                                    ? "Leaves this Mac"
+                                    : "Stays on this Mac"}{" "}
+                                  · {COSTS[tool.cost_class] ?? tool.cost_class}
+                                </span>
+                              </p>
+                              <p className="text-[13px] leading-relaxed">
+                                {tool.description}
+                              </p>
+                              {fix === null ? null : (
+                                <p className="text-[13px]" data-field="repair">
+                                  {fix}
+                                </p>
+                              )}
+                            </div>
+                            <div className="col-start-2 flex flex-wrap items-center gap-1.5 sm:col-start-3 sm:flex-col sm:items-end">
+                              <Availability tool={tool} />
+                              {tool.approval === "always" ? (
+                                <Badge variant="attention">
+                                  <ShieldAlert aria-hidden="true" />
+                                  Every call waits for a person
+                                </Badge>
+                              ) : null}
+                            </div>
+                          </li>
+                        );
+                      })}
+                  </ul>
+                </section>
+              );
+            })}
+        </div>
+        {selected === null ? null : (
+          <aside
+            aria-label="Tool detail"
+            data-panel={selected}
+            className="min-w-0 space-y-3 lg:sticky lg:top-6 lg:self-start"
+          >
+            <div className="flex items-center gap-3 text-[13px]">
+              <Link
+                href={`/tools/${encodeURIComponent(selected)}`}
+                className="underline underline-offset-4"
+              >
+                Open as a page
+              </Link>
+              <Link
+                href={closeHref()}
+                scroll={false}
+                className="text-muted-foreground ml-auto underline underline-offset-4"
+              >
+                Close
+              </Link>
+            </div>
+            <ToolDetail key={selected} toolId={selected} />
+          </aside>
+        )}
+      </div>
     </div>
   );
 }
@@ -353,7 +428,13 @@ function FieldTable({
       {fields.length === 0 ? (
         <p className="text-muted-foreground text-sm">None.</p>
       ) : (
-        <div className="overflow-x-auto">
+        // A scroll region a keyboard can reach and screen readers can name (axe scrollable-region-focusable).
+        <div
+          tabIndex={0}
+          role="region"
+          aria-label={`${title} table`}
+          className="overflow-x-auto"
+        >
           <table
             className="w-full text-left text-[13px]"
             data-fields={direction}
@@ -539,7 +620,7 @@ export function ToolDetail({ toolId }: { toolId: string }) {
         </dl>
         <dl className="space-y-2 border-t pt-4">
           <dt className="text-muted-foreground text-xs font-semibold tracking-wide">
-            Granted to
+            Can be granted by
           </dt>
           <dd>
             {tool.grantable_to.length === 0 ? (
@@ -559,11 +640,16 @@ export function ToolDetail({ toolId }: { toolId: string }) {
           </dd>
         </dl>
       </Card>
+      <Grants toolId={tool.tool_id} />
+      <CopySchema schema={tool.input_schema} version={tool.version} />
       <FieldTable tool={tool} direction="input" />
       <FieldTable tool={tool} direction="output" />
       <details className="text-sm">
         <summary className="cursor-pointer font-semibold">JSON Schema</summary>
-        <pre className="border-border bg-background mt-2 overflow-x-auto rounded-lg border px-3.5 py-3 font-mono text-xs leading-relaxed">
+        <pre
+          tabIndex={0}
+          className="border-border bg-background mt-2 overflow-x-auto rounded-lg border px-3.5 py-3 font-mono text-xs leading-relaxed"
+        >
           {JSON.stringify(
             { input: tool.input_schema, output: tool.output_schema },
             null,
@@ -593,6 +679,83 @@ function Fact({
         {term}
       </dt>
       <dd className={cn(className)}>{children}</dd>
+    </div>
+  );
+}
+
+// PRD-Studio TL-02: Experts whose latest version grants this tool, and published workflows that reach it.
+function Grants({ toolId }: { toolId: string }) {
+  const state = useLoaded(
+    `/api/v1/tools/${encodeURIComponent(toolId)}/grants`,
+    parseToolGrants,
+  );
+  return (
+    <section
+      aria-labelledby={`grants-${toolId}`}
+      data-field="granted-to"
+      className="space-y-2"
+    >
+      <h3 id={`grants-${toolId}`} className="text-sm font-semibold">
+        Granted to
+      </h3>
+      {state.kind === "loading" ? (
+        <p className="text-muted-foreground text-sm">Loading.</p>
+      ) : state.kind === "unavailable" ? (
+        <p className="text-muted-foreground text-sm">
+          Who has it can&apos;t be read right now.
+        </p>
+      ) : state.value.experts.length === 0 &&
+        state.value.workflows.length === 0 ? (
+        <p className="text-sm">No Expert or published workflow grants it.</p>
+      ) : (
+        <ul className="flex flex-wrap gap-2 text-[12.5px]">
+          {state.value.experts.map((item) => (
+            <li key={item.id} data-granted-expert={item.id}>
+              <Link
+                href={`/experts/${item.id}`}
+                className="border-border inline-block rounded-full border px-2.5 py-0.5 underline-offset-4 hover:underline"
+              >
+                Expert {item.name}, version {item.version}
+              </Link>
+            </li>
+          ))}
+          {state.value.workflows.map((item) => (
+            <li key={item.id} data-granted-workflow={item.id}>
+              <Link
+                href={`/workflows/${item.id}`}
+                className="border-border inline-block rounded-full border px-2.5 py-0.5 underline-offset-4 hover:underline"
+              >
+                Workflow {item.name}, version {item.version}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+// PRD-Studio TL-03: exactly the shown version's input schema.
+function CopySchema({ schema, version }: { schema: unknown; version: number }) {
+  const [copied, setCopied] = useState<string | null>(null);
+  async function copy(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(schema, null, 2));
+      setCopied(`Copied the input schema of version ${version}.`);
+    } catch {
+      setCopied("Copying isn't allowed here.");
+    }
+  }
+  return (
+    <div className="flex items-center gap-3">
+      <Button variant="outline" size="sm" onClick={() => void copy()}>
+        Copy schema
+      </Button>
+      {copied === null ? null : (
+        <p role="status" data-message="copied" className="text-[13px]">
+          {copied}
+        </p>
+      )}
     </div>
   );
 }
