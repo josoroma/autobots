@@ -139,16 +139,34 @@ python3.12 scripts/browse_trial.py --key-file .env
 
 Its record is `.checks/browse-trial/result.json`. Started again, it refuses before anything starts. A repeat needs the owner's request, given as `--owner-requested-repeat`.
 
-## The GitHub issue connector
+## The GitHub tools
 
-The first consequential connector, by [Decision 0007](../decisions/0007-first-connector-github-issues.md). It creates an issue in one repository and does nothing else. An owner grants it per Expert, goals without an Expert don't get it, and each call waits for a person's approval.
+All on one configured repository, by [Decision 0007](../decisions/0007-first-connector-github-issues.md), widened by [Decision 0022](../decisions/0022-studio-product-surfaces.md#decision) D6. An owner grants them per Expert, and goals without an Expert don't get them. No tool takes a repository from the model.
 
-Set both for the worker:
+- **`create_github_issue`** creates an issue, and each call waits for a person's approval.
+  - Version 2 adds up to 10 labels. New grants get version 2.
+  - A run whose grants pinned version 1 keeps calling version 1, which is unchanged.
+- **Four read-only tools** need no approval and leave no receipt:
+  - `github_list_pull_requests`
+  - `github_list_workflow_runs`
+  - `github_search_issues`, pinned to the repository
+  - `github_read_file`, text up to 1 MiB, whose content never appears on run screens.
+
+Set both for the worker and the API, then restart both:
 
 ```sh
 GITHUB_REPOSITORY=owner/name
-GITHUB_TOKEN=<a fine-grained token limited to that repository, with Issues read and write>
+GITHUB_TOKEN=<a fine-grained token limited to that repository>
 ```
+
+The token's repository permissions are exactly:
+- Issues: read and write
+- Pull requests: read and write
+- Contents: read and write
+- Actions: read
+- Metadata: read
+
+Until both are set, Tools shows every GitHub tool as `key_missing`, with this repair.
 
 The token is read for each attempt and stored nowhere. Without both, a call fails as `connector_not_configured` and sends nothing.
 

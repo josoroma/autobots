@@ -1933,6 +1933,13 @@ export const schemas = {
         "title": "Credential",
         "type": "string"
       },
+      "scopes": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Scopes",
+        "type": "array"
+      },
       "source": {
         "const": "environment",
         "title": "Source",
@@ -1949,6 +1956,7 @@ export const schemas = {
     "required": [
       "credential",
       "variables",
+      "scopes",
       "source"
     ],
     "title": "KeyRequirementView",
@@ -7178,6 +7186,7 @@ export function parseInstanceView(value: unknown): InstanceView {
 
 export interface KeyRequirementView {
   credential: string;
+  scopes: string[];
   source: "environment";
   variables: string[];
 }

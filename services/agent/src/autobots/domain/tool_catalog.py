@@ -37,7 +37,10 @@ GROUP_TITLES: Mapping[ToolGroup, tuple[str, str]] = {
     ToolGroup.MARKET_DATA: ("Market data", "Prices, exchange rates and inflation."),
     ToolGroup.BROWSING: ("Autonomous browsing", "Goal-driven browser control."),
     ToolGroup.CODE: ("Code", "Search and edit the run's own files as code."),
-    ToolGroup.CONNECTORS: ("Connectors", "Effects in an outside service, each approved."),
+    ToolGroup.CONNECTORS: (
+        "Connectors",
+        "An outside service: reads, and effects that are each approved.",
+    ),
     ToolGroup.DELEGATION: ("Delegation", "Assign bounded work to an Expert."),
     ToolGroup.LEARNING: ("Learning", "Propose memory or skill changes for review."),
 }
@@ -93,6 +96,8 @@ class KeyRequirement:
 
     credential: str
     variables: tuple[str, ...]
+    # What the credential must be allowed to do, named for its repair (PRD-Studio GH-07).
+    scopes: tuple[str, ...] = ()
 
 
 def key_availability(

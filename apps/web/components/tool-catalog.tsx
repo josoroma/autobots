@@ -75,7 +75,12 @@ const AVAILABILITY_FILTERS = ["available", "key_missing", "disabled_by_policy"];
 export function repair(tool: ToolDescriptor): string | null {
   if (tool.availability === "key_missing" && tool.key_requirement) {
     const names = tool.key_requirement.variables.join(" and ");
-    return `Set ${names} in the worker's environment, then restart the worker and the API.`;
+    // PRD-Studio GH-07: names and permissions only, never a value.
+    const scopes =
+      tool.key_requirement.scopes.length === 0
+        ? ""
+        : ` The token needs these permissions on that repository only: ${tool.key_requirement.scopes.join(", ")}.`;
+    return `Set ${names} in the worker's environment.${scopes} Then restart the worker and the API.`;
   }
   if (tool.availability_reason === "isolated_executor_not_qualified") {
     return "Disabled until the isolated browser executor is qualified and turned on. See the operations runbook.";

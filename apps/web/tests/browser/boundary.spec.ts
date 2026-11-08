@@ -193,7 +193,7 @@ test("US-14.1: a member reads the tool catalog through the BFF, and nothing else
   );
   expect(new Set(ids).size).toBe(ids.length);
   expect(ids).toEqual(
-    expect.arrayContaining(["calculate@1", "create_github_issue@1"]),
+    expect.arrayContaining(["calculate@1", "create_github_issue@2"]),
   );
   const browse = catalog.tools.find(
     (tool: { tool_id: string }) => tool.tool_id === "browse_goal",

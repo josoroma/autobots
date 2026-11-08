@@ -1932,6 +1932,13 @@
             "title": "Credential",
             "type": "string"
           },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          },
           "source": {
             "const": "environment",
             "title": "Source",
@@ -1948,6 +1955,7 @@
         "required": [
           "credential",
           "variables",
+          "scopes",
           "source"
         ],
         "title": "KeyRequirementView",

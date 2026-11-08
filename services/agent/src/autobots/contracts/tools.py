@@ -1,9 +1,11 @@
 """Versioned input and output contracts for the narrow tool set."""
 
-from typing import Any, Literal
+import re
+from datetime import datetime
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from autobots.contracts.primitives import STRICT_CONTRACT
 
@@ -53,6 +55,145 @@ class CreateGithubIssueOutput(BaseModel):
 
     number: int
     url: str
+
+
+GithubLabel = Annotated[str, Field(min_length=1, max_length=50)]
+
+
+class CreateGithubIssueV2Input(BaseModel):
+    """PRD-Studio GH-05: version 1's fields, and up to 10 labels. Still no repository."""
+
+    model_config = TOOL_CONTRACT
+
+    title: str = Field(min_length=1, max_length=256)
+    body: str = Field(max_length=60_000)
+    labels: list[GithubLabel] = Field(default_factory=list, max_length=10)
+
+
+# PRD-Studio GH-01 to GH-04. Every input is bounded, and none names a repository: the one configured
+# repository is server configuration (Decision 0022 D6).
+GithubBranch = Annotated[str, Field(min_length=1, max_length=255, pattern=r"^[A-Za-z0-9._/-]+$")]
+GithubLimit = Annotated[int, Field(ge=1, le=100)]
+# Qualifiers that would widen a search past the configured repository are refused.
+_SEARCH_SCOPE = re.compile(r"(?i)(^|\s)-?(repo|org|user|owner)\s*:")
+
+
+class GithubListPullRequestsInput(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    state: Literal["open", "closed", "merged"] = "open"
+    base: GithubBranch | None = None
+    since: datetime | None = None
+    limit: GithubLimit = 30
+
+
+class GithubPullRequest(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    number: int
+    title: str
+    author: str | None
+    merged_at: str | None
+    labels: list[str]
+    url: str
+
+
+class GithubListPullRequestsOutput(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    pull_requests: list[GithubPullRequest]
+
+
+class GithubListWorkflowRunsInput(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    workflow: str | None = Field(
+        default=None, min_length=1, max_length=100, pattern=r"^[A-Za-z0-9._-]+\.ya?ml$"
+    )
+    branch: GithubBranch | None = None
+    status: Literal["failure", "success"] | None = None
+    since: datetime | None = None
+    limit: GithubLimit = 20
+
+
+class GithubFailingJob(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    name: str
+    failed_steps: list[str]
+
+
+class GithubWorkflowRun(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    id: int
+    conclusion: str | None
+    created_at: str | None
+    updated_at: str | None
+    head_sha: str
+    failing_jobs: list[GithubFailingJob]
+
+
+class GithubListWorkflowRunsOutput(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    runs: list[GithubWorkflowRun]
+
+
+class GithubSearchIssuesInput(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    query: str = Field(min_length=1, max_length=256)
+    state: Literal["open", "closed"] | None = None
+
+    @field_validator("query")
+    @classmethod
+    def _within_the_repository(cls, query: str) -> str:
+        if _SEARCH_SCOPE.search(query):
+            raise ValueError("the search can't name another repository, owner or organization")
+        return query
+
+
+class GithubIssue(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    number: int
+    title: str
+    state: str
+    labels: list[str]
+    url: str
+
+
+class GithubSearchIssuesOutput(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    issues: list[GithubIssue]
+
+
+class GithubReadFileInput(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    path: str = Field(min_length=1, max_length=500, pattern=r"^[A-Za-z0-9._/ -]+$")
+    ref: GithubBranch | None = None
+
+    @field_validator("path")
+    @classmethod
+    def _inside_the_repository(cls, path: str) -> str:
+        if path.startswith("/") or ".." in path.split("/"):
+            raise ValueError("a path is relative to the repository and can't climb out of it")
+        return path
+
+
+class GithubReadFileOutput(BaseModel):
+    """`content` reaches the model only. A tool use and run screens keep its SHA and size."""
+
+    model_config = TOOL_CONTRACT
+
+    path: str
+    ref: str | None
+    sha: str
+    size: int
+    content: str
 
 
 class SaveArtifactInput(BaseModel):
@@ -115,6 +256,8 @@ class KeyRequirementView(BaseModel):
 
     credential: str
     variables: list[str]
+    # What the credential must be allowed to do, for the repair to name. Never a value.
+    scopes: list[str]
     source: Literal["environment"]
 
 

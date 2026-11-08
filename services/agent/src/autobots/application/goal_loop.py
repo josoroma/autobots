@@ -23,7 +23,8 @@ from autobots.adapters.checkpoints import (
     graph_config,
     is_stale_owner,
 )
-from autobots.adapters.github_issues import GITHUB_ISSUE
+from autobots.adapters.github_issues import GITHUB_ISSUE, GITHUB_ISSUE_V2
+from autobots.adapters.github_reads import GITHUB_READ_TOOLS
 from autobots.adapters.jina import JINA_TOOLS
 from autobots.adapters.loop_middleware import (
     AdmittedModel,
@@ -173,6 +174,8 @@ def loop_registry(
         READ_OFFLOAD,
         PROPOSE_IMPROVEMENT,
         GITHUB_ISSUE,
+        GITHUB_ISSUE_V2,
+        *GITHUB_READ_TOOLS,
         *TAVILY_TOOLS,
         *JINA_TOOLS,
         *MARKET_TOOLS,

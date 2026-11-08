@@ -90,7 +90,8 @@ def test_the_tool_is_consequential_and_never_retried() -> None:
 
 
 def test_an_owner_grants_it_and_a_plain_goal_does_not_get_it() -> None:
-    assert EXPERT_TOOLS[definition_id()] == 1
+    # New grants get version 2, with labels (US-15.14). Version 1 stays registered.
+    assert EXPERT_TOOLS[definition_id()] == 2
     assert definition_id() not in LOOP_TOOL_GRANTS
 
 

@@ -195,7 +195,13 @@ def test_a_configured_connector_can_be_granted() -> None:
     environ = {"GITHUB_TOKEN": FAKE_TOKEN, "GITHUB_REPOSITORY": FAKE_REPOSITORY}
     config = expand_groups(ExpertConfig(tool_groups=["connectors"]), environ)
     validate_config(config, environ)
-    assert config.tools == ["create_github_issue"]
+    assert config.tools == [
+        "create_github_issue",
+        "github_list_pull_requests",
+        "github_list_workflow_runs",
+        "github_read_file",
+        "github_search_issues",
+    ]
 
 
 # US-14.5: availability and a provider key's use make no request of their own. Sockets are blocked

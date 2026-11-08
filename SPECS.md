@@ -505,12 +505,12 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.13#2 | Accept and freeze an execution budget from US$0.25 to US$5.00 in steps of US$0.25, never above the remaining daily cap. | DONE | US-15.13 |
 | US-15.13#3 | Render the tabs, search, rows, preview panel with its version switch, and recent executions on Workflows. | DONE | US-15.13 |
 | US-15.13#4 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.13 |
-| US-15.14 | GitHub read tools and issue labels on one repository | READY | EPIC-15 |
-| US-15.14#1 | Add the four read tools as plain `httpx` adapters with an injectable transport over the shared repository configuration, with schema ceilings, public fields and recorded fixtures. | TODO | US-15.14 |
-| US-15.14#2 | Register `create_github_issue` version 2 with optional `labels`, up to 10, keeping version 1 unchanged. | TODO | US-15.14 |
-| US-15.14#3 | Report `key_missing` for every GitHub tool until both variables are set, with a repair naming them, the token's scopes and a restart, and update the operations runbook with the fine-grained scopes D6 lists. | TODO | US-15.14 |
-| US-15.14#4 | Cover the scenarios with fake transports only. | TODO | US-15.14 |
-| US-15.15 | Approval-gated pull-request connector | BLOCKED | EPIC-15 |
+| US-15.14 | GitHub read tools and issue labels on one repository | DONE | EPIC-15 |
+| US-15.14#1 | Add the four read tools as plain `httpx` adapters with an injectable transport over the shared repository configuration, with schema ceilings, public fields and recorded fixtures. | DONE | US-15.14 |
+| US-15.14#2 | Register `create_github_issue` version 2 with optional `labels`, up to 10, keeping version 1 unchanged. | DONE | US-15.14 |
+| US-15.14#3 | Report `key_missing` for every GitHub tool until both variables are set, with a repair naming them, the token's scopes and a restart, and update the operations runbook with the fine-grained scopes D6 lists. | DONE | US-15.14 |
+| US-15.14#4 | Cover the scenarios with fake transports only. | DONE | US-15.14 |
+| US-15.15 | Approval-gated pull-request connector | READY | EPIC-15 |
 | US-15.15#1 | Add `github_open_pull_request` as a consequential connector with approval on every call, limits of 20 files and 1 MiB in total, and no repository input. | TODO | US-15.15 |
 | US-15.15#2 | Compute each file's diff against the base for the approval request, binding the approval to the exact request. | TODO | US-15.15 |
 | US-15.15#3 | Create `autobots/<operation_id>`, commit only the named paths, open the pull request with the operation-ID marker, and read back the branch and pull request before any retry. | TODO | US-15.15 |
@@ -555,7 +555,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.24#2 | Add the event type to the typed union, the generated client and the consumer in the same change, with the consumer ignoring unknown types. | TODO | US-15.24 |
 | US-15.24#3 | Add the "Stream text as it's written" preference to Appearance, and honor it in the run view. | TODO | US-15.24 |
 | US-15.24#4 | Cover the scenarios with a scripted model on a disposable stack, including a scan for reasoning, tool arguments and secrets. | TODO | US-15.24 |
-| US-15.25 | Concept Experts and workflows seed | BLOCKED | EPIC-15 |
+| US-15.25 | Concept Experts and workflows seed | READY | EPIC-15 |
 | US-15.25#1 | Add a repeatable seed, kept apart from migrations, that targets a named workspace with bounded upserts and no user-edit overwrites. | TODO | US-15.25 |
 | US-15.25#2 | Seed a workflow as a draft when a tool it needs is unavailable. | TODO | US-15.25 |
 | US-15.25#3 | Cover the scenarios on a disposable stack, including a double seed and a secret scan. | TODO | US-15.25 |
@@ -6654,7 +6654,8 @@ Open Questions:
 
 ### US-15.14: GitHub read tools and issue labels on one repository
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-15-14-github-read-tools-issue/`
 
 As a goal's owner
 I want four read-only GitHub tools, and labels on new issues, all on one configured repository
@@ -6710,17 +6711,17 @@ Dependencies:
 - US-14.8
 
 Tasks:
-- [ ] Add the four read tools as plain `httpx` adapters with an injectable transport over the shared repository configuration, with schema ceilings, public fields and recorded fixtures.
-- [ ] Register `create_github_issue` version 2 with optional `labels`, up to 10, keeping version 1 unchanged.
-- [ ] Report `key_missing` for every GitHub tool until both variables are set, with a repair naming them, the token's scopes and a restart, and update the operations runbook with the fine-grained scopes D6 lists.
-- [ ] Cover the scenarios with fake transports only.
+- [x] Add the four read tools as plain `httpx` adapters with an injectable transport over the shared repository configuration, with schema ceilings, public fields and recorded fixtures.
+- [x] Register `create_github_issue` version 2 with optional `labels`, up to 10, keeping version 1 unchanged.
+- [x] Report `key_missing` for every GitHub tool until both variables are set, with a repair naming them, the token's scopes and a restart, and update the operations runbook with the fine-grained scopes D6 lists.
+- [x] Cover the scenarios with fake transports only.
 
 Open Questions:
 - None.
 
 ### US-15.15: Approval-gated pull-request connector
 
-Status: BLOCKED
+Status: READY
 
 As a goal's owner
 I want an Expert to propose a pull request that a person approves with its full diff
@@ -7223,7 +7224,7 @@ Open Questions:
 
 ### US-15.25: Concept Experts and workflows seed
 
-Status: BLOCKED
+Status: READY
 
 As a workspace owner
 I want an optional seed of the five concept Experts and six workflows in a workspace I choose

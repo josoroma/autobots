@@ -142,6 +142,7 @@ def describe(tool: ToolDefinition, environ: Mapping[str, str]) -> ToolDescriptor
             KeyRequirementView(
                 credential=requirement.credential,
                 variables=list(requirement.variables),
+                scopes=list(requirement.scopes),
                 source="environment",
             )
             if requirement

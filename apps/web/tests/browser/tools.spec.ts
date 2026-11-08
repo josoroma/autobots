@@ -106,11 +106,20 @@ test("unavailable tools say so in words, with their repair", async ({
   page,
 }) => {
   await signedIn(page, "/tools");
-  const github = page.locator('[data-tool="create_github_issue"]');
-  await expect(github).toContainText("Unavailable: key not set");
-  await expect(github.locator('[data-field="repair"]')).toHaveText(
-    "Set GITHUB_REPOSITORY and GITHUB_TOKEN in the worker's environment, then restart the worker and the API.",
-  );
+  // PRD-Studio GH-07: every GitHub tool, with both variables, the token's permissions and a restart.
+  for (const id of [
+    "create_github_issue",
+    "github_list_pull_requests",
+    "github_list_workflow_runs",
+    "github_search_issues",
+    "github_read_file",
+  ]) {
+    const github = page.locator(`[data-tool="${id}"]`);
+    await expect(github).toContainText("Unavailable: key not set");
+    await expect(github.locator('[data-field="repair"]')).toHaveText(
+      "Set GITHUB_REPOSITORY and GITHUB_TOKEN in the worker's environment. The token needs these permissions on that repository only: Issues: read and write, Pull requests: read and write, Contents: read and write, Actions: read, Metadata: read. Then restart the worker and the API.",
+    );
+  }
   const browse = page.locator('[data-tool="browse_goal"]');
   await expect(browse).toContainText("Unavailable: disabled by policy");
   await expect(browse.locator('[data-field="repair"]')).toHaveText(

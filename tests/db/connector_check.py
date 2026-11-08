@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import os
 import sys
@@ -13,6 +14,8 @@ import httpx
 import psycopg
 
 from autobots.adapters.github_issues import REPOSITORY_VARIABLE, TOKEN_VARIABLE, TOOL_ID, github_issue_tool, marker
+from autobots.adapters.github_reads import github_read_tools
+from autobots.application.tool_uses import list_tool_uses
 from autobots.application.approvals import decide
 from autobots.application.runs import admit_run
 from autobots.application.tool_gateway import ToolGateway, ToolRegistry, ToolScope
@@ -26,6 +29,7 @@ ACTOR = uuid4()
 TOKEN = 'arranged-connector-token'
 ENV = {REPOSITORY_VARIABLE: 'owner/throwaway', TOKEN_VARIABLE: TOKEN}
 cases = []
+FILE_TEXT = 'PRIVATE-FILE-TEXT that only the model may read\n'
 
 
 def check(name: str, expected: str, observed: object, passed: bool) -> None:
@@ -38,13 +42,26 @@ class FakeGithub:
     def __init__(self) -> None:
         self.mode, self.readback = 'ok', 200
         self.posts: list[str] = []
+        self.payloads: list[dict[str, Any]] = []
+        self.seen: list[httpx.Request] = []
         self.issues: list[dict[str, Any]] = []
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.seen.append(request)
+        if request.method == 'GET' and '/contents/' in request.url.path:
+            return httpx.Response(200, json={'type': 'file', 'size': len(FILE_TEXT), 'sha': 'arranged-sha',
+                                             'content': base64.b64encode(FILE_TEXT.encode()).decode()})
+        if request.method == 'GET' and request.url.path == '/search/issues':
+            return httpx.Response(200, json={'items': [{'number': 1, 'title': 'Arranged', 'state': 'open', 'labels': [], 'html_url': 'u'}]})
+        if request.method == 'GET' and request.url.path.endswith('/pulls'):
+            return httpx.Response(200, json=[{'number': 4, 'title': 'Arranged PR', 'user': {'login': 'ada'}, 'merged_at': None, 'labels': [], 'html_url': 'u'}])
+        if request.method == 'GET' and request.url.path.endswith('/actions/runs'):
+            return httpx.Response(200, json={'workflow_runs': [{'id': 5, 'conclusion': 'success', 'head_sha': 'abc'}]})
         if request.method == 'GET':
             return httpx.Response(self.readback, json=self.issues if self.readback == 200 else {'message': 'arranged'})
         body = json.loads(request.content)
         self.posts.append(body['body'])
+        self.payloads.append(body)
         if self.mode == 'never':
             self.mode = 'ok'
             raise httpx.ReadError('arranged')
@@ -62,9 +79,14 @@ class FakeGithub:
 async def main() -> None:
     github = FakeGithub()
     registry = ToolRegistry()
-    registry.register(github_issue_tool(httpx.MockTransport(github), ENV, settle_seconds=()))
+    transport = httpx.MockTransport(github)
+    registry.register(github_issue_tool(transport, ENV, settle_seconds=()))
+    registry.register(github_issue_tool(transport, ENV, settle_seconds=(), version=2))
+    for tool in github_read_tools(transport, ENV):
+        registry.register(tool)
     gateway = ToolGateway(registry)
-    granted = {TOOL_ID: EXPERT_TOOLS[TOOL_ID]}
+    # Version 1, as a run whose grants pinned it before version 2 existed (US-15.14).
+    granted = {TOOL_ID: 1}
 
     def issue(title: str) -> dict[str, str]:
         return {'title': title, 'body': f'About {title}'}
@@ -95,7 +117,7 @@ async def main() -> None:
         # Out of scope: refused by the gateway, with nothing sent.
         ungranted = await gateway.execute(db, ToolScope(WORKSPACE, run, lease.generation, {}), TOOL_ID, issue('ungranted'))
         check('a run without the grant is refused before any request', 'denied, 0 requests', (ungranted.outcome.value, ungranted.code, len(github.posts)), ungranted.outcome.value == 'denied' and not github.posts)
-        wrong = await gateway.execute(db, ToolScope(WORKSPACE, run, lease.generation, {TOOL_ID: 2}), TOOL_ID, issue('version'))
+        wrong = await gateway.execute(db, ToolScope(WORKSPACE, run, lease.generation, {TOOL_ID: 3}), TOOL_ID, issue('version'))
         check('another version of the grant is refused too', 'denied, 0 requests', (wrong.outcome.value, wrong.code, len(github.posts)), wrong.outcome.value == 'denied' and not github.posts)
         elsewhere = await gateway.execute(db, scope, TOOL_ID, {**issue('elsewhere'), 'repository': 'other/repo'})
         check('an argument naming another repository is refused', 'invalid_arguments, 0 requests', (elsewhere.code, len(github.posts)), elsewhere.code == 'invalid_arguments' and not github.posts)
@@ -156,6 +178,63 @@ async def main() -> None:
         for table in ('app_private.tool_receipts', 'public.approval_requests', 'public.run_events'):
             leaks += await value(f"select count(*) from {table} t where t.run_id = %s and t::text like %s", run, f'%{TOKEN}%')
         check('no receipt, approval or event holds the token', '0', leaks, leaks == 0)
+
+        # US-15.14: version 2's labels, and version 1 unchanged above.
+        check('version 1 created its issues with a title and body only', 'no labels sent', [sorted(p) for p in github.payloads[:1]],
+              all(set(payload) == {'title', 'body'} for payload in github.payloads))
+        granted = {TOOL_ID: EXPERT_TOOLS[TOOL_ID]}
+        check('new grants get version 2', '2', EXPERT_TOOLS[TOOL_ID], EXPERT_TOOLS[TOOL_ID] == 2)
+        run, lease = await start()
+        scope = ToolScope(WORKSPACE, run, lease.generation, granted)
+        ten = [f'label-{index}' for index in range(10)]
+        posted, approvals_before = len(github.posts), await value('select count(*) from public.approval_requests where run_id = %s', run)
+        eleven = await gateway.execute(db, scope, TOOL_ID, {**issue('eleven'), 'labels': [*ten, 'one-too-many']})
+        approvals_after = await value('select count(*) from public.approval_requests where run_id = %s', run)
+        check('eleven labels are refused before any approval request or request to GitHub', 'invalid_arguments, no approval, no request',
+              (eleven.code, approvals_after - approvals_before, len(github.posts) - posted),
+              eleven.code == 'invalid_arguments' and approvals_after == approvals_before and len(github.posts) == posted)
+        pending = await gateway.execute(db, scope, TOOL_ID, {**issue('labelled'), 'labels': ten})
+        check('ten labels wait for approval', 'approval_pending', pending.code, pending.code == 'approval_pending')
+        await approve(run)
+        scope = await resumed(run)
+        labelled = await gateway.execute(db, scope, TOOL_ID, {**issue('labelled'), 'labels': ten})
+        check('approved, version 2 creates the issue with those labels', 'succeeded, the ten labels sent',
+              (labelled.outcome.value, github.payloads[-1].get('labels')), labelled.outcome.value == 'succeeded' and github.payloads[-1].get('labels') == ten)
+
+        # The four read tools: no approval, recorded as read-only tool uses, on the configured repository only.
+        reads = {name: 1 for name in ('github_list_pull_requests', 'github_list_workflow_runs', 'github_search_issues', 'github_read_file')}
+        run, lease = await start()
+        scope = ToolScope(WORKSPACE, run, lease.generation, reads)
+        github.seen.clear()
+        calls = {'github_list_pull_requests': {'state': 'open', 'limit': 5}, 'github_list_workflow_runs': {'limit': 5},
+                 'github_search_issues': {'query': 'arranged'}, 'github_read_file': {'path': 'README.md'}}
+        results = {name: await gateway.execute(db, scope, name, arguments) for name, arguments in calls.items()}
+        check('each read succeeds without an approval', 'four succeeded, none pending',
+              {name: (result.outcome.value, result.code) for name, result in results.items()},
+              all(result.outcome.value == 'succeeded' for result in results.values()))
+        check('every request targets only the configured repository', 'repos/owner/throwaway or a search pinned to it',
+              sorted({request.url.path for request in github.seen}),
+              all(request.url.path.startswith('/repos/owner/throwaway/') or
+                  (request.url.path == '/search/issues' and 'repo:owner/throwaway' in request.url.params['q']) for request in github.seen))
+        rows = await (await db.execute("select tool_id, outcome, operation_id, tool_group, output_public from app_private.tool_uses "
+                                       "where run_id = %s order by sequence_in_run", (run,))).fetchall()
+        check('each is recorded as a read-only tool use, with no operation identity', 'four rows, succeeded, no operation ID, connectors',
+              [(row[0], row[1], row[2], row[3]) for row in rows],
+              len(rows) == 4 and all(row[1] == 'succeeded' and row[2] is None and row[3] == 'connectors' for row in rows))
+        receipts = await value('select count(*) from app_private.tool_receipts where run_id = %s', run)
+        approvals = await value('select count(*) from public.approval_requests where run_id = %s', run)
+        check('and none left a receipt or an approval request', '0, 0', (receipts, approvals), receipts == 0 and approvals == 0)
+        file_row = next(row for row in rows if row[0] == 'github_read_file')
+        check("a read file's tool use keeps its SHA and size, never its content", "sha and size, no content",
+              file_row[4], file_row[4].get('sha') == 'arranged-sha' and file_row[4].get('size') == len(FILE_TEXT) and 'content' not in file_row[4])
+        listed = await list_tool_uses(db, WORKSPACE, run)
+        listed_text = json.dumps([item.model_dump(mode='json') for item in listed.uses])
+        events = await value("select count(*) from public.run_events where run_id = %s and payload::text like %s", run, '%' + FILE_TEXT[:20] + '%')
+        check('its listing and run events never hold the text', 'digest and size only, 0 events',
+              (FILE_TEXT[:20] in listed_text, events), FILE_TEXT[:20] not in listed_text and events == 0)
+        repository = await gateway.execute(db, scope, 'github_list_pull_requests', {'repository': 'other/repo'})
+        check('a read naming a repository is refused before any request', 'invalid_arguments, no new request',
+              (repository.code, len(github.seen)), repository.code == 'invalid_arguments' and len(github.seen) == 4)
 
 
 try:

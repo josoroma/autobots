@@ -38,7 +38,13 @@ PROVIDER_TOOLS = {
 EXPERT_TOOLS = {
     **GENERAL_TOOLS,
     "propose_improvement": 1,
-    "create_github_issue": 1,
+    # Version 2 adds labels (PRD-Studio GH-05). A run whose grants pinned version 1 keeps it.
+    "create_github_issue": 2,
+    # Read only, on the one configured repository (PRD-Studio GH-01 to GH-04).
+    "github_list_pull_requests": 1,
+    "github_list_workflow_runs": 1,
+    "github_search_issues": 1,
+    "github_read_file": 1,
     # It reaches the network, so only an owner's Expert grants it, never a plain goal.
     "store_remote_file": 1,
     # Code tools over the run's own files, for Experts that do code-shaped work (Decision 0017).

@@ -16,8 +16,12 @@ TOOL_VERSIONS: Mapping[str, int] = {
     "assign_specialist": 1,
     "calculate": 1,
     "complete_task": 1,
-    "create_github_issue": 1,
+    "create_github_issue": 2,
     "extract_website_content": 1,
+    "github_list_pull_requests": 1,
+    "github_list_workflow_runs": 1,
+    "github_read_file": 1,
+    "github_search_issues": 1,
     "inflation_rates": 1,
     "market_history": 1,
     "patch_code_file": 1,
@@ -41,7 +45,10 @@ TOOL_VERSIONS: Mapping[str, int] = {
 }
 # (tool, recorded version, current version), only where old checkpoints keep their meaning.
 # read_run_file 1 stays registered, and a run that pinned it keeps calling it (US-14.9).
-COMPATIBLE_TOOL_CHANGES: frozenset[tuple[str, int, int]] = frozenset({("read_run_file", 1, 2)})
+# create_github_issue 1 stays registered too, unchanged, beside version 2's labels (US-15.14).
+COMPATIBLE_TOOL_CHANGES: frozenset[tuple[str, int, int]] = frozenset(
+    {("read_run_file", 1, 2), ("create_github_issue", 1, 2)}
+)
 
 INCOMPATIBLE = "incompatible_version"
 
