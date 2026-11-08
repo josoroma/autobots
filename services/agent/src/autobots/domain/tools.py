@@ -45,6 +45,8 @@ EXPERT_TOOLS = {
     "github_list_workflow_runs": 1,
     "github_search_issues": 1,
     "github_read_file": 1,
+    # Consequential, with approval on every call and each file's diff (PRD-Studio GH-06).
+    "github_open_pull_request": 1,
     # It reaches the network, so only an owner's Expert grants it, never a plain goal.
     "store_remote_file": 1,
     # Code tools over the run's own files, for Experts that do code-shaped work (Decision 0017).

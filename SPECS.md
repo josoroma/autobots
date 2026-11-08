@@ -510,11 +510,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.14#2 | Register `create_github_issue` version 2 with optional `labels`, up to 10, keeping version 1 unchanged. | DONE | US-15.14 |
 | US-15.14#3 | Report `key_missing` for every GitHub tool until both variables are set, with a repair naming them, the token's scopes and a restart, and update the operations runbook with the fine-grained scopes D6 lists. | DONE | US-15.14 |
 | US-15.14#4 | Cover the scenarios with fake transports only. | DONE | US-15.14 |
-| US-15.15 | Approval-gated pull-request connector | READY | EPIC-15 |
-| US-15.15#1 | Add `github_open_pull_request` as a consequential connector with approval on every call, limits of 20 files and 1 MiB in total, and no repository input. | TODO | US-15.15 |
-| US-15.15#2 | Compute each file's diff against the base for the approval request, binding the approval to the exact request. | TODO | US-15.15 |
-| US-15.15#3 | Create `autobots/<operation_id>`, commit only the named paths, open the pull request with the operation-ID marker, and read back the branch and pull request before any retry. | TODO | US-15.15 |
-| US-15.15#4 | Cover the scenarios with fake transports only, including a lost response. | TODO | US-15.15 |
+| US-15.15 | Approval-gated pull-request connector | DONE | EPIC-15 |
+| US-15.15#1 | Add `github_open_pull_request` as a consequential connector with approval on every call, limits of 20 files and 1 MiB in total, and no repository input. | DONE | US-15.15 |
+| US-15.15#2 | Compute each file's diff against the base for the approval request, binding the approval to the exact request. | DONE | US-15.15 |
+| US-15.15#3 | Create `autobots/<operation_id>`, commit only the named paths, open the pull request with the operation-ID marker, and read back the branch and pull request before any retry. | DONE | US-15.15 |
+| US-15.15#4 | Cover the scenarios with fake transports only, including a lost response. | DONE | US-15.15 |
 | US-15.16 | Live GitHub qualification on the configured repository | BLOCKED | EPIC-15 |
 | US-15.16#1 | Extend the GitHub qualification runner, in no verification profile, to the read tools, labels and pull requests, refusing to start without the token and the recorded authorization. | TODO | US-15.16 |
 | US-15.16#2 | Run it once and record redacted evidence: the outputs' shapes, the markers, the retry readback and the absence of the token. | TODO | US-15.16 |
@@ -6721,7 +6721,8 @@ Open Questions:
 
 ### US-15.15: Approval-gated pull-request connector
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-15-15-approval-gated-pull-request/`
 
 As a goal's owner
 I want an Expert to propose a pull request that a person approves with its full diff
@@ -6772,10 +6773,10 @@ Dependencies:
 - US-5.4
 
 Tasks:
-- [ ] Add `github_open_pull_request` as a consequential connector with approval on every call, limits of 20 files and 1 MiB in total, and no repository input.
-- [ ] Compute each file's diff against the base for the approval request, binding the approval to the exact request.
-- [ ] Create `autobots/<operation_id>`, commit only the named paths, open the pull request with the operation-ID marker, and read back the branch and pull request before any retry.
-- [ ] Cover the scenarios with fake transports only, including a lost response.
+- [x] Add `github_open_pull_request` as a consequential connector with approval on every call, limits of 20 files and 1 MiB in total, and no repository input.
+- [x] Compute each file's diff against the base for the approval request, binding the approval to the exact request.
+- [x] Create `autobots/<operation_id>`, commit only the named paths, open the pull request with the operation-ID marker, and read back the branch and pull request before any retry.
+- [x] Cover the scenarios with fake transports only, including a lost response.
 
 Open Questions:
 - None.

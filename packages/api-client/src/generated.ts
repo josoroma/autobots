@@ -77,6 +77,35 @@ export const schemas = {
     "title": "ApprovalDecision",
     "type": "object"
   },
+  "ApprovalFileDiff": {
+    "additionalProperties": false,
+    "properties": {
+      "change": {
+        "enum": [
+          "added",
+          "modified",
+          "unchanged"
+        ],
+        "title": "Change",
+        "type": "string"
+      },
+      "diff": {
+        "title": "Diff",
+        "type": "string"
+      },
+      "path": {
+        "title": "Path",
+        "type": "string"
+      }
+    },
+    "required": [
+      "path",
+      "change",
+      "diff"
+    ],
+    "title": "ApprovalFileDiff",
+    "type": "object"
+  },
   "ApprovalList": {
     "additionalProperties": false,
     "properties": {
@@ -235,6 +264,34 @@ export const schemas = {
     "title": "ApprovalResult",
     "type": "object"
   },
+  "ApprovalReviewDetail": {
+    "additionalProperties": false,
+    "description": "PRD-Studio GH-06: each file's diff against the base branch's head, which the approval\nbinds. A moved head stops the call with base_moved.",
+    "properties": {
+      "base_branch": {
+        "title": "Base Branch",
+        "type": "string"
+      },
+      "base_sha": {
+        "title": "Base Sha",
+        "type": "string"
+      },
+      "files": {
+        "items": {
+          "$ref": "#/components/schemas/ApprovalFileDiff"
+        },
+        "title": "Files",
+        "type": "array"
+      }
+    },
+    "required": [
+      "base_branch",
+      "base_sha",
+      "files"
+    ],
+    "title": "ApprovalReviewDetail",
+    "type": "object"
+  },
   "ApprovalScope": {
     "additionalProperties": false,
     "description": "The grants the request was made under. They hash to the scope it's checked against.",
@@ -388,6 +445,16 @@ export const schemas = {
           }
         ],
         "title": "Resource Target"
+      },
+      "review_detail": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ApprovalReviewDetail"
+          },
+          {
+            "type": "null"
+          }
+        ]
       },
       "run_goal": {
         "anyOf": [
@@ -6653,6 +6720,16 @@ export function parseApprovalDecision(value: unknown): ApprovalDecision {
   return parseWith(schemas, "ApprovalDecision", value) as ApprovalDecision;
 }
 
+export interface ApprovalFileDiff {
+  change: "added" | "modified" | "unchanged";
+  diff: string;
+  path: string;
+}
+
+export function parseApprovalFileDiff(value: unknown): ApprovalFileDiff {
+  return parseWith(schemas, "ApprovalFileDiff", value) as ApprovalFileDiff;
+}
+
 export interface ApprovalList {
   approvals: ApprovalView[];
   counts: ApprovalCounts;
@@ -6697,6 +6774,16 @@ export function parseApprovalResult(value: unknown): ApprovalResult {
   return parseWith(schemas, "ApprovalResult", value) as ApprovalResult;
 }
 
+export interface ApprovalReviewDetail {
+  base_branch: string;
+  base_sha: string;
+  files: ApprovalFileDiff[];
+}
+
+export function parseApprovalReviewDetail(value: unknown): ApprovalReviewDetail {
+  return parseWith(schemas, "ApprovalReviewDetail", value) as ApprovalReviewDetail;
+}
+
 export interface ApprovalScope {
   paths: string[];
   tools: Record<string, unknown>;
@@ -6722,6 +6809,7 @@ export interface ApprovalView {
   policy_version: string | null;
   requester: ApprovalRequester | null;
   resource_target: string | null;
+  review_detail?: ApprovalReviewDetail | null;
   run_goal: string | null;
   run_id: string;
   scope_snapshot: ApprovalScope | null;

@@ -97,6 +97,9 @@ class ToolDefinition:
     cost_note: str | None = None
     key_requirement: KeyRequirement | None = None
     # Top-level fields a run's screens may show, TU-04. The default shows none.
+    # PRD-Studio GH-06: what the reviewer sees beyond the arguments, read before the approval
+    # request exists. It may read the destination, never write it.
+    review_detail: Callable[[Any], Awaitable[dict[str, Any]]] | None = None
     public_input_fields: tuple[str, ...] = ()
     public_output_fields: tuple[str, ...] = ()
     # AB-02: an `arbitrary_execution` tool exists only while its executor reports qualified.
@@ -200,6 +203,13 @@ def _operation_id(scope: ToolScope, tool: ToolDefinition, parsed: BaseModel) -> 
     place = f"|{scope.instance}" if scope.instance else ""
     identity = f"{scope.run_id}{place}|{tool.tool_id}|{tool.version}|{_hash(parsed)}"
     return hashlib.sha256(identity.encode()).hexdigest()
+
+
+async def _has_approval(connection: Any, operation_id: str) -> bool:
+    cursor = await connection.execute(
+        "select 1 from public.approval_requests where operation_id = %s", (operation_id,)
+    )
+    return await cursor.fetchone() is not None
 
 
 def _denied(code: str) -> ToolResult:
@@ -312,6 +322,18 @@ class ToolGateway:
         if tool.approval_required or (
             tool.operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE
         ):
+            detail = None
+            if tool.review_detail is not None and not await _has_approval(
+                connection, _operation_id(scope, tool, parsed)
+            ):
+                try:
+                    detail = await asyncio.wait_for(
+                        tool.review_detail(parsed), tool.timeout_seconds
+                    )
+                except ToolFailed as error:
+                    return _denied(str(error) or "review_unavailable")
+                except Exception:
+                    return _denied("review_unavailable")
             code = await approval_gate(
                 connection,
                 workspace_id=scope.workspace_id,
@@ -329,6 +351,7 @@ class ToolGateway:
                 scope=scope_snapshot(scope.tools, scope.paths),
                 policy_version=APPROVAL_POLICY_VERSION,
                 policy_rule=_approval_rule(tool),
+                review_detail=detail,
             )
             if code is not None:
                 return _denied(code)

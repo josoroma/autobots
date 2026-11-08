@@ -76,6 +76,35 @@
         "title": "ApprovalDecision",
         "type": "object"
       },
+      "ApprovalFileDiff": {
+        "additionalProperties": false,
+        "properties": {
+          "change": {
+            "enum": [
+              "added",
+              "modified",
+              "unchanged"
+            ],
+            "title": "Change",
+            "type": "string"
+          },
+          "diff": {
+            "title": "Diff",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "change",
+          "diff"
+        ],
+        "title": "ApprovalFileDiff",
+        "type": "object"
+      },
       "ApprovalList": {
         "additionalProperties": false,
         "properties": {
@@ -234,6 +263,34 @@
         "title": "ApprovalResult",
         "type": "object"
       },
+      "ApprovalReviewDetail": {
+        "additionalProperties": false,
+        "description": "PRD-Studio GH-06: each file's diff against the base branch's head, which the approval\nbinds. A moved head stops the call with base_moved.",
+        "properties": {
+          "base_branch": {
+            "title": "Base Branch",
+            "type": "string"
+          },
+          "base_sha": {
+            "title": "Base Sha",
+            "type": "string"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalFileDiff"
+            },
+            "title": "Files",
+            "type": "array"
+          }
+        },
+        "required": [
+          "base_branch",
+          "base_sha",
+          "files"
+        ],
+        "title": "ApprovalReviewDetail",
+        "type": "object"
+      },
       "ApprovalScope": {
         "additionalProperties": false,
         "description": "The grants the request was made under. They hash to the scope it's checked against.",
@@ -387,6 +444,16 @@
               }
             ],
             "title": "Resource Target"
+          },
+          "review_detail": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalReviewDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "run_goal": {
             "anyOf": [

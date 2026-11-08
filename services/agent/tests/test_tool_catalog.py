@@ -199,6 +199,7 @@ def test_a_configured_connector_can_be_granted() -> None:
         "create_github_issue",
         "github_list_pull_requests",
         "github_list_workflow_runs",
+        "github_open_pull_request",
         "github_read_file",
         "github_search_issues",
     ]

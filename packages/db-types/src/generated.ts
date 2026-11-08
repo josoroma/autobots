@@ -23,6 +23,7 @@ export interface ApprovalRequestsRow {
   scope_snapshot: unknown | null;
   policy_version: string | null;
   policy_rule: string | null;
+  review_detail: unknown | null;
 }
 
 export interface ArtifactsRow {

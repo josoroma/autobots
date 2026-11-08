@@ -25,6 +25,7 @@ from autobots.contracts.approvals import (
     ApprovalList,
     ApprovalRequester,
     ApprovalResult,
+    ApprovalReviewDetail,
     ApprovalScope,
     ApprovalView,
     PendingApprovals,
@@ -104,6 +105,9 @@ async def get_approvals(
                 else ("you" if row["decided_by"] == user else "member"),
                 decided_by_name=row["decided_by_name"],
                 arguments_bytes=int(row["arguments_bytes"]),
+                review_detail=None
+                if row["review_detail"] is None
+                else ApprovalReviewDetail.model_validate(row["review_detail"]),
             )
             for row in rows
         ],

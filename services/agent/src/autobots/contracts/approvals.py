@@ -33,6 +33,25 @@ class ApprovalScope(BaseModel):
     paths: list[str]
 
 
+class ApprovalFileDiff(BaseModel):
+    model_config = VIEW
+
+    path: str
+    change: Literal["added", "modified", "unchanged"]
+    diff: str
+
+
+class ApprovalReviewDetail(BaseModel):
+    """PRD-Studio GH-06: each file's diff against the base branch's head, which the approval
+    binds. A moved head stops the call with base_moved."""
+
+    model_config = VIEW
+
+    base_branch: str
+    base_sha: str
+    files: list[ApprovalFileDiff]
+
+
 class ApprovalView(BaseModel):
     """What a reviewer decides on. The hash they saw comes back with the decision."""
 
@@ -63,6 +82,7 @@ class ApprovalView(BaseModel):
     decided_by: Literal["you", "member"] | None
     decided_by_name: str | None
     arguments_bytes: int
+    review_detail: ApprovalReviewDetail | None = None
 
 
 class ApprovalCounts(BaseModel):

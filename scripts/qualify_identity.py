@@ -162,6 +162,7 @@ def artifact_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port
                                          ('blocker_check.py', [workspace_a], 'blocker'),
                                          ('major_check.py', [workspace_a, workspace_b], 'major'),
                                          ('connector_check.py', [workspace_a], 'connector'),
+                                         ('pull_request_check.py', [workspace_a], 'pull request'),
                                          ('wake_check.py', [workspace_a], 'wake'),
                                          ('review_check.py', [workspace_a], 'review'),
                                          ('improvement_check.py', [workspace_a, workspace_b], 'improvement'),

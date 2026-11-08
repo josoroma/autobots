@@ -103,6 +103,7 @@ async def approval_gate(
     policy_version: str | None = None,
     policy_rule: str | None = None,
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
+    review_detail: dict[str, Any] | None = None,
 ) -> str | None:
     """None releases the operation. Any code means no effect, and says why."""
     async with connection.transaction():
@@ -124,8 +125,8 @@ async def approval_gate(
                 "insert into public.approval_requests (id, workspace_id, run_id, operation_id, "
                 "tool_id, tool_version, operation_class, argument_hash, arguments, scope_hash, "
                 "policy_reason, resource_target, requested_by, requested_by_agent, "
-                "scope_snapshot, policy_version, policy_rule, expires_at) "
-                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
+                "scope_snapshot, policy_version, policy_rule, review_detail, expires_at) "
+                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
                 "clock_timestamp() + make_interval(secs => %s))",
                 (
                     approval_id,
@@ -145,6 +146,7 @@ async def approval_gate(
                     None if scope is None else json.dumps(scope),
                     policy_version,
                     policy_rule,
+                    None if review_detail is None else json.dumps(review_detail),
                     ttl_seconds,
                 ),
             )
@@ -330,7 +332,7 @@ async def list_approvals(
         "where u.operation_id = a.operation_id and t ->> 'id' = u.task_id "
         "order by p.version desc limit 1), "
         "a.decided_at, a.decided_by, d.display_name, "
-        "octet_length(a.arguments::text) "
+        "octet_length(a.arguments::text), a.review_detail "
         "from public.approval_requests a left join public.experts e "
         "on e.id = (a.requested_by_agent ->> 'id')::uuid and e.workspace_id = a.workspace_id "
         "left join public.runs r on r.id = a.run_id and r.workspace_id = a.workspace_id "
@@ -363,6 +365,7 @@ async def list_approvals(
         "decided_by",
         "decided_by_name",
         "arguments_bytes",
+        "review_detail",
     )
     return [dict(zip(names, row, strict=True)) for row in await cursor.fetchall()]
 

@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from autobots.contracts.primitives import STRICT_CONTRACT
 
@@ -194,6 +194,53 @@ class GithubReadFileOutput(BaseModel):
     sha: str
     size: int
     content: str
+
+
+MAX_PULL_REQUEST_BYTES = 1_048_576
+
+
+class GithubFileChange(BaseModel):
+    """A file's full new content. Only named paths are committed."""
+
+    model_config = TOOL_CONTRACT
+
+    path: str = Field(min_length=1, max_length=500, pattern=r"^[A-Za-z0-9._/ -]+$")
+    content: str = Field(max_length=MAX_PULL_REQUEST_BYTES)
+
+    @field_validator("path")
+    @classmethod
+    def _inside_the_repository(cls, path: str) -> str:
+        if path.startswith("/") or ".." in path.split("/") or path.startswith(".git/"):
+            raise ValueError("a path is relative to the repository and can't climb out of it")
+        return path
+
+
+class GithubOpenPullRequestInput(BaseModel):
+    """PRD-Studio GH-06: up to 20 files and 1 MiB in all, and no repository."""
+
+    model_config = TOOL_CONTRACT
+
+    title: str = Field(min_length=1, max_length=256)
+    body: str = Field(default="", max_length=60_000)
+    base: GithubBranch
+    files: list[GithubFileChange] = Field(min_length=1, max_length=20)
+
+    @model_validator(mode="after")
+    def _bounded(self) -> "GithubOpenPullRequestInput":
+        if sum(len(item.content.encode()) for item in self.files) > MAX_PULL_REQUEST_BYTES:
+            raise ValueError("the changes are more than 1 MiB in all")
+        if len({item.path for item in self.files}) != len(self.files):
+            raise ValueError("each path appears once")
+        return self
+
+
+class GithubOpenPullRequestOutput(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    number: int
+    url: str
+    branch: str
+    head_sha: str
 
 
 class SaveArtifactInput(BaseModel):

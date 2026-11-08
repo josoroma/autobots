@@ -24,6 +24,7 @@ from autobots.adapters.checkpoints import (
     is_stale_owner,
 )
 from autobots.adapters.github_issues import GITHUB_ISSUE, GITHUB_ISSUE_V2
+from autobots.adapters.github_pulls import GITHUB_PULL_REQUEST
 from autobots.adapters.github_reads import GITHUB_READ_TOOLS
 from autobots.adapters.jina import JINA_TOOLS
 from autobots.adapters.loop_middleware import (
@@ -176,6 +177,7 @@ def loop_registry(
         GITHUB_ISSUE,
         GITHUB_ISSUE_V2,
         *GITHUB_READ_TOOLS,
+        GITHUB_PULL_REQUEST,
         *TAVILY_TOOLS,
         *JINA_TOOLS,
         *MARKET_TOOLS,
