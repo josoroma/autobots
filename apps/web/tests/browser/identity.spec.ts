@@ -122,8 +122,17 @@ test("the account footer, the Account page and the display name", async ({
 
   const footer = page.locator("[data-account]");
   await expect(footer.locator('[data-field="display-name"]')).toHaveText(local);
+  // Decision 0023 E3: a member of two workspaces has none until they choose, then its role shows.
   await expect(footer.locator('[data-field="role"]')).toHaveText(
-    me.workspaces[0].role === "owner" ? "Owner" : "Member",
+    "No workspace",
+  );
+  const chosen = me.workspaces[0] as { name: string; role: string };
+  await Promise.all([
+    page.waitForEvent("load"),
+    page.getByLabel("Choose a workspace").selectOption({ label: chosen.name }),
+  ]);
+  await expect(footer.locator('[data-field="role"]')).toHaveText(
+    chosen.role === "owner" ? "Owner" : "Member",
   );
   await expect(footer).toContainText("this Mac");
   await footer.locator("summary").click();

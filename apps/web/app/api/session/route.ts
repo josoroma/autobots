@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { CSRF_COOKIE, CSRF_HEADER, guardRequest } from "@/lib/request-guard";
 import { serverConfig } from "@/lib/server-config";
 import { sessionClient } from "@/lib/session";
+import { WORKSPACE_COOKIE } from "@/lib/workspace-choice";
 
 const REFUSED = {
   code: "sign_in_failed",
@@ -62,5 +63,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
   }
   const client = await sessionClient();
   await client.auth.signOut({ scope: "local" });
-  return NextResponse.json({ signed_in: false });
+  const reply = NextResponse.json({ signed_in: false });
+  reply.cookies.delete(WORKSPACE_COOKIE);
+  return reply;
 }

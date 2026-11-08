@@ -5,6 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { CSRF_COOKIE, CSRF_HEADER, guardRequest } from "@/lib/request-guard";
 import { serverConfig } from "@/lib/server-config";
 import { accessToken } from "@/lib/session";
+import { chosenWorkspace, WORKSPACE_HEADER } from "@/lib/workspace-choice";
 
 const MAX_BODY_BYTES = 64 * 1024;
 // A goal may carry up to five attached text files of 1 MiB each (PRD-Tool-Catalog FI-01), which
@@ -55,10 +56,16 @@ async function authorized(
   if (session === null) {
     return safeError(401, "not_signed_in", "Sign in first.");
   }
-  return new Headers({
+  const headers = new Headers({
     Authorization: `Bearer ${session}`,
     "X-Autobots-Internal": config.internalToken,
   });
+  // Decision 0023 E3: the chosen workspace, which the API checks against membership.
+  const workspace = await chosenWorkspace();
+  if (workspace !== null) {
+    headers.set(WORKSPACE_HEADER, workspace);
+  }
+  return headers;
 }
 
 export async function forward(

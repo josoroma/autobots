@@ -312,7 +312,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
                                      'AUTOBOTS_TEST_SERVICE_KEY': stack.values['SERVICE_ROLE_KEY'], 'AUTOBOTS_WEB_REPORT': str(report),
                                      'AUTOBOTS_WEB_OUTPUT': str(root / '.checks/identity/results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots),
                                      'AUTOBOTS_TEST_VISUAL_DIR': str(root / '.checks/identity/visual')}
-        result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'browser/operations', 'approvals', 'effects', 'experts', 'models', 'composer', 'home', 'workflow-list', 'identity', 'settings', 'runs', 'run-panel', 'search', 'new-run', 'stream-result', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=660, check=False,
+        result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'browser/operations', 'approvals', 'effects', 'experts', 'models', 'composer', 'home', 'workflow-list', 'identity', 'settings', 'runs', 'run-panel', 'search', 'new-run', 'stream-result', 'workspace-choice', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=660, check=False,
                                 env=browser_env)
         # A real restart, then Settings reads the stored records. Then one is removed, under the same key.
         stop(processes[0])
@@ -666,6 +666,19 @@ def qualify(root: Path) -> int:
                     arranged_ops.returncode == 0 and zoned.returncode == 0)
         artifacts = {**artifacts, 'AUTOBOTS_TEST_OPS_EMAIL': email_n, 'AUTOBOTS_TEST_OPS_PASSWORD': password_n, 'AUTOBOTS_TEST_OPS_WORKSPACE': ops_ws,
                      'AUTOBOTS_TEST_OPS_HELPER': str(root / 'tests/db/operations_live.py')}
+        # US-16.3, arranged: a member of two workspaces, their own P and runs-g's G, with a run only in P.
+        # The ops-n workspace is one they don't belong to.
+        email_p, password_p = 'multi-p@example.invalid', secrets.token_urlsafe(24)
+        multi = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_p, password_p)
+        arranged_multi = stack.sql(
+            f"insert into public.workspace_members (workspace_id, user_id, role) values ('{listed}', '{multi['user_id']}', 'member');\n"
+            f"insert into public.runs (id, workspace_id, status, goal_summary, limit_micro_usd, policy_snapshot) values "
+            f"(gen_random_uuid(), '{multi['workspace_id']}', 'succeeded', 'Only in workspace P', 1000000, '{{}}');\n")
+        cases.check('the two-workspace member is arranged', 'exit 0', f'exit {arranged_multi.returncode}: {arranged_multi.stderr[-300:]}',
+                    arranged_multi.returncode == 0)
+        artifacts = {**artifacts, 'AUTOBOTS_TEST_MULTI_EMAIL': email_p, 'AUTOBOTS_TEST_MULTI_PASSWORD': password_p,
+                     'AUTOBOTS_TEST_MULTI_WORKSPACE_P': multi['workspace_id'], 'AUTOBOTS_TEST_MULTI_WORKSPACE_G': listed,
+                     'AUTOBOTS_TEST_FOREIGN_WORKSPACE': ops_ws}
         # US-15.22, arranged: "read" names a run's goal, an Expert and a workflow in the ops-n workspace, and a
         # run and an Expert in the workflows workspace, which a search from ops-n must not return.
         search_ids = {'run': '99999999-9999-4999-8999-0000000000d1', 'expert': '99999999-9999-4999-8999-0000000000d2',

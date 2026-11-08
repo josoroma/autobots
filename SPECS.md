@@ -575,11 +575,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-16.2#2 | Compare the applied count in readiness, with schema_behind and schema_ahead. | DONE | US-16.2 |
 | US-16.2#3 | Extend the required relations and columns through migration 49. | DONE | US-16.2 |
 | US-16.2#4 | Show applied against shipped in Operations, and cover the scenarios on a disposable stack. | DONE | US-16.2 |
-| US-16.3 | Workspace choice for members of several workspaces | READY | EPIC-16 |
-| US-16.3#1 | Add a same-origin, CSRF-checked route that keeps the choice in an HttpOnly cookie. | TODO | US-16.3 |
-| US-16.3#2 | Send the choice from the BFF and the event stream as `X-Autobots-Workspace`. | TODO | US-16.3 |
-| US-16.3#3 | Add the sidebar chooser for members of several workspaces. | TODO | US-16.3 |
-| US-16.3#4 | Cover the scenarios in the browser on a disposable stack. | TODO | US-16.3 |
+| US-16.3 | Workspace choice for members of several workspaces | DONE | EPIC-16 |
+| US-16.3#1 | Add a same-origin, CSRF-checked route that keeps the choice in an HttpOnly cookie. | DONE | US-16.3 |
+| US-16.3#2 | Send the choice from the BFF and the event stream as `X-Autobots-Workspace`. | DONE | US-16.3 |
+| US-16.3#3 | Add the sidebar chooser for members of several workspaces. | DONE | US-16.3 |
+| US-16.3#4 | Cover the scenarios in the browser on a disposable stack. | DONE | US-16.3 |
 | US-16.4 | A current install with Sol's live qualification | READY | EPIC-16 |
 | US-16.4#1 | Back up the install, then apply the pending migrations through the guarded path. | TODO | US-16.4 |
 | US-16.4#2 | Run Sol's corpus live within its ledger, and record the report. | TODO | US-16.4 |
@@ -7473,7 +7473,8 @@ Open Questions:
 
 ### US-16.3: Workspace choice for members of several workspaces
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-16-3-workspace-choice-members-several/`
 
 As a member of more than one workspace
 I want to choose which workspace I'm working in, and change it
@@ -7517,10 +7518,10 @@ Dependencies:
 - None
 
 Tasks:
-- [ ] Add a same-origin, CSRF-checked route that keeps the choice in an HttpOnly cookie.
-- [ ] Send the choice from the BFF and the event stream as `X-Autobots-Workspace`.
-- [ ] Add the sidebar chooser for members of several workspaces.
-- [ ] Cover the scenarios in the browser on a disposable stack.
+- [x] Add a same-origin, CSRF-checked route that keeps the choice in an HttpOnly cookie.
+- [x] Send the choice from the BFF and the event stream as `X-Autobots-Workspace`.
+- [x] Add the sidebar chooser for members of several workspaces.
+- [x] Cover the scenarios in the browser on a disposable stack.
 
 Open Questions:
 - None.

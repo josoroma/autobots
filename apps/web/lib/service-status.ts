@@ -11,6 +11,7 @@ import {
 
 import { serverConfig } from "@/lib/server-config";
 import { accessToken } from "@/lib/session";
+import { chosenWorkspace, WORKSPACE_HEADER } from "@/lib/workspace-choice";
 
 export type ServiceStatus = "available" | "unavailable";
 
@@ -26,6 +27,15 @@ function client(headers: Record<string, string>) {
       })) as typeof fetch,
     headers: { "X-Autobots-Internal": config.internalToken, ...headers },
   };
+}
+
+/** A member read, with the chosen workspace when there is one (Decision 0023 E3). */
+async function memberClient(token: string) {
+  const workspace = await chosenWorkspace();
+  return client({
+    Authorization: `Bearer ${token}`,
+    ...(workspace === null ? {} : { [WORKSPACE_HEADER]: workspace }),
+  });
 }
 
 /** An unreachable or invalid API is a visible state, and its details stay on the server. */
@@ -56,7 +66,7 @@ export async function fetchReadiness(): Promise<MemberReadiness | null> {
     const token = await accessToken();
     return token === null
       ? null
-      : await getReadiness(client({ Authorization: `Bearer ${token}` }));
+      : await getReadiness(await memberClient(token));
   } catch {
     return null;
   }
@@ -68,11 +78,7 @@ export async function fetchPendingApprovals(): Promise<number | null> {
     const token = await accessToken();
     return token === null
       ? null
-      : (
-          await countPendingApprovals(
-            client({ Authorization: `Bearer ${token}` }),
-          )
-        ).pending;
+      : (await countPendingApprovals(await memberClient(token))).pending;
   } catch {
     return null;
   }

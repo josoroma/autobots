@@ -224,7 +224,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
 
 - **Browser to web:** an HttpOnly SameSite=strict session cookie (`lib/session.ts`), with host, origin, fetch-site and CSRF checks (`lib/request-guard.ts`). The BFF adds the internal token on the server.
 - **Web to API:** `api/security.py` requires `X-Autobots-Internal` (constant-time compare) and a Bearer JWT (HS256, audience `authenticated`). Membership comes from `public.workspace_members` (`api/membership.py`).
-- **Workspace selection:** `current_workspace` (`api/settings_routes.py:46–60`) uses a verified `X-Autobots-Workspace` header. Without one, it uses the user's only workspace and otherwise refuses with `403 workspace_required` "Choose a workspace." `lib/bff.ts` forwards the header, but no component, `lib` module or `packages/api-client/src` file sets it, so a member of several workspaces is refused on member routes.
+- **Workspace selection:** `current_workspace` (`api/settings_routes.py`) uses a verified `X-Autobots-Workspace` header; without one it uses the user's only workspace and otherwise refuses with `403 workspace_required`. Since US-16.3, after the analyzed revision: `POST /api/workspace` (same origin, CSRF-checked, membership checked against the session) keeps the choice in the HttpOnly, SameSite=Strict `autobots.workspace` cookie (`lib/workspace-choice.ts`); `lib/bff.ts` and `lib/service-status.ts` send it as the header; sign-out deletes it; `components/workspace-chooser.tsx` in the account footer asks a member of several workspaces to choose, with no implicit default.
 - **Owners:**
   - `require_owner` gates the owner routes: Expert writes, workflow draft writes, `/v1/operations/jobs`, retention changes, replays, policy reset, and others.
   - Workflow drafts are also owner-only in RLS.
@@ -388,7 +388,6 @@ Accepted limits, by decision:
 - Decision 0014: rare uncounted active time, paid calls during a drain, and Continue losing its key on reload.
 
 Observed risks:
-- **Workspace selection:** a member of more than one workspace gets `workspace_required` on member routes, because no client sends `X-Autobots-Workspace`.
 - **Input-size estimate:** a reservation's input size is a byte-based estimate, because no tokenizer is pinned.
 - **Uncertain calls not logged:** `charge_not_reported`, `cancelled_after_dispatch` and a cut drain emit no `worker.call_uncertain`.
 - **Duplicate issues:** `create_github_issue` has no idempotency key (Decision 0007). The PR connector uses a branch name and marker instead.

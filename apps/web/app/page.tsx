@@ -1,3 +1,4 @@
+import { chosenWorkspace, currentWorkspace } from "@/lib/workspace-choice";
 import { Server, UserRound } from "lucide-react";
 import Link from "next/link";
 
@@ -29,10 +30,11 @@ const LOWER_ITEM = "border-t py-3 text-sm";
 const LOWER_ACTION = "mt-auto pt-2";
 
 export default async function HomePage() {
-  const [status, session, readiness] = await Promise.all([
+  const [status, session, readiness, chosen] = await Promise.all([
     fetchServiceStatus(),
     fetchSession(),
     fetchReadiness(),
+    chosenWorkspace(),
   ]);
   return (
     <div className="mx-auto w-full max-w-[780px] md:pt-10">
@@ -40,7 +42,9 @@ export default async function HomePage() {
         {session === null ? null : (
           <HomeGreeting
             name={session.display_name}
-            timeZone={session.workspaces[0]?.timezone ?? "UTC"}
+            timeZone={
+              currentWorkspace(session.workspaces, chosen)?.timezone ?? "UTC"
+            }
           />
         )}
         <h1 className="text-4xl leading-[1.1] md:text-[44px]">
