@@ -1,5 +1,6 @@
 "use client";
 
+import { CircleAlert, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
 
@@ -21,7 +22,8 @@ export function ContinueRun({ runId }: { runId: string }) {
 
   if (!open) {
     return (
-      <Button variant="secondary" onClick={() => setOpen(true)}>
+      <Button variant="outline" onClick={() => setOpen(true)}>
+        <RotateCcw aria-hidden="true" />
         Continue in a new run
       </Button>
     );
@@ -78,8 +80,11 @@ export function ContinueRun({ runId }: { runId: string }) {
   }
 
   return (
-    <div data-continue-run="true" className="space-y-2 text-sm">
-      <p>
+    <div
+      data-continue-run="true"
+      className="bg-card space-y-3 rounded-xl border p-4 text-sm"
+    >
+      <p className="leading-relaxed">
         This starts a new run with the same goal, linked to this one, which
         stays as it is. Its steps are new, so it can repeat what this run did,
         and anything consequential waits for a new approval. Its Expert,
@@ -87,7 +92,9 @@ export function ContinueRun({ runId }: { runId: string }) {
         carried over.
       </p>
       {started !== null ? null : lost ? (
-        <p>The model stays as chosen, as this may already be running.</p>
+        <p className="text-muted-foreground">
+          The model stays as chosen, as this may already be running.
+        </p>
       ) : (
         <RunDisclosure chosen={profile} onChoose={setProfile} />
       )}
@@ -98,12 +105,23 @@ export function ContinueRun({ runId }: { runId: string }) {
       ) : (
         <p role="status">
           {already ? "It had already started. " : "Queued. "}
-          <Link href={`/runs/${started}`} className="font-medium underline">
+          <Link
+            href={`/runs/${started}`}
+            className="font-medium underline underline-offset-4"
+          >
             {already ? "Open the run" : "Open the new run"}
           </Link>
         </p>
       )}
-      {problem === null ? null : <p role="alert">{problem}</p>}
+      {problem === null ? null : (
+        <p role="alert" className="flex items-start gap-2">
+          <CircleAlert
+            aria-hidden="true"
+            className="text-destructive mt-0.5 size-4 shrink-0"
+          />
+          <span>{problem}</span>
+        </p>
+      )}
     </div>
   );
 }

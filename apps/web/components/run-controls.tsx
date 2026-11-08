@@ -4,6 +4,7 @@ import {
   parseReconciliationResult,
   parseRunSummary,
 } from "@autobots/api-client";
+import { CircleAlert, CircleDollarSign, Pause, Play } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -137,10 +138,15 @@ export function RunControls({
           {commands.map((command) => (
             <Button
               key={command}
-              variant={command === "cancel" ? "secondary" : "default"}
+              variant={command === "cancel" ? "outline" : "default"}
               disabled={busy}
               onClick={() => void send(command)}
             >
+              {command === "pause" ? (
+                <Pause aria-hidden="true" />
+              ) : command === "resume" ? (
+                <Play aria-hidden="true" />
+              ) : null}
               {LABELS[command]}
             </Button>
           ))}
@@ -150,37 +156,61 @@ export function RunControls({
         <form
           onSubmit={(event) => void reconcile(event)}
           data-reconcile="true"
-          className="space-y-2 text-sm"
+          className="border-attention/40 bg-card dark:bg-attention/5 space-y-3 rounded-xl border p-4 text-sm"
         >
-          <p>
-            {openCalls === 1
-              ? "One model call has"
-              : `${openCalls} model calls have`}{" "}
-            no settled charge. Look it up in OpenRouter&apos;s own records,
-            since no one here can tell. Only the workspace owner can record it.
+          <p className="flex items-start gap-2.5 leading-relaxed">
+            <CircleDollarSign
+              aria-hidden="true"
+              className="text-attention mt-0.5 size-4 shrink-0"
+            />
+            <span>
+              {openCalls === 1
+                ? "One model call has"
+                : `${openCalls} model calls have`}{" "}
+              no settled charge. Look it up in OpenRouter&apos;s own records,
+              since no one here can tell. Only the workspace owner can record
+              it.
+            </span>
           </p>
-          <label htmlFor="model-call-charge" className="font-medium">
-            Charge seen, in US dollars
-          </label>
-          <Input
-            id="model-call-charge"
-            value={charge}
-            onChange={(event) => setCharge(event.target.value)}
-            inputMode="decimal"
-            autoComplete="off"
-          />
-          <Button type="submit" variant="secondary" disabled={busy}>
-            Record the charge
-          </Button>
+          <div className="space-y-1.5">
+            <label htmlFor="model-call-charge" className="block font-medium">
+              Charge seen, in US dollars
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                id="model-call-charge"
+                value={charge}
+                onChange={(event) => setCharge(event.target.value)}
+                inputMode="decimal"
+                autoComplete="off"
+                className="w-40 font-mono tabular-nums"
+              />
+              <Button type="submit" variant="outline" disabled={busy}>
+                Record the charge
+              </Button>
+            </div>
+          </div>
         </form>
       )}
       {refusal === null ? null : (
-        <p role="alert" data-control-refusal="true" className="text-sm">
-          {refusal}
+        <p
+          role="alert"
+          data-control-refusal="true"
+          className="flex items-start gap-2 text-sm"
+        >
+          <CircleAlert
+            aria-hidden="true"
+            className="text-destructive mt-0.5 size-4 shrink-0"
+          />
+          <span>{refusal}</span>
         </p>
       )}
       {note === null ? null : (
-        <p role="status" data-control-note="true" className="text-sm">
+        <p
+          role="status"
+          data-control-note="true"
+          className="text-muted-foreground text-sm"
+        >
           {note}
         </p>
       )}

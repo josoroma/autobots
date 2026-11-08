@@ -62,27 +62,35 @@ export function UnknownEffects({
 
   return (
     <div data-unknown-effects="true" className="space-y-3 text-sm">
-      <p>
+      <p className="leading-relaxed">
         These may or may not have happened. Check the destination&apos;s own
         records, since no one here can tell, and an effect isn&apos;t repeated
         until you do.
       </p>
-      <label htmlFor="effect-evidence" className="font-medium">
-        What you saw
-      </label>
-      <Textarea
-        id="effect-evidence"
-        rows={2}
-        value={evidence}
-        onChange={(event) => setEvidence(event.target.value)}
-      />
-      <ul className="space-y-2">
+      <div className="space-y-1.5">
+        <label htmlFor="effect-evidence" className="block font-medium">
+          What you saw
+        </label>
+        <Textarea
+          id="effect-evidence"
+          rows={2}
+          value={evidence}
+          onChange={(event) => setEvidence(event.target.value)}
+        />
+      </div>
+      <ul className="divide-y border-y">
         {operations.map((operation) => (
-          <li key={operation.operation_id} className="space-y-1">
-            <p className="font-medium">{operation.tool_id}</p>
-            <div className="flex gap-3">
+          <li
+            key={operation.operation_id}
+            className="flex flex-wrap items-center justify-between gap-3 py-3"
+          >
+            <p className="min-w-0 font-mono text-[13px] font-medium break-all">
+              {operation.tool_id}
+            </p>
+            <div className="flex flex-wrap gap-2">
               <Button
-                variant="secondary"
+                variant="outline"
+                size="sm"
                 disabled={evidence.trim() === ""}
                 onClick={() =>
                   void record(
@@ -95,7 +103,8 @@ export function UnknownEffects({
                 It happened
               </Button>
               <Button
-                variant="secondary"
+                variant="outline"
+                size="sm"
                 disabled={evidence.trim() === ""}
                 onClick={() =>
                   void record(
@@ -111,7 +120,11 @@ export function UnknownEffects({
           </li>
         ))}
       </ul>
-      {message === null ? null : <p role="status">{message}</p>}
+      {message === null ? null : (
+        <p role="status" className="text-muted-foreground">
+          {message}
+        </p>
+      )}
     </div>
   );
 }

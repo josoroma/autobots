@@ -5,9 +5,16 @@ import {
   type ToolUseList,
   type ToolUseView,
 } from "@autobots/api-client";
+import {
+  CircleAlert,
+  CircleCheck,
+  CircleDashed,
+  CircleHelp,
+  Ban,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 // PRD-Tool-Catalog TV-01 to TV-03: when, which tool, why (the plan task), for what, and outcome.
 // Only public fields, digests and sizes reach this page; content never does.
@@ -18,6 +25,46 @@ const OUTCOMES: Record<string, string> = {
   unknown: "Outcome unknown",
   denied: "Denied",
 };
+
+const HEAD = "px-3 py-2 font-medium";
+const CELL = "px-3 py-2.5";
+
+// Decorative: the outcome's words beside it carry the meaning.
+function OutcomeIcon({ outcome }: { outcome: string | null }) {
+  const shared = "mt-0.5 size-3.5 shrink-0";
+  if (outcome === "succeeded") {
+    return (
+      <CircleCheck
+        aria-hidden="true"
+        className={cn(shared, "text-success-text")}
+      />
+    );
+  }
+  if (outcome === "failed") {
+    return (
+      <CircleAlert
+        aria-hidden="true"
+        className={cn(shared, "text-destructive")}
+      />
+    );
+  }
+  if (outcome === "unknown") {
+    return (
+      <CircleHelp aria-hidden="true" className={cn(shared, "text-attention")} />
+    );
+  }
+  if (outcome === "denied") {
+    return (
+      <Ban aria-hidden="true" className={cn(shared, "text-muted-foreground")} />
+    );
+  }
+  return (
+    <CircleDashed
+      aria-hidden="true"
+      className={cn(shared, "text-muted-foreground")}
+    />
+  );
+}
 
 function when(use: ToolUseView): string {
   const time = new Date(use.requested_at).toLocaleTimeString(undefined, {
@@ -111,23 +158,23 @@ export function ToolUseTable({
       <table className="w-full text-left text-sm" data-tool-uses="true">
         <caption className="sr-only">{caption}</caption>
         <thead>
-          <tr className="border-b">
-            <th scope="col" className="py-1.5 pr-3 font-medium">
+          <tr className="text-muted-foreground border-b text-xs">
+            <th scope="col" className={cn(HEAD, "pl-0")}>
               When
             </th>
-            <th scope="col" className="py-1.5 pr-3 font-medium">
+            <th scope="col" className={HEAD}>
               Tool
             </th>
-            <th scope="col" className="py-1.5 pr-3 font-medium">
+            <th scope="col" className={HEAD}>
               Plan task
             </th>
-            <th scope="col" className="py-1.5 pr-3 font-medium">
+            <th scope="col" className={HEAD}>
               Inputs
             </th>
-            <th scope="col" className="py-1.5 pr-3 font-medium">
+            <th scope="col" className={HEAD}>
               Result
             </th>
-            <th scope="col" className="py-1.5 pr-3 font-medium">
+            <th scope="col" className={HEAD}>
               Outcome
             </th>
           </tr>
@@ -139,11 +186,20 @@ export function ToolUseTable({
               data-tool-use={use.id}
               data-tool-id={use.tool_id}
               data-outcome={use.outcome ?? "open"}
-              className="border-b align-top"
+              className="border-b align-top last:border-b-0"
             >
-              <td className="py-1.5 pr-3 whitespace-nowrap">{when(use)}</td>
-              <th scope="row" className="py-1.5 pr-3 font-normal">
-                <code>{use.tool_id}</code>
+              <td
+                className={cn(
+                  CELL,
+                  "text-muted-foreground pl-0 text-xs whitespace-nowrap tabular-nums",
+                )}
+              >
+                {when(use)}
+              </td>
+              <th scope="row" className={cn(CELL, "font-normal")}>
+                <code className="font-mono text-[13px] font-medium">
+                  {use.tool_id}
+                </code>
                 {use.tool_version === null ? "" : ` v${use.tool_version}`}
                 {use.group === null ? null : (
                   <span className="text-muted-foreground block text-xs">
@@ -151,17 +207,26 @@ export function ToolUseTable({
                   </span>
                 )}
               </th>
-              <td className="py-1.5 pr-3" data-field="task">
+              <td className={CELL} data-field="task">
                 {use.task_title ?? "No plan task"}
               </td>
-              <td className="py-1.5 pr-3 break-all" data-field="inputs">
+              <td
+                className={cn(CELL, "font-mono text-xs break-all")}
+                data-field="inputs"
+              >
                 {brief(use.input_public) || "Not shown"}
               </td>
-              <td className="py-1.5 pr-3 break-all" data-field="result">
+              <td
+                className={cn(CELL, "font-mono text-xs break-all")}
+                data-field="result"
+              >
                 {result(use)}
               </td>
-              <td className="py-1.5 pr-3" data-field="outcome">
-                {outcome(use)}
+              <td className={CELL} data-field="outcome">
+                <span className="inline-flex items-start gap-1.5">
+                  <OutcomeIcon outcome={use.outcome} />
+                  {outcome(use)}
+                </span>
               </td>
             </tr>
           ))}
@@ -182,8 +247,11 @@ export function ToolsUsed({
   const { uses, failed } = useToolUses(runId, version);
   const latest = uses?.at(-1);
   return (
-    <Card aria-labelledby="tools-used-heading" className="space-y-3">
-      <h2 id="tools-used-heading" className="text-lg font-medium">
+    <section
+      aria-labelledby="tools-used-heading"
+      className="space-y-3 border-t pt-6"
+    >
+      <h2 id="tools-used-heading" className="text-sm font-semibold">
         Tools used
       </h2>
       <p className="sr-only" aria-live="polite" data-field="tool-announcement">
@@ -196,12 +264,14 @@ export function ToolsUsed({
           Tool uses aren&apos;t available right now.
         </p>
       ) : uses === null ? (
-        <p className="text-sm">Loading tool uses.</p>
+        <p className="text-muted-foreground text-sm">Loading tool uses.</p>
       ) : uses.length === 0 ? (
-        <p className="text-sm">No tool has been used yet.</p>
+        <p className="text-muted-foreground text-sm">
+          No tool has been used yet.
+        </p>
       ) : (
         <ToolUseTable uses={uses} caption="Tools this run used, in order" />
       )}
-    </Card>
+    </section>
   );
 }

@@ -11,10 +11,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, INNER_BOX } from "@/components/ui/card";
 import { Choice, Input, Select, Textarea } from "@/components/ui/field";
+import { SectionLabel } from "@/components/ui/page-header";
 import { AVAILABILITY, repair } from "@/components/tool-catalog";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { cn } from "@/lib/utils";
+
 const PROFILES = [
   { id: "", label: "Workspace setting" },
   { id: "openrouter_terra", label: "Terra" },
@@ -211,161 +214,195 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
   }
   if (expert === null || draft === null) {
     return (
-      <p role="status" className="text-sm">
+      <p role="status" className="text-muted-foreground text-sm">
         Loading this Expert.
       </p>
     );
   }
+  const granted = expansion(catalog, draft);
   return (
-    <>
-      <Card aria-labelledby="config-heading" className="space-y-3">
-        <h2 id="config-heading" className="text-lg font-medium">
-          {expert.name}, version {expert.latest_version}
-        </h2>
-        <form onSubmit={(event) => void save(event)} className="space-y-3">
-          <div className="space-y-1">
-            <label htmlFor="purpose" className="text-sm font-medium">
-              Purpose
-            </label>
-            <Input
-              id="purpose"
-              value={draft.purpose}
-              onChange={(event) =>
-                setDraft({ ...draft, purpose: event.target.value })
-              }
-            />
+    <div className="grid items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_300px]">
+      <Card aria-labelledby="config-heading" className="space-y-6 p-6">
+        <div className="flex items-center gap-3">
+          <span
+            aria-hidden="true"
+            className="bg-background grid size-10 shrink-0 place-items-center rounded-[10px] border font-serif text-lg dark:border-transparent dark:bg-muted"
+          >
+            {expert.name.trim().charAt(0).toUpperCase()}
+          </span>
+          <h2
+            id="config-heading"
+            className="font-serif text-[22px] leading-tight font-normal tracking-tight"
+          >
+            {expert.name}, version {expert.latest_version}
+          </h2>
+        </div>
+        <form onSubmit={(event) => void save(event)} className="space-y-6">
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label htmlFor="purpose" className="text-sm font-medium">
+                Purpose
+              </label>
+              <Input
+                id="purpose"
+                value={draft.purpose}
+                onChange={(event) =>
+                  setDraft({ ...draft, purpose: event.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="instructions" className="text-sm font-medium">
+                Instructions
+              </label>
+              <Textarea
+                id="instructions"
+                rows={5}
+                value={draft.instructions}
+                onChange={(event) =>
+                  setDraft({ ...draft, instructions: event.target.value })
+                }
+              />
+            </div>
           </div>
-          <div className="space-y-1">
-            <label htmlFor="instructions" className="text-sm font-medium">
-              Instructions
-            </label>
-            <Textarea
-              id="instructions"
-              rows={5}
-              value={draft.instructions}
-              onChange={(event) =>
-                setDraft({ ...draft, instructions: event.target.value })
-              }
-            />
-          </div>
-          <fieldset className="space-y-1" data-field="tool-groups">
-            <legend className="text-sm font-medium">Grant whole groups</legend>
+          <fieldset
+            className="space-y-2 border-t pt-5"
+            data-field="tool-groups"
+          >
+            <legend className={LEGEND}>Grant whole groups</legend>
             {catalog === null ? (
-              <p className="text-sm">Loading the tool catalog.</p>
+              <p className="text-muted-foreground text-sm">
+                Loading the tool catalog.
+              </p>
             ) : (
-              catalog.groups
-                .filter((group) => members(catalog, group.group).length > 0)
-                .map((group) => {
-                  const tools = grantable(catalog).filter(
-                    (tool) => tool.group === group.group,
-                  );
-                  const blocked = tools.some(
-                    (tool) => tool.availability !== "available",
-                  );
-                  const checked = draft.groups.includes(group.group);
-                  return (
+              <div className="grid gap-x-6 gap-y-2 @xl:grid-cols-2">
+                {catalog.groups
+                  .filter((group) => members(catalog, group.group).length > 0)
+                  .map((group) => {
+                    const tools = grantable(catalog).filter(
+                      (tool) => tool.group === group.group,
+                    );
+                    const blocked = tools.some(
+                      (tool) => tool.availability !== "available",
+                    );
+                    const checked = draft.groups.includes(group.group);
+                    return (
+                      <label
+                        key={group.group}
+                        htmlFor={`grant-group-${group.group}`}
+                        className="flex items-start gap-2.5 text-sm"
+                      >
+                        <Choice
+                          id={`grant-group-${group.group}`}
+                          type="checkbox"
+                          checked={checked}
+                          disabled={blocked && !checked}
+                          className="mt-0.5 shrink-0"
+                          onChange={(event) =>
+                            setDraft({
+                              ...draft,
+                              groups: event.target.checked
+                                ? [...draft.groups, group.group]
+                                : draft.groups.filter(
+                                    (item) => item !== group.group,
+                                  ),
+                            })
+                          }
+                        />
+                        <span>
+                          {group.title} group ({tools.length}{" "}
+                          {tools.length === 1 ? "tool" : "tools"})
+                          {blocked ? ", includes an unavailable tool" : ""}
+                        </span>
+                      </label>
+                    );
+                  })}
+              </div>
+            )}
+          </fieldset>
+          <fieldset className="space-y-2 border-t pt-5">
+            <legend className={LEGEND}>Allowed tools</legend>
+            <div className="grid gap-x-6 gap-y-2 @xl:grid-cols-2">
+              {grantable(catalog).map((tool) => {
+                const named = draft.tools.includes(tool.tool_id);
+                const fromGroup = draft.groups.includes(tool.group);
+                const unavailable = tool.availability !== "available";
+                const fix = repair(tool);
+                return (
+                  <div key={tool.tool_id} data-tool={tool.tool_id}>
                     <label
-                      key={group.group}
-                      htmlFor={`grant-group-${group.group}`}
-                      className="flex items-center gap-2 text-sm"
+                      htmlFor={`grant-tool-${tool.tool_id}`}
+                      className="flex items-start gap-2.5 text-sm"
                     >
                       <Choice
-                        id={`grant-group-${group.group}`}
+                        id={`grant-tool-${tool.tool_id}`}
+                        aria-describedby={
+                          unavailable
+                            ? `grant-tool-${tool.tool_id}-why`
+                            : undefined
+                        }
                         type="checkbox"
-                        checked={checked}
-                        disabled={blocked && !checked}
+                        checked={named || fromGroup}
+                        disabled={unavailable && !named && !fromGroup}
+                        className="mt-0.5 shrink-0"
                         onChange={(event) =>
                           setDraft({
                             ...draft,
+                            tools: event.target.checked
+                              ? [...draft.tools, tool.tool_id]
+                              : draft.tools.filter(
+                                  (item) => item !== tool.tool_id,
+                                ),
+                            // Unchecking one tool of a whole group means the group isn't whole.
                             groups: event.target.checked
-                              ? [...draft.groups, group.group]
+                              ? draft.groups
                               : draft.groups.filter(
-                                  (item) => item !== group.group,
+                                  (item) => item !== tool.group,
                                 ),
                           })
                         }
                       />
-                      {group.title} group ({tools.length}{" "}
-                      {tools.length === 1 ? "tool" : "tools"})
-                      {blocked ? ", includes an unavailable tool" : ""}
+                      <span>
+                        {tool.title}
+                        {tool.approval === "always" ? ", after approval" : ""}
+                      </span>
                     </label>
-                  );
-                })
-            )}
+                    {unavailable ? (
+                      <p
+                        id={`grant-tool-${tool.tool_id}-why`}
+                        className="text-muted-foreground ml-6.5 text-xs"
+                        data-field="unavailable"
+                      >
+                        {AVAILABILITY[tool.availability] ?? tool.availability}
+                        {fix === null ? "" : `. ${fix}`}
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
           </fieldset>
-          <fieldset className="space-y-1">
-            <legend className="text-sm font-medium">Allowed tools</legend>
-            {grantable(catalog).map((tool) => {
-              const named = draft.tools.includes(tool.tool_id);
-              const fromGroup = draft.groups.includes(tool.group);
-              const unavailable = tool.availability !== "available";
-              const fix = repair(tool);
-              return (
-                <div key={tool.tool_id} data-tool={tool.tool_id}>
-                  <label
-                    htmlFor={`grant-tool-${tool.tool_id}`}
-                    className="flex items-center gap-2 text-sm"
-                  >
-                    <Choice
-                      id={`grant-tool-${tool.tool_id}`}
-                      aria-describedby={
-                        unavailable
-                          ? `grant-tool-${tool.tool_id}-why`
-                          : undefined
-                      }
-                      type="checkbox"
-                      checked={named || fromGroup}
-                      disabled={unavailable && !named && !fromGroup}
-                      onChange={(event) =>
-                        setDraft({
-                          ...draft,
-                          tools: event.target.checked
-                            ? [...draft.tools, tool.tool_id]
-                            : draft.tools.filter(
-                                (item) => item !== tool.tool_id,
-                              ),
-                          // Unchecking one tool of a whole group means the group isn't whole.
-                          groups: event.target.checked
-                            ? draft.groups
-                            : draft.groups.filter(
-                                (item) => item !== tool.group,
-                              ),
-                        })
-                      }
-                    />
-                    {tool.title}
-                    {tool.approval === "always" ? ", after approval" : ""}
-                  </label>
-                  {unavailable ? (
-                    <p
-                      id={`grant-tool-${tool.tool_id}-why`}
-                      className="text-muted-foreground ml-6 text-xs"
-                      data-field="unavailable"
-                    >
-                      {AVAILABILITY[tool.availability] ?? tool.availability}
-                      {fix === null ? "" : `. ${fix}`}
-                    </p>
-                  ) : null}
-                </div>
-              );
-            })}
-          </fieldset>
-          <p className="text-sm" data-field="expansion" aria-live="polite">
-            {expansion(catalog, draft).length === 0
+          <p
+            className={cn(INNER_BOX, "text-sm wrap-anywhere")}
+            data-field="expansion"
+            aria-live="polite"
+          >
+            {granted.length === 0
               ? "This version grants no tools."
-              : `This version grants: ${expansion(catalog, draft).join(", ")}${
+              : `This version grants: ${granted.join(", ")}${
                   draft.groups.length === 0
                     ? "."
                     : `, from ${draft.groups.length === 1 ? "the group" : "the groups"} ${draft.groups.join(", ")} and the tools named.`
                 }`}
           </p>
-          <div className="space-y-1">
+          <div className="space-y-1.5 border-t pt-5">
             <label htmlFor="executor" className="text-sm font-medium">
               Model for its work
             </label>
             <Select
               id="executor"
               value={draft.executor}
+              className="sm:max-w-xs"
               onChange={(event) =>
                 setDraft({ ...draft, executor: event.target.value })
               }
@@ -385,16 +422,19 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
             </Select>
           </div>
           {dropped.length === 0 ? null : (
-            <p data-field="dropped-bindings" className="text-sm">
+            <p
+              data-field="dropped-bindings"
+              className="rounded-lg border p-3 text-sm"
+            >
               The saved version names a model that isn&apos;t offered for new
               runs for {dropped.join(", ")}. Saving removes that.
             </p>
           )}
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-2 border-t pt-5">
             <Button type="submit">Save revision</Button>
             <Button
               type="button"
-              variant="secondary"
+              variant="outline"
               onClick={() => void startSession()}
             >
               Start a session
@@ -407,22 +447,29 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
           </p>
         )}
       </Card>
-      <Card aria-labelledby="versions-heading" className="space-y-2">
-        <h2 id="versions-heading" className="text-lg font-medium">
-          Versions
-        </h2>
-        <ol className="space-y-1 text-sm">
+      <Card aria-labelledby="versions-heading" className="space-y-3">
+        <SectionLabel id="versions-heading">Versions</SectionLabel>
+        <ol className="text-sm">
           {expert.versions.map((version) => (
-            <li key={version.version} data-version={version.version}>
-              Version {version.version}:{" "}
-              {version.config.tools?.join(", ") || "no tools"}
-              {(version.config.tool_groups ?? []).length === 0
-                ? ""
-                : ` (groups: ${(version.config.tool_groups ?? []).join(", ")})`}
+            <li
+              key={version.version}
+              data-version={version.version}
+              className="border-t py-2.5 wrap-anywhere first:border-t-0 first:pt-0"
+            >
+              <span className="font-medium">Version {version.version}</span>:{" "}
+              <span className="text-muted-foreground font-mono text-xs">
+                {version.config.tools?.join(", ") || "no tools"}
+                {(version.config.tool_groups ?? []).length === 0
+                  ? ""
+                  : ` (groups: ${(version.config.tool_groups ?? []).join(", ")})`}
+              </span>
             </li>
           ))}
         </ol>
       </Card>
-    </>
+    </div>
   );
 }
+
+// A section label inside the form, kept a native legend so the group keeps its name.
+const LEGEND = "text-muted-foreground mb-2 text-xs font-semibold tracking-wide";

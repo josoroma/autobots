@@ -1,0 +1,16 @@
+/*
+ * Decision 0021 R3: the one paired extension to the Luma palette that DS-03 allows. luma.css stays the
+ * canonical, unedited palette; this file only adds names it doesn't define. `--attention` marks what waits
+ * for a person (pending approvals, requested input, drafts) and always sits beside words.
+ * Measured (WCAG 2.1): light 5.8:1 on --background, 5.3:1 on --muted; dark 11.5:1 on --background,
+ * 10.4:1 on --card. --attention-foreground on --attention: light 5.8:1, dark 10.3:1.
+ */
+:root {
+  --attention: oklch(0.52 0.13 55);
+  --attention-foreground: oklch(1 0 0);
+}
+
+.dark {
+  --attention: oklch(0.828 0.189 84.429);
+  --attention-foreground: oklch(0.21 0.02 70);
+}

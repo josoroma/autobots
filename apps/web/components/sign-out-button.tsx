@@ -13,7 +13,8 @@ export function SignOutButton({ className }: { className?: string }) {
   }
   return (
     <Button
-      variant="secondary"
+      variant="outline"
+      size="sm"
       className={className}
       onClick={() => void signOut()}
     >

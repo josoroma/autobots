@@ -5,15 +5,15 @@ import { cn } from "@/lib/utils";
 
 // Every form control in the app, DS-03: `input`, `border` and `ring`, with visible keyboard focus. Focus
 // itself comes from `:focus-visible` in globals.css. `data-slot` lets a check tell these from a raw control.
-// Luma shapes: single-line controls are pills on a muted fill; a textarea keeps a large, non-pill radius.
+// Studio shapes (Decision 0021): controls sit on the page surface in light and a muted fill in dark.
 const CONTROL =
-  "bg-muted text-foreground border-input control-boundary block w-full border px-3 py-2 text-sm disabled:opacity-60";
+  "bg-background dark:bg-muted/60 text-foreground border-input control-boundary block w-full border px-3 py-2 text-sm disabled:opacity-60";
 
 export function Input({ className, ...props }: ComponentProps<"input">) {
   return (
     <input
       data-slot="input"
-      className={cn(CONTROL, "rounded-4xl", className)}
+      className={cn(CONTROL, "h-9 rounded-lg", className)}
       {...props}
     />
   );
@@ -23,7 +23,7 @@ export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
   return (
     <textarea
       data-slot="textarea"
-      className={cn(CONTROL, "rounded-2xl", className)}
+      className={cn(CONTROL, "rounded-xl", className)}
       {...props}
     />
   );
@@ -35,7 +35,11 @@ export function Select({ className, ...props }: ComponentProps<"select">) {
     <span className="relative block">
       <select
         data-slot="select"
-        className={cn(CONTROL, "appearance-none rounded-4xl pr-9", className)}
+        className={cn(
+          CONTROL,
+          "h-9 appearance-none rounded-lg pr-9",
+          className,
+        )}
         {...props}
       />
       <ChevronsUpDown

@@ -9,7 +9,8 @@ export function AboutServices({ className }: { className?: string }) {
   return (
     <>
       <Button
-        variant="secondary"
+        variant="outline"
+        size="sm"
         className={className}
         onClick={() => dialog.current?.showModal()}
       >
@@ -18,17 +19,22 @@ export function AboutServices({ className }: { className?: string }) {
       <dialog
         ref={dialog}
         aria-labelledby="about-services-title"
-        className="bg-popover text-popover-foreground border-border m-auto max-w-md space-y-3 rounded-4xl border p-6 backdrop:bg-black/50"
+        className="bg-popover text-popover-foreground border-border m-auto w-[calc(100%-2rem)] max-w-md space-y-3 rounded-2xl border p-6 shadow-lg backdrop:bg-black/50"
       >
-        <h2 id="about-services-title" className="text-lg font-medium">
+        <h2
+          id="about-services-title"
+          className="font-serif text-[22px] leading-tight font-normal tracking-tight"
+        >
           About local services
         </h2>
-        <p className="text-sm">
+        <p className="text-sm leading-relaxed">
           The interface, API and workers run natively on this Mac. Requests
           never own long-running work, so closing this page does not stop a run.
         </p>
-        <form method="dialog">
-          <Button type="submit">Close</Button>
+        <form method="dialog" className="flex justify-end pt-2">
+          <Button type="submit" variant="outline">
+            Close
+          </Button>
         </form>
       </dialog>
     </>

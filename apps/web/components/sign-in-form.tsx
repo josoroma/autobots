@@ -1,5 +1,6 @@
 "use client";
 
+import { CircleAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
@@ -35,8 +36,8 @@ export function SignInForm() {
   }
 
   return (
-    <form onSubmit={(event) => void submit(event)} className="space-y-3">
-      <div className="space-y-1">
+    <form onSubmit={(event) => void submit(event)} className="space-y-4">
+      <div className="space-y-1.5">
         <label htmlFor="email" className="text-sm font-medium">
           Email
         </label>
@@ -48,7 +49,7 @@ export function SignInForm() {
           required
         />
       </div>
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         <label htmlFor="password" className="text-sm font-medium">
           Password
         </label>
@@ -61,11 +62,15 @@ export function SignInForm() {
         />
       </div>
       {failed ? (
-        <p role="alert" className="text-sm font-medium">
+        <p role="alert" className="flex items-start gap-2 text-sm font-medium">
+          <CircleAlert
+            aria-hidden="true"
+            className="text-destructive mt-0.5 size-4 shrink-0"
+          />
           That email and password did not work.
         </p>
       ) : null}
-      <Button type="submit" disabled={pending}>
+      <Button type="submit" size="lg" disabled={pending} className="w-full">
         {pending ? "Signing in" : "Sign in"}
       </Button>
     </form>

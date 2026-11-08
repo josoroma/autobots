@@ -7,20 +7,19 @@ import { ServiceStatusBadge } from "@/components/service-status-badge";
 import { SignOutButton } from "@/components/sign-out-button";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  IconTile,
-} from "@/components/ui/card";
+import { SectionLabel } from "@/components/ui/page-header";
 import { fetchServiceStatus, fetchSession } from "@/lib/service-status";
+import { cn } from "@/lib/utils";
 
 // The status is read per request, on the server, so it is never baked into a build.
 export const dynamic = "force-dynamic";
 
-// The two small cards share a row and end in their one action, at the same height, so Tab never climbs.
-const SMALL_CARD = "flex flex-col gap-5";
+// Decision 0021: the two lower sections are quiet hairline lists. They share a row and end in their one
+// action at the same height, so Tab never climbs from one to the next.
+const LOWER_SECTION = "flex min-w-0 flex-col";
+const LOWER_HEAD = "mb-2 flex items-center gap-2";
+const LOWER_ITEM = "border-t py-3 text-sm";
+const LOWER_ACTION = "mt-auto pt-2";
 
 export default async function HomePage() {
   const [status, session] = await Promise.all([
@@ -28,69 +27,81 @@ export default async function HomePage() {
     fetchSession(),
   ]);
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-3xl font-semibold tracking-tight">
+    <div className="mx-auto w-full max-w-[780px] md:pt-10">
+      <header className="mb-8 space-y-3 text-center">
+        <h1 className="text-4xl leading-[1.1] md:text-[44px]">
           Local workbench
         </h1>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-muted-foreground mx-auto max-w-xl text-[15px]">
           Start a goal, see what it would use, and check the services on this
           Mac.
         </p>
       </header>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card aria-labelledby="account-heading" className={SMALL_CARD}>
-          <CardHeader>
-            <IconTile icon={UserRound} />
-            <div className="min-w-0 flex-1 space-y-1">
-              <CardTitle id="account-heading">Account</CardTitle>
-              {session === null ? (
-                <CardDescription data-session="signed-out">
-                  You are not signed in.
-                </CardDescription>
-              ) : (
-                <CardDescription data-session="signed-in">
-                  Signed in, with access to {session.workspace_ids.length}{" "}
-                  workspace
-                  {session.workspace_ids.length === 1 ? "" : "s"}.
-                </CardDescription>
-              )}
-            </div>
-            <Badge variant={session === null ? "outline" : "secondary"} dot>
+      <GoalComposer />
+      <div className="mt-14 grid gap-10 md:grid-cols-2 md:gap-8">
+        <section aria-labelledby="account-heading" className={LOWER_SECTION}>
+          <div className={LOWER_HEAD}>
+            <UserRound
+              aria-hidden="true"
+              className="text-muted-foreground size-3.5 shrink-0"
+            />
+            <SectionLabel id="account-heading" className="text-[12.5px]">
+              Account
+            </SectionLabel>
+            <Badge
+              variant={session === null ? "muted" : "success"}
+              dot
+              className="ml-auto"
+            >
               {session === null ? "Signed out" : "Signed in"}
             </Badge>
-          </CardHeader>
-          <div className="mt-auto">
+          </div>
+          <div className={LOWER_ITEM}>
+            {session === null ? (
+              <p data-session="signed-out">You are not signed in.</p>
+            ) : (
+              <p data-session="signed-in">
+                Signed in, with access to {session.workspace_ids.length}{" "}
+                workspace
+                {session.workspace_ids.length === 1 ? "" : "s"}.
+              </p>
+            )}
+          </div>
+          <div className={LOWER_ACTION}>
             {session === null ? (
               <Link
                 href="/sign-in"
-                className={buttonVariants({ className: "w-full" })}
+                className={buttonVariants({ variant: "outline", size: "sm" })}
               >
                 Sign in
               </Link>
             ) : (
-              <SignOutButton className="w-full" />
+              <SignOutButton />
             )}
           </div>
-        </Card>
-        <Card aria-labelledby="services-heading" className={SMALL_CARD}>
-          <CardHeader>
-            <IconTile icon={Server} />
-            <div className="min-w-0 flex-1 space-y-1">
-              <CardTitle id="services-heading">Services</CardTitle>
-              <CardDescription>
-                The app and your data stay on this Mac. Model calls go to
-                OpenRouter, and this page makes none.
-              </CardDescription>
-            </div>
-          </CardHeader>
-          <ServiceStatusBadge status={status} />
-          <div className="mt-auto">
-            <AboutServices className="w-full" />
+        </section>
+        <section aria-labelledby="services-heading" className={LOWER_SECTION}>
+          <div className={LOWER_HEAD}>
+            <Server
+              aria-hidden="true"
+              className="text-muted-foreground size-3.5 shrink-0"
+            />
+            <SectionLabel id="services-heading" className="text-[12.5px]">
+              Services
+            </SectionLabel>
           </div>
-        </Card>
+          <p className={cn(LOWER_ITEM, "text-muted-foreground")}>
+            The app and your data stay on this Mac. Model calls go to
+            OpenRouter, and this page makes none.
+          </p>
+          <div className={LOWER_ITEM}>
+            <ServiceStatusBadge status={status} />
+          </div>
+          <div className={LOWER_ACTION}>
+            <AboutServices />
+          </div>
+        </section>
       </div>
-      <GoalComposer />
     </div>
   );
 }

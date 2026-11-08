@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { WorkflowEditor } from "@/components/workflow-editor";
 
 export const metadata: Metadata = { title: "Workflow" };
@@ -11,8 +12,8 @@ export default async function WorkflowPage({
 }) {
   const { id } = await params;
   return (
-    <div className="max-w-4xl space-y-6">
-      <h1 className="text-2xl font-semibold">Workflow</h1>
+    <div className="@container max-w-6xl space-y-8">
+      <PageHeader title="Workflow" />
       <WorkflowEditor workflowId={id} />
     </div>
   );

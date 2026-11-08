@@ -9,10 +9,8 @@ import {
 import { Info, Lock, Send, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { INNER_BOX } from "@/components/ui/card";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Select } from "@/components/ui/field";
-import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 // MP-07. Every screen that creates a run shows this, and reading it starts nothing.
@@ -99,11 +97,13 @@ export function RunDisclosure({
   const budget = (budgetMicroUsd / MICRO_USD).toFixed(2);
 
   // Each sentence below keeps its exact words, which product rules and tests read. Spans only arrange
-  // them: an uppercase label, a larger figure, and hidden punctuation that keeps the sentence whole.
+  // them: a small label, the figure, and hidden punctuation that keeps the sentence whole.
+  // Decision 0021: quiet hairlines, no filled tiles, so the same block reads well in every screen that
+  // starts a run. Light surfaces stay unfilled, as muted text on a light tint measures under 4.5:1.
   return (
-    <div data-field="disclosure" className="flex flex-col gap-4 text-sm">
+    <div data-field="disclosure" className="flex flex-col gap-3 text-sm">
       {onChoose === undefined || models === null ? null : (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <label htmlFor="run-model" className="font-medium">
             Model for this run
           </label>
@@ -111,6 +111,7 @@ export function RunDisclosure({
             id="run-model"
             value={chosenProfile}
             onChange={(event) => onChoose(event.target.value)}
+            className="sm:w-72"
           >
             <option value={WORKSPACE_DEFAULT}>The workspace setting</option>
             {models.models
@@ -126,9 +127,12 @@ export function RunDisclosure({
       {failed ? (
         <p
           data-disclosure="models-unavailable"
-          className={cn(INNER_BOX, "flex items-start gap-2")}
+          className="flex items-start gap-2.5 rounded-lg border px-3.5 py-3"
         >
-          <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          <Info
+            aria-hidden="true"
+            className="text-muted-foreground mt-0.5 size-4 shrink-0"
+          />
           <span>
             The models this run would use can&apos;t be read right now. It would
             use the workspace setting, as Settings shows it.
@@ -142,7 +146,7 @@ export function RunDisclosure({
         <p
           data-disclosure="not-offered"
           role="alert"
-          className="border-destructive/50 flex items-start gap-2 rounded-2xl border p-3"
+          className="border-destructive/50 dark:bg-destructive/10 flex items-start gap-2.5 rounded-lg border px-3.5 py-3"
         >
           <TriangleAlert
             aria-hidden="true"
@@ -157,11 +161,16 @@ export function RunDisclosure({
           </span>
         </p>
       ) : null}
-      <div className={cn("grid gap-3", showModel && "sm:grid-cols-2")}>
+      <div
+        className={cn(
+          "grid rounded-lg border",
+          showModel && "divide-y sm:grid-cols-2 sm:divide-x sm:divide-y-0",
+        )}
+      >
         {showModel && executor !== undefined ? (
           <p
             data-disclosure="model"
-            className={cn(INNER_BOX, "flex flex-col gap-1")}
+            className="flex min-w-0 flex-col gap-0.5 px-3.5 py-2.5"
           >
             <Eyebrow>
               Model<span className="sr-only">:</span>
@@ -175,27 +184,28 @@ export function RunDisclosure({
         ) : null}
         <p
           data-disclosure="budget"
-          className={cn(INNER_BOX, "flex flex-col gap-1")}
+          className="flex min-w-0 flex-col gap-0.5 px-3.5 py-2.5"
         >
           <Eyebrow>
             Budget<span className="sr-only">:</span>
           </Eyebrow>{" "}
           <span>
             <span className="text-muted-foreground">up to</span>{" "}
-            <span className="text-2xl font-semibold tabular-nums">
-              US${budget}
-            </span>
+            <span className="font-medium tabular-nums">US${budget}</span>
           </span>{" "}
           <span className="text-muted-foreground">for this run.</span>
         </p>
       </div>
       {showModel ? (
         <>
-          <details className={INNER_BOX}>
+          <details className="rounded-lg border px-3.5 py-2.5">
             <summary className="cursor-pointer font-medium">
               Roles, of which only the executor dispatches
             </summary>
-            <ul data-disclosure="roles" className="mt-2 space-y-1">
+            <ul
+              data-disclosure="roles"
+              className="mt-2 space-y-1 border-t pt-2 font-mono text-xs"
+            >
               {bindings.map((binding) => (
                 <li key={binding.role} className="wrap-anywhere">
                   {binding.role}: {canonical(binding.profile)}
@@ -219,26 +229,28 @@ export function RunDisclosure({
           ) : null}
         </>
       ) : null}
-      <Separator />
-      <p
-        data-disclosure="data"
-        className="text-muted-foreground flex items-start gap-2"
-      >
-        <Send aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-        <span>
-          Sent to OpenRouter{sendsOnlyIfAgent ? ", if an agent step runs" : ""}:
-          selected instructions, conversation and context excerpts, retrieved
-          material, tool outputs and required protocol metadata. App records
-          stay on this Mac.
-        </span>
-      </p>
-      <p
-        data-disclosure="consent"
-        className="flex items-center gap-2 font-medium"
-      >
-        <Lock aria-hidden="true" className="size-4 shrink-0" />
-        <span>Nothing is sent until you press Run.</span>
-      </p>
+      <div className="flex flex-col gap-1.5 border-t pt-3 text-[13px]">
+        <p
+          data-disclosure="data"
+          className="text-muted-foreground flex items-start gap-2"
+        >
+          <Send aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+          <span>
+            Sent to OpenRouter
+            {sendsOnlyIfAgent ? ", if an agent step runs" : ""}: selected
+            instructions, conversation and context excerpts, retrieved material,
+            tool outputs and required protocol metadata. App records stay on
+            this Mac.
+          </span>
+        </p>
+        <p
+          data-disclosure="consent"
+          className="flex items-center gap-2 font-medium"
+        >
+          <Lock aria-hidden="true" className="size-3.5 shrink-0" />
+          <span>Nothing is sent until you press Run.</span>
+        </p>
+      </div>
     </div>
   );
 }

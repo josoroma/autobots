@@ -1,12 +1,14 @@
 "use client";
 
 import { parseApprovalList, type ApprovalView } from "@autobots/api-client";
+import { ArrowUpRight, Check, Lock } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, INNER_BOX } from "@/components/ui/card";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { cn } from "@/lib/utils";
 
 const MESSAGES: Record<string, string> = {
   owner_required: "Only the workspace owner can decide.",
@@ -137,14 +139,17 @@ export function ApprovalsPanel() {
 
   if (failed) {
     return (
-      <p role="alert" className="text-sm">
+      <p
+        role="alert"
+        className="border-destructive/35 text-destructive rounded-lg border p-4 text-sm"
+      >
         Approvals could not be loaded. Sign in, then try again.
       </p>
     );
   }
   if (approvals === null) {
     return (
-      <p role="status" className="text-sm">
+      <p role="status" className="text-muted-foreground text-sm">
         Loading approvals.
       </p>
     );
@@ -152,67 +157,137 @@ export function ApprovalsPanel() {
   return (
     <>
       {message === null ? null : (
-        <p role="status" data-message="decision" className="text-sm">
+        <p
+          role="status"
+          data-message="decision"
+          className={cn(INNER_BOX, "text-sm")}
+        >
           {message}
         </p>
       )}
       {approvals.length === 0 ? (
-        <p className="text-sm">Nothing is waiting for a decision.</p>
+        <Card className="border-dashed">
+          <p className="text-sm">Nothing is waiting for a decision.</p>
+        </Card>
       ) : (
         approvals.map((approval) => (
           <Card
             key={approval.id}
             data-approval={approval.id}
-            className="space-y-2"
+            className="space-y-5 p-5 sm:p-6"
           >
-            <h2 className="text-lg font-medium">
-              {approval.tool_id}, version {approval.tool_version}
-            </h2>
-            <p data-approval-reason="true" className="text-sm">
-              Why it&apos;s asking:{" "}
-              {approval.policy_reason ??
-                "not recorded, as this request is older than that record."}
-            </p>
-            <p data-approval-target="true" className="text-sm break-words">
-              Target:{" "}
-              {approval.resource_target ??
-                "not recorded. Read the exact request below."}
-            </p>
-            <p data-approval-requester="true" className="text-sm">
-              Requested by: {requesterText(approval)}
-            </p>
-            <p data-approval-scope="true" className="text-sm break-words">
-              Scope when asked: {scopeText(approval)}
-            </p>
-            <p data-approval-policy="true" className="text-sm">
-              Policy version: {policyText(approval)}
-            </p>
-            <p className="text-sm">
-              Effect: {approval.operation_class.replaceAll("_", " ")}
-            </p>
-            <pre
-              tabIndex={0}
-              className="bg-muted max-h-96 overflow-auto rounded-2xl p-3 text-sm break-words whitespace-pre-wrap"
-            >
-              {approval.arguments}
-            </pre>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 space-y-2">
+                <h2 className="font-serif text-[22px] leading-tight font-normal tracking-tight break-words">
+                  {approval.tool_id}, version {approval.tool_version}
+                </h2>
+              </div>
+              <Link
+                href={`/runs/${approval.run_id}`}
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" }),
+                  "w-fit shrink-0",
+                )}
+              >
+                Open the run
+                <ArrowUpRight aria-hidden="true" />
+              </Link>
+            </div>
+
+            {/* The facts about this request, each with its own label. */}
+            <dl className="grid overflow-hidden rounded-lg border text-[13px] sm:grid-cols-2">
+              <Fact data-approval-requester="true" label="Requested by">
+                {requesterText(approval)}
+              </Fact>
+              <Fact data-approval-reason="true" label="Why it's asking">
+                {approval.policy_reason ??
+                  "not recorded, as this request is older than that record."}
+              </Fact>
+              <Fact data-approval-scope="true" label="Scope when asked">
+                {scopeText(approval)}
+              </Fact>
+              <Fact data-approval-policy="true" label="Policy version">
+                {policyText(approval)}
+              </Fact>
+              <Fact
+                label="Expires"
+                colon={false}
+                className="sm:col-span-2 sm:odd:border-r-0"
+              >
+                <span className="text-attention">
+                  {new Date(approval.expires_at).toLocaleString()}.
+                </span>
+              </Fact>
+            </dl>
+
+            <div className="overflow-hidden rounded-xl border">
+              <p className="border-b px-3.5 py-2.5 text-[12.5px] font-semibold dark:bg-muted/40">
+                Exact request
+              </p>
+              <dl className="grid grid-cols-[6.5rem_minmax(0,1fr)] text-[13.5px]">
+                <div data-approval-target="true" className="contents">
+                  <dt className="text-muted-foreground border-b px-3.5 py-2.5 font-mono text-[12.5px]">
+                    Target<span className="sr-only">:</span>
+                  </dt>{" "}
+                  <dd className="border-b py-2.5 pr-3.5 break-words">
+                    {approval.resource_target ??
+                      "not recorded. Read the exact request below."}
+                  </dd>
+                </div>
+                <div className="contents">
+                  <dt className="text-muted-foreground px-3.5 py-2.5 font-mono text-[12.5px]">
+                    Effect<span className="sr-only">:</span>
+                  </dt>{" "}
+                  <dd className="py-2.5 pr-3.5">
+                    {approval.operation_class.replaceAll("_", " ")}
+                  </dd>
+                </div>
+              </dl>
+              <pre
+                tabIndex={0}
+                className="max-h-96 overflow-auto border-t p-3.5 font-mono text-[13px] leading-relaxed break-words whitespace-pre-wrap dark:bg-muted/30"
+              >
+                {approval.arguments}
+              </pre>
+            </div>
             {approval.arguments_truncated ? (
-              <p role="alert" className="text-sm font-medium">
+              <p
+                role="alert"
+                className="border-destructive/35 text-destructive rounded-lg border p-3 text-sm font-medium"
+              >
                 {MESSAGES.approval_too_large}
               </p>
             ) : null}
-            <p className="text-muted-foreground text-sm">
-              Expires {new Date(approval.expires_at).toLocaleString()}.{" "}
-              <Link href={`/runs/${approval.run_id}`} className="underline">
-                Open the run
-              </Link>
+
+            <p
+              className={cn(INNER_BOX, "flex items-start gap-3 text-[13.5px]")}
+            >
+              <Lock
+                aria-hidden="true"
+                className="text-muted-foreground mt-0.5 size-4 shrink-0"
+              />
+              <span>
+                <span className="font-semibold">
+                  Approving releases only this exact request.
+                </span>{" "}
+                <span className="text-muted-foreground">
+                  Rejecting lets the run replan or fail, and this request
+                  won&apos;t run.
+                </span>
+              </span>
             </p>
-            <div className="flex gap-3">
-              <Button onClick={() => void decide(approval, "approve")}>
+
+            <div className="flex flex-wrap gap-2.5">
+              <Button
+                size="lg"
+                onClick={() => void decide(approval, "approve")}
+              >
+                <Check aria-hidden="true" />
                 Approve
               </Button>
               <Button
-                variant="secondary"
+                size="lg"
+                variant="outline"
                 onClick={() => void decide(approval, "reject")}
               >
                 Reject
@@ -222,5 +297,36 @@ export function ApprovalsPanel() {
         ))
       )}
     </>
+  );
+}
+
+// One labelled fact. The colon is for assistive technology and copied text; sighted readers see the label
+// above the value.
+function Fact({
+  label,
+  colon = true,
+  className,
+  children,
+  ...props
+}: {
+  label: string;
+  colon?: boolean;
+  className?: string;
+  children: ReactNode;
+} & Record<`data-${string}`, string>) {
+  return (
+    <div
+      className={cn(
+        "border-b px-3.5 py-3 last:border-b-0 sm:odd:border-r",
+        className,
+      )}
+      {...props}
+    >
+      <dt className="text-muted-foreground mb-0.5 text-xs">
+        {label}
+        {colon ? <span className="sr-only">:</span> : null}
+      </dt>{" "}
+      <dd className="break-words">{children}</dd>
+    </div>
   );
 }

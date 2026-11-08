@@ -5,13 +5,15 @@ import {
   parseExpertView,
   type ExpertView,
 } from "@autobots/api-client";
+import { ArrowRight, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { IconTile } from "@/components/ui/card";
 import { Choice, Input } from "@/components/ui/field";
+import { SectionLabel } from "@/components/ui/page-header";
 import { csrfFetch } from "@/lib/csrf-fetch";
 
 export function ExpertsPanel() {
@@ -103,66 +105,69 @@ export function ExpertsPanel() {
   }
   if (experts === null) {
     return (
-      <p role="status" className="text-sm">
+      <p role="status" className="text-muted-foreground text-sm">
         Loading Experts.
       </p>
     );
   }
   return (
     <>
-      <Card aria-labelledby="list-heading" className="space-y-3">
-        <h2 id="list-heading" className="text-lg font-medium">
-          Your Experts
-        </h2>
+      <section aria-labelledby="list-heading" className="space-y-4">
+        <SectionLabel id="list-heading">Your Experts</SectionLabel>
         {experts.length === 0 ? (
-          <p className="text-sm">No Experts yet.</p>
+          <p className="text-muted-foreground rounded-xl border border-dashed p-6 text-sm">
+            No Experts yet.
+          </p>
         ) : (
-          <ul className="space-y-2 text-sm">
+          <ul className="grid gap-3.5 @xl:grid-cols-2 @4xl:grid-cols-3">
             {experts.map((expert) => (
-              <li key={expert.id} className="flex items-center gap-3">
-                <Choice
-                  type="checkbox"
-                  id={`route-${expert.id}`}
-                  checked={routed.has(expert.id)}
-                  onChange={() => toggle(expert.id)}
-                  aria-label={`Include ${expert.name} in a coordinator session`}
-                />
-                <Link
-                  href={`/experts/${expert.id}`}
-                  className="font-medium underline"
-                >
-                  {expert.name}
-                </Link>
-                <span className="text-muted-foreground">
-                  Version {expert.latest_version}
-                </span>
-              </li>
+              <ExpertCard
+                key={expert.id}
+                expert={expert}
+                checked={routed.has(expert.id)}
+                onToggle={() => toggle(expert.id)}
+              />
             ))}
           </ul>
         )}
-        <Button
-          variant="secondary"
-          onClick={() => void coordinate()}
-          disabled={routed.size === 0}
+        <div className="flex justify-end">
+          <Button
+            className="rounded-full"
+            onClick={() => void coordinate()}
+            disabled={routed.size === 0}
+          >
+            Start a coordinator session
+            <ArrowRight aria-hidden="true" />
+          </Button>
+        </div>
+      </section>
+      <section
+        aria-labelledby="create-heading"
+        className="space-y-3 rounded-xl border border-dashed p-5"
+      >
+        <div className="flex items-center gap-3">
+          <IconTile icon={Plus} className="rounded-full" />
+          <h2 id="create-heading" className="text-[15px] font-semibold">
+            New Expert
+          </h2>
+        </div>
+        <form
+          onSubmit={(event) => void create(event)}
+          className="flex flex-col gap-3 sm:flex-row sm:items-end"
         >
-          Start a coordinator session
-        </Button>
-      </Card>
-      <Card aria-labelledby="create-heading" className="space-y-3">
-        <h2 id="create-heading" className="text-lg font-medium">
-          New Expert
-        </h2>
-        <form onSubmit={(event) => void create(event)} className="space-y-3">
-          <label htmlFor="expert-name" className="text-sm font-medium">
-            Name
-          </label>
-          <Input
-            id="expert-name"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            maxLength={100}
-          />
+          <div className="min-w-0 flex-1 space-y-1.5 sm:max-w-sm">
+            <label htmlFor="expert-name" className="text-sm font-medium">
+              Name
+            </label>
+            <Input
+              id="expert-name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              maxLength={100}
+            />
+          </div>
           <Button type="submit" disabled={name.trim() === ""}>
+            <Plus aria-hidden="true" />
             Create
           </Button>
         </form>
@@ -171,7 +176,89 @@ export function ExpertsPanel() {
             {message}
           </p>
         )}
-      </Card>
+      </section>
     </>
   );
 }
+
+const SHOWN_TOOLS = 4;
+
+// One Expert as a card: what its latest version says, from the list already loaded.
+function ExpertCard({
+  expert,
+  checked,
+  onToggle,
+}: {
+  expert: ExpertView;
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  const latest = expert.versions.at(-1)?.config;
+  const bindings = Object.entries(latest?.role_bindings ?? {}).map(
+    ([role, profile]) => `${role}: ${String(profile)}`,
+  );
+  const tools = latest?.tools ?? [];
+  const groups = latest?.tool_groups ?? [];
+  const purpose = latest?.purpose?.trim() ?? "";
+  return (
+    <li className="bg-card text-card-foreground has-checked:border-primary/60 has-checked:ring-primary/15 flex flex-col gap-3 rounded-xl border p-[18px] has-checked:ring-3">
+      <div className="flex items-start gap-3">
+        <span
+          aria-hidden="true"
+          className="bg-background grid size-9 shrink-0 place-items-center rounded-[10px] border font-serif text-base dark:border-transparent dark:bg-muted"
+        >
+          {expert.name.trim().charAt(0).toUpperCase()}
+        </span>
+        <div className="min-w-0 flex-1">
+          <Link
+            href={`/experts/${expert.id}`}
+            className="text-[15px] font-semibold wrap-anywhere underline-offset-4 hover:underline"
+          >
+            {expert.name}
+          </Link>
+          <p className="text-muted-foreground font-mono text-[11.5px] wrap-anywhere">
+            <span>Version {expert.latest_version}</span>
+            {bindings.length === 0 ? null : (
+              <span> · {bindings.join(", ")}</span>
+            )}
+          </p>
+        </div>
+        <Choice
+          type="checkbox"
+          id={`route-${expert.id}`}
+          checked={checked}
+          onChange={onToggle}
+          aria-label={`Include ${expert.name} in a coordinator session`}
+          className="mt-0.5 shrink-0"
+        />
+      </div>
+      {purpose === "" ? null : (
+        <p className="text-muted-foreground text-[13.5px] leading-normal">
+          {purpose}
+        </p>
+      )}
+      <div className="mt-auto flex flex-wrap gap-1.5 border-t pt-3">
+        {tools.length === 0 && groups.length === 0 ? (
+          <span className={CHIP}>no tools</span>
+        ) : (
+          <>
+            {tools.slice(0, SHOWN_TOOLS).map((tool) => (
+              <span key={tool} className={CHIP}>
+                {tool}
+              </span>
+            ))}
+            {tools.length > SHOWN_TOOLS ? (
+              <span className={CHIP}>+{tools.length - SHOWN_TOOLS}</span>
+            ) : null}
+            {groups.length === 0 ? null : (
+              <span className={CHIP}>groups: {groups.join(", ")}</span>
+            )}
+          </>
+        )}
+      </div>
+    </li>
+  );
+}
+
+const CHIP =
+  "text-muted-foreground rounded-md border px-1.5 py-px font-mono text-[11.5px] wrap-anywhere";

@@ -5,13 +5,16 @@ import {
   parseWorkflowView,
   type WorkflowView,
 } from "@autobots/api-client";
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { IconTile } from "@/components/ui/card";
 import { Input } from "@/components/ui/field";
+import { SectionLabel } from "@/components/ui/page-header";
 import { csrfFetch } from "@/lib/csrf-fetch";
 
 export function WorkflowsPanel() {
@@ -76,54 +79,117 @@ export function WorkflowsPanel() {
   }
   if (workflows === null) {
     return (
-      <p role="status" className="text-sm">
+      <p role="status" className="text-muted-foreground text-sm">
         Loading workflows.
       </p>
     );
   }
   return (
     <>
-      <Card aria-labelledby="list-heading" className="space-y-3">
-        <h2 id="list-heading" className="text-lg font-medium">
-          Your workflows
-        </h2>
+      <section aria-labelledby="list-heading" className="space-y-3">
+        <SectionLabel id="list-heading">Your workflows</SectionLabel>
         {workflows.length === 0 ? (
-          <p className="text-sm">No workflows yet.</p>
+          <p className="text-muted-foreground rounded-xl border border-dashed p-6 text-sm">
+            No workflows yet.
+          </p>
         ) : (
-          <ul className="space-y-2 text-sm">
-            {workflows.map((workflow) => (
-              <li key={workflow.id}>
-                <Link
-                  href={`/workflows/${workflow.id}`}
-                  className="font-medium underline"
+          <table className="w-full text-left text-[13.5px]">
+            <thead>
+              <tr className="border-b">
+                <th
+                  scope="col"
+                  className="text-muted-foreground pr-3 pb-2.5 text-[12.5px] font-medium"
                 >
-                  {workflow.name}
-                </Link>{" "}
-                <span className="text-muted-foreground">
-                  {workflow.latest_version === 0
-                    ? "Not published"
-                    : `Version ${workflow.latest_version}`}
-                </span>
-              </li>
-            ))}
-          </ul>
+                  Workflow
+                </th>
+                <th
+                  scope="col"
+                  className="text-muted-foreground px-3 pb-2.5 text-[12.5px] font-medium"
+                >
+                  Version
+                </th>
+                <th
+                  scope="col"
+                  className="text-muted-foreground hidden px-3 pb-2.5 text-right text-[12.5px] font-medium @xl:table-cell"
+                >
+                  Nodes
+                </th>
+                <th
+                  scope="col"
+                  className="text-muted-foreground hidden pb-2.5 pl-3 text-[12.5px] font-medium @xl:table-cell"
+                >
+                  Graph hash
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {workflows.map((workflow) => {
+                const latest = workflow.versions.at(-1);
+                return (
+                  <tr key={workflow.id} className="border-b">
+                    <td className="py-3.5 pr-3 align-middle">
+                      <Link
+                        href={`/workflows/${workflow.id}`}
+                        className="font-medium wrap-anywhere underline-offset-4 hover:underline"
+                      >
+                        {workflow.name}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-3.5 align-middle">
+                      {workflow.latest_version === 0 ? (
+                        <Badge variant="attention" dot>
+                          Not published
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">
+                          Version {workflow.latest_version}
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="hidden px-3 py-3.5 text-right align-middle font-mono text-[12.5px] tabular-nums @xl:table-cell">
+                      {latest?.graph.nodes?.length ?? (
+                        <span className="text-muted-foreground">none</span>
+                      )}
+                    </td>
+                    <td className="text-muted-foreground hidden py-3.5 pl-3 align-middle font-mono text-[12.5px] @xl:table-cell">
+                      {latest === undefined
+                        ? "none"
+                        : latest.graph_hash.slice(0, 12)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         )}
-      </Card>
-      <Card aria-labelledby="create-heading" className="space-y-3">
-        <h2 id="create-heading" className="text-lg font-medium">
-          New workflow
-        </h2>
-        <form onSubmit={(event) => void create(event)} className="space-y-3">
-          <label htmlFor="workflow-name" className="text-sm font-medium">
-            Name
-          </label>
-          <Input
-            id="workflow-name"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            maxLength={100}
-          />
+      </section>
+      <section
+        aria-labelledby="create-heading"
+        className="space-y-3 rounded-xl border border-dashed p-5"
+      >
+        <div className="flex items-center gap-3">
+          <IconTile icon={Plus} className="rounded-full" />
+          <h2 id="create-heading" className="text-[15px] font-semibold">
+            New workflow
+          </h2>
+        </div>
+        <form
+          onSubmit={(event) => void create(event)}
+          className="flex flex-col gap-3 sm:flex-row sm:items-end"
+        >
+          <div className="min-w-0 flex-1 space-y-1.5 sm:max-w-sm">
+            <label htmlFor="workflow-name" className="text-sm font-medium">
+              Name
+            </label>
+            <Input
+              id="workflow-name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              maxLength={100}
+            />
+          </div>
           <Button type="submit" disabled={name.trim() === ""}>
+            <Plus aria-hidden="true" />
             Create
           </Button>
         </form>
@@ -132,7 +198,7 @@ export function WorkflowsPanel() {
             {message}
           </p>
         )}
-      </Card>
+      </section>
     </>
   );
 }

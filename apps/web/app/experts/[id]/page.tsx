@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { ExpertEditor } from "@/components/expert-editor";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const metadata: Metadata = { title: "Expert" };
 
@@ -11,8 +12,8 @@ export default async function ExpertPage({
 }) {
   const { id } = await params;
   return (
-    <div className="max-w-3xl space-y-6">
-      <h1 className="text-2xl font-semibold">Expert</h1>
+    <div className="@container max-w-6xl space-y-8">
+      <PageHeader title="Expert" />
       <ExpertEditor expertId={id} />
     </div>
   );

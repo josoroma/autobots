@@ -27,7 +27,7 @@ The worker claims and runs admitted jobs only when `AUTOBOTS_WORKER_INFERENCE=en
 - **Tooling:** `scripts/`, with `.claude/` (agents, skills, rules, hooks, `settings.json`).
 - **Delivery records:** `openspec/` (63 archived changes, 63 specs, `delivery/goal.md`), `SPEC-LOGS/`, `.claude/ohmyorch/project.json`.
 - **Engineering records:** under `docs/engineering/`: `decisions/` (0001 to 0014), `runbooks/` (10), `evidence/`, `work-items/` (12 tracked), `templates/`, `prerequisite-inventory.md`.
-- **Design:** `docs/design/luma.css` and concept art in `docs/imagine/`.
+- **Design:** `docs/design/luma.css`, its one paired extension `docs/design/studio-extensions.css`, and concept art in `docs/imagine/`.
 - **Research:** `research/`. `research/upstream/` is ignored and isn't repository input.
 - **No CI:** `.github/` has no tracked files, and no other CI configuration was found at the top level.
 
@@ -181,7 +181,7 @@ Layers under `services/agent/src/autobots/`:
 - **Memory and learning:** lexical search in Postgres, and proposals through regression and an owner's review with rollback. A promoted skill reaches a new run's instructions as reference (`experts.py`, `improvements.py`). Promotion gates on a reviewer's text checks (Decision 0011).
 - **Operations:** the status page reports database, schema, Storage, disk, queue, delayed routines, catalog availability, restore history and each route's qualification. Logs are redacted JSON lines. Retention is per workspace.
 - **Evidence-limited behavior:** the inspector reads typed columns and checkpoint metadata (ID, parent, step, source), never checkpoint content, tool arguments or partial output (`run_projection.py`).
-- **Design:** Luma tokens, dark by default, with `components/theme-provider.tsx`. Eight named surfaces, such as charts and a workflow canvas, don't exist in the app, and the owner confirmed reading the requirement as not reaching them yet ([US-10.2, DS-03](docs/engineering/evidence/US-10.2/summary.md#ds-design-system)).
+- **Design:** Luma tokens, dark by default, with `components/theme-provider.tsx`. The Studio presentation ([Decision 0021](docs/engineering/decisions/0021-studio-interface-redesign.md), STUDIO-UI-001, after the analyzed revision) groups the sidebar into the daily work, Build and System, opens each page with a serif `PageHeader`, and adds an attention tone for what waits for a person. Eight named surfaces, such as charts and a workflow canvas, don't exist in the app, and the owner confirmed reading the requirement as not reaching them yet ([US-10.2, DS-03](docs/engineering/evidence/US-10.2/summary.md#ds-design-system)).
 
 ## Product implementation status
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 
-import { Paperclip, Play, Sparkles, X } from "lucide-react";
+import { FileText, Paperclip, Play, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { RunDisclosure } from "@/components/run-disclosure";
@@ -13,7 +13,6 @@ import {
   CardHeader,
   CardTitle,
   INNER_BOX,
-  IconTile,
 } from "@/components/ui/card";
 import { Input, Textarea } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
@@ -173,100 +172,120 @@ export function GoalComposer() {
   }
 
   return (
-    <Card aria-labelledby="composer-heading" className="flex flex-col gap-6">
-      <CardHeader>
-        <IconTile icon={Sparkles} />
-        <div className="min-w-0 flex-1 space-y-1">
-          <CardTitle id="composer-heading">New goal</CardTitle>
+    <Card
+      aria-labelledby="composer-heading"
+      className="border-input flex flex-col rounded-2xl p-0 shadow-lg dark:shadow-black/60"
+    >
+      <CardHeader className="px-5 pt-5">
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <CardTitle id="composer-heading" className="font-medium">
+            New goal
+          </CardTitle>
           <CardDescription>
             Describe the work, check what it would use, then press Run.
           </CardDescription>
         </div>
       </CardHeader>
-      {/* Document order stays goal, model choice, attachments, Run, so Tab never skips back. On wide
-          screens the disclosure and attachments sit beside the goal and Run sits at the bottom of the
-          goal's column. */}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
-        <div className="flex flex-col gap-2">
-          <label htmlFor="goal" className="text-sm font-medium">
-            Goal
-          </label>
-          <Textarea
-            id="goal"
-            value={draft}
-            onChange={(event) => update(event.target.value)}
-            rows={6}
-            className="min-h-36 flex-1 resize-y"
+      {/* Document order stays goal, model choice, attachments, Run, and the card reads top to bottom in
+          that order, so Tab never climbs: the writing area, what the run would use, files, then Run. */}
+      <div className="flex flex-col gap-1 px-5 pt-4 pb-4">
+        <label
+          htmlFor="goal"
+          className="text-muted-foreground text-xs font-medium"
+        >
+          Goal
+        </label>
+        <Textarea
+          id="goal"
+          value={draft}
+          onChange={(event) => update(event.target.value)}
+          rows={4}
+          className="min-h-28 resize-y rounded-none border-transparent bg-transparent px-0 text-base leading-relaxed dark:bg-transparent"
+        />
+      </div>
+      <div className="border-t px-5 py-4">
+        <RunDisclosure chosen={profile} onChoose={setProfile} />
+      </div>
+      <div
+        className="flex flex-col gap-2 border-t px-5 pt-4"
+        data-field="attachments"
+      >
+        <label
+          htmlFor="attachments"
+          className="flex items-center gap-2 text-sm font-medium"
+        >
+          <Paperclip
+            aria-hidden="true"
+            className="text-muted-foreground size-4"
           />
-        </div>
-        <div className="flex flex-col gap-6 lg:row-span-2">
-          <RunDisclosure chosen={profile} onChoose={setProfile} />
-          <div className="flex flex-col gap-2" data-field="attachments">
-            <label
-              htmlFor="attachments"
-              className="flex items-center gap-2 text-sm font-medium"
-            >
-              <Paperclip aria-hidden="true" className="size-4" />
-              Attach files
-            </label>
-            <Input
-              id="attachments"
-              type="file"
-              multiple
-              accept=".txt,.text,.md,.markdown,.json,.csv,text/plain,text/markdown,application/json,text/csv"
-              aria-describedby="attachments-help"
-              className="min-w-0 file:mr-3 file:border-0 file:bg-transparent file:font-medium"
-              onChange={(event) => {
-                void attach(event.target.files);
-                event.target.value = "";
-              }}
-            />
-            <p id="attachments-help" className="text-muted-foreground text-xs">
-              Up to {MAX_FILES} plain text, markdown, JSON or CSV files, 1 MiB
-              each. The run can read them under inputs/.
+          Attach files
+        </label>
+        <Input
+          id="attachments"
+          type="file"
+          multiple
+          accept=".txt,.text,.md,.markdown,.json,.csv,text/plain,text/markdown,application/json,text/csv"
+          aria-describedby="attachments-help"
+          className="min-w-0 file:mr-3 file:border-0 file:bg-transparent file:font-medium"
+          onChange={(event) => {
+            void attach(event.target.files);
+            event.target.value = "";
+          }}
+        />
+        <p id="attachments-help" className="text-muted-foreground text-xs">
+          Up to {MAX_FILES} plain text, markdown, JSON or CSV files, 1 MiB each.
+          The run can read them under inputs/.
+        </p>
+        {files.length === 0 ? null : (
+          <ul className="flex flex-wrap gap-2 pt-1" aria-label="Attached files">
+            {files.map((file) => (
+              <li
+                key={file.path}
+                data-attached={file.path}
+                className="bg-background flex max-w-full min-w-0 items-center gap-2.5 rounded-lg border py-1.5 pr-1.5 pl-2 text-[13px]"
+              >
+                <span
+                  aria-hidden="true"
+                  className="text-muted-foreground grid size-7 shrink-0 place-items-center rounded-md border"
+                >
+                  <FileText className="size-3.5" />
+                </span>
+                <span className="flex min-w-0 flex-col">
+                  <code className="truncate">{file.path}</code>
+                  <span className="text-muted-foreground truncate text-[11.5px]">
+                    {file.media_type}
+                  </span>
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 shrink-0"
+                  aria-label={`Remove ${file.name}`}
+                  onClick={() =>
+                    setFiles(files.filter((item) => item.path !== file.path))
+                  }
+                >
+                  <X aria-hidden="true" className="size-3.5" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div aria-live="polite" data-field="attach-refusals">
+          {refusals.map((reason) => (
+            <p key={reason} className="text-sm">
+              {reason}
             </p>
-            {files.length === 0 ? null : (
-              <ul className="space-y-1 text-sm" aria-label="Attached files">
-                {files.map((file) => (
-                  <li
-                    key={file.path}
-                    data-attached={file.path}
-                    className="flex items-center gap-2"
-                  >
-                    <code className="truncate">{file.path}</code>
-                    <span className="text-muted-foreground text-xs">
-                      {file.media_type}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="px-2 py-1"
-                      aria-label={`Remove ${file.name}`}
-                      onClick={() =>
-                        setFiles(
-                          files.filter((item) => item.path !== file.path),
-                        )
-                      }
-                    >
-                      <X aria-hidden="true" className="size-3.5" />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div aria-live="polite" data-field="attach-refusals">
-              {refusals.map((reason) => (
-                <p key={reason} className="text-sm">
-                  {reason}
-                </p>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
+      </div>
+      <div className="flex justify-end px-5 pt-2 pb-4">
         <Button
           onClick={() => void run()}
           disabled={draft.trim() === ""}
-          className="w-full lg:self-end"
+          size="lg"
+          className="rounded-full px-5"
         >
           <Play aria-hidden="true" className="size-4" />
           Run
@@ -276,7 +295,7 @@ export function GoalComposer() {
         <p
           role="alert"
           data-outcome={outcome}
-          className={cn(INNER_BOX, "text-sm")}
+          className={cn(INNER_BOX, "mx-5 mb-5 text-sm")}
         >
           {outcome === "credentials_required" ? (
             <>

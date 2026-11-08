@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { SessionPanel } from "@/components/session-panel";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const metadata: Metadata = { title: "Session" };
 
@@ -11,8 +12,8 @@ export default async function SessionPage({
 }) {
   const { id } = await params;
   return (
-    <div className="max-w-3xl space-y-6">
-      <h1 className="text-2xl font-semibold">Session</h1>
+    <div className="@container max-w-4xl space-y-8">
+      <PageHeader title="Session" />
       <SessionPanel sessionId={id} />
     </div>
   );

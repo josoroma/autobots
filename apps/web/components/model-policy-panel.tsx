@@ -6,16 +6,22 @@ import {
   type ModelList,
   type ModelPolicyState,
 } from "@autobots/api-client";
+import { Info, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, INNER_BOX } from "@/components/ui/card";
 import { Select } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { cn } from "@/lib/utils";
 
 const WORKSPACE_DEFAULT = "";
 const EXECUTOR = "executor";
 const SUMMARIZER = "summarizer";
+
+// One role per row: its name on the left and its native select on the right (Decision 0021).
+const ROW = "border-border flex items-center gap-2.5 border-t py-[7px]";
+const ROW_CONTROL = "ml-auto w-40 shrink-0 sm:w-56";
 
 function modelLabel(canonicalId: string, wireId: string): string {
   return `${canonicalId} (requested as ${wireId})`;
@@ -30,30 +36,39 @@ function RoleEffect({ state }: { state: ModelPolicyState }) {
       binding.role !== EXECUTOR && binding.profile !== executor?.profile,
   );
   return (
-    <div data-field="role-effect" className="space-y-1 text-sm">
-      <p>
-        Only the executor&apos;s binding dispatches in this release. Other roles
-        that differ from it don&apos;t take effect.
-      </p>
-      {differing.length === 0 ? (
-        <p data-role-effect="same">
-          Every role has the same binding as the executor now.
+    <div
+      data-field="role-effect"
+      className={cn(INNER_BOX, "flex gap-3 px-3.5 text-[13.5px]")}
+    >
+      <Info
+        aria-hidden="true"
+        className="text-muted-foreground mt-0.5 size-4 shrink-0"
+      />
+      <div className="min-w-0 space-y-1">
+        <p>
+          Only the executor&apos;s binding dispatches in this release. Other
+          roles that differ from it don&apos;t take effect.
         </p>
-      ) : (
-        <p data-role-effect="differs">
-          These differ from the executor, so they don&apos;t take effect:{" "}
-          {differing.map((binding) => binding.role).join(", ")}.
+        {differing.length === 0 ? (
+          <p data-role-effect="same">
+            Every role has the same binding as the executor now.
+          </p>
+        ) : (
+          <p data-role-effect="differs">
+            These differ from the executor, so they don&apos;t take effect:{" "}
+            {differing.map((binding) => binding.role).join(", ")}.
+          </p>
+        )}
+        <p>
+          A summarizer that differs pauses the run with route_not_bound, once
+          the run needs compaction.
         </p>
-      )}
-      <p>
-        A summarizer that differs pauses the run with route_not_bound, once the
-        run needs compaction.
-      </p>
-      {differing.some((binding) => binding.role === SUMMARIZER) ? (
-        <p data-role-effect="summarizer" className="font-medium">
-          The summarizer differs here, so long runs will pause that way.
-        </p>
-      ) : null}
+        {differing.some((binding) => binding.role === SUMMARIZER) ? (
+          <p data-role-effect="summarizer" className="font-medium">
+            The summarizer differs here, so long runs will pause that way.
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -155,14 +170,24 @@ export function ModelPolicyPanel() {
       notOffered.has(profile as (typeof listed)[number]["profile"]),
     );
   return (
-    <Card aria-labelledby="policy-heading" className="space-y-4">
-      <h2 id="policy-heading" className="text-lg font-medium">
+    <section aria-labelledby="policy-heading" className="space-y-5">
+      <h2 id="policy-heading" className="text-sm font-semibold">
         Approved models and role policy
       </h2>
-      <ul data-field="approved-models" className="space-y-1 text-sm">
+      <ul
+        data-field="approved-models"
+        className="grid gap-3.5 text-[13px] md:grid-cols-2 xl:grid-cols-3"
+      >
         {models.models.map((model) => (
-          <li key={model.profile} data-approved-model={model.profile}>
-            <span className="break-all">
+          <li
+            key={model.profile}
+            data-approved-model={model.profile}
+            className={cn(
+              "border-border min-w-0 rounded-xl border px-[18px] py-4 leading-relaxed",
+              model.offered ? "bg-card text-card-foreground" : "bg-background",
+            )}
+          >
+            <span className="font-mono text-[12.5px] wrap-anywhere">
               {modelLabel(model.canonical_id, model.wire_id)}
             </span>
             {model.available ? "" : ". Not in the catalog right now."}
@@ -177,59 +202,35 @@ export function ModelPolicyPanel() {
         <p
           data-field="not-offered"
           role="alert"
-          className="text-sm font-medium"
+          className="border-destructive/40 dark:bg-destructive/10 flex gap-3 rounded-lg border px-3.5 py-3 text-[13.5px] font-medium"
         >
-          A saved choice here names a model that isn&apos;t offered for new
-          runs, so new runs are refused until you change it. Nothing replaces it
-          for you.
+          <TriangleAlert
+            aria-hidden="true"
+            className="text-destructive mt-0.5 size-4 shrink-0"
+          />
+          <span>
+            A saved choice here names a model that isn&apos;t offered for new
+            runs, so new runs are refused until you change it. Nothing replaces
+            it for you.
+          </span>
         </p>
       ) : null}
-      <form onSubmit={(event) => void save(event)} className="space-y-3">
-        <div className="space-y-1">
-          <label htmlFor="workspace-default" className="text-sm font-medium">
-            Workspace default
-          </label>
-          <Select
-            id="workspace-default"
-            value={defaultProfile}
-            onChange={(event) => setDefaultProfile(event.target.value)}
-          >
-            {choices(defaultProfile).map((model) => (
-              <option
-                key={model.profile}
-                value={model.profile}
-                disabled={!model.offered}
-              >
-                {model.canonical_id}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <fieldset className="space-y-2">
-          <legend className="text-sm font-medium">Role overrides</legend>
-          {state.policy.bindings.map((binding) => (
-            <div key={binding.role} className="space-y-1">
-              <label
-                htmlFor={`role-${binding.role}`}
-                className="text-muted-foreground text-sm"
-              >
-                {binding.role}
-              </label>
+      <form onSubmit={(event) => void save(event)} className="space-y-5">
+        <div className="border-border border-b">
+          <div className={ROW}>
+            <label
+              htmlFor="workspace-default"
+              className="min-w-0 text-[13.5px] font-medium"
+            >
+              Workspace default
+            </label>
+            <div className={cn(ROW_CONTROL, "w-44 sm:w-80")}>
               <Select
-                id={`role-${binding.role}`}
-                value={overrides[binding.role] ?? WORKSPACE_DEFAULT}
-                onChange={(event) => {
-                  const next = { ...overrides };
-                  if (event.target.value === WORKSPACE_DEFAULT) {
-                    delete next[binding.role];
-                  } else {
-                    next[binding.role] = event.target.value;
-                  }
-                  setOverrides(next);
-                }}
+                id="workspace-default"
+                value={defaultProfile}
+                onChange={(event) => setDefaultProfile(event.target.value)}
               >
-                <option value={WORKSPACE_DEFAULT}>Workspace default</option>
-                {choices(overrides[binding.role]).map((model) => (
+                {choices(defaultProfile).map((model) => (
                   <option
                     key={model.profile}
                     value={model.profile}
@@ -240,11 +241,54 @@ export function ModelPolicyPanel() {
                 ))}
               </Select>
             </div>
-          ))}
+          </div>
+        </div>
+        <fieldset className="min-w-0">
+          <legend className="mb-2 text-sm font-semibold">Role overrides</legend>
+          <div className="border-border grid gap-x-8 border-b md:grid-cols-2">
+            {state.policy.bindings.map((binding) => (
+              <div key={binding.role} className={ROW}>
+                <label
+                  htmlFor={`role-${binding.role}`}
+                  className="min-w-0 font-mono text-[12.5px] break-all"
+                >
+                  {binding.role}
+                </label>
+                <div className={ROW_CONTROL}>
+                  <Select
+                    id={`role-${binding.role}`}
+                    value={overrides[binding.role] ?? WORKSPACE_DEFAULT}
+                    onChange={(event) => {
+                      const next = { ...overrides };
+                      if (event.target.value === WORKSPACE_DEFAULT) {
+                        delete next[binding.role];
+                      } else {
+                        next[binding.role] = event.target.value;
+                      }
+                      setOverrides(next);
+                    }}
+                  >
+                    <option value={WORKSPACE_DEFAULT}>Workspace default</option>
+                    {choices(overrides[binding.role]).map((model) => (
+                      <option
+                        key={model.profile}
+                        value={model.profile}
+                        disabled={!model.offered}
+                      >
+                        {model.canonical_id}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              </div>
+            ))}
+          </div>
         </fieldset>
-        <Button type="submit" disabled={busy}>
-          {busy ? "Saving" : "Save policy"}
-        </Button>
+        <div className="border-border border-t pt-4">
+          <Button type="submit" size="lg" disabled={busy}>
+            {busy ? "Saving" : "Save policy"}
+          </Button>
+        </div>
       </form>
       {message === null ? null : (
         <p
@@ -256,6 +300,6 @@ export function ModelPolicyPanel() {
           {message}
         </p>
       )}
-    </Card>
+    </section>
   );
 }

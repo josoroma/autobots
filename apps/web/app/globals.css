@@ -1,8 +1,23 @@
 @import "tailwindcss";
 /* The only token definition, unedited. See PRD-Design-System.md DS-01. */
 @import "../../../docs/design/luma.css";
+/* Decision 0021 R3: the one documented paired extension, kept beside the canonical file, never inside it. */
+@import "../../../docs/design/studio-extensions.css";
 
 @custom-variant dark (&:is(.dark *));
+
+/* Decision 0021 R4–R5: aliases over existing tokens. The attention pair lives in studio-extensions.css. */
+:root {
+  /* R4: status text from existing tokens, chosen per theme for 4.5:1 on background and card. */
+  --success-text: var(--chart-4);
+  --live-text: var(--primary);
+  --serif:
+    ui-serif, "New York", "Iowan Old Style", Charter, Georgia, Cambria, serif;
+}
+.dark {
+  --success-text: var(--chart-2);
+  --live-text: var(--sidebar-primary);
+}
 
 @theme inline {
   --color-background: var(--background);
@@ -36,6 +51,11 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-attention: var(--attention);
+  --color-attention-foreground: var(--attention-foreground);
+  --color-success-text: var(--success-text);
+  --color-live-text: var(--live-text);
+  --font-serif: var(--serif);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -53,7 +73,13 @@
     background-color: var(--background);
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+  }
+  /* Decision 0021 R5: page titles are set in the system serif. */
+  main h1 {
+    font-family: var(--serif);
+    font-weight: 400;
+    letter-spacing: -0.02em;
   }
   /* US-11.11: light `--ring` measures about 2.5:1, under WCAG's 3:1. The token stays, and the
      foreground beside it is what reaches 3:1, in the pairing DS-04 asks to correct first. */

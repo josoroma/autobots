@@ -1,12 +1,35 @@
 "use client";
 
 import { parseLocalStatus, type LocalStatus } from "@autobots/api-client";
+import {
+  Activity,
+  Archive,
+  Box,
+  CalendarClock,
+  Check,
+  CircleAlert,
+  Cloud,
+  Database,
+  HardDrive,
+  History,
+  Hourglass,
+  Layers,
+  ListChecks,
+  ListOrdered,
+  type LucideIcon,
+  Pause,
+  Radio,
+  RotateCw,
+  Route,
+  Server,
+  Trash2,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { cn } from "@/lib/utils";
 
 const CONDITIONS: Record<string, string> = {
   database_ready: "The database is answering.",
@@ -47,6 +70,32 @@ const LABELS: Record<string, string> = {
   queue: "Queue",
   worker: "Worker",
 };
+
+// Decorative: each check's name and message carry its meaning.
+const ICONS: Record<string, LucideIcon> = {
+  database: Database,
+  schema: ListChecks,
+  hold: Pause,
+  adapter: Hourglass,
+  storage: Box,
+  disk: HardDrive,
+  queue: ListOrdered,
+  worker: Server,
+};
+
+// The dot only repeats the message beside it (Decision 0021 R4).
+const DOTS: Record<string, string> = {
+  ok: "bg-success-text",
+  degraded: "bg-muted-foreground",
+  unavailable: "bg-destructive",
+};
+
+const BOX = "border-border space-y-3 rounded-xl border px-5 py-4";
+const BOX_HEADING = "flex items-center gap-2 text-sm font-semibold";
+const HEADING_ICON = "text-muted-foreground size-4 shrink-0";
+const FACT_ICON = "text-muted-foreground mt-0.5 size-4 shrink-0";
+const RETENTION_ROW =
+  "text-muted-foreground flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 text-[13px]";
 
 function days(value: string): number | null {
   const parsed = Number.parseInt(value, 10);
@@ -125,151 +174,259 @@ export function OperationsPanel() {
   if (failed !== null) return <p role="alert">{failed}</p>;
   if (status === null) return <p role="status">Loading…</p>;
   return (
-    <div className="space-y-4">
-      <Card className="space-y-3 p-4">
-        <p role="status" className="font-medium">
+    <div className="space-y-5">
+      <section
+        className={cn(
+          "flex flex-wrap items-center gap-4 rounded-xl border px-5 py-4",
+          status.ready
+            ? "border-success-text/35 dark:bg-success-text/5"
+            : "border-destructive/40 dark:bg-destructive/5",
+        )}
+      >
+        <span
+          aria-hidden="true"
+          className={cn(
+            "grid size-9 shrink-0 place-items-center rounded-full border",
+            status.ready
+              ? "text-success-text border-success-text/35 dark:bg-success-text/15 dark:border-transparent"
+              : "text-destructive border-destructive/40 dark:bg-destructive/15 dark:border-transparent",
+          )}
+        >
+          {status.ready ? (
+            <Check className="size-4" strokeWidth={2.25} />
+          ) : (
+            <CircleAlert className="size-4" strokeWidth={2.25} />
+          )}
+        </span>
+        <p
+          role="status"
+          className="font-serif min-w-0 flex-1 text-[21px] leading-snug tracking-[-0.01em]"
+        >
           {status.ready
             ? "Ready. New work can start."
             : "Not ready. New work is refused until this clears."}
         </p>
-        <ul className="space-y-1 text-sm">
-          {status.conditions.map((condition) => (
-            <li key={condition.name} data-state={condition.state}>
-              <span className="font-medium">{LABELS[condition.name]}: </span>
-              {CONDITIONS[condition.code] ?? condition.code}
-            </li>
-          ))}
-        </ul>
-        <p className="text-sm">
-          Remote tracing:{" "}
-          {status.remote_tracing === "disabled"
-            ? "off. Logs stay on this Mac."
-            : "on. Check this process's environment."}
-        </p>
-        <p className="text-sm">
-          Last backup:{" "}
-          {status.backup_age_hours === null
-            ? "none found in the configured directory."
-            : `${status.backup_age_hours} hours ago.`}
-        </p>
-        <p data-field="openrouter" className="text-sm">
-          OpenRouter:{" "}
-          {status.openrouter === "available"
-            ? "OpenRouter's catalog answered. That says nothing about your key or a model call."
-            : status.openrouter === "unavailable"
-              ? "OpenRouter can't be reached. Local work and this page keep working, and new model calls wait."
-              : "not checked, as provider settings aren't configured for this process."}
-        </p>
-        {status.queue === null ? (
-          <p className="text-sm">
-            Workspace counts need the database, so they aren&apos;t shown.
-          </p>
-        ) : (
-          <p className="text-sm">
-            Jobs in this workspace: {status.queue.queued} queued,{" "}
-            {status.queue.claimed} running, {status.queue.expired_leases} lost
-            their worker.
-          </p>
-        )}
-        <Button variant="secondary" onClick={() => void load()}>
+        <Button variant="outline" size="sm" onClick={() => void load()}>
+          <RotateCw aria-hidden="true" />
           Check again
         </Button>
-      </Card>
-      <Card aria-labelledby="delayed-heading" className="space-y-3 p-4">
-        <h2 id="delayed-heading" className="font-medium">
-          Delayed schedules
-        </h2>
-        {status.delayed_schedules.length === 0 ? (
-          <p data-field="delayed" className="text-sm">
-            No routine occurrence is recorded as delayed.
+      </section>
+      <ul className="bg-border border-border grid gap-px overflow-hidden rounded-xl border sm:grid-cols-2 lg:grid-cols-4">
+        {status.conditions.map((condition) => {
+          const Icon = ICONS[condition.name] ?? Activity;
+          return (
+            <li
+              key={condition.name}
+              data-state={condition.state}
+              className="bg-background min-h-24 space-y-1.5 px-4 py-3.5"
+            >
+              <p className="flex items-center gap-2 text-[13.5px] font-semibold">
+                <Icon
+                  aria-hidden="true"
+                  className="text-muted-foreground size-3.5 shrink-0"
+                />
+                {LABELS[condition.name]}
+                <span className="sr-only">: </span>
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "ml-auto size-1.5 shrink-0 rounded-full",
+                    DOTS[condition.state] ?? "bg-muted-foreground",
+                  )}
+                />
+              </p>
+              <p className="text-muted-foreground text-[12.5px] leading-relaxed">
+                {CONDITIONS[condition.code] ?? condition.code}
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+      <section className="border-border divide-border divide-y rounded-xl border text-sm">
+        <p className="flex items-start gap-3 px-4 py-3">
+          <Radio aria-hidden="true" className={FACT_ICON} />
+          <span>
+            Remote tracing:{" "}
+            {status.remote_tracing === "disabled"
+              ? "off. Logs stay on this Mac."
+              : "on. Check this process's environment."}
+          </span>
+        </p>
+        <p className="flex items-start gap-3 px-4 py-3">
+          <Archive aria-hidden="true" className={FACT_ICON} />
+          <span>
+            Last backup:{" "}
+            {status.backup_age_hours === null
+              ? "none found in the configured directory."
+              : `${status.backup_age_hours} hours ago.`}
+          </span>
+        </p>
+        <p data-field="openrouter" className="flex items-start gap-3 px-4 py-3">
+          <Cloud aria-hidden="true" className={FACT_ICON} />
+          <span>
+            OpenRouter:{" "}
+            {status.openrouter === "available"
+              ? "OpenRouter's catalog answered. That says nothing about your key or a model call."
+              : status.openrouter === "unavailable"
+                ? "OpenRouter can't be reached. Local work and this page keep working, and new model calls wait."
+                : "not checked, as provider settings aren't configured for this process."}
+          </span>
+        </p>
+        {status.queue === null ? (
+          <p className="flex items-start gap-3 px-4 py-3">
+            <Layers aria-hidden="true" className={FACT_ICON} />
+            <span>
+              Workspace counts need the database, so they aren&apos;t shown.
+            </span>
           </p>
         ) : (
-          <ul data-field="delayed" className="space-y-1 text-sm">
-            {status.delayed_schedules.map((occurrence) => (
-              <li key={`${occurrence.routine}-${occurrence.occurrence_time}`}>
-                {occurrence.routine}: {occurrence.status.replaceAll("_", " ")}{" "}
-                at {new Date(occurrence.occurrence_time).toISOString()}
-                {occurrence.reason === null
-                  ? ""
-                  : `, ${occurrence.reason.replaceAll("_", " ")}`}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-      <Card aria-labelledby="restores-heading" className="space-y-3 p-4">
-        <h2 id="restores-heading" className="font-medium">
-          Restore history
-        </h2>
-        {status.restores.length === 0 ? (
-          <p data-field="restores" className="text-sm">
-            No restore is recorded, so no backup here is known to restore.
+          <p className="flex items-start gap-3 px-4 py-3">
+            <Layers aria-hidden="true" className={FACT_ICON} />
+            <span>
+              Jobs in this workspace: {status.queue.queued} queued,{" "}
+              {status.queue.claimed} running, {status.queue.expired_leases} lost
+              their worker.
+            </span>
           </p>
-        ) : (
-          <ul data-field="restores" className="space-y-1 text-sm">
-            {status.restores.map((restore) => (
-              <li key={`${restore.at}-${restore.result}`}>
-                {new Date(restore.at).toISOString()}:{" "}
-                {restore.result === "passed"
-                  ? `verified, ${restore.checks_passed} of ${restore.checks_total} checks`
-                  : restore.result === "failed"
-                    ? `verification failed, ${restore.checks_passed} of ${restore.checks_total} checks`
-                    : "restored, and not verified"}
-              </li>
-            ))}
-          </ul>
         )}
-      </Card>
-      {status.route_qualifications.length === 0 ? null : (
-        <Card aria-labelledby="routes-heading" className="space-y-3 p-4">
-          <h2 id="routes-heading" className="font-medium">
-            Route qualification
+      </section>
+      <div className="grid gap-5 lg:grid-cols-2">
+        <section aria-labelledby="delayed-heading" className={BOX}>
+          <h2 id="delayed-heading" className={BOX_HEADING}>
+            <CalendarClock aria-hidden="true" className={HEADING_ICON} />
+            Delayed schedules
           </h2>
-          <ul className="space-y-3 text-sm">
-            {status.route_qualifications.map((route) => (
-              <li key={route.profile} data-operations-route={route.profile}>
-                <p className="font-medium break-all">{route.canonical_id}</p>
-                <p>
-                  {route.status === "qualified_with_limits"
-                    ? `Tested ${route.qualified_on}, with limits.`
-                    : "Not qualified."}
-                </p>
-                {route.limits === null ? null : <p>{route.limits}</p>}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
-      {status.retention === null ? null : (
-        <Card className="space-y-3 p-4">
-          <h2 className="font-medium">Retention</h2>
-          <p className="text-sm">
-            Empty keeps everything. Expiring a finished run removes its
-            checkpoints, working files and artifact bytes. Its record, activity
-            and operation receipts stay, and a run with an unresolved effect is
-            never touched.
-          </p>
-          <label className="block text-sm">
-            Run content, days after finishing
-            <Input
-              className="ml-2 inline-block w-24"
-              inputMode="numeric"
-              value={runDays}
-              onChange={(event) => setRunDays(event.target.value)}
-            />
-          </label>
-          <label className="block text-sm">
-            Retry keys, days
-            <Input
-              className="ml-2 inline-block w-24"
-              inputMode="numeric"
-              value={receiptDays}
-              onChange={(event) => setReceiptDays(event.target.value)}
-            />
-          </label>
-          <Button onClick={() => void save()}>Save retention</Button>
-          {message === null ? null : <p role="status">{message}</p>}
-        </Card>
+          {status.delayed_schedules.length === 0 ? (
+            <p data-field="delayed" className="text-muted-foreground text-sm">
+              No routine occurrence is recorded as delayed.
+            </p>
+          ) : (
+            <ul
+              data-field="delayed"
+              className="divide-border divide-y border-t text-sm"
+            >
+              {status.delayed_schedules.map((occurrence) => (
+                <li
+                  key={`${occurrence.routine}-${occurrence.occurrence_time}`}
+                  className="py-2"
+                >
+                  {occurrence.routine}: {occurrence.status.replaceAll("_", " ")}{" "}
+                  at {new Date(occurrence.occurrence_time).toISOString()}
+                  {occurrence.reason === null
+                    ? ""
+                    : `, ${occurrence.reason.replaceAll("_", " ")}`}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        <section aria-labelledby="restores-heading" className={BOX}>
+          <h2 id="restores-heading" className={BOX_HEADING}>
+            <History aria-hidden="true" className={HEADING_ICON} />
+            Restore history
+          </h2>
+          {status.restores.length === 0 ? (
+            <p data-field="restores" className="text-muted-foreground text-sm">
+              No restore is recorded, so no backup here is known to restore.
+            </p>
+          ) : (
+            <ul
+              data-field="restores"
+              className="divide-border divide-y border-t text-sm"
+            >
+              {status.restores.map((restore) => (
+                <li key={`${restore.at}-${restore.result}`} className="py-2">
+                  {new Date(restore.at).toISOString()}:{" "}
+                  {restore.result === "passed"
+                    ? `verified, ${restore.checks_passed} of ${restore.checks_total} checks`
+                    : restore.result === "failed"
+                      ? `verification failed, ${restore.checks_passed} of ${restore.checks_total} checks`
+                      : "restored, and not verified"}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+      {status.route_qualifications.length === 0 &&
+      status.retention === null ? null : (
+        <div className="grid gap-5 lg:grid-cols-2">
+          {status.route_qualifications.length === 0 ? null : (
+            <section aria-labelledby="routes-heading" className={BOX}>
+              <h2 id="routes-heading" className={BOX_HEADING}>
+                <Route aria-hidden="true" className={HEADING_ICON} />
+                Route qualification
+              </h2>
+              <ul className="divide-border divide-y border-t text-sm">
+                {status.route_qualifications.map((route) => (
+                  <li
+                    key={route.profile}
+                    data-operations-route={route.profile}
+                    className="space-y-0.5 py-2.5"
+                  >
+                    <p className="font-mono text-[12.5px] font-medium break-all">
+                      {route.canonical_id}
+                    </p>
+                    <p>
+                      {route.status === "qualified_with_limits"
+                        ? `Tested ${route.qualified_on}, with limits.`
+                        : "Not qualified."}
+                    </p>
+                    {route.limits === null ? null : (
+                      <p className="text-muted-foreground text-[12.5px] leading-relaxed">
+                        {route.limits}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {status.retention === null ? null : (
+            <section className={BOX}>
+              <h2 className={BOX_HEADING}>
+                <Trash2 aria-hidden="true" className={HEADING_ICON} />
+                Retention
+              </h2>
+              <p className="text-muted-foreground text-[13px] leading-relaxed">
+                Empty keeps everything. Expiring a finished run removes its
+                checkpoints, working files and artifact bytes. Its record,
+                activity and operation receipts stay, and a run with an
+                unresolved effect is never touched.
+              </p>
+              <div className="space-y-2.5">
+                <label className={RETENTION_ROW}>
+                  <span>Run content, days after finishing</span>
+                  <Input
+                    className="w-28"
+                    inputMode="numeric"
+                    value={runDays}
+                    onChange={(event) => setRunDays(event.target.value)}
+                  />
+                </label>
+                <label className={RETENTION_ROW}>
+                  <span>Retry keys, days</span>
+                  <Input
+                    className="w-28"
+                    inputMode="numeric"
+                    value={receiptDays}
+                    onChange={(event) => setReceiptDays(event.target.value)}
+                  />
+                </label>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button size="sm" onClick={() => void save()}>
+                  Save retention
+                </Button>
+                {message === null ? null : (
+                  <p role="status" className="text-sm">
+                    {message}
+                  </p>
+                )}
+              </div>
+            </section>
+          )}
+        </div>
       )}
     </div>
   );

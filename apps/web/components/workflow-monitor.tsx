@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 
 import { ToolUseTable, useToolUses } from "@/components/tool-uses";
 import { Card } from "@/components/ui/card";
+import { SectionLabel } from "@/components/ui/page-header";
+import { cn } from "@/lib/utils";
 
 const POLL_MS = 1000;
 const TERMINAL = new Set(["succeeded", "failed", "cancelled"]);
@@ -77,46 +79,85 @@ export function WorkflowMonitor({ executionId }: { executionId: string }) {
   }
   if (view === null) {
     return (
-      <p role="status" data-connection={state} className="text-sm">
+      <p
+        role="status"
+        data-connection={state}
+        className="text-muted-foreground text-sm"
+      >
         {state === "reconnecting" ? "Reconnecting." : "Loading this execution."}
       </p>
     );
   }
   return (
     <>
-      <Card aria-labelledby="binding-heading" className="space-y-2">
-        <h2 id="binding-heading" className="text-lg font-medium">
-          Binding
-        </h2>
-        <p data-binding="true" className="text-sm">
-          Version {view.workflow_version}, hash {view.graph_hash.slice(0, 12)}.
-        </p>
-        <p role="status" data-run-status={view.run_status} className="text-sm">
-          Run: {view.run_status.replaceAll("_", " ")}
-          {view.stop_reason === null
-            ? ""
-            : `, ${view.stop_reason.replaceAll("_", " ")}`}
-          .{" "}
-          <Link href={`/runs/${view.run_id}`} className="underline">
-            Open the run
-          </Link>
-        </p>
-        <p data-connection={state} className="text-muted-foreground text-sm">
-          {state === "reconnecting"
-            ? "Reconnecting. Showing the last known state."
-            : "Live"}
-        </p>
+      <Card aria-labelledby="binding-heading" className="space-y-3">
+        <SectionLabel id="binding-heading">Binding</SectionLabel>
+        <div className="flex flex-col gap-x-8 gap-y-2 text-sm @2xl:flex-row @2xl:flex-wrap @2xl:items-baseline">
+          <p data-binding="true">
+            Version {view.workflow_version}, hash{" "}
+            <span className="font-mono text-[12.5px]">
+              {view.graph_hash.slice(0, 12)}
+            </span>
+            .
+          </p>
+          <p role="status" data-run-status={view.run_status}>
+            Run:{" "}
+            <span className={cn("font-medium", tone(view.run_status))}>
+              {view.run_status.replaceAll("_", " ")}
+            </span>
+            {view.stop_reason === null
+              ? ""
+              : `, ${view.stop_reason.replaceAll("_", " ")}`}
+            .{" "}
+            <Link
+              href={`/runs/${view.run_id}`}
+              className="font-medium underline"
+            >
+              Open the run
+            </Link>
+          </p>
+          <p
+            data-connection={state}
+            className={cn(
+              "flex items-center gap-1.5 @2xl:ml-auto",
+              state === "reconnecting"
+                ? "text-muted-foreground"
+                : "text-foreground",
+            )}
+          >
+            <span
+              aria-hidden="true"
+              className="size-1.5 shrink-0 rounded-full bg-current"
+            />
+            {state === "reconnecting"
+              ? "Reconnecting. Showing the last known state."
+              : "Live"}
+          </p>
+        </div>
       </Card>
-      <Card aria-labelledby="instances-heading" className="space-y-2">
-        <h2 id="instances-heading" className="text-lg font-medium">
-          Node instances
-        </h2>
-        <table className="w-full text-left text-sm">
+      <Card aria-labelledby="instances-heading" className="space-y-3">
+        <SectionLabel id="instances-heading">Node instances</SectionLabel>
+        <table className="w-full text-left text-[13.5px]">
           <thead>
-            <tr>
-              <th scope="col">Instance</th>
-              <th scope="col">Block version</th>
-              <th scope="col">Status</th>
+            <tr className="border-b">
+              <th
+                scope="col"
+                className="text-muted-foreground pr-3 pb-2.5 text-[12.5px] font-medium"
+              >
+                Instance
+              </th>
+              <th
+                scope="col"
+                className="text-muted-foreground px-3 pb-2.5 text-[12.5px] font-medium"
+              >
+                Block version
+              </th>
+              <th
+                scope="col"
+                className="text-muted-foreground pb-2.5 pl-3 text-[12.5px] font-medium"
+              >
+                Status
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -125,14 +166,30 @@ export function WorkflowMonitor({ executionId }: { executionId: string }) {
                 key={instance.key}
                 data-instance={instance.key}
                 data-status={instance.status}
+                className="border-b align-top last:border-b-0"
               >
-                <td className="py-1 font-medium">{instance.key}</td>
-                <td>{String(view.block_versions[instance.node_id])}</td>
-                <td>
-                  {STATUS_TEXT[instance.status] ?? instance.status}
-                  {instance.error_code === null
-                    ? ""
-                    : `: ${instance.error_code.replaceAll("_", " ")}`}
+                <td className="py-2.5 pr-3 font-mono text-[12.5px] font-medium wrap-anywhere">
+                  {instance.key}
+                </td>
+                <td className="px-3 py-2.5 font-mono text-[12.5px]">
+                  {String(view.block_versions[instance.node_id])}
+                </td>
+                <td className="py-2.5 pl-3">
+                  <span className="inline-flex items-baseline gap-2">
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "size-1.5 shrink-0 translate-y-[-1px] rounded-full bg-current",
+                        tone(instance.status) || "text-muted-foreground",
+                      )}
+                    />
+                    <span>
+                      {STATUS_TEXT[instance.status] ?? instance.status}
+                      {instance.error_code === null
+                        ? ""
+                        : `: ${instance.error_code.replaceAll("_", " ")}`}
+                    </span>
+                  </span>
                 </td>
               </tr>
             ))}
@@ -144,24 +201,28 @@ export function WorkflowMonitor({ executionId }: { executionId: string }) {
         version={loads}
         instances={view.instances.map((instance) => instance.key)}
       />
-      <Card aria-labelledby="emissions-heading" className="space-y-2">
-        <h2 id="emissions-heading" className="text-lg font-medium">
-          Output emissions
-        </h2>
+      <Card aria-labelledby="emissions-heading" className="space-y-3">
+        <SectionLabel id="emissions-heading">Output emissions</SectionLabel>
         {view.emissions.length === 0 ? (
-          <p className="text-sm">Nothing has been emitted yet.</p>
+          <p className="text-muted-foreground text-sm">
+            Nothing has been emitted yet.
+          </p>
         ) : (
-          <ul className="space-y-1 text-sm">
+          <ul className="text-sm">
             {view.emissions.map((emission) => (
               <li
                 key={`${emission.instance_key}-${emission.port}-${emission.sequence}`}
                 data-emission={`${emission.instance_key}.${emission.port}.${emission.sequence}`}
+                className="border-t py-2 wrap-anywhere first:border-t-0 first:pt-0"
               >
-                <span className="font-medium">
+                <span className="font-mono text-[12.5px] font-medium">
                   {emission.instance_key}.{emission.port}
                   {emission.sequence === 0 ? "" : ` [${emission.sequence}]`}
                 </span>
-                : <code>{emission.value}</code>
+                :{" "}
+                <code className="rounded-md border px-1.5 py-px font-mono text-[12.5px] dark:border-transparent dark:bg-muted">
+                  {emission.value}
+                </code>
               </li>
             ))}
           </ul>
@@ -169,6 +230,15 @@ export function WorkflowMonitor({ executionId }: { executionId: string }) {
       </Card>
     </>
   );
+}
+
+// Colored words for a state, beside the words themselves (Decision 0021 R3–R4). Unknown states stay plain.
+function tone(status: string): string {
+  if (status === "succeeded") return "text-success-text";
+  if (status === "failed" || status === "blocked") return "text-destructive";
+  if (status === "waiting_approval") return "text-attention";
+  if (status === "running") return "text-live-text";
+  return "";
 }
 
 /** Tool uses under the node instance that made them. Nodes share their execution's run. */
@@ -190,17 +260,17 @@ function NodeToolUses({
   );
   return (
     <Card aria-labelledby="node-tools-heading" className="space-y-3">
-      <h2 id="node-tools-heading" className="text-lg font-medium">
-        Tool uses by node
-      </h2>
+      <SectionLabel id="node-tools-heading">Tool uses by node</SectionLabel>
       {failed && uses === null ? (
         <p role="alert" className="text-sm">
           Tool uses aren&apos;t available right now.
         </p>
       ) : uses === null ? (
-        <p className="text-sm">Loading tool uses.</p>
+        <p className="text-muted-foreground text-sm">Loading tool uses.</p>
       ) : uses.length === 0 ? (
-        <p className="text-sm">No node has used a tool yet.</p>
+        <p className="text-muted-foreground text-sm">
+          No node has used a tool yet.
+        </p>
       ) : (
         <>
           {keys.map((key) => (
@@ -208,10 +278,10 @@ function NodeToolUses({
               key={key}
               aria-labelledby={`node-tools-${key}`}
               data-node-tools={key}
-              className="space-y-1"
+              className="space-y-1.5 border-t pt-3"
             >
               <h3 id={`node-tools-${key}`} className="text-sm font-medium">
-                Node {key}
+                Node <span className="font-mono text-[12.5px]">{key}</span>
               </h3>
               <ToolUseTable
                 uses={uses.filter((use) => use.instance_key === key)}
@@ -223,7 +293,7 @@ function NodeToolUses({
             <section
               aria-labelledby="node-tools-outside"
               data-node-tools="outside"
-              className="space-y-1"
+              className="space-y-1.5 border-t pt-3"
             >
               <h3 id="node-tools-outside" className="text-sm font-medium">
                 Outside any node
