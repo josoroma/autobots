@@ -3,6 +3,7 @@
 import {
   parseBlockCatalog,
   parseExecutionBinding,
+  parseRunPreview,
   parseWorkflowValidation,
   parseWorkflowView,
   type BlockCatalog,
@@ -113,6 +114,8 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
   const [chosen, setChosen] = useState<number | null>(null);
   const [inputs, setInputs] = useState("{}");
   const [description, setDescription] = useState("");
+  const [budgets, setBudgets] = useState<number[] | null>(null);
+  const [budget, setBudget] = useState(1_000_000);
 
   useEffect(() => {
     let active = true;
@@ -138,6 +141,24 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
       .catch(() => {
         if (active) setUnavailable(true);
       });
+    // WF-05: the same budget choices as a goal run, from what's left of today's cap (D11).
+    fetch("/api/v1/run-preview", { cache: "no-store" })
+      .then(async (reply) => {
+        if (!active || !reply.ok) return;
+        const range = parseRunPreview(await reply.json()).budget;
+        if (range === null) return;
+        const steps: number[] = [];
+        for (
+          let value = range.min_micro_usd;
+          value <= range.max_micro_usd;
+          value += range.step_micro_usd
+        ) {
+          steps.push(value);
+        }
+        setBudgets(steps);
+        setBudget(range.default_micro_usd);
+      })
+      .catch(() => undefined);
     fetch("/api/v1/workflow-blocks", { cache: "no-store" })
       .then(async (reply) => {
         if (active && reply.ok)
@@ -353,7 +374,13 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
           "Content-Type": "application/json",
           "Idempotency-Key": crypto.randomUUID(),
         },
-        body: JSON.stringify({ version: chosen, inputs: values }),
+        body: JSON.stringify({
+          version: chosen,
+          inputs: values,
+          ...(budgets === null || budgets.length === 0
+            ? {}
+            : { budget_micro_usd: budget }),
+        }),
       },
     ).catch(() => null);
     if (reply?.ok === true) {
@@ -611,7 +638,32 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
                 className="font-mono text-[12.5px] leading-relaxed"
               />
             </div>
+            {budgets === null ? null : (
+              <div className="space-y-1.5">
+                <label htmlFor="execution-budget" className={SECTION}>
+                  Budget
+                </label>
+                <Select
+                  id="execution-budget"
+                  value={budgets.length === 0 ? "" : String(budget)}
+                  disabled={budgets.length === 0}
+                  onChange={(event) => setBudget(Number(event.target.value))}
+                  className="tabular-nums sm:max-w-40"
+                >
+                  {budgets.length === 0 ? (
+                    <option value="">Nothing left today</option>
+                  ) : (
+                    budgets.map((value) => (
+                      <option key={value} value={String(value)}>
+                        US${(value / 1_000_000).toFixed(2)}
+                      </option>
+                    ))
+                  )}
+                </Select>
+              </div>
+            )}
             <RunDisclosure
+              budgetMicroUsd={budget}
               sendsOnlyIfAgent
               usesModel={
                 workflow.versions

@@ -110,6 +110,55 @@ class WorkflowDraftPublish(BaseModel):
     expected_version: int = Field(ge=0)
 
 
+class WorkflowExecutionSummary(BaseModel):
+    """PRD-Studio WF-04: one execution's version, state, ledger spend and duration. Spend is an
+    estimate while a reservation is held or a charge was never reported."""
+
+    model_config = VIEW
+
+    id: Identifier
+    run_id: Identifier
+    version: int
+    status: str
+    charged_micro_usd: int
+    reserved_micro_usd: int
+    unreported: bool
+    started_at: str
+    # Until the run ends, None.
+    duration_seconds: int | None
+
+
+class WorkflowExecutionList(BaseModel):
+    model_config = VIEW
+
+    schema_version: Literal[1]
+    executions: list[WorkflowExecutionSummary]
+
+
+class WorkflowStepView(BaseModel):
+    """WF-03: one step of a version, in the order it runs."""
+
+    model_config = VIEW
+
+    id: str
+    block: str
+    label: str | None
+    expert_id: Identifier | None
+    expert_name: str | None
+    # The executor's canonical model for an agent step, as a run started now would resolve it.
+    model: str | None
+    tools: list[str]
+    approval: bool
+
+
+class WorkflowPreview(BaseModel):
+    model_config = VIEW
+
+    schema_version: Literal[1]
+    version: int | Literal["draft"]
+    steps: list[WorkflowStepView]
+
+
 class WorkflowView(BaseModel):
     model_config = VIEW
 
@@ -120,6 +169,11 @@ class WorkflowView(BaseModel):
     latest_version: int
     versions: list[WorkflowVersionView]
     draft: WorkflowDraftView | None
+    # WF-01, from the latest published version: its Experts in step order and its step count.
+    experts: list[str]
+    step_count: int
+    last_execution: WorkflowExecutionSummary | None
+    run_count: int
 
 
 class WorkflowList(BaseModel):
@@ -189,6 +243,8 @@ class ExecutionCreate(BaseModel):
     version: Annotated[int, Field(ge=1)] | Literal["draft"]
     inputs: dict[str, Any] = Field(default_factory=dict)
     documents: list[InputDocument] = Field(default_factory=list, max_length=10)
+    # WF-05 and Decision 0022 D11: US$0.25 to US$5.00 in US$0.25 steps, within today's cap.
+    budget_micro_usd: int | None = Field(default=None, ge=0)
 
 
 class ExecutionBinding(BaseModel):

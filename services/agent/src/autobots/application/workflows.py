@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 from autobots.application.experts import create_session
 from autobots.application.run_projection import public_text
 from autobots.application.runs import admit_run, existing_receipt, request_hash, store_receipt
+from autobots.application.workflow_overview import expert_chain, recent_executions, run_count
 from autobots.contracts.experts import SessionExpert
 from autobots.contracts.plans import InputDocument
 from autobots.contracts.workflows import (
@@ -96,7 +97,27 @@ async def _view(
         latest_version=latest,
         versions=versions,
         draft=await _draft(connection, workflow_id),
+        **await _overview(connection, workflow_id, versions),
     )
+
+
+async def _overview(
+    connection: Any, workflow_id: UUID, versions: list[WorkflowVersionView]
+) -> dict[str, Any]:
+    """WF-01's row facts, from the latest published version and this workflow's executions."""
+    cursor = await connection.execute(
+        "select workspace_id from public.workflows where id = %s", (workflow_id,)
+    )
+    row = await cursor.fetchone()
+    workspace_id = row[0]
+    latest = ir_normalized(versions[-1].graph.model_dump(mode="json")) if versions else None
+    recent = await recent_executions(connection, workspace_id, workflow_id, limit=1)
+    return {
+        "experts": await expert_chain(connection, workspace_id, latest),
+        "step_count": len(latest["nodes"]) if latest else 0,
+        "last_execution": recent[0] if recent else None,
+        "run_count": await run_count(connection, workspace_id, workflow_id),
+    }
 
 
 async def get_workflow(connection: Any, workspace_id: UUID, workflow_id: UUID) -> WorkflowView:

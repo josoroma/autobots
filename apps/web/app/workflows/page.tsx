@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { WorkflowsPanel } from "@/components/workflows-panel";
@@ -12,7 +13,15 @@ export default function WorkflowsPage() {
         title="Workflows"
         description="Graphs of blocks, published as numbered versions. An execution runs one published version, and publishing never changes an earlier one."
       />
-      <WorkflowsPanel />
+      <Suspense
+        fallback={
+          <p role="status" className="text-muted-foreground text-sm">
+            Loading workflows.
+          </p>
+        }
+      >
+        <WorkflowsPanel />
+      </Suspense>
     </div>
   );
 }

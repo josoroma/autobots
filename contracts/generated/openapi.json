@@ -1290,6 +1290,18 @@
       "ExecutionCreate": {
         "additionalProperties": false,
         "properties": {
+          "budget_micro_usd": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Micro Usd"
+          },
           "documents": {
             "items": {
               "$ref": "#/components/schemas/InputDocument"
@@ -6047,6 +6059,93 @@
         "title": "WorkflowErrorView",
         "type": "object"
       },
+      "WorkflowExecutionList": {
+        "additionalProperties": false,
+        "properties": {
+          "executions": {
+            "items": {
+              "$ref": "#/components/schemas/WorkflowExecutionSummary"
+            },
+            "title": "Executions",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "executions"
+        ],
+        "title": "WorkflowExecutionList",
+        "type": "object"
+      },
+      "WorkflowExecutionSummary": {
+        "additionalProperties": false,
+        "description": "PRD-Studio WF-04: one execution's version, state, ledger spend and duration. Spend is an\nestimate while a reservation is held or a charge was never reported.",
+        "properties": {
+          "charged_micro_usd": {
+            "title": "Charged Micro Usd",
+            "type": "integer"
+          },
+          "duration_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Seconds"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reserved_micro_usd": {
+            "title": "Reserved Micro Usd",
+            "type": "integer"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "started_at": {
+            "title": "Started At",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "unreported": {
+            "title": "Unreported",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "version",
+          "status",
+          "charged_micro_usd",
+          "reserved_micro_usd",
+          "unreported",
+          "started_at",
+          "duration_seconds"
+        ],
+        "title": "WorkflowExecutionSummary",
+        "type": "object"
+      },
       "WorkflowGraph": {
         "additionalProperties": false,
         "properties": {
@@ -6181,6 +6280,42 @@
         "title": "WorkflowNode",
         "type": "object"
       },
+      "WorkflowPreview": {
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/WorkflowStepView"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "const": "draft",
+                "type": "string"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "schema_version",
+          "version",
+          "steps"
+        ],
+        "title": "WorkflowPreview",
+        "type": "object"
+      },
       "WorkflowPublish": {
         "additionalProperties": false,
         "properties": {
@@ -6207,6 +6342,88 @@
           "graph"
         ],
         "title": "WorkflowPublish",
+        "type": "object"
+      },
+      "WorkflowStepView": {
+        "additionalProperties": false,
+        "description": "WF-03: one step of a version, in the order it runs.",
+        "properties": {
+          "approval": {
+            "title": "Approval",
+            "type": "boolean"
+          },
+          "block": {
+            "title": "Block",
+            "type": "string"
+          },
+          "expert_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expert Id"
+          },
+          "expert_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expert Name"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "block",
+          "label",
+          "expert_id",
+          "expert_name",
+          "model",
+          "tools",
+          "approval"
+        ],
+        "title": "WorkflowStepView",
         "type": "object"
       },
       "WorkflowValidation": {
@@ -6309,10 +6526,27 @@
               }
             ]
           },
+          "experts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Experts",
+            "type": "array"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "last_execution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkflowExecutionSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "latest_version": {
             "title": "Latest Version",
@@ -6322,9 +6556,17 @@
             "title": "Name",
             "type": "string"
           },
+          "run_count": {
+            "title": "Run Count",
+            "type": "integer"
+          },
           "schema_version": {
             "const": 1,
             "title": "Schema Version",
+            "type": "integer"
+          },
+          "step_count": {
+            "title": "Step Count",
             "type": "integer"
           },
           "versions": {
@@ -6342,7 +6584,11 @@
           "description",
           "latest_version",
           "versions",
-          "draft"
+          "draft",
+          "experts",
+          "step_count",
+          "last_execution",
+          "run_count"
         ],
         "title": "WorkflowView",
         "type": "object"
@@ -12635,6 +12881,94 @@
       }
     },
     "/v1/workflows/{workflow_id}/executions": {
+      "get": {
+        "description": "WF-04: the ten newest executions, with version, state, spend and duration.",
+        "operationId": "listWorkflowExecutions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workflow_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Workflow Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowExecutionList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Executions"
+      },
       "post": {
         "operationId": "createWorkflowExecution",
         "parameters": [
@@ -12742,6 +13076,105 @@
           }
         },
         "summary": "Post Execution"
+      }
+    },
+    "/v1/workflows/{workflow_id}/preview": {
+      "get": {
+        "description": "WF-03: a published version's steps, or the draft's, with `version=draft`.",
+        "operationId": "previewWorkflowVersion",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workflow_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Workflow Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowPreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Preview"
       }
     },
     "/v1/workflows/{workflow_id}/versions": {

@@ -1291,6 +1291,18 @@ export const schemas = {
   "ExecutionCreate": {
     "additionalProperties": false,
     "properties": {
+      "budget_micro_usd": {
+        "anyOf": [
+          {
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Budget Micro Usd"
+      },
       "documents": {
         "items": {
           "$ref": "#/components/schemas/InputDocument"
@@ -6048,6 +6060,93 @@ export const schemas = {
     "title": "WorkflowErrorView",
     "type": "object"
   },
+  "WorkflowExecutionList": {
+    "additionalProperties": false,
+    "properties": {
+      "executions": {
+        "items": {
+          "$ref": "#/components/schemas/WorkflowExecutionSummary"
+        },
+        "title": "Executions",
+        "type": "array"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "executions"
+    ],
+    "title": "WorkflowExecutionList",
+    "type": "object"
+  },
+  "WorkflowExecutionSummary": {
+    "additionalProperties": false,
+    "description": "PRD-Studio WF-04: one execution's version, state, ledger spend and duration. Spend is an\nestimate while a reservation is held or a charge was never reported.",
+    "properties": {
+      "charged_micro_usd": {
+        "title": "Charged Micro Usd",
+        "type": "integer"
+      },
+      "duration_seconds": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Duration Seconds"
+      },
+      "id": {
+        "format": "uuid",
+        "title": "Id",
+        "type": "string"
+      },
+      "reserved_micro_usd": {
+        "title": "Reserved Micro Usd",
+        "type": "integer"
+      },
+      "run_id": {
+        "format": "uuid",
+        "title": "Run Id",
+        "type": "string"
+      },
+      "started_at": {
+        "title": "Started At",
+        "type": "string"
+      },
+      "status": {
+        "title": "Status",
+        "type": "string"
+      },
+      "unreported": {
+        "title": "Unreported",
+        "type": "boolean"
+      },
+      "version": {
+        "title": "Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "id",
+      "run_id",
+      "version",
+      "status",
+      "charged_micro_usd",
+      "reserved_micro_usd",
+      "unreported",
+      "started_at",
+      "duration_seconds"
+    ],
+    "title": "WorkflowExecutionSummary",
+    "type": "object"
+  },
   "WorkflowGraph": {
     "additionalProperties": false,
     "properties": {
@@ -6182,6 +6281,42 @@ export const schemas = {
     "title": "WorkflowNode",
     "type": "object"
   },
+  "WorkflowPreview": {
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "steps": {
+        "items": {
+          "$ref": "#/components/schemas/WorkflowStepView"
+        },
+        "title": "Steps",
+        "type": "array"
+      },
+      "version": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "const": "draft",
+            "type": "string"
+          }
+        ],
+        "title": "Version"
+      }
+    },
+    "required": [
+      "schema_version",
+      "version",
+      "steps"
+    ],
+    "title": "WorkflowPreview",
+    "type": "object"
+  },
   "WorkflowPublish": {
     "additionalProperties": false,
     "properties": {
@@ -6208,6 +6343,88 @@ export const schemas = {
       "graph"
     ],
     "title": "WorkflowPublish",
+    "type": "object"
+  },
+  "WorkflowStepView": {
+    "additionalProperties": false,
+    "description": "WF-03: one step of a version, in the order it runs.",
+    "properties": {
+      "approval": {
+        "title": "Approval",
+        "type": "boolean"
+      },
+      "block": {
+        "title": "Block",
+        "type": "string"
+      },
+      "expert_id": {
+        "anyOf": [
+          {
+            "format": "uuid",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Expert Id"
+      },
+      "expert_name": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Expert Name"
+      },
+      "id": {
+        "title": "Id",
+        "type": "string"
+      },
+      "label": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Label"
+      },
+      "model": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Model"
+      },
+      "tools": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Tools",
+        "type": "array"
+      }
+    },
+    "required": [
+      "id",
+      "block",
+      "label",
+      "expert_id",
+      "expert_name",
+      "model",
+      "tools",
+      "approval"
+    ],
+    "title": "WorkflowStepView",
     "type": "object"
   },
   "WorkflowValidation": {
@@ -6310,10 +6527,27 @@ export const schemas = {
           }
         ]
       },
+      "experts": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Experts",
+        "type": "array"
+      },
       "id": {
         "format": "uuid",
         "title": "Id",
         "type": "string"
+      },
+      "last_execution": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/WorkflowExecutionSummary"
+          },
+          {
+            "type": "null"
+          }
+        ]
       },
       "latest_version": {
         "title": "Latest Version",
@@ -6323,9 +6557,17 @@ export const schemas = {
         "title": "Name",
         "type": "string"
       },
+      "run_count": {
+        "title": "Run Count",
+        "type": "integer"
+      },
       "schema_version": {
         "const": 1,
         "title": "Schema Version",
+        "type": "integer"
+      },
+      "step_count": {
+        "title": "Step Count",
         "type": "integer"
       },
       "versions": {
@@ -6343,7 +6585,11 @@ export const schemas = {
       "description",
       "latest_version",
       "versions",
-      "draft"
+      "draft",
+      "experts",
+      "step_count",
+      "last_execution",
+      "run_count"
     ],
     "title": "WorkflowView",
     "type": "object"
@@ -6745,6 +6991,7 @@ export function parseExecutionBinding(value: unknown): ExecutionBinding {
 }
 
 export interface ExecutionCreate {
+  budget_micro_usd?: number | null;
   documents?: InputDocument[];
   inputs?: Record<string, unknown>;
   version: number | "draft";
@@ -8006,6 +8253,31 @@ export function parseWorkflowErrorView(value: unknown): WorkflowErrorView {
   return parseWith(schemas, "WorkflowErrorView", value) as WorkflowErrorView;
 }
 
+export interface WorkflowExecutionList {
+  executions: WorkflowExecutionSummary[];
+  schema_version: 1;
+}
+
+export function parseWorkflowExecutionList(value: unknown): WorkflowExecutionList {
+  return parseWith(schemas, "WorkflowExecutionList", value) as WorkflowExecutionList;
+}
+
+export interface WorkflowExecutionSummary {
+  charged_micro_usd: number;
+  duration_seconds: number | null;
+  id: string;
+  reserved_micro_usd: number;
+  run_id: string;
+  started_at: string;
+  status: string;
+  unreported: boolean;
+  version: number;
+}
+
+export function parseWorkflowExecutionSummary(value: unknown): WorkflowExecutionSummary {
+  return parseWith(schemas, "WorkflowExecutionSummary", value) as WorkflowExecutionSummary;
+}
+
 export interface WorkflowGraph {
   ir_version?: 1 | 2 | null;
   links?: WorkflowLink[];
@@ -8048,6 +8320,16 @@ export function parseWorkflowNode(value: unknown): WorkflowNode {
   return parseWith(schemas, "WorkflowNode", value) as WorkflowNode;
 }
 
+export interface WorkflowPreview {
+  schema_version: 1;
+  steps: WorkflowStepView[];
+  version: number | "draft";
+}
+
+export function parseWorkflowPreview(value: unknown): WorkflowPreview {
+  return parseWith(schemas, "WorkflowPreview", value) as WorkflowPreview;
+}
+
 export interface WorkflowPublish {
   expected_version: number;
   graph: WorkflowGraph;
@@ -8056,6 +8338,21 @@ export interface WorkflowPublish {
 
 export function parseWorkflowPublish(value: unknown): WorkflowPublish {
   return parseWith(schemas, "WorkflowPublish", value) as WorkflowPublish;
+}
+
+export interface WorkflowStepView {
+  approval: boolean;
+  block: string;
+  expert_id: string | null;
+  expert_name: string | null;
+  id: string;
+  label: string | null;
+  model: string | null;
+  tools: string[];
+}
+
+export function parseWorkflowStepView(value: unknown): WorkflowStepView {
+  return parseWith(schemas, "WorkflowStepView", value) as WorkflowStepView;
 }
 
 export interface WorkflowValidation {
@@ -8084,10 +8381,14 @@ export function parseWorkflowVersionView(value: unknown): WorkflowVersionView {
 export interface WorkflowView {
   description: string | null;
   draft: WorkflowDraftView | null;
+  experts: string[];
   id: string;
+  last_execution: WorkflowExecutionSummary | null;
   latest_version: number;
   name: string;
+  run_count: number;
   schema_version: 1;
+  step_count: number;
   versions: WorkflowVersionView[];
 }
 
@@ -8372,8 +8673,16 @@ export async function publishWorkflowDraft(options: ClientOptions, workflow_id: 
   return parseWorkflowView(await requestJson(options, "POST", `/v1/workflows/${encodeURIComponent(workflow_id)}/draft/publish`, body));
 }
 
+export async function listWorkflowExecutions(options: ClientOptions, workflow_id: string): Promise<WorkflowExecutionList> {
+  return parseWorkflowExecutionList(await requestJson(options, "GET", `/v1/workflows/${encodeURIComponent(workflow_id)}/executions`));
+}
+
 export async function createWorkflowExecution(options: ClientOptions, workflow_id: string, body: ExecutionCreate): Promise<ExecutionBinding> {
   return parseExecutionBinding(await requestJson(options, "POST", `/v1/workflows/${encodeURIComponent(workflow_id)}/executions`, body));
+}
+
+export async function previewWorkflowVersion(options: ClientOptions, workflow_id: string): Promise<WorkflowPreview> {
+  return parseWorkflowPreview(await requestJson(options, "GET", `/v1/workflows/${encodeURIComponent(workflow_id)}/preview`));
 }
 
 export async function publishWorkflowVersion(options: ClientOptions, workflow_id: string, body: WorkflowPublish): Promise<WorkflowView> {

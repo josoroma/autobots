@@ -500,11 +500,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.12#3 | Expose them in Pydantic and FastAPI, regenerate OpenAPI and the TypeScript client, and forward them through the BFF. | DONE | US-15.12 |
 | US-15.12#4 | Save, publish and discard the draft from the workflow editor. | DONE | US-15.12 |
 | US-15.12#5 | Cover the scenarios on a disposable stack and in browser specs. | DONE | US-15.12 |
-| US-15.13 | Workflow list, preview, executions and budget | READY | EPIC-15 |
-| US-15.13#1 | Add per-workflow executions with version, state, spend and duration, the Experts in step order, the step count, the last execution and the run count to the workflow read models in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.13 |
-| US-15.13#2 | Accept and freeze an execution budget from US$0.25 to US$5.00 in steps of US$0.25, never above the remaining daily cap. | TODO | US-15.13 |
-| US-15.13#3 | Render the tabs, search, rows, preview panel with its version switch, and recent executions on Workflows. | TODO | US-15.13 |
-| US-15.13#4 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.13 |
+| US-15.13 | Workflow list, preview, executions and budget | DONE | EPIC-15 |
+| US-15.13#1 | Add per-workflow executions with version, state, spend and duration, the Experts in step order, the step count, the last execution and the run count to the workflow read models in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | DONE | US-15.13 |
+| US-15.13#2 | Accept and freeze an execution budget from US$0.25 to US$5.00 in steps of US$0.25, never above the remaining daily cap. | DONE | US-15.13 |
+| US-15.13#3 | Render the tabs, search, rows, preview panel with its version switch, and recent executions on Workflows. | DONE | US-15.13 |
+| US-15.13#4 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.13 |
 | US-15.14 | GitHub read tools and issue labels on one repository | READY | EPIC-15 |
 | US-15.14#1 | Add the four read tools as plain `httpx` adapters with an injectable transport over the shared repository configuration, with schema ceilings, public fields and recorded fixtures. | TODO | US-15.14 |
 | US-15.14#2 | Register `create_github_issue` version 2 with optional `labels`, up to 10, keeping version 1 unchanged. | TODO | US-15.14 |
@@ -542,7 +542,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.21#2 | Add the Settings sub-navigation and the Notifications, Data on this Mac and Keyboard pages. | TODO | US-15.21 |
 | US-15.21#3 | Raise browser notifications for runs entering waiting_approval or waiting_input while the app is open, only with the browser's permission and the setting on. | TODO | US-15.21 |
 | US-15.21#4 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.21 |
-| US-15.22 | Search palette | BLOCKED | EPIC-15 |
+| US-15.22 | Search palette | READY | EPIC-15 |
 | US-15.22#1 | Add one workspace-scoped search over run goals and the names of Experts, workflows and tools, with typed results, in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client and forward it through the BFF. | TODO | US-15.22 |
 | US-15.22#2 | Add the Search button with its key hint after the skip link, the ⌘K handler that ignores text fields, and the palette dialog with a listbox. | TODO | US-15.22 |
 | US-15.22#3 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.22 |
@@ -6600,7 +6600,8 @@ Open Questions:
 
 ### US-15.13: Workflow list, preview, executions and budget
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-15-13-workflow-list-preview-executions/`
 
 As an automation builder
 I want each workflow's Experts, versions, steps, last execution and run count in the list, a preview of a version's steps, its recent executions, and a budget for each execution
@@ -6643,10 +6644,10 @@ Dependencies:
 - US-14.4
 
 Tasks:
-- [ ] Add per-workflow executions with version, state, spend and duration, the Experts in step order, the step count, the last execution and the run count to the workflow read models in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
-- [ ] Accept and freeze an execution budget from US$0.25 to US$5.00 in steps of US$0.25, never above the remaining daily cap.
-- [ ] Render the tabs, search, rows, preview panel with its version switch, and recent executions on Workflows.
-- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+- [x] Add per-workflow executions with version, state, spend and duration, the Experts in step order, the step count, the last execution and the run count to the workflow read models in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
+- [x] Accept and freeze an execution budget from US$0.25 to US$5.00 in steps of US$0.25, never above the remaining daily cap.
+- [x] Render the tabs, search, rows, preview panel with its version switch, and recent executions on Workflows.
+- [x] Cover the scenarios on a disposable stack and in browser specs with axe.
 
 Open Questions:
 - None.
@@ -7077,7 +7078,7 @@ Open Questions:
 
 ### US-15.22: Search palette
 
-Status: BLOCKED
+Status: READY
 
 As a workspace member
 I want ⌘K to open one search over runs, Experts, workflows and tools

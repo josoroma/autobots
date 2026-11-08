@@ -289,6 +289,28 @@ def validate_graph(graph: Mapping[str, Any]) -> list[GraphError]:
     return _iteration_errors(nodes, successors)
 
 
+def step_order(graph: Mapping[str, Any]) -> list[str]:
+    """Node IDs in the order the graph runs them: each after everything that feeds it, and ties
+    in the order the nodes are listed. A node in an unsupported cycle keeps its listed place."""
+    names = [node["id"] for node in graph.get("nodes", [])]
+    waiting: dict[str, int] = dict.fromkeys(names, 0)
+    successors: dict[str, list[str]] = defaultdict(list)
+    for link in graph.get("links", []):
+        if link.get("source") in waiting and link.get("target") in waiting:
+            successors[link["source"]].append(link["target"])
+            waiting[link["target"]] += 1
+    ordered: list[str] = []
+    ready = deque(name for name in names if waiting[name] == 0)
+    while ready:
+        name = ready.popleft()
+        ordered.append(name)
+        for target in successors[name]:
+            waiting[target] -= 1
+            if waiting[target] == 0:
+                ready.append(target)
+    return ordered + [name for name in names if name not in ordered]
+
+
 def canonical(graph: Mapping[str, Any]) -> str:
     return json.dumps(graph, sort_keys=True, separators=(",", ":"))
 

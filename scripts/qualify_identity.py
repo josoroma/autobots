@@ -269,7 +269,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
                                      'AUTOBOTS_TEST_SERVICE_KEY': stack.values['SERVICE_ROLE_KEY'], 'AUTOBOTS_WEB_REPORT': str(report),
                                      'AUTOBOTS_WEB_OUTPUT': str(root / '.checks/identity/results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots),
                                      'AUTOBOTS_TEST_VISUAL_DIR': str(root / '.checks/identity/visual')}
-        result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'browser/operations', 'approvals', 'effects', 'experts', 'models', 'composer', 'home', 'identity', 'settings', 'runs', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
+        result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'browser/operations', 'approvals', 'effects', 'experts', 'models', 'composer', 'home', 'workflow-list', 'identity', 'settings', 'runs', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
                                 env=browser_env)
         # A real restart, then Settings reads the stored records. Then one is removed, under the same key.
         stop(processes[0])
@@ -542,6 +542,63 @@ def qualify(root: Path) -> int:
         cases.check('the home workspace is arranged', 'exit 0', f'exit {arranged_home.returncode}: {arranged_home.stderr[-200:]}', arranged_home.returncode == 0)
         artifacts = {**artifacts, 'AUTOBOTS_TEST_HOME_EMAIL': email_k, 'AUTOBOTS_TEST_HOME_PASSWORD': password_k,
                      'AUTOBOTS_TEST_HOME_RUNS': ','.join(home_runs), 'AUTOBOTS_TEST_HOME_APPROVALS': ','.join(approvals_k)}
+        # US-15.13, arranged: an owner with a US$10.00 daily cap and two Experts. "Weekly brief" has versions 1
+        # and 2 (research, then write, then an approval gate), a draft and three executions: one reported, one
+        # failed with an unreported charge and one still running. "Plain totals" has published versions only.
+        email_l, password_l = 'flows-l@example.invalid', secrets.token_urlsafe(24)
+        builder = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_l, password_l)
+        flows_ws, flows_user = builder['workspace_id'], builder['user_id']
+        analyst, writer = '88888888-8888-4888-8888-0000000000e1', '88888888-8888-4888-8888-0000000000e2'
+        brief, plain = '88888888-8888-4888-8888-0000000000f1', '88888888-8888-4888-8888-0000000000f2'
+        flow_runs = [f'88888888-8888-4888-8888-00000000000{index}' for index in range(1, 4)]
+
+        def brief_graph(write_label: str) -> str:
+            return json.dumps({'ir_version': 2, 'nodes': [
+                {'id': 'in', 'block': 'input', 'version': 1, 'config': {'type': 'string'}},
+                {'id': 'research', 'block': 'agent', 'version': 1, 'config': {'expert_id': analyst}, 'label': 'Find sources'},
+                {'id': 'write', 'block': 'agent', 'version': 1, 'config': {'expert_id': writer}, 'label': write_label},
+                {'id': 'gate', 'block': 'approval', 'version': 1, 'config': {}},
+                {'id': 'out', 'block': 'output', 'version': 1, 'config': {}}],
+                'links': [{'source': 'in', 'source_port': 'value', 'target': 'research', 'target_port': 'goal'},
+                          {'source': 'research', 'source_port': 'result', 'target': 'write', 'target_port': 'goal'},
+                          {'source': 'write', 'source_port': 'result', 'target': 'gate', 'target_port': 'value'},
+                          {'source': 'gate', 'source_port': 'value', 'target': 'out', 'target_port': 'value'}]})
+        plain_graph = json.dumps({'nodes': [{'id': 'in', 'block': 'input', 'version': 1, 'config': {'type': 'string'}},
+                                            {'id': 'up', 'block': 'transform', 'version': 1, 'config': {'operation': 'upper'}},
+                                            {'id': 'out', 'block': 'output', 'version': 1, 'config': {}}],
+                                  'links': [{'source': 'in', 'source_port': 'value', 'target': 'up', 'target_port': 'value'},
+                                            {'source': 'up', 'source_port': 'value', 'target': 'out', 'target_port': 'value'}]})
+        executions = ((flow_runs[0], 1, 'succeeded', '30 minutes', '65 seconds'), (flow_runs[1], 2, 'failed', '20 minutes', '2 minutes'),
+                      (flow_runs[2], 2, 'running', '10 minutes', '0 seconds'))
+        arranged_flows = stack.sql(
+            f"insert into app_private.model_spend_limits (workspace_id, daily_limit_micro_usd) values ('{flows_ws}', 10000000);\n"
+            f"insert into public.experts (id, workspace_id, name, latest_version) values ('{analyst}', '{flows_ws}', 'Research analyst', 1), "
+            f"('{writer}', '{flows_ws}', 'Brief writer', 1);\n"
+            "insert into public.expert_versions (expert_id, version, config, created_by) values "
+            f"""('{analyst}', 1, '{{"tools": ["calculate", "read_csv"], "role_bindings": {{"executor": "openrouter_sol"}}}}', '{flows_user}'), """
+            f"""('{writer}', 1, '{{"tools": ["save_artifact"]}}', '{flows_user}');\n"""
+            f"insert into public.workflows (id, workspace_id, name, description, latest_version) values "
+            f"('{brief}', '{flows_ws}', 'Weekly brief', 'Research, then a brief for review', 2), ('{plain}', '{flows_ws}', 'Plain totals', null, 2);\n"
+            "insert into public.workflow_versions (workflow_id, version, graph, graph_hash, block_versions, source, created_by) values "
+            f"('{brief}', 1, '{brief_graph('Write the brief')}', 'brief-1', '{{}}', 'user', '{flows_user}'), "
+            f"('{brief}', 2, '{brief_graph('Write the weekly brief')}', 'brief-2', '{{}}', 'user', '{flows_user}'), "
+            f"('{plain}', 1, '{plain_graph}', 'plain-1', '{{}}', 'user', '{flows_user}'), "
+            f"('{plain}', 2, '{plain_graph}', 'plain-2', '{{}}', 'user', '{flows_user}');\n"
+            f"insert into public.workflow_drafts (workflow_id, workspace_id, graph, saved_by) values ('{brief}', '{flows_ws}', '{brief_graph('Draft writer')}', '{flows_user}');\n"
+            + ''.join(f"insert into public.runs (id, workspace_id, status, goal_summary, limit_micro_usd, policy_snapshot, created_at, updated_at) values "
+                      f"('{run}', '{flows_ws}', '{status}', 'Workflow Weekly brief, version {version}', 1000000, '{{}}', now() - interval '{ago}', "
+                      f"now() - interval '{ago}' + interval '{took}');\n"
+                      f"insert into public.workflow_executions (id, workspace_id, workflow_id, workflow_version, graph_hash, block_versions, inputs, created_by, run_id, created_at) "
+                      f"values (gen_random_uuid(), '{flows_ws}', '{brief}', {version}, 'brief-{version}', '{{}}', '{{}}', '{flows_user}', '{run}', now() - interval '{ago}');\n"
+                      for run, version, status, ago, took in executions)
+            + "insert into app_private.model_invocations (id, workspace_id, root_run_id, run_id, role, profile, wire_id, attempt, spend_day, "
+              "reserved_micro_usd, charged_micro_usd, status, failure_class) values "
+              f"(gen_random_uuid(), '{flows_ws}', '{flow_runs[0]}', '{flow_runs[0]}', 'executor', 'openrouter_terra', 'w', 1, current_date - 1, 0, 120000, 'succeeded', null), "
+              f"(gen_random_uuid(), '{flows_ws}', '{flow_runs[1]}', '{flow_runs[1]}', 'executor', 'openrouter_terra', 'w', 1, current_date - 1, 40000, null, 'uncertain', 'charge_not_reported'), "
+              f"(gen_random_uuid(), '{flows_ws}', '{flow_runs[2]}', '{flow_runs[2]}', 'executor', 'openrouter_terra', 'w', 1, current_date - 1, 50000, null, 'reserved', null);\n")
+        cases.check('the workflows workspace is arranged', 'exit 0', f'exit {arranged_flows.returncode}: {arranged_flows.stderr[-300:]}', arranged_flows.returncode == 0)
+        artifacts = {**artifacts, 'AUTOBOTS_TEST_FLOWS_EMAIL': email_l, 'AUTOBOTS_TEST_FLOWS_PASSWORD': password_l,
+                     'AUTOBOTS_TEST_FLOWS_BRIEF': brief, 'AUTOBOTS_TEST_FLOWS_PLAIN': plain, 'AUTOBOTS_TEST_FLOWS_RUNS': ','.join(flow_runs)}
         # Its own workspace with no key, as the one above asserts that it holds exactly one run.
         email_e, password_e = 'owner-e@example.invalid', secrets.token_urlsafe(24)
         owner_e = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_e, password_e)

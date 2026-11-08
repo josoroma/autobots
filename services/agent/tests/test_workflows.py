@@ -416,3 +416,25 @@ def test_a_label_on_a_declared_version_1_graph_is_refused() -> None:
     assert [error.code for error in validate_graph({**simple(), "ir_version": 3})] == [
         "unknown_ir_version"
     ]
+
+
+def test_steps_run_after_what_feeds_them_and_ties_keep_their_listed_order() -> None:
+    from autobots.domain.workflows import step_order
+
+    graph = {
+        "nodes": [
+            {"id": "out", "block": "output", "version": 1, "config": {}},
+            {"id": "write", "block": "agent", "version": 1, "config": {}},
+            {"id": "in", "block": "input", "version": 1, "config": {}},
+            {"id": "research", "block": "agent", "version": 1, "config": {}},
+            {"id": "gate", "block": "approval", "version": 1, "config": {}},
+        ],
+        "links": [
+            {"source": "in", "source_port": "value", "target": "research", "target_port": "x"},
+            {"source": "research", "source_port": "x", "target": "write", "target_port": "x"},
+            {"source": "write", "source_port": "x", "target": "gate", "target_port": "value"},
+            {"source": "gate", "source_port": "value", "target": "out", "target_port": "value"},
+        ],
+    }
+    assert step_order(graph) == ["in", "research", "write", "gate", "out"]
+    assert step_order({"nodes": [{"id": "a"}, {"id": "b"}], "links": []}) == ["a", "b"]

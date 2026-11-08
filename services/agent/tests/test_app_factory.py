@@ -44,6 +44,7 @@ def test_the_schema_builds_without_any_connection() -> None:
         "/v1/workflows/{workflow_id}/description",
         "/v1/workflows/{workflow_id}/draft",
         "/v1/workflows/{workflow_id}/draft/publish",
+        "/v1/workflows/{workflow_id}/preview",
         "/v1/workflows/{workflow_id}/executions",
         "/v1/workflows/{workflow_id}/versions",
         "/v1/experts",

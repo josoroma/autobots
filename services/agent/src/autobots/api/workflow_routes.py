@@ -1,17 +1,21 @@
 """Workflow validation, publication and execution binding. Publishing changes what can run."""
 
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Request, status
 
 from autobots.api.errors import ApiError
 from autobots.api.operation_routes import require_ready
+from autobots.api.run_routes import budget_error
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, provider_settings, require_owner
+from autobots.application.model_admission import remaining_daily_micro_usd
 from autobots.application.provider_settings import ProviderSettings
 from autobots.application.runs import IdempotencyConflict
+from autobots.application.workflow_overview import preview_steps, recent_executions
 from autobots.application.workflows import (
+    DEFAULT_LIMIT_MICRO_USD,
     WorkflowRefused,
     create_execution,
     create_workflow,
@@ -36,12 +40,15 @@ from autobots.contracts.workflows import (
     WorkflowDraftPublish,
     WorkflowDraftSave,
     WorkflowErrorView,
+    WorkflowExecutionList,
     WorkflowGraph,
     WorkflowList,
+    WorkflowPreview,
     WorkflowPublish,
     WorkflowValidation,
     WorkflowView,
 )
+from autobots.domain.budgets import BudgetRefused, require_budget
 from autobots.domain.models import NOT_OFFERED_CODE, NOT_OFFERED_MESSAGE
 from autobots.domain.workflows import (
     BLOCKS,
@@ -163,6 +170,54 @@ async def post_workflow(
             )
         except (WorkflowRefused, IdempotencyConflict) as error:
             raise _error(error) from None
+
+
+@router.get(
+    "/workflows/{workflow_id}/executions",
+    operation_id="listWorkflowExecutions",
+    response_model=WorkflowExecutionList,
+)
+async def get_executions(
+    workflow_id: UUID, request: Request, workspace: Member
+) -> WorkflowExecutionList:
+    """WF-04: the ten newest executions, with version, state, spend and duration."""
+    async with _pool(request).connection() as connection:
+        try:
+            await get_workflow(connection, workspace, workflow_id)
+        except WorkflowRefused as error:
+            raise _error(error) from None
+        executions = await recent_executions(connection, workspace, workflow_id)
+    return WorkflowExecutionList(schema_version=1, executions=executions)
+
+
+@router.get(
+    "/workflows/{workflow_id}/preview",
+    operation_id="previewWorkflowVersion",
+    response_model=WorkflowPreview,
+)
+async def get_preview(
+    workflow_id: UUID, version: str, request: Request, workspace: Member
+) -> WorkflowPreview:
+    """WF-03: a published version's steps, or the draft's, with `version=draft`."""
+    async with _pool(request).connection() as connection:
+        try:
+            view = await get_workflow(connection, workspace, workflow_id)
+        except WorkflowRefused as error:
+            raise _error(error) from None
+        if version == "draft":
+            if view.draft is None:
+                raise ApiError(404, "workflow_draft_not_found", "This workflow has no saved draft.")
+            graph = view.draft.graph
+            shown: int | Literal["draft"] = "draft"
+        else:
+            found = next((item for item in view.versions if str(item.version) == version), None)
+            if found is None:
+                raise ApiError(404, "workflow_version_not_found", "That version doesn't exist.")
+            graph, shown = found.graph, found.version
+        steps = await preview_steps(
+            connection, workspace, ir_normalized(graph.model_dump(mode="json"))
+        )
+    return WorkflowPreview(schema_version=1, version=shown, steps=steps)
 
 
 @router.put(
@@ -292,7 +347,18 @@ async def post_execution(
 ) -> ExecutionBinding:
     if body.version == "draft":
         raise ApiError(409, DRAFT_NOT_RUNNABLE, "Only a published version can run.")
+    limit = DEFAULT_LIMIT_MICRO_USD
     async with _pool(request).connection() as connection:
+        if body.budget_micro_usd is not None:
+            # WF-05: the same budget rules as a goal run (Decision 0022 D11).
+            try:
+                require_budget(
+                    body.budget_micro_usd,
+                    await remaining_daily_micro_usd(connection, workspace),
+                )
+            except BudgetRefused as refused:
+                raise budget_error(refused.code) from None
+            limit = body.budget_micro_usd
         if await needs_model(connection, workspace, workflow_id, body.version):
             code = await settings.run_intent(workspace)
             if code != "ready":
@@ -308,6 +374,7 @@ async def post_execution(
                 version=body.version,
                 inputs=body.inputs,
                 documents=tuple(body.documents),
+                limit_micro_usd=limit,
             )
         except (WorkflowRefused, IdempotencyConflict) as error:
             raise _error(error) from None
