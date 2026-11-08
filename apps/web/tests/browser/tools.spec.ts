@@ -23,16 +23,49 @@ async function noViolations(page: Page): Promise<void> {
   ).toEqual([]);
 }
 
-test("Tools sits directly before Settings and lists tools by group", async ({
+test("Tools sits under Build after Workflows and lists tools by group", async ({
   page,
 }) => {
   await signedIn(page, "/");
-  const labels = await page
-    .getByRole("navigation")
-    .getByRole("link")
-    .allTextContents();
+  const navigation = page.getByRole("navigation");
+  const labels = await navigation.getByRole("link").allTextContents();
   const trimmed = labels.map((label) => label.trim());
-  expect(trimmed.indexOf("Tools")).toBe(trimmed.indexOf("Settings") - 1);
+  // US-15.1: three groups, in order, with Tools directly after Workflows.
+  expect(trimmed).toEqual([
+    "Home",
+    "Runs",
+    "Approvals",
+    "Experts",
+    "Workflows",
+    "Tools",
+    "Operations",
+    "Models",
+    "Settings",
+  ]);
+  for (const [group, links] of [
+    ["Work", ["Home", "Runs", "Approvals"]],
+    ["Build", ["Experts", "Workflows", "Tools"]],
+    ["System", ["Operations", "Models", "Settings"]],
+  ] as const) {
+    const list = navigation.getByRole("list", { name: group });
+    await expect(list).toBeVisible();
+    expect(
+      (await list.getByRole("link").allTextContents()).map((l) => l.trim()),
+    ).toEqual([...links]);
+  }
+  await expect(
+    navigation.getByRole("link", { name: "Home", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+  // The skip link stays first, and activating it moves focus into the main content.
+  await page.keyboard.press("Tab");
+  await expect(
+    page.getByRole("link", { name: "Skip to content" }),
+  ).toBeFocused();
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
+  expect(
+    await page.evaluate(() => document.activeElement?.closest("main") !== null),
+  ).toBe(true);
   await page.getByRole("link", { name: "Tools", exact: true }).click();
   await expect(page).toHaveURL(/\/tools$/);
   await expect(

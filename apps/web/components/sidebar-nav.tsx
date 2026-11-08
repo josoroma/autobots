@@ -23,10 +23,13 @@ interface Item {
   icon: LucideIcon;
 }
 
-// Decision 0021 R5: the same nine links, grouped by what the person is doing. Tools stays directly before Settings (Decision 0017 C9).
-const GROUPS: { label: string | null; items: Item[] }[] = [
+// PRD-Studio SH-01 and Decision 0022 D2: the same nine links, grouped by what the person is doing,
+// with Tools under Build directly after Workflows.
+const GROUPS: { label: string; shown: boolean; items: Item[] }[] = [
   {
-    label: null,
+    // Named for assistive technology; the concepts draw this first group without a heading.
+    label: "Work",
+    shown: false,
     items: [
       { href: "/", label: "Home", icon: House },
       { href: "/runs", label: "Runs", icon: Play },
@@ -35,17 +38,19 @@ const GROUPS: { label: string | null; items: Item[] }[] = [
   },
   {
     label: "Build",
+    shown: true,
     items: [
       { href: "/experts", label: "Experts", icon: UsersRound },
       { href: "/workflows", label: "Workflows", icon: Workflow },
+      { href: "/tools", label: "Tools", icon: Wrench },
     ],
   },
   {
     label: "System",
+    shown: true,
     items: [
       { href: "/operations", label: "Operations", icon: Activity },
       { href: "/settings/models", label: "Models", icon: Cpu },
-      { href: "/tools", label: "Tools", icon: Wrench },
       { href: "/settings", label: "Settings", icon: Settings },
     ],
   },
@@ -66,19 +71,20 @@ export function SidebarNav() {
   const active = current(usePathname());
   return (
     <div className="space-y-4">
-      {GROUPS.map(({ label, items }) => (
-        <div key={label ?? "work"} className="space-y-1">
-          {label ? (
-            <p
-              id={`nav-${label.toLowerCase()}`}
-              className="text-muted-foreground px-3 pb-1 text-xs font-semibold tracking-wide"
-            >
-              {label}
-            </p>
-          ) : null}
+      {GROUPS.map(({ label, shown, items }) => (
+        <div key={label} className="space-y-1">
+          <p
+            id={`nav-${label.toLowerCase()}`}
+            className={cn(
+              "text-muted-foreground px-3 pb-1 text-xs font-semibold tracking-wide",
+              !shown && "sr-only",
+            )}
+          >
+            {label}
+          </p>
           <ul
             className="space-y-0.5"
-            aria-labelledby={label ? `nav-${label.toLowerCase()}` : undefined}
+            aria-labelledby={`nav-${label.toLowerCase()}`}
           >
             {items.map(({ href, label: text, icon: Icon }) => {
               const here = href === active;

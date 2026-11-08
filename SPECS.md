@@ -437,10 +437,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.16#1 | Add the trial runner, in no verification profile, reading the owner's key file in its own process and refusing a repeat without the owner's request. | DONE | US-14.16 |
 | US-14.16#2 | Run the trial once and record the redacted evidence: the summary's label, visited URLs, model calls, receipts, spend and the hosts the proxy connected to. | DONE | US-14.16 |
 | EPIC-15 | Studio product surfaces | — | — |
-| US-15.1 | Sidebar groups with Tools under Build | READY | EPIC-15 |
-| US-15.1#1 | Regroup the sidebar's links in the web shell, keeping link names, roles and data hooks. | TODO | US-15.1 |
-| US-15.1#2 | Update `tools.spec.ts` to Tools under Build after Workflows, and any `appearance.spec.ts` assertion of the old placement. | TODO | US-15.1 |
-| US-15.1#3 | Cover the scenarios in browser specs with axe. | TODO | US-15.1 |
+| US-15.1 | Sidebar groups with Tools under Build | DONE | EPIC-15 |
+| US-15.1#1 | Regroup the sidebar's links in the web shell, keeping link names, roles and data hooks. | DONE | US-15.1 |
+| US-15.1#2 | Update `tools.spec.ts` to Tools under Build after Workflows, and any `appearance.spec.ts` assertion of the old placement. | DONE | US-15.1 |
+| US-15.1#3 | Cover the scenarios in browser specs with axe. | DONE | US-15.1 |
 | US-15.2 | Display name, workspace role and account | READY | EPIC-15 |
 | US-15.2#1 | Add a per-user profile by migration with a display name checked to 1–60 characters, and RLS that lets a user write their own name and members of a shared workspace read it, with negative tests for anonymous, other-user and other-workspace roles. | TODO | US-15.2 |
 | US-15.2#2 | Add the role and workspace name to `SessionSummary`, and a profile read and update, in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.2 |
@@ -546,7 +546,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.22#1 | Add one workspace-scoped search over run goals and the names of Experts, workflows and tools, with typed results, in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client and forward it through the BFF. | TODO | US-15.22 |
 | US-15.22#2 | Add the Search button with its key hint after the skip link, the ⌘K handler that ignores text fields, and the palette dialog with a listbox. | TODO | US-15.22 |
 | US-15.22#3 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.22 |
-| US-15.23 | New run shortcut | BLOCKED | EPIC-15 |
+| US-15.23 | New run shortcut | READY | EPIC-15 |
 | US-15.23#1 | Add the New run button with its key hint after the skip link, and the shortcut handler that ignores text fields. | TODO | US-15.23 |
 | US-15.23#2 | Update `appearance.spec.ts`'s tab-order assertion so the skip link stays first. | TODO | US-15.23 |
 | US-15.23#3 | Cover the scenarios in browser specs with axe. | TODO | US-15.23 |
@@ -5936,7 +5936,8 @@ Scheduled by [Decision 0022](docs/engineering/decisions/0022-studio-product-surf
 
 ### US-15.1: Sidebar groups with Tools under Build
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-15-1-sidebar-groups-tools-under/`
 
 As a workspace member
 I want the sidebar grouped into the daily work, Build and System, with Tools under Build
@@ -5976,9 +5977,9 @@ Dependencies:
 - US-11.11
 
 Tasks:
-- [ ] Regroup the sidebar's links in the web shell, keeping link names, roles and data hooks.
-- [ ] Update `tools.spec.ts` to Tools under Build after Workflows, and any `appearance.spec.ts` assertion of the old placement.
-- [ ] Cover the scenarios in browser specs with axe.
+- [x] Regroup the sidebar's links in the web shell, keeping link names, roles and data hooks.
+- [x] Update `tools.spec.ts` to Tools under Build after Workflows, and any `appearance.spec.ts` assertion of the old placement.
+- [x] Cover the scenarios in browser specs with axe.
 
 Open Questions:
 - None.
@@ -7112,7 +7113,7 @@ Open Questions:
 
 ### US-15.23: New run shortcut
 
-Status: BLOCKED
+Status: READY
 
 As a goal's owner
 I want a New run button with the ⇧⌘O hint in the shell
