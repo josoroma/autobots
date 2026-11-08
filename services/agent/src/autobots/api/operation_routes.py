@@ -14,17 +14,24 @@ from autobots.api.settings_routes import current_workspace, require_owner
 from autobots.application.operations import (
     DEFAULT_MIN_FREE_BYTES,
     Condition,
+    ProbeTimes,
     QueueCounts,
+    applied_migrations,
     backup_age_hours,
+    checkpoint_adapter,
     database_conditions,
     delayed_occurrences,
+    disk_bytes,
     disk_condition,
     is_ready,
-    openrouter_availability,
+    live_workers,
+    loopback_only,
     queue_condition,
     queue_counts,
     restore_history,
     storage_condition,
+    stored_bytes,
+    timed_catalog,
     worker_condition,
 )
 from autobots.application.provider_settings import ProviderSettings, read_route_qualifications
@@ -40,6 +47,7 @@ from autobots.contracts.operations import (
     LocalStatus,
     MemberReadiness,
     OperationCondition,
+    OperationValues,
     QueueStatus,
     RestoreRecord,
     RetentionApplied,
@@ -61,11 +69,26 @@ def _pool(request: Request) -> Any:
     return pool
 
 
+def probe_times(request: Request) -> ProbeTimes:
+    """This process's readiness probe window, made on first use."""
+    probes = getattr(request.app.state, "probe_times", None)
+    if probes is None:
+        probes = ProbeTimes()
+        request.app.state.probe_times = probes
+    return probes
+
+
+def _data_root() -> Path:
+    return Path(os.environ.get("AUTOBOTS_CONFIG_ROOT") or ".")
+
+
 async def _installation_conditions(request: Request) -> list[Condition]:
-    database, schema, hold, adapter = await database_conditions(request.app.state.pool)
+    database, schema, hold, adapter = await database_conditions(
+        request.app.state.pool, probe_times(request)
+    )
     storage = await storage_condition(getattr(request.app.state, "object_store", None))
     minimum = int(os.environ.get("AUTOBOTS_MIN_FREE_BYTES", DEFAULT_MIN_FREE_BYTES))
-    disk = disk_condition(Path(os.environ.get("AUTOBOTS_CONFIG_ROOT") or "."), minimum)
+    disk = disk_condition(_data_root(), minimum)
     return [database, schema, hold, adapter, storage, disk]
 
 
@@ -98,6 +121,9 @@ async def get_local_status(
     retention: RetentionSettings | None = None
     delayed: list[DelayedOccurrence] = []
     qualifications: list[RouteQualification] = []
+    workers: int | None = None
+    migrations: int | None = None
+    storage_used: int | None = None
     if database_up:
         workspace_id = await current_workspace(request, user_id, x_autobots_workspace)
         if await request.app.state.membership.role_in(user_id, workspace_id) != "owner":
@@ -117,6 +143,9 @@ async def get_local_status(
                 for row in await delayed_occurrences(connection, workspace_id)
             ]
             qualifications = await read_route_qualifications(connection)
+            workers = await live_workers(connection)
+            migrations = await applied_migrations(connection)
+            storage_used = await stored_bytes(connection, workspace_id)
         queue = QueueStatus(
             queued=counts.queued,
             claimed=counts.claimed,
@@ -124,6 +153,11 @@ async def get_local_status(
             oldest_queued_seconds=counts.oldest_queued_seconds,
         )
         retention = RetentionSettings(run_days=policy.run_days, receipt_days=policy.receipt_days)
+    openrouter, catalog_ms = await timed_catalog(
+        getattr(getattr(request.app.state, "provider_context", None), "fetch_catalog", None)
+    )
+    disk = disk_bytes(_data_root())
+    probes = probe_times(request)
     return LocalStatus(
         schema_version=1,
         ready=is_ready(conditions),
@@ -138,12 +172,24 @@ async def get_local_status(
         backup_age_hours=backup_age_hours(
             os.environ.get("AUTOBOTS_BACKUP_DIR", ""), datetime.now(UTC)
         ),
-        openrouter=await openrouter_availability(
-            getattr(getattr(request.app.state, "provider_context", None), "fetch_catalog", None)
-        ),  # type: ignore[arg-type]
+        openrouter=openrouter,  # type: ignore[arg-type]
         delayed_schedules=delayed,
         restores=_restore_records(os.environ.get("AUTOBOTS_BACKUP_DIR", "")),
         route_qualifications=qualifications,
+        values=OperationValues(
+            database_p95_ms=probes.p95(),
+            database_probes=probes.count(),
+            applied_migrations=migrations,
+            storage_bytes=storage_used,
+            disk_free_bytes=disk[0] if disk else None,
+            disk_total_bytes=disk[1] if disk else None,
+            leased_jobs=queue.claimed if queue else None,
+            queued_jobs=queue.queued if queue else None,
+            checkpoint_adapter=checkpoint_adapter(),
+            catalog_fetch_ms=catalog_ms,
+            loopback_only=loopback_only(),
+            workers=workers,
+        ),
     )
 
 
@@ -199,7 +245,9 @@ async def get_readiness(
     if not workspaces:
         raise ApiError(403, "forbidden", "This workspace is not available.")
     workspace_id = x_autobots_workspace or sorted(workspaces)[0]
-    database, schema, *_rest = await database_conditions(request.app.state.pool)
+    database, schema, *_rest = await database_conditions(
+        request.app.state.pool, probe_times(request)
+    )
     database_up = database.state == "ok" and schema.state == "ok"
     services = [ServiceReadiness(name="api", state="ready", code="api_ready")]
     if not database_up:

@@ -71,6 +71,30 @@ class RestoreRecord(BaseModel):
     checks_total: int | None = Field(ge=0)
 
 
+class OperationValues(BaseModel):
+    """Decision 0022 D5's measured values, and nothing more: numbers, a release name and a flag.
+    No path, address, identifier or secret. Each is null when it can't be measured."""
+
+    model_config = VIEW
+
+    # The p95 of the last readiness probes' database answer times, and how many probes it covers.
+    database_p95_ms: int | None = Field(ge=0)
+    database_probes: int = Field(ge=0)
+    applied_migrations: int | None = Field(ge=0)
+    # This workspace's published artifact bytes in Storage.
+    storage_bytes: int | None = Field(ge=0)
+    disk_free_bytes: int | None = Field(ge=0)
+    disk_total_bytes: int | None = Field(ge=0)
+    leased_jobs: int | None = Field(ge=0)
+    queued_jobs: int | None = Field(ge=0)
+    checkpoint_adapter: str = Field(pattern=r"^[a-z0-9-]+ [0-9A-Za-z.+-]+$")
+    # How long this page load's catalog check took to answer.
+    catalog_fetch_ms: int | None = Field(ge=0)
+    # Whether every TCP socket the API listens on is bound to loopback.
+    loopback_only: bool | None
+    workers: int | None = Field(ge=0)
+
+
 class LocalStatus(BaseModel):
     """`scope` is `installation` when the database is down, as no workspace can be verified."""
 
@@ -88,6 +112,7 @@ class LocalStatus(BaseModel):
     delayed_schedules: list[DelayedOccurrence]
     restores: list[RestoreRecord]
     route_qualifications: list[RouteQualification]
+    values: OperationValues
 
 
 class RetentionApplied(BaseModel):

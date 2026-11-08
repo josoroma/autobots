@@ -17,6 +17,7 @@ import {
   ListChecks,
   ListOrdered,
   type LucideIcon,
+  Network,
   Pause,
   Radio,
   RotateCw,
@@ -97,6 +98,56 @@ const FACT_ICON = "text-muted-foreground mt-0.5 size-4 shrink-0";
 const RETENTION_ROW =
   "text-muted-foreground flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 text-[13px]";
 
+const count = new Intl.NumberFormat("en");
+const gigabytes = new Intl.NumberFormat("en", { maximumFractionDigits: 1 });
+
+function gb(bytes: number): string {
+  return `${gigabytes.format(bytes / 1_000_000_000)} GB`;
+}
+
+const HOLD_TEXT: Record<string, string> = {
+  no_hold: "no hold",
+  restore_hold: "held after a restore",
+  hold_unknown: "hold unknown",
+};
+
+type Values = LocalStatus["values"];
+
+// PRD-Studio OP-02: a check's measured value, when one exists (Decision 0022 D5). Numbers only.
+function valueFor(name: string, values: Values): string | null {
+  switch (name) {
+    case "database":
+      return values.database_p95_ms === null
+        ? "No probe timed yet."
+        : `p95 ${values.database_p95_ms} ms over the last ${values.database_probes} probes.`;
+    case "schema":
+      return values.applied_migrations === null
+        ? null
+        : `${count.format(values.applied_migrations)} migrations applied.`;
+    case "adapter":
+      // The package and its release. Its name holds the database's, so the page names it plainly.
+      return `LangGraph checkpoint adapter ${values.checkpoint_adapter.split(" ").at(-1) ?? ""}.`;
+    case "storage":
+      return values.storage_bytes === null
+        ? null
+        : `${count.format(values.storage_bytes)} bytes in published artifacts.`;
+    case "disk":
+      return values.disk_free_bytes === null || values.disk_total_bytes === null
+        ? null
+        : `${gb(values.disk_free_bytes)} free of ${gb(values.disk_total_bytes)}.`;
+    case "queue":
+      return values.leased_jobs === null || values.queued_jobs === null
+        ? null
+        : `${values.leased_jobs} leased, ${values.queued_jobs} queued.`;
+    case "worker":
+      return values.workers === null
+        ? null
+        : `${values.workers} ${values.workers === 1 ? "worker" : "workers"}.`;
+    default:
+      return null;
+  }
+}
+
 function days(value: string): number | null {
   const parsed = Number.parseInt(value, 10);
   return Number.isNaN(parsed) ? null : parsed;
@@ -173,6 +224,9 @@ export function OperationsPanel() {
 
   if (failed !== null) return <p role="alert">{failed}</p>;
   if (status === null) return <p role="status">Loading…</p>;
+  const passing = status.conditions.filter((item) => item.state === "ok");
+  const hold = status.conditions.find((item) => item.name === "hold");
+  const workers = status.values.workers;
   return (
     <div className="space-y-5">
       <section
@@ -198,20 +252,44 @@ export function OperationsPanel() {
             <CircleAlert className="size-4" strokeWidth={2.25} />
           )}
         </span>
-        <p
-          role="status"
-          className="font-serif min-w-0 flex-1 text-[21px] leading-snug tracking-[-0.01em]"
-        >
-          {status.ready
-            ? "Ready. New work can start."
-            : "Not ready. New work is refused until this clears."}
-        </p>
+        <div className="min-w-0 flex-1 space-y-1">
+          <p
+            role="status"
+            className="font-serif text-[21px] leading-snug tracking-[-0.01em]"
+          >
+            {status.ready
+              ? "Ready. New work can start."
+              : "Not ready. New work is refused until this clears."}
+          </p>
+          {/* OP-01: the counts behind the sentence, from the checks shown below. */}
+          <p
+            data-field="verdict"
+            className="text-muted-foreground text-[13px] tabular-nums"
+          >
+            <span data-field="checks-passing">
+              {passing.length} of {status.conditions.length} checks pass
+            </span>
+            {" · "}
+            <span data-field="workers">
+              {workers === null
+                ? "workers unknown"
+                : `${workers} ${workers === 1 ? "worker" : "workers"}`}
+            </span>
+            {" · "}
+            <span data-field="hold">
+              {HOLD_TEXT[hold?.code ?? "hold_unknown"] ?? "hold unknown"}
+            </span>
+          </p>
+        </div>
         <Button variant="outline" size="sm" onClick={() => void load()}>
           <RotateCw aria-hidden="true" />
           Check again
         </Button>
       </section>
-      <ul className="bg-border border-border grid gap-px overflow-hidden rounded-xl border sm:grid-cols-2 lg:grid-cols-4">
+      <ul
+        data-field="checks"
+        className="bg-border border-border grid gap-px overflow-hidden rounded-xl border sm:grid-cols-2 lg:grid-cols-4"
+      >
         {status.conditions.map((condition) => {
           const Icon = ICONS[condition.name] ?? Activity;
           return (
@@ -238,6 +316,14 @@ export function OperationsPanel() {
               <p className="text-muted-foreground text-[12.5px] leading-relaxed">
                 {CONDITIONS[condition.code] ?? condition.code}
               </p>
+              {valueFor(condition.name, status.values) === null ? null : (
+                <p
+                  data-field={`value-${condition.name}`}
+                  className="text-foreground text-[12.5px] break-words tabular-nums"
+                >
+                  {valueFor(condition.name, status.values)}
+                </p>
+              )}
             </li>
           );
         })}
@@ -270,6 +356,23 @@ export function OperationsPanel() {
               : status.openrouter === "unavailable"
                 ? "OpenRouter can't be reached. Local work and this page keep working, and new model calls wait."
                 : "not checked, as provider settings aren't configured for this process."}
+            {status.values.catalog_fetch_ms === null ? null : (
+              <span data-field="catalog-time">
+                {" "}
+                The catalog answered in {status.values.catalog_fetch_ms} ms.
+              </span>
+            )}
+          </span>
+        </p>
+        <p data-field="loopback" className="flex items-start gap-3 px-4 py-3">
+          <Network aria-hidden="true" className={FACT_ICON} />
+          <span>
+            Network:{" "}
+            {status.values.loopback_only === true
+              ? "the API listens on this Mac's loopback only."
+              : status.values.loopback_only === false
+                ? "the API listens beyond loopback. Check how it was started."
+                : "not determined in this process."}
           </span>
         </p>
         {status.queue === null ? (

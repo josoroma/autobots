@@ -2162,6 +2162,9 @@
             ],
             "title": "Scope",
             "type": "string"
+          },
+          "values": {
+            "$ref": "#/components/schemas/OperationValues"
           }
         },
         "required": [
@@ -2176,7 +2179,8 @@
           "openrouter",
           "delayed_schedules",
           "restores",
-          "route_qualifications"
+          "route_qualifications",
+          "values"
         ],
         "title": "LocalStatus",
         "type": "object"
@@ -2770,6 +2774,157 @@
           "code"
         ],
         "title": "OperationCondition",
+        "type": "object"
+      },
+      "OperationValues": {
+        "additionalProperties": false,
+        "description": "Decision 0022 D5's measured values, and nothing more: numbers, a release name and a flag.\nNo path, address, identifier or secret. Each is null when it can't be measured.",
+        "properties": {
+          "applied_migrations": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied Migrations"
+          },
+          "catalog_fetch_ms": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Fetch Ms"
+          },
+          "checkpoint_adapter": {
+            "pattern": "^[a-z0-9-]+ [0-9A-Za-z.+-]+$",
+            "title": "Checkpoint Adapter",
+            "type": "string"
+          },
+          "database_p95_ms": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Database P95 Ms"
+          },
+          "database_probes": {
+            "minimum": 0.0,
+            "title": "Database Probes",
+            "type": "integer"
+          },
+          "disk_free_bytes": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disk Free Bytes"
+          },
+          "disk_total_bytes": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disk Total Bytes"
+          },
+          "leased_jobs": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leased Jobs"
+          },
+          "loopback_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loopback Only"
+          },
+          "queued_jobs": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queued Jobs"
+          },
+          "storage_bytes": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Bytes"
+          },
+          "workers": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workers"
+          }
+        },
+        "required": [
+          "database_p95_ms",
+          "database_probes",
+          "applied_migrations",
+          "storage_bytes",
+          "disk_free_bytes",
+          "disk_total_bytes",
+          "leased_jobs",
+          "queued_jobs",
+          "checkpoint_adapter",
+          "catalog_fetch_ms",
+          "loopback_only",
+          "workers"
+        ],
+        "title": "OperationValues",
         "type": "object"
       },
       "OutstandingSummary": {

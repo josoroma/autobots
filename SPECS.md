@@ -523,12 +523,12 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.17#2 | Add the current task, task times, per-task tools, tokens and the root tree's metered-call count to the run read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | DONE | US-15.17 |
 | US-15.17#3 | Build the side panel on Runs with Open run, Pause, Resume and Cancel through the existing commands and expected-version guard. | DONE | US-15.17 |
 | US-15.17#4 | Cover the scenarios, including the stale worker, on a disposable stack with a scripted model, and in browser specs with axe. | DONE | US-15.17 |
-| US-15.18 | Operations verdict and check detail | READY | EPIC-15 |
-| US-15.18#1 | Record each readiness probe's database answer time and keep the last 20 for a p95, with no tracing. | TODO | US-15.18 |
-| US-15.18#2 | Add the worker count, applied migrations, storage and disk bytes, leased and queued jobs, checkpoint adapter, catalog fetch time and loopback check to the status read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.18 |
-| US-15.18#3 | Render the verdict and the values on Operations. | TODO | US-15.18 |
-| US-15.18#4 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.18 |
-| US-15.19 | Operations jobs chart | BLOCKED | EPIC-15 |
+| US-15.18 | Operations verdict and check detail | DONE | EPIC-15 |
+| US-15.18#1 | Record each readiness probe's database answer time and keep the last 20 for a p95, with no tracing. | DONE | US-15.18 |
+| US-15.18#2 | Add the worker count, applied migrations, storage and disk bytes, leased and queued jobs, checkpoint adapter, catalog fetch time and loopback check to the status read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | DONE | US-15.18 |
+| US-15.18#3 | Render the verdict and the values on Operations. | DONE | US-15.18 |
+| US-15.18#4 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.18 |
+| US-15.19 | Operations jobs chart | READY | EPIC-15 |
 | US-15.19#1 | Add an hourly job count by outcome over 24 hours in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.19 |
 | US-15.19#2 | Render the chart with chart tokens and its text table on Operations. | TODO | US-15.19 |
 | US-15.19#3 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.19 |
@@ -6874,7 +6874,8 @@ Open Questions:
 
 ### US-15.18: Operations verdict and check detail
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-15-18-operations-verdict-check-detail/`
 
 As an operator
 I want a one-line verdict and each check's measured value on Operations
@@ -6920,17 +6921,17 @@ Dependencies:
 - US-11.8
 
 Tasks:
-- [ ] Record each readiness probe's database answer time and keep the last 20 for a p95, with no tracing.
-- [ ] Add the worker count, applied migrations, storage and disk bytes, leased and queued jobs, checkpoint adapter, catalog fetch time and loopback check to the status read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
-- [ ] Render the verdict and the values on Operations.
-- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+- [x] Record each readiness probe's database answer time and keep the last 20 for a p95, with no tracing.
+- [x] Add the worker count, applied migrations, storage and disk bytes, leased and queued jobs, checkpoint adapter, catalog fetch time and loopback check to the status read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
+- [x] Render the verdict and the values on Operations.
+- [x] Cover the scenarios on a disposable stack and in browser specs with axe.
 
 Open Questions:
 - None.
 
 ### US-15.19: Operations jobs chart
 
-Status: BLOCKED
+Status: READY
 
 As an operator
 I want jobs per hour over the last 24 hours, with a text table

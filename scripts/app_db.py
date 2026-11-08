@@ -488,6 +488,14 @@ def loop_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
     cases.denied('the runtime role cannot rewrite evidence', stack.runtime("delete from app_private.plan_evidence;\n"), 'permission denied')
     cases.denied('authenticated cannot read task times', stack.as_role('authenticated', USER_A, 'select * from app_private.plan_task_times'), 'permission denied')
     cases.denied('the runtime role cannot delete task times', stack.runtime("delete from app_private.plan_task_times;\n"), 'permission denied')
+    # US-15.18: the applied-migration count, the one number the runtime role may read of the history.
+    counted = stack.runtime('select app_private.applied_migration_count();\n')
+    expected_count = str(len([path for path in (Path(__file__).resolve().parents[1] / 'supabase/migrations').glob('*.sql') if MIGRATION_NAME.fullmatch(path.name)]))
+    cases.check('the runtime role reads the applied-migration count, and only that', expected_count, last_line(counted),
+                counted.returncode == 0 and last_line(counted) == expected_count)
+    cases.denied('authenticated cannot read the applied-migration count',
+                 stack.as_role('authenticated', USER_A, 'select app_private.applied_migration_count()'), 'permission denied')
+    cases.denied('the runtime role cannot read the migration history itself', stack.runtime('select name from autobots_disposable.migrations;\n'), 'permission denied')
 
 
 def recovery_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:

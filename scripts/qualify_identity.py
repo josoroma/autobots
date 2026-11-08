@@ -602,6 +602,27 @@ def qualify(root: Path) -> int:
         cases.check('the workflows workspace is arranged', 'exit 0', f'exit {arranged_flows.returncode}: {arranged_flows.stderr[-300:]}', arranged_flows.returncode == 0)
         artifacts = {**artifacts, 'AUTOBOTS_TEST_FLOWS_EMAIL': email_l, 'AUTOBOTS_TEST_FLOWS_PASSWORD': password_l,
                      'AUTOBOTS_TEST_FLOWS_BRIEF': brief, 'AUTOBOTS_TEST_FLOWS_PLAIN': plain, 'AUTOBOTS_TEST_FLOWS_RUNS': ','.join(flow_runs)}
+        # US-15.18, arranged: an owner whose workspace has one job that lost its worker, one leased and one
+        # queued, none of which any worker may take, and two published artifacts of 1,000 and 2,345 bytes
+        # beside a staged one. The spec adds two live worker heartbeats while it looks, and stops them.
+        email_n, password_n = 'ops-n@example.invalid', secrets.token_urlsafe(24)
+        operator = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_n, password_n)
+        ops_ws = operator['workspace_id']
+        ops_runs = [f'99999999-9999-4999-8999-00000000000{index}' for index in range(1, 4)]
+        ops_jobs = (('claimed', "now() - interval '1 minute'"), ('claimed', "now() + interval '1 day'"), ('queued', 'null'))
+        arranged_ops = stack.sql(
+            ''.join(f"insert into public.runs (id, workspace_id, status, goal_summary, limit_micro_usd, policy_snapshot) values "
+                    f"('{run}', '{ops_ws}', '{'running' if job == 'claimed' else 'queued'}', 'Operations job {index + 1}', 1000000, '{{}}');\n"
+                    f"insert into app_private.run_jobs (run_id, workspace_id, status, available_at, generation, lease_owner, lease_expires_at) values "
+                    f"('{run}', '{ops_ws}', '{job}', now() + interval '30 days', 1, {'null' if job == 'queued' else repr('arranged-ops')}, {expires});\n"
+                    for index, (run, (job, expires)) in enumerate(zip(ops_runs, ops_jobs)))
+            + "insert into public.artifacts (id, workspace_id, run_id, operation_id, name, object_path, media_type, size_bytes, sha256, status) values "
+            + ', '.join(f"(gen_random_uuid(), '{ops_ws}', '{ops_runs[0]}', 'ops-n-{index}', 'file-{index}.md', 'ops-n/{index}', 'text/markdown', {size}, "
+                        f"'{format(index, '064x')}', '{state}')" for index, (size, state) in enumerate(((1000, 'published'), (2345, 'published'), (999, 'staged'))))
+            + ';\n')
+        cases.check('the operations workspace is arranged', 'exit 0', f'exit {arranged_ops.returncode}: {arranged_ops.stderr[-300:]}', arranged_ops.returncode == 0)
+        artifacts = {**artifacts, 'AUTOBOTS_TEST_OPS_EMAIL': email_n, 'AUTOBOTS_TEST_OPS_PASSWORD': password_n,
+                     'AUTOBOTS_TEST_OPS_HELPER': str(root / 'tests/db/operations_live.py')}
         # Its own workspace with no key, as the one above asserts that it holds exactly one run.
         email_e, password_e = 'owner-e@example.invalid', secrets.token_urlsafe(24)
         owner_e = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_e, password_e)

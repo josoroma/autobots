@@ -69,7 +69,7 @@ def arranged(
     worker: Condition = WORKER_READY,
     auth: str = "configured",
 ) -> TestClient:
-    async def conditions(_pool: object) -> tuple[Condition, ...]:
+    async def conditions(_pool: object, _probes: object = None) -> tuple[Condition, ...]:
         return database
 
     async def worker_state(_connection: object, _counts: object) -> Condition:
