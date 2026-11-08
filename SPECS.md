@@ -447,11 +447,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.2#3 | Forward both through the BFF with the existing session and request checks. | DONE | US-15.2 |
 | US-15.2#4 | Add the shell's account footer and menu, and Settings → Account. | DONE | US-15.2 |
 | US-15.2#5 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.2 |
-| US-15.3 | Member-readable readiness, health line and service chips | READY | EPIC-15 |
-| US-15.3#1 | Add a member-readable readiness read in the application layer, holding only the API, worker, database and OpenRouter authentication states. | TODO | US-15.3 |
-| US-15.3#2 | Add its Pydantic contract and FastAPI route, regenerate OpenAPI and the TypeScript client, and forward it through the BFF. | TODO | US-15.3 |
-| US-15.3#3 | Add the shell's health line and Home's service chips. | TODO | US-15.3 |
-| US-15.3#4 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.3 |
+| US-15.3 | Member-readable readiness, health line and service chips | DONE | EPIC-15 |
+| US-15.3#1 | Add a member-readable readiness read in the application layer, holding only the API, worker, database and OpenRouter authentication states. | DONE | US-15.3 |
+| US-15.3#2 | Add its Pydantic contract and FastAPI route, regenerate OpenAPI and the TypeScript client, and forward it through the BFF. | DONE | US-15.3 |
+| US-15.3#3 | Add the shell's health line and Home's service chips. | DONE | US-15.3 |
+| US-15.3#4 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.3 |
 | US-15.4 | Run list projection, filters and spend | READY | EPIC-15 |
 | US-15.4#1 | Extend the run list projection in the application layer with labels, stop_reason, plan progress, frozen profiles and ledger spend. | TODO | US-15.4 |
 | US-15.4#2 | Add status-group, text and profile filters, per-tab counts, a keyset cursor and a total in the Pydantic contract and FastAPI route, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.4 |
@@ -6052,7 +6052,8 @@ Open Questions:
 
 ### US-15.3: Member-readable readiness, health line and service chips
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-15-3-member-readable-readiness-health/`
 
 As a workspace member
 I want to see whether the local services are ready without owner-only detail
@@ -6094,10 +6095,10 @@ Dependencies:
 - US-3.2
 
 Tasks:
-- [ ] Add a member-readable readiness read in the application layer, holding only the API, worker, database and OpenRouter authentication states.
-- [ ] Add its Pydantic contract and FastAPI route, regenerate OpenAPI and the TypeScript client, and forward it through the BFF.
-- [ ] Add the shell's health line and Home's service chips.
-- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+- [x] Add a member-readable readiness read in the application layer, holding only the API, worker, database and OpenRouter authentication states.
+- [x] Add its Pydantic contract and FastAPI route, regenerate OpenAPI and the TypeScript client, and forward it through the BFF.
+- [x] Add the shell's health line and Home's service chips.
+- [x] Cover the scenarios on a disposable stack and in browser specs with axe.
 
 Open Questions:
 - None.

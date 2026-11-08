@@ -1886,6 +1886,35 @@ export const schemas = {
     "title": "LocalStatus",
     "type": "object"
   },
+  "MemberReadiness": {
+    "additionalProperties": false,
+    "description": "Readiness any member may read. No counts, no paths, no identifiers, no secrets.",
+    "properties": {
+      "ready": {
+        "title": "Ready",
+        "type": "boolean"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "services": {
+        "items": {
+          "$ref": "#/components/schemas/ServiceReadiness"
+        },
+        "title": "Services",
+        "type": "array"
+      }
+    },
+    "required": [
+      "schema_version",
+      "ready",
+      "services"
+    ],
+    "title": "MemberReadiness",
+    "type": "object"
+  },
   "MemoryCreate": {
     "additionalProperties": false,
     "properties": {
@@ -4100,6 +4129,42 @@ export const schemas = {
     "title": "ServiceHealth",
     "type": "object"
   },
+  "ServiceReadiness": {
+    "additionalProperties": false,
+    "description": "One service's readiness for members (PRD-Studio SH-04): a state and a code, nothing more.",
+    "properties": {
+      "code": {
+        "title": "Code",
+        "type": "string"
+      },
+      "name": {
+        "enum": [
+          "api",
+          "worker",
+          "database",
+          "openrouter"
+        ],
+        "title": "Name",
+        "type": "string"
+      },
+      "state": {
+        "enum": [
+          "ready",
+          "not_ready",
+          "unknown"
+        ],
+        "title": "State",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name",
+      "state",
+      "code"
+    ],
+    "title": "ServiceReadiness",
+    "type": "object"
+  },
   "SessionCreate": {
     "additionalProperties": false,
     "properties": {
@@ -6150,6 +6215,16 @@ export function parseLocalStatus(value: unknown): LocalStatus {
   return parseWith(schemas, "LocalStatus", value) as LocalStatus;
 }
 
+export interface MemberReadiness {
+  ready: boolean;
+  schema_version: 1;
+  services: ServiceReadiness[];
+}
+
+export function parseMemberReadiness(value: unknown): MemberReadiness {
+  return parseWith(schemas, "MemberReadiness", value) as MemberReadiness;
+}
+
 export interface MemoryCreate {
   content: string;
   expert_id?: string | null;
@@ -6779,6 +6854,16 @@ export function parseServiceHealth(value: unknown): ServiceHealth {
   return parseWith(schemas, "ServiceHealth", value) as ServiceHealth;
 }
 
+export interface ServiceReadiness {
+  code: string;
+  name: "api" | "worker" | "database" | "openrouter";
+  state: "ready" | "not_ready" | "unknown";
+}
+
+export function parseServiceReadiness(value: unknown): ServiceReadiness {
+  return parseWith(schemas, "ServiceReadiness", value) as ServiceReadiness;
+}
+
 export interface SessionCreate {
   experts: SessionExpert[];
   kind: "direct" | "coordinator";
@@ -7230,6 +7315,10 @@ export async function getProfile(options: ClientOptions): Promise<ProfileView> {
 
 export async function updateProfile(options: ClientOptions, body: ProfileUpdate): Promise<ProfileView> {
   return parseProfileView(await requestJson(options, "PUT", `/v1/profile`, body));
+}
+
+export async function getReadiness(options: ClientOptions): Promise<MemberReadiness> {
+  return parseMemberReadiness(await requestJson(options, "GET", `/v1/readiness`));
 }
 
 export async function listRoutines(options: ClientOptions): Promise<RoutineList> {

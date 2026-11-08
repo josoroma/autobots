@@ -1885,6 +1885,35 @@
         "title": "LocalStatus",
         "type": "object"
       },
+      "MemberReadiness": {
+        "additionalProperties": false,
+        "description": "Readiness any member may read. No counts, no paths, no identifiers, no secrets.",
+        "properties": {
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceReadiness"
+            },
+            "title": "Services",
+            "type": "array"
+          }
+        },
+        "required": [
+          "schema_version",
+          "ready",
+          "services"
+        ],
+        "title": "MemberReadiness",
+        "type": "object"
+      },
       "MemoryCreate": {
         "additionalProperties": false,
         "properties": {
@@ -4097,6 +4126,42 @@
           "status"
         ],
         "title": "ServiceHealth",
+        "type": "object"
+      },
+      "ServiceReadiness": {
+        "additionalProperties": false,
+        "description": "One service's readiness for members (PRD-Studio SH-04): a state and a code, nothing more.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "name": {
+            "enum": [
+              "api",
+              "worker",
+              "database",
+              "openrouter"
+            ],
+            "title": "Name",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "ready",
+              "not_ready",
+              "unknown"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "state",
+          "code"
+        ],
+        "title": "ServiceReadiness",
         "type": "object"
       },
       "SessionCreate": {
@@ -7345,6 +7410,86 @@
           }
         },
         "summary": "Update Profile"
+      }
+    },
+    "/v1/readiness": {
+      "get": {
+        "description": "PRD-Studio SH-04 and HM-05: any member's view, with states and codes only.\n\nThe workspace is the chosen one, verified, or else the session's first, as the shell's footer\nshows it. A user with no workspace is refused.",
+        "operationId": "getReadiness",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberReadiness"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Readiness"
       }
     },
     "/v1/routines": {

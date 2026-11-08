@@ -2,7 +2,9 @@ import "server-only";
 
 import {
   getHealth,
+  getReadiness,
   getSession,
+  type MemberReadiness,
   type SessionSummary,
 } from "@autobots/api-client";
 
@@ -42,6 +44,18 @@ export async function fetchSession(): Promise<SessionSummary | null> {
     return token === null
       ? null
       : await getSession(client({ Authorization: `Bearer ${token}` }));
+  } catch {
+    return null;
+  }
+}
+
+/** PRD-Studio SH-04: readiness any member may read, or null when signed out or unreachable. */
+export async function fetchReadiness(): Promise<MemberReadiness | null> {
+  try {
+    const token = await accessToken();
+    return token === null
+      ? null
+      : await getReadiness(client({ Authorization: `Bearer ${token}` }));
   } catch {
     return null;
   }

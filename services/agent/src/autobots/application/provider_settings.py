@@ -130,6 +130,19 @@ class ProviderSettings:
     async def route_qualifications(self) -> list[RouteQualification]:
         return await read_route_qualifications(self._connection)
 
+    async def auth_status(self, workspace_id: UUID) -> str:
+        """The stored authentication state only, as `status` reports it, with no catalog fetch."""
+        _version, auth_status, _validated_at = await self._settings_row(workspace_id)
+        if await self._effective_environment(workspace_id) is not None:
+            return auth_status
+        try:
+            await self._store.load_active(workspace_id)
+        except CredentialMissing:
+            return "missing"
+        except (CredentialStorageUnavailable, CredentialDecryptionError):
+            return "unavailable"
+        return auth_status
+
     async def status(self, workspace_id: UUID) -> ProviderStatus:
         version, auth_status, validated_at = await self._settings_row(workspace_id)
         source = "none"

@@ -99,3 +99,26 @@ class RetentionApplied(BaseModel):
     keys_expired: int = Field(ge=0)
     objects_removed: int = Field(ge=0)
     objects_pending: int = Field(ge=0)
+
+
+ServiceName = Literal["api", "worker", "database", "openrouter"]
+
+
+class ServiceReadiness(BaseModel):
+    """One service's readiness for members (PRD-Studio SH-04): a state and a code, nothing more."""
+
+    model_config = VIEW
+
+    name: ServiceName
+    state: Literal["ready", "not_ready", "unknown"]
+    code: str
+
+
+class MemberReadiness(BaseModel):
+    """Readiness any member may read. No counts, no paths, no identifiers, no secrets."""
+
+    model_config = VIEW
+
+    schema_version: Literal[1]
+    ready: bool
+    services: list[ServiceReadiness]

@@ -21,7 +21,7 @@ export async function AccountFooter() {
   const session = await fetchSession();
   if (session === null) {
     return (
-      <div className="border-sidebar-border mt-auto border-t px-2 pt-3">
+      <div className="border-sidebar-border border-t px-2 pt-3">
         <Link
           href="/sign-in"
           className="text-sidebar-foreground text-sm font-medium underline"
@@ -35,7 +35,7 @@ export async function AccountFooter() {
   return (
     <details
       data-account
-      className="border-sidebar-border group relative mt-auto border-t pt-3"
+      className="border-sidebar-border group relative border-t pt-3"
     >
       <summary className="hover:bg-sidebar-accent flex cursor-pointer list-none items-center gap-2.5 rounded-lg px-2 py-1.5 [&::-webkit-details-marker]:hidden">
         <span

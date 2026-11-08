@@ -3,12 +3,17 @@ import Link from "next/link";
 
 import { AboutServices } from "@/components/about-services";
 import { GoalComposer } from "@/components/goal-composer";
+import { ServiceChips } from "@/components/readiness";
 import { ServiceStatusBadge } from "@/components/service-status-badge";
 import { SignOutButton } from "@/components/sign-out-button";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { SectionLabel } from "@/components/ui/page-header";
-import { fetchServiceStatus, fetchSession } from "@/lib/service-status";
+import {
+  fetchReadiness,
+  fetchServiceStatus,
+  fetchSession,
+} from "@/lib/service-status";
 import { cn } from "@/lib/utils";
 
 // The status is read per request, on the server, so it is never baked into a build.
@@ -22,9 +27,10 @@ const LOWER_ITEM = "border-t py-3 text-sm";
 const LOWER_ACTION = "mt-auto pt-2";
 
 export default async function HomePage() {
-  const [status, session] = await Promise.all([
+  const [status, session, readiness] = await Promise.all([
     fetchServiceStatus(),
     fetchSession(),
+    fetchReadiness(),
   ]);
   return (
     <div className="mx-auto w-full max-w-[780px] md:pt-10">
@@ -96,6 +102,7 @@ export default async function HomePage() {
           </p>
           <div className={LOWER_ITEM}>
             <ServiceStatusBadge status={status} />
+            {readiness === null ? null : <ServiceChips readiness={readiness} />}
           </div>
           <div className={LOWER_ACTION}>
             <AboutServices />

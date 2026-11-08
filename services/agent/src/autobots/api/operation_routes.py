@@ -14,6 +14,7 @@ from autobots.api.settings_routes import current_workspace, require_owner
 from autobots.application.operations import (
     DEFAULT_MIN_FREE_BYTES,
     Condition,
+    QueueCounts,
     backup_age_hours,
     database_conditions,
     delayed_occurrences,
@@ -26,7 +27,7 @@ from autobots.application.operations import (
     storage_condition,
     worker_condition,
 )
-from autobots.application.provider_settings import read_route_qualifications
+from autobots.application.provider_settings import ProviderSettings, read_route_qualifications
 from autobots.application.retention import (
     RetentionPolicy,
     apply_retention,
@@ -37,11 +38,13 @@ from autobots.application.run_projection import public_text
 from autobots.contracts.operations import (
     DelayedOccurrence,
     LocalStatus,
+    MemberReadiness,
     OperationCondition,
     QueueStatus,
     RestoreRecord,
     RetentionApplied,
     RetentionSettings,
+    ServiceReadiness,
 )
 from autobots.contracts.settings import RouteQualification
 from autobots.operations.logs import remote_tracing_disabled
@@ -176,4 +179,59 @@ async def post_retention_apply(request: Request, workspace_id: Owner) -> Retenti
         keys_expired=report.keys_expired,
         objects_removed=report.objects_removed,
         objects_pending=report.objects_pending,
+    )
+
+
+@router.get("/readiness", operation_id="getReadiness", response_model=MemberReadiness)
+async def get_readiness(
+    request: Request,
+    user_id: Annotated[UUID, Depends(current_user)],
+    x_autobots_workspace: Annotated[UUID | None, Header()] = None,
+) -> MemberReadiness:
+    """PRD-Studio SH-04 and HM-05: any member's view, with states and codes only.
+
+    The workspace is the chosen one, verified, or else the session's first, as the shell's footer
+    shows it. A user with no workspace is refused.
+    """
+    workspaces = await request.app.state.membership.workspaces_for(user_id)
+    if x_autobots_workspace is not None and x_autobots_workspace not in workspaces:
+        raise ApiError(403, "forbidden", "This workspace is not available.")
+    if not workspaces:
+        raise ApiError(403, "forbidden", "This workspace is not available.")
+    workspace_id = x_autobots_workspace or sorted(workspaces)[0]
+    database, schema, *_rest = await database_conditions(request.app.state.pool)
+    database_up = database.state == "ok" and schema.state == "ok"
+    services = [ServiceReadiness(name="api", state="ready", code="api_ready")]
+    if not database_up:
+        services.append(ServiceReadiness(name="worker", state="unknown", code="database_unready"))
+        services.append(ServiceReadiness(name="database", state="not_ready", code=database.code))
+        services.append(
+            ServiceReadiness(name="openrouter", state="unknown", code="database_unready")
+        )
+        return MemberReadiness(schema_version=1, ready=False, services=services)
+    async with _pool(request).connection() as connection:
+        worker = await worker_condition(connection, QueueCounts(0, 0, 0, 0))
+        context = request.app.state.provider_context
+        auth = (
+            await ProviderSettings(connection, context).auth_status(workspace_id)
+            if context is not None
+            else "unavailable"
+        )
+    services.append(
+        ServiceReadiness(
+            name="worker", state="ready" if worker.state == "ok" else "not_ready", code=worker.code
+        )
+    )
+    services.append(ServiceReadiness(name="database", state="ready", code="database_ready"))
+    services.append(
+        ServiceReadiness(
+            name="openrouter",
+            state="ready" if auth == "configured" else "not_ready",
+            code=f"auth_{auth}",
+        )
+    )
+    return MemberReadiness(
+        schema_version=1,
+        ready=all(item.state == "ready" for item in services),
+        services=services,
     )

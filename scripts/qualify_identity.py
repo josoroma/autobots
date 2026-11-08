@@ -301,6 +301,21 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
             qualification_codes.append(ran.returncode)
             if ran.returncode:
                 print(ran.stdout[-1500:], file=sys.stderr)
+        # US-15.3: readiness as a member. First with no worker heartbeat, then with an arranged one
+        # dated ahead, so it stays fresh for the whole run, and removed afterwards.
+        for index, title in enumerate(("names the service that isn't ready", 'all local services ready'), start=1):
+            report_path = root / f'.checks/identity/playwright-readiness-{index}.json'
+            report_path.unlink(missing_ok=True)
+            qualification_reports.append(report_path)
+            if index == 2:
+                stack.runtime("insert into app_private.worker_heartbeats (worker_id, state, claims_inference, beat_at) "
+                              "values ('arranged-readiness', 'running', true, clock_timestamp() + interval '15 minutes');\n")
+            ran = subprocess.run([str(playwright), 'test', 'browser/readiness', '-g', title, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=180, check=False,
+                                 env={**browser_env, 'AUTOBOTS_WEB_REPORT': str(report_path)})
+            qualification_codes.append(ran.returncode)
+            if ran.returncode:
+                print(ran.stdout[-1500:], file=sys.stderr)
+        stack.runtime("delete from app_private.worker_heartbeats where worker_id = 'arranged-readiness';\n")
         # The slice runs last, with a worker, so nothing above sees its jobs claimed.
         stack.runtime("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done';\n")
         # Arranged: the settings suite changed the workspace default, and the fixture worker's route is the original.
@@ -403,6 +418,12 @@ def qualify(root: Path) -> int:
         no_key_run = '33333333-3333-4333-8333-333333333333'
         stack.runtime(f"insert into public.runs (id, workspace_id, limit_micro_usd, goal_summary) values ('{no_key_run}', '{owner_d['workspace_id']}', 1, 'Arranged in a workspace with no key');\n")
         artifacts = {**artifacts, 'AUTOBOTS_TEST_NO_KEY_RUN': no_key_run, 'AUTOBOTS_TEST_NO_KEY_EMAIL': email_d, 'AUTOBOTS_TEST_NO_KEY_PASSWORD': password_d}
+        # US-15.3, arranged: a member of workspace A only, who isn't its owner.
+        email_f, password_f = 'reader-f@example.invalid', secrets.token_urlsafe(24)
+        reader = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_f, password_f)
+        stack.runtime(f"insert into public.workspace_members (workspace_id, user_id, role) values ('{owner_a['workspace_id']}', '{reader['user_id']}', 'member');\n"
+                      f"delete from public.workspace_members where workspace_id = '{reader['workspace_id']}' and user_id = '{reader['user_id']}';\n")
+        artifacts = {**artifacts, 'AUTOBOTS_TEST_READER_EMAIL': email_f, 'AUTOBOTS_TEST_READER_PASSWORD': password_f}
         # Its own workspace with no key, as the one above asserts that it holds exactly one run.
         email_e, password_e = 'owner-e@example.invalid', secrets.token_urlsafe(24)
         owner_e = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_e, password_e)
