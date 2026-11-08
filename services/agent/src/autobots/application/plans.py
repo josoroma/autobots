@@ -246,6 +246,15 @@ def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
                     arguments.summary,
                 ),
             )
+            # RN-05: its finish, in database time. The first one stands, as a repeat changes
+            # nothing. A task finished with no use that served it starts and finishes together.
+            await context.connection.execute(
+                "insert into app_private.plan_task_times "
+                "(run_id, task_id, started_at, finished_at) values (%s, %s, now(), now()) "
+                "on conflict (run_id, task_id) do update "
+                "set finished_at = coalesce(plan_task_times.finished_at, excluded.finished_at)",
+                (run_id, arguments.task_id),
+            )
         return TaskCompleted(
             task_id=arguments.task_id,
             remaining=sorted(set(tasks) - done - {arguments.task_id}),

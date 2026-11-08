@@ -32,13 +32,23 @@ class CriterionView(BaseModel):
 
 
 class TaskView(BaseModel):
+    """One plan task. `marker` is RN-04's done, current or to-do: the current task is the earliest
+    open task that has started (RN-05). Times are database times the worker recorded on its fenced
+    path. `wall_seconds` runs from start to finish, or to now for an open task that has started.
+    `tools` are the tools uses served it, in first-use order, planning tools excepted."""
+
     model_config = VIEW
 
     id: str
     title: str
     status: Literal["open", "complete"]
+    marker: Literal["done", "current", "to_do"]
     criteria: list[str]
     evidence_summary: str | None
+    started_at: UtcTimestamp | None
+    finished_at: UtcTimestamp | None
+    wall_seconds: int | None
+    tools: list[str]
 
 
 class PlanSummary(BaseModel):
@@ -47,6 +57,7 @@ class PlanSummary(BaseModel):
     version: int
     revision_reason: str | None
     tasks: list[TaskView]
+    current_task_id: str | None
 
 
 class UsageSummary(BaseModel):
@@ -154,6 +165,9 @@ class RunWorkspace(BaseModel):
     budgets: RunBudgets
     # A goal run of its own that has finished. A child or a workflow's run isn't one.
     can_continue: bool
+    # Decision 0017 Q4: metered tool calls made in this run's root tree, of what one tree may make.
+    metered_tool_calls: int
+    metered_tool_call_limit: int
 
 
 RunListGroup = Literal["all", "active", "needs_you", "finished"]

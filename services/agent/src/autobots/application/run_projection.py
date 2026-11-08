@@ -2,8 +2,8 @@
 
 import base64
 import re
-from datetime import datetime
-from typing import Any
+from datetime import UTC, datetime
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -13,6 +13,7 @@ from autobots.application.plans import latest_plan, load_goal
 from autobots.application.reconciliation import unknown_operations
 from autobots.application.recovery import outstanding
 from autobots.application.runs import RunNotFound
+from autobots.application.tool_uses import METERED_TOOL_CALLS
 from autobots.contracts.adapters import run_from_row, run_summary_from_domain
 from autobots.contracts.artifacts import ArtifactSummary
 from autobots.contracts.run_workspace import (
@@ -149,6 +150,10 @@ async def read_events(
     )
 
 
+def _utc(value: Any) -> datetime | None:
+    return value.astimezone(UTC) if value is not None else None
+
+
 async def _plan_summary(connection: Any, run_id: UUID) -> PlanSummary | None:
     plan = await latest_plan(connection, run_id)
     if plan is None:
@@ -163,16 +168,54 @@ async def _plan_summary(connection: Any, run_id: UUID) -> PlanSummary | None:
         "select task_id, summary from app_private.plan_evidence where run_id = %s", (run_id,)
     )
     evidence = dict(await cursor.fetchall())
+    # RN-05's times, with the wall time measured by the database's own clock.
+    cursor = await connection.execute(
+        "select task_id, started_at, finished_at, "
+        "round(extract(epoch from coalesce(finished_at, now()) - started_at))::bigint "
+        "from app_private.plan_task_times where run_id = %s",
+        (run_id,),
+    )
+    times = {row[0]: row[1:] for row in await cursor.fetchall()}
+    cursor = await connection.execute(
+        "select task_id, tool_id from app_private.tool_uses where run_id = %s "
+        "and task_id is not null and tool_id <> all(%s) order by id",
+        (run_id, sorted(PLAN_TOOLS)),
+    )
+    used: dict[str, list[str]] = {}
+    for task_id, tool_id in await cursor.fetchall():
+        if tool_id not in used.setdefault(task_id, []):
+            used[task_id].append(tool_id)
+    order = {task.id: index for index, task in enumerate(tasks)}
+    started_open = [task.id for task in tasks if task.id not in evidence and task.id in times]
+    # The earliest open task that has started, by start time and then plan order.
+    current = min(started_open, key=lambda name: (times[name][0], order[name]), default=None)
+
+    def marker(name: str) -> Literal["done", "current", "to_do"]:
+        if name in evidence:
+            return "done"
+        return "current" if name == current else "to_do"
+
+    def wall(name: str) -> int | None:
+        if name not in times or (name not in evidence and name != current):
+            return None
+        return max(int(times[name][2]), 0)
+
     return PlanSummary(
         version=version,
         revision_reason=public_text(reason) if reason else None,
+        current_task_id=current,
         tasks=[
             TaskView(
                 id=task.id,
                 title=public_text(task.title),
                 status="complete" if task.id in evidence else "open",
+                marker=marker(task.id),
                 criteria=task.criteria,
                 evidence_summary=public_text(evidence[task.id]) if task.id in evidence else None,
+                started_at=_utc(times[task.id][0]) if task.id in times else None,
+                finished_at=_utc(times[task.id][1]) if task.id in times else None,
+                wall_seconds=wall(task.id),
+                tools=used.get(task.id, []),
             )
             for task in tasks
         ],
@@ -249,6 +292,16 @@ async def _role_map(connection: Any, run_id: UUID) -> list[FrozenBinding]:
     ]
 
 
+async def _metered_calls(connection: Any, run_id: UUID) -> int:
+    """Counted over the run's whole root tree, as admission counts them (Decision 0017 Q4)."""
+    cursor = await connection.execute(
+        "select count(*) from app_private.tool_uses u where u.metered and u.root_run_id = "
+        "(select coalesce(r.root_run_id, r.id) from public.runs r where r.id = %s)",
+        (run_id,),
+    )
+    return int((await cursor.fetchone())[0])
+
+
 async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> RunWorkspace:
     row = await _require_run(connection, workspace_id, run_id)
     summary = _summary(row)
@@ -319,6 +372,8 @@ async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> R
         ),
         cursor=row[-1],
         role_map=await _role_map(connection, run_id),
+        metered_tool_calls=await _metered_calls(connection, run_id),
+        metered_tool_call_limit=METERED_TOOL_CALLS,
         budgets=RunBudgets(
             context_tokens=CONTEXT_TOKENS, max_output_tokens_per_call=MAX_OUTPUT_TOKENS
         ),

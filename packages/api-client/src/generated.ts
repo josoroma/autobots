@@ -2822,6 +2822,17 @@ export const schemas = {
   "PlanSummary": {
     "additionalProperties": false,
     "properties": {
+      "current_task_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Current Task Id"
+      },
       "revision_reason": {
         "anyOf": [
           {
@@ -2848,7 +2859,8 @@ export const schemas = {
     "required": [
       "version",
       "revision_reason",
-      "tasks"
+      "tasks",
+      "current_task_id"
     ],
     "title": "PlanSummary",
     "type": "object"
@@ -4597,6 +4609,14 @@ export const schemas = {
           }
         ]
       },
+      "metered_tool_call_limit": {
+        "title": "Metered Tool Call Limit",
+        "type": "integer"
+      },
+      "metered_tool_calls": {
+        "title": "Metered Tool Calls",
+        "type": "integer"
+      },
       "objective": {
         "anyOf": [
           {
@@ -4685,7 +4705,9 @@ export const schemas = {
       "cursor",
       "role_map",
       "budgets",
-      "can_continue"
+      "can_continue",
+      "metered_tool_calls",
+      "metered_tool_call_limit"
     ],
     "title": "RunWorkspace",
     "type": "object"
@@ -4972,6 +4994,7 @@ export const schemas = {
   },
   "TaskView": {
     "additionalProperties": false,
+    "description": "One plan task. `marker` is RN-04's done, current or to-do: the current task is the earliest\nopen task that has started (RN-05). Times are database times the worker recorded on its fenced\npath. `wall_seconds` runs from start to finish, or to now for an open task that has started.\n`tools` are the tools uses served it, in first-use order, planning tools excepted.",
     "properties": {
       "criteria": {
         "items": {
@@ -4991,9 +5014,44 @@ export const schemas = {
         ],
         "title": "Evidence Summary"
       },
+      "finished_at": {
+        "anyOf": [
+          {
+            "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Finished At"
+      },
       "id": {
         "title": "Id",
         "type": "string"
+      },
+      "marker": {
+        "enum": [
+          "done",
+          "current",
+          "to_do"
+        ],
+        "title": "Marker",
+        "type": "string"
+      },
+      "started_at": {
+        "anyOf": [
+          {
+            "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Started At"
       },
       "status": {
         "enum": [
@@ -5006,14 +5064,37 @@ export const schemas = {
       "title": {
         "title": "Title",
         "type": "string"
+      },
+      "tools": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Tools",
+        "type": "array"
+      },
+      "wall_seconds": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Wall Seconds"
       }
     },
     "required": [
       "id",
       "title",
       "status",
+      "marker",
       "criteria",
-      "evidence_summary"
+      "evidence_summary",
+      "started_at",
+      "finished_at",
+      "wall_seconds",
+      "tools"
     ],
     "title": "TaskView",
     "type": "object"
@@ -7489,6 +7570,7 @@ export function parsePendingApprovals(value: unknown): PendingApprovals {
 }
 
 export interface PlanSummary {
+  current_task_id: string | null;
   revision_reason: string | null;
   tasks: TaskView[];
   version: number;
@@ -7979,6 +8061,8 @@ export interface RunWorkspace {
   criteria: CriterionView[];
   cursor: number;
   expert: ExpertBinding | null;
+  metered_tool_call_limit: number;
+  metered_tool_calls: number;
   objective: string | null;
   outstanding: OutstandingSummary;
   plan: PlanSummary | null;
@@ -8082,9 +8166,14 @@ export function parseSessionWorkspace(value: unknown): SessionWorkspace {
 export interface TaskView {
   criteria: string[];
   evidence_summary: string | null;
+  finished_at: string | null;
   id: string;
+  marker: "done" | "current" | "to_do";
+  started_at: string | null;
   status: "open" | "complete";
   title: string;
+  tools: string[];
+  wall_seconds: number | null;
 }
 
 export function parseTaskView(value: unknown): TaskView {

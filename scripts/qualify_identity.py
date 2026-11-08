@@ -167,8 +167,10 @@ def artifact_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port
                                          ('review_check.py', [workspace_a], 'review'),
                                          ('improvement_check.py', [workspace_a, workspace_b], 'improvement'),
                                          ('provider_key_check.py', [workspace_a], 'provider key'),
-                                         # Last, so no later check's cleanup ends the run it leaves claimed for the browser.
-                                         ('tool_use_view_check.py', [workspace_a], 'tool-use view')):
+                                         # Last, so no later check's cleanup ends the runs they leave claimed for the browser.
+                                         # The task timing check claims only its own runs and cleans up nothing.
+                                         ('tool_use_view_check.py', [workspace_a], 'tool-use view'),
+                                         ('task_timing_check.py', [workspace_a], 'task timing')):
         checked = subprocess.run([str(root / PYTHON), str(root / 'tests/db' / check_file), *arguments],
                                  env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'AUTOBOTS_STORAGE_BASE': base, 'AUTOBOTS_STORAGE_SERVICE': stack.values['SERVICE_ROLE_KEY'],
                                       'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
@@ -270,7 +272,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
                                      'AUTOBOTS_TEST_SERVICE_KEY': stack.values['SERVICE_ROLE_KEY'], 'AUTOBOTS_WEB_REPORT': str(report),
                                      'AUTOBOTS_WEB_OUTPUT': str(root / '.checks/identity/results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots),
                                      'AUTOBOTS_TEST_VISUAL_DIR': str(root / '.checks/identity/visual')}
-        result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'browser/operations', 'approvals', 'effects', 'experts', 'models', 'composer', 'home', 'workflow-list', 'identity', 'settings', 'runs', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
+        result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'browser/operations', 'approvals', 'effects', 'experts', 'models', 'composer', 'home', 'workflow-list', 'identity', 'settings', 'runs', 'run-panel', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
                                 env=browser_env)
         # A real restart, then Settings reads the stored records. Then one is removed, under the same key.
         stop(processes[0])

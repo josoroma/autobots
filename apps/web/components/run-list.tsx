@@ -2,7 +2,10 @@
 
 import { parseRunList, type RunList as Runs } from "@autobots/api-client";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+
+import { RunPanel } from "@/components/run-panel";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -120,6 +123,28 @@ function Spend({ run }: { run: Row }) {
   );
 }
 
+// The state's dot and words, for a row and for the side panel.
+export function StateLine({ status, text }: { status: string; text?: string }) {
+  return (
+    <span
+      data-field="state"
+      className={cn(
+        "inline-flex items-center gap-2 text-[13px]",
+        STATE_TEXT[tone(status)],
+      )}
+    >
+      <span
+        aria-hidden="true"
+        className={cn(
+          "size-[7px] shrink-0 rounded-full",
+          STATE_DOT[tone(status)],
+        )}
+      />
+      {text ?? STATUS_TEXT[status] ?? status}
+    </span>
+  );
+}
+
 function stateLine(run: Row): string {
   const words = STATUS_TEXT[run.status] ?? run.status;
   if (run.status === "failed" && run.stop_reason)
@@ -139,6 +164,10 @@ export function RunList() {
   const [list, setList] = useState<Runs | null>(null);
   const [failed, setFailed] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshed, setRefreshed] = useState(0);
+  // RN-04: the selected run's panel, in the address so a reload keeps it open.
+  const selected = useSearchParams().get("run");
+  const router = useRouter();
 
   const url = useCallback(
     (cursor: string | null) => {
@@ -176,7 +205,7 @@ export function RunList() {
       active = false;
       clearTimeout(timer);
     };
-  }, [url]);
+  }, [url, refreshed]);
 
   async function loadMore(): Promise<void> {
     if (list?.next_cursor == null) return;
@@ -325,24 +354,28 @@ export function RunList() {
                   >
                     {run.label ?? "Goal"}
                     {run.parent_run_id === null ? null : " · A child run"}
+                    {" · "}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        router.replace(
+                          `/runs?run=${encodeURIComponent(run.id)}`,
+                          { scroll: false },
+                        )
+                      }
+                      aria-expanded={run.id === selected}
+                      aria-controls={
+                        run.id === selected ? "run-panel" : undefined
+                      }
+                      aria-label={`Details for ${run.goal_summary === "" ? "Untitled run" : run.goal_summary}`}
+                      data-field="details"
+                      className="text-foreground underline underline-offset-4"
+                    >
+                      Details
+                    </button>
                   </span>
                 </div>
-                <span
-                  data-field="state"
-                  className={cn(
-                    "inline-flex items-center gap-2 text-[13px]",
-                    STATE_TEXT[tone(run.status)],
-                  )}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      "size-[7px] shrink-0 rounded-full",
-                      STATE_DOT[tone(run.status)],
-                    )}
-                  />
-                  {stateLine(run)}
-                </span>
+                <StateLine status={run.status} text={stateLine(run)} />
                 <span
                   data-field="models"
                   className="text-muted-foreground font-mono text-xs"
@@ -379,6 +412,13 @@ export function RunList() {
             ) : null}
           </div>
         </div>
+      )}
+      {selected === null ? null : (
+        <RunPanel
+          key={selected}
+          runId={selected}
+          onChanged={() => setRefreshed((value) => value + 1)}
+        />
       )}
     </div>
   );

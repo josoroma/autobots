@@ -136,6 +136,14 @@ async def begin_use(
                 ),
             )
             use_id: int = (await cursor.fetchone())[0]
+            if task_id is not None:
+                # RN-05: a task starts with the first use that serves it, in database time, fenced
+                # by this transaction's lease. A later use keeps the first start.
+                await connection.execute(
+                    "insert into app_private.plan_task_times (run_id, task_id) values (%s, %s) "
+                    "on conflict (run_id, task_id) do nothing",
+                    (scope.run_id, task_id),
+                )
             await append_event(
                 connection,
                 scope.run_id,

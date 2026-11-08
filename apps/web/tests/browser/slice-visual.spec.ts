@@ -85,7 +85,9 @@ interface Motion {
   moving_by_default: number;
 }
 
-const KEYBOARD_CAP = 200;
+// A bound on the walk, not a limit on a page: each Runs row has its goal link and a Details button
+// (US-15.17), so a full page of runs needs more than 200 stops. Every control must still be reached.
+const KEYBOARD_CAP = 400;
 
 // Everything in the page's own colors, read back through a canvas so any CSS color becomes sRGB.
 const MEASURE = `

@@ -518,11 +518,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.16 | Live GitHub qualification on the configured repository | DONE | EPIC-15 |
 | US-15.16#1 | Extend the GitHub qualification runner, in no verification profile, to the read tools, labels and pull requests, refusing to start without the token and the recorded authorization. | DONE | US-15.16 |
 | US-15.16#2 | Run it once and record redacted evidence: the outputs' shapes, the markers, the retry readback and the absence of the token. | DONE | US-15.16 |
-| US-15.17 | Run side panel and plan task timing | READY | EPIC-15 |
-| US-15.17#1 | Add plan task start and finish times by migration, written only on the worker's fenced path in database time. | TODO | US-15.17 |
-| US-15.17#2 | Add the current task, task times, per-task tools, tokens and the root tree's metered-call count to the run read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.17 |
-| US-15.17#3 | Build the side panel on Runs with Open run, Pause, Resume and Cancel through the existing commands and expected-version guard. | TODO | US-15.17 |
-| US-15.17#4 | Cover the scenarios, including the stale worker, on a disposable stack with a scripted model, and in browser specs with axe. | TODO | US-15.17 |
+| US-15.17 | Run side panel and plan task timing | DONE | EPIC-15 |
+| US-15.17#1 | Add plan task start and finish times by migration, written only on the worker's fenced path in database time. | DONE | US-15.17 |
+| US-15.17#2 | Add the current task, task times, per-task tools, tokens and the root tree's metered-call count to the run read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | DONE | US-15.17 |
+| US-15.17#3 | Build the side panel on Runs with Open run, Pause, Resume and Cancel through the existing commands and expected-version guard. | DONE | US-15.17 |
+| US-15.17#4 | Cover the scenarios, including the stale worker, on a disposable stack with a scripted model, and in browser specs with axe. | DONE | US-15.17 |
 | US-15.18 | Operations verdict and check detail | READY | EPIC-15 |
 | US-15.18#1 | Record each readiness probe's database answer time and keep the last 20 for a p95, with no tracing. | TODO | US-15.18 |
 | US-15.18#2 | Add the worker count, applied migrations, storage and disk bytes, leased and queued jobs, checkpoint adapter, catalog fetch time and loopback check to the status read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.18 |
@@ -6823,7 +6823,8 @@ Open Questions:
 
 ### US-15.17: Run side panel and plan task timing
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-15-17-run-side-panel-plan/`
 
 As a run's owner
 I want a side panel on the run list with the plan's progress, each task's tools and wall time, spend and controls
@@ -6863,10 +6864,10 @@ Dependencies:
 - US-14.3
 
 Tasks:
-- [ ] Add plan task start and finish times by migration, written only on the worker's fenced path in database time.
-- [ ] Add the current task, task times, per-task tools, tokens and the root tree's metered-call count to the run read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
-- [ ] Build the side panel on Runs with Open run, Pause, Resume and Cancel through the existing commands and expected-version guard.
-- [ ] Cover the scenarios, including the stale worker, on a disposable stack with a scripted model, and in browser specs with axe.
+- [x] Add plan task start and finish times by migration, written only on the worker's fenced path in database time.
+- [x] Add the current task, task times, per-task tools, tokens and the root tree's metered-call count to the run read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
+- [x] Build the side panel on Runs with Open run, Pause, Resume and Cancel through the existing commands and expected-version guard.
+- [x] Cover the scenarios, including the stale worker, on a disposable stack with a scripted model, and in browser specs with axe.
 
 Open Questions:
 - None.

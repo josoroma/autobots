@@ -486,6 +486,8 @@ def loop_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
     cases.denied('authenticated cannot read plans', stack.as_role('authenticated', USER_A, 'select * from app_private.plan_versions'), 'permission denied')
     cases.denied('the runtime role cannot rewrite a saved plan', stack.runtime("update app_private.plan_versions set revision_reason = 'x';\n"), 'permission denied')
     cases.denied('the runtime role cannot rewrite evidence', stack.runtime("delete from app_private.plan_evidence;\n"), 'permission denied')
+    cases.denied('authenticated cannot read task times', stack.as_role('authenticated', USER_A, 'select * from app_private.plan_task_times'), 'permission denied')
+    cases.denied('the runtime role cannot delete task times', stack.runtime("delete from app_private.plan_task_times;\n"), 'permission denied')
 
 
 def recovery_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:

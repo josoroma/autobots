@@ -34,8 +34,8 @@ markers are preserved across refreshes.
 | 13 | US-15.13 | us-15-13-workflow-list-preview-executions | DONE | Workflow list, preview, executions and budget |
 | 14 | US-15.14 | us-15-14-github-read-tools-issue | DONE | GitHub read tools and issue labels on one repository |
 | 15 | US-15.15 | us-15-15-approval-gated-pull-request | DONE | Approval-gated pull-request connector |
-| 16 | US-15.16 | us-15-16-live-github-qualification-configured | IN PROGRESS | Live GitHub qualification on the configured repository |
-| 17 | US-15.17 | us-15-17-run-side-panel-plan | READY | Run side panel and plan task timing |
+| 16 | US-15.16 | us-15-16-live-github-qualification-configured | DONE | Live GitHub qualification on the configured repository |
+| 17 | US-15.17 | us-15-17-run-side-panel-plan | IN PROGRESS | Run side panel and plan task timing |
 | 18 | US-15.18 | us-15-18-operations-verdict-check-detail | READY | Operations verdict and check detail |
 | 19 | US-15.19 | us-15-19-operations-jobs-chart | BLOCKED | Operations jobs chart |
 | 20 | US-15.20 | us-15-20-appearance-preferences-system-theme | READY | Appearance preferences with a System theme |
@@ -48,10 +48,10 @@ markers are preserved across refreshes.
 ## Next Action
 
 Action: implement
-Story: US-15.16
-Change: us-15-16-live-github-qualification-configured
+Story: US-15.17
+Change: us-15-17-run-side-panel-plan
 Owner: main-session
-Command: /ohmyorch:opsx-apply us-15-16-live-github-qualification-configured
+Command: /ohmyorch:opsx-apply us-15-17-run-side-panel-plan
 Reason: gate implementation: 3/4 tasks complete
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
