@@ -620,8 +620,11 @@ def qualify(root: Path) -> int:
             + ', '.join(f"(gen_random_uuid(), '{ops_ws}', '{ops_runs[0]}', 'ops-n-{index}', 'file-{index}.md', 'ops-n/{index}', 'text/markdown', {size}, "
                         f"'{format(index, '064x')}', '{state}')" for index, (size, state) in enumerate(((1000, 'published'), (2345, 'published'), (999, 'staged'))))
             + ';\n')
-        cases.check('the operations workspace is arranged', 'exit 0', f'exit {arranged_ops.returncode}: {arranged_ops.stderr[-300:]}', arranged_ops.returncode == 0)
-        artifacts = {**artifacts, 'AUTOBOTS_TEST_OPS_EMAIL': email_n, 'AUTOBOTS_TEST_OPS_PASSWORD': password_n,
+        # US-15.19: its jobs chart reads hours in Costa Rica's time, which has no daylight saving.
+        zoned = stack.sql(f"update public.workspaces set timezone = 'America/Costa_Rica' where id = '{ops_ws}';\n")
+        cases.check('the operations workspace is arranged', 'exit 0', f'exit {arranged_ops.returncode}: {arranged_ops.stderr[-300:]}',
+                    arranged_ops.returncode == 0 and zoned.returncode == 0)
+        artifacts = {**artifacts, 'AUTOBOTS_TEST_OPS_EMAIL': email_n, 'AUTOBOTS_TEST_OPS_PASSWORD': password_n, 'AUTOBOTS_TEST_OPS_WORKSPACE': ops_ws,
                      'AUTOBOTS_TEST_OPS_HELPER': str(root / 'tests/db/operations_live.py')}
         # Its own workspace with no key, as the one above asserts that it holds exactly one run.
         email_e, password_e = 'owner-e@example.invalid', secrets.token_urlsafe(24)

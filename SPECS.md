@@ -528,10 +528,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.18#2 | Add the worker count, applied migrations, storage and disk bytes, leased and queued jobs, checkpoint adapter, catalog fetch time and loopback check to the status read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | DONE | US-15.18 |
 | US-15.18#3 | Render the verdict and the values on Operations. | DONE | US-15.18 |
 | US-15.18#4 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.18 |
-| US-15.19 | Operations jobs chart | READY | EPIC-15 |
-| US-15.19#1 | Add an hourly job count by outcome over 24 hours in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.19 |
-| US-15.19#2 | Render the chart with chart tokens and its text table on Operations. | TODO | US-15.19 |
-| US-15.19#3 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.19 |
+| US-15.19 | Operations jobs chart | DONE | EPIC-15 |
+| US-15.19#1 | Add an hourly job count by outcome over 24 hours in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | DONE | US-15.19 |
+| US-15.19#2 | Render the chart with chart tokens and its text table on Operations. | DONE | US-15.19 |
+| US-15.19#3 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.19 |
 | US-15.20 | Appearance preferences with a System theme | READY | EPIC-15 |
 | US-15.20#1 | Offer System, Light and Dark in the theme provider: dark for a first visit and for a missing, invalid or unavailable value, and System following the OS only when chosen. | TODO | US-15.20 |
 | US-15.20#2 | Add the serif, density and reduce-motion preferences, stored in the browser and changing presentation only. | TODO | US-15.20 |
@@ -6931,7 +6931,8 @@ Open Questions:
 
 ### US-15.19: Operations jobs chart
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-15-19-operations-jobs-chart/`
 
 As an operator
 I want jobs per hour over the last 24 hours, with a text table
@@ -6967,9 +6968,9 @@ Dependencies:
 - US-15.18
 
 Tasks:
-- [ ] Add an hourly job count by outcome over 24 hours in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
-- [ ] Render the chart with chart tokens and its text table on Operations.
-- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+- [x] Add an hourly job count by outcome over 24 hours in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
+- [x] Render the chart with chart tokens and its text table on Operations.
+- [x] Cover the scenarios on a disposable stack and in browser specs with axe.
 
 Open Questions:
 - None.

@@ -389,5 +389,69 @@ def loopback_only(fds: Any = None) -> bool | None:
     return all(_is_loopback(address) for address in bound)
 
 
+@dataclass(frozen=True)
+class JobHourCounts:
+    starts_at: datetime
+    hour: str
+    succeeded: int
+    waited: int
+    failed: int
+    in_progress: int
+
+
+# PRD-Studio OP-03 and Decision 0022 D14. Each hour of the last 24 in the workspace's timezone, from
+# the runs' own status changes: succeeded, waited for a person (entered waiting_approval or
+# waiting_input), failed with cancelled, and in progress (a run now running or paused, in the hour
+# of its latest change). Counts only.
+_JOB_HOURS = """
+with zone as (
+  select coalesce(nullif(timezone, ''), 'UTC') as name from public.workspaces
+  where id = %(workspace)s
+), hours as (
+  select local_hour at time zone zone.name as starts_at, to_char(local_hour, 'HH24:00') as hour
+  from zone, generate_series(
+    date_trunc('hour', now() at time zone zone.name) - interval '23 hours',
+    date_trunc('hour', now() at time zone zone.name), interval '1 hour') as local_hour
+), changes as (
+  select e.run_id, e.payload ->> 'current' as status, e.occurred_at
+  from public.run_events e join public.runs r on r.id = e.run_id
+  where r.workspace_id = %(workspace)s and e.payload ->> 'type' = 'run.status_changed'
+    and e.occurred_at >= (select min(starts_at) from hours)
+), latest as (
+  select distinct on (e.run_id) e.run_id, e.occurred_at
+  from public.run_events e join public.runs r on r.id = e.run_id
+  where r.workspace_id = %(workspace)s and r.status in ('running', 'paused')
+    and e.payload ->> 'type' = 'run.status_changed'
+  order by e.run_id, e.sequence desc
+)
+select h.starts_at, h.hour,
+  (select count(distinct c.run_id) from changes c where c.status = 'succeeded'
+     and c.occurred_at >= h.starts_at and c.occurred_at < h.starts_at + interval '1 hour'),
+  (select count(distinct c.run_id) from changes c
+     where c.status in ('waiting_approval', 'waiting_input')
+     and c.occurred_at >= h.starts_at and c.occurred_at < h.starts_at + interval '1 hour'),
+  (select count(distinct c.run_id) from changes c where c.status in ('failed', 'cancelled')
+     and c.occurred_at >= h.starts_at and c.occurred_at < h.starts_at + interval '1 hour'),
+  (select count(*) from latest l
+     where l.occurred_at >= h.starts_at and l.occurred_at < h.starts_at + interval '1 hour')
+from hours h order by h.starts_at
+"""
+
+
+async def job_hours(connection: Any, workspace_id: UUID) -> tuple[str, list[JobHourCounts]]:
+    """The workspace's timezone, and its last 24 hours of job counts, oldest first."""
+    cursor = await connection.execute(
+        "select coalesce(nullif(timezone, ''), 'UTC') from public.workspaces where id = %s",
+        (workspace_id,),
+    )
+    zone = await cursor.fetchone()
+    cursor = await connection.execute(_JOB_HOURS, {"workspace": workspace_id})
+    rows = [
+        JobHourCounts(row[0], str(row[1]), int(row[2]), int(row[3]), int(row[4]), int(row[5]))
+        for row in await cursor.fetchall()
+    ]
+    return (str(zone[0]) if zone else "UTC"), rows
+
+
 def is_ready(conditions: tuple[Condition, ...] | list[Condition]) -> bool:
     return all(item.state == "ok" for item in conditions if item.name in BLOCKING)

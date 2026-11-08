@@ -1993,6 +1993,87 @@ export const schemas = {
     "title": "InstanceView",
     "type": "object"
   },
+  "JobHour": {
+    "additionalProperties": false,
+    "description": "One hour of the workspace's jobs (PRD-Studio OP-03, Decision 0022 D14). Counts only.",
+    "properties": {
+      "failed": {
+        "minimum": 0.0,
+        "title": "Failed",
+        "type": "integer"
+      },
+      "hour": {
+        "pattern": "^[0-2][0-9]:00$",
+        "title": "Hour",
+        "type": "string"
+      },
+      "in_progress": {
+        "minimum": 0.0,
+        "title": "In Progress",
+        "type": "integer"
+      },
+      "starts_at": {
+        "format": "date-time",
+        "pattern": "^.+(Z|[+-]00:00)$",
+        "title": "Starts At",
+        "type": "string"
+      },
+      "succeeded": {
+        "minimum": 0.0,
+        "title": "Succeeded",
+        "type": "integer"
+      },
+      "waited": {
+        "minimum": 0.0,
+        "title": "Waited",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "starts_at",
+      "hour",
+      "succeeded",
+      "waited",
+      "failed",
+      "in_progress"
+    ],
+    "title": "JobHour",
+    "type": "object"
+  },
+  "JobsChart": {
+    "additionalProperties": false,
+    "description": "The last 24 hours, oldest first, in the workspace's timezone. No identifier, no goal text.",
+    "properties": {
+      "hours": {
+        "items": {
+          "$ref": "#/components/schemas/JobHour"
+        },
+        "maxItems": 25,
+        "minItems": 1,
+        "title": "Hours",
+        "type": "array"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "timezone": {
+        "maxLength": 64,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9_+/-]+$",
+        "title": "Timezone",
+        "type": "string"
+      }
+    },
+    "required": [
+      "schema_version",
+      "timezone",
+      "hours"
+    ],
+    "title": "JobsChart",
+    "type": "object"
+  },
   "KeyRequirementView": {
     "additionalProperties": false,
     "properties": {
@@ -7508,6 +7589,29 @@ export function parseInstanceView(value: unknown): InstanceView {
   return parseWith(schemas, "InstanceView", value) as InstanceView;
 }
 
+export interface JobHour {
+  failed: number;
+  hour: string;
+  in_progress: number;
+  starts_at: string;
+  succeeded: number;
+  waited: number;
+}
+
+export function parseJobHour(value: unknown): JobHour {
+  return parseWith(schemas, "JobHour", value) as JobHour;
+}
+
+export interface JobsChart {
+  hours: JobHour[];
+  schema_version: 1;
+  timezone: string;
+}
+
+export function parseJobsChart(value: unknown): JobsChart {
+  return parseWith(schemas, "JobsChart", value) as JobsChart;
+}
+
 export interface KeyRequirementView {
   credential: string;
   scopes: string[];
@@ -8828,6 +8932,10 @@ export async function searchMemory(options: ClientOptions): Promise<MemorySearch
 
 export async function getModels(options: ClientOptions): Promise<ModelList> {
   return parseModelList(await requestJson(options, "GET", `/v1/models`));
+}
+
+export async function getJobsChart(options: ClientOptions): Promise<JobsChart> {
+  return parseJobsChart(await requestJson(options, "GET", `/v1/operations/jobs`));
 }
 
 export async function getLocalStatus(options: ClientOptions): Promise<LocalStatus> {

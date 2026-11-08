@@ -1,0 +1,7 @@
+## Decisions
+
+- **Source:** each count comes from `public.run_events` `run.status_changed` rows, the canonical transitions' own record. Hours are generated in the workspace's timezone and converted back to instants. Each series counts distinct runs per hour.
+- **In progress:** a run whose status is now running or paused, counted in the hour of its latest status change. D14 names the series without saying which hour it belongs to; a run currently in progress sits at the change that put it there.
+- **Colors:** the series mean outcomes, so they wear status tokens, never the Luma chart ramp. That ramp is one hue in five lightness steps and fails as a categorical set: its lightness band, chroma and adjacent ΔE checks fail, the worst pair at 8.2 against a floor of 15. The stack order succeeded, waited, in progress, failed is the permutation with the best worst-adjacent CVD separation (`validate_palette.js`): 8.9 light and 10.4 dark, with normal vision at 19.6 or more. Status tokens are outside the categorical validator's scope. Their mitigation is labels, a legend with totals, textures on waited and failed, a tooltip and the table.
+- **Marks:** thin bars with a 2px gap between segments, rounded only at the top end, and recessive grid lines. The hover target is the whole hour column.
+- **Table:** in a `<details>`, so 24 rows don't lengthen the page. It's a native control, so keyboard and screen readers reach it.

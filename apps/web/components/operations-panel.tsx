@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
+import { JobsChart } from "@/components/jobs-chart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
@@ -393,6 +394,7 @@ export function OperationsPanel() {
           </p>
         )}
       </section>
+      {status.queue === null ? null : <JobsChart />}
       <div className="grid gap-5 lg:grid-cols-2">
         <section aria-labelledby="delayed-heading" className={BOX}>
           <h2 id="delayed-heading" className={BOX_HEADING}>

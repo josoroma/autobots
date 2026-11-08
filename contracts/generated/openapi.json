@@ -1992,6 +1992,87 @@
         "title": "InstanceView",
         "type": "object"
       },
+      "JobHour": {
+        "additionalProperties": false,
+        "description": "One hour of the workspace's jobs (PRD-Studio OP-03, Decision 0022 D14). Counts only.",
+        "properties": {
+          "failed": {
+            "minimum": 0.0,
+            "title": "Failed",
+            "type": "integer"
+          },
+          "hour": {
+            "pattern": "^[0-2][0-9]:00$",
+            "title": "Hour",
+            "type": "string"
+          },
+          "in_progress": {
+            "minimum": 0.0,
+            "title": "In Progress",
+            "type": "integer"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "succeeded": {
+            "minimum": 0.0,
+            "title": "Succeeded",
+            "type": "integer"
+          },
+          "waited": {
+            "minimum": 0.0,
+            "title": "Waited",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "starts_at",
+          "hour",
+          "succeeded",
+          "waited",
+          "failed",
+          "in_progress"
+        ],
+        "title": "JobHour",
+        "type": "object"
+      },
+      "JobsChart": {
+        "additionalProperties": false,
+        "description": "The last 24 hours, oldest first, in the workspace's timezone. No identifier, no goal text.",
+        "properties": {
+          "hours": {
+            "items": {
+              "$ref": "#/components/schemas/JobHour"
+            },
+            "maxItems": 25,
+            "minItems": 1,
+            "title": "Hours",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "timezone": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_+/-]+$",
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "timezone",
+          "hours"
+        ],
+        "title": "JobsChart",
+        "type": "object"
+      },
       "KeyRequirementView": {
         "additionalProperties": false,
         "properties": {
@@ -8376,6 +8457,86 @@
           }
         },
         "summary": "Get Models"
+      }
+    },
+    "/v1/operations/jobs": {
+      "get": {
+        "description": "PRD-Studio OP-03: the workspace's jobs per hour over 24 hours, by outcome. Counts only.",
+        "operationId": "getJobsChart",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobsChart"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Jobs Chart"
       }
     },
     "/v1/operations/local-status": {

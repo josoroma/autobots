@@ -5,6 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from autobots.contracts.primitives import UtcTimestamp
 from autobots.contracts.settings import RouteQualification
 
 VIEW = ConfigDict(extra="forbid", frozen=True)
@@ -113,6 +114,30 @@ class LocalStatus(BaseModel):
     restores: list[RestoreRecord]
     route_qualifications: list[RouteQualification]
     values: OperationValues
+
+
+class JobHour(BaseModel):
+    """One hour of the workspace's jobs (PRD-Studio OP-03, Decision 0022 D14). Counts only."""
+
+    model_config = VIEW
+
+    starts_at: UtcTimestamp
+    # The hour's start in the workspace's timezone, as 14:00.
+    hour: str = Field(pattern=r"^[0-2][0-9]:00$")
+    succeeded: int = Field(ge=0)
+    waited: int = Field(ge=0)
+    failed: int = Field(ge=0)
+    in_progress: int = Field(ge=0)
+
+
+class JobsChart(BaseModel):
+    """The last 24 hours, oldest first, in the workspace's timezone. No identifier, no goal text."""
+
+    model_config = VIEW
+
+    schema_version: Literal[1]
+    timezone: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_+/-]+$")
+    hours: list[JobHour] = Field(min_length=1, max_length=25)
 
 
 class RetentionApplied(BaseModel):

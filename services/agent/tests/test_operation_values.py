@@ -27,7 +27,7 @@ from autobots.application.operations import (
     timed_catalog,
 )
 from autobots.application.retention import RetentionPolicy
-from autobots.contracts.operations import OperationValues
+from autobots.contracts.operations import JobHour, JobsChart, OperationValues
 
 INTERNAL = "fixture-internal"
 SECRET = "fixture-jwt-secret-with-enough-length"
@@ -233,3 +233,26 @@ def test_the_status_holds_numbers_only_and_producing_it_sends_nothing_off_this_m
     ):
         assert leak not in text, leak
     assert sent == []
+
+
+def test_the_jobs_chart_holds_hourly_counts_by_outcome_only() -> None:
+    assert set(JobsChart.model_fields) == {"schema_version", "timezone", "hours"}
+    assert set(JobHour.model_fields) == {
+        "starts_at",
+        "hour",
+        "succeeded",
+        "waited",
+        "failed",
+        "in_progress",
+    }
+    with pytest.raises(ValueError):
+        JobHour.model_validate(
+            {
+                "starts_at": "2026-11-08T10:00:00Z",
+                "hour": "Run 7f3a",
+                "succeeded": 0,
+                "waited": 0,
+                "failed": 0,
+                "in_progress": 0,
+            }
+        )

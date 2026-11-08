@@ -23,6 +23,7 @@ def test_the_schema_builds_without_any_connection() -> None:
         "/v1/approvals/count",
         "/v1/approvals/{approval_id}/decision",
         "/v1/improvements",
+        "/v1/operations/jobs",
         "/v1/operations/local-status",
         "/v1/operations/retention",
         "/v1/operations/retention/apply",

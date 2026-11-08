@@ -24,6 +24,7 @@ from autobots.application.operations import (
     disk_bytes,
     disk_condition,
     is_ready,
+    job_hours,
     live_workers,
     loopback_only,
     queue_condition,
@@ -44,6 +45,8 @@ from autobots.application.retention import (
 from autobots.application.run_projection import public_text
 from autobots.contracts.operations import (
     DelayedOccurrence,
+    JobHour,
+    JobsChart,
     LocalStatus,
     MemberReadiness,
     OperationCondition,
@@ -190,6 +193,28 @@ async def get_local_status(
             loopback_only=loopback_only(),
             workers=workers,
         ),
+    )
+
+
+@router.get("/operations/jobs", operation_id="getJobsChart", response_model=JobsChart)
+async def get_jobs_chart(request: Request, workspace_id: Owner) -> JobsChart:
+    """PRD-Studio OP-03: the workspace's jobs per hour over 24 hours, by outcome. Counts only."""
+    async with _pool(request).connection() as connection:
+        zone, hours = await job_hours(connection, workspace_id)
+    return JobsChart(
+        schema_version=1,
+        timezone=zone,
+        hours=[
+            JobHour(
+                starts_at=item.starts_at.astimezone(UTC),
+                hour=item.hour,
+                succeeded=item.succeeded,
+                waited=item.waited,
+                failed=item.failed,
+                in_progress=item.in_progress,
+            )
+            for item in hours
+        ],
     )
 
 
