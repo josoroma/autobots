@@ -473,11 +473,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.7#1 | Derive Granted to from the latest Expert versions and the agent steps of published workflows in the application layer, and expose it in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | DONE | US-15.7 |
 | US-15.7#2 | Render the group list with counts, the text filter, the side panel and Copy schema, keeping `/tools/{tool_id}`. | DONE | US-15.7 |
 | US-15.7#3 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.7 |
-| US-15.8 | Model catalog facts, binding source and form actions | READY | EPIC-15 |
-| US-15.8#1 | Add catalog prices per 1M tokens, supported parameters, the fetch time and each role binding's source to the model read models in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.8 |
-| US-15.8#2 | Add a Reset all write that clears role overrides under the expected version. | TODO | US-15.8 |
-| US-15.8#3 | Render the facts, sources, Discard, Reset all and the summary on Models, and the binding source in the run's role map. | TODO | US-15.8 |
-| US-15.8#4 | Cover the scenarios with a fake catalog on a disposable stack and in browser specs with axe. | TODO | US-15.8 |
+| US-15.8 | Model catalog facts, binding source and form actions | DONE | EPIC-15 |
+| US-15.8#1 | Add catalog prices per 1M tokens, supported parameters, the fetch time and each role binding's source to the model read models in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | DONE | US-15.8 |
+| US-15.8#2 | Add a Reset all write that clears role overrides under the expected version. | DONE | US-15.8 |
+| US-15.8#3 | Render the facts, sources, Discard, Reset all and the summary on Models, and the binding source in the run's role map. | DONE | US-15.8 |
+| US-15.8#4 | Cover the scenarios with a fake catalog on a disposable stack and in browser specs with axe. | DONE | US-15.8 |
 | US-15.9 | Composer chips, run preview and budget | READY | EPIC-15 |
 | US-15.9#1 | Add the allowed budget range and the remaining daily cap to run intent, and the profiles by role and the default tool grants to a preview, in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.9 |
 | US-15.9#2 | Validate and freeze a chosen budget at admission, refusing values outside US$0.25–5.00, off the US$0.25 step or above the remaining daily cap. | TODO | US-15.9 |
@@ -6332,7 +6332,8 @@ Open Questions:
 
 ### US-15.8: Model catalog facts, binding source and form actions
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-15-8-model-catalog-facts-binding/`
 
 As a workspace owner
 I want each approved profile's catalog prices and capabilities, where each role's binding comes from, and Discard and Reset all
@@ -6370,10 +6371,10 @@ Dependencies:
 - US-3.4
 
 Tasks:
-- [ ] Add catalog prices per 1M tokens, supported parameters, the fetch time and each role binding's source to the model read models in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
-- [ ] Add a Reset all write that clears role overrides under the expected version.
-- [ ] Render the facts, sources, Discard, Reset all and the summary on Models, and the binding source in the run's role map.
-- [ ] Cover the scenarios with a fake catalog on a disposable stack and in browser specs with axe.
+- [x] Add catalog prices per 1M tokens, supported parameters, the fetch time and each role binding's source to the model read models in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
+- [x] Add a Reset all write that clears role overrides under the expected version.
+- [x] Render the facts, sources, Discard, Reset all and the summary on Models, and the binding source in the run's role map.
+- [x] Cover the scenarios with a fake catalog on a disposable stack and in browser specs with axe.
 
 Open Questions:
 - None.

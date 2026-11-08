@@ -120,12 +120,23 @@ def approved_role(value: object) -> ModelRole:
         raise UnknownModelProfile("not a known model role") from None
 
 
+class BindingSource(StrEnum):
+    """Which step of MP-01's order chose a role's binding, PRD-Studio MD-02."""
+
+    RUN_OVERRIDE = "run_override"
+    WORKSPACE_OVERRIDE = "workspace_override"
+    WORKSPACE_DEFAULT = "workspace_default"
+    BUILTIN_DEFAULT = "builtin_default"
+
+
 @dataclass(frozen=True)
 class RolePolicy:
     """The complete effective map, frozen at admission. Children and compaction inherit it."""
 
     version: int
     bindings: Mapping[ModelRole, ModelProfileId]
+    # Empty for a run frozen before sources were recorded.
+    sources: Mapping[ModelRole, BindingSource] = MappingProxyType({})
 
     def profile_for(self, role: ModelRole) -> ModelProfile:
         return PROFILES[self.bindings[role]]
@@ -149,14 +160,20 @@ def resolve_role_policy(
     }
     workspace_wide = approved_profile(workspace_default) if workspace_default is not None else None
 
-    def resolve(role: ModelRole) -> ModelProfileId:
+    def resolve(role: ModelRole) -> tuple[ModelProfileId, BindingSource]:
         if role in run_roles:
-            return run_roles[role]
+            return run_roles[role], BindingSource.RUN_OVERRIDE
         if run_wide is not None:
-            return run_wide
+            return run_wide, BindingSource.RUN_OVERRIDE
         if role in workspace_roles:
-            return workspace_roles[role]
-        return workspace_wide if workspace_wide is not None else builtin_default(role)
+            return workspace_roles[role], BindingSource.WORKSPACE_OVERRIDE
+        if workspace_wide is not None:
+            return workspace_wide, BindingSource.WORKSPACE_DEFAULT
+        return builtin_default(role), BindingSource.BUILTIN_DEFAULT
 
-    bindings = {role: resolve(role) for role in ModelRole}
-    return RolePolicy(ROLE_POLICY_VERSION, MappingProxyType(bindings))
+    resolved = {role: resolve(role) for role in ModelRole}
+    return RolePolicy(
+        ROLE_POLICY_VERSION,
+        MappingProxyType({role: found[0] for role, found in resolved.items()}),
+        MappingProxyType({role: found[1] for role, found in resolved.items()}),
+    )

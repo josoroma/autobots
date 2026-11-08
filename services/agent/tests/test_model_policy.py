@@ -439,3 +439,74 @@ def test_once_offered_researcher_defaults_to_sol_behind_every_choice(
         assert resolve_role_policy(**arguments).bindings[researcher] is TERRA, arguments
     assert resolve_role_policy(run_profile="openrouter_sol").bindings[ModelRole.CODER] is SOL
     models.require_offered([SOL])
+
+
+def test_each_binding_records_where_it_came_from() -> None:
+    """PRD-Studio MD-02: run override, workspace override, workspace default or built-in default."""
+    from autobots.domain.models import BindingSource
+
+    with_default = resolve_role_policy(
+        run_role_overrides={"executor": "openrouter_sol"},
+        workspace_role_overrides={"coder": "openrouter_terra"},
+        workspace_default="openrouter_terra",
+    )
+    assert with_default.sources[ModelRole.EXECUTOR] is BindingSource.RUN_OVERRIDE
+    assert with_default.sources[ModelRole.CODER] is BindingSource.WORKSPACE_OVERRIDE
+    assert with_default.sources[ModelRole.RESEARCHER] is BindingSource.WORKSPACE_DEFAULT
+    run_wide = resolve_role_policy(
+        run_profile="openrouter_terra", workspace_default="openrouter_sol"
+    )
+    assert set(run_wide.sources.values()) == {BindingSource.RUN_OVERRIDE}
+    no_default = resolve_role_policy(workspace_role_overrides={"coder": "openrouter_terra"})
+    assert no_default.sources[ModelRole.CODER] is BindingSource.WORKSPACE_OVERRIDE
+    assert no_default.sources[ModelRole.RESEARCHER] is BindingSource.BUILTIN_DEFAULT
+    assert no_default.bindings[ModelRole.RESEARCHER] is ModelProfileId.SOL
+    shown = {binding.role: binding.source for binding in effective_policy(no_default).bindings}
+    assert shown[ModelRole.PLANNER] is BindingSource.BUILTIN_DEFAULT
+    assert len(shown) == 14
+
+
+def test_a_frozen_snapshot_keeps_its_sources_and_an_older_one_has_none() -> None:
+    from autobots.application.runs import _snapshot
+    from autobots.domain.models import BindingSource
+
+    policy = resolve_role_policy(run_role_overrides={"executor": "openrouter_sol"})
+    snapshot = json.loads(_snapshot(policy))
+    assert snapshot["sources"]["executor"] == "run_override"
+    assert snapshot["sources"]["researcher"] == "builtin_default"
+    assert frozen_policy(snapshot).sources[ModelRole.EXECUTOR] is BindingSource.RUN_OVERRIDE
+    older = {key: value for key, value in snapshot.items() if key != "sources"}
+    assert dict(frozen_policy(older).sources) == {}
+
+
+def test_listed_prices_are_per_million_tokens_and_kept_apart_from_the_reserved_rate() -> None:
+    payload = {
+        "data": [
+            {
+                "id": PROFILES[ModelProfileId.TERRA].wire_id,
+                "canonical_slug": PROFILES[ModelProfileId.TERRA].canonical_id,
+                "supported_parameters": ["tools", "max_tokens"],
+                "pricing": {
+                    "prompt": "0.00000125",
+                    "completion": "0.00001",
+                    "input_cache_write": "0.000002",
+                },
+            }
+        ]
+    }
+    entry = parse_catalog(payload, retrieved_at=NOW, revision="test").entries[0]
+    assert (entry.listed_input_per_million, entry.listed_output_per_million) == (
+        1_250_000,
+        10_000_000,
+    )
+    # Admission still reserves the worst reachable input rate.
+    assert entry.pricing is not None and entry.pricing.input_per_million == 2_000_000
+    unreadable = parse_catalog(
+        {"data": [{**payload["data"][0], "pricing": {"prompt": "x", "completion": "-1"}}]},
+        retrieved_at=NOW,
+        revision="test",
+    ).entries[0]
+    assert (unreadable.listed_input_per_million, unreadable.listed_output_per_million) == (
+        None,
+        None,
+    )

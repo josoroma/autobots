@@ -16,7 +16,49 @@ import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
 
 const WORKSPACE_DEFAULT = "";
+// The workspace default select's "none": each role takes its built-in default (MD-02).
+const BUILTIN_DEFAULT = "";
 const EXECUTOR = "executor";
+
+// PRD-Studio MD-02: which step of MP-01's order chose a role's binding.
+const SOURCE_LABEL: Record<string, string> = {
+  run_override: "Run override",
+  workspace_override: "Workspace override",
+  workspace_default: "Workspace default",
+  builtin_default: "Built-in default",
+};
+
+// Micro-USD per 1M tokens, as US$ with at least two decimals.
+function perMillion(micro: number | null): string {
+  if (micro === null) return "not listed";
+  const dollars = (micro / 1_000_000).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  });
+  return `US$${dollars}`;
+}
+
+function fetchedAt(value: string | null): string {
+  if (value === null) return "The catalog couldn't be fetched.";
+  const when = new Date(value);
+  return `Catalog fetched ${when.toLocaleString("en-US", {
+    dateStyle: "medium",
+    timeStyle: "medium",
+  })}.`;
+}
+
+function sameForm(
+  state: ModelPolicyState,
+  defaultProfile: string,
+  overrides: Record<string, string>,
+): boolean {
+  const saved = state.role_overrides as Record<string, string>;
+  const keys = new Set([...Object.keys(saved), ...Object.keys(overrides)]);
+  return (
+    (state.default_profile ?? BUILTIN_DEFAULT) === defaultProfile &&
+    [...keys].every((role) => saved[role] === overrides[role])
+  );
+}
 const SUMMARIZER = "summarizer";
 
 // One role per row: its name on the left and its native select on the right (Decision 0021).
@@ -84,7 +126,7 @@ export function ModelPolicyPanel() {
 
   const adopt = useCallback((next: ModelPolicyState) => {
     setState(next);
-    setDefaultProfile(next.default_profile);
+    setDefaultProfile(next.default_profile ?? BUILTIN_DEFAULT);
     setOverrides(next.role_overrides as Record<string, string>);
   }, []);
 
@@ -123,7 +165,8 @@ export function ModelPolicyPanel() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         expected_version: state.version,
-        default_profile: defaultProfile,
+        default_profile:
+          defaultProfile === BUILTIN_DEFAULT ? null : defaultProfile,
         role_overrides: overrides,
       }),
     }).catch(() => null);
@@ -141,6 +184,35 @@ export function ModelPolicyPanel() {
       failure?.code === "stale_version"
         ? "This policy changed after you opened it, so nothing was saved. Reload the page and try again."
         : (failure?.message ?? "That did not save. Nothing changed."),
+    );
+  }
+
+  // MD-03: clears every role override under the version this screen loaded.
+  async function resetAll(): Promise<void> {
+    if (state === null) return;
+    setBusy(true);
+    setMessage(null);
+    const reply = await csrfFetch("/api/settings/model-policy/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expected_version: state.version }),
+    }).catch(() => null);
+    setBusy(false);
+    if (reply?.ok === true) {
+      adopt(parseModelPolicyState(await reply.json()));
+      setMessage(
+        "Every role override is cleared. New runs freeze this, and admitted runs keep theirs.",
+      );
+      return;
+    }
+    const failure = (await reply?.json().catch(() => null)) as {
+      code?: string;
+      message?: string;
+    } | null;
+    setMessage(
+      failure?.code === "stale_version"
+        ? "This policy changed after you opened it, so nothing was reset. Reload the page and try again."
+        : (failure?.message ?? "That did not reset. Nothing changed."),
     );
   }
 
@@ -164,8 +236,17 @@ export function ModelPolicyPanel() {
   const notOffered = new Set(
     listed.filter((model) => !model.offered).map((model) => model.profile),
   );
+  const dirty = !sameForm(state, defaultProfile, overrides);
+  const following = state.policy.bindings.filter(
+    (binding) =>
+      binding.source === "workspace_default" ||
+      binding.source === "builtin_default",
+  ).length;
+  const savedSource = new Map(
+    state.policy.bindings.map((binding) => [binding.role, binding.source]),
+  );
   const savedChoiceNotOffered =
-    notOffered.has(state.default_profile) ||
+    (state.default_profile !== null && notOffered.has(state.default_profile)) ||
     Object.values(state.role_overrides).some((profile) =>
       notOffered.has(profile as (typeof listed)[number]["profile"]),
     );
@@ -194,9 +275,56 @@ export function ModelPolicyPanel() {
             {model.offered
               ? ""
               : ". Approved, and not offered for new runs until it's qualified."}
+            <dl
+              data-field="catalog-facts"
+              className="border-border mt-3 space-y-1.5 border-t pt-3"
+            >
+              <div className="flex gap-2">
+                <dt className="text-muted-foreground">Input</dt>
+                <dd data-price="input" className="ml-auto tabular-nums">
+                  {perMillion(model.input_per_million_micro_usd)} per 1M tokens
+                </dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="text-muted-foreground">Output</dt>
+                <dd data-price="output" className="ml-auto tabular-nums">
+                  {perMillion(model.output_per_million_micro_usd)} per 1M tokens
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">
+                  Capabilities, from the catalog
+                </dt>
+                <dd data-field="capabilities" className="mt-1">
+                  {model.capabilities.length === 0 ? (
+                    <span className="text-muted-foreground">None listed.</span>
+                  ) : (
+                    <ul className="flex flex-wrap gap-1.5">
+                      {model.capabilities.map((name) => (
+                        <li
+                          key={name}
+                          data-capability={name}
+                          className="border-border rounded-full border px-2 py-0.5 font-mono text-[11.5px]"
+                        >
+                          {name}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </dd>
+              </div>
+            </dl>
           </li>
         ))}
       </ul>
+      <p
+        data-field="catalog-fetched"
+        className="text-muted-foreground text-[12.5px]"
+      >
+        {fetchedAt(models.fetched_at)} Prices and capabilities come from the
+        catalog. Whether a route is qualified is recorded separately, under the
+        provider.
+      </p>
       <RoleEffect state={state} />
       {savedChoiceNotOffered ? (
         <p
@@ -230,6 +358,9 @@ export function ModelPolicyPanel() {
                 value={defaultProfile}
                 onChange={(event) => setDefaultProfile(event.target.value)}
               >
+                <option value={BUILTIN_DEFAULT}>
+                  Built-in default (Sol for researcher, Terra otherwise)
+                </option>
                 {choices(defaultProfile).map((model) => (
                   <option
                     key={model.profile}
@@ -248,12 +379,23 @@ export function ModelPolicyPanel() {
           <div className="border-border grid gap-x-8 border-b md:grid-cols-2">
             {state.policy.bindings.map((binding) => (
               <div key={binding.role} className={ROW}>
-                <label
-                  htmlFor={`role-${binding.role}`}
-                  className="min-w-0 font-mono text-[12.5px] break-all"
-                >
-                  {binding.role}
-                </label>
+                <div className="min-w-0">
+                  <label
+                    htmlFor={`role-${binding.role}`}
+                    className="block font-mono text-[12.5px] break-all"
+                  >
+                    {binding.role}
+                  </label>
+                  <span
+                    data-binding-source={savedSource.get(binding.role)}
+                    className="text-muted-foreground block text-[12px]"
+                  >
+                    {SOURCE_LABEL[savedSource.get(binding.role) ?? ""] ??
+                      "Not recorded"}
+                    {", "}
+                    {binding.canonical_id}
+                  </span>
+                </div>
                 <div className={ROW_CONTROL}>
                   <Select
                     id={`role-${binding.role}`}
@@ -284,10 +426,38 @@ export function ModelPolicyPanel() {
             ))}
           </div>
         </fieldset>
-        <div className="border-border border-t pt-4">
+        <div className="border-border flex flex-wrap items-center gap-3 border-t pt-4">
           <Button type="submit" size="lg" disabled={busy}>
             {busy ? "Saving" : "Save policy"}
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            disabled={busy || !dirty}
+            onClick={() => {
+              adopt(state);
+              setMessage("Discarded. The form shows the saved policy.");
+            }}
+          >
+            Discard
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            disabled={busy}
+            onClick={() => void resetAll()}
+          >
+            Reset all
+          </Button>
+          <p
+            data-field="policy-summary"
+            className="text-muted-foreground ml-auto text-[13px] tabular-nums"
+          >
+            {following} of {state.policy.bindings.length} roles follow the
+            workspace default
+          </p>
         </div>
       </form>
       {message === null ? null : (

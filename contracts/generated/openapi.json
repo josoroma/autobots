@@ -643,6 +643,17 @@
         "title": "AssignmentView",
         "type": "object"
       },
+      "BindingSource": {
+        "description": "Which step of MP-01's order chose a role's binding, PRD-Studio MD-02.",
+        "enum": [
+          "run_override",
+          "workspace_override",
+          "workspace_default",
+          "builtin_default"
+        ],
+        "title": "BindingSource",
+        "type": "string"
+      },
       "BlockCatalog": {
         "additionalProperties": false,
         "properties": {
@@ -1680,6 +1691,23 @@
             "title": "Role",
             "type": "string"
           },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "run_override",
+                  "workspace_override",
+                  "workspace_default",
+                  "builtin_default"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
           "wire_id": {
             "title": "Wire Id",
             "type": "string"
@@ -1689,7 +1717,8 @@
           "role",
           "profile",
           "canonical_id",
-          "wire_id"
+          "wire_id",
+          "source"
         ],
         "title": "FrozenBinding",
         "type": "object"
@@ -2140,9 +2169,38 @@
             "title": "Canonical Id",
             "type": "string"
           },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "input_per_million_micro_usd": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Per Million Micro Usd"
+          },
           "offered": {
             "title": "Offered",
             "type": "boolean"
+          },
+          "output_per_million_micro_usd": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Per Million Micro Usd"
           },
           "profile": {
             "$ref": "#/components/schemas/ModelProfileId"
@@ -2157,7 +2215,10 @@
           "canonical_id",
           "wire_id",
           "available",
-          "offered"
+          "offered",
+          "input_per_million_micro_usd",
+          "output_per_million_micro_usd",
+          "capabilities"
         ],
         "title": "ModelAvailability",
         "type": "object"
@@ -2352,6 +2413,18 @@
             "title": "Catalog Status",
             "type": "string"
           },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
           "models": {
             "items": {
               "$ref": "#/components/schemas/ModelAvailability"
@@ -2368,6 +2441,7 @@
         "required": [
           "schema_version",
           "catalog_status",
+          "fetched_at",
           "models"
         ],
         "title": "ModelList",
@@ -2377,7 +2451,14 @@
         "additionalProperties": false,
         "properties": {
           "default_profile": {
-            "$ref": "#/components/schemas/ModelProfileId"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelProfileId"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "policy": {
             "$ref": "#/components/schemas/EffectiveRolePolicy"
@@ -2414,7 +2495,14 @@
         "description": "Not strict, so JSON strings become enums. Unknown fields and values are still refused.",
         "properties": {
           "default_profile": {
-            "$ref": "#/components/schemas/ModelProfileId"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelProfileId"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "expected_version": {
             "minimum": 0.0,
@@ -3135,6 +3223,9 @@
           "role": {
             "$ref": "#/components/schemas/ModelRole"
           },
+          "source": {
+            "$ref": "#/components/schemas/BindingSource"
+          },
           "wire_id": {
             "title": "Wire Id",
             "type": "string"
@@ -3144,7 +3235,8 @@
           "role",
           "profile",
           "canonical_id",
-          "wire_id"
+          "wire_id",
+          "source"
         ],
         "title": "RoleBinding",
         "type": "object"
@@ -10204,7 +10296,7 @@
     },
     "/v1/settings/model-policy": {
       "get": {
-        "description": "What a new run would freeze. No row yet means version 0, with the application's default.",
+        "description": "What a new run would freeze. No row yet means version 0, naming no workspace default, so\neach role reads its built-in default as admission resolves it (MD-02).",
         "operationId": "getModelPolicy",
         "parameters": [
           {
@@ -10367,6 +10459,96 @@
           }
         },
         "summary": "Put Model Policy"
+      }
+    },
+    "/v1/settings/model-policy/reset": {
+      "post": {
+        "description": "Reset all, MD-03: every role override is cleared and the workspace default is kept.",
+        "operationId": "resetModelPolicyOverrides",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelPolicyState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset Model Policy Overrides"
       }
     },
     "/v1/settings/model-providers": {

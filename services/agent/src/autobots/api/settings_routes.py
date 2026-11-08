@@ -31,7 +31,6 @@ from autobots.contracts.settings import (
     RunIntentCheck,
 )
 from autobots.domain.models import (
-    DEFAULT_PROFILE,
     ProfileNotOffered,
     UnknownModelProfile,
     approved_profile,
@@ -172,7 +171,7 @@ async def get_models(
 
 
 def _policy_state(
-    version: int, default_profile: str, overrides: dict[str, str]
+    version: int, default_profile: str | None, overrides: dict[str, str]
 ) -> ModelPolicyState:
     policy = resolve_role_policy(
         workspace_default=default_profile, workspace_role_overrides=overrides
@@ -180,7 +179,7 @@ def _policy_state(
     return ModelPolicyState(
         schema_version=1,
         version=version,
-        default_profile=approved_profile(default_profile),
+        default_profile=None if default_profile is None else approved_profile(default_profile),
         role_overrides={role: approved_profile(profile) for role, profile in overrides.items()},
         policy=effective_policy(policy),
     )
@@ -192,7 +191,8 @@ def _policy_state(
 async def get_model_policy(
     request: Request, workspace_id: Annotated[UUID, Depends(current_workspace)]
 ) -> ModelPolicyState:
-    """What a new run would freeze. No row yet means version 0, with the application's default."""
+    """What a new run would freeze. No row yet means version 0, naming no workspace default, so
+    each role reads its built-in default as admission resolves it (MD-02)."""
     pool: Any = request.app.state.pool
     if pool is None:
         raise ApiError(503, "service_unavailable", "Provider settings are unavailable.")
@@ -204,7 +204,7 @@ async def get_model_policy(
         )
         row = await cursor.fetchone()
     if row is None:
-        return _policy_state(0, DEFAULT_PROFILE.value, {})
+        return _policy_state(0, None, {})
     return _policy_state(row[0], row[1], row[2] or {})
 
 
@@ -217,11 +217,14 @@ async def put_model_policy(
     workspace_id: Annotated[UUID, Depends(require_owner)],
 ) -> ModelPolicyState:
     overrides = {role: profile.value for role, profile in body.role_overrides.items()}
+    chosen_default = None if body.default_profile is None else body.default_profile.value
+    named = [
+        *([body.default_profile] if body.default_profile else []),
+        *body.role_overrides.values(),
+    ]
     try:
-        resolve_role_policy(
-            workspace_default=body.default_profile.value, workspace_role_overrides=overrides
-        )
-        require_offered([body.default_profile, *body.role_overrides.values()])
+        resolve_role_policy(workspace_default=chosen_default, workspace_role_overrides=overrides)
+        require_offered(named)
     except UnknownModelProfile as error:
         raise ApiError(422, "unknown_model", "Choose an approved model and role.") from error
     except ProfileNotOffered as refused:
@@ -243,14 +246,43 @@ async def put_model_policy(
             "(workspace_id, version, default_profile, role_overrides) values (%s, %s, %s, %s) "
             "on conflict (workspace_id) do update set version = excluded.version, "
             "default_profile = excluded.default_profile, role_overrides = excluded.role_overrides",
-            (
-                workspace_id,
-                current + 1,
-                body.default_profile.value,
-                policy_overrides_json(overrides),
-            ),
+            (workspace_id, current + 1, chosen_default, policy_overrides_json(overrides)),
         )
-    return _policy_state(current + 1, body.default_profile.value, overrides)
+    return _policy_state(current + 1, chosen_default, overrides)
+
+
+@router.post(
+    "/settings/model-policy/reset",
+    operation_id="resetModelPolicyOverrides",
+    response_model=ModelPolicyState,
+)
+async def reset_model_policy_overrides(
+    body: ExpectedVersion,
+    request: Request,
+    workspace_id: Annotated[UUID, Depends(require_owner)],
+) -> ModelPolicyState:
+    """Reset all, MD-03: every role override is cleared and the workspace default is kept."""
+    pool: Any = request.app.state.pool
+    if pool is None:
+        raise ApiError(503, "service_unavailable", "Provider settings are unavailable.")
+    async with pool.connection() as connection, connection.transaction():
+        cursor = await connection.execute(
+            "select version, default_profile from app_private.model_policies "
+            "where workspace_id = %s for update",
+            (workspace_id,),
+        )
+        row = await cursor.fetchone()
+        current, kept = (row[0], row[1]) if row else (0, None)
+        if current != body.expected_version:
+            raise ApiError(409, "stale_version", "The policy changed. Reload and try again.")
+        await connection.execute(
+            "insert into app_private.model_policies "
+            "(workspace_id, version, default_profile, role_overrides) values (%s, %s, %s, '{}') "
+            "on conflict (workspace_id) do update set version = excluded.version, "
+            "role_overrides = excluded.role_overrides",
+            (workspace_id, current + 1, kept),
+        )
+    return _policy_state(current + 1, kept, {})
 
 
 @router.post("/runs/intent", operation_id="checkRunIntent", response_model=RunIntentCheck)

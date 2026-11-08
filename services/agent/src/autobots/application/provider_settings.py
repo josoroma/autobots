@@ -277,8 +277,9 @@ class ProviderSettings:
         snapshot = parse_catalog(payload or {}, retrieved_at=now, revision="live")
         models = []
         for profile in PROFILES.values():
+            entry = None
             try:
-                validated_entry(profile, snapshot, now)
+                entry = validated_entry(profile, snapshot, now)
                 available = True
             except ModelUnavailable:
                 available = False
@@ -289,10 +290,18 @@ class ProviderSettings:
                     wire_id=profile.wire_id,
                     available=available,
                     offered=is_offered(profile.id),
+                    input_per_million_micro_usd=entry.listed_input_per_million if entry else None,
+                    output_per_million_micro_usd=entry.listed_output_per_million if entry else None,
+                    capabilities=sorted(entry.supported_parameters) if entry else [],
                 )
             )
         status = "available" if payload is not None else "unavailable"
-        return ModelList(schema_version=1, catalog_status=status, models=models)  # type: ignore[arg-type]
+        return ModelList(
+            schema_version=1,
+            catalog_status=status,  # type: ignore[arg-type]
+            fetched_at=now if payload is not None else None,
+            models=models,
+        )
 
 
 async def read_route_qualifications(connection: Any) -> list[RouteQualification]:

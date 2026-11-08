@@ -644,6 +644,17 @@ export const schemas = {
     "title": "AssignmentView",
     "type": "object"
   },
+  "BindingSource": {
+    "description": "Which step of MP-01's order chose a role's binding, PRD-Studio MD-02.",
+    "enum": [
+      "run_override",
+      "workspace_override",
+      "workspace_default",
+      "builtin_default"
+    ],
+    "title": "BindingSource",
+    "type": "string"
+  },
   "BlockCatalog": {
     "additionalProperties": false,
     "properties": {
@@ -1681,6 +1692,23 @@ export const schemas = {
         "title": "Role",
         "type": "string"
       },
+      "source": {
+        "anyOf": [
+          {
+            "enum": [
+              "run_override",
+              "workspace_override",
+              "workspace_default",
+              "builtin_default"
+            ],
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Source"
+      },
       "wire_id": {
         "title": "Wire Id",
         "type": "string"
@@ -1690,7 +1718,8 @@ export const schemas = {
       "role",
       "profile",
       "canonical_id",
-      "wire_id"
+      "wire_id",
+      "source"
     ],
     "title": "FrozenBinding",
     "type": "object"
@@ -2141,9 +2170,38 @@ export const schemas = {
         "title": "Canonical Id",
         "type": "string"
       },
+      "capabilities": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Capabilities",
+        "type": "array"
+      },
+      "input_per_million_micro_usd": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Input Per Million Micro Usd"
+      },
       "offered": {
         "title": "Offered",
         "type": "boolean"
+      },
+      "output_per_million_micro_usd": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Output Per Million Micro Usd"
       },
       "profile": {
         "$ref": "#/components/schemas/ModelProfileId"
@@ -2158,7 +2216,10 @@ export const schemas = {
       "canonical_id",
       "wire_id",
       "available",
-      "offered"
+      "offered",
+      "input_per_million_micro_usd",
+      "output_per_million_micro_usd",
+      "capabilities"
     ],
     "title": "ModelAvailability",
     "type": "object"
@@ -2353,6 +2414,18 @@ export const schemas = {
         "title": "Catalog Status",
         "type": "string"
       },
+      "fetched_at": {
+        "anyOf": [
+          {
+            "format": "date-time",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Fetched At"
+      },
       "models": {
         "items": {
           "$ref": "#/components/schemas/ModelAvailability"
@@ -2369,6 +2442,7 @@ export const schemas = {
     "required": [
       "schema_version",
       "catalog_status",
+      "fetched_at",
       "models"
     ],
     "title": "ModelList",
@@ -2378,7 +2452,14 @@ export const schemas = {
     "additionalProperties": false,
     "properties": {
       "default_profile": {
-        "$ref": "#/components/schemas/ModelProfileId"
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ModelProfileId"
+          },
+          {
+            "type": "null"
+          }
+        ]
       },
       "policy": {
         "$ref": "#/components/schemas/EffectiveRolePolicy"
@@ -2415,7 +2496,14 @@ export const schemas = {
     "description": "Not strict, so JSON strings become enums. Unknown fields and values are still refused.",
     "properties": {
       "default_profile": {
-        "$ref": "#/components/schemas/ModelProfileId"
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ModelProfileId"
+          },
+          {
+            "type": "null"
+          }
+        ]
       },
       "expected_version": {
         "minimum": 0.0,
@@ -3136,6 +3224,9 @@ export const schemas = {
       "role": {
         "$ref": "#/components/schemas/ModelRole"
       },
+      "source": {
+        "$ref": "#/components/schemas/BindingSource"
+      },
       "wire_id": {
         "title": "Wire Id",
         "type": "string"
@@ -3145,7 +3236,8 @@ export const schemas = {
       "role",
       "profile",
       "canonical_id",
-      "wire_id"
+      "wire_id",
+      "source"
     ],
     "title": "RoleBinding",
     "type": "object"
@@ -6156,6 +6248,12 @@ export function parseAssignmentView(value: unknown): AssignmentView {
   return parseWith(schemas, "AssignmentView", value) as AssignmentView;
 }
 
+export type BindingSource = "run_override" | "workspace_override" | "workspace_default" | "builtin_default";
+
+export function parseBindingSource(value: unknown): BindingSource {
+  return parseWith(schemas, "BindingSource", value) as BindingSource;
+}
+
 export interface BlockCatalog {
   blocks: BlockView[];
   schema_version: 1;
@@ -6473,6 +6571,7 @@ export interface FrozenBinding {
   canonical_id: string;
   profile: string;
   role: string;
+  source: "run_override" | "workspace_override" | "workspace_default" | "builtin_default" | null;
   wire_id: string;
 }
 
@@ -6610,7 +6709,10 @@ export function parseMemorySearchView(value: unknown): MemorySearchView {
 export interface ModelAvailability {
   available: boolean;
   canonical_id: string;
+  capabilities: string[];
+  input_per_million_micro_usd: number | null;
   offered: boolean;
+  output_per_million_micro_usd: number | null;
   profile: ModelProfileId;
   wire_id: string;
 }
@@ -6657,6 +6759,7 @@ export function parseModelCallView(value: unknown): ModelCallView {
 
 export interface ModelList {
   catalog_status: "available" | "unavailable" | "unknown";
+  fetched_at: string | null;
   models: ModelAvailability[];
   schema_version: 1;
 }
@@ -6666,7 +6769,7 @@ export function parseModelList(value: unknown): ModelList {
 }
 
 export interface ModelPolicyState {
-  default_profile: ModelProfileId;
+  default_profile: ModelProfileId | null;
   policy: EffectiveRolePolicy;
   role_overrides: Record<string, unknown>;
   schema_version: 1;
@@ -6678,7 +6781,7 @@ export function parseModelPolicyState(value: unknown): ModelPolicyState {
 }
 
 export interface ModelPolicyUpdate {
-  default_profile: ModelProfileId;
+  default_profile: ModelProfileId | null;
   expected_version: number;
   role_overrides: Record<string, unknown>;
 }
@@ -6897,6 +7000,7 @@ export interface RoleBinding {
   canonical_id: string;
   profile: ModelProfileId;
   role: ModelRole;
+  source: BindingSource;
   wire_id: string;
 }
 
@@ -7822,6 +7926,10 @@ export async function getModelPolicy(options: ClientOptions): Promise<ModelPolic
 
 export async function putModelPolicy(options: ClientOptions, body: ModelPolicyUpdate): Promise<ModelPolicyState> {
   return parseModelPolicyState(await requestJson(options, "PUT", `/v1/settings/model-policy`, body));
+}
+
+export async function resetModelPolicyOverrides(options: ClientOptions, body: ExpectedVersion): Promise<ModelPolicyState> {
+  return parseModelPolicyState(await requestJson(options, "POST", `/v1/settings/model-policy/reset`, body));
 }
 
 export async function getModelProviders(options: ClientOptions): Promise<ProviderStatus> {

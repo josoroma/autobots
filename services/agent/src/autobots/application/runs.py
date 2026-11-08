@@ -140,6 +140,8 @@ def _snapshot(policy: RolePolicy | None) -> str:
         {
             "version": policy.version,
             "bindings": {role.value: profile.value for role, profile in policy.bindings.items()},
+            # Where each binding came from, PRD-Studio MD-02. Older snapshots have none.
+            "sources": {role.value: source.value for role, source in policy.sources.items()},
             "routes": {
                 profile.value: {
                     "wire_id": PROFILES[profile].wire_id,

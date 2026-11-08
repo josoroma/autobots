@@ -29,6 +29,10 @@ class CatalogEntry:
     canonical_slug: str
     supported_parameters: frozenset[str]
     pricing: Pricing | None = None
+    # The listed base rates in micro-USD per 1M tokens, for display only (PRD-Studio MD-01).
+    # Admission reserves from `pricing`, the worst reachable rate, never from these.
+    listed_input_per_million: int | None = None
+    listed_output_per_million: int | None = None
 
 
 @dataclass(frozen=True)
@@ -95,6 +99,14 @@ def parse_pricing(item: Mapping[str, Any]) -> Pricing | None:
     return Pricing(prompt, completion, request, min(above) if above else None)
 
 
+def _listed(value: object) -> int | None:
+    """USD per token as listed, in micro-USD per 1M tokens. A negative or unreadable one is None."""
+    if value is None:
+        return None
+    price = _scaled(value, 1_000_000 * 1_000_000)
+    return price if price is not None and price >= 0 else None
+
+
 def parse_catalog(
     payload: Mapping[str, Any], *, retrieved_at: datetime, revision: str
 ) -> CatalogSnapshot:
@@ -104,7 +116,17 @@ def parse_catalog(
         wire_id, slug = item.get("id"), item.get("canonical_slug")
         if isinstance(wire_id, str) and isinstance(slug, str):
             supported = frozenset(str(name) for name in item.get("supported_parameters") or ())
-            entries.append(CatalogEntry(wire_id, slug, supported, parse_pricing(item)))
+            listed = item.get("pricing") if isinstance(item.get("pricing"), Mapping) else {}
+            entries.append(
+                CatalogEntry(
+                    wire_id,
+                    slug,
+                    supported,
+                    parse_pricing(item),
+                    _listed(listed.get("prompt")),
+                    _listed(listed.get("completion")),
+                )
+            )
     return CatalogSnapshot(revision, retrieved_at, tuple(entries))
 
 

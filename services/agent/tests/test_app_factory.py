@@ -66,6 +66,7 @@ def test_the_schema_builds_without_any_connection() -> None:
         "/v1/readiness",
         "/v1/session",
         "/v1/settings/model-policy",
+        "/v1/settings/model-policy/reset",
         "/v1/settings/model-providers",
         "/v1/settings/model-providers/openrouter/credential",
         "/v1/settings/model-providers/openrouter/validate",

@@ -69,6 +69,11 @@ class ModelAvailability(BaseModel):
     available: bool
     # New work can choose it. An approved model that isn't offered stays listed, with its record.
     offered: bool
+    # From the catalog only, PRD-Studio MD-01, and never a qualification. Micro-USD per 1M tokens,
+    # None when this exact model isn't in a fresh catalog or its base price can't be read.
+    input_per_million_micro_usd: int | None
+    output_per_million_micro_usd: int | None
+    capabilities: list[str]
 
 
 class ModelList(BaseModel):
@@ -76,6 +81,8 @@ class ModelList(BaseModel):
 
     schema_version: Literal[1]
     catalog_status: CatalogStatus
+    # When the catalog behind these facts was fetched, or None when it couldn't be.
+    fetched_at: datetime | None
     models: list[ModelAvailability]
 
 
@@ -85,7 +92,8 @@ class ModelPolicyUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     expected_version: int = Field(ge=0)
-    default_profile: ModelProfileId
+    # None names no workspace default, so each role takes its built-in default (MD-02).
+    default_profile: ModelProfileId | None
     role_overrides: dict[str, ModelProfileId]
 
 
@@ -94,7 +102,7 @@ class ModelPolicyState(BaseModel):
 
     schema_version: Literal[1]
     version: int
-    default_profile: ModelProfileId
+    default_profile: ModelProfileId | None
     role_overrides: dict[str, ModelProfileId]
     policy: EffectiveRolePolicy
 

@@ -267,7 +267,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
                                      'AUTOBOTS_TEST_SERVICE_KEY': stack.values['SERVICE_ROLE_KEY'], 'AUTOBOTS_WEB_REPORT': str(report),
                                      'AUTOBOTS_WEB_OUTPUT': str(root / '.checks/identity/results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots),
                                      'AUTOBOTS_TEST_VISUAL_DIR': str(root / '.checks/identity/visual')}
-        result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'browser/operations', 'approvals', 'effects', 'experts', 'identity', 'settings', 'runs', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
+        result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'browser/operations', 'approvals', 'effects', 'experts', 'models', 'identity', 'settings', 'runs', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
                                 env=browser_env)
         # A real restart, then Settings reads the stored records. Then one is removed, under the same key.
         stop(processes[0])
@@ -477,6 +477,21 @@ def qualify(root: Path) -> int:
             f"insert into public.workflow_versions (workflow_id, version, graph, graph_hash, block_versions, source, created_by) "
             f"values ('{flow}', 1, '{graph}', 'arranged', '{{}}', 'user', '{curator['user_id']}');\n")
         artifacts = {**artifacts, 'AUTOBOTS_TEST_EXPERTS_EMAIL': email_h, 'AUTOBOTS_TEST_EXPERTS_PASSWORD': password_h}
+        # US-15.8, arranged: an owner whose workspace saves no default and one role override, and a run
+        # admitted with a run role override, through the admission code (tests/db/model_sources.py).
+        email_i, password_i = 'models-i@example.invalid', secrets.token_urlsafe(24)
+        chooser = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_i, password_i)
+        sourced = subprocess.run([str(root / PYTHON), str(root / 'tests/db/model_sources.py'), chooser['workspace_id'], chooser['user_id']],
+                                 capture_output=True, text=True, errors='replace', timeout=120, check=False, cwd=root,
+                                 env={**tool_env(), 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1', 'AUTOBOTS_DATABASE_URL': runtime_url})
+        if sourced.returncode:
+            raise Unavailable(f'the binding-source run could not be arranged: {sourced.stderr[-500:]}')
+        sources = json.loads(sourced.stdout.strip().splitlines()[-1])
+        cases.check('a run admitted with a run role override records its sources', 'executor run_override, coder workspace_override, researcher builtin_default',
+                    str({role: sources['sources'].get(role) for role in ('executor', 'coder', 'researcher')}),
+                    (sources['sources'].get('executor'), sources['sources'].get('coder'), sources['sources'].get('researcher'))
+                    == ('run_override', 'workspace_override', 'builtin_default'))
+        artifacts = {**artifacts, 'AUTOBOTS_TEST_MODELS_EMAIL': email_i, 'AUTOBOTS_TEST_MODELS_PASSWORD': password_i, 'AUTOBOTS_TEST_MODELS_RUN': sources['run_id']}
         # Its own workspace with no key, as the one above asserts that it holds exactly one run.
         email_e, password_e = 'owner-e@example.invalid', secrets.token_urlsafe(24)
         owner_e = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_e, password_e)

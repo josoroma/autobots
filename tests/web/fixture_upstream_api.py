@@ -17,9 +17,12 @@ import uvicorn
 from autobots.adapters.models.factory import OPENROUTER_BASE_URL
 from autobots.adapters.models.openrouter_metadata import catalog_fetcher, key_validator
 from autobots.api.main import create_configured_app
-from autobots.domain.models import PROFILES
+from autobots.domain.models import PROFILES, ModelProfileId
 
 LOG = Path(os.environ['AUTOBOTS_TEST_UPSTREAM_LOG'])
+PARAMETERS = ('max_tokens', 'response_format', 'tool_choice', 'tools')
+PRICES = {ModelProfileId.DEEPSEEK_FLASH: ('0.0000002', '0.0000008'), ModelProfileId.TERRA: ('0.00000125', '0.00001'),
+          ModelProfileId.SOL: ('0.000003', '0.000015')}
 
 
 def handle(request: httpx.Request) -> httpx.Response:
@@ -33,7 +36,9 @@ def handle(request: httpx.Request) -> httpx.Response:
     if request.url.path.endswith('/models'):
         if Path(os.environ['AUTOBOTS_TEST_CATALOG_DOWN']).exists():
             return httpx.Response(503)
-        data = [{'id': p.wire_id, 'canonical_slug': p.canonical_id, 'supported_parameters': []} for p in PROFILES.values()]
+        # US-15.8: listed prices and parameters, so Models shows catalog facts. USD per token.
+        data = [{'id': p.wire_id, 'canonical_slug': p.canonical_id, 'supported_parameters': list(PARAMETERS),
+                 'pricing': {'prompt': PRICES[p.id][0], 'completion': PRICES[p.id][1]}} for p in PROFILES.values()]
         return httpx.Response(200, content=json.dumps({'data': data}))
     return httpx.Response(599)
 

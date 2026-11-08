@@ -50,6 +50,7 @@ from autobots.application.worker_leases import Lease
 from autobots.domain.models import (
     MAX_OUTPUT_TOKENS,
     PROFILES,
+    BindingSource,
     ModelRole,
     RolePolicy,
     UnknownModelProfile,
@@ -113,7 +114,12 @@ def frozen_policy(snapshot: Mapping[str, Any] | None) -> RolePolicy:
         current = PROFILES[approved_profile(name)]
         if route != {"wire_id": current.wire_id, "canonical_id": current.canonical_id}:
             raise UnknownModelProfile("this run was frozen on another model for that profile")
-    return RolePolicy(int((snapshot or {}).get("version", 0)), policy)
+    sources = {
+        approved_role(role): BindingSource(source)
+        for role, source in ((snapshot or {}).get("sources") or {}).items()
+        if source in BindingSource._value2member_map_
+    }
+    return RolePolicy(int((snapshot or {}).get("version", 0)), policy, sources)
 
 
 def prepared(

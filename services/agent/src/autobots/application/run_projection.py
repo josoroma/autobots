@@ -44,6 +44,7 @@ from autobots.domain.models import (
     CONTEXT_TOKENS,
     MAX_OUTPUT_TOKENS,
     PROFILES,
+    BindingSource,
     UnknownModelProfile,
     approved_profile,
 )
@@ -225,6 +226,9 @@ async def _expert(connection: Any, run_id: UUID) -> ExpertBinding | None:
     )
 
 
+BINDING_SOURCES = frozenset(source.value for source in BindingSource)
+
+
 async def _role_map(connection: Any, run_id: UUID) -> list[FrozenBinding]:
     cursor = await connection.execute(
         "select policy_snapshot from public.runs where id = %s", (run_id,)
@@ -232,12 +236,14 @@ async def _role_map(connection: Any, run_id: UUID) -> list[FrozenBinding]:
     row = await cursor.fetchone()
     snapshot = (row[0] if row else None) or {}
     routes = snapshot.get("routes") or {}
+    sources = snapshot.get("sources") or {}
     return [
         FrozenBinding(
             role=role,
             profile=profile,
             canonical_id=_canonical_id(profile, routes),
             wire_id=str((routes.get(profile) or {}).get("wire_id") or "unknown"),
+            source=sources.get(role) if sources.get(role) in BINDING_SOURCES else None,
         )
         for role, profile in sorted((snapshot.get("bindings") or {}).items())
     ]

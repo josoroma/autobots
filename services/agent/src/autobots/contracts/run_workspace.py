@@ -127,6 +127,10 @@ class FrozenBinding(BaseModel):
     profile: str
     canonical_id: str
     wire_id: str
+    # Which step of MP-01's order chose it. None for a run admitted before sources were recorded.
+    source: (
+        Literal["run_override", "workspace_override", "workspace_default", "builtin_default"] | None
+    )
 
 
 class RunWorkspace(BaseModel):

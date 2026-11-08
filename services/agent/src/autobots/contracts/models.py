@@ -5,7 +5,13 @@ from typing import Literal
 from pydantic import BaseModel
 
 from autobots.contracts.primitives import STRICT_CONTRACT
-from autobots.domain.models import PROFILES, ModelProfileId, ModelRole, RolePolicy
+from autobots.domain.models import (
+    PROFILES,
+    BindingSource,
+    ModelProfileId,
+    ModelRole,
+    RolePolicy,
+)
 
 
 class RoleBinding(BaseModel):
@@ -15,6 +21,8 @@ class RoleBinding(BaseModel):
     profile: ModelProfileId
     canonical_id: str
     wire_id: str
+    # Which step of MP-01's order chose it, PRD-Studio MD-02.
+    source: BindingSource
 
 
 class EffectiveRolePolicy(BaseModel):
@@ -35,6 +43,7 @@ def effective_policy(policy: RolePolicy) -> EffectiveRolePolicy:
                 profile=profile,
                 canonical_id=PROFILES[profile].canonical_id,
                 wire_id=PROFILES[profile].wire_id,
+                source=policy.sources[role],
             )
             for role, profile in policy.bindings.items()
         ],

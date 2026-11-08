@@ -79,6 +79,13 @@ const CONNECTION_TEXT = {
 type Connection = keyof typeof CONNECTION_TEXT;
 const RECONNECT_MS = 1000;
 
+// PRD-Studio MD-02: which step of MP-01's order chose the binding when this run was admitted.
+const ROLE_SOURCE: Record<string, string> = {
+  run_override: "run override",
+  workspace_override: "workspace override",
+  workspace_default: "workspace default",
+  builtin_default: "built-in default",
+};
 function describe(event: RunEvent): string {
   const payload = event.payload;
   if (payload.type === "run.status_changed") {
@@ -648,6 +655,15 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
                       <span className="text-muted-foreground font-mono text-xs break-all">
                         {binding.wire_id}
                       </span>
+                      {binding.source === null ? null : (
+                        <span
+                          data-binding-source={binding.source}
+                          className="text-muted-foreground"
+                        >
+                          {" "}
+                          · {ROLE_SOURCE[binding.source]}
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>
