@@ -48,6 +48,29 @@ Run it with the same tool variables the worker has, such as `GITHUB_REPOSITORY` 
 
 Expected: one line of JSON naming what was created, kept or left as a draft.
 
+## Real examples on the install (paid)
+
+Decision 0023 E6. This spends money, from the shared ledger, so it refuses without `--paid`. It reserves US$0.45 before anything is sent, and refuses while another job is queued or a routine is enabled.
+
+```sh
+services/agent/.venv/bin/python scripts/persistent_install.py examples --project autobots-install --paid
+```
+
+It signs in as the owner from the install's own record, which it never prints, and does five things:
+- runs the concept seed above;
+- gives Market watcher and Research analyst `publish_artifact` through one new version each (E7);
+- runs two small goals: one on Terra, and one with Brief writer on Sol;
+- starts the published Vendor due diligence workflow for one vendor;
+- runs one worker with inference on, until the goals end and the workflow waits at its approval or ends.
+
+A goal that already succeeded isn't run again. It writes a private report under the install's `reports/`. A workflow still waiting keeps its whole reservation held in the ledger.
+
+Expected: exit 0. In the app, Approvals shows one `workflow_approval` waiting. To see the screens as the owner without typing the password, run the read-only checks. They write screenshots to `.checks/install-screens`:
+
+```sh
+services/agent/.venv/bin/python scripts/persistent_install.py screens --project autobots-install
+```
+
 ## OpenRouter settings
 
 Settings → Models → OpenRouter shows the source, authentication, catalog and live qualification separately. **Save & validate** sends a transient key to this Mac's server, checks `GET /key` and the public catalog, encrypts it and never starts a run. A rejected key or an outage leaves the previous key in place. Disconnect removes only the workspace's stored key.

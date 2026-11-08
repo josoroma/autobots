@@ -57,7 +57,12 @@ class PlanTask(BaseModel):
     id: str = Field(pattern=r"^[a-z0-9_-]{1,40}$")
     title: str = Field(min_length=1, max_length=300)
     depends_on: list[str] = Field(default_factory=list, max_length=30)
-    criteria: list[str] = Field(default_factory=list, max_length=20)
+    criteria: list[str] = Field(
+        default_factory=list,
+        max_length=20,
+        description="IDs of the goal's criteria this task covers, exactly as listed, such as c1. "
+        "Never a criterion's text.",
+    )
     tools: list[str] = Field(default_factory=list, max_length=20)
     expected_evidence: str = Field(min_length=1, max_length=500)
 

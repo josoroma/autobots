@@ -92,6 +92,10 @@ def main() -> None:
               (configs['Code maintainer']['tools'], configs['Market watcher']['tools']),
               {'search_files', 'read_code_file', 'patch_code_file', 'write_code_file'} <= set(configs['Code maintainer']['tools'])
               and {'calculate', 'read_csv', 'save_artifact'} <= set(configs['Market watcher']['tools']))
+        # Decision 0023 E7: an Expert that saves can publish, so a workflow step it runs can pass verification.
+        publishing = {name: 'publish_artifact' in configs[name]['tools'] for name in ('Market watcher', 'Research analyst', 'Brief writer')}
+        check('every concept Expert that saves files can also publish them', 'Market watcher, Research analyst and Brief writer publish',
+              publishing, all(publishing.values()))
         labels = rows(db, "select v.graph -> 'nodes' from public.workflow_versions v join public.workflows w on w.id = v.workflow_id "
                           "where w.workspace_id = %s and w.name = 'Vendor due diligence'", WORKSPACE)
         steps = [node.get('label') for node in labels[0][0] if node.get('block') == 'agent'] if labels else []

@@ -114,7 +114,7 @@ PAUSE_FOR = frozenset(
 )
 NOT_OURS = frozenset({"lease_lost", "run_not_running", "run_not_found", "approval_pending"})
 SYSTEM_PROMPT = (
-    "Work only on the stated goal. First call propose_plan, covering every criterion. "
+    "Work only on the stated goal. First call propose_plan, covering every criterion by its ID. "
     "Use only the tools offered. Call complete_task with real evidence as tasks finish. "
     "When every task is complete, reply without calling a tool."
 )
@@ -264,13 +264,21 @@ async def _scope_guidance(connection: Any, run_id: UUID, goal: GoalSpec) -> str:
 
 def _opening(goal: GoalSpec) -> str:
     criteria = "\n".join(f"- {name}: {text}" for name, text in sorted(goal.criteria.items()))
-    opening = f"Goal: {goal.objective}\n\nCriteria:\n{criteria}"
+    # Decision 0023: a plan cites criteria by ID. A model that copied their text, or treated a
+    # delivery step as one, had its plan refused as out of scope, and a refusal names only a code.
+    ids = ", ".join(sorted(goal.criteria))
+    opening = (
+        f"Goal: {goal.objective}\n\nCriteria:\n{criteria}\n\n"
+        f"In propose_plan, each task's criteria field lists criterion IDs from this list ({ids}) "
+        "and nothing else: never their text, and no new criteria."
+    )
     if "publish_artifact" not in goal.allowed_tools:
         return opening
     # Verification accepts only published files, so the model has to know that from the start.
     lines = [
-        "Saving a file delivers nothing. Before your final reply, save it under outputs/ with "
-        "save_artifact, then call publish_artifact with its path and version."
+        "These are steps, not criteria. Saving a file delivers nothing. Before your final "
+        "reply, save it under outputs/ with save_artifact, then call publish_artifact with its "
+        "path and version."
     ]
     for required in goal.required_artifacts:
         lines.append(f"- Publish a file named {required.name}.")

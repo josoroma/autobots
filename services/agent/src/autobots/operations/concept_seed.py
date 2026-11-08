@@ -43,7 +43,14 @@ EXPERTS = (
     ExpertSeed(
         "Market watcher",
         "Tracks prices, exchange rates and inflation, and explains what moved and why it matters.",
-        ("market_history", "inflation_rates", "calculate", "read_csv", "save_artifact"),
+        (
+            "market_history",
+            "inflation_rates",
+            "calculate",
+            "read_csv",
+            "save_artifact",
+            "publish_artifact",
+        ),
     ),
     ExpertSeed(
         "Research analyst",
@@ -55,6 +62,7 @@ EXPERTS = (
             "tavily_search",
             "tavily_extract",
             "save_artifact",
+            "publish_artifact",
         ),
     ),
     ExpertSeed(

@@ -141,7 +141,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
 - **Concept seed:** `python -m autobots.operations.concept_seed --workspace <id>`.
 - **Paid operations modules:** `operations/route_qualification.py`, `operations/reasoning_trial.py`, and `operations/browse_trial.py` (through `scripts/browse_trial.py`).
 - **Install and data:**
-  - `scripts/persistent_install.py`: `init`, `up`, `setup`, `status`, `apply`, `goal`. `reset` and `apply --reset` exist only to refuse.
+  - `scripts/persistent_install.py`: `init`, `up`, `setup`, `status`, `apply`, `goal`, and, after the analyzed revision (US-16.4, US-16.5), `screens` (read-only owner browser checks, `install-current.spec.ts`) and `examples` (paid, US$0.45 from the shared ledger). `reset` and `apply --reset` exist only to refuse.
   - `scripts/local_backup.py`: `keygen`, `backup`, `restore`, `verify`.
 - **Paid or real-world runners, in no profile:**
   - `scripts/live_goal.py`, `scripts/qualify_release.py`;
@@ -293,7 +293,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
   - One draft per workflow, which an owner can save, publish or discard. Executions and routines refuse `"draft"` with `draft_not_runnable`.
   - The list gives the Experts, step count, last execution and run count, with `/executions` and `/preview`.
   - Executions accept a D11 budget.
-- **Concept seed:** `operations/concept_seed.py` creates five Experts and six workflows through the application layer, as the owner.
+- **Concept seed:** `operations/concept_seed.py` creates five Experts and six workflows through the application layer, as the owner. Since Decision 0023 E7, after the analyzed revision, Market watcher and Research analyst also get `publish_artifact`. Since E8, `goal_loop.SYSTEM_PROMPT`, the goal's opening and `PlanTask.criteria`'s description say a plan cites criterion IDs only.
   - It keeps anything already named.
   - It strips unavailable tools and says so in the Expert's purpose.
   - It saves the GitHub-dependent workflows (while GitHub is unavailable) and Interview synthesis as drafts.

@@ -161,3 +161,34 @@ def test_a_reply_shows_the_operation_id_a_receipt_has_to_cite() -> None:
     effect = ToolResult(ToolOutcome.SUCCEEDED, output={}, operation_id="op-1")
     assert json.loads(effect.for_model())["operation_id"] == "op-1"
     assert "operation_id" not in json.loads(ToolResult(ToolOutcome.SUCCEEDED).for_model())
+
+
+def test_the_opening_says_a_plan_cites_criteria_by_id() -> None:
+    """Live, Sol cited a criterion by its text and turned a delivery step into a criterion, and
+    the plan was refused as out of scope twice. The model is told the IDs, and that steps aren't
+    criteria."""
+    goal = GOAL.model_copy(update={"allowed_tools": {"save_artifact": 1, "publish_artifact": 1}})
+    opening = _opening(goal)
+    assert "criterion IDs from this list (c1, c2)" in opening
+    assert "never their text, and no new criteria" in opening
+    assert "These are steps, not criteria." in opening
+
+
+def test_the_plan_schema_describes_criteria_as_ids() -> None:
+    """What the model reads in propose_plan's own schema."""
+    schema = PlanProposal.model_json_schema()
+    described = schema["$defs"]["PlanTask"]["properties"]["criteria"]["description"]
+    assert "IDs of the goal's criteria" in described and "such as c1" in described
+
+
+def test_a_criterion_cited_by_its_text_is_still_refused() -> None:
+    """The check itself is unchanged: only the listed IDs count."""
+    cited = PlanTask(
+        id="a",
+        title="Write it",
+        criteria=["c1: Has a summary", "c2"],
+        expected_evidence="outputs/report.md",
+    )
+    with pytest.raises(PlanRejected) as refused:
+        validate_proposal(GOAL, PlanProposal(tasks=[cited]), None, frozenset())
+    assert (refused.value.code, refused.value.detail) == ("plan_out_of_scope", "criterion")

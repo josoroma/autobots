@@ -51,3 +51,11 @@ def test_the_github_tools_are_unavailable_until_both_variables_are_set() -> None
         assert tool not in without
         assert tool in with_github
     assert {"calculate", "save_artifact", "read_csv"} <= without
+
+
+def test_every_concept_expert_that_saves_can_publish() -> None:
+    """Decision 0023 E7: verification needs a published file from every run, a workflow's
+    delegated step included, so an Expert that saves files is granted publish_artifact too."""
+    for expert in EXPERTS:
+        if "save_artifact" in expert.tools:
+            assert "publish_artifact" in expert.tools, expert.name

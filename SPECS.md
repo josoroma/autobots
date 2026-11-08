@@ -584,10 +584,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-16.4#1 | Back up the install, then apply the pending migrations through the guarded path. | DONE | US-16.4 |
 | US-16.4#2 | Run Sol's corpus live within its ledger, and record the report. | DONE | US-16.4 |
 | US-16.4#3 | Record today's qualification in a migration, apply it, and check Settings → Models. | DONE | US-16.4 |
-| US-16.5 | Real examples on the install | READY | EPIC-16 |
-| US-16.5#1 | Seed the concept Experts and workflows into the owner workspace. | TODO | US-16.5 |
-| US-16.5#2 | Add a guarded command that runs the example goals and workflow live under the shared ledger. | TODO | US-16.5 |
-| US-16.5#3 | Check Runs, Experts, Workflows and Approvals show them. | TODO | US-16.5 |
+| US-16.5 | Real examples on the install | DONE | EPIC-16 |
+| US-16.5#1 | Seed the concept Experts and workflows into the owner workspace. | DONE | US-16.5 |
+| US-16.5#2 | Add a guarded command that runs the example goals and workflow live under the shared ledger. | DONE | US-16.5 |
+| US-16.5#3 | Tell the model that a plan cites criteria by ID, which live Expert runs got wrong. | DONE | US-16.5 |
+| US-16.5#4 | Check Runs, Experts, Workflows and Approvals show them. | DONE | US-16.5 |
 
 ## Dependency Diagram
 
@@ -1888,8 +1889,10 @@ flowchart TD
     US_16_5 --> T_16_5_1
     T_16_5_2["US-16.5#2: Add a guarded command that runs the example goals and workflow live under the shared ledger."]
     US_16_5 --> T_16_5_2
-    T_16_5_3["US-16.5#3: Check Runs, Experts, Workflows and Approvals show them."]
+    T_16_5_3["US-16.5#3: Tell the model that a plan cites criteria by ID, which live Expert runs got wrong."]
     US_16_5 --> T_16_5_3
+    T_16_5_4["US-16.5#4: Check Runs, Experts, Workflows and Approvals show them."]
+    US_16_5 --> T_16_5_4
   end
 ```
 
@@ -7572,7 +7575,8 @@ Open Questions:
 
 ### US-16.5: Real examples on the install
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-16-5-real-examples-install/`
 
 As an owner
 I want real Experts, workflows, runs and an approval in my app
@@ -7606,9 +7610,10 @@ Dependencies:
 - US-16.4
 
 Tasks:
-- [ ] Seed the concept Experts and workflows into the owner workspace.
-- [ ] Add a guarded command that runs the example goals and workflow live under the shared ledger.
-- [ ] Check Runs, Experts, Workflows and Approvals show them.
+- [x] Seed the concept Experts and workflows into the owner workspace.
+- [x] Add a guarded command that runs the example goals and workflow live under the shared ledger.
+- [x] Tell the model that a plan cites criteria by ID, which live Expert runs got wrong.
+- [x] Check Runs, Experts, Workflows and Approvals show them.
 
 Open Questions:
 - None.

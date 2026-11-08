@@ -174,8 +174,8 @@ All of these use one configured repository (`GITHUB_REPOSITORY`) and the worker-
 
 | Expert | Purpose | Tools |
 |---|---|---|
-| Market watcher | Tracks prices, exchange rates and inflation, and explains what moved and why it matters | `market_history`, `inflation_rates`, `calculate`, `read_csv`, `save_artifact` |
-| Research analyst | Searches the web and reads sources carefully. Cites every claim and flags anything it couldn't confirm | `search_web`, `extract_website_content`, `tavily_search`, `tavily_extract`, `save_artifact` |
+| Market watcher | Tracks prices, exchange rates and inflation, and explains what moved and why it matters | `market_history`, `inflation_rates`, `calculate`, `read_csv`, `save_artifact`, `publish_artifact` |
+| Research analyst | Searches the web and reads sources carefully. Cites every claim and flags anything it couldn't confirm | `search_web`, `extract_website_content`, `tavily_search`, `tavily_extract`, `save_artifact`, `publish_artifact` |
 | Brief writer | Turns findings into a short brief with a recommendation, a comparison table and numbered sources | `read_run_file`, `save_artifact`, `publish_artifact` |
 | Issue triager | Groups failing checks by cause and drafts one GitHub issue per distinct failure. Each issue waits for you | `read_csv`, `github_list_workflow_runs`, `github_search_issues`, `create_github_issue` |
 | Code maintainer | Reads the repository, edits copies in the run's files, and proposes a pull request that waits for you | `github_read_file`, `search_files`, `read_code_file`, `patch_code_file`, `write_code_file`, `github_open_pull_request` |
