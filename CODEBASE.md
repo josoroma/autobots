@@ -1,340 +1,453 @@
 # Autobots codebase context
 
-**Inspected:** 2026-11-06. **Scope:** descriptive inventory of what the repository currently is. This file supplies no product requirements.
+Analyzed revision: 095a97614b4fe65427072c74c166218a70213723
+Working tree: dirty. Modified: `openspec/delivery/goal.md` only (the delivery loop's status record: EPIC-15 goal set to COMPLETE and US-15.25 to DONE, not committed). Nothing untracked is described.
 
-Analyzed revision: 4315944bf8dc34300360e4a4cec2cf8c3937e7b6
-Working tree: dirty. Modified: `.env.example`. Untracked and not described here: `README-QA.md`, `docs/diagrams/`, `docs/engineering/evidence/DOC-QA-001/`, `docs/engineering/work-items/DOC-QA-001.md`.
+**Inspected:** 2026-11-08, at HEAD on `main` (committed 2026-11-08T13:37:14-06:00, no remote). **Scope:** what the repository currently is. This file supplies no product requirements.
 
 ## System Summary
 
-The repository holds product PRDs, a source-traceable backlog, local delivery and verification tooling, and a local application: a Next.js web app, a FastAPI API, a Python worker running goals through Deep Agents and LangGraph, self-hosted Supabase in Docker, and inference through OpenRouter only. `SPECS.md` has 13 epics and 64 stories: 62 `DONE` and 2 `BLOCKED` (US-13.1 and US-13.2, each with an `External:` dependency on the owner scheduling it).
+The repository holds:
+- product PRDs and a backlog where every story traces to its sources;
+- local delivery and verification tooling;
+- a local application: a Next.js web app, a FastAPI API, and a Python worker that runs goals through Deep Agents and LangGraph, with self-hosted Supabase in Docker and inference through OpenRouter only.
 
-The worker claims and runs admitted jobs only when `AUTOBOTS_WORKER_INFERENCE=enabled`; by default it does maintenance only. That path has run on fake transports, on disposable stacks with a real provider, and on one persistent install on this Mac, which its latest record leaves stopped.
+`SPECS.md` has 15 epics and 105 stories, all `Status: DONE`. EPIC-14 is the tool catalog and EPIC-15 is the Studio product surfaces.
 
-[The US-10.2 release record](docs/engineering/evidence/US-10.2/summary.md) reads H1 as "met, with its stated limits" and product acceptance as "supported by this record, with the limits the owner accepted", leaving release to the owner. Passing a verification profile establishes neither.
+The worker claims and runs admitted jobs only when `AUTOBOTS_WORKER_INFERENCE=enabled`. By default it does maintenance only. That path has run on fake transports, on disposable stacks with a real provider, and on one persistent install on this Mac. The install's latest record (US-12.6) leaves it stopped at migration 35, and nothing since records applying migrations 36–49 to it.
+
+[The US-10.2 release record](docs/engineering/evidence/US-10.2/summary.md) reads H1 as "met, with its stated limits" and leaves release to the owner. Passing a verification profile establishes neither H1 nor product acceptance. Neither do the EPIC-14 and EPIC-15 per-story records, which each say so.
 
 ## Repository Map
 
-- **Intent:** `PRD-*.md` and `SPECS.md`, mapped through `.claude/autobots.json`. `docs/engineering/option-b-contract.md` is the technical contract.
+- **Intent:** `PRD-*.md` (10 files, including `PRD-Studio.md` and `PRD-Tool-Catalog.md`) and `SPECS.md`, mapped through `.claude/autobots.json`. The technical contract is `docs/engineering/option-b-contract.md`.
 - **Source:**
-  - `services/agent/src/autobots/`: Python service.
-  - `apps/web/`: Next.js.
-  - `packages/api-client/src/runtime.ts`: client runtime.
-  - `supabase/migrations/`, `supabase/seeds/`, `supabase/bootstrap/`: SQL.
-  - `infra/`: Compose, including a vendored Supabase release in `infra/supabase/upstream/`.
-- **Generated:** `contracts/generated/openapi.json`, `packages/api-client/src/generated.ts`, `packages/db-types/src/generated.ts`. Backlog navigation in `SPECS.md` is also generated.
-- **Tests:** `services/agent/tests/` (24 test modules plus a fake OpenRouter), `apps/web/tests/` (25 browser specs, 2 unit tests), `packages/api-client/tests/`, `tests/harness/`, `tests/db/`, `tests/web/`, `tests/faults/`, `tests/toolchain/`, `tests/qualification/`. `contracts/fixtures/` holds shared cases.
-- **Tooling:** `scripts/`, with `.claude/` (agents, skills, rules, hooks, `settings.json`).
-- **Delivery records:** `openspec/` (63 archived changes, 63 specs, `delivery/goal.md`), `SPEC-LOGS/`, `.claude/ohmyorch/project.json`.
-- **Engineering records:** under `docs/engineering/`: `decisions/` (0001 to 0014), `runbooks/` (10), `evidence/`, `work-items/` (12 tracked), `templates/`, `prerequisite-inventory.md`.
-- **Design:** `docs/design/luma.css`, its one paired extension `docs/design/studio-extensions.css`, and concept art in `docs/imagine/`.
-- **Research:** `research/`. `research/upstream/` is ignored and isn't repository input.
-- **No CI:** `.github/` has no tracked files, and no other CI configuration was found at the top level.
+  - `services/agent/src/autobots/`: the Python service (`domain/`, `contracts/`, `application/`, `adapters/`, `api/`, `operations/`, `persistence/`).
+  - `apps/web/`: Next.js (`app/`, `components/`, `lib/`).
+  - `packages/api-client/src/runtime.ts`: the client runtime.
+  - SQL: `supabase/migrations/` (49 files), `supabase/seeds/`, `supabase/bootstrap/`.
+  - `infra/`: Compose files, the vendored Supabase release in `infra/supabase/upstream/`, and the browser executor images in `infra/browser/`.
+- **Generated:**
+  - `contracts/generated/openapi.json`;
+  - `packages/api-client/src/generated.ts`;
+  - `packages/db-types/src/generated.ts`;
+  - the backlog navigation in `SPECS.md`.
+- **Tests:**
+  - `services/agent/tests/`: 40 `test_*.py` modules, plus `conftest.py` and `fake_openrouter.py`.
+  - `apps/web/tests/`: 38 browser specs and 2 unit tests.
+  - `tests/db/`: disposable-stack checks and their workers.
+  - `tests/harness/`, `tests/web/` (fixture API, upstream and worker), `tests/faults/`, `tests/toolchain/`, `tests/qualification/`.
+  - `contracts/fixtures/`: shared cases.
+- **Tooling:** `scripts/` (27 tracked files), `Makefile` (wraps the persistent install), and `.claude/` (7 agents, 13 skills, 9 rules, `hooks/dispatch.py`, `settings.json`, `ohmyorch/`).
+- **Operator guides:** `README-SETUP-RUN.md` (set up, start, stop) and `README-QA.md` (runtime Q&A, which describes revision `ecb34900e46c`).
+- **Delivery records:** `openspec/` (105 archived changes, 74 specs, `delivery/goal.md`), `SPEC-LOGS/`, `.claude/ohmyorch/project.json`.
+- **Engineering records:** `docs/engineering/` holds:
+  - `decisions/`: 0001–0022;
+  - `runbooks/`: 9;
+  - `evidence/`: 27 directories;
+  - `work-items/`: 15;
+  - `templates/` and `prerequisite-inventory.md`.
+- **Design:** `docs/design/luma.css`, `docs/design/studio-extensions.css`, and the concept images in `docs/imagine/`.
+- **Research:** `research/`. `research/upstream/` is git-ignored (`.gitignore:7`) and is not repository input.
+- **No CI:** `.github/` has no tracked files, and no other CI configuration was found.
 
 ## Runtime and Tooling
 
-Probed with `--version` on 2026-11-06, on this Mac. Presence isn't qualification.
+Versions as recorded in the previous refresh (2026-11-06). Neither the manifests nor the lock files changed since 4315944.
 
-- **Probed tools:** Python 3.12.16, uv 0.13.6, Docker 29.9.2, Supabase CLI 2.98.2, OpenSpec 1.13.2, jq 1.7.1-apple, Bash 3.2.57, Claude Code 2.1.314.
-- **Node:** the shell default is 26.13.0. The repository pins 22.23.2 (`.node-version`, `package.json`), and `scripts/toolchain.py` selects it per process. pnpm 12.16.1 is pinned through Corepack.
-- **Python service:** `services/agent/pyproject.toml` requires `==3.12.*` and uses `uv.lock`. It pins `deepagents` 0.7.32, `langgraph` 1.2.19, `langgraph-checkpoint-postgres` 3.2.0, `langchain` 1.4.8, `langchain-openrouter` 0.2.9, `openrouter` 0.11.46, `fastapi` 0.162.0, `psycopg` 3.3.8 and `cryptography` 50.0.2. Dev tools are ruff, mypy (strict) and pytest.
-- **Web:** `apps/web/package.json` pins Next 16.4.5, React 19.3.1, TypeScript 6.0.3, Tailwind 4.3.4, `@supabase/ssr` 0.12.7, Playwright 1.64.1 and axe. `pnpm-lock.yaml` is the lock.
-- **Infrastructure:** `infra/disposable/compose.yaml` pins images by digest. `infra/supabase/compose.overlay.yaml` binds gateway and database to `127.0.0.1` and puts Realtime, Edge Functions and Supavisor in a `removed` profile.
+- **Tools:** Python 3.12, uv, Docker, Supabase CLI, OpenSpec 1.13.2 (doctor), jq 1.7.1-apple (doctor) and Claude Code. Having a tool installed doesn't make it qualified.
+- **Node:** pinned to 22.23.2 in `.node-version` and `package.json` `engines`, and `scripts/toolchain.py` selects it per process. pnpm 12.16.1 is pinned through Corepack (`packageManager`).
+- **Python service (`services/agent/pyproject.toml`):**
+  - `requires-python ==3.12.*`, locked with `uv.lock`.
+  - Pins: `deepagents` 0.7.32, `langgraph` 1.2.19, `langgraph-checkpoint-postgres` 3.2.0, `langchain` 1.4.8, `langchain-openrouter` 0.2.9, `openrouter` 0.11.46, `fastapi` 0.162.0, `httpx` 0.28.1, `psycopg` 3.3.8, `psycopg-pool` 3.3.3, `cryptography` 50.0.2, `langchain-mcp-adapters` 0.3.2.
+  - Dev tools: ruff, mypy (strict), pytest.
+- **Web (`apps/web/package.json`):** Next 16.4.5, React 19.3.1, TypeScript 6.0.3, Tailwind 4.3.4, `@supabase/ssr` 0.12.7, Playwright 1.64.1 and `@axe-core/playwright` 4.14.0. The lock is `pnpm-lock.yaml`.
+- **Infrastructure:**
+  - `infra/disposable/compose.yaml` pins images by digest.
+  - `infra/supabase/compose.overlay.yaml` binds the gateway and database to `127.0.0.1`.
+  - `infra/browser/browser.Dockerfile` uses the Playwright image by digest. `infra/browser/proxy.Dockerfile` runs the standard-library egress proxy on a Python base pinned by digest.
+- **Makefile:** `make help`, `first-time`, `install`, `owner`, `build`, `migrate`, `start`/`stop` (stack, api, web, worker), `status`, `logs`, `check`.
+  - It wraps `scripts/persistent_install.py`, and its header says it removes no container or volume.
+  - Inference stays off unless `INFERENCE=enabled` is named on the command line.
 
 ## Architecture
 
 Layers under `services/agent/src/autobots/`:
 
 - **`domain/`:** pure rules.
-  - `models.py`: two approved profiles, 14 roles, the policy order, `OFFERED_FOR_NEW_RUNS`.
-  - `runs.py`: run states and commands.
-  - `tools.py`: operation classes and tool grants.
-  - `workflows.py` and `workflow_execution.py`: the workflow subset and readiness.
-  - `routines.py`, and `execution.py`: the versions a run records.
-- **`contracts/`:** public Pydantic DTOs, the source of OpenAPI. `persistence/rows.py` holds row helpers.
+  - `models.py`: three approved profiles, 14 roles, `BindingSource` (run override, workspace override, workspace default, built-in default), `OFFERED_FOR_NEW_RUNS = {Terra, Sol}`, and `MAX_OUTPUT_TOKENS = 512`.
+  - `budgets.py`: US$0.25–US$5.00 in US$0.25 steps.
+  - Also `runs.py`, `tools.py`, `tool_catalog.py`, `workflows.py` (`ir_normalized`), `workflow_execution.py`, `routines.py`, `execution.py`.
+- **`contracts/`:** the public Pydantic DTOs, which are the source of OpenAPI. Row helpers are in `persistence/rows.py`.
 - **`application/`:**
   - Admission: `runs.py`.
   - Goal loop: `goal_loop.py`, `plans.py`, `run_usage.py`, `verification.py`, `recovery.py`, `compaction.py`.
-  - Model spend: `model_admission.py`, `model_attempts.py`, `worker_inference.py`.
-  - Tools: `tool_gateway.py`, `tools.py`, `reconciliation.py`, `approvals.py`.
-  - Product surfaces: `experts.py`, `assignments.py`, `workflows.py`, `workflow_runner.py`, `routines.py`, `memory.py`, `improvements.py`, `artifacts.py`, `run_projection.py`.
+  - Model spend: `model_admission.py`, `model_attempts.py`, `worker_inference.py`, `profiles.py`.
+  - Tools: `tool_gateway.py`, `tools.py`, `tool_catalog.py`, `tool_grants.py`, `tool_uses.py`, `code_tools.py`, `browsing_loop.py`, `browsing_tool.py`, `reconciliation.py`, `approvals.py`.
+  - Product surfaces: `experts.py`, `assignments.py`, `workflows.py`, `workflow_overview.py`, `workflow_runner.py`, `routines.py`, `memory.py`, `improvements.py`, `artifacts.py`, `run_projection.py`, `search.py`.
   - Local operations: `operations.py`, `retention.py`, `worker_leases.py`, `provider_settings.py`, `credentials/`.
 - **`adapters/`:**
-  - `loop_middleware.py`: limits and admission around every dispatch.
-  - `tool_middleware.py`: answers tool calls from the gateway.
-  - `checkpoints.py`, `object_storage.py`, `github_issues.py`.
-  - `models/`: catalog, client factory, OpenRouter metadata.
-- **`api/`:** the factory in `app.py`, the configured entry in `main.py`, 12 route modules, and safe errors. `contracts/generated/openapi.json` lists 48 paths under `/v1`. Artifact download and the event stream are outside the schema.
-- **`operations/`:** the worker, structured logs, owner bootstrap, route qualification and the reasoning trial.
+  - Dispatch: `loop_middleware.py`, `tool_middleware.py`.
+  - Storage and checkpoints: `checkpoints.py`, `object_storage.py`.
+  - Live text: `result_stream.py`.
+  - Outbound HTTP: `provider_http.py`, `url_guard.py`, `remote_files.py`, `tavily.py`, `jina.py`, `market_data.py`, `github_issues.py`, `github_reads.py`, `github_pulls.py`.
+  - Browser: `browser_executor.py`, `browser_page.py`, `egress_proxy.py`.
+  - Models: `models/` (`catalog.py`, `factory.py`, `openrouter_metadata.py`).
+- **`api/`:** `app.py` (factory), `main.py` (configured entry), 14 route modules, `security.py`, `membership.py` and `errors.py`.
+  - `contracts/generated/openapi.json` lists 66 paths under `/v1`.
+  - Outside the schema (`include_in_schema=False`): artifact download and `/v1/runs/{id}/events/stream`.
+- **`operations/`:** `worker.py`, `logs.py`, `bootstrap_owner.py`, `route_qualification.py`, `reasoning_trial.py`, `browse_trial.py`, `concept_seed.py`, `fake_stream.py`.
 
-**The model path.** `goal_loop.py` builds the graph with `create_deep_agent`, wrapping the client in `AdmittedModel`, which refuses any call outside an admitted dispatch, so an SDK-initiated call can't spend unseen. `LoopMiddleware` in `adapters/loop_middleware.py` does the following for each dispatch:
+**The model path.** `goal_loop.py` builds the graph with `create_deep_agent` around `AdmittedModel`, which refuses any call outside an admitted dispatch. For each dispatch, `LoopMiddleware` (`adapters/loop_middleware.py`):
+- rechecks ownership, parent status and active time;
+- consumes the root's `model_calls` limit;
+- bounds a call at 120 s and interrupts it on cancel;
+- compacts the model's view through the same admission;
+- allows one shorter retry after a `length` cut-off;
+- reserves the route's worst case plus an amount for prompt bytes, and stops with `cost_unavailable` or `request_unencodable`;
+- reconciles a late reply on a lost lease as `source="provider"`.
 
-- Rechecks ownership, parent status and active time.
-- Consumes the root's `model_calls` limit.
-- Bounds a call at 120 seconds and interrupts it on cancel.
-- Compacts the model's view, with summaries through the same admission.
-- Allows one shorter retry after a `length` cut-off.
-- Records reply facts with no message content.
-- Reserves the route's worst case plus an amount for prompt bytes beyond the assumed 32,000 tokens.
-- Stops with `cost_unavailable` if a request could reach a higher long-prompt tier, or if a fresh catalog price exceeds what was reserved (the latter check is in `worker_inference.py`).
-- Stops with `request_unencodable` on text that can't be encoded.
-- Reconciles a late reply on a lost lease as `source="provider"`.
+Every admitted call streams. `_streamed` assembles the `astream` chunks and parses the tool-call arguments strictly. A failure after the first chunk is `partial_stream` (`application/model_attempts.py`), which is reconciled, not retried.
 
-**Uncertain calls.** When a call's failure class is uncertain, `_log_uncertain` writes a `worker.call_uncertain` WARNING to the worker's log. It holds the shortened invocation and run, the failure class, the exception's and cause's type names, any HTTP status, and a `reason` of `call_time_limit` or `run_interrupted`. It holds no message text and no charge, there is no column for it, and no screen shows it ([Decision 0014](docs/engineering/decisions/0014-release-limits-accepted.md)).
+**Uncertain calls.** `_log_uncertain` writes a `worker.call_uncertain` WARNING. It holds type names, the HTTP status and a `reason`, and never message text. No column or screen shows it ([Decision 0014](docs/engineering/decisions/0014-release-limits-accepted.md)).
 
-**Routes.** All 14 role bindings resolve and freeze at admission, and a run dispatches through its `executor` binding. A `summarizer` binding that differs pauses a run needing compaction with `route_not_bound` ([Decision 0009](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md)).
+**Routes.** All 14 role bindings resolve and freeze at admission. Each binding's source is recorded in the effective policy and in the run snapshot.
+- `builtin_default` gives `researcher` Sol while Sol is offered, and Terra otherwise.
+- A run dispatches through its `executor` binding.
+- A `summarizer` binding that differs pauses a run needing compaction with `route_not_bound` ([Decision 0009](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md)).
 
-**Ownership.** `worker_leases.py` claims jobs by database time with a rising generation, and triggers from `20261105000008_worker_ownership.sql` refuse checkpoint writes from any other generation. `WakeClock` detects a real sleep from two clocks. `goal_loop._keep_lease` reconnects after a dropped connection, revives an unclaimed lease after a wake, and discounts time asleep through `run_usage.discount_sleep`, deliberately uncapped by the database clock ([US-12.5](docs/engineering/evidence/US-12.5/summary.md)).
+**Ownership.** `worker_leases.py` claims jobs by database time with a rising generation. Triggers from `20261105000008_worker_ownership.sql` refuse checkpoint writes from any other generation. `WakeClock` and `goal_loop._keep_lease` handle sleep and wake ([US-12.5](docs/engineering/evidence/US-12.5/summary.md)).
 
-**Web.** `apps/web/app/` holds the pages. Same-origin BFF routes under `app/api/` forward through `lib/bff.ts`. `packages/api-client` is the generated client. Form controls come from `components/ui/field.tsx`, which `tests/harness/test_shared_form_controls.py` enforces.
+**Live result text.** `goal_loop.py:350` creates a per-run `ResultTap` (`adapters/result_stream.py`).
+- It reads only the growing `content` of `save_artifact` calls whose path is under `outputs/`.
+- It coalesces it (0.15 s, 1,500-character pieces) and sends it with `NOTIFY` on `autobots_result_text`. A tap failure never stops the run.
+- The stream route opens its own `LISTEN` connection (`api/event_routes.py`, `_listener`) and forwards this run's notes as `event: live` frames carrying a `result.text.delta` `RunEvent`, with no `id:`, so they never move the replay cursor and are never stored.
+
+**Web.**
+- Pages are under `apps/web/app/`. The same-origin BFF routes under `app/api/` (7 route files) forward through `lib/bff.ts`.
+- `packages/api-client` is the generated client.
+- Form controls come from `components/ui/field.tsx`, which `tests/harness/test_shared_form_controls.py` enforces.
+- The shell is `components/app-shell.tsx` with `sidebar-nav.tsx` (Work: Home, Runs, Approvals; Build: Experts, Workflows, Tools; System: Operations, Models, Settings).
 
 ## Entry Points
 
-- **API:** `uvicorn --factory autobots.api.main:create_configured_app`. It turns inherited tracing off first. uvicorn's own lines go through the JSON format, and access lines aren't logged (`operations/logs.py`).
+- **API:** `uvicorn --factory autobots.api.main:create_configured_app`. It turns inherited tracing off first and logs JSON lines with no access lines (`operations/logs.py`).
 - **Worker:** `python -m autobots.operations.worker`.
-  - It always runs `maintenance_step`: expiring approvals, `evaluate_routines`, and `retention.apply_all` hourly.
-  - `AUTOBOTS_WORKER_INFERENCE=enabled` adds `inference_step`, which calls `goal_loop.process_next` with `InferenceSource.bind`. The worker refuses to start half configured.
-  - `_drive` routes a workflow's run to `workflow_runner.run_workflow`.
-- **Web:** `next start apps/web` ([local app runbook](docs/engineering/runbooks/local-app.md)).
+  - It always runs `maintenance_step`: expiring approvals, evaluating routines, and `retention.apply_all` hourly.
+  - `AUTOBOTS_WORKER_INFERENCE=enabled` adds `inference_step` (`goal_loop.process_next`).
+  - It exits on a partial configuration: `AUTOBOTS_DATABASE_URL`, an absolute `AUTOBOTS_CONFIG_ROOT`, and the Supabase URL and service key (`operations/worker.py:284–323`).
+- **Web:** `next start` in `apps/web`, or `make start-web` ([local app runbook](docs/engineering/runbooks/local-app.md), `README-SETUP-RUN.md`).
 - **Owner bootstrap:** `python -m autobots.operations.bootstrap_owner`.
-- **Paid operations modules:** `operations/route_qualification.py` and `operations/reasoning_trial.py`.
-- **Install and data:** `scripts/persistent_install.py` (`init`, `up`, `setup`, `status`, `apply`, `goal`; `reset` and `apply --reset` exist only to refuse), `scripts/local_backup.py` (`keygen`, `backup`, `restore`, `verify`).
-- **Verification and generation:** see [Common Commands](#common-commands).
-- **Paid or real-world runners, in no profile:** `scripts/live_goal.py`, `scripts/qualify_release.py`, `scripts/qualify_github_connector.py`. `scripts/qualify_mac_sleep.py` needs a person to sleep the Mac.
+- **Concept seed:** `python -m autobots.operations.concept_seed --workspace <id>`.
+- **Paid operations modules:** `operations/route_qualification.py`, `operations/reasoning_trial.py`, and `operations/browse_trial.py` (through `scripts/browse_trial.py`).
+- **Install and data:**
+  - `scripts/persistent_install.py`: `init`, `up`, `setup`, `status`, `apply`, `goal`. `reset` and `apply --reset` exist only to refuse.
+  - `scripts/local_backup.py`: `keygen`, `backup`, `restore`, `verify`.
+- **Paid or real-world runners, in no profile:**
+  - `scripts/live_goal.py`, `scripts/qualify_release.py`;
+  - `scripts/qualify_github_connector.py`, `scripts/qualify_browser_executor.py`, `scripts/qualify_browse_goal.py`, `scripts/browse_trial.py`;
+  - `scripts/qualify_mac_sleep.py`, which needs a person to sleep the Mac.
 - **Hooks:** `.claude/hooks/dispatch.py`, for `SessionStart`, `PreToolUse`, `PostToolUse`, `Stop` and `SubagentStop` in `.claude/settings.json`.
 
 ## Data and Persistence
 
-- **Migrations:** `supabase/migrations/` holds 35 ordered files, `20261105000001_workspaces.sql` to `20261106000035_charge_source.sql`, in the schemas `public`, `app_private` and `agent_runtime`. The newest two:
-  - `20261106000034_route_limits_from_review.sql` appends stored limits text to `agent_runtime.route_qualifications`: concurrent admission on a live route wasn't tested, and per profile, one real goal repeated on disposable stacks went 0 of 5 for DeepSeek and 5 of 5 for Terra.
-  - `20261106000035_charge_source.sql` adds nullable `app_private.model_invocations.charge_source`, checked to `provider` or `owner`. `ModelAdmission.reconcile` writes it. `RunInspector`'s `ModelCallView` exposes `reconciled`, `outcome_unknown` and `charge_source_unknown`.
-- **Seeds and bootstrap:** `supabase/seeds/reference.sql` is the repeatable model reference. `supabase/bootstrap/` holds roles and Storage policies.
-- **Public tables:** workspaces and members, runs and `run_events`, `artifacts`, `approval_requests`, Experts and versions, `sessions`, workflows with versions, executions, node instances and emissions, routines with versions and occurrences, `memory_items`, improvement and knowledge tables, `model_profiles`.
-- **Private tables:** jobs, goal specs, plans, usage, verifications, `model_invocations`, `tool_receipts`, assignments, credentials, policies and spend limits, idempotency receipts, heartbeats, retention, `installation_holds`.
+- **Migrations:** `supabase/migrations/` holds 49 ordered files, from `20261105000001_workspaces.sql` to `20261108000049_applied_migration_count.sql`, in the schemas `public`, `app_private` and `agent_runtime`. Since migration 35:
+
+| Migration | Change |
+|---|---|
+| 36 | `runs.started_by`. On `approval_requests`: `requested_by`, `requested_by_agent`, `scope_snapshot`, `policy_version`, `policy_rule`, which a trigger makes immutable |
+| 37 | `app_private.improvement_replays` and `improvement_replay_runs` |
+| 38 | `app_private.tool_uses` |
+| 39 | `tool_uses.instance_key` (the workflow node instance) |
+| 40 | Adds Sol to the profile checks and `model_profiles` |
+| 41 | Sol's row in `route_qualifications` |
+| 42 | `public.user_profiles`, with RLS and `shares_workspace_with` |
+| 43 | `model_policies.default_profile` becomes nullable |
+| 44 | The per-run limit defaults to 5,000,000 µUSD |
+| 45 | `workflows.description` |
+| 46 | `public.workflow_drafts`. Members read it; owners write it through `is_workspace_owner` |
+| 47 | `approval_requests.review_detail` |
+| 48 | `app_private.plan_task_times` |
+| 49 | `app_private.applied_migration_count()`, a security-definer function returning a count only, from `autobots_install.migrations` or `autobots_disposable.migrations` |
+
+- **Seeds and bootstrap:** `supabase/seeds/reference.sql` is the repeatable model reference, and `supabase/bootstrap/` holds roles and Storage policies. The concept Experts and workflows are not in any seed or migration.
+- **Public tables:**
+  - workspaces (with `timezone`), members, `user_profiles`;
+  - runs, `run_events`, `artifacts`, `approval_requests`;
+  - Experts and their versions, `sessions`;
+  - workflows with versions, drafts, executions, node instances and emissions;
+  - routines with versions and occurrences;
+  - `memory_items`, the improvement and knowledge tables, `model_profiles`.
+- **Private tables:**
+  - jobs, goal specs, plans, `plan_task_times`, usage, verifications;
+  - `model_invocations`, `tool_receipts`, `tool_uses`, assignments, improvement replays;
+  - credentials, policies, spend limits, idempotency receipts;
+  - heartbeats, retention, `installation_holds`.
 - **`agent_runtime`:** LangGraph checkpoints, `adapter_qualifications`, `route_qualifications`.
-- **Schema readiness:** `application/operations.py` checks required relations and also `REQUIRED_COLUMNS`, including `charge_source`, so a column-only migration not yet applied reads as a schema problem and gates admission.
-- **Install-only schema:** `autobots_install`, holding identity and applied-migration digests (`scripts/persistent_install.py`). [US-12.6](docs/engineering/evidence/US-12.6/summary.md) records 36 history rows: 35 migrations and the Storage policies.
+- **Schema readiness:** `application/operations.py` checks `REQUIRED_RELATIONS` and `REQUIRED_COLUMNS`, which cover objects up to migration 37. Operations displays the applied-migration count but does not compare it against the files.
+- **Install-only schema:** `autobots_install` holds the install's identity and applied-migration digests (`scripts/persistent_install.py`).
+- **Ephemeral channel:** Postgres `NOTIFY autobots_result_text`. Nothing is stored.
 - **Objects and files:**
-  - Artifacts are in private Supabase Storage through `adapters/object_storage.py`.
-  - Provider keys are AES-256-GCM sealed under a master key file (`application/credentials/`).
+  - Artifacts live in private Supabase Storage (`adapters/object_storage.py`).
+  - Provider keys are sealed with AES-256-GCM under a master key file (`application/credentials/`).
   - Backups are cold and encrypted, with a signed manifest, and restore only into a new held disposable project.
-  - The shared spending ledger is `.checks/decision-0009/ledger.json` (ignored).
-  - The install's record, secrets and logs are recorded at `~/.local/share/autobots-install` by [the operations runbook](docs/engineering/runbooks/operations.md); this analysis didn't read them.
+  - The shared ledger is `.checks/decision-0009/ledger.json` (ignored).
+  - The install's record, secrets and logs are at `~/.local/share/autobots-install` (Makefile `INSTALL_DIR`). This analysis did not read them.
 
 ## Integration points
 
 **Internal.**
-- `.claude/autobots.json` maps documents, the verifier report and upstream pins. `.claude/ohmyorch/project.json` activates OhMyOrch.
+- `.claude/autobots.json` maps the documents, the verifier report and the upstream pins. `.claude/ohmyorch/project.json` activates OhMyOrch.
 - `scripts/specs.py` (`validate`, `render`, `promote`) checks structure, sources, Gherkin, statuses and dependencies. It can't prove semantic entailment.
-- `scripts/generate_contracts.py` (`write`, `check`) generates OpenAPI and the TypeScript client offline. `scripts/app_db.py types` generates row types for `public`.
+- `scripts/generate_contracts.py` (`write`, `check`) generates OpenAPI and the TypeScript client offline. `scripts/app_db.py types` generates the `public` row types.
 
-**External.**
-- **OpenRouter:** the only inference provider, through `adapters/models/factory.py` and `openrouter_metadata.py` (key check and real catalog fetch). Profiles are `openrouter_terra` and `openrouter_deepseek_flash`. A client is built inside each attempt from a key resolved there, and requests ask for at most 512 output tokens.
-- **GitHub:** `adapters/github_issues.py`, tool `create_github_issue`, one operation on one configured repository, granted per Expert ([Decision 0007](docs/engineering/decisions/0007-first-connector-github-issues.md)). Readback waits up to 15 seconds, after one measured lag of about 9 seconds.
+**External.** The variable names are in `.env.example`: `OPENROUTER_API_KEY`, `TAVILY_API_KEY`, `JINA_API_KEY`, `GITHUB_REPOSITORY`, `GITHUB_TOKEN`, `AUTOBOTS_BROWSER_EXECUTOR`.
+- **OpenRouter** is the only inference provider (`adapters/models/factory.py`, `openrouter_metadata.py`).
+  - Profiles: `openrouter_terra`, `openrouter_sol` (`openai/gpt-6.1-sol`) and `openrouter_deepseek_flash`, in `domain/models.py`.
+  - The client is built inside each attempt from a key resolved there, with at most 512 output tokens.
+  - Every call is streamed.
+  - `/v1/models` adds the listed prices per 1M tokens, the supported parameters and `fetched_at`.
+- **GitHub, on one configured repository** (`GITHUB_REPOSITORY`):
+  - `adapters/github_reads.py`: four read-only tools, `github_list_pull_requests`, `github_list_workflow_runs`, `github_search_issues` (pinned to the repository) and `github_read_file` (private content, at most 1,048,576 bytes).
+  - `adapters/github_issues.py`: `create_github_issue` versions 1 and 2; v2 takes up to 10 labels.
+  - `adapters/github_pulls.py`: `github_open_pull_request`. It waits for approval with a per-file diff (`review_detail`), opens `autobots/<operation_id>` with a marker, reads back before a retry, and stops with `base_moved`.
+- **Tavily** (`adapters/tavily.py`): `tavily_search`, `tavily_extract`, `tavily_map`, `tavily_crawl`. Read-only, metered, with Tavily's inference options off.
+- **Jina** (`adapters/jina.py`): `search_web`, `extract_website_content` (reader mode).
+- **Market data** (`adapters/market_data.py`): `market_history` (Yahoo chart endpoint over `httpx`) and `inflation_rates` (World Bank `FP.CPI.TOTL.ZG`), both keyless.
+- **Fetch guard:** `adapters/url_guard.py` admits only `https` URLs whose every DNS answer is global, revalidates up to 3 redirects, and caps size and time. `adapters/provider_http.py` reads a provider key per attempt.
+- **Browser:** `adapters/browser_executor.py` runs one hardened Chromium container per call behind `egress_proxy.py`, which allows only `CONNECT` to named hosts and gates DevTools with a token. `browser_page.py` reads pages over CDP.
 - **Supabase:** Auth, Storage and PostgREST, self-hosted and loopback-bound.
-- **MCP:** `langchain-mcp-adapters` is pinned but not imported under `src/` (grep), and the release record says no MCP adapter exists.
+- **MCP:** `langchain-mcp-adapters` is pinned but not imported under `src/`.
 - **Tracing:** `forbid_remote_tracing` turns inherited LangSmith and OTLP settings off.
 
 ## Authentication and Authorization
 
-- **Browser to web:** an HttpOnly, SameSite=strict session cookie (`lib/session.ts`), with host, origin, fetch-site and CSRF checks in `lib/request-guard.ts`. The BFF adds the internal token on the server.
-- **Web to API:** `api/security.py` requires `X-Autobots-Internal` (compared in constant time) and a Bearer JWT verified as HS256 with audience `authenticated`. Membership comes from `public.workspace_members` (`api/membership.py`). Client-supplied user or workspace IDs aren't trusted.
-- **Owners:** owner-only routes include Expert writes. A non-owner naming an Expert version gets `403 owner_required` ([Decision 0011](docs/engineering/decisions/0011-review-dispositions.md)). Public signup is disabled ([local app runbook](docs/engineering/runbooks/local-app.md)).
-- **Effects:** `application/approvals.py` binds a proposal to its exact arguments before the wait. Effect rulings must carry the receipt's `generation`, and a stale one is refused.
-- **Approval record (US-13.1, after this analysis):** migration `20261107000036_approval_requester_scope_policy.sql` adds `runs.started_by` and, on `approval_requests`, `requested_by`, `requested_by_agent`, `scope_snapshot`, `policy_version` and `policy_rule`. A trigger refuses any later change to them. `admit_run` takes an explicit `started_by`, a child copies its parent's, and a routine's run has none. The gateway stores `APPROVAL_POLICY_VERSION` (`approval-policy/1`), and the inbox shows all three, or not recorded on older requests ([Decision 0015](docs/engineering/decisions/0015-approval-request-fields.md)).
-- **Held-out replay (US-13.2, after this analysis):** migration `20261107000037_improvement_replays.sql` adds `app_private.improvement_replays` and `improvement_replay_runs`. `POST /v1/improvements/{id}/replay` (owner-only) admits each owner-written task as an ordinary run with the proposal applied to it alone: a skill in its instructions, a memory in its `search_memory` results. `decide` refuses promotion with `replay_required`, `replay_running` or `replay_failed` until every run of the latest replay succeeded. Text cases became optional. `tests/db/improvement_check.py` now runs in `scripts/qualify_identity.py`, because replay runs are verified from Storage ([Decision 0016](docs/engineering/decisions/0016-held-out-replay.md)).
-- **Accepted single-owner limits:** memory is scoped to the workspace, not to a user (Decision 0009). `authenticated` can read raw emissions within a workspace, and a rollback's actor and a promoted memory's `created_by` aren't recorded ([Decision 0013](docs/engineering/decisions/0013-release-closure.md)).
+- **Browser to web:** an HttpOnly SameSite=strict session cookie (`lib/session.ts`), with host, origin, fetch-site and CSRF checks (`lib/request-guard.ts`). The BFF adds the internal token on the server.
+- **Web to API:** `api/security.py` requires `X-Autobots-Internal` (constant-time compare) and a Bearer JWT (HS256, audience `authenticated`). Membership comes from `public.workspace_members` (`api/membership.py`).
+- **Workspace selection:** `current_workspace` (`api/settings_routes.py:46–60`) uses a verified `X-Autobots-Workspace` header. Without one, it uses the user's only workspace and otherwise refuses with `403 workspace_required` "Choose a workspace." `lib/bff.ts` forwards the header, but no component, `lib` module or `packages/api-client/src` file sets it, so a member of several workspaces is refused on member routes.
+- **Owners:**
+  - `require_owner` gates the owner routes: Expert writes, workflow draft writes, `/v1/operations/jobs`, retention changes, replays, policy reset, and others.
+  - Workflow drafts are also owner-only in RLS.
+  - Public signup is disabled ([local app runbook](docs/engineering/runbooks/local-app.md)).
+- **Effects and approvals:**
+  - `application/approvals.py` binds a proposal to its exact arguments before the wait.
+  - Effect rulings must carry the receipt's `generation`.
+  - Requests store the requester, agent, scope snapshot and `APPROVAL_POLICY_VERSION`, immutable by trigger ([Decision 0015](docs/engineering/decisions/0015-approval-request-fields.md)).
+  - `arbitrary_execution` is admitted only for a tool whose executor reports qualified.
+- **Accepted single-owner limits:** memory is scoped to the workspace, not the user (Decision 0009). `authenticated` can read raw emissions within a workspace, and a rollback's actor isn't recorded ([Decision 0013](docs/engineering/decisions/0013-release-closure.md)).
 
 ## Current capabilities
 
-- **Screens:** Home, Runs, Run, Run inspector, Experts and editor, Sessions, Workflows, editor and monitor, Approvals, Operations, Settings, Models, Sign-in. Routines, memory and improvements have API routes and no screens (Decision 0009).
+- **Screens:**
+  - Home, Runs (with the side panel), Run, Run inspector, Approvals;
+  - Experts and the editor, Sessions;
+  - Workflows, the editor, and the execution monitor (`app/workflow-executions/[id]`);
+  - Tools and tool detail, Operations, Sign-in;
+  - Settings: Appearance, Notifications, Account, Data on this Mac, Keyboard and Models.
+  - Routines, memory and improvements have API routes and no screens.
+- **Shell:**
+  - The account footer shows the display name and role (`/v1/session`, `/v1/profile`).
+  - The health line comes from `/v1/readiness`, which any member can read.
+  - The approvals count badge comes from `/v1/approvals/count`.
+  - After the skip link come New run (⇧⌘O, `new-run.tsx`) and Search (⌘K, `search-palette.tsx`).
+  - `WaitingNotifier` polls every 4 s while `autobots.notify` is on and notification permission is granted.
+- **Home:**
+  - A greeting in the workspace's timezone, then "What should we work on?".
+  - Needs you (pending approvals and `waiting_input` runs) and the five most recent runs (`home-activity.tsx`).
+  - The composer has Model, Expert and Budget chips, preview chips (`GET /v1/run-preview`), and up to 5 text files of 1 MiB each as typed inputs.
+  - `?new=1` focuses the goal.
 - **Runs:**
-  - `POST /v1/runs` admits atomically with idempotency receipts and refuses when not ready (`503 not_ready`) or with no usable key.
-  - `components/run-controls.tsx` exposes pause, resume, cancel and owner reconciliation of a model call's charge.
-  - `components/continue-run.tsx` starts a linked new run. With `goal_text` omitted, the server repeats the stored goal, and `RunWorkspace.can_continue` says whether a run qualifies. Terminal runs don't resume.
-  - A rate limit or provider error ends a run after its retries (Decision 0011).
-- **New-run model choice:**
-  - `OFFERED_FOR_NEW_RUNS` is Terra alone, by Decision 0013. DeepSeek stays approved in `PROFILES`, the seed and the catalog list, where `ModelAvailability.offered` is false.
-  - New work naming it is refused with `model_not_offered` and no substitute: `422` when the request names it, including Experts and settings; `409` for a saved choice or a workflow; `RoutineRefused` for a routine. A workflow is checked only if it needs a model. `/v1/runs/intent` returns the same code.
-  - A run already admitted keeps its frozen route, so `worker_inference.py` can still serve one.
-  - The web panels keep a saved choice visible and unselectable.
-- **Goal execution:** versioned plans and evidence, required artifacts, verification from artifacts and checks, staged and verified artifact publication, cursor replay and a live event stream.
-- **Tools:** plan tools, `calculate`, `read_run_file`, `save_artifact`, `publish_artifact`, `search_memory`, and optionally `propose_improvement`, `create_github_issue` and the provider tools below. `assign_specialist` is for coordinator sessions only. Receipts are in `app_private.tool_receipts`.
-- **Tool catalog (US-14.1, after the analyzed revision):** `application/tool_catalog.py` derives descriptors from the worker's registry, and `GET /v1/tools`, `/v1/tools/{tool_id}` and `/v1/tools/{tool_id}/versions/{version}` serve them to members. Availability is computed per request from whether key variables are set. `browse_goal` is catalogued as `disabled_by_policy` and never registered.
-- **Tools screen and group grants (US-14.2, after the analyzed revision):** `/tools` and `/tools/{tool_id}` in the web app, with a sidebar entry under Build, after Workflows (US-15.1). Expert configs carry `tool_groups`, which a save expands into explicit tools, and a save naming an unavailable tool is refused `expert_tool_unavailable`.
-- **Tool-use record (US-14.3, after the analyzed revision):** `app_private.tool_uses` (migration 38) holds one row per gateway dispatch, denials included, with the served plan task, public fields, digests and sizes. `tool.use.started` and `tool.use.completed` join the event union. `GET /v1/runs/{run_id}/tool-uses` lists a run or a root's tree. A root run tree may make 20 metered tool calls.
-- **Tool-use views (US-14.4, after the analyzed revision):** the run workspace's Tools used and the workflow monitor's Tool uses by node read the listing; migration 39 records each use's workflow node instance.
-- **Tool-provider keys (US-14.5, after the analyzed revision):** `adapters/provider_http.py` reads a provider's key per attempt for that attempt's HTTP client only. Run creation through a session and routine occurrences are refused `tool_unavailable` when a granted tool's key is missing. Log redaction and the evidence scan recognize Tavily, Jina and GitHub key shapes.
-- **URL guard (US-14.8, after the analyzed revision):** `adapters/url_guard.py` admits only `https` URLs whose every DNS answer is globally routable, revalidates each redirect (at most three) and caps size and time, with typed refusals.
-- **Tavily tools (US-14.6, after the analyzed revision):** `adapters/tavily.py` registers `tavily_search`, `tavily_extract`, `tavily_map` and `tavily_crawl`, read-only and metered, Expert-grantable, with Tavily's inference options always off. Tested with fake transports only.
-- **Jina tools (US-14.7, after the analyzed revision):** `adapters/jina.py` registers `search_web` and `extract_website_content` (reader mode, no model options), read-only and metered, Expert-grantable. Tested with fake transports only.
-- **File tools (US-14.9, after the analyzed revision):** the goal composer attaches up to 5 text files (1 MiB each) as typed run inputs. `read_run_file` version 2 (paging) is registered beside version 1, `read_csv` is a general tool, and `store_remote_file` (Expert-only) saves a guarded text download under `outputs/`.
-- **Market data (US-14.10, after the analyzed revision):** `adapters/market_data.py` registers `market_history` (Yahoo Finance's chart endpoint over `httpx`, no `yfinance`) and `inflation_rates` (World Bank `FP.CPI.TOTL.ZG` for CRI, USA, EMU), keyless and metered. Tested with fake transports only.
-- **Code tools (US-14.11, after the analyzed revision):** `application/code_tools.py` registers `search_files`, `read_code_file`, `write_code_file` and `patch_code_file` over the run's own files, pure Python, writes under `outputs/` only, Expert-grantable.
-- **Browser executor (US-14.13, after the analyzed revision):** `adapters/browser_executor.py` runs one hardened Chromium container per call (`infra/browser/`, Playwright image pinned by digest) behind an egress sidecar (`adapters/egress_proxy.py`) that allows only `CONNECT` to the call's named public hosts and gates DevTools with a token. Qualified live by `scripts/qualify_browser_executor.py`, in no verification profile. Nothing calls it yet.
-- **Sol profile (US-14.15, after the analyzed revision):** `openrouter_sol` (`openai/gpt-6.1-sol`) is a third approved profile, qualified live on 2026-11-07 and offered; `researcher` resolves to it unless a run or workspace chooses otherwise (Decision 0019).
-- **Browsing loop (US-14.14, after the analyzed revision):** `application/browsing_loop.py` is Autobots' own read-only loop (Decision 0020; browser-use isn't installed). Each step shows the page as text and takes one required tool call (`open_link`, `go_to`, `scroll`, `finish`), admitted by `LoopMiddleware.admitted` on a route `InferenceSource.role_route` binds from the run's frozen policy (`researcher`). `adapters/browser_page.py` reads pages over the executor's CDP. `browse_goal` (US-14.12, `application/browsing_tool.py`) runs it: `arbitrary_execution`, Expert-only, approved on every call, metered, registered only while `AUTOBOTS_BROWSER_EXECUTOR=enabled` and the executor's qualification is current. The registry and gateway admit `arbitrary_execution` only for a tool whose executor reports qualified. `operations/browse_trial.py` (US-14.16) is the once-only live trial on Sol, driven by `scripts/browse_trial.py`.
-- **Specialists:** `application/assignments.py` runs child runs synchronously, with scope intersected from the parent and spend counted on the root.
-- **Unknown effects:** these stay visible until a tool's readback or an owner's report resolves them.
-- **Workflows:** a typed subset, immutable versions, a run bound to version and hash, and insert-only emissions.
-- **Routines:** explicit, with immutable versions, admitted with a unique key by the maintenance step when readiness allows.
-- **Memory and learning:** lexical search in Postgres, and proposals through regression and an owner's review with rollback. A promoted skill reaches a new run's instructions as reference (`experts.py`, `improvements.py`). Promotion gates on a reviewer's text checks (Decision 0011).
-- **Operations:** the status page reports database, schema, Storage, disk, queue, delayed routines, catalog availability, restore history and each route's qualification. Logs are redacted JSON lines. Retention is per workspace.
-- **Evidence-limited behavior:** the inspector reads typed columns and checkpoint metadata (ID, parent, step, source), never checkpoint content, tool arguments or partial output (`run_projection.py`).
-- **Identity (US-15.2, after the analyzed revision):** `public.user_profiles` holds one editable display name per user, with RLS for own writes and shared-workspace reads. `/v1/session` returns the display name (falling back to the email's local part), the email and each workspace's name and role. `/v1/profile` reads and saves the name, and the shell's account footer and `/settings/account` show them.
-- **Member readiness (US-15.3, after the analyzed revision):** `/v1/readiness` gives any workspace member the API, worker, database and OpenRouter authentication states and codes, with no counts or paths, and reads authentication from stored state only. The shell's health line and Home's service chips show it.
-- **Run list (US-15.4, after the analyzed revision):** `/v1/runs` returns each run's label, stop reason, plan progress, frozen profiles and ledger spend, with `group`, `q`, `profile` and keyset `cursor` filters, per-group server counts and a total. Runs shows tabs, filters, "≈" for estimates and Load more.
-- **Approvals inbox (US-15.5, after the analyzed revision):** `/v1/approvals` lists `pending` or `decided` requests with counts, the run's goal, the plan task served (through the tool use's operation ID), the decider and time, and the stored arguments' size. `/v1/approvals/count` feeds the sidebar badge. The screen pairs a one-tab-stop list with the selected request's detail, offers JSON and Fields views, and decides with ⌘↵ or ⌘⌫ pressed twice.
-- **Expert cards (US-15.6, after the analyzed revision):** `ExpertView` carries `run_count` and `last_run_at`. Experts shows the executor's profile, tools with "+N", usage, an approval note and Start run, with All, Can change things outside and Read only filters drawn from the catalog.
-- **Tool panel (US-15.7, after the analyzed revision):** `/v1/tools/{tool_id}/grants` lists the Experts whose latest version grants a tool and the published workflows whose agent steps use them. Tools shows group counts, a text filter, the selected tool's detail in a URL-kept side panel with Granted to and Copy schema, and keeps `/tools/{tool_id}` as a page.
-- **Models facts and sources (US-15.8, after the analyzed revision):** `/v1/models` adds listed catalog prices per 1M tokens, supported parameters as capabilities and `fetched_at`. Each resolved binding records its source (run override, workspace override, workspace default or built-in default) in the effective policy and the frozen run snapshot. A workspace policy may name no default (`default_profile` nullable). `POST /v1/settings/model-policy/reset` clears role overrides under the expected version. Models adds Discard, Reset all and the follow-the-default summary.
-- **Composer chips and preview (US-15.9, after the analyzed revision):** `domain/budgets.py` holds Decision 0022 D11's budget rules. `RunRequest.budget_micro_usd` is validated against them and the remaining daily cap, then frozen as the run's limit. `GET /v1/run-preview` and `RunIntentCheck.budget` return the allowed range, the profiles each role resolves to and the granted tools. The ledger's per-run ceiling defaults to US$5.00. Home's composer has Model, Expert (a direct session first) and Budget chips, preview chips, and file chips with name, type and size.
-- **Home greeting and activity (US-15.10, after the analyzed revision):** the session's workspaces carry their `timezone`. Home greets the member by it above "What should we work on?", lists Needs you (pending approvals linking to Review, `waiting_input` runs linking to the run) and the five most recent runs. Approvals opens with `?approval=` selected.
-- **Workflow description and labels (US-15.11, after the analyzed revision):** `public.workflows.description` is optional and set at creation or by `PUT /v1/workflows/{id}/description`. Workflow IR version 2 adds an optional node `label`. `ir_normalized` keeps version 1 graphs stored and hashed as before, and the editor edits both.
-- **Workflow drafts (US-15.12, after the analyzed revision):** `public.workflow_drafts` holds one draft per workflow. Members read it, and only owners write it (RLS and `is_workspace_owner`). Owners save, publish (under the expected version) and discard it through `/v1/workflows/{id}/draft`. Executions and routines refuse `"draft"` with `draft_not_runnable`, and the editor has the draft controls.
-- **Workflow list and preview (US-15.13, after the analyzed revision):** `WorkflowView` carries the Experts in step order, step count, last execution and run count. `/v1/workflows/{id}/executions` and `/v1/workflows/{id}/preview` serve recent executions (spend and duration) and a version's ordered steps. Executions accept a D11 budget. Workflows has tabs, search, rows and a preview panel, and the editor has a Budget select.
-- **GitHub read tools and labels (US-15.14, after the analyzed revision):** `adapters/github_reads.py` adds four read-only tools on the configured repository: list pull requests, list workflow runs, search issues (pinned to the repository) and read file (content private, up to 1 MiB). `create_github_issue` version 2 adds up to 10 labels, and version 1 stays registered. Key requirements carry the token's scopes for the repair.
-- **Pull-request connector (US-15.15, after the analyzed revision):** `github_open_pull_request` waits for approval with each file's diff against the base head (`ToolDefinition.review_detail`, stored in `approval_requests.review_detail`). It opens `autobots/<operation_id>` with only the named paths and the marker, reads back before a retry, and stops with `base_moved`, returning the request to a new approval.
-- **Live GitHub qualification (US-15.16, after the analyzed revision):** `scripts/qualify_github_connector.py --suite studio`, in no profile, reads only `GITHUB_REPOSITORY` and `GITHUB_TOKEN` from an env file and refuses without the owner's recorded authorization. It counts every request against its cap in a ledger kept between runs, and runs a read-only `review` phase before an `apply` phase that writes. It qualified the four read tools, a labelled issue and an approved pull request once against `josoroma/bot-test`.
-- **Run side panel and task timing (US-15.17, after the analyzed revision):** `app_private.plan_task_times` records each task's start at the first tool use that serves it, in `begin_use`'s leased transaction, and its finish in `complete_task`'s, in database time. `RunWorkspace` adds task markers (done, current, to do), times, wall seconds and used tools, `current_task_id`, and the root tree's metered-call count. Runs has a Details link per row that opens `run-panel.tsx` under the list (`?run=<id>`), whose commands send the version the panel loaded.
-- **Operations verdict and values (US-15.18, after the analyzed revision):** `LocalStatus.values` (`OperationValues`) holds exactly Decision 0022 D5's values: the p95 of the last 20 readiness probes' database answer times (an in-process `ProbeTimes` window), applied migrations (via `app_private.applied_migration_count()`), published artifact bytes, disk free and total, leased and queued jobs, the checkpoint adapter release, the catalog check's duration, a loopback-only bind check over the API's own listening sockets, and live workers. Operations shows "N of M checks pass", the worker count and the hold beside the readiness sentence, and each check's value.
-- **Operations jobs chart (US-15.19, after the analyzed revision):** `GET /v1/operations/jobs` (owner) returns the workspace timezone and 24 hourly buckets of counts from `run.status_changed` events: succeeded, waited (entered `waiting_approval` or `waiting_input`), failed with cancelled, and in progress (now running or paused, at its latest change). `jobs-chart.tsx` stacks them on status tokens with 45°/135° textures on waited and failed, a legend with totals, a hover tooltip and a disclosed table of the same counts.
-- **Appearance preferences (US-15.20, after the analyzed revision):** the theme provider offers System, Light and Dark (`enableSystem`, still dark by default and for any invalid or unreadable value). The root layout's before-paint script keeps `system` and applies `data-serif`, `data-density` and `data-motion` from `autobots.serif|density|motion`. `globals.css` adds `--document`/`font-document` (used for a run's goal and evidence text), compact `--spacing: 0.2rem` and a forced reduced-motion rule. Settings → Appearance has the theme cards, a serif checkbox with a sample, and density and motion radios.
-- **Settings sections (US-15.21, after the analyzed revision):** `app/settings/layout.tsx` stacks a "Settings sections" nav (Appearance, Notifications, Account, Data on this Mac, Keyboard, plus Models and Operations) above each page. `GET /v1/retention` gives any member the retention windows and their own role; Data on this Mac shows it read-only, with the Operations link for the owner only. `WaitingNotifier` in the root layout polls the Needs-you run list every 4 s while "Tell me when a run waits for me" (`autobots.notify`) is on and permission is granted, and raises one browser notification per run newly waiting. Keyboard lists `lib/shortcuts.ts`.
-- **Search palette (US-15.22, after the analyzed revision):** `GET /v1/search?q=` (any member, `application/search.py`) returns up to five typed results each of runs by goal and Experts and workflows by name, all workspace-scoped in SQL, plus catalog tools by title or ID, each with its app path. `search-palette.tsx` puts a Search button with a ⌘K hint after the skip link, opens on ⌘K/Ctrl+K outside text fields (`lib/keyboard.ts`), and is a modal dialog with a combobox over a listbox, arrow keys with `aria-activedescendant`, Enter to open and focus returned on close.
-- **New run shortcut (US-15.23, after the analyzed revision):** `new-run.tsx` puts a New run button with the ⇧⌘O hint directly after the skip link (before Search). The button, or ⇧⌘O / Shift+Ctrl+O outside text fields, focuses the composer's goal on Home or opens `/?new=1`, which `GoalComposer` turns into goal focus before dropping the marker. Specs locate the composer's submit as the exact "Run" button.
-- **Streamed calls and result text (US-15.24, after the analyzed revision):** every admitted model call streams (`AdmittedModel` via `_streamed`, `AttemptModel.astream`). It is assembled and its tool-call arguments parsed strictly, and a failure after the first chunk is `partial_stream`. A per-run `ResultTap` (`adapters/result_stream.py`) sends the growing `content` of `save_artifact` calls to `outputs/` as coalesced Postgres NOTIFY payloads on `autobots_result_text`, and nothing else. The live SSE stream LISTENs and forwards them as `event: live` `RunEvent`s with a `result.text.delta` payload, never stored. The run view shows them under Result until the published artifact replaces them, and "Stream text as it's written" turns them off. Fake transports answer streamed requests with `operations/fake_stream.py`. The US-15.18 bind check now inspects socket descriptors only, never duplicating or closing one.
-- **Concept seed (US-15.25, after the analyzed revision):** `python -m autobots.operations.concept_seed --workspace <id>` creates PRD-Studio SD-02's five Experts and six workflows through the application layer, as the workspace owner. It keeps anything already named, strips unavailable tools from Experts and says so in their purpose, and saves the GitHub-dependent workflows (while GitHub is unavailable) and Interview synthesis as drafts. It is not a migration, writes no secret and admits no run.
-- **Design:** Luma tokens, dark by default, with `components/theme-provider.tsx`. The Studio presentation ([Decision 0021](docs/engineering/decisions/0021-studio-interface-redesign.md), STUDIO-UI-001, after the analyzed revision) groups the sidebar into Work (named for screen readers), Build and System, with Tools under Build (US-15.1), opens each page with a serif `PageHeader`, and adds an attention tone for what waits for a person. Eight named surfaces, such as charts and a workflow canvas, don't exist in the app, and the owner confirmed reading the requirement as not reaching them yet ([US-10.2, DS-03](docs/engineering/evidence/US-10.2/summary.md#ds-design-system)).
+  - `POST /v1/runs` admits atomically with idempotency receipts. It refuses with `503 not_ready`, when no key is usable, or for a budget outside `domain/budgets.py` or above the remaining daily cap.
+  - `/v1/runs` returns the label, stop reason, plan progress, frozen profiles and ledger spend, with `group`, `q`, `profile` and keyset `cursor` filters and per-group counts.
+  - `run-panel.tsx` opens under the list at `?run=<id>`. Its commands send the version it loaded.
+  - `RunWorkspace` adds task markers, times from `plan_task_times`, wall seconds, used tools, `current_task_id`, and the metered-call count.
+  - The controls are pause, resume, cancel, owner reconciliation of a call's charge, and Continue (a linked new run). Terminal runs don't resume.
+- **Live result text:** while a run writes a result, the run view shows its text under Result until the published artifact replaces it. "Stream text as it's written" (`autobots.stream`) turns this off.
+- **Model choice:**
+  - New work can choose Terra or Sol.
+  - New work naming DeepSeek is refused with `model_not_offered` and no substitute (`422` when the request names it, `409` for a saved choice or a workflow, `RoutineRefused` for a routine).
+  - An already-admitted run keeps its frozen route.
+  - Models shows the facts, binding sources, Discard, Reset all (`POST /v1/settings/model-policy/reset`), and the follow-the-default summary.
+- **Goal execution:** versioned plans and evidence, required artifacts, verification from artifacts and checks, staged and verified publication, cursor replay, and a live SSE stream.
+- **Tools:**
+  - The catalog (`application/tool_catalog.py`) is derived from the registry, and availability is computed per request.
+  - Registered tools:
+    - plan tools, `calculate`, `read_run_file` v1 and v2, `read_csv`, `read_offload`;
+    - `save_artifact`, `publish_artifact`, `search_memory`, `propose_improvement`;
+    - `store_remote_file` (Expert-only);
+    - the code tools (`search_files`, `read_code_file`, `write_code_file`, `patch_code_file`, which write under `outputs/` only);
+    - the provider tools above.
+  - `browse_goal` (`application/browsing_tool.py`) is registered only while `AUTOBOTS_BROWSER_EXECUTOR=enabled` and the executor's qualification is current. It is approved on every call and runs the read-only loop in `browsing_loop.py` on the `researcher` route.
+  - Every gateway dispatch writes a `tool_uses` row, and the API serves `GET /v1/runs/{id}/tool-uses`.
+  - `/v1/tools/{id}/grants` lists the Experts and published workflows using a tool. The Tools page has group counts, a filter, and a side panel with Granted to and Copy schema.
+- **Approvals:** `/v1/approvals` lists pending or decided requests with goal, task, decider and argument size. The screen pairs a list with the selected request's detail (JSON or Fields view, a PR diff from `review_detail`), and decides with ⌘↵ or ⌘⌫ pressed twice.
+- **Experts:**
+  - Cards show the executor's profile, tools with "+N", `run_count` and `last_run_at`, an approval note, and Start run.
+  - Filters come from the catalog.
+  - Configs carry `tool_groups`, which a save expands. A save naming an unavailable tool is refused with `expert_tool_unavailable`.
+- **Specialists:** `application/assignments.py` runs child runs synchronously, with the scope intersected from the parent and spend counted on the root.
+- **Workflows:**
+  - A typed subset with immutable versions. A run binds to a version and hash, and emissions are insert-only.
+  - IR v2 adds an optional node `label`, and `ir_normalized` keeps v1 hashes.
+  - Optional description.
+  - One draft per workflow, which an owner can save, publish or discard. Executions and routines refuse `"draft"` with `draft_not_runnable`.
+  - The list gives the Experts, step count, last execution and run count, with `/executions` and `/preview`.
+  - Executions accept a D11 budget.
+- **Concept seed:** `operations/concept_seed.py` creates five Experts and six workflows through the application layer, as the owner.
+  - It keeps anything already named.
+  - It strips unavailable tools and says so in the Expert's purpose.
+  - It saves the GitHub-dependent workflows (while GitHub is unavailable) and Interview synthesis as drafts.
+  - It writes no secret and admits no run.
+- **Routines:** explicit, with immutable versions, admitted with a unique key by the maintenance step.
+- **Memory and learning:**
+  - Lexical search in Postgres.
+  - Proposals go through regression and an owner's review with rollback.
+  - `POST /v1/improvements/{id}/replay` admits the owner's held-out tasks, and promotion is refused with `replay_required`, `replay_running` or `replay_failed` ([Decision 0016](docs/engineering/decisions/0016-held-out-replay.md)).
+- **Operations:**
+  - The readiness sentence, "N of M checks pass", the worker count and the hold.
+  - `LocalStatus.values`:
+    - database p95 over the last 20 probes;
+    - applied migrations, artifact bytes, disk;
+    - leased and queued jobs, the checkpoint adapter release, the catalog check's duration;
+    - a loopback-only bind check over the API's listening sockets (descriptors only);
+    - live workers.
+  - `GET /v1/operations/jobs` (owner) returns 24 hourly buckets from `run.status_changed` events, which `jobs-chart.tsx` renders with a legend, tooltip and disclosed table.
+  - Logs are redacted JSON lines, and retention is per workspace (`GET /v1/retention` for any member).
+- **Search:** `GET /v1/search?q=` (`application/search.py`) returns up to five each of runs by goal and of Experts and workflows by name, scoped to the workspace in SQL, plus catalog tools. The palette is a modal combobox over a listbox using `aria-activedescendant`.
+- **Appearance:**
+  - System, Light and Dark (`theme-provider.tsx`, `enableSystem`, dark by default).
+  - The before-paint script in `app/layout.tsx` applies `data-serif`, `data-density`, `data-motion` and `data-stream` from `autobots.*` keys.
+  - `globals.css` adds `--document`, compact `--spacing: 0.2rem`, and a forced reduced-motion rule.
+- **Design:** Luma tokens and the Studio presentation ([Decision 0021](docs/engineering/decisions/0021-studio-interface-redesign.md), [Decision 0022](docs/engineering/decisions/0022-studio-product-surfaces.md)), with a serif `PageHeader` and an attention tone. No workflow canvas component exists (grep for `canvas` in `apps/web/components` finds none). The model-assisted features stay out of scope under Decision 0022 D13.
 
 ## Product implementation status
 
-What has run how. These classes aren't interchangeable, and later code doesn't inherit earlier live results. Most live evidence predates US-12.8's bound fingerprint `51212ae1…`, and **nothing live ran at that fingerprint** ([record](docs/engineering/evidence/US-10.2/summary.md#revisions)).
+These evidence classes aren't interchangeable, and later code doesn't inherit earlier live results.
 
 | Class | What ran | Result and limit |
 |---|---|---|
-| Fake transport under the real SDK | `services/agent/tests`, `scripts/qualify_worker_inference.py` on a disposable stack | 55 of 55 cases at the bound fingerprint. Credential failures, catalog outages and compaction through the worker are mock-level |
-| Disposable stack, scripted model | `db` and `operations` profiles, [closing checks](docs/engineering/evidence/US-10.2/closing-checks.json), [the screen walk](docs/engineering/evidence/US-12.2/summary.md) | [US-12.8](docs/engineering/evidence/US-12.8/summary.md): all exit 0. Closing checks: 12 of 12 cancels on running runs, at most 13.5 ms; a stream cut by TCP reset 4 times and rebuilt; 9 secrets found nowhere scanned |
-| Real sleep, disposable stack, scripted model | [US-12.5](docs/engineering/evidence/US-12.5/summary.md) | 988 s across 20 wakes ended `succeeded`, at `05916d5e…`. An earlier attempt found a defect, since fixed. No real provider across a sleep |
-| Live, direct | [US-3.4](docs/engineering/evidence/US-3.4/summary.md), US-7.2 against GitHub, US-11.2's reasoning trial | No worker or ledger around them. Terra's reasoning `id` is removed by the pinned SDK, accepted in Decision 0013 |
-| Live, disposable stack | [LIVE-GOAL-1](docs/engineering/evidence/LIVE-GOAL-1/summary.md), [US-10.1](docs/engineering/evidence/US-10.1/summary.md), [US-12.4](docs/engineering/evidence/US-12.4/summary.md) | One repeated goal: Terra 5 of 5, DeepSeek 0 of 5. Corpus: 104 of 120 (86.7%), scored by string checks on an assistant-written corpus. Two calls at once: 9 of 10 goals, and **one of five rounds paused as `uncertain_acceptance` with no known cause** |
-| Persistent install | US-11.3 and [US-12.6](docs/engineering/evidence/US-12.6/summary.md) | Compose project `autobots-install`, gateway `127.0.0.1:55321`, database `55322`, API `8001`, web `3000`. Two real goals in total, both succeeded, on Terra. Recorded stopped, data kept, at migration 35 of 35, at `05916d5e…` |
+| Fake transport under the real SDK | `services/agent/tests`, `qualify_worker_inference.py`, `operations/fake_stream.py` for streamed replies | Credential failures, catalog outages, streaming, and the Tavily, Jina, market and GitHub tools in tests are mock-level |
+| Disposable stack, scripted model | `db` and `operations` profiles, [the closing checks](docs/engineering/evidence/US-10.2/closing-checks.json) | Per-story records for US-15.20–15.25 report `db` exit 0, the latest at 2026-11-08T19:36Z (US-15.25). The newest recorded `operations` run found is at [US-12.8](docs/engineering/evidence/US-12.8/summary.md) |
+| Real sleep, disposable stack | [US-12.5](docs/engineering/evidence/US-12.5/summary.md) | 988 s across 20 wakes, `succeeded`. No real provider across a sleep |
+| Live, direct | US-3.4, US-7.2, US-11.2; US-14.15 (Sol route: 39 calls, US$0.011482 reported); US-15.16 (GitHub, `josoroma/bot-test`, 30 of 40 requests) | No worker or ledger around them. All predate streaming (US-15.24) except US-15.16, which makes no model calls |
+| Live, disposable stack | LIVE-GOAL-1, US-10.1, US-12.4; US-14.16 (one `browse_goal` on Sol, US$0.00565) | Terra 5 of 5 and DeepSeek 0 of 5 on one repeated goal. **One US-12.4 round paused as `uncertain_acceptance` with no known cause** |
+| Persistent install | US-11.3, [US-12.6](docs/engineering/evidence/US-12.6/summary.md) | Compose project `autobots-install`, ports 55321, 55322, 8001, 3000. Recorded stopped at migration 35 of 35. No later record found |
 
-**Release record ([US-10.2](docs/engineering/evidence/US-10.2/summary.md)).**
-- It maps LC, MP, LM, DS and DH items to evidence or a decision, and says nothing mandatory is open.
-- It states that partial rows stand on owner decisions and don't meet their text, and that PRD 13.1's stability target is "not met, not revised, accepted as a limit".
-- Open in substance:
-  - The owner's call on whether to release.
-  - The pause's cause stays unexplained, and `worker.call_uncertain` hasn't caught a real one.
-  - No person new to the app has used it, and no person has judged task quality.
-  - No screen reader has been used.
-  - No real network loss or real provider across a sleep has been observed.
-  - Docker or Mac restart wasn't run.
-- EPIC-13 waits for the owner to schedule it.
-- PRD 12.2's timing metrics are later scope, and routine screens are later scope.
-
-**Spending.** The shared ledger read US$0.315650 of US$1 after US-12.6, including US$0.25 held from US-12.4's paused round. [Decision 0014](docs/engineering/decisions/0014-release-limits-accepted.md) says the authority for paid calls and persistent changes has ended.
+**Streamed calls against a live OpenRouter route aren't qualified.** The US-15.24 record says that needs its own capped authorization. Paid authority now exists only as per-decision, once-each grants (for example Decision 0019's S4 and S6). [Decision 0014](docs/engineering/decisions/0014-release-limits-accepted.md) ended general authority.
 
 ## Tests and Quality Gates
 
-`scripts/verify.py` has five profiles and exits 0 passed, 1 a check failed, 2 unavailable. It never installs.
+`scripts/verify.py` implements `harness`, `fast`, `full`, `db` and `operations` (`IMPLEMENTED_PROFILES`). It exits 0 passed, 1 a check failed, 2 unavailable, and it never installs.
 
 - **`harness`:** configuration, backlog validation, deterministic harness tests.
-- **`fast`:** adds Python and web steps for what changed, and records the rest `not_run`.
-- **`full`:** every static and unit step, `next build`, `contract_drift`, the fault qualification (`scripts/qualify_faults.py`), the toolchain scope test, and `qualify_web.py`.
-- **`db`:** disposable targets for `disposable_db`, `supabase_stack`, `app_db`, `qualify_identity` and `qualify_persistent_apply`.
-- **`operations`:** `qualify_operations`, `qualify_backup` and `qualify_upgrade`, on disposable projects with a scripted model.
+- **`fast`:** adds the Python and web steps for what changed.
+- **`full`:** every static and unit step, `next build`, `contract_drift`, `qualify_faults.py`, the toolchain scope test, and `qualify_web.py`. Per-story records report 41 browser tests.
+- **`db`:** disposable targets for `disposable_db`, `supabase_stack`, `app_db`, `qualify_identity` (including `tests/db/*_check.py` such as `result_stream_check`, `task_timing_check`, `pull_request_check`, `concept_seed_check`) and `qualify_persistent_apply`.
+- **`operations`:** `qualify_operations`, `qualify_backup`, `qualify_upgrade`, on disposable projects with a scripted model.
 
-Last recorded at [US-12.8](docs/engineering/evidence/US-12.8/summary.md), on 2026-11-06: `harness` 284 tests; `full` 24 checks, 554 Python tests and 32 browser tests; `db` 44, 18, 449, 447 and 29 cases; `operations` 69, 50 and 45 cases. Only `harness` was re-run for this document.
-
-**Browser specs.** By this analysis of Playwright filters (inference from `scripts/`), of 25 spec files:
-- 21 run through `qualify_identity.py`.
-- 2 through `qualify_web.py`.
+**Browser specs.** This mapping of the 38 spec files is inferred from the Playwright filters in `scripts/`:
+- 33 run through `qualify_identity.py`: 22 in the main list, 3 by title (`qualification`, `saved-choice`, `readiness`) and 8 `slice*`.
+- 3 run through `qualify_web.py`: `appearance`, `boundary`, `tools`.
 - `release-latency` runs only under `qualify_release.py --ui`.
-- `install.spec.ts` runs by hand on the install.
+- `install.spec.ts` runs by hand.
 
-**In no profile:** `qualify_worker_inference.py`, `qualify_mac_sleep.py`, `qualify_release.py`, `qualify_github_connector.py`, `live_goal.py`, and `tests/toolchain` other than its scope test.
+**In no profile:** `qualify_worker_inference.py`, `qualify_github_connector.py` (`--suite studio`, review then apply, ledger-capped), `qualify_browser_executor.py`, `qualify_browse_goal.py`, `browse_trial.py`, `qualify_mac_sleep.py`, `qualify_release.py`, `live_goal.py`, and `tests/toolchain` other than its scope test.
 
-**Evidence and hooks.** `scripts/evidence.py` (`fingerprints`, `validate`, `complete`, `record`) checks work-item records for consistency, not correctness. Hook script fixtures are in `tests/harness/test_hooks.py`. Hooks are configured and not qualified: nothing shows Claude's own crash, timeout or Stop recursion behavior ([Decision 0012](docs/engineering/decisions/0012-unqualified-hooks-in-h1.md)).
+**Evidence and hooks.** `scripts/evidence.py` checks records for consistency, not correctness. The hook fixtures are in `tests/harness/test_hooks.py`. Hooks are configured but not qualified ([Decision 0012](docs/engineering/decisions/0012-unqualified-hooks-in-h1.md)).
 
 ## Common Commands
 
 ```sh
-python3.12 scripts/specs.py validate
-python3.12 scripts/specs.py render
+python3.12 scripts/specs.py validate             # also render, promote
 python3.12 scripts/verify.py --profile harness   # also fast, full, db, operations
 python3.12 scripts/toolchain.py versions         # also lock, bootstrap, check
 python3.12 scripts/generate_contracts.py check   # or write
 python3.12 scripts/evidence.py fingerprints
 python3.12 scripts/qualify_worker_inference.py
+make help                                        # persistent install: start, stop, status, migrate, check
 ```
 
-Start, drain and stop are in [the operations runbook](docs/engineering/runbooks/operations.md). Other procedures are in `docs/engineering/runbooks/`: `backup-restore`, `upgrade`, `mac-sleep`, `local-supabase`, `local-app`, `first-slice`, `toolchains`, `development-harness`, `ohmyorch-delivery`.
+Start, drain and stop are in [the operations runbook](docs/engineering/runbooks/operations.md) and `README-SETUP-RUN.md`. The other runbooks in `docs/engineering/runbooks/` are `backup-restore`, `upgrade`, `mac-sleep`, `local-supabase`, `local-app`, `first-slice`, `toolchains`, `development-harness` and `ohmyorch-delivery`.
 
 ## Conventions
 
-- Stable `SP-*`, `EPIC-*`, `US-*` and requirement IDs. Revisions keep IDs and are recorded in decisions.
-- Routine delivery follows the OpenSpec lifecycle, with the archived change as its record ([Decision 0003](docs/engineering/decisions/0003-openspec-only-delivery.md), `.claude/rules/ohmyorch-delivery.md`). Final reviews and Gate 0 have fuller records under `docs/engineering/evidence/`.
-- Money is integer micro-USD. Errors reach clients as typed codes. Logs carry exception type names, never messages, and identifiers are cut to eight characters.
-- Pydantic owns public contracts and SQL owns schema. Generated files aren't hand-edited. Migrations and seeds are separate. Each migration is applied once and digest-checked on the install.
-- Loopback-only ports, digest-pinned disposable images, and marked `autobots-disposable-*` projects for checks.
-- Runners that a change under `scripts/` would void a binding for are kept beside their evidence, such as `docs/engineering/evidence/US-12.4/measure_two_calls.py`.
+- Stable `SP-*`, `EPIC-*`, `US-*` and requirement IDs. Code comments cite their source IDs, such as `PRD-Studio ST-01` and `Decision 0022 D5`.
+- Routine delivery follows the OpenSpec lifecycle, and the archived change is the record ([Decision 0003](docs/engineering/decisions/0003-openspec-only-delivery.md)). Each `verification.md` ends with a "Not established" line.
+- Money is integer micro-USD. Errors reach clients as typed codes. Logs carry exception type names, never messages, with identifiers cut to 8 characters.
+- Pydantic owns the public contracts and SQL owns the schema. Generated files aren't hand-edited. Migrations and seeds are separate.
+- Versioned tools keep the old version registered beside the new one (`read_run_file`, `create_github_issue`).
+- Browser preferences are `localStorage` keys `autobots.<name>`. Ports are loopback only. Disposable images are pinned by digest, and check projects are marked `autobots-disposable-*`.
 
 ## Constraints and Technical Debt
 
 Accepted limits, by decision:
-- [Decision 0005](docs/engineering/decisions/0005-deepseek-strict-nested-unsupported.md): DeepSeek strict nested output is unsupported.
-- [Decision 0008](docs/engineering/decisions/0008-us-10-1-limits-accepted.md): US-10.1's limits.
-- [Decision 0010](docs/engineering/decisions/0010-contrast-pass-line.md): WCAG 2.1 AA as the pass line.
-- Decision 0013: PRD 8.3's empty `inputs` grant, and routines reading policy and skill text at each occurrence.
-- Decision 0014: active time can go uncounted in rare clock cases; a running step can send further paid calls during a drain; a page reload loses Continue's kept key, so a later press can start a second paid run.
+- Decision 0005: strict nested output is unsupported on DeepSeek.
+- Decision 0008: US-10.1's limits.
+- Decision 0010: WCAG 2.1 AA is the pass line.
+- Decision 0013: PRD 8.3's empty `inputs` grant.
+- Decision 0014: rare uncounted active time, paid calls during a drain, and Continue losing its key on reload.
 
 Observed risks:
-- A reservation's input size is a byte-based estimate, as no tokenizer is pinned.
-- `charge_not_reported`, `cancelled_after_dispatch` and a call left by a cut drain emit no `worker.call_uncertain` (US-10.2).
-- GitHub issue creation has no idempotency key, and a failure after acceptance can create a duplicate (Decision 0007).
-- `input_manifest` in `scripts/harness_lib.py` hashes everything under `supabase/`, including git-ignored files. Run from this repository, even `supabase --version` writes `supabase/.temp/cli-latest`, which changes the source fingerprint and makes `scripts/evidence.py validate` fail until the file is removed. Observed once during this refresh.
+- **Workspace selection:** a member of more than one workspace gets `workspace_required` on member routes, because no client sends `X-Autobots-Workspace`.
+- **Schema readiness:** `REQUIRED_RELATIONS` and `REQUIRED_COLUMNS` (`application/operations.py:29–55`) name nothing created by migrations 38–49. The applied-migration count is displayed but not compared. How a database missing those objects behaves was not examined.
+- **Input-size estimate:** a reservation's input size is a byte-based estimate, because no tokenizer is pinned.
+- **Uncertain calls not logged:** `charge_not_reported`, `cancelled_after_dispatch` and a cut drain emit no `worker.call_uncertain`.
+- **Duplicate issues:** `create_github_issue` has no idempotency key (Decision 0007). The PR connector uses a branch name and marker instead.
+- **Fingerprint churn:** `input_manifest` in `scripts/harness_lib.py` hashes everything under `supabase/`, including ignored files such as `supabase/.temp/cli-latest`.
 
-Text in the repository that differs from the code or tree:
-- `README.md` says implementation and release qualification remain pending, and calls the product unimplemented.
-- `SPECS.md`'s `CODEBASE Context` line reads "development-harness work only, product unimplemented".
-- `docs/engineering/runbooks/development-harness.md` counts 23 browser spec files; 25 are tracked.
-- `application/run_projection.py:1` says nothing there reads checkpoints, while line 447 reads their metadata.
-- `check_run_intent`'s docstring in `api/settings_routes.py` calls run admission a later story.
-- `docs/engineering/runbooks/mac-sleep.md` doesn't name `sleep_counted_as_work`, which `scripts/qualify_mac_sleep.py` reports.
-- `services/agent/pyproject.toml` still describes a "minimal non-feature scaffold".
+Repository text that differs from the code or tree:
+- `README.md` says implementation remains pending and calls the product unimplemented.
+- `SPECS.md` line 3 reads "development-harness work only, product unimplemented".
+- `docs/engineering/runbooks/development-harness.md:47–48` counts 23 browser spec files. There are 38.
+- `application/run_projection.py:1` says nothing there reads checkpoints, while line 642 reads their metadata.
+- `check_run_intent` (`api/settings_routes.py:296`) calls run admission "a later story".
+- `docs/engineering/runbooks/mac-sleep.md` doesn't name `sleep_counted_as_work`.
+- `services/agent/pyproject.toml:4` still says "minimal non-feature scaffold".
+- `README-QA.md` describes revision `ecb34900e46c`.
 
-Hooks are guardrails and not OS confinement. [The harness runbook](docs/engineering/runbooks/development-harness.md) lists Bash forms that get past the secret patterns.
+Hooks are guardrails, not OS confinement ([the harness runbook](docs/engineering/runbooks/development-harness.md)).
 
 ## Upstream evidence and local constraints
 
-- `.claude/autobots.json` records two OhMyOrch pins: `fddfbf53c8c10d45782796cc9a7edf95bc8d3a07` for the spec-ingestor agent, and `9f384fa97ea9bf43d46c2a19770bb580697ccf14`, branch `openspec-only`, for the delivery plugin. The clone at `research/upstream/OhMyOrch` is ignored and its HEAD is `9f384fa`; `fddfbf5` is present in its history. The plugin reports version 0.0.1.
+- `.claude/autobots.json` pins OhMyOrch at `fddfbf53…` for the spec-ingestor and `9f384fa9…` (branch `openspec-only`) for the delivery plugin. The ignored clone's HEAD is `9f384fa`, and the plugin reports version 0.0.1.
 - The same file records assistant event delivery as `not_tested`, and the plugin's as `not_qualified_one_pretooluse_event_observed`.
-- Local model research under `research/` is historical, per `README.md`. No local model runtime is part of the application.
+- No local model runtime is part of the application. The `research/` material is historical.
 
 ## Gaps and evidence limits
 
-- Passing `harness`, `fast`, `full`, `db` or `operations` proves those checks, not H1, product acceptance or anything about a persistent stack. The H1 reading belongs to the release record, and a later source change voids its binding.
-- `SPECS.md`, `CODEBASE.md`, work items and runbooks are excluded from the source fingerprint (`scripts/evidence.py`, `RECORD_FILES`), as are evidence directories. `scripts/evidence.py validate US-12.8` passed at this refresh, so the source inputs matched `51212ae1…` then.
-- US-10.1's figures predate EPIC-11 and EPIC-12 and stand by Decision 0014 without repetition. US-3.4, US-7.2 and LIVE-GOAL-1 predate later admission changes.
-- Raw reports under `.checks/` are ignored and local, so committed summaries are what a reader of this repository can check.
+- Passing any profile proves those checks only, not H1, product acceptance or anything about a persistent stack.
+- No independent review ran on EPIC-14 or EPIC-15 stories (Decision 0003). Their scenarios were observed by the delivering session.
+- `SPECS.md`, `CODEBASE.md`, work items and runbooks are excluded from the source fingerprint (`scripts/evidence.py`, `RECORD_FILES`). The US-12.8 binding predates 59 commits of source change.
+- Raw reports under `.checks/`, including the US-15.16 qualification files, are ignored and local.
 
 ## Evidence Paths
 
-- [`docs/engineering/evidence/US-10.2/`](docs/engineering/evidence/US-10.2/summary.md): release record, three reviews, closing checks and their runner.
-- [`docs/engineering/evidence/US-12.8/`](docs/engineering/evidence/US-12.8/summary.md): the current Gate 0 binding, manifest and reviews. US-12.3 and US-11.12 are replaced and kept as history.
-- `docs/engineering/evidence/US-12.2/`, `US-12.4/`, `US-12.5/`, `US-12.6/`, `US-11.11/`: screen walk, two-call workload, real sleep, install, visual captures.
-- `docs/engineering/evidence/LIVE-GOAL-1/`, `US-10.1/`, `US-3.4/`, `WORKER-INFERENCE-001/`: live and mock inference.
-- `docs/engineering/evidence/README.md`, `docs/engineering/templates/`: the evidence contract.
-- `docs/engineering/decisions/`: Decisions 0001 to 0014.
-- `openspec/changes/archive/*/verification.md`: per-story records, mostly written by the session that built the story.
-- `services/agent/src/autobots/adapters/loop_middleware.py`, `domain/models.py`, `operations/worker.py`, `application/worker_inference.py`, `application/goal_loop.py`: the inference path.
-- `supabase/migrations/`, `contracts/generated/openapi.json`, `scripts/verify.py`, `scripts/harness_lib.py`: schema, public contract and verifier.
+- `services/agent/src/autobots/domain/models.py`: profiles, offered set, binding sources, output cap.
+- `services/agent/src/autobots/adapters/loop_middleware.py`, `application/goal_loop.py`, `application/model_attempts.py`: admitted, streamed calls.
+- `services/agent/src/autobots/adapters/result_stream.py`, `api/event_routes.py`: NOTIFY tap and live SSE frames.
+- `services/agent/src/autobots/adapters/github_reads.py`, `github_issues.py`, `github_pulls.py`: GitHub tools.
+- `services/agent/src/autobots/adapters/tavily.py`, `jina.py`, `market_data.py`, `url_guard.py`, `browser_executor.py`, `egress_proxy.py`: other integrations.
+- `services/agent/src/autobots/application/operations.py`, `api/operation_routes.py`: readiness, values, jobs chart.
+- `services/agent/src/autobots/api/settings_routes.py:46–70`, `api/membership.py`, `apps/web/lib/bff.ts`: workspace and owner resolution.
+- `services/agent/src/autobots/operations/concept_seed.py`, `operations/worker.py`: entry points.
+- `services/agent/src/autobots/application/search.py`, `domain/budgets.py`, `domain/workflows.py`: search, budgets, workflow IR.
+- `supabase/migrations/20261107000036_…` to `20261108000049_applied_migration_count.sql`: schema since the last refresh.
+- `contracts/generated/openapi.json`: 66 `/v1` paths.
+- `apps/web/components/` (`search-palette.tsx`, `new-run.tsx`, `waiting-notifier.tsx`, `jobs-chart.tsx`, `run-panel.tsx`, `settings-nav.tsx`, `sidebar-nav.tsx`, `appearance-control.tsx`), `apps/web/app/layout.tsx`, `apps/web/app/globals.css`: Studio surfaces.
+- `scripts/verify.py`, `scripts/qualify_identity.py:276–335`, `scripts/qualify_web.py:169`, `scripts/harness_lib.py`: verifier and browser-spec mapping.
+- `openspec/changes/archive/2026-11-07-us-14-*/`, `2026-11-08-us-15-*/verification.md`: per-story records (pointers only).
+- `docs/engineering/decisions/0019-sol-profile-and-browser-use.md`, `0022-studio-product-surfaces.md`: paid authority, Studio scope.
+- `docs/engineering/evidence/US-10.2/`, `US-12.8/`, `US-12.6/`: release record, Gate 0 binding, install.
+- `Makefile`, `README-SETUP-RUN.md`, `.env.example` (variable names only), `.claude/autobots.json`.
 
 ## Unknowns
 
-- Whether the install is stopped and at migration 35 now. Records say so, and neither Docker nor its directory was inspected. `persistent_install.py status` would settle it.
-- Why US-12.4's round 1 paused. The record calls it unexplained.
-- Whether the OhMyOrch role identity and full lifecycle hold in a live session beyond what this delivery did, and what Claude does when a hook crashes or times out.
-- Real behavior of provider credential validation against OpenRouter's own failures: MP-A02 and MP-A03 ran against a fake upstream.
-- This refresh didn't re-read every module line by line. The descriptions of `recovery`, `approvals`, `memory`, `compaction`, `workflow_runner` internals, `retention` and `scripts/local_backup.py` rest on the prior inventory, with no contradicting change found in the diff. Reading them would settle it. The diffs of `improvements`, `model_attempts`, `reconciliation`, `reasoning_trial` and `route_qualification` weren't read.
+- Whether the persistent install is still stopped at migration 35, or has had 36–49 applied. No record was found, and neither Docker nor `~/.local/share/autobots-install` was inspected. `make status` or `persistent_install.py status` would settle it.
+- Current pass counts for each profile at HEAD. Only per-story exit codes are recorded, and no profile was run for this refresh. The newest `operations` run found predates EPIC-13.
+- Behavior of streamed calls against live OpenRouter: not qualified, and settled only by a capped authorized run.
+- How screens and admission behave on a database missing migrations 38–49, since the readiness lists don't cover them.
+- Why US-12.4's round 1 paused (the record calls it unexplained).
+- What Claude does when a hook crashes or times out, and whether live event delivery holds beyond the one observed event.
+- Real OpenRouter credential-validation failures: MP-A02 and MP-A03 ran against a fake upstream.
+- This refresh did not re-read `recovery`, `compaction`, `memory`, `workflow_runner`, `retention`, `improvements` or `scripts/local_backup.py` line by line. Their descriptions rest on the prior inventory.
+- The exact tool count in the live registry at runtime, which depends on the keys and the executor flag.

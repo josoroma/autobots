@@ -10,7 +10,7 @@ markers are preserved across refreshes.
 | Target | EPIC-15 |
 | Kind | epic |
 | Focus | - |
-| Status | ACTIVE |
+| Status | COMPLETE |
 | Reason | - |
 | Started | 2026-11-07 |
 | Updated | 2026-11-08 |
@@ -43,16 +43,16 @@ markers are preserved across refreshes.
 | 22 | US-15.22 | us-15-22-search-palette | DONE | Search palette |
 | 23 | US-15.23 | us-15-23-new-run-shortcut | DONE | New run shortcut |
 | 24 | US-15.24 | us-15-24-streaming-result-text | DONE | Streaming result text |
-| 25 | US-15.25 | us-15-25-concept-experts-workflows-seed | IN PROGRESS | Concept Experts and workflows seed |
+| 25 | US-15.25 | us-15-25-concept-experts-workflows-seed | DONE | Concept Experts and workflows seed |
 
 ## Next Action
 
-Action: implement
-Story: US-15.25
-Change: us-15-25-concept-experts-workflows-seed
+Action: complete
+Story: -
+Change: -
 Owner: main-session
-Command: /ohmyorch:opsx-apply us-15-25-concept-experts-workflows-seed
-Reason: gate implementation: 2/3 tasks complete
+Command: none — every story in the goal is DONE
+Reason: all 25 story/stories are DONE
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.
