@@ -97,11 +97,26 @@ migrate:
 start_time = LC_ALL=C TZ=UTC ps -p "$(1)" -o lstart= 2>/dev/null
 running = pid="$$(sed -n 1p "$(RUN_DIR)/$(1).pid" 2>/dev/null)"; started="$$($(call start_time,$${pid:-0}))"; [ -n "$$started" ] && [ "$$started" = "$$(sed -n 2p "$(RUN_DIR)/$(1).pid")" ]
 
+# $(strays_name): pids that look like this process without being the tracked one. A copy started
+# outside this file, or one whose pid file was lost, would otherwise make the next start fail on its
+# port, or run a second worker. The worker pattern's brackets, and dropping this shell's own pid, keep
+# the recipe's own command line from matching.
+strays_api    = lsof -nP -t -iTCP:$(API_PORT) -sTCP:LISTEN 2>/dev/null
+strays_web    = lsof -nP -t -iTCP:$(WEB_PORT) -sTCP:LISTEN 2>/dev/null
+strays_worker = pgrep -f 'autobots[.]operations[.]worker' 2>/dev/null | grep -vx "$$$$"
+stray_pids    = held="$$($(strays_$(1)) | tr '\n' ' ' | sed 's/ *$$//')"
+
 # $(call launch,name,command): start in the background, with the install's environment.
+# It refuses beside an untracked copy and never stops one itself, as a worker may be in a paid call.
 define launch
 	@mkdir -p "$(RUN_DIR)" "$(LOG_DIR)"; \
 	if $(call running,$(1)); then \
 		echo '$(1): already running'; \
+	elif $(call stray_pids,$(1)); [ -n "$$held" ]; then \
+		echo '$(1): refused. pid '"$$held"' looks like a copy of the $(1) that this install does not track, so a new one would clash with it.'; \
+		echo '  See it with: ps -o pid,lstart,command -p '"$$held"; \
+		echo '  Stop it with: kill -TERM '"$$held"' (a worker drains for up to 30 seconds), then run this again.'; \
+		exit 1; \
 	else \
 		set -a; . "$(APP_ENV)"; set +a; \
 		PYTHONPATH=services/agent/src PATH="$(NODE_BIN):$$PATH" NEXT_TELEMETRY_DISABLED=1 AUTOBOTS_WORKER_INFERENCE="$(INFERENCE)" \
@@ -160,6 +175,10 @@ define halt
 		echo '$(1): stopped'; \
 	else \
 		echo '$(1): not running'; \
+		if $(call stray_pids,$(1)); [ -n "$$held" ]; then \
+			echo '$(1): pid '"$$held"' looks like one this install does not track, so it was left running.'; \
+			echo '  See it with: ps -o pid,lstart,command -p '"$$held"'. Stop it with: kill -TERM '"$$held"; \
+		fi; \
 	fi; \
 	rm -f "$(RUN_DIR)/$(1).pid"
 endef

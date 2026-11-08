@@ -108,7 +108,7 @@ This starts the containers, API, web app and worker, and reports an error if the
 
 It doesn't apply migrations or rebuild the web app. See [Updating the code](#updating-the-code). It also starts the worker once the API and web app answer, without waiting for the Operations page to say ready, so check that page if something looks wrong.
 
-The `make` commands only track what they started. If you started a process by hand from a runbook, stop it yourself first, or you'll end up with two workers. `make stop` reports a hand-started worker as `not running` and leaves it running, and it keeps billing if its inference is on.
+The `make` commands only stop what they started. Something else may hold the API or web port, or run a worker: a process you started by hand from a runbook, or one whose pid file was lost. In that case `make stop` reports it by pid and leaves it running, since a worker may be in a paid call. `make start` refuses to start beside it, so you won't end up with two workers. Stop it yourself with the `kill -TERM <pid>` the message gives, then run `make start` again. A worker keeps billing until it stops if its inference is on.
 
 ## Stop
 
@@ -205,7 +205,8 @@ make first-time GATEWAY_PORT=55421 DB_PORT=55422 API_PORT=8101 WEB_PORT=3100
 | Exit 2, `<tool> <version> is required and was not found` | That exact version is missing or moved, for example after `brew upgrade`. Install it, and don't run `uv self update` |
 | Exit 2, `not prepared` | `make toolchain` |
 | `the stack did not start`, naming a missing image, or an image `is not on this machine` | On a first install, `make images`. After a pull, **stop**: the pinned image changed, and pulling it lets the next start recreate the database on it. [Follow the upgrade runbook](docs/engineering/runbooks/upgrade.md) first |
-| `not answering at`, and `Something else may hold the port` | Another program is on that port, or the process failed to start. Read the log it names. The message `answering` only appears when our own process holds the port |
+| `refused. pid <n> looks like a copy of the api` (or web, or worker) | A copy this install doesn't track is still running. Check it with `ps -o pid,lstart,command -p <n>`, stop it with `kill -TERM <n>`, then `make start` |
+| `not answering at`, and `Something else may hold the port` | Another program took the port during start, or the process failed to start. Read the log it names. The message `answering` only appears when our own process holds the port |
 | `init` refuses a held port | Stop whatever holds it, or [choose other ports](#where-everything-lives) |
 | `503 not_ready` | Read the conditions on the Operations page. [The health table](docs/engineering/runbooks/operations.md#reading-health) says what each one means. A disk with under 2 GiB free refuses new work by itself |
 | `schema_behind` | See [Updating the code](#updating-the-code) |
