@@ -8,6 +8,10 @@ export const SHORTCUTS: ShortcutGroup[] = [
     where: "Anywhere",
     shortcuts: [
       {
+        keys: ["⇧", "⌘", "O"],
+        action: "Open Home's composer with focus in the goal. Ctrl works for ⌘",
+      },
+      {
         keys: ["⌘", "K"],
         action: "Search runs, Experts, workflows and tools. Ctrl works for ⌘",
       },

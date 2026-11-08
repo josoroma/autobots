@@ -69,12 +69,14 @@ test("⌘K and the Search button after the skip link open the palette, and ⌘K 
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
 
-  // The skip link is the first stop, and Search, with its key hint, the next.
+  // The skip link is the first stop, then New run, then Search with its key hint.
   await page.goto("/runs");
   await page.keyboard.press("Tab");
   await expect(
     page.getByRole("link", { name: "Skip to content" }),
   ).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "New run" })).toBeFocused();
   await page.keyboard.press("Tab");
   const button = page.getByRole("button", { name: "Search" });
   await expect(button).toBeFocused();

@@ -80,7 +80,7 @@ test("a saved default naming DeepSeek refuses new runs with no substitute, and i
   await page.getByLabel("Model for this run").selectOption("");
   await expect(disclosure).toBeVisible();
   await page.getByRole("textbox", { name: "Goal" }).fill("kept draft");
-  await page.getByRole("button", { name: "Run" }).click();
+  await page.getByRole("button", { name: "Run", exact: true }).click();
   await expect(
     page.getByText(/isn't offered for new runs/).first(),
   ).toBeVisible();

@@ -298,7 +298,9 @@ for (const theme of ["dark", "light"] as const) {
     await expect(
       page.getByRole("link", { name: "Skip to content" }),
     ).toBeFocused();
-    // Decision 0022 D3: Search is the first stop after the skip link.
+    // Decision 0022 D3 and D16: New run, then Search, follow the skip link, which stays first.
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("button", { name: "New run" })).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(page.getByRole("button", { name: "Search" })).toBeFocused();
     await page.keyboard.press("Tab");

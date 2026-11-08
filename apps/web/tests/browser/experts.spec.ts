@@ -88,7 +88,7 @@ test("an owner saves revisions in the editor, and a session shows what it really
   );
 
   await page.getByLabel("Goal").fill("Sum the totals");
-  await page.getByRole("button", { name: "Run" }).click();
+  await page.getByRole("button", { name: "Run", exact: true }).click();
   await page.getByRole("link", { name: "Open this run" }).click();
   await expect(page.locator('[data-expert="Writer"]')).toContainText(
     "version 2",
@@ -220,7 +220,7 @@ test("a coordinator routes only among its list, and adds nothing", async ({
 
   await page.getByLabel(/Calculator, version 1/).check();
   await page.getByLabel("Goal").fill("Add it up");
-  await page.getByRole("button", { name: "Run" }).click();
+  await page.getByRole("button", { name: "Run", exact: true }).click();
   await page.getByRole("link", { name: "Open this run" }).click();
   await expect(page.locator('[data-expert="Calculator"]')).toContainText(
     "calculate",

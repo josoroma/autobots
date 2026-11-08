@@ -546,10 +546,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.22#1 | Add one workspace-scoped search over run goals and the names of Experts, workflows and tools, with typed results, in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client and forward it through the BFF. | DONE | US-15.22 |
 | US-15.22#2 | Add the Search button with its key hint after the skip link, the ⌘K handler that ignores text fields, and the palette dialog with a listbox. | DONE | US-15.22 |
 | US-15.22#3 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.22 |
-| US-15.23 | New run shortcut | READY | EPIC-15 |
-| US-15.23#1 | Add the New run button with its key hint after the skip link, and the shortcut handler that ignores text fields. | TODO | US-15.23 |
-| US-15.23#2 | Update `appearance.spec.ts`'s tab-order assertion so the skip link stays first. | TODO | US-15.23 |
-| US-15.23#3 | Cover the scenarios in browser specs with axe. | TODO | US-15.23 |
+| US-15.23 | New run shortcut | DONE | EPIC-15 |
+| US-15.23#1 | Add the New run button with its key hint after the skip link, and the shortcut handler that ignores text fields. | DONE | US-15.23 |
+| US-15.23#2 | Update `appearance.spec.ts`'s tab-order assertion so the skip link stays first. | DONE | US-15.23 |
+| US-15.23#3 | Cover the scenarios in browser specs with axe. | DONE | US-15.23 |
 | US-15.24 | Streaming result text | READY | EPIC-15 |
 | US-15.24#1 | Emit ephemeral, coalesced `result.text.delta` events for the final result's text only, on the live stream and never into durable events. | TODO | US-15.24 |
 | US-15.24#2 | Add the event type to the typed union, the generated client and the consumer in the same change, with the consumer ignoring unknown types. | TODO | US-15.24 |
@@ -7132,7 +7132,8 @@ Open Questions:
 
 ### US-15.23: New run shortcut
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-15-23-new-run-shortcut/`
 
 As a goal's owner
 I want a New run button with the ⇧⌘O hint in the shell
@@ -7167,9 +7168,9 @@ Dependencies:
 - US-15.1
 
 Tasks:
-- [ ] Add the New run button with its key hint after the skip link, and the shortcut handler that ignores text fields.
-- [ ] Update `appearance.spec.ts`'s tab-order assertion so the skip link stays first.
-- [ ] Cover the scenarios in browser specs with axe.
+- [x] Add the New run button with its key hint after the skip link, and the shortcut handler that ignores text fields.
+- [x] Update `appearance.spec.ts`'s tab-order assertion so the skip link stays first.
+- [x] Cover the scenarios in browser specs with axe.
 
 Open Questions:
 - None.

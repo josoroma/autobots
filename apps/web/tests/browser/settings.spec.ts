@@ -53,7 +53,7 @@ test("without a key, local work stays usable and a model call is credentials_req
   page.on("request", (request) => {
     if (request.url().endsWith("/api/v1/runs")) intents.push(request.method());
   });
-  await page.getByRole("button", { name: "Run" }).click();
+  await page.getByRole("button", { name: "Run", exact: true }).click();
   await expect(
     page.locator('[data-outcome="credentials_required"]'),
   ).toBeVisible();
@@ -221,7 +221,7 @@ test("Validate and Disconnect work, and disconnecting blocks model work again", 
   await expect(page.locator('[data-field="source"]')).toHaveText("None");
   await page.goto("/");
   await page.getByRole("textbox", { name: "Goal" }).fill(DRAFT);
-  await page.getByRole("button", { name: "Run" }).click();
+  await page.getByRole("button", { name: "Run", exact: true }).click();
   await expect(
     page.locator('[data-outcome="credentials_required"]'),
   ).toBeVisible();

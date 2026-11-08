@@ -26,6 +26,7 @@ import {
   INNER_BOX,
 } from "@/components/ui/card";
 import { Input, Select, Textarea } from "@/components/ui/field";
+import { focusGoal, NEW_RUN_PARAM } from "@/components/new-run";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
 
@@ -111,6 +112,19 @@ type Outcome =
 
 export function GoalComposer() {
   const restored = useSyncExternalStore(subscribe, storedDraft, () => "");
+  // Arrived from New run or ⇧⌘O (SH-02): focus the goal, then drop the marker from the address.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get(NEW_RUN_PARAM) !== "1") return;
+    focusGoal();
+    params.delete(NEW_RUN_PARAM);
+    const rest = params.toString();
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${window.location.pathname}${rest === "" ? "" : `?${rest}`}`,
+    );
+  }, []);
   const [edited, setEdited] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [runId, setRunId] = useState<string | null>(null);

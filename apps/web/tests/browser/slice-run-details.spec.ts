@@ -154,7 +154,7 @@ test("a person picks the other model for one run: it freezes, the default stays,
   await page
     .getByRole("textbox", { name: "Goal" })
     .fill("slice-only-claims one run");
-  await page.getByRole("button", { name: "Run" }).click();
+  await page.getByRole("button", { name: "Run", exact: true }).click();
   const link = page
     .locator('[data-outcome="queued"]')
     .getByRole("link", { name: "Open this run" });
@@ -265,7 +265,7 @@ test("an unapproved model is refused, no run starts, and the draft is kept", asy
       postData: JSON.stringify({ ...body, run_profile: "openai/gpt-unknown" }),
     });
   });
-  await page.getByRole("button", { name: "Run" }).click();
+  await page.getByRole("button", { name: "Run", exact: true }).click();
   await expect(page.locator('[data-outcome="model_refused"]')).toContainText(
     "isn't approved",
   );
@@ -337,7 +337,7 @@ test("continuing a finished run asks for a new run naming it, with the disclosur
   });
   await page
     .locator("[data-continue-run]")
-    .getByRole("button", { name: "Run" })
+    .getByRole("button", { name: "Run", exact: true })
     .click();
   await expect(page.locator("[data-continue-run]")).toContainText(
     "it may have started",
@@ -353,7 +353,7 @@ test("continuing a finished run asks for a new run naming it, with the disclosur
   );
   await page
     .locator("[data-continue-run]")
-    .getByRole("button", { name: "Run" })
+    .getByRole("button", { name: "Run", exact: true })
     .click();
   // The server repeats what it stored, as the page's copy is cut and redacted.
   const body = (await sent).postDataJSON();

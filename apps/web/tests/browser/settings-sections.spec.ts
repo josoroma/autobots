@@ -88,7 +88,7 @@ test("Keyboard lists each shortcut with its keys and what it does", async ({
   await signIn(page, EMAIL_C, PASSWORD_C);
   await page.goto("/settings/keyboard");
   const rows = page.locator("[data-shortcut]");
-  await expect(rows).toHaveCount(7);
+  await expect(rows).toHaveCount(8);
   const listed = await rows.evaluateAll((items) =>
     items.map((item) => ({
       keys: [...item.querySelectorAll("kbd")].map((key) => key.textContent),
@@ -96,6 +96,7 @@ test("Keyboard lists each shortcut with its keys and what it does", async ({
     })),
   );
   expect(listed.map((item) => item.keys.join(" "))).toEqual([
+    "⇧ ⌘ O",
     "⌘ K",
     "J",
     "K",
@@ -105,9 +106,10 @@ test("Keyboard lists each shortcut with its keys and what it does", async ({
     "Tab",
   ]);
   for (const item of listed) expect(item.action.length).toBeGreaterThan(10);
-  expect(listed[0]?.action).toContain("Search");
-  expect(listed[4]?.action).toContain("Approve");
-  expect(listed[5]?.action).toContain("Reject");
+  expect(listed[0]?.action).toContain("composer");
+  expect(listed[1]?.action).toContain("Search");
+  expect(listed[5]?.action).toContain("Approve");
+  expect(listed[6]?.action).toContain("Reject");
   await axe(page);
 });
 

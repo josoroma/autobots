@@ -293,7 +293,7 @@ test("a signed-out stream is refused, and Run links to the new run", async ({
   await signIn(page, EMAIL_A, PASSWORD_A);
   await admitted(page, "link");
   await page.getByRole("textbox", { name: "Goal" }).fill("Open what I started");
-  await page.getByRole("button", { name: "Run" }).click();
+  await page.getByRole("button", { name: "Run", exact: true }).click();
   await page.getByRole("link", { name: "Open this run" }).click();
   await expect(page).toHaveURL(/\/runs\//);
   await expect(
@@ -488,7 +488,7 @@ test("US-14.9: up to five text files attach to a goal as run inputs, and the res
   await page
     .getByRole("textbox", { name: "Goal" })
     .fill("Summarize the attached files");
-  await page.getByRole("button", { name: "Run" }).click();
+  await page.getByRole("button", { name: "Run", exact: true }).click();
   await page.getByRole("link", { name: "Open this run" }).click();
   await expect(page).toHaveURL(/\/runs\/[0-9a-f-]{36}/);
   const runId = page.url().split("/").at(-1) ?? "";

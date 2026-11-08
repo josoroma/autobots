@@ -2,6 +2,7 @@ import { Zap } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { AccountFooter } from "@/components/account-footer";
+import { NewRun } from "@/components/new-run";
 import { HealthLine } from "@/components/readiness";
 import { SearchPalette } from "@/components/search-palette";
 import { SidebarNav } from "@/components/sidebar-nav";
@@ -38,8 +39,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             </span>
             <span className="font-serif text-lg tracking-tight">Autobots</span>
           </p>
-          {/* Decision 0022 D3: the first stop after the skip link. */}
-          <SearchPalette />
+          {/* Decision 0022 D3 and D16: New run, then Search, right after the skip link. */}
+          <div className="space-y-1.5">
+            <NewRun />
+            <SearchPalette />
+          </div>
           <nav aria-label="Main" className="pt-1">
             <ShellNav />
           </nav>

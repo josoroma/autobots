@@ -58,7 +58,7 @@ test("Run admits exactly once through the real form, and a reload starts nothing
     if (request.method() === "POST" && request.url().endsWith("/api/v1/runs"))
       posts.push(request.url());
   });
-  await page.getByRole("button", { name: "Run" }).click();
+  await page.getByRole("button", { name: "Run", exact: true }).click();
   const queued = page.locator('[data-outcome="queued"]');
   await expect(queued).toHaveText(/^Your goal is queued\. Open this run$/);
   await expect(
