@@ -465,5 +465,134 @@
       "code": "",
       "message": "x"
     }
+  },
+  {
+    "name": "workflow graph at IR version 1, with no labels",
+    "model": "WorkflowGraph",
+    "valid": true,
+    "value": {
+      "nodes": [
+        {
+          "id": "in",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "out",
+          "block": "output",
+          "version": 1,
+          "config": {}
+        }
+      ],
+      "links": [
+        {
+          "source": "in",
+          "source_port": "value",
+          "target": "out",
+          "target_port": "value"
+        }
+      ]
+    }
+  },
+  {
+    "name": "workflow graph at IR version 2, with a label",
+    "model": "WorkflowGraph",
+    "valid": true,
+    "value": {
+      "nodes": [
+        {
+          "id": "in",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          },
+          "label": "Ask for a topic"
+        },
+        {
+          "id": "out",
+          "block": "output",
+          "version": 1,
+          "config": {}
+        }
+      ],
+      "links": [
+        {
+          "source": "in",
+          "source_port": "value",
+          "target": "out",
+          "target_port": "value"
+        }
+      ],
+      "ir_version": 2
+    }
+  },
+  {
+    "name": "workflow graph at an unknown IR version",
+    "model": "WorkflowGraph",
+    "valid": false,
+    "value": {
+      "nodes": [
+        {
+          "id": "in",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "out",
+          "block": "output",
+          "version": 1,
+          "config": {}
+        }
+      ],
+      "links": [
+        {
+          "source": "in",
+          "source_port": "value",
+          "target": "out",
+          "target_port": "value"
+        }
+      ],
+      "ir_version": 3
+    }
+  },
+  {
+    "name": "workflow node with an empty label",
+    "model": "WorkflowGraph",
+    "valid": false,
+    "value": {
+      "nodes": [
+        {
+          "id": "in",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          },
+          "label": ""
+        },
+        {
+          "id": "out",
+          "block": "output",
+          "version": 1,
+          "config": {}
+        }
+      ],
+      "links": [
+        {
+          "source": "in",
+          "source_port": "value",
+          "target": "out",
+          "target_port": "value"
+        }
+      ],
+      "ir_version": 2
+    }
   }
 ]

@@ -31,6 +31,7 @@ from autobots.domain.workflows import (
     block_versions,
     graph_hash,
     input_errors,
+    ir_normalized,
     validate_graph,
 )
 
@@ -51,10 +52,12 @@ class WorkflowRefused(Exception):
 
 
 def _plain(graph: WorkflowGraph) -> dict[str, Any]:
-    return graph.model_dump(mode="json")
+    return ir_normalized(graph.model_dump(mode="json"))
 
 
-async def _view(connection: Any, workflow_id: UUID, name: str, latest: int) -> WorkflowView:
+async def _view(
+    connection: Any, workflow_id: UUID, name: str, latest: int, description: str | None
+) -> WorkflowView:
     cursor = await connection.execute(
         "select version, graph_hash, source, graph, block_versions "
         "from public.workflow_versions where workflow_id = %s order by version",
@@ -71,13 +74,19 @@ async def _view(connection: Any, workflow_id: UUID, name: str, latest: int) -> W
         for row in await cursor.fetchall()
     ]
     return WorkflowView(
-        schema_version=1, id=workflow_id, name=name, latest_version=latest, versions=versions
+        schema_version=1,
+        id=workflow_id,
+        name=name,
+        description=description,
+        latest_version=latest,
+        versions=versions,
     )
 
 
 async def get_workflow(connection: Any, workspace_id: UUID, workflow_id: UUID) -> WorkflowView:
     cursor = await connection.execute(
-        "select id, name, latest_version from public.workflows where id = %s and workspace_id = %s",
+        "select id, name, latest_version, description from public.workflows "
+        "where id = %s and workspace_id = %s",
         (workflow_id, workspace_id),
     )
     row = await cursor.fetchone()
@@ -88,7 +97,7 @@ async def get_workflow(connection: Any, workspace_id: UUID, workflow_id: UUID) -
 
 async def list_workflows(connection: Any, workspace_id: UUID) -> list[WorkflowView]:
     cursor = await connection.execute(
-        "select id, name, latest_version from public.workflows "
+        "select id, name, latest_version, description from public.workflows "
         "where workspace_id = %s order by name",
         (workspace_id,),
     )
@@ -96,9 +105,18 @@ async def list_workflows(connection: Any, workspace_id: UUID) -> list[WorkflowVi
 
 
 async def create_workflow(
-    connection: Any, *, workspace_id: UUID, actor_id: UUID, idempotency_key: str, name: str
+    connection: Any,
+    *,
+    workspace_id: UUID,
+    actor_id: UUID,
+    idempotency_key: str,
+    name: str,
+    description: str | None = None,
 ) -> WorkflowView:
-    fingerprint = request_hash({"name": name})
+    # Only when given, so a receipt from before descriptions still matches.
+    fingerprint = request_hash(
+        {"name": name, **({"description": description} if description else {})}
+    )
     scope = (workspace_id, actor_id, "create_workflow", str(workspace_id), idempotency_key)
     async with connection.transaction():
         existing = await existing_receipt(connection, scope, fingerprint)
@@ -112,10 +130,25 @@ async def create_workflow(
             raise WorkflowRefused("workflow_name_taken")
         workflow_id = uuid4()
         await connection.execute(
-            "insert into public.workflows (id, workspace_id, name) values (%s, %s, %s)",
-            (workflow_id, workspace_id, name),
+            "insert into public.workflows (id, workspace_id, name, description) "
+            "values (%s, %s, %s, %s)",
+            (workflow_id, workspace_id, name, description),
         )
         await store_receipt(connection, scope, fingerprint, {"workflow_id": str(workflow_id)})
+    return await get_workflow(connection, workspace_id, workflow_id)
+
+
+async def set_description(
+    connection: Any, workspace_id: UUID, workflow_id: UUID, description: str | None
+) -> WorkflowView:
+    """PRD-Studio WF-06. Describing a workflow changes no version."""
+    cursor = await connection.execute(
+        "update public.workflows set description = %s where id = %s and workspace_id = %s "
+        "returning id",
+        (description, workflow_id, workspace_id),
+    )
+    if await cursor.fetchone() is None:
+        raise WorkflowRefused("workflow_not_found")
     return await get_workflow(connection, workspace_id, workflow_id)
 
 

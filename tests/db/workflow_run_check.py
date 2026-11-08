@@ -23,7 +23,8 @@ from autobots.application.goal_loop import LoopConfig, process_next  # noqa: E40
 from autobots.application.plans import load_goal  # noqa: E402
 from autobots.application.runs import apply_command  # noqa: E402
 from autobots.application.worker_leases import claim_next  # noqa: E402
-from autobots.application.workflows import create_execution, create_workflow, publish_version  # noqa: E402
+from autobots.application.workflows import create_execution, create_workflow, publish_version, set_description  # noqa: E402
+from autobots.domain.workflows import block_versions, graph_hash  # noqa: E402
 from autobots.contracts.experts import ExpertConfig  # noqa: E402
 from autobots.contracts.plans import InputDocument  # noqa: E402
 from autobots.contracts.workflows import WorkflowGraph  # noqa: E402
@@ -280,6 +281,43 @@ async def main() -> None:
             workflow_runner.validate_graph = real_validate
         state = await run_state(execution)
         check('a version the rules now reject fails without running', 'failed, workflow_invalid, no instance', (state, result.code if result else None, await statuses(execution)), state == 'failed' and result is not None and result.code == 'workflow_invalid' and await statuses(execution) == {})
+
+        # US-15.11 (PRD-Studio WF-06): an optional description, labels at IR version 2, and version 1 unchanged.
+        shout = {'nodes': [node('in', 'input', type='string'), node('up', 'transform', operation='upper'), node('out', 'output')],
+                 'links': [link('in', 'value', 'up', 'value'), link('up', 'value', 'out', 'value')]}
+        described = await create_workflow(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='described', name='Described', description='Shouts the topic back')
+        plain_flow = await create_workflow(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='undescribed', name='Undescribed')
+        check('a workflow keeps its optional description, and one without has none', 'the text, then None',
+              (described.description, plain_flow.description), described.description == 'Shouts the topic back' and plain_flow.description is None)
+        labelled = {**shout, 'nodes': [shout['nodes'][0], {**shout['nodes'][1], 'label': 'Shout it'}, shout['nodes'][2]]}
+        execution = await start('Labelled', labelled, {'in': 'loud'})
+        stored = await value('select graph from public.workflow_versions v join public.workflow_executions x on x.workflow_id = v.workflow_id and x.workflow_version = v.version where x.id = %s', execution.id)
+        check('a labelled graph is stored at IR version 2 with its labels', "ir_version 2, up labelled 'Shout it'",
+              (stored.get('ir_version'), [item.get('label') for item in stored['nodes']]),
+              stored.get('ir_version') == 2 and [item.get('label') for item in stored['nodes']] == [None, 'Shout it', None])
+        result = await advance()
+        check('and it runs', 'succeeded, LOUD', (result.outcome, await emitted(execution, 'out', 'value')), result.outcome == 'succeeded' and await emitted(execution, 'out', 'value') == 'LOUD')
+        execution = await start('Version one', shout, {'in': 'quiet'})
+        row = await (await db.execute('select v.graph, v.graph_hash from public.workflow_versions v join public.workflow_executions x on x.workflow_id = v.workflow_id and x.workflow_version = v.version where x.id = %s', (execution.id,))).fetchone()
+        check('an unlabelled graph stays at IR version 1 and hashes as before', 'no ir_version or label keys, the raw hash',
+              (sorted(row[0]), row[1] == graph_hash(shout)),
+              'ir_version' not in row[0] and all('label' not in item for item in row[0]['nodes']) and row[1] == graph_hash(shout) and row[0] == shout)
+        result = await advance()
+        check('and it still runs', 'succeeded, QUIET', (result.outcome, await emitted(execution, 'out', 'value')), result.outcome == 'succeeded' and await emitted(execution, 'out', 'value') == 'QUIET')
+        # Arranged as a version published before the migration: its stored graph and hash, written as they were.
+        older = uuid4()
+        await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
+        await db.execute('insert into public.workflows (id, workspace_id, name, latest_version) values (%s, %s, %s, 1)', (older, WORKSPACE, 'Published before'))
+        await db.execute("insert into public.workflow_versions (workflow_id, version, graph, graph_hash, block_versions, source, created_by) values (%s, 1, %s, %s, %s, 'user', %s)",
+                         (older, json.dumps(shout), graph_hash(shout), json.dumps(block_versions(shout)), ACTOR))
+        bound = await create_execution(db, workspace_id=WORKSPACE, actor_id=ACTOR, workflow_id=older, idempotency_key='older-e', version=1, inputs={'in': 'kept'})
+        check('a version published before the change binds the same version and hash', 'version 1, the stored hash',
+              (bound.workflow_version, bound.graph_hash == graph_hash(shout)), bound.workflow_version == 1 and bound.graph_hash == graph_hash(shout))
+        result = await advance()
+        check('and runs unchanged', 'succeeded, KEPT', (result.outcome, await emitted(bound, 'out', 'value')), result.outcome == 'succeeded' and await emitted(bound, 'out', 'value') == 'KEPT')
+        described = await set_description(db, WORKSPACE, plain_flow.id, 'Added later')
+        check('a description can be added later without a new version', 'Added later, version 0', (described.description, described.latest_version),
+              described.description == 'Added later' and described.latest_version == 0)
     print(json.dumps({'cases': cases}))
 
 try:

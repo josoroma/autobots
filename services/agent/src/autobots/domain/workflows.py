@@ -12,6 +12,10 @@ from dataclasses import dataclass
 from typing import Any
 
 MAX_FOREACH_ITEMS = 100
+# PRD-Studio WF-06: IR version 2 adds an optional `label` to each node. A graph with no
+# `ir_version` is version 1, which stays valid and hashes exactly as it always did.
+IR_VERSIONS = frozenset({1, 2})
+LABELLED_IR_VERSION = 2
 TRANSFORMS = frozenset({"identity", "upper", "lower", "length", "sum", "to_string"})
 PREDICATES = frozenset({"equals", "not_equals", "greater_than", "less_than", "contains"})
 
@@ -192,9 +196,33 @@ def _iteration_errors(
     return errors
 
 
+def ir_normalized(graph: Mapping[str, Any]) -> dict[str, Any]:
+    """As stored and hashed. An absent label or IR version is left out, so a version 1 graph is
+    unchanged, and a graph whose nodes carry labels is stored at IR version 2."""
+    plain = dict(graph)
+    plain["nodes"] = [
+        {key: value for key, value in node.items() if not (key == "label" and value is None)}
+        for node in graph.get("nodes", [])
+    ]
+    if plain.get("ir_version") is None:
+        plain.pop("ir_version", None)
+        if any("label" in node for node in plain["nodes"]):
+            plain["ir_version"] = LABELLED_IR_VERSION
+    return plain
+
+
 def validate_graph(graph: Mapping[str, Any]) -> list[GraphError]:
     """Typed errors, all at once where they can be found. An empty list means publishable."""
     errors: list[GraphError] = []
+    version = graph.get("ir_version", 1)
+    if version not in IR_VERSIONS:
+        return [GraphError("unknown_ir_version")]
+    if version < LABELLED_IR_VERSION:
+        errors.extend(
+            GraphError("label_needs_ir_version_2", node["id"])
+            for node in graph.get("nodes", [])
+            if node.get("label") is not None
+        )
     nodes: dict[str, Mapping[str, Any]] = {}
     for node in graph.get("nodes", []):
         if node["id"] in nodes:

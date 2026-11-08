@@ -380,3 +380,39 @@ def test_equal_foreach_items_are_separate_operations() -> None:
     arguments = AssignSpecialist(expert_id=str(uuid4()), goal="x")
     ids = {_operation_id(replace(scope, instance=key), tool, arguments) for key in seen}  # type: ignore[arg-type]
     assert len(ids) == 2
+
+
+def test_a_version_1_graph_hashes_as_it_always_did() -> None:
+    """PRD-Studio WF-06: the contract's new fields leave an unlabelled graph's stored form alone."""
+    from autobots.contracts.workflows import WorkflowGraph
+    from autobots.domain.workflows import ir_normalized
+
+    raw = simple()
+    through_contract = ir_normalized(WorkflowGraph.model_validate(raw).model_dump(mode="json"))
+    assert "ir_version" not in through_contract
+    assert all("label" not in node for node in through_contract["nodes"])
+    assert graph_hash(through_contract) == graph_hash(raw)
+    assert validate_graph(through_contract) == []
+
+
+def test_labels_store_a_graph_at_ir_version_2() -> None:
+    from autobots.contracts.workflows import WorkflowGraph
+    from autobots.domain.workflows import ir_normalized
+
+    labelled = simple()
+    labelled["nodes"][1]["label"] = "Shout it"
+    stored = ir_normalized(WorkflowGraph.model_validate(labelled).model_dump(mode="json"))
+    assert stored["ir_version"] == 2
+    assert stored["nodes"][1]["label"] == "Shout it"
+    assert "label" not in stored["nodes"][0]
+    assert validate_graph(stored) == []
+    assert graph_hash(stored) != graph_hash(simple())
+
+
+def test_a_label_on_a_declared_version_1_graph_is_refused() -> None:
+    graph = {**simple(), "ir_version": 1}
+    graph["nodes"][0]["label"] = "Start"
+    assert [error.code for error in validate_graph(graph)] == ["label_needs_ir_version_2"]
+    assert [error.code for error in validate_graph({**simple(), "ir_version": 3})] == [
+        "unknown_ir_version"
+    ]

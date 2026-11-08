@@ -5896,6 +5896,19 @@
       "WorkflowCreate": {
         "additionalProperties": false,
         "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
           "name": {
             "maxLength": 100,
             "minLength": 1,
@@ -5907,6 +5920,30 @@
           "name"
         ],
         "title": "WorkflowCreate",
+        "type": "object"
+      },
+      "WorkflowDescription": {
+        "additionalProperties": false,
+        "description": "PRD-Studio WF-06: replaces the description. None removes it.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "required": [
+          "description"
+        ],
+        "title": "WorkflowDescription",
         "type": "object"
       },
       "WorkflowErrorView": {
@@ -5950,6 +5987,21 @@
       "WorkflowGraph": {
         "additionalProperties": false,
         "properties": {
+          "ir_version": {
+            "anyOf": [
+              {
+                "enum": [
+                  1,
+                  2
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ir Version"
+          },
           "links": {
             "items": {
               "$ref": "#/components/schemas/WorkflowLink"
@@ -6039,6 +6091,19 @@
             "pattern": "^[A-Za-z0-9_-]{1,60}$",
             "title": "Id",
             "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
           },
           "version": {
             "title": "Version",
@@ -6160,6 +6225,17 @@
       "WorkflowView": {
         "additionalProperties": false,
         "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -6190,6 +6266,7 @@
           "schema_version",
           "id",
           "name",
+          "description",
           "latest_version",
           "versions"
         ],
@@ -12085,6 +12162,105 @@
           }
         },
         "summary": "Read Workflow"
+      }
+    },
+    "/v1/workflows/{workflow_id}/description": {
+      "put": {
+        "operationId": "setWorkflowDescription",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workflow_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Workflow Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkflowDescription"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Description"
       }
     },
     "/v1/workflows/{workflow_id}/executions": {

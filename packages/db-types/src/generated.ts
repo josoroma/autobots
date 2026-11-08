@@ -243,6 +243,7 @@ export interface WorkflowsRow {
   name: string;
   latest_version: number;
   created_at: string;
+  description: string | null;
 }
 
 export interface WorkspaceMembersRow {

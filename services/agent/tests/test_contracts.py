@@ -12,6 +12,7 @@ from pydantic import BaseModel, ValidationError
 from autobots.contracts.adapters import run_from_row, run_summary_from_domain
 from autobots.contracts.export import openapi_document
 from autobots.contracts.runs import ErrorResponse, RunEvent, RunSummary
+from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.runs import (
     NORMAL_EXITS,
     TERMINAL,
@@ -31,6 +32,7 @@ MODELS: dict[str, type[BaseModel]] = {
     "RunSummary": RunSummary,
     "RunEvent": RunEvent,
     "ErrorResponse": ErrorResponse,
+    "WorkflowGraph": WorkflowGraph,
 }
 RUN_ID = UUID("11111111-1111-4111-8111-111111111111")
 WORKSPACE_ID = UUID("22222222-2222-4222-8222-222222222222")

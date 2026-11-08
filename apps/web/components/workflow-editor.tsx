@@ -23,7 +23,7 @@ import { RunDisclosure } from "@/components/run-disclosure";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Select, Textarea } from "@/components/ui/field";
+import { Input, Select, Textarea } from "@/components/ui/field";
 import { SectionLabel } from "@/components/ui/page-header";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
@@ -55,6 +55,53 @@ function parsed(text: string): unknown {
   }
 }
 
+type DraftNode = { id: string; block: string; label?: string | null };
+type DraftGraph = {
+  nodes: DraftNode[];
+  ir_version?: number | null;
+  [key: string]: unknown;
+};
+
+function draftGraph(text: string): DraftGraph | null {
+  const graph = parsed(text) as DraftGraph | null;
+  return graph !== null &&
+    typeof graph === "object" &&
+    Array.isArray(graph.nodes) &&
+    graph.nodes.every(
+      (node) => typeof node === "object" && typeof node?.id === "string",
+    )
+    ? graph
+    : null;
+}
+
+// What the API returns carries `label: null` and `ir_version: null` where nothing is set. Left out
+// here, so an unlabelled graph stays at IR version 1 and keeps its hash.
+function tidy(graph: unknown): string {
+  const plain = JSON.parse(JSON.stringify(graph)) as DraftGraph;
+  if (plain.ir_version === null) delete plain.ir_version;
+  for (const node of plain.nodes ?? []) {
+    if (node.label === null) delete node.label;
+  }
+  return JSON.stringify(plain, null, 2);
+}
+
+// PRD-Studio WF-06: a label bumps the graph to IR version 2, and with none left it returns to 1.
+function withLabel(text: string, nodeId: string, label: string): string {
+  const graph = draftGraph(text);
+  if (graph === null) return text;
+  for (const node of graph.nodes) {
+    if (node.id !== nodeId) continue;
+    if (label.trim() === "") delete node.label;
+    else node.label = label;
+  }
+  if (graph.nodes.some((node) => typeof node.label === "string")) {
+    graph.ir_version = 2;
+  } else {
+    delete graph.ir_version;
+  }
+  return JSON.stringify(graph, null, 2);
+}
+
 export function WorkflowEditor({ workflowId }: { workflowId: string }) {
   const router = useRouter();
   const [workflow, setWorkflow] = useState<WorkflowView | null>(null);
@@ -65,6 +112,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const [chosen, setChosen] = useState<number | null>(null);
   const [inputs, setInputs] = useState("{}");
+  const [description, setDescription] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -78,9 +126,10 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
         }
         const loaded = parseWorkflowView(await reply.json());
         setWorkflow(loaded);
+        setDescription(loaded.description ?? "");
         const latest = loaded.versions.at(-1);
         if (latest !== undefined) {
-          setDraft(JSON.stringify(latest.graph, null, 2));
+          setDraft(tidy(latest.graph));
           setChosen(latest.version);
         }
       })
@@ -156,6 +205,39 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
     );
   }
 
+  async function saveDescription(): Promise<void> {
+    if (workflow === null) return;
+    setMessage(null);
+    const text = description.trim();
+    const reply = await csrfFetch(
+      `/api/v1/workflows/${encodeURIComponent(workflow.id)}/description`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: text === "" ? null : text }),
+      },
+    ).catch(() => null);
+    if (reply?.ok === true) {
+      const saved = parseWorkflowView(await reply.json());
+      setWorkflow(saved);
+      setDescription(saved.description ?? "");
+      setMessage(
+        saved.description === null
+          ? "The description is removed. No version changed."
+          : "Description saved. No version changed.",
+      );
+      return;
+    }
+    const failure = (await reply?.json().catch(() => null)) as {
+      code?: string;
+    } | null;
+    setMessage(
+      failure?.code === "owner_required"
+        ? "Only the workspace owner can describe a workflow."
+        : "The description could not be saved.",
+    );
+  }
+
   async function run(): Promise<void> {
     if (workflow === null || chosen === null) return;
     setMessage(null);
@@ -228,6 +310,26 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
           )}
         </div>
         <div className="space-y-1.5">
+          <label htmlFor="workflow-description" className={SECTION}>
+            Description
+          </label>
+          <Textarea
+            id="workflow-description"
+            rows={2}
+            maxLength={500}
+            value={description}
+            placeholder="What this workflow does"
+            onChange={(event) => setDescription(event.target.value)}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void saveDescription()}
+          >
+            Save description
+          </Button>
+        </div>
+        <div className="space-y-1.5">
           <label htmlFor="graph" className={SECTION}>
             Graph
           </label>
@@ -243,6 +345,38 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
             className="font-mono text-[12.5px] leading-relaxed"
           />
         </div>
+        {draftGraph(draft) === null ? null : (
+          <fieldset data-field="step-labels" className="min-w-0 space-y-2">
+            <legend className={cn(SECTION, "mb-1")}>Step labels</legend>
+            <p className="text-muted-foreground text-[12.5px]">
+              Optional. A label says what a step does, and a labelled graph is
+              published at IR version 2.
+            </p>
+            {draftGraph(draft)!.nodes.map((node) => (
+              <div
+                key={node.id}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1"
+              >
+                <label
+                  htmlFor={`label-${node.id}`}
+                  className="w-40 shrink-0 font-mono text-[12.5px] break-all"
+                >
+                  {node.id} ({node.block})
+                </label>
+                <Input
+                  id={`label-${node.id}`}
+                  maxLength={80}
+                  value={typeof node.label === "string" ? node.label : ""}
+                  onChange={(event) => {
+                    setDraft(withLabel(draft, node.id, event.target.value));
+                    setCheck(null);
+                  }}
+                  className="h-8 min-w-0 flex-1"
+                />
+              </div>
+            ))}
+          </fieldset>
+        )}
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => void validate()}>
             <ListChecks aria-hidden="true" />

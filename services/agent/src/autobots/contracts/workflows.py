@@ -17,6 +17,8 @@ class WorkflowNode(BaseModel):
     block: str = Field(max_length=40)
     version: int
     config: dict[str, Any] = Field(default_factory=dict)
+    # IR version 2 (PRD-Studio WF-06): what this step does, shown in lists and previews.
+    label: str | None = Field(default=None, min_length=1, max_length=80)
 
 
 class WorkflowLink(BaseModel):
@@ -33,6 +35,8 @@ class WorkflowGraph(BaseModel):
 
     nodes: list[WorkflowNode] = Field(default_factory=list, max_length=200)
     links: list[WorkflowLink] = Field(default_factory=list, max_length=1000)
+    # Absent means version 1. A graph whose nodes carry labels is stored at version 2.
+    ir_version: Literal[1, 2] | None = None
 
 
 class WorkflowErrorView(BaseModel):
@@ -56,6 +60,15 @@ class WorkflowCreate(BaseModel):
     model_config = VIEW
 
     name: str = Field(min_length=1, max_length=100)
+    description: str | None = Field(default=None, min_length=1, max_length=500)
+
+
+class WorkflowDescription(BaseModel):
+    """PRD-Studio WF-06: replaces the description. None removes it."""
+
+    model_config = VIEW
+
+    description: str | None = Field(min_length=1, max_length=500)
 
 
 class WorkflowPublish(BaseModel):
@@ -82,6 +95,7 @@ class WorkflowView(BaseModel):
     schema_version: Literal[1]
     id: Identifier
     name: str
+    description: str | None
     latest_version: int
     versions: list[WorkflowVersionView]
 

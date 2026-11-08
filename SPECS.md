@@ -488,12 +488,12 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.10#1 | Render the greeting from the workspace's timezone and the display name. | DONE | US-15.10 |
 | US-15.10#2 | Render Needs you from pending approvals and the run list's Needs you group, and Recent runs from the run list. | DONE | US-15.10 |
 | US-15.10#3 | Cover the scenarios in browser specs with axe on a disposable stack. | DONE | US-15.10 |
-| US-15.11 | Workflow description and node labels | READY | EPIC-15 |
-| US-15.11#1 | Add a nullable workflow description by migration. | TODO | US-15.11 |
-| US-15.11#2 | Add an optional node `label` in a new Workflow IR version in the domain, keeping the previous version valid, with shared fixtures for both versions. | TODO | US-15.11 |
-| US-15.11#3 | Expose both in the Pydantic contracts and FastAPI routes, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.11 |
-| US-15.11#4 | Edit the description and the labels in the workflow editor. | TODO | US-15.11 |
-| US-15.11#5 | Cover the scenarios on a disposable stack. | TODO | US-15.11 |
+| US-15.11 | Workflow description and node labels | DONE | EPIC-15 |
+| US-15.11#1 | Add a nullable workflow description by migration. | DONE | US-15.11 |
+| US-15.11#2 | Add an optional node `label` in a new Workflow IR version in the domain, keeping the previous version valid, with shared fixtures for both versions. | DONE | US-15.11 |
+| US-15.11#3 | Expose both in the Pydantic contracts and FastAPI routes, then regenerate OpenAPI and the TypeScript client. | DONE | US-15.11 |
+| US-15.11#4 | Edit the description and the labels in the workflow editor. | DONE | US-15.11 |
+| US-15.11#5 | Cover the scenarios on a disposable stack. | DONE | US-15.11 |
 | US-15.12 | Workflow drafts | READY | EPIC-15 |
 | US-15.12#1 | Add one draft per workflow by migration, with RLS that lets only the owner write it, and negative tests. | TODO | US-15.12 |
 | US-15.12#2 | Add saving a draft, publishing it with an expected version and discarding it in the application layer, and refuse a draft wherever a run or routine binds a version. | TODO | US-15.12 |
@@ -6496,7 +6496,8 @@ Open Questions:
 
 ### US-15.11: Workflow description and node labels
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-15-11-workflow-description-node-labels/`
 
 As an automation builder
 I want an optional description on a workflow and an optional label on each graph node
@@ -6533,11 +6534,11 @@ Dependencies:
 - US-6.3
 
 Tasks:
-- [ ] Add a nullable workflow description by migration.
-- [ ] Add an optional node `label` in a new Workflow IR version in the domain, keeping the previous version valid, with shared fixtures for both versions.
-- [ ] Expose both in the Pydantic contracts and FastAPI routes, then regenerate OpenAPI and the TypeScript client.
-- [ ] Edit the description and the labels in the workflow editor.
-- [ ] Cover the scenarios on a disposable stack.
+- [x] Add a nullable workflow description by migration.
+- [x] Add an optional node `label` in a new Workflow IR version in the domain, keeping the previous version valid, with shared fixtures for both versions.
+- [x] Expose both in the Pydantic contracts and FastAPI routes, then regenerate OpenAPI and the TypeScript client.
+- [x] Edit the description and the labels in the workflow editor.
+- [x] Cover the scenarios on a disposable stack.
 
 Open Questions:
 - None.

@@ -20,6 +20,7 @@ from autobots.application.workflows import (
     needs_model,
     publish_version,
     read_execution,
+    set_description,
 )
 from autobots.contracts.workflows import (
     BlockCatalog,
@@ -28,6 +29,7 @@ from autobots.contracts.workflows import (
     ExecutionCreate,
     ExecutionView,
     WorkflowCreate,
+    WorkflowDescription,
     WorkflowErrorView,
     WorkflowGraph,
     WorkflowList,
@@ -36,7 +38,13 @@ from autobots.contracts.workflows import (
     WorkflowView,
 )
 from autobots.domain.models import NOT_OFFERED_CODE, NOT_OFFERED_MESSAGE
-from autobots.domain.workflows import BLOCKS, GraphError, graph_hash, validate_graph
+from autobots.domain.workflows import (
+    BLOCKS,
+    GraphError,
+    graph_hash,
+    ir_normalized,
+    validate_graph,
+)
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 Key = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)]
@@ -106,7 +114,7 @@ async def get_execution(execution_id: UUID, request: Request, workspace: Member)
     "/workflows/validate", operation_id="validateWorkflow", response_model=WorkflowValidation
 )
 async def post_validate(graph: WorkflowGraph, _: Member) -> WorkflowValidation:
-    plain = graph.model_dump(mode="json")
+    plain = ir_normalized(graph.model_dump(mode="json"))
     errors = validate_graph(plain)
     return WorkflowValidation(
         schema_version=1,
@@ -139,8 +147,24 @@ async def post_workflow(
                 actor_id=user,
                 idempotency_key=key,
                 name=body.name,
+                description=body.description,
             )
         except (WorkflowRefused, IdempotencyConflict) as error:
+            raise _error(error) from None
+
+
+@router.put(
+    "/workflows/{workflow_id}/description",
+    operation_id="setWorkflowDescription",
+    response_model=WorkflowView,
+)
+async def put_description(
+    workflow_id: UUID, body: WorkflowDescription, request: Request, workspace: Owner
+) -> WorkflowView:
+    async with _pool(request).connection() as connection:
+        try:
+            return await set_description(connection, workspace, workflow_id, body.description)
+        except WorkflowRefused as error:
             raise _error(error) from None
 
 

@@ -5897,6 +5897,19 @@ export const schemas = {
   "WorkflowCreate": {
     "additionalProperties": false,
     "properties": {
+      "description": {
+        "anyOf": [
+          {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Description"
+      },
       "name": {
         "maxLength": 100,
         "minLength": 1,
@@ -5908,6 +5921,30 @@ export const schemas = {
       "name"
     ],
     "title": "WorkflowCreate",
+    "type": "object"
+  },
+  "WorkflowDescription": {
+    "additionalProperties": false,
+    "description": "PRD-Studio WF-06: replaces the description. None removes it.",
+    "properties": {
+      "description": {
+        "anyOf": [
+          {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Description"
+      }
+    },
+    "required": [
+      "description"
+    ],
+    "title": "WorkflowDescription",
     "type": "object"
   },
   "WorkflowErrorView": {
@@ -5951,6 +5988,21 @@ export const schemas = {
   "WorkflowGraph": {
     "additionalProperties": false,
     "properties": {
+      "ir_version": {
+        "anyOf": [
+          {
+            "enum": [
+              1,
+              2
+            ],
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Ir Version"
+      },
       "links": {
         "items": {
           "$ref": "#/components/schemas/WorkflowLink"
@@ -6040,6 +6092,19 @@ export const schemas = {
         "pattern": "^[A-Za-z0-9_-]{1,60}$",
         "title": "Id",
         "type": "string"
+      },
+      "label": {
+        "anyOf": [
+          {
+            "maxLength": 80,
+            "minLength": 1,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Label"
       },
       "version": {
         "title": "Version",
@@ -6161,6 +6226,17 @@ export const schemas = {
   "WorkflowView": {
     "additionalProperties": false,
     "properties": {
+      "description": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Description"
+      },
       "id": {
         "format": "uuid",
         "title": "Id",
@@ -6191,6 +6267,7 @@ export const schemas = {
       "schema_version",
       "id",
       "name",
+      "description",
       "latest_version",
       "versions"
     ],
@@ -7804,11 +7881,20 @@ export function parseVerificationSummary(value: unknown): VerificationSummary {
 }
 
 export interface WorkflowCreate {
+  description?: string | null;
   name: string;
 }
 
 export function parseWorkflowCreate(value: unknown): WorkflowCreate {
   return parseWith(schemas, "WorkflowCreate", value) as WorkflowCreate;
+}
+
+export interface WorkflowDescription {
+  description: string | null;
+}
+
+export function parseWorkflowDescription(value: unknown): WorkflowDescription {
+  return parseWith(schemas, "WorkflowDescription", value) as WorkflowDescription;
 }
 
 export interface WorkflowErrorView {
@@ -7822,6 +7908,7 @@ export function parseWorkflowErrorView(value: unknown): WorkflowErrorView {
 }
 
 export interface WorkflowGraph {
+  ir_version?: 1 | 2 | null;
   links?: WorkflowLink[];
   nodes?: WorkflowNode[];
 }
@@ -7854,6 +7941,7 @@ export interface WorkflowNode {
   block: string;
   config?: Record<string, unknown>;
   id: string;
+  label?: string | null;
   version: number;
 }
 
@@ -7895,6 +7983,7 @@ export function parseWorkflowVersionView(value: unknown): WorkflowVersionView {
 }
 
 export interface WorkflowView {
+  description: string | null;
   id: string;
   latest_version: number;
   name: string;
@@ -8165,6 +8254,10 @@ export async function validateWorkflow(options: ClientOptions, body: WorkflowGra
 
 export async function getWorkflow(options: ClientOptions, workflow_id: string): Promise<WorkflowView> {
   return parseWorkflowView(await requestJson(options, "GET", `/v1/workflows/${encodeURIComponent(workflow_id)}`));
+}
+
+export async function setWorkflowDescription(options: ClientOptions, workflow_id: string, body: WorkflowDescription): Promise<WorkflowView> {
+  return parseWorkflowView(await requestJson(options, "PUT", `/v1/workflows/${encodeURIComponent(workflow_id)}/description`, body));
 }
 
 export async function createWorkflowExecution(options: ClientOptions, workflow_id: string, body: ExecutionCreate): Promise<ExecutionBinding> {
