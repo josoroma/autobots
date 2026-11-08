@@ -555,10 +555,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.24#2 | Add the event type to the typed union, the generated client and the consumer in the same change, with the consumer ignoring unknown types. | DONE | US-15.24 |
 | US-15.24#3 | Add the "Stream text as it's written" preference to Appearance, and honor it in the run view. | DONE | US-15.24 |
 | US-15.24#4 | Cover the scenarios with a scripted model on a disposable stack, including a scan for reasoning, tool arguments and secrets. | DONE | US-15.24 |
-| US-15.25 | Concept Experts and workflows seed | READY | EPIC-15 |
-| US-15.25#1 | Add a repeatable seed, kept apart from migrations, that targets a named workspace with bounded upserts and no user-edit overwrites. | TODO | US-15.25 |
-| US-15.25#2 | Seed a workflow as a draft when a tool it needs is unavailable. | TODO | US-15.25 |
-| US-15.25#3 | Cover the scenarios on a disposable stack, including a double seed and a secret scan. | TODO | US-15.25 |
+| US-15.25 | Concept Experts and workflows seed | DONE | EPIC-15 |
+| US-15.25#1 | Add a repeatable seed, kept apart from migrations, that targets a named workspace with bounded upserts and no user-edit overwrites. | DONE | US-15.25 |
+| US-15.25#2 | Seed a workflow as a draft when a tool it needs is unavailable. | DONE | US-15.25 |
+| US-15.25#3 | Cover the scenarios on a disposable stack, including a double seed and a secret scan. | DONE | US-15.25 |
 
 ## Dependency Diagram
 
@@ -7232,7 +7232,8 @@ Open Questions:
 
 ### US-15.25: Concept Experts and workflows seed
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-15-25-concept-experts-workflows-seed/`
 
 As a workspace owner
 I want an optional seed of the five concept Experts and six workflows in a workspace I choose
@@ -7277,9 +7278,9 @@ Dependencies:
 - US-2.4
 
 Tasks:
-- [ ] Add a repeatable seed, kept apart from migrations, that targets a named workspace with bounded upserts and no user-edit overwrites.
-- [ ] Seed a workflow as a draft when a tool it needs is unavailable.
-- [ ] Cover the scenarios on a disposable stack, including a double seed and a secret scan.
+- [x] Add a repeatable seed, kept apart from migrations, that targets a named workspace with bounded upserts and no user-edit overwrites.
+- [x] Seed a workflow as a draft when a tool it needs is unavailable.
+- [x] Cover the scenarios on a disposable stack, including a double seed and a secret scan.
 
 Open Questions:
 - None.

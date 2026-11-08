@@ -34,6 +34,20 @@ AUTOBOTS_SUPABASE_URL=<gateway url> AUTOBOTS_SERVICE_ROLE_KEY=<service role key>
 
 Expected: one line of JSON with the new user and workspace IDs. Exit 1 means a service refused, for example an email already in use. Run it once. `supabase/bootstrap/storage.sql` must already have been applied as the database superuser, because the migration role cannot alter Storage's tables.
 
+## Seed the concept Experts and workflows (optional)
+
+This puts the five concept Experts and six workflows of PRD-Studio SD-02 into one workspace you name. It is not a migration, and it is safe to run again: anything that already has its name in that workspace is kept exactly as it is, so a second run, or your own later edits, are never overwritten. It writes no secret and starts no run.
+
+```sh
+AUTOBOTS_DATABASE_URL=<runtime role url> PYTHONPATH=services/agent/src services/agent/.venv/bin/python -m autobots.operations.concept_seed --workspace <workspace id>
+```
+
+Run it with the same tool variables the worker has, such as `GITHUB_REPOSITORY` and `GITHUB_TOKEN`, so it sees the same tools as available.
+- **An unavailable tool:** an Expert is saved without it, and its purpose says so.
+- **Drafts:** Nightly test triage and Release notes from merged PRs are drafts while the GitHub tools are unavailable. Interview synthesis stays a draft until an execution can carry files.
+
+Expected: one line of JSON naming what was created, kept or left as a draft.
+
 ## OpenRouter settings
 
 Settings → Models → OpenRouter shows the source, authentication, catalog and live qualification separately. **Save & validate** sends a transient key to this Mac's server, checks `GET /key` and the public catalog, encrypts it and never starts a run. A rejected key or an outage leaves the previous key in place. Disconnect removes only the workspace's stored key.

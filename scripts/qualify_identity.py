@@ -644,6 +644,17 @@ def qualify(root: Path) -> int:
             f"insert into public.workflows (id, workspace_id, name, description, latest_version) values ('{search_ids['workflow']}', '{ops_ws}', 'Read and summarize', null, 0);\n")
         cases.check('the search records are arranged', 'exit 0', f'exit {arranged_search.returncode}: {arranged_search.stderr[-300:]}', arranged_search.returncode == 0)
         artifacts = {**artifacts, 'AUTOBOTS_TEST_SEARCH_IDS': json.dumps(search_ids)}
+        # US-15.25: the concept seed, run twice into a fresh workspace with no GitHub variables.
+        email_o, password_o = 'seed-o@example.invalid', secrets.token_urlsafe(24)
+        seeded_ws = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_o, password_o)['workspace_id']
+        seeded = subprocess.run([str(root / PYTHON), str(root / 'tests/db/concept_seed_check.py'), seeded_ws], capture_output=True, text=True, errors='replace',
+                                timeout=240, check=False, cwd=root,
+                                env={**tool_env(), 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1', 'AUTOBOTS_DATABASE_URL': runtime_url})
+        if seeded.returncode or not seeded.stdout.strip():
+            cases.check('the concept seed check ran', 'exit 0', f'exit {seeded.returncode}: {seeded.stderr.strip()[-380:]}', False)
+        else:
+            for case in json.loads(seeded.stdout.strip().splitlines()[-1])['cases']:
+                cases.check(case['id'], case['expected'], case['observed'], case['passed'])
         # Its own workspace with no key, as the one above asserts that it holds exactly one run.
         email_e, password_e = 'owner-e@example.invalid', secrets.token_urlsafe(24)
         owner_e = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_e, password_e)

@@ -42,17 +42,17 @@ markers are preserved across refreshes.
 | 21 | US-15.21 | us-15-21-settings-sub-pages-notifications | DONE | Settings sub-pages for notifications, data and keyboard |
 | 22 | US-15.22 | us-15-22-search-palette | DONE | Search palette |
 | 23 | US-15.23 | us-15-23-new-run-shortcut | DONE | New run shortcut |
-| 24 | US-15.24 | us-15-24-streaming-result-text | IN PROGRESS | Streaming result text |
-| 25 | US-15.25 | us-15-25-concept-experts-workflows-seed | READY | Concept Experts and workflows seed |
+| 24 | US-15.24 | us-15-24-streaming-result-text | DONE | Streaming result text |
+| 25 | US-15.25 | us-15-25-concept-experts-workflows-seed | IN PROGRESS | Concept Experts and workflows seed |
 
 ## Next Action
 
-Action: propose
-Story: US-15.24
-Change: us-15-24-streaming-result-text
+Action: implement
+Story: US-15.25
+Change: us-15-25-concept-experts-workflows-seed
 Owner: main-session
-Command: /ohmyorch:opsx-propose us-15-24-streaming-result-text
-Reason: gate planning: missing: proposal.md, specs/, tasks.md
+Command: /ohmyorch:opsx-apply us-15-25-concept-experts-workflows-seed
+Reason: gate implementation: 2/3 tasks complete
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.
