@@ -79,7 +79,7 @@ test("a graph is validated, published, run and monitored, and the monitor only r
   await expect(
     page.locator('[data-error="foreach_bound_required"]'),
   ).toContainText("at each");
-  await page.getByRole("button", { name: "Publish" }).click();
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(page.locator('[data-message="editor"]')).toContainText(
     "foreach_bound_required",
   );
@@ -94,7 +94,7 @@ test("a graph is validated, published, run and monitored, and the monitor only r
     .withTags(["wcag2a", "wcag2aa"])
     .analyze();
   expect(axe.violations.map((violation) => violation.id)).toEqual([]);
-  await page.getByRole("button", { name: "Publish" }).click();
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(page.locator('[data-message="editor"]')).toContainText(
     "Published as version 1",
   );
@@ -224,7 +224,7 @@ test("a failed branch is shown as failed, with what it blocked", async ({
     ],
   };
   await page.getByLabel("Graph").fill(JSON.stringify(graph));
-  await page.getByRole("button", { name: "Publish" }).click();
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(page.locator('[data-message="editor"]')).toContainText(
     "Published",
   );

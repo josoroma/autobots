@@ -114,9 +114,10 @@ def seed(stack: AppStack, root: Path) -> subprocess.CompletedProcess[str]:
 def reset(stack: AppStack) -> None:
     require_marker(stack)
     result = stack.sql('drop schema if exists app_private cascade;\ndrop schema if exists agent_runtime cascade;\n'
-                       'drop table if exists public.user_profiles, public.knowledge_heads, public.knowledge_versions, public.improvement_candidates, public.memory_items, public.routine_occurrences, public.routine_versions, public.routines, public.workflow_emissions, public.workflow_node_instances, public.workflow_executions, public.workflow_versions, public.workflows, public.approval_requests, public.artifacts, public.run_events, public.runs, public.sessions, public.expert_versions, public.experts, public.model_profiles, public.workspace_members, '
+                       'drop table if exists public.workflow_drafts, public.user_profiles, public.knowledge_heads, public.knowledge_versions, public.improvement_candidates, public.memory_items, public.routine_occurrences, public.routine_versions, public.routines, public.workflow_emissions, public.workflow_node_instances, public.workflow_executions, public.workflow_versions, public.workflows, public.approval_requests, public.artifacts, public.run_events, public.runs, public.sessions, public.expert_versions, public.experts, public.model_profiles, public.workspace_members, '
                        'public.workspaces cascade;\ndrop function if exists public.is_workspace_member(uuid);\n'
                        'drop function if exists public.shares_workspace_with(uuid);\n'
+                       'drop function if exists public.is_workspace_owner(uuid);\n'
                        'truncate autobots_disposable.migrations;\n')
     if result.returncode:
         raise Unavailable(f'the disposable reset failed: {result.stderr[-200:]}')
@@ -244,6 +245,42 @@ def profile_cases(stack: AppStack, cases: Cases) -> None:
     for label, value in (('an empty name', ''), ('a 61-character name', 'x' * 61), ('untrimmed spaces', ' Ada ')):
         refused = as_user('authenticated', USER_A, f"update public.user_profiles set display_name = '{value}' where user_id = '{USER_A}'")
         cases.denied(f'the schema refuses {label}', refused, 'check constraint')
+
+
+def draft_cases(stack: AppStack, cases: Cases) -> None:
+    """US-15.12: a member reads a workflow's draft, only an owner writes it, and another workspace sees none."""
+    member, flow = 'c6666666-6666-4666-8666-666666666666', 'f6666666-6666-4666-8666-666666666666'
+    graph = '{"nodes": [], "links": []}'
+    setup = (f"insert into public.workspace_members (workspace_id, user_id, role) values ('{WORKSPACE_A}', '{member}', 'member');\n"
+             f"insert into public.workflows (id, workspace_id, name) values ('{flow}', '{WORKSPACE_A}', 'Drafted');\n"
+             f"insert into public.workflow_drafts (workflow_id, workspace_id, graph, saved_by) values ('{flow}', '{WORKSPACE_A}', '{graph}', '{USER_A}');\n")
+
+    def as_user(user: str, statement: str) -> subprocess.CompletedProcess[str]:
+        claims = json.dumps({'role': 'authenticated', 'sub': user})
+        return stack.sql(f"begin;\n{setup}set local role authenticated;\nselect set_config('request.jwt.claims', '{claims}', true), "
+                         f"set_config('request.jwt.claim.sub', '{user}', true);\n{statement};\nrollback;\n")
+
+    seen = last_line(as_user(member, f"select count(*) from public.workflow_drafts where workflow_id = '{flow}'"))
+    cases.check("a member reads the workflow's draft", '1', seen, seen == '1')
+    outsider = last_line(as_user(USER_B, f"select count(*) from public.workflow_drafts where workflow_id = '{flow}'"))
+    cases.check('another workspace reads no draft', '0', outsider, outsider == '0')
+    owned = last_line(as_user(USER_A, f"with changed as (update public.workflow_drafts set graph = '{{\"nodes\": [], \"links\": [], \"ir_version\": 2}}' "
+                                     f"where workflow_id = '{flow}' returning 1) select count(*) from changed"))
+    cases.check('the owner saves over the draft', '1', owned, owned == '1')
+    for label, statement in (('change', f"with changed as (update public.workflow_drafts set graph = '{graph}' where workflow_id = '{flow}' returning 1) select count(*) from changed"),
+                             ('discard', f"with gone as (delete from public.workflow_drafts where workflow_id = '{flow}' returning 1) select count(*) from gone")):
+        for who, user in (('a member who isn\'t the owner', member), ('another workspace', USER_B)):
+            touched = last_line(as_user(user, statement))
+            cases.check(f"{who} can't {label} the draft", '0', touched, touched == '0')
+    replaced = as_user(member, f"delete from public.workflow_drafts where workflow_id = '{flow}';\n"
+                               f"insert into public.workflow_drafts (workflow_id, workspace_id, graph, saved_by) values ('{flow}', '{WORKSPACE_A}', '{graph}', '{member}')")
+    cases.denied("a member who isn't the owner can't save a draft", replaced, 'row-level security')
+    other = as_user(USER_B, f"insert into public.workflow_drafts (workflow_id, workspace_id, graph, saved_by) values ('{flow}', '{WORKSPACE_A}', '{graph}', '{USER_B}')")
+    cases.denied("another workspace can't save a draft", other, 'row-level security')
+    mismatched = stack.sql(f"begin;\n{setup}insert into public.workspaces (id, name) values ('d6666666-6666-4666-8666-666666666666', 'Elsewhere');\n"
+                           f"update public.workflow_drafts set workspace_id = 'd6666666-6666-4666-8666-666666666666' where workflow_id = '{flow}';\nrollback;\n")
+    cases.denied("a draft can't name another workspace than its workflow's", mismatched, 'foreign key')
+    cases.denied('anonymous cannot read drafts', stack.as_role('anon', None, 'select * from public.workflow_drafts'), 'permission denied')
 
 
 def authority_cases(stack: AppStack, cases: Cases) -> None:
@@ -590,6 +627,7 @@ def qualify(root: Path, write_types: bool = False) -> int:
         constraint_cases(stack, cases)
         access_cases(stack, cases)
         profile_cases(stack, cases)
+        draft_cases(stack, cases)
         authority_cases(stack, cases)
         framework_cases(stack, cases, root, db_port)
         credential_cases(stack, cases, root, db_port)

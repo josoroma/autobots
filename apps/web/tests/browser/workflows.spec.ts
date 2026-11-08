@@ -178,7 +178,7 @@ test("a workflow's optional description and step labels, edited in the editor an
   expect(draft.nodes[1].label).toBe("Shout it");
   await page.getByRole("button", { name: "Validate" }).click();
   await expect(page.locator('[data-validation="valid"]')).toBeVisible();
-  await page.getByRole("button", { name: "Publish" }).click();
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(page.locator('[data-message="editor"]')).toContainText(
     "Published as version 1",
   );
@@ -212,4 +212,158 @@ test("a workflow's optional description and step labels, edited in the editor an
   const first = (await versioned.json()).versions[0];
   expect(first.graph.ir_version).toBeNull();
   expect(first.graph_hash).toBe(checked.graph_hash);
+});
+
+test("one saved draft: the owner saves it, publishes it under the expected version or discards it, and nothing runs it", async ({
+  page,
+  browser,
+}) => {
+  await signIn(page, EMAIL_A, PASSWORD_A);
+  await page.goto("/workflows");
+  const stamp = Date.now();
+  const graph = (operation: string, label?: string) => ({
+    ...GRAPH,
+    ...(label === undefined ? {} : { ir_version: 2 }),
+    nodes: GRAPH.nodes.map((node) =>
+      node.id === "up"
+        ? {
+            ...node,
+            config: { operation },
+            ...(label === undefined ? {} : { label }),
+          }
+        : node,
+    ),
+  });
+  const flow = await (
+    await page.request.post("/api/v1/workflows", {
+      headers: await write(page, `drafted-${stamp}`),
+      data: { name: `Drafted ${stamp}` },
+    })
+  ).json();
+  const base = `/api/v1/workflows/${flow.id}`;
+  for (const [index, operation] of ["upper", "lower", "to_string"].entries()) {
+    const published = await page.request.post(`${base}/versions`, {
+      headers: await write(page, `drafted-${stamp}-${index}`),
+      data: { expected_version: index, graph: graph(operation) },
+    });
+    expect(published.status()).toBe(201);
+  }
+  const read = async () => (await page.request.get(base)).json();
+  const hashes = (await read()).versions.map(
+    (item: { version: number; graph_hash: string }) =>
+      `${item.version}:${item.graph_hash}`,
+  );
+  expect(hashes).toHaveLength(3);
+
+  // Saved twice from the editor: one draft, the second graph.
+  await page.goto(`/workflows/${flow.id}`);
+  await page.getByLabel("Graph").fill(JSON.stringify(graph("lower")));
+  await page.getByRole("button", { name: "Save draft" }).click();
+  await expect(page.locator('[data-message="editor"]')).toHaveText(
+    "Draft saved. Runs keep using the published versions.",
+  );
+  await page
+    .getByLabel("Graph")
+    .fill(JSON.stringify(graph("upper", "Second draft")));
+  const saved = page.waitForResponse(
+    (reply) =>
+      reply.url().endsWith(`/workflows/${flow.id}/draft`) &&
+      reply.request().method() === "PUT",
+  );
+  await page.getByRole("button", { name: "Save draft" }).click();
+  expect((await saved).status()).toBe(200);
+  await expect(page.locator('[data-field="draft-badge"]')).toBeVisible();
+  const second = (await read()).draft;
+  expect(second.graph.ir_version).toBe(2);
+  expect(second.graph.nodes[1].label).toBe("Second draft");
+
+  // A member who isn't the owner can't save one.
+  const context = await browser.newContext();
+  const member = await context.newPage();
+  await signIn(member, EMAIL_C, PASSWORD_C);
+  const refused = await member.request.put(`${base}/draft`, {
+    headers: {
+      ...(await write(member, `member-${stamp}`)),
+      "X-Autobots-Workspace": process.env.AUTOBOTS_TEST_WORKSPACE_A ?? "",
+    },
+    data: { graph: graph("lower") },
+  });
+  expect(refused.status()).toBe(403);
+  expect((await refused.json()).code).toBe("owner_required");
+  await context.close();
+  expect((await read()).draft.graph).toEqual(second.graph);
+
+  // A stale publish creates nothing and keeps the draft.
+  const stale = await page.request.post(`${base}/draft/publish`, {
+    headers: await write(page, `stale-${stamp}`),
+    data: { expected_version: 2 },
+  });
+  expect(stale.status()).toBe(409);
+  expect((await stale.json()).code).toBe("workflow_version_conflict");
+  let current = await read();
+  expect(current.latest_version).toBe(3);
+  expect(current.draft).not.toBeNull();
+
+  // Publishing from the editor names version 3 and creates immutable version 4.
+  await page.reload();
+  await page.getByRole("button", { name: "Publish draft" }).click();
+  await expect(page.locator('[data-message="editor"]')).toHaveText(
+    "Published the draft as version 4. Earlier versions don't change.",
+  );
+  current = await read();
+  expect(current.latest_version).toBe(4);
+  expect(current.draft).toBeNull();
+  expect(current.versions[3].graph.nodes[1].label).toBe("Second draft");
+  const fourth = current.versions[3].graph_hash;
+
+  // Runs and routines can't name a draft. An execution binds a published version's hash.
+  await page.request.put(`${base}/draft`, {
+    headers: await write(page, `again-${stamp}`),
+    data: { graph: graph("lower") },
+  });
+  const draftRun = await page.request.post(`${base}/executions`, {
+    headers: await write(page, `run-draft-${stamp}`),
+    data: { version: "draft", inputs: { in: "x" } },
+  });
+  expect(draftRun.status()).toBe(409);
+  expect((await draftRun.json()).code).toBe("draft_not_runnable");
+  const draftRoutine = await page.request.post("/api/v1/routines", {
+    headers: await write(page, `routine-draft-${stamp}`),
+    data: {
+      name: `Draft routine ${stamp}`,
+      config: {
+        target: { kind: "workflow", id: flow.id, version: "draft" },
+        trigger: { kind: "daily", time: "09:00" },
+      },
+    },
+  });
+  expect(draftRoutine.status()).toBe(422);
+  expect((await draftRoutine.json()).code).toBe("draft_not_runnable");
+  const bound = await page.request.post(`${base}/executions`, {
+    headers: await write(page, `run-four-${stamp}`),
+    data: { version: 4, inputs: { in: "x" } },
+  });
+  expect(bound.status()).toBe(201);
+  const binding = await bound.json();
+  expect(binding.workflow_version).toBe(4);
+  expect(binding.graph_hash).toBe(fourth);
+
+  // Discarding leaves every published version and its hash alone.
+  await page.reload();
+  await page.getByRole("button", { name: "Discard draft" }).click();
+  await expect(page.locator('[data-message="editor"]')).toHaveText(
+    "Draft discarded. The published versions are unchanged.",
+  );
+  current = await read();
+  expect(current.draft).toBeNull();
+  expect(
+    current.versions
+      .slice(0, 3)
+      .map(
+        (item: { version: number; graph_hash: string }) =>
+          `${item.version}:${item.graph_hash}`,
+      ),
+  ).toEqual(hashes);
+  expect(current.versions[3].graph_hash).toBe(fourth);
+  await expect(page.locator('[data-field="draft-badge"]')).toHaveCount(0);
 });

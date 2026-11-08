@@ -1305,9 +1305,17 @@ export const schemas = {
         "type": "object"
       },
       "version": {
-        "minimum": 1.0,
-        "title": "Version",
-        "type": "integer"
+        "anyOf": [
+          {
+            "minimum": 1.0,
+            "type": "integer"
+          },
+          {
+            "const": "draft",
+            "type": "string"
+          }
+        ],
+        "title": "Version"
       }
     },
     "required": [
@@ -3604,9 +3612,17 @@ export const schemas = {
         "type": "string"
       },
       "version": {
-        "minimum": 1.0,
-        "title": "Version",
-        "type": "integer"
+        "anyOf": [
+          {
+            "minimum": 1.0,
+            "type": "integer"
+          },
+          {
+            "const": "draft",
+            "type": "string"
+          }
+        ],
+        "title": "Version"
       }
     },
     "required": [
@@ -5947,6 +5963,53 @@ export const schemas = {
     "title": "WorkflowDescription",
     "type": "object"
   },
+  "WorkflowDraftPublish": {
+    "additionalProperties": false,
+    "properties": {
+      "expected_version": {
+        "minimum": 0.0,
+        "title": "Expected Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "expected_version"
+    ],
+    "title": "WorkflowDraftPublish",
+    "type": "object"
+  },
+  "WorkflowDraftSave": {
+    "additionalProperties": false,
+    "properties": {
+      "graph": {
+        "$ref": "#/components/schemas/WorkflowGraph"
+      }
+    },
+    "required": [
+      "graph"
+    ],
+    "title": "WorkflowDraftSave",
+    "type": "object"
+  },
+  "WorkflowDraftView": {
+    "additionalProperties": false,
+    "description": "PRD-Studio WF-02: the one saved draft beside the published versions. Nothing runs it.",
+    "properties": {
+      "graph": {
+        "$ref": "#/components/schemas/WorkflowGraph"
+      },
+      "saved_at": {
+        "title": "Saved At",
+        "type": "string"
+      }
+    },
+    "required": [
+      "graph",
+      "saved_at"
+    ],
+    "title": "WorkflowDraftView",
+    "type": "object"
+  },
   "WorkflowErrorView": {
     "additionalProperties": false,
     "properties": {
@@ -6237,6 +6300,16 @@ export const schemas = {
         ],
         "title": "Description"
       },
+      "draft": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/WorkflowDraftView"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
       "id": {
         "format": "uuid",
         "title": "Id",
@@ -6269,7 +6342,8 @@ export const schemas = {
       "name",
       "description",
       "latest_version",
-      "versions"
+      "versions",
+      "draft"
     ],
     "title": "WorkflowView",
     "type": "object"
@@ -6673,7 +6747,7 @@ export function parseExecutionBinding(value: unknown): ExecutionBinding {
 export interface ExecutionCreate {
   documents?: InputDocument[];
   inputs?: Record<string, unknown>;
-  version: number;
+  version: number | "draft";
 }
 
 export function parseExecutionCreate(value: unknown): ExecutionCreate {
@@ -7335,7 +7409,7 @@ export function parseRoutineRevision(value: unknown): RoutineRevision {
 export interface RoutineTarget {
   id: string;
   kind: "expert" | "workflow";
-  version: number;
+  version: number | "draft";
 }
 
 export function parseRoutineTarget(value: unknown): RoutineTarget {
@@ -7897,6 +7971,31 @@ export function parseWorkflowDescription(value: unknown): WorkflowDescription {
   return parseWith(schemas, "WorkflowDescription", value) as WorkflowDescription;
 }
 
+export interface WorkflowDraftPublish {
+  expected_version: number;
+}
+
+export function parseWorkflowDraftPublish(value: unknown): WorkflowDraftPublish {
+  return parseWith(schemas, "WorkflowDraftPublish", value) as WorkflowDraftPublish;
+}
+
+export interface WorkflowDraftSave {
+  graph: WorkflowGraph;
+}
+
+export function parseWorkflowDraftSave(value: unknown): WorkflowDraftSave {
+  return parseWith(schemas, "WorkflowDraftSave", value) as WorkflowDraftSave;
+}
+
+export interface WorkflowDraftView {
+  graph: WorkflowGraph;
+  saved_at: string;
+}
+
+export function parseWorkflowDraftView(value: unknown): WorkflowDraftView {
+  return parseWith(schemas, "WorkflowDraftView", value) as WorkflowDraftView;
+}
+
 export interface WorkflowErrorView {
   code: string;
   node: string | null;
@@ -7984,6 +8083,7 @@ export function parseWorkflowVersionView(value: unknown): WorkflowVersionView {
 
 export interface WorkflowView {
   description: string | null;
+  draft: WorkflowDraftView | null;
   id: string;
   latest_version: number;
   name: string;
@@ -8258,6 +8358,18 @@ export async function getWorkflow(options: ClientOptions, workflow_id: string): 
 
 export async function setWorkflowDescription(options: ClientOptions, workflow_id: string, body: WorkflowDescription): Promise<WorkflowView> {
   return parseWorkflowView(await requestJson(options, "PUT", `/v1/workflows/${encodeURIComponent(workflow_id)}/description`, body));
+}
+
+export async function saveWorkflowDraft(options: ClientOptions, workflow_id: string, body: WorkflowDraftSave): Promise<WorkflowView> {
+  return parseWorkflowView(await requestJson(options, "PUT", `/v1/workflows/${encodeURIComponent(workflow_id)}/draft`, body));
+}
+
+export async function discardWorkflowDraft(options: ClientOptions, workflow_id: string): Promise<WorkflowView> {
+  return parseWorkflowView(await requestJson(options, "DELETE", `/v1/workflows/${encodeURIComponent(workflow_id)}/draft`));
+}
+
+export async function publishWorkflowDraft(options: ClientOptions, workflow_id: string, body: WorkflowDraftPublish): Promise<WorkflowView> {
+  return parseWorkflowView(await requestJson(options, "POST", `/v1/workflows/${encodeURIComponent(workflow_id)}/draft/publish`, body));
 }
 
 export async function createWorkflowExecution(options: ClientOptions, workflow_id: string, body: ExecutionCreate): Promise<ExecutionBinding> {

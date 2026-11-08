@@ -1,6 +1,6 @@
 """Workflow IR and API contracts, PRD 7.3 and 11.2."""
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -89,6 +89,27 @@ class WorkflowVersionView(BaseModel):
     block_versions: dict[str, str]
 
 
+class WorkflowDraftView(BaseModel):
+    """PRD-Studio WF-02: the one saved draft beside the published versions. Nothing runs it."""
+
+    model_config = VIEW
+
+    graph: WorkflowGraph
+    saved_at: str
+
+
+class WorkflowDraftSave(BaseModel):
+    model_config = VIEW
+
+    graph: WorkflowGraph
+
+
+class WorkflowDraftPublish(BaseModel):
+    model_config = VIEW
+
+    expected_version: int = Field(ge=0)
+
+
 class WorkflowView(BaseModel):
     model_config = VIEW
 
@@ -98,6 +119,7 @@ class WorkflowView(BaseModel):
     description: str | None
     latest_version: int
     versions: list[WorkflowVersionView]
+    draft: WorkflowDraftView | None
 
 
 class WorkflowList(BaseModel):
@@ -163,7 +185,8 @@ class ExecutionView(BaseModel):
 class ExecutionCreate(BaseModel):
     model_config = VIEW
 
-    version: int = Field(ge=1)
+    # "draft" is accepted here only to be refused with `draft_not_runnable` (WF-02).
+    version: Annotated[int, Field(ge=1)] | Literal["draft"]
     inputs: dict[str, Any] = Field(default_factory=dict)
     documents: list[InputDocument] = Field(default_factory=list, max_length=10)
 

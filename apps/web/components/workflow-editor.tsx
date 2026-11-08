@@ -132,6 +132,8 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
           setDraft(tidy(latest.graph));
           setChosen(latest.version);
         }
+        // WF-02: a saved draft opens in the editor, beside the published versions.
+        if (loaded.draft !== null) setDraft(tidy(loaded.draft.graph));
       })
       .catch(() => {
         if (active) setUnavailable(true);
@@ -203,6 +205,103 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
         ? "Only the workspace owner can publish."
         : (failure?.message ?? "That could not be published."),
     );
+  }
+
+  // PRD-Studio WF-02: one saved draft, published under the expected version or discarded.
+  async function draftRequest(
+    method: "PUT" | "DELETE" | "POST",
+    suffix: string,
+    body?: unknown,
+  ): Promise<{ view: WorkflowView | null; code?: string; message?: string }> {
+    if (workflow === null) return { view: null };
+    const reply = await csrfFetch(
+      `/api/v1/workflows/${encodeURIComponent(workflow.id)}/draft${suffix}`,
+      {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          ...(method === "POST"
+            ? { "Idempotency-Key": crypto.randomUUID() }
+            : {}),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      },
+    ).catch(() => null);
+    if (reply?.ok === true) {
+      return { view: parseWorkflowView(await reply.json()) };
+    }
+    const failure = (await reply?.json().catch(() => null)) as {
+      code?: string;
+      message?: string;
+    } | null;
+    return { view: null, ...failure };
+  }
+
+  function refused(code: string | undefined, message: string | undefined) {
+    setMessage(
+      code === "owner_required"
+        ? "Only the workspace owner can change the draft."
+        : code === "workflow_version_conflict"
+          ? "A newer version was published, so the draft wasn't. Reload and try again."
+          : (message ?? "That could not be done. Nothing changed."),
+    );
+  }
+
+  async function saveDraft(): Promise<void> {
+    setMessage(null);
+    const graph = parsed(draft);
+    if (graph === null) {
+      setMessage("That isn't valid JSON.");
+      return;
+    }
+    const {
+      view,
+      code,
+      message: reason,
+    } = await draftRequest("PUT", "", {
+      graph,
+    });
+    if (view === null) {
+      refused(code, reason);
+      return;
+    }
+    setWorkflow(view);
+    setMessage("Draft saved. Runs keep using the published versions.");
+  }
+
+  async function publishDraft(): Promise<void> {
+    if (workflow === null) return;
+    setMessage(null);
+    const {
+      view,
+      code,
+      message: reason,
+    } = await draftRequest("POST", "/publish", {
+      expected_version: workflow.latest_version,
+    });
+    if (view === null) {
+      refused(code, reason);
+      return;
+    }
+    setWorkflow(view);
+    setChosen(view.latest_version);
+    setMessage(
+      `Published the draft as version ${view.latest_version}. Earlier versions don't change.`,
+    );
+  }
+
+  async function discardDraft(): Promise<void> {
+    setMessage(null);
+    const { view, code, message: reason } = await draftRequest("DELETE", "");
+    if (view === null) {
+      refused(code, reason);
+      return;
+    }
+    setWorkflow(view);
+    const latest = view.versions.at(-1);
+    setDraft(latest === undefined ? STARTER : tidy(latest.graph));
+    setCheck(null);
+    setMessage("Draft discarded. The published versions are unchanged.");
   }
 
   async function saveDescription(): Promise<void> {
@@ -308,6 +407,11 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
           ) : (
             <Badge variant="outline">Version {workflow.latest_version}</Badge>
           )}
+          {workflow.draft === null ? null : (
+            <Badge variant="attention" dot data-field="draft-badge">
+              Draft saved
+            </Badge>
+          )}
         </div>
         <div className="space-y-1.5">
           <label htmlFor="workflow-description" className={SECTION}>
@@ -386,6 +490,32 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
             <Upload aria-hidden="true" />
             Publish
           </Button>
+        </div>
+        <div
+          role="group"
+          aria-label="Draft"
+          className="flex flex-wrap items-center gap-2 border-t pt-4"
+        >
+          <Button variant="outline" onClick={() => void saveDraft()}>
+            Save draft
+          </Button>
+          <Button
+            variant="outline"
+            disabled={workflow.draft === null}
+            onClick={() => void publishDraft()}
+          >
+            Publish draft
+          </Button>
+          <Button
+            variant="outline"
+            disabled={workflow.draft === null}
+            onClick={() => void discardDraft()}
+          >
+            Discard draft
+          </Button>
+          <p className="text-muted-foreground text-[12.5px]">
+            Runs and routines use published versions only.
+          </p>
         </div>
         {check === null ? null : check.valid ? (
           <p

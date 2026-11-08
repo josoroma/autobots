@@ -1,6 +1,6 @@
 """Routine contracts, PRD 10.4. A version states everything a scheduled run gets."""
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -14,7 +14,8 @@ class RoutineTarget(BaseModel):
 
     kind: Literal["expert", "workflow"]
     id: Identifier
-    version: int = Field(ge=1)
+    # "draft" is accepted here only to be refused with `draft_not_runnable` (PRD-Studio WF-02).
+    version: Annotated[int, Field(ge=1)] | Literal["draft"]
 
 
 class RoutineConfig(BaseModel):

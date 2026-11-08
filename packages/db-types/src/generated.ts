@@ -193,6 +193,14 @@ export interface UserProfilesRow {
   updated_at: string;
 }
 
+export interface WorkflowDraftsRow {
+  workflow_id: string;
+  workspace_id: string;
+  graph: unknown;
+  saved_by: string;
+  saved_at: string;
+}
+
 export interface WorkflowEmissionsRow {
   execution_id: string;
   instance_key: string;

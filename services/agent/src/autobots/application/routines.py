@@ -59,8 +59,16 @@ async def _expert_config(
     return version.config
 
 
+def pinned_version(config: RoutineConfig) -> int:
+    """A routine binds a published version only, never a workflow's draft (PRD-Studio WF-02)."""
+    if config.target.version == "draft":
+        raise RoutineRefused("draft_not_runnable")
+    return config.target.version
+
+
 async def _validate(connection: Any, workspace_id: UUID, config: RoutineConfig) -> None:
     """A routine can only narrow what its pinned target has."""
+    pinned_version(config)
     try:
         validate_trigger(config.trigger, config.timezone)
     except TriggerInvalid as invalid:
@@ -75,7 +83,7 @@ async def _validate(connection: Any, workspace_id: UUID, config: RoutineConfig) 
     cursor = await connection.execute(
         "select 1 from public.workflow_versions v join public.workflows w on w.id = v.workflow_id "
         "where v.workflow_id = %s and v.version = %s and w.workspace_id = %s",
-        (config.target.id, config.target.version, workspace_id),
+        (config.target.id, pinned_version(config), workspace_id),
     )
     if await cursor.fetchone() is None:
         raise RoutineRefused("routine_target_not_found")
@@ -277,7 +285,7 @@ async def _admit(
             actor_id=actor,
             workflow_id=config.target.id,
             idempotency_key=key,
-            version=config.target.version,
+            version=pinned_version(config),
             inputs=config.inputs,
             limit_micro_usd=config.limit_micro_usd,
             tools=config.tools,
@@ -318,7 +326,7 @@ async def _admit(
         binding=SimpleNamespace(
             session_id=None,
             expert_id=config.target.id,
-            version=config.target.version,
+            version=pinned_version(config),
             instructions=expert.instructions
             + await active_skill_text(connection, workspace_id, expert.skills),
             tools={**PLAN_TOOLS, **{tool: EXPERT_TOOLS[tool] for tool in tools}},
@@ -332,7 +340,7 @@ async def _needs_model(config: RoutineConfig, connection: Any) -> bool:
         return True
     cursor = await connection.execute(
         "select graph from public.workflow_versions where workflow_id = %s and version = %s",
-        (config.target.id, config.target.version),
+        (config.target.id, pinned_version(config)),
     )
     graph = (await cursor.fetchone())[0]
     return any(node["block"] == "agent" for node in graph["nodes"])

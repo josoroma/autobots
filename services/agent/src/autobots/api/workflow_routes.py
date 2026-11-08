@@ -15,11 +15,14 @@ from autobots.application.workflows import (
     WorkflowRefused,
     create_execution,
     create_workflow,
+    discard_draft,
     get_workflow,
     list_workflows,
     needs_model,
+    publish_draft,
     publish_version,
     read_execution,
+    save_draft,
     set_description,
 )
 from autobots.contracts.workflows import (
@@ -30,6 +33,8 @@ from autobots.contracts.workflows import (
     ExecutionView,
     WorkflowCreate,
     WorkflowDescription,
+    WorkflowDraftPublish,
+    WorkflowDraftSave,
     WorkflowErrorView,
     WorkflowGraph,
     WorkflowList,
@@ -64,11 +69,18 @@ def _views(errors: list[GraphError]) -> list[WorkflowErrorView]:
     return [WorkflowErrorView(code=e.code, node=e.node, port=e.port) for e in errors]
 
 
+DRAFT_NOT_RUNNABLE = "draft_not_runnable"
+
+
 def _error(error: WorkflowRefused | IdempotencyConflict) -> ApiError:
     if isinstance(error, IdempotencyConflict):
         return ApiError(409, error.code, "This key was already used with different content.")
+    if error.code == "workflow_draft_not_found":
+        return ApiError(404, error.code, "This workflow has no saved draft.")
     if error.code.endswith("not_found"):
         return ApiError(404, error.code, "That workflow is not available.")
+    if error.code == "workflow_version_conflict":
+        return ApiError(409, error.code, "A newer version was published. Reload and try again.")
     if error.code in {"workflow_invalid", "workflow_inputs_invalid"}:
         codes = ", ".join(sorted({item.code for item in error.errors}))
         return ApiError(422, error.code, f"That isn't valid: {codes}.")
@@ -154,6 +166,61 @@ async def post_workflow(
 
 
 @router.put(
+    "/workflows/{workflow_id}/draft", operation_id="saveWorkflowDraft", response_model=WorkflowView
+)
+async def put_draft(
+    workflow_id: UUID, body: WorkflowDraftSave, request: Request, workspace: Owner, user: User
+) -> WorkflowView:
+    """WF-02: an owner keeps one draft, replaced by each save."""
+    async with _pool(request).connection() as connection:
+        try:
+            return await save_draft(connection, workspace, user, workflow_id, body.graph)
+        except WorkflowRefused as error:
+            raise _error(error) from None
+
+
+@router.delete(
+    "/workflows/{workflow_id}/draft",
+    operation_id="discardWorkflowDraft",
+    response_model=WorkflowView,
+)
+async def delete_draft(workflow_id: UUID, request: Request, workspace: Owner) -> WorkflowView:
+    async with _pool(request).connection() as connection:
+        try:
+            return await discard_draft(connection, workspace, workflow_id)
+        except WorkflowRefused as error:
+            raise _error(error) from None
+
+
+@router.post(
+    "/workflows/{workflow_id}/draft/publish",
+    operation_id="publishWorkflowDraft",
+    response_model=WorkflowView,
+    status_code=status.HTTP_201_CREATED,
+)
+async def post_draft_publish(
+    workflow_id: UUID,
+    body: WorkflowDraftPublish,
+    request: Request,
+    key: Key,
+    workspace: Owner,
+    user: User,
+) -> WorkflowView:
+    async with _pool(request).connection() as connection:
+        try:
+            return await publish_draft(
+                connection,
+                workspace_id=workspace,
+                actor_id=user,
+                workflow_id=workflow_id,
+                idempotency_key=key,
+                expected_version=body.expected_version,
+            )
+        except (WorkflowRefused, IdempotencyConflict) as error:
+            raise _error(error) from None
+
+
+@router.put(
     "/workflows/{workflow_id}/description",
     operation_id="setWorkflowDescription",
     response_model=WorkflowView,
@@ -223,6 +290,8 @@ async def post_execution(
     user: User,
     settings: Annotated[ProviderSettings, Depends(provider_settings)],
 ) -> ExecutionBinding:
+    if body.version == "draft":
+        raise ApiError(409, DRAFT_NOT_RUNNABLE, "Only a published version can run.")
     async with _pool(request).connection() as connection:
         if await needs_model(connection, workspace, workflow_id, body.version):
             code = await settings.run_intent(workspace)

@@ -494,13 +494,13 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.11#3 | Expose both in the Pydantic contracts and FastAPI routes, then regenerate OpenAPI and the TypeScript client. | DONE | US-15.11 |
 | US-15.11#4 | Edit the description and the labels in the workflow editor. | DONE | US-15.11 |
 | US-15.11#5 | Cover the scenarios on a disposable stack. | DONE | US-15.11 |
-| US-15.12 | Workflow drafts | READY | EPIC-15 |
-| US-15.12#1 | Add one draft per workflow by migration, with RLS that lets only the owner write it, and negative tests. | TODO | US-15.12 |
-| US-15.12#2 | Add saving a draft, publishing it with an expected version and discarding it in the application layer, and refuse a draft wherever a run or routine binds a version. | TODO | US-15.12 |
-| US-15.12#3 | Expose them in Pydantic and FastAPI, regenerate OpenAPI and the TypeScript client, and forward them through the BFF. | TODO | US-15.12 |
-| US-15.12#4 | Save, publish and discard the draft from the workflow editor. | TODO | US-15.12 |
-| US-15.12#5 | Cover the scenarios on a disposable stack and in browser specs. | TODO | US-15.12 |
-| US-15.13 | Workflow list, preview, executions and budget | BLOCKED | EPIC-15 |
+| US-15.12 | Workflow drafts | DONE | EPIC-15 |
+| US-15.12#1 | Add one draft per workflow by migration, with RLS that lets only the owner write it, and negative tests. | DONE | US-15.12 |
+| US-15.12#2 | Add saving a draft, publishing it with an expected version and discarding it in the application layer, and refuse a draft wherever a run or routine binds a version. | DONE | US-15.12 |
+| US-15.12#3 | Expose them in Pydantic and FastAPI, regenerate OpenAPI and the TypeScript client, and forward them through the BFF. | DONE | US-15.12 |
+| US-15.12#4 | Save, publish and discard the draft from the workflow editor. | DONE | US-15.12 |
+| US-15.12#5 | Cover the scenarios on a disposable stack and in browser specs. | DONE | US-15.12 |
+| US-15.13 | Workflow list, preview, executions and budget | READY | EPIC-15 |
 | US-15.13#1 | Add per-workflow executions with version, state, spend and duration, the Experts in step order, the step count, the last execution and the run count to the workflow read models in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.13 |
 | US-15.13#2 | Accept and freeze an execution budget from US$0.25 to US$5.00 in steps of US$0.25, never above the remaining daily cap. | TODO | US-15.13 |
 | US-15.13#3 | Render the tabs, search, rows, preview panel with its version switch, and recent executions on Workflows. | TODO | US-15.13 |
@@ -6545,7 +6545,8 @@ Open Questions:
 
 ### US-15.12: Workflow drafts
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-15-12-workflow-drafts/`
 
 As an automation builder
 I want one saved draft beside a workflow's published versions
@@ -6588,18 +6589,18 @@ Dependencies:
 - US-7.1
 
 Tasks:
-- [ ] Add one draft per workflow by migration, with RLS that lets only the owner write it, and negative tests.
-- [ ] Add saving a draft, publishing it with an expected version and discarding it in the application layer, and refuse a draft wherever a run or routine binds a version.
-- [ ] Expose them in Pydantic and FastAPI, regenerate OpenAPI and the TypeScript client, and forward them through the BFF.
-- [ ] Save, publish and discard the draft from the workflow editor.
-- [ ] Cover the scenarios on a disposable stack and in browser specs.
+- [x] Add one draft per workflow by migration, with RLS that lets only the owner write it, and negative tests.
+- [x] Add saving a draft, publishing it with an expected version and discarding it in the application layer, and refuse a draft wherever a run or routine binds a version.
+- [x] Expose them in Pydantic and FastAPI, regenerate OpenAPI and the TypeScript client, and forward them through the BFF.
+- [x] Save, publish and discard the draft from the workflow editor.
+- [x] Cover the scenarios on a disposable stack and in browser specs.
 
 Open Questions:
 - None.
 
 ### US-15.13: Workflow list, preview, executions and budget
 
-Status: BLOCKED
+Status: READY
 
 As an automation builder
 I want each workflow's Experts, versions, steps, last execution and run count in the list, a preview of a version's steps, its recent executions, and a budget for each execution

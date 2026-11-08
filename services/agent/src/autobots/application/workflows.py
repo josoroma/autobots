@@ -1,6 +1,7 @@
 """Publishing immutable workflow versions, and binding executions to them exactly, PRD 7.3."""
 
 import json
+from datetime import UTC
 from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
@@ -15,6 +16,7 @@ from autobots.contracts.workflows import (
     ExecutionBinding,
     ExecutionView,
     InstanceView,
+    WorkflowDraftView,
     WorkflowGraph,
     WorkflowVersionView,
     WorkflowView,
@@ -55,6 +57,19 @@ def _plain(graph: WorkflowGraph) -> dict[str, Any]:
     return ir_normalized(graph.model_dump(mode="json"))
 
 
+async def _draft(connection: Any, workflow_id: UUID) -> WorkflowDraftView | None:
+    cursor = await connection.execute(
+        "select graph, saved_at from public.workflow_drafts where workflow_id = %s",
+        (workflow_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        return None
+    return WorkflowDraftView(
+        graph=WorkflowGraph.model_validate(row[0]), saved_at=row[1].astimezone(UTC).isoformat()
+    )
+
+
 async def _view(
     connection: Any, workflow_id: UUID, name: str, latest: int, description: str | None
 ) -> WorkflowView:
@@ -80,6 +95,7 @@ async def _view(
         description=description,
         latest_version=latest,
         versions=versions,
+        draft=await _draft(connection, workflow_id),
     )
 
 
@@ -150,6 +166,65 @@ async def set_description(
     if await cursor.fetchone() is None:
         raise WorkflowRefused("workflow_not_found")
     return await get_workflow(connection, workspace_id, workflow_id)
+
+
+async def save_draft(
+    connection: Any, workspace_id: UUID, actor_id: UUID, workflow_id: UUID, graph: WorkflowGraph
+) -> WorkflowView:
+    """WF-02: one draft per workflow, replaced by each save. A draft needn't be valid yet."""
+    cursor = await connection.execute(
+        "insert into public.workflow_drafts (workflow_id, workspace_id, graph, saved_by) "
+        "select id, workspace_id, %s, %s from public.workflows where id = %s and workspace_id = %s "
+        "on conflict (workflow_id) do update set graph = excluded.graph, "
+        "saved_by = excluded.saved_by, saved_at = now() returning workflow_id",
+        (json.dumps(_plain(graph)), actor_id, workflow_id, workspace_id),
+    )
+    if await cursor.fetchone() is None:
+        raise WorkflowRefused("workflow_not_found")
+    return await get_workflow(connection, workspace_id, workflow_id)
+
+
+async def discard_draft(connection: Any, workspace_id: UUID, workflow_id: UUID) -> WorkflowView:
+    """Removes only the draft. Published versions and their hashes are untouched."""
+    view = await get_workflow(connection, workspace_id, workflow_id)
+    if view.draft is None:
+        raise WorkflowRefused("workflow_draft_not_found")
+    await connection.execute(
+        "delete from public.workflow_drafts where workflow_id = %s and workspace_id = %s",
+        (workflow_id, workspace_id),
+    )
+    return await get_workflow(connection, workspace_id, workflow_id)
+
+
+async def publish_draft(
+    connection: Any,
+    *,
+    workspace_id: UUID,
+    actor_id: UUID,
+    workflow_id: UUID,
+    idempotency_key: str,
+    expected_version: int,
+) -> WorkflowView:
+    """Validates the draft and publishes it as the next immutable version, under the expected
+    version. Only then is the draft removed, so a stale or invalid publish keeps it."""
+    view = await get_workflow(connection, workspace_id, workflow_id)
+    if view.draft is None:
+        raise WorkflowRefused("workflow_draft_not_found")
+    published = await publish_version(
+        connection,
+        workspace_id=workspace_id,
+        actor_id=actor_id,
+        workflow_id=workflow_id,
+        idempotency_key=idempotency_key,
+        expected_version=expected_version,
+        graph=view.draft.graph,
+        source="user",
+    )
+    await connection.execute(
+        "delete from public.workflow_drafts where workflow_id = %s and graph = %s",
+        (workflow_id, json.dumps(_plain(view.draft.graph))),
+    )
+    return await get_workflow(connection, workspace_id, published.id)
 
 
 async def publish_version(

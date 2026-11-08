@@ -44,6 +44,8 @@ def _error(error: RoutineRefused | IdempotencyConflict) -> ApiError:
         return ApiError(409, error.code, "This key was already used with different content.")
     if error.code.endswith("not_found"):
         return ApiError(404, error.code, "That is not available.")
+    if error.code == "draft_not_runnable":
+        return ApiError(422, error.code, "A routine binds a published version, not a draft.")
     if error.code in {"routine_name_taken", "routine_version_conflict"}:
         return ApiError(409, error.code, "That conflicts with what is saved. Reload and try again.")
     return ApiError(422, error.code, "That routine isn't valid.")
