@@ -40,3 +40,7 @@ IDs stay, and each requirement's text is edited to match.
 ## Reversal
 
 Each can be changed later under its existing ID. No data depends on these choices. Bringing DeepSeek back needs a recorded qualification and a decision.
+
+## Amended
+
+[Decision 0022](0022-studio-product-surfaces.md) D5 narrows the deferral of metrics: Operations may show the local counts and measured values D5 lists, and nothing more.

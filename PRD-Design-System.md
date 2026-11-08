@@ -29,7 +29,7 @@ shadcn's documented theming model uses semantic surface/foreground pairs, CSS va
 
 ## DS-02 — Dark is the default
 
-A first visit, missing preference, invalid preference or unavailable preference storage renders dark. The Mac/browser operating-system preference does not change that default. An explicit user selection of **Dark** or **Light** persists locally and is restored on subsequent visits. An old `system` preference resolves to dark; the initial selector offers only Dark and Light.
+A first visit, missing preference, invalid preference or unavailable preference storage renders dark. The Mac/browser operating-system preference does not change that default. An explicit user selection of **System**, **Dark** or **Light** persists locally and is restored on subsequent visits; **System** follows the operating-system preference only once the user has chosen it. *Amended by [Decision 0022](docs/engineering/decisions/0022-studio-product-surfaces.md) D2, which added System; before it, an old `system` value resolved to dark and the selector offered only Dark and Light.*
 
 Use a dedicated nonsecret appearance preference such as `autobots.theme`. This permission to store an appearance choice does not permit storing credentials, provider responses or sensitive run state in browser persistence.
 

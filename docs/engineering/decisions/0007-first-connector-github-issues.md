@@ -26,3 +26,7 @@ That the connector works against GitHub, until a live run against the owner's fi
 ## Reversal
 
 Remove the tool and its grant. Saved runs that recorded the tool's version would stop as `incompatible_version`, with a linked new run as the way forward. Issues already created stay in the repository.
+
+## Amended
+
+[Decision 0022](0022-studio-product-surfaces.md) D6 and D7 widen this to one configured repository, with four read-only GitHub tools, `labels` on issues, and an approval-gated pull-request connector, all under a fine-grained token for that repository.

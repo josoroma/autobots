@@ -25,3 +25,7 @@ That the redesigned screens pass DS-04 beyond what `slice-visual.spec.ts` measur
 ## Reversal
 
 Revert the work item's commit. No data, contract or migration changes.
+
+## Amended
+
+[Decision 0022](0022-studio-product-surfaces.md) D1 brings R6's set-aside elements into scope as PRD-Studio.md specifies, and D2 replaces R5's grouping with Tools under **Build**. R1's presentation-only scope applies to this decision's own change only.

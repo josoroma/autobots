@@ -98,6 +98,32 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
   - [US-14.14: Admitted model for the browsing loop](#us-1414-admitted-model-for-the-browsing-loop)
   - [US-14.15: Sol profile and route qualification](#us-1415-sol-profile-and-route-qualification)
   - [US-14.16: Live browse trial with Sol](#us-1416-live-browse-trial-with-sol)
+- [EPIC-15: Studio product surfaces](#epic-15-studio-product-surfaces)
+  - [US-15.1: Sidebar groups with Tools under Build](#us-151-sidebar-groups-with-tools-under-build)
+  - [US-15.2: Display name, workspace role and account](#us-152-display-name-workspace-role-and-account)
+  - [US-15.3: Member-readable readiness, health line and service chips](#us-153-member-readable-readiness-health-line-and-service-chips)
+  - [US-15.4: Run list projection, filters and spend](#us-154-run-list-projection-filters-and-spend)
+  - [US-15.5: Approvals inbox, count badge and decision shortcuts](#us-155-approvals-inbox-count-badge-and-decision-shortcuts)
+  - [US-15.6: Expert card facts and filters](#us-156-expert-card-facts-and-filters)
+  - [US-15.7: Tools side panel, Granted to and Copy schema](#us-157-tools-side-panel-granted-to-and-copy-schema)
+  - [US-15.8: Model catalog facts, binding source and form actions](#us-158-model-catalog-facts-binding-source-and-form-actions)
+  - [US-15.9: Composer chips, run preview and budget](#us-159-composer-chips-run-preview-and-budget)
+  - [US-15.10: Home greeting, Needs you and recent runs](#us-1510-home-greeting-needs-you-and-recent-runs)
+  - [US-15.11: Workflow description and node labels](#us-1511-workflow-description-and-node-labels)
+  - [US-15.12: Workflow drafts](#us-1512-workflow-drafts)
+  - [US-15.13: Workflow list, preview, executions and budget](#us-1513-workflow-list-preview-executions-and-budget)
+  - [US-15.14: GitHub read tools and issue labels on one repository](#us-1514-github-read-tools-and-issue-labels-on-one-repository)
+  - [US-15.15: Approval-gated pull-request connector](#us-1515-approval-gated-pull-request-connector)
+  - [US-15.16: Live GitHub qualification on the configured repository](#us-1516-live-github-qualification-on-the-configured-repository)
+  - [US-15.17: Run side panel and plan task timing](#us-1517-run-side-panel-and-plan-task-timing)
+  - [US-15.18: Operations verdict and check detail](#us-1518-operations-verdict-and-check-detail)
+  - [US-15.19: Operations jobs chart](#us-1519-operations-jobs-chart)
+  - [US-15.20: Appearance preferences with a System theme](#us-1520-appearance-preferences-with-a-system-theme)
+  - [US-15.21: Settings sub-pages for notifications, data and keyboard](#us-1521-settings-sub-pages-for-notifications-data-and-keyboard)
+  - [US-15.22: Search palette](#us-1522-search-palette)
+  - [US-15.23: New run shortcut](#us-1523-new-run-shortcut)
+  - [US-15.24: Streaming result text](#us-1524-streaming-result-text)
+  - [US-15.25: Concept Experts and workflows seed](#us-1525-concept-experts-and-workflows-seed)
 
 ## Work Item Status
 
@@ -410,6 +436,129 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.16 | Live browse trial with Sol | DONE | EPIC-14 |
 | US-14.16#1 | Add the trial runner, in no verification profile, reading the owner's key file in its own process and refusing a repeat without the owner's request. | DONE | US-14.16 |
 | US-14.16#2 | Run the trial once and record the redacted evidence: the summary's label, visited URLs, model calls, receipts, spend and the hosts the proxy connected to. | DONE | US-14.16 |
+| EPIC-15 | Studio product surfaces | — | — |
+| US-15.1 | Sidebar groups with Tools under Build | READY | EPIC-15 |
+| US-15.1#1 | Regroup the sidebar's links in the web shell, keeping link names, roles and data hooks. | TODO | US-15.1 |
+| US-15.1#2 | Update `tools.spec.ts` to Tools under Build after Workflows, and any `appearance.spec.ts` assertion of the old placement. | TODO | US-15.1 |
+| US-15.1#3 | Cover the scenarios in browser specs with axe. | TODO | US-15.1 |
+| US-15.2 | Display name, workspace role and account | READY | EPIC-15 |
+| US-15.2#1 | Add a per-user profile by migration with a display name checked to 1–60 characters, and RLS that lets a user write their own name and members of a shared workspace read it, with negative tests for anonymous, other-user and other-workspace roles. | TODO | US-15.2 |
+| US-15.2#2 | Add the role and workspace name to `SessionSummary`, and a profile read and update, in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.2 |
+| US-15.2#3 | Forward both through the BFF with the existing session and request checks. | TODO | US-15.2 |
+| US-15.2#4 | Add the shell's account footer and menu, and Settings → Account. | TODO | US-15.2 |
+| US-15.2#5 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.2 |
+| US-15.3 | Member-readable readiness, health line and service chips | READY | EPIC-15 |
+| US-15.3#1 | Add a member-readable readiness read in the application layer, holding only the API, worker, database and OpenRouter authentication states. | TODO | US-15.3 |
+| US-15.3#2 | Add its Pydantic contract and FastAPI route, regenerate OpenAPI and the TypeScript client, and forward it through the BFF. | TODO | US-15.3 |
+| US-15.3#3 | Add the shell's health line and Home's service chips. | TODO | US-15.3 |
+| US-15.3#4 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.3 |
+| US-15.4 | Run list projection, filters and spend | READY | EPIC-15 |
+| US-15.4#1 | Extend the run list projection in the application layer with labels, stop_reason, plan progress, frozen profiles and ledger spend. | TODO | US-15.4 |
+| US-15.4#2 | Add status-group, text and profile filters, per-tab counts, a keyset cursor and a total in the Pydantic contract and FastAPI route, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.4 |
+| US-15.4#3 | Forward the filters and the cursor through the BFF. | TODO | US-15.4 |
+| US-15.4#4 | Render the tabs, filters, Load more, labels, the "≈" spend and the meter on Runs. | TODO | US-15.4 |
+| US-15.4#5 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.4 |
+| US-15.5 | Approvals inbox, count badge and decision shortcuts | READY | EPIC-15 |
+| US-15.5#1 | Add decided statuses, tab counts, `decided_at` and `decided_by`, the run goal, the served plan task found through the tool use's operation ID, and the stored arguments' byte size to the approval read model. | TODO | US-15.5 |
+| US-15.5#2 | Add a pending-count endpoint and the extended views in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.5 |
+| US-15.5#3 | Forward both through the BFF. | TODO | US-15.5 |
+| US-15.5#4 | Build the tabs, the list beside the detail, the Fields and JSON views with sanitized markdown, J and K, and ⌘↵ and ⌘⌫ with a second press and a live announcement. | TODO | US-15.5 |
+| US-15.5#5 | Add the sidebar badge. | TODO | US-15.5 |
+| US-15.5#6 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.5 |
+| US-15.6 | Expert card facts and filters | READY | EPIC-15 |
+| US-15.6#1 | Add each Expert's run count and last run time to the Expert read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.6 |
+| US-15.6#2 | Render the card facts, Start run, the approval note, the filters with counts and the search on Experts. | TODO | US-15.6 |
+| US-15.6#3 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.6 |
+| US-15.7 | Tools side panel, Granted to and Copy schema | READY | EPIC-15 |
+| US-15.7#1 | Derive Granted to from the latest Expert versions and the agent steps of published workflows in the application layer, and expose it in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.7 |
+| US-15.7#2 | Render the group list with counts, the text filter, the side panel and Copy schema, keeping `/tools/{tool_id}`. | TODO | US-15.7 |
+| US-15.7#3 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.7 |
+| US-15.8 | Model catalog facts, binding source and form actions | READY | EPIC-15 |
+| US-15.8#1 | Add catalog prices per 1M tokens, supported parameters, the fetch time and each role binding's source to the model read models in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.8 |
+| US-15.8#2 | Add a Reset all write that clears role overrides under the expected version. | TODO | US-15.8 |
+| US-15.8#3 | Render the facts, sources, Discard, Reset all and the summary on Models, and the binding source in the run's role map. | TODO | US-15.8 |
+| US-15.8#4 | Cover the scenarios with a fake catalog on a disposable stack and in browser specs with axe. | TODO | US-15.8 |
+| US-15.9 | Composer chips, run preview and budget | READY | EPIC-15 |
+| US-15.9#1 | Add the allowed budget range and the remaining daily cap to run intent, and the profiles by role and the default tool grants to a preview, in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.9 |
+| US-15.9#2 | Validate and freeze a chosen budget at admission, refusing values outside US$0.25–5.00, off the US$0.25 step or above the remaining daily cap. | TODO | US-15.9 |
+| US-15.9#3 | Forward intent, preview and budget through the BFF. | TODO | US-15.9 |
+| US-15.9#4 | Add the Expert, budget and models chips, the preview chips and the file chips to Home's composer. | TODO | US-15.9 |
+| US-15.9#5 | Cover the scenarios on a disposable stack with a fake transport and in browser specs with axe. | TODO | US-15.9 |
+| US-15.10 | Home greeting, Needs you and recent runs | BLOCKED | EPIC-15 |
+| US-15.10#1 | Render the greeting from the workspace's timezone and the display name. | TODO | US-15.10 |
+| US-15.10#2 | Render Needs you from pending approvals and the run list's Needs you group, and Recent runs from the run list. | TODO | US-15.10 |
+| US-15.10#3 | Cover the scenarios in browser specs with axe on a disposable stack. | TODO | US-15.10 |
+| US-15.11 | Workflow description and node labels | READY | EPIC-15 |
+| US-15.11#1 | Add a nullable workflow description by migration. | TODO | US-15.11 |
+| US-15.11#2 | Add an optional node `label` in a new Workflow IR version in the domain, keeping the previous version valid, with shared fixtures for both versions. | TODO | US-15.11 |
+| US-15.11#3 | Expose both in the Pydantic contracts and FastAPI routes, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.11 |
+| US-15.11#4 | Edit the description and the labels in the workflow editor. | TODO | US-15.11 |
+| US-15.11#5 | Cover the scenarios on a disposable stack. | TODO | US-15.11 |
+| US-15.12 | Workflow drafts | READY | EPIC-15 |
+| US-15.12#1 | Add one draft per workflow by migration, with RLS that lets only the owner write it, and negative tests. | TODO | US-15.12 |
+| US-15.12#2 | Add saving a draft, publishing it with an expected version and discarding it in the application layer, and refuse a draft wherever a run or routine binds a version. | TODO | US-15.12 |
+| US-15.12#3 | Expose them in Pydantic and FastAPI, regenerate OpenAPI and the TypeScript client, and forward them through the BFF. | TODO | US-15.12 |
+| US-15.12#4 | Save, publish and discard the draft from the workflow editor. | TODO | US-15.12 |
+| US-15.12#5 | Cover the scenarios on a disposable stack and in browser specs. | TODO | US-15.12 |
+| US-15.13 | Workflow list, preview, executions and budget | BLOCKED | EPIC-15 |
+| US-15.13#1 | Add per-workflow executions with version, state, spend and duration, the Experts in step order, the step count, the last execution and the run count to the workflow read models in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.13 |
+| US-15.13#2 | Accept and freeze an execution budget from US$0.25 to US$5.00 in steps of US$0.25, never above the remaining daily cap. | TODO | US-15.13 |
+| US-15.13#3 | Render the tabs, search, rows, preview panel with its version switch, and recent executions on Workflows. | TODO | US-15.13 |
+| US-15.13#4 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.13 |
+| US-15.14 | GitHub read tools and issue labels on one repository | READY | EPIC-15 |
+| US-15.14#1 | Add the four read tools as plain `httpx` adapters with an injectable transport over the shared repository configuration, with schema ceilings, public fields and recorded fixtures. | TODO | US-15.14 |
+| US-15.14#2 | Register `create_github_issue` version 2 with optional `labels`, up to 10, keeping version 1 unchanged. | TODO | US-15.14 |
+| US-15.14#3 | Report `key_missing` for every GitHub tool until both variables are set, with a repair naming them, the token's scopes and a restart, and update the operations runbook with the fine-grained scopes D6 lists. | TODO | US-15.14 |
+| US-15.14#4 | Cover the scenarios with fake transports only. | TODO | US-15.14 |
+| US-15.15 | Approval-gated pull-request connector | BLOCKED | EPIC-15 |
+| US-15.15#1 | Add `github_open_pull_request` as a consequential connector with approval on every call, limits of 20 files and 1 MiB in total, and no repository input. | TODO | US-15.15 |
+| US-15.15#2 | Compute each file's diff against the base for the approval request, binding the approval to the exact request. | TODO | US-15.15 |
+| US-15.15#3 | Create `autobots/<operation_id>`, commit only the named paths, open the pull request with the operation-ID marker, and read back the branch and pull request before any retry. | TODO | US-15.15 |
+| US-15.15#4 | Cover the scenarios with fake transports only, including a lost response. | TODO | US-15.15 |
+| US-15.16 | Live GitHub qualification on the configured repository | BLOCKED | EPIC-15 |
+| US-15.16#1 | Extend the GitHub qualification runner, in no verification profile, to the read tools, labels and pull requests, refusing to start without the token and the recorded authorization. | TODO | US-15.16 |
+| US-15.16#2 | Run it once and record redacted evidence: the outputs' shapes, the markers, the retry readback and the absence of the token. | TODO | US-15.16 |
+| US-15.17 | Run side panel and plan task timing | BLOCKED | EPIC-15 |
+| US-15.17#1 | Add plan task start and finish times by migration, written only on the worker's fenced path in database time. | TODO | US-15.17 |
+| US-15.17#2 | Add the current task, task times, per-task tools, tokens and the root tree's metered-call count to the run read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.17 |
+| US-15.17#3 | Build the side panel on Runs with Open run, Pause, Resume and Cancel through the existing commands and expected-version guard. | TODO | US-15.17 |
+| US-15.17#4 | Cover the scenarios, including the stale worker, on a disposable stack with a scripted model, and in browser specs with axe. | TODO | US-15.17 |
+| US-15.18 | Operations verdict and check detail | READY | EPIC-15 |
+| US-15.18#1 | Record each readiness probe's database answer time and keep the last 20 for a p95, with no tracing. | TODO | US-15.18 |
+| US-15.18#2 | Add the worker count, applied migrations, storage and disk bytes, leased and queued jobs, checkpoint adapter, catalog fetch time and loopback check to the status read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.18 |
+| US-15.18#3 | Render the verdict and the values on Operations. | TODO | US-15.18 |
+| US-15.18#4 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.18 |
+| US-15.19 | Operations jobs chart | BLOCKED | EPIC-15 |
+| US-15.19#1 | Add an hourly job count by outcome over 24 hours in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.19 |
+| US-15.19#2 | Render the chart with chart tokens and its text table on Operations. | TODO | US-15.19 |
+| US-15.19#3 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.19 |
+| US-15.20 | Appearance preferences with a System theme | READY | EPIC-15 |
+| US-15.20#1 | Offer System, Light and Dark in the theme provider: dark for a first visit and for a missing, invalid or unavailable value, and System following the OS only when chosen. | TODO | US-15.20 |
+| US-15.20#2 | Add the serif, density and reduce-motion preferences, stored in the browser and changing presentation only. | TODO | US-15.20 |
+| US-15.20#3 | Update `appearance.spec.ts` for System and the new preferences, under both OS schemes and with invalid and unavailable storage. | TODO | US-15.20 |
+| US-15.20#4 | Cover the scenarios in browser specs with axe in both themes. | TODO | US-15.20 |
+| US-15.21 | Settings sub-pages for notifications, data and keyboard | BLOCKED | EPIC-15 |
+| US-15.21#1 | Add a member-readable retention summary in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client and forward it through the BFF. | TODO | US-15.21 |
+| US-15.21#2 | Add the Settings sub-navigation and the Notifications, Data on this Mac and Keyboard pages. | TODO | US-15.21 |
+| US-15.21#3 | Raise browser notifications for runs entering waiting_approval or waiting_input while the app is open, only with the browser's permission and the setting on. | TODO | US-15.21 |
+| US-15.21#4 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.21 |
+| US-15.22 | Search palette | BLOCKED | EPIC-15 |
+| US-15.22#1 | Add one workspace-scoped search over run goals and the names of Experts, workflows and tools, with typed results, in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client and forward it through the BFF. | TODO | US-15.22 |
+| US-15.22#2 | Add the Search button with its key hint after the skip link, the ⌘K handler that ignores text fields, and the palette dialog with a listbox. | TODO | US-15.22 |
+| US-15.22#3 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.22 |
+| US-15.23 | New run shortcut | BLOCKED | EPIC-15 |
+| US-15.23#1 | Add the New run button with its key hint after the skip link, and the shortcut handler that ignores text fields. | TODO | US-15.23 |
+| US-15.23#2 | Update `appearance.spec.ts`'s tab-order assertion so the skip link stays first. | TODO | US-15.23 |
+| US-15.23#3 | Cover the scenarios in browser specs with axe. | TODO | US-15.23 |
+| US-15.24 | Streaming result text | BLOCKED | EPIC-15 |
+| US-15.24#1 | Emit ephemeral, coalesced `result.text.delta` events for the final result's text only, on the live stream and never into durable events. | TODO | US-15.24 |
+| US-15.24#2 | Add the event type to the typed union, the generated client and the consumer in the same change, with the consumer ignoring unknown types. | TODO | US-15.24 |
+| US-15.24#3 | Add the "Stream text as it's written" preference to Appearance, and honor it in the run view. | TODO | US-15.24 |
+| US-15.24#4 | Cover the scenarios with a scripted model on a disposable stack, including a scan for reasoning, tool arguments and secrets. | TODO | US-15.24 |
+| US-15.25 | Concept Experts and workflows seed | BLOCKED | EPIC-15 |
+| US-15.25#1 | Add a repeatable seed, kept apart from migrations, that targets a named workspace with bounded upserts and no user-edit overwrites. | TODO | US-15.25 |
+| US-15.25#2 | Seed a workflow as a draft when a tool it needs is unavailable. | TODO | US-15.25 |
+| US-15.25#3 | Cover the scenarios on a disposable stack, including a double seed and a secret scan. | TODO | US-15.25 |
 
 ## Dependency Diagram
 
@@ -522,6 +671,33 @@ flowchart TD
     US_14_14["US-14.14: Admitted model for the browsing loop"]
     US_14_15["US-14.15: Sol profile and route qualification"]
     US_14_16["US-14.16: Live browse trial with Sol"]
+  end
+  subgraph EPIC_15["EPIC-15: Studio product surfaces"]
+    US_15_1["US-15.1: Sidebar groups with Tools under Build"]
+    US_15_2["US-15.2: Display name, workspace role and account"]
+    US_15_3["US-15.3: Member-readable readiness, health line and service chips"]
+    US_15_4["US-15.4: Run list projection, filters and spend"]
+    US_15_5["US-15.5: Approvals inbox, count badge and decision shortcuts"]
+    US_15_6["US-15.6: Expert card facts and filters"]
+    US_15_7["US-15.7: Tools side panel, Granted to and Copy schema"]
+    US_15_8["US-15.8: Model catalog facts, binding source and form actions"]
+    US_15_9["US-15.9: Composer chips, run preview and budget"]
+    US_15_10["US-15.10: Home greeting, Needs you and recent runs"]
+    US_15_11["US-15.11: Workflow description and node labels"]
+    US_15_12["US-15.12: Workflow drafts"]
+    US_15_13["US-15.13: Workflow list, preview, executions and budget"]
+    US_15_14["US-15.14: GitHub read tools and issue labels on one repository"]
+    US_15_15["US-15.15: Approval-gated pull-request connector"]
+    US_15_16["US-15.16: Live GitHub qualification on the configured repository"]
+    US_15_17["US-15.17: Run side panel and plan task timing"]
+    US_15_18["US-15.18: Operations verdict and check detail"]
+    US_15_19["US-15.19: Operations jobs chart"]
+    US_15_20["US-15.20: Appearance preferences with a System theme"]
+    US_15_21["US-15.21: Settings sub-pages for notifications, data and keyboard"]
+    US_15_22["US-15.22: Search palette"]
+    US_15_23["US-15.23: New run shortcut"]
+    US_15_24["US-15.24: Streaming result text"]
+    US_15_25["US-15.25: Concept Experts and workflows seed"]
   end
   US_1_1 -.-> US_1_2
   US_1_1 -.-> US_1_3
@@ -739,6 +915,86 @@ flowchart TD
   US_12_1 -.-> US_14_15
   US_14_12 -.-> US_14_16
   US_14_15 -.-> US_14_16
+  US_14_2 -.-> US_15_1
+  US_11_11 -.-> US_15_1
+  US_2_2 -.-> US_15_2
+  US_2_3 -.-> US_15_2
+  US_2_4 -.-> US_15_2
+  US_2_5 -.-> US_15_2
+  US_9_1 -.-> US_15_3
+  US_11_8 -.-> US_15_3
+  US_3_2 -.-> US_15_3
+  US_11_5 -.-> US_15_4
+  US_4_6 -.-> US_15_4
+  US_3_3 -.-> US_15_4
+  US_5_1 -.-> US_15_4
+  US_6_3 -.-> US_15_4
+  US_5_3 -.-> US_15_5
+  US_11_7 -.-> US_15_5
+  US_13_1 -.-> US_15_5
+  US_14_3 -.-> US_15_5
+  US_5_1 -.-> US_15_6
+  US_14_2 -.-> US_15_6
+  US_11_5 -.-> US_15_6
+  US_14_2 -.-> US_15_7
+  US_5_1 -.-> US_15_7
+  US_6_1 -.-> US_15_7
+  US_11_6 -.-> US_15_8
+  US_14_15 -.-> US_15_8
+  US_3_4 -.-> US_15_8
+  US_11_9 -.-> US_15_9
+  US_14_9 -.-> US_15_9
+  US_14_15 -.-> US_15_9
+  US_5_1 -.-> US_15_9
+  US_3_3 -.-> US_15_9
+  US_15_2 -.-> US_15_10
+  US_15_4 -.-> US_15_10
+  US_15_5 -.-> US_15_10
+  US_6_1 -.-> US_15_11
+  US_6_3 -.-> US_15_11
+  US_6_1 -.-> US_15_12
+  US_6_3 -.-> US_15_12
+  US_7_1 -.-> US_15_12
+  US_15_11 -.-> US_15_13
+  US_15_12 -.-> US_15_13
+  US_14_4 -.-> US_15_13
+  US_7_2 -.-> US_15_14
+  US_14_3 -.-> US_15_14
+  US_14_5 -.-> US_15_14
+  US_14_8 -.-> US_15_14
+  US_15_14 -.-> US_15_15
+  US_15_5 -.-> US_15_15
+  US_5_4 -.-> US_15_15
+  US_15_14 -.-> US_15_16
+  US_15_15 -.-> US_15_16
+  EXT_US_15_16_1["External: the owner&#x27;s fine-grained GITHUB_TOKEN for josoroma/bot-test in the worker environment, and a separate capped authorization for the live calls (Decision 0022 D12)."]
+  EXT_US_15_16_1 -.-> US_15_16
+  US_15_4 -.-> US_15_17
+  US_4_2 -.-> US_15_17
+  US_4_3 -.-> US_15_17
+  US_11_4 -.-> US_15_17
+  US_14_3 -.-> US_15_17
+  US_9_1 -.-> US_15_18
+  US_9_2 -.-> US_15_18
+  US_11_8 -.-> US_15_18
+  US_15_18 -.-> US_15_19
+  US_11_11 -.-> US_15_20
+  US_3_2 -.-> US_15_20
+  US_15_2 -.-> US_15_21
+  US_15_4 -.-> US_15_21
+  US_15_5 -.-> US_15_21
+  US_15_20 -.-> US_15_21
+  US_15_4 -.-> US_15_22
+  US_15_6 -.-> US_15_22
+  US_15_13 -.-> US_15_22
+  US_15_1 -.-> US_15_23
+  US_15_20 -.-> US_15_24
+  US_4_3 -.-> US_15_24
+  US_4_6 -.-> US_15_24
+  US_15_11 -.-> US_15_25
+  US_15_12 -.-> US_15_25
+  US_15_14 -.-> US_15_25
+  US_2_4 -.-> US_15_25
 ```
 
 ```mermaid
@@ -1328,6 +1584,231 @@ flowchart TD
     US_14_16 --> T_14_16_1
     T_14_16_2["US-14.16#2: Run the trial once and record the redacted evidence: the summary&#x27;s label, visited URLs, model calls, receipts, spend and the hosts the proxy connected to."]
     US_14_16 --> T_14_16_2
+  end
+```
+
+```mermaid
+flowchart TD
+  subgraph EPIC_15["EPIC-15 tasks"]
+    US_15_1["US-15.1: Sidebar groups with Tools under Build"]
+    T_15_1_1["US-15.1#1: Regroup the sidebar&#x27;s links in the web shell, keeping link names, roles and data hooks."]
+    US_15_1 --> T_15_1_1
+    T_15_1_2["US-15.1#2: Update `tools.spec.ts` to Tools under Build after Workflows, and any `appearance.spec.ts` assertion of the old placement."]
+    US_15_1 --> T_15_1_2
+    T_15_1_3["US-15.1#3: Cover the scenarios in browser specs with axe."]
+    US_15_1 --> T_15_1_3
+    US_15_2["US-15.2: Display name, workspace role and account"]
+    T_15_2_1["US-15.2#1: Add a per-user profile by migration with a display name checked to 1–60 characters, and RLS that lets a user write their own name and members of a shared workspace read it, with negative tests for anonymous, other-user and other-workspace roles."]
+    US_15_2 --> T_15_2_1
+    T_15_2_2["US-15.2#2: Add the role and workspace name to `SessionSummary`, and a profile read and update, in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client."]
+    US_15_2 --> T_15_2_2
+    T_15_2_3["US-15.2#3: Forward both through the BFF with the existing session and request checks."]
+    US_15_2 --> T_15_2_3
+    T_15_2_4["US-15.2#4: Add the shell&#x27;s account footer and menu, and Settings → Account."]
+    US_15_2 --> T_15_2_4
+    T_15_2_5["US-15.2#5: Cover the scenarios on a disposable stack and in browser specs with axe."]
+    US_15_2 --> T_15_2_5
+    US_15_3["US-15.3: Member-readable readiness, health line and service chips"]
+    T_15_3_1["US-15.3#1: Add a member-readable readiness read in the application layer, holding only the API, worker, database and OpenRouter authentication states."]
+    US_15_3 --> T_15_3_1
+    T_15_3_2["US-15.3#2: Add its Pydantic contract and FastAPI route, regenerate OpenAPI and the TypeScript client, and forward it through the BFF."]
+    US_15_3 --> T_15_3_2
+    T_15_3_3["US-15.3#3: Add the shell&#x27;s health line and Home&#x27;s service chips."]
+    US_15_3 --> T_15_3_3
+    T_15_3_4["US-15.3#4: Cover the scenarios on a disposable stack and in browser specs with axe."]
+    US_15_3 --> T_15_3_4
+    US_15_4["US-15.4: Run list projection, filters and spend"]
+    T_15_4_1["US-15.4#1: Extend the run list projection in the application layer with labels, stop_reason, plan progress, frozen profiles and ledger spend."]
+    US_15_4 --> T_15_4_1
+    T_15_4_2["US-15.4#2: Add status-group, text and profile filters, per-tab counts, a keyset cursor and a total in the Pydantic contract and FastAPI route, then regenerate OpenAPI and the TypeScript client."]
+    US_15_4 --> T_15_4_2
+    T_15_4_3["US-15.4#3: Forward the filters and the cursor through the BFF."]
+    US_15_4 --> T_15_4_3
+    T_15_4_4["US-15.4#4: Render the tabs, filters, Load more, labels, the &quot;≈&quot; spend and the meter on Runs."]
+    US_15_4 --> T_15_4_4
+    T_15_4_5["US-15.4#5: Cover the scenarios on a disposable stack and in browser specs with axe."]
+    US_15_4 --> T_15_4_5
+    US_15_5["US-15.5: Approvals inbox, count badge and decision shortcuts"]
+    T_15_5_1["US-15.5#1: Add decided statuses, tab counts, `decided_at` and `decided_by`, the run goal, the served plan task found through the tool use&#x27;s operation ID, and the stored arguments&#x27; byte size to the approval read model."]
+    US_15_5 --> T_15_5_1
+    T_15_5_2["US-15.5#2: Add a pending-count endpoint and the extended views in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client."]
+    US_15_5 --> T_15_5_2
+    T_15_5_3["US-15.5#3: Forward both through the BFF."]
+    US_15_5 --> T_15_5_3
+    T_15_5_4["US-15.5#4: Build the tabs, the list beside the detail, the Fields and JSON views with sanitized markdown, J and K, and ⌘↵ and ⌘⌫ with a second press and a live announcement."]
+    US_15_5 --> T_15_5_4
+    T_15_5_5["US-15.5#5: Add the sidebar badge."]
+    US_15_5 --> T_15_5_5
+    T_15_5_6["US-15.5#6: Cover the scenarios on a disposable stack and in browser specs with axe."]
+    US_15_5 --> T_15_5_6
+    US_15_6["US-15.6: Expert card facts and filters"]
+    T_15_6_1["US-15.6#1: Add each Expert&#x27;s run count and last run time to the Expert read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client."]
+    US_15_6 --> T_15_6_1
+    T_15_6_2["US-15.6#2: Render the card facts, Start run, the approval note, the filters with counts and the search on Experts."]
+    US_15_6 --> T_15_6_2
+    T_15_6_3["US-15.6#3: Cover the scenarios on a disposable stack and in browser specs with axe."]
+    US_15_6 --> T_15_6_3
+    US_15_7["US-15.7: Tools side panel, Granted to and Copy schema"]
+    T_15_7_1["US-15.7#1: Derive Granted to from the latest Expert versions and the agent steps of published workflows in the application layer, and expose it in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client."]
+    US_15_7 --> T_15_7_1
+    T_15_7_2["US-15.7#2: Render the group list with counts, the text filter, the side panel and Copy schema, keeping `/tools/{tool_id}`."]
+    US_15_7 --> T_15_7_2
+    T_15_7_3["US-15.7#3: Cover the scenarios on a disposable stack and in browser specs with axe."]
+    US_15_7 --> T_15_7_3
+    US_15_8["US-15.8: Model catalog facts, binding source and form actions"]
+    T_15_8_1["US-15.8#1: Add catalog prices per 1M tokens, supported parameters, the fetch time and each role binding&#x27;s source to the model read models in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client."]
+    US_15_8 --> T_15_8_1
+    T_15_8_2["US-15.8#2: Add a Reset all write that clears role overrides under the expected version."]
+    US_15_8 --> T_15_8_2
+    T_15_8_3["US-15.8#3: Render the facts, sources, Discard, Reset all and the summary on Models, and the binding source in the run&#x27;s role map."]
+    US_15_8 --> T_15_8_3
+    T_15_8_4["US-15.8#4: Cover the scenarios with a fake catalog on a disposable stack and in browser specs with axe."]
+    US_15_8 --> T_15_8_4
+    US_15_9["US-15.9: Composer chips, run preview and budget"]
+    T_15_9_1["US-15.9#1: Add the allowed budget range and the remaining daily cap to run intent, and the profiles by role and the default tool grants to a preview, in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client."]
+    US_15_9 --> T_15_9_1
+    T_15_9_2["US-15.9#2: Validate and freeze a chosen budget at admission, refusing values outside US$0.25–5.00, off the US$0.25 step or above the remaining daily cap."]
+    US_15_9 --> T_15_9_2
+    T_15_9_3["US-15.9#3: Forward intent, preview and budget through the BFF."]
+    US_15_9 --> T_15_9_3
+    T_15_9_4["US-15.9#4: Add the Expert, budget and models chips, the preview chips and the file chips to Home&#x27;s composer."]
+    US_15_9 --> T_15_9_4
+    T_15_9_5["US-15.9#5: Cover the scenarios on a disposable stack with a fake transport and in browser specs with axe."]
+    US_15_9 --> T_15_9_5
+    US_15_10["US-15.10: Home greeting, Needs you and recent runs"]
+    T_15_10_1["US-15.10#1: Render the greeting from the workspace&#x27;s timezone and the display name."]
+    US_15_10 --> T_15_10_1
+    T_15_10_2["US-15.10#2: Render Needs you from pending approvals and the run list&#x27;s Needs you group, and Recent runs from the run list."]
+    US_15_10 --> T_15_10_2
+    T_15_10_3["US-15.10#3: Cover the scenarios in browser specs with axe on a disposable stack."]
+    US_15_10 --> T_15_10_3
+    US_15_11["US-15.11: Workflow description and node labels"]
+    T_15_11_1["US-15.11#1: Add a nullable workflow description by migration."]
+    US_15_11 --> T_15_11_1
+    T_15_11_2["US-15.11#2: Add an optional node `label` in a new Workflow IR version in the domain, keeping the previous version valid, with shared fixtures for both versions."]
+    US_15_11 --> T_15_11_2
+    T_15_11_3["US-15.11#3: Expose both in the Pydantic contracts and FastAPI routes, then regenerate OpenAPI and the TypeScript client."]
+    US_15_11 --> T_15_11_3
+    T_15_11_4["US-15.11#4: Edit the description and the labels in the workflow editor."]
+    US_15_11 --> T_15_11_4
+    T_15_11_5["US-15.11#5: Cover the scenarios on a disposable stack."]
+    US_15_11 --> T_15_11_5
+    US_15_12["US-15.12: Workflow drafts"]
+    T_15_12_1["US-15.12#1: Add one draft per workflow by migration, with RLS that lets only the owner write it, and negative tests."]
+    US_15_12 --> T_15_12_1
+    T_15_12_2["US-15.12#2: Add saving a draft, publishing it with an expected version and discarding it in the application layer, and refuse a draft wherever a run or routine binds a version."]
+    US_15_12 --> T_15_12_2
+    T_15_12_3["US-15.12#3: Expose them in Pydantic and FastAPI, regenerate OpenAPI and the TypeScript client, and forward them through the BFF."]
+    US_15_12 --> T_15_12_3
+    T_15_12_4["US-15.12#4: Save, publish and discard the draft from the workflow editor."]
+    US_15_12 --> T_15_12_4
+    T_15_12_5["US-15.12#5: Cover the scenarios on a disposable stack and in browser specs."]
+    US_15_12 --> T_15_12_5
+    US_15_13["US-15.13: Workflow list, preview, executions and budget"]
+    T_15_13_1["US-15.13#1: Add per-workflow executions with version, state, spend and duration, the Experts in step order, the step count, the last execution and the run count to the workflow read models in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client."]
+    US_15_13 --> T_15_13_1
+    T_15_13_2["US-15.13#2: Accept and freeze an execution budget from US$0.25 to US$5.00 in steps of US$0.25, never above the remaining daily cap."]
+    US_15_13 --> T_15_13_2
+    T_15_13_3["US-15.13#3: Render the tabs, search, rows, preview panel with its version switch, and recent executions on Workflows."]
+    US_15_13 --> T_15_13_3
+    T_15_13_4["US-15.13#4: Cover the scenarios on a disposable stack and in browser specs with axe."]
+    US_15_13 --> T_15_13_4
+    US_15_14["US-15.14: GitHub read tools and issue labels on one repository"]
+    T_15_14_1["US-15.14#1: Add the four read tools as plain `httpx` adapters with an injectable transport over the shared repository configuration, with schema ceilings, public fields and recorded fixtures."]
+    US_15_14 --> T_15_14_1
+    T_15_14_2["US-15.14#2: Register `create_github_issue` version 2 with optional `labels`, up to 10, keeping version 1 unchanged."]
+    US_15_14 --> T_15_14_2
+    T_15_14_3["US-15.14#3: Report `key_missing` for every GitHub tool until both variables are set, with a repair naming them, the token&#x27;s scopes and a restart, and update the operations runbook with the fine-grained scopes D6 lists."]
+    US_15_14 --> T_15_14_3
+    T_15_14_4["US-15.14#4: Cover the scenarios with fake transports only."]
+    US_15_14 --> T_15_14_4
+    US_15_15["US-15.15: Approval-gated pull-request connector"]
+    T_15_15_1["US-15.15#1: Add `github_open_pull_request` as a consequential connector with approval on every call, limits of 20 files and 1 MiB in total, and no repository input."]
+    US_15_15 --> T_15_15_1
+    T_15_15_2["US-15.15#2: Compute each file&#x27;s diff against the base for the approval request, binding the approval to the exact request."]
+    US_15_15 --> T_15_15_2
+    T_15_15_3["US-15.15#3: Create `autobots/&lt;operation_id&gt;`, commit only the named paths, open the pull request with the operation-ID marker, and read back the branch and pull request before any retry."]
+    US_15_15 --> T_15_15_3
+    T_15_15_4["US-15.15#4: Cover the scenarios with fake transports only, including a lost response."]
+    US_15_15 --> T_15_15_4
+    US_15_16["US-15.16: Live GitHub qualification on the configured repository"]
+    T_15_16_1["US-15.16#1: Extend the GitHub qualification runner, in no verification profile, to the read tools, labels and pull requests, refusing to start without the token and the recorded authorization."]
+    US_15_16 --> T_15_16_1
+    T_15_16_2["US-15.16#2: Run it once and record redacted evidence: the outputs&#x27; shapes, the markers, the retry readback and the absence of the token."]
+    US_15_16 --> T_15_16_2
+    US_15_17["US-15.17: Run side panel and plan task timing"]
+    T_15_17_1["US-15.17#1: Add plan task start and finish times by migration, written only on the worker&#x27;s fenced path in database time."]
+    US_15_17 --> T_15_17_1
+    T_15_17_2["US-15.17#2: Add the current task, task times, per-task tools, tokens and the root tree&#x27;s metered-call count to the run read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client."]
+    US_15_17 --> T_15_17_2
+    T_15_17_3["US-15.17#3: Build the side panel on Runs with Open run, Pause, Resume and Cancel through the existing commands and expected-version guard."]
+    US_15_17 --> T_15_17_3
+    T_15_17_4["US-15.17#4: Cover the scenarios, including the stale worker, on a disposable stack with a scripted model, and in browser specs with axe."]
+    US_15_17 --> T_15_17_4
+    US_15_18["US-15.18: Operations verdict and check detail"]
+    T_15_18_1["US-15.18#1: Record each readiness probe&#x27;s database answer time and keep the last 20 for a p95, with no tracing."]
+    US_15_18 --> T_15_18_1
+    T_15_18_2["US-15.18#2: Add the worker count, applied migrations, storage and disk bytes, leased and queued jobs, checkpoint adapter, catalog fetch time and loopback check to the status read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client."]
+    US_15_18 --> T_15_18_2
+    T_15_18_3["US-15.18#3: Render the verdict and the values on Operations."]
+    US_15_18 --> T_15_18_3
+    T_15_18_4["US-15.18#4: Cover the scenarios on a disposable stack and in browser specs with axe."]
+    US_15_18 --> T_15_18_4
+    US_15_19["US-15.19: Operations jobs chart"]
+    T_15_19_1["US-15.19#1: Add an hourly job count by outcome over 24 hours in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client."]
+    US_15_19 --> T_15_19_1
+    T_15_19_2["US-15.19#2: Render the chart with chart tokens and its text table on Operations."]
+    US_15_19 --> T_15_19_2
+    T_15_19_3["US-15.19#3: Cover the scenarios on a disposable stack and in browser specs with axe."]
+    US_15_19 --> T_15_19_3
+    US_15_20["US-15.20: Appearance preferences with a System theme"]
+    T_15_20_1["US-15.20#1: Offer System, Light and Dark in the theme provider: dark for a first visit and for a missing, invalid or unavailable value, and System following the OS only when chosen."]
+    US_15_20 --> T_15_20_1
+    T_15_20_2["US-15.20#2: Add the serif, density and reduce-motion preferences, stored in the browser and changing presentation only."]
+    US_15_20 --> T_15_20_2
+    T_15_20_3["US-15.20#3: Update `appearance.spec.ts` for System and the new preferences, under both OS schemes and with invalid and unavailable storage."]
+    US_15_20 --> T_15_20_3
+    T_15_20_4["US-15.20#4: Cover the scenarios in browser specs with axe in both themes."]
+    US_15_20 --> T_15_20_4
+    US_15_21["US-15.21: Settings sub-pages for notifications, data and keyboard"]
+    T_15_21_1["US-15.21#1: Add a member-readable retention summary in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client and forward it through the BFF."]
+    US_15_21 --> T_15_21_1
+    T_15_21_2["US-15.21#2: Add the Settings sub-navigation and the Notifications, Data on this Mac and Keyboard pages."]
+    US_15_21 --> T_15_21_2
+    T_15_21_3["US-15.21#3: Raise browser notifications for runs entering waiting_approval or waiting_input while the app is open, only with the browser&#x27;s permission and the setting on."]
+    US_15_21 --> T_15_21_3
+    T_15_21_4["US-15.21#4: Cover the scenarios on a disposable stack and in browser specs with axe."]
+    US_15_21 --> T_15_21_4
+    US_15_22["US-15.22: Search palette"]
+    T_15_22_1["US-15.22#1: Add one workspace-scoped search over run goals and the names of Experts, workflows and tools, with typed results, in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client and forward it through the BFF."]
+    US_15_22 --> T_15_22_1
+    T_15_22_2["US-15.22#2: Add the Search button with its key hint after the skip link, the ⌘K handler that ignores text fields, and the palette dialog with a listbox."]
+    US_15_22 --> T_15_22_2
+    T_15_22_3["US-15.22#3: Cover the scenarios on a disposable stack and in browser specs with axe."]
+    US_15_22 --> T_15_22_3
+    US_15_23["US-15.23: New run shortcut"]
+    T_15_23_1["US-15.23#1: Add the New run button with its key hint after the skip link, and the shortcut handler that ignores text fields."]
+    US_15_23 --> T_15_23_1
+    T_15_23_2["US-15.23#2: Update `appearance.spec.ts`&#x27;s tab-order assertion so the skip link stays first."]
+    US_15_23 --> T_15_23_2
+    T_15_23_3["US-15.23#3: Cover the scenarios in browser specs with axe."]
+    US_15_23 --> T_15_23_3
+    US_15_24["US-15.24: Streaming result text"]
+    T_15_24_1["US-15.24#1: Emit ephemeral, coalesced `result.text.delta` events for the final result&#x27;s text only, on the live stream and never into durable events."]
+    US_15_24 --> T_15_24_1
+    T_15_24_2["US-15.24#2: Add the event type to the typed union, the generated client and the consumer in the same change, with the consumer ignoring unknown types."]
+    US_15_24 --> T_15_24_2
+    T_15_24_3["US-15.24#3: Add the &quot;Stream text as it&#x27;s written&quot; preference to Appearance, and honor it in the run view."]
+    US_15_24 --> T_15_24_3
+    T_15_24_4["US-15.24#4: Cover the scenarios with a scripted model on a disposable stack, including a scan for reasoning, tool arguments and secrets."]
+    US_15_24 --> T_15_24_4
+    US_15_25["US-15.25: Concept Experts and workflows seed"]
+    T_15_25_1["US-15.25#1: Add a repeatable seed, kept apart from migrations, that targets a named workspace with bounded upserts and no user-edit overwrites."]
+    US_15_25 --> T_15_25_1
+    T_15_25_2["US-15.25#2: Seed a workflow as a draft when a tool it needs is unavailable."]
+    US_15_25 --> T_15_25_2
+    T_15_25_3["US-15.25#3: Cover the scenarios on a disposable stack, including a double seed and a secret scan."]
+    US_15_25 --> T_15_25_3
   end
 ```
 
@@ -5445,6 +5926,1338 @@ Dependencies:
 Tasks:
 - [x] Add the trial runner, in no verification profile, reading the owner's key file in its own process and refusing a repeat without the owner's request.
 - [x] Run the trial once and record the redacted evidence: the summary's label, visited URLs, model calls, receipts, spend and the hosts the proxy connected to.
+
+Open Questions:
+- None.
+
+# EPIC-15: Studio product surfaces
+
+Scheduled by [Decision 0022](docs/engineering/decisions/0022-studio-product-surfaces.md#decision) and sourced from [PRD-Studio.md](PRD-Studio.md#shell). Story order follows the Studio plan's phasing: data the app already has, then read models, workflow depth, GitHub tools, run timing and Operations detail, and last search, preferences, streaming and the concept seed. The model-assisted features stay out of this epic (D13). Each element is built only where real data backs it, and no screen shows sample data. Every GitHub scenario runs against a fake transport, and live use is a separate story that needs the owner's token and a capped authorization (D12). No story in this epic establishes H1 or product acceptance ([what Decision 0022 doesn't establish](docs/engineering/decisions/0022-studio-product-surfaces.md#what-this-doesnt-establish)).
+
+### US-15.1: Sidebar groups with Tools under Build
+
+Status: READY
+
+As a workspace member
+I want the sidebar grouped into the daily work, Build and System, with Tools under Build
+So that the navigation matches the Studio concepts the owner chose.
+
+Source:
+- [Shell, SH-01](PRD-Studio.md#shell)
+- [Decision 0022, D2](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [Decision 0017, amended C9](docs/engineering/decisions/0017-tool-catalog.md#amended)
+- [Decision 0021, amended R5](docs/engineering/decisions/0021-studio-interface-redesign.md#amended)
+- [DS-04](PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
+
+Codebase Context:
+- [Design and Tools screen](CODEBASE.md#current-capabilities): the Studio presentation groups the sidebar into the daily work, Build and System, and US-14.2 put Tools before Settings. Both are described as after the analyzed revision. This is not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Three named groups
+  Given a signed-in workspace member on any screen
+  When the sidebar renders
+  Then its links read, in order, Home, Runs and Approvals in the work group, Experts, Workflows and Tools under Build, and Operations, Models and Settings under System, each group is named in text, and the current page is marked by more than color
+
+Scenario: The skip link stays first
+  Given a fresh load of any screen
+  When the person presses Tab once
+  Then the skip link has focus, and activating it moves focus to the main content
+
+Scenario: The browser specs follow the decision
+  Given tools.spec.ts and appearance.spec.ts
+  When they run against the regrouped sidebar
+  Then tools.spec.ts asserts Tools directly after Workflows under Build, no spec asserts Tools directly before Settings, and axe reports no violations
+```
+
+Dependencies:
+- US-14.2
+- US-11.11
+
+Tasks:
+- [ ] Regroup the sidebar's links in the web shell, keeping link names, roles and data hooks.
+- [ ] Update `tools.spec.ts` to Tools under Build after Workflows, and any `appearance.spec.ts` assertion of the old placement.
+- [ ] Cover the scenarios in browser specs with axe.
+
+Open Questions:
+- None.
+
+### US-15.2: Display name, workspace role and account
+
+Status: READY
+
+As a workspace member
+I want an editable display name, and my role and each workspace's name in my session
+So that the shell, Home and Settings can name me without showing me to anyone outside my workspaces.
+
+Source:
+- [Identity, ID-01 and ID-02](PRD-Studio.md#identity)
+- [Shell, SH-05](PRD-Studio.md#shell)
+- [Settings, SE-04](PRD-Studio.md#settings)
+- [Decision 0022, D10](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [SP-005](docs/engineering/option-b-contract.md#sp-005--local-services-and-isolation)
+- [SP-009](docs/engineering/option-b-contract.md#sp-009--types-and-ownership)
+- [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
+
+Codebase Context:
+- [Membership](CODEBASE.md#authentication-and-authorization): membership comes from `public.workspace_members`, and client-supplied user or workspace IDs aren't trusted.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Edit my own display name
+  Given a signed-in member on Settings → Account
+  When they save a display name of 1 to 60 characters, and then try an empty name and one of 61 characters
+  Then the first is saved and shown in the shell footer, and the others are refused with a typed code and leave the saved name unchanged
+
+Scenario: RLS bounds who reads and writes a name
+  Given on a disposable stack two users who share a workspace and a third user who belongs only to another workspace
+  When each, as the authenticated role, reads and tries to update the others' profile rows
+  Then each user can update only their own name, a member of the shared workspace can read the other's name, and the third user can neither read nor change either
+
+Scenario: Fall back to the email's local part
+  Given a user signed in as ada@example.com who has never saved a display name
+  When the shell footer and the session summary load
+  Then the name shown is "ada"
+
+Scenario: Session summary and account footer
+  Given a user who is owner of one workspace and member of another
+  When the session summary is read through the BFF and the footer's menu is opened
+  Then the summary returns each workspace's name and the user's role in it, the footer shows the display name, the role in the current workspace and "this Mac", and its menu offers Settings → Account and Sign out
+
+Scenario: Account page
+  Given Settings → Account
+  When it loads
+  Then it shows the display name as editable, the email as read-only, the role and Sign out
+```
+
+Dependencies:
+- US-2.2
+- US-2.3
+- US-2.4
+- US-2.5
+
+Tasks:
+- [ ] Add a per-user profile by migration with a display name checked to 1–60 characters, and RLS that lets a user write their own name and members of a shared workspace read it, with negative tests for anonymous, other-user and other-workspace roles.
+- [ ] Add the role and workspace name to `SessionSummary`, and a profile read and update, in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
+- [ ] Forward both through the BFF with the existing session and request checks.
+- [ ] Add the shell's account footer and menu, and Settings → Account.
+- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+
+Open Questions:
+- None.
+
+### US-15.3: Member-readable readiness, health line and service chips
+
+Status: READY
+
+As a workspace member
+I want to see whether the local services are ready without owner-only detail
+So that I know whether a run can start before I write a goal.
+
+Source:
+- [Shell, SH-04](PRD-Studio.md#shell)
+- [Home, HM-05](PRD-Studio.md#home)
+- [PRD 12.1 Home and Operations](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [MP-04](PRD-Model-Providers.md#mp-04-settings-flow-and-states)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+- [SP-018](docs/engineering/option-b-contract.md#sp-018--local-operations-and-runbooks)
+
+Codebase Context:
+- [Operations](CODEBASE.md#current-capabilities): the status page reports database, schema, Storage, disk, queue, delayed routines, catalog availability, restore history and route qualification.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: All ready
+  Given a disposable stack whose API, worker and database are ready and whose OpenRouter authentication is valid
+  When a member who isn't the owner opens any screen and then Home
+  Then the shell's line reads "All local services ready", and Home shows the API, worker and database as ready and OpenRouter as authenticated, each in words
+
+Scenario: Name the service that isn't ready
+  Given a disposable stack whose worker has no current heartbeat and whose other services are ready
+  When the member opens any screen and then Home
+  Then the shell's line names the worker as not ready, Home's worker chip says so in text, and the screens stay usable
+
+Scenario: Nothing private in the member read
+  Given the member readiness read
+  When its response is inspected
+  Then it holds readiness states only, with no counts, no paths and no secret, and reading it makes no model call
+```
+
+Dependencies:
+- US-9.1
+- US-11.8
+- US-3.2
+
+Tasks:
+- [ ] Add a member-readable readiness read in the application layer, holding only the API, worker, database and OpenRouter authentication states.
+- [ ] Add its Pydantic contract and FastAPI route, regenerate OpenAPI and the TypeScript client, and forward it through the BFF.
+- [ ] Add the shell's health line and Home's service chips.
+- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+
+Open Questions:
+- None.
+
+### US-15.4: Run list projection, filters and spend
+
+Status: READY
+
+As a workspace member
+I want each run in the list to show what it is, how far it got, its models and its spend, with filters and paging
+So that I can find a run and read its state without opening it.
+
+Source:
+- [Runs, RN-01 to RN-03](PRD-Studio.md#runs)
+- [Decision 0022, D9](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [MP-07](PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
+- [SP-010](docs/engineering/option-b-contract.md#sp-010--canonical-run-states-and-transitions)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: One row per run with its facts
+  Given runs in this workspace started as a goal, in an Expert session and by a workflow, with plans, frozen profiles and ledger entries, and runs in another workspace
+  When a member reads the run list through the BFF
+  Then each row for this workspace returns the goal summary, the Expert, session or workflow label, the status and stop_reason, tasks complete of total, the frozen profiles, charged spend, outstanding reservations, an unreported flag, and the created and updated times, and no run from the other workspace appears
+
+Scenario: Status tabs with server counts
+  Given runs in every canonical state, including a paused run
+  When the member switches between All, Active, Needs you and Finished
+  Then Active holds queued, running, verifying, paused and cancelling runs, Needs you holds waiting_approval and waiting_input runs, Finished holds succeeded, failed and cancelled runs, and each tab's count comes from the server
+
+Scenario: Text and profile filters with keyset paging
+  Given more matching runs than fit on one page
+  When the member filters by text that matches a goal or an Expert name, then by a profile, and presses Load more while a new run is admitted
+  Then only matching runs appear, the next page continues from the cursor with no row repeated or skipped, and the total reflects the filter
+
+Scenario: Estimated spend is marked
+  Given one run with an outstanding reservation, one with an unreported charge and one that is fully reported
+  When the list renders
+  Then the first two show "≈" before their amounts, the third shows its reported amount without it, and each row's meter shows spent and reserved against the frozen limit in text as well as color
+```
+
+Dependencies:
+- US-11.5
+- US-4.6
+- US-3.3
+- US-5.1
+- US-6.3
+
+Tasks:
+- [ ] Extend the run list projection in the application layer with labels, stop_reason, plan progress, frozen profiles and ledger spend.
+- [ ] Add status-group, text and profile filters, per-tab counts, a keyset cursor and a total in the Pydantic contract and FastAPI route, then regenerate OpenAPI and the TypeScript client.
+- [ ] Forward the filters and the cursor through the BFF.
+- [ ] Render the tabs, filters, Load more, labels, the "≈" spend and the meter on Runs.
+- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+
+Open Questions:
+- None.
+
+### US-15.5: Approvals inbox, count badge and decision shortcuts
+
+Status: READY
+
+As a reviewer
+I want waiting and decided requests beside their full context, a count in the sidebar, and keyboard shortcuts that need confirming
+So that I can decide exact requests quickly without approving anything I didn't see.
+
+Source:
+- [Approvals, AP-01 to AP-04](PRD-Studio.md#approvals)
+- [Shell, SH-03](PRD-Studio.md#shell)
+- [Decision 0022, D3](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [PRD 9.2](PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
+- [Tool-use record](PRD-Tool-Catalog.md#tool-use-record)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Waiting and Decided with counts
+  Given pending, approved, rejected, expired and withdrawn requests in this workspace
+  When a reviewer opens Approvals and presses J and K with focus outside any text field
+  Then Waiting lists the pending requests and Decided lists the rest, each tab shows its count, the list sits beside the selected request's detail, and J and K move the selection between requests
+
+Scenario: Facts of a request
+  Given a decided request whose operation ID matches a tool use made for a plan task
+  When the request is selected
+  Then the detail shows who requested it, the run's goal, that plan task's title, the expiry as both relative and absolute time, and who decided it, when, and the outcome
+
+Scenario: The exact request, whole
+  Given a pending request whose arguments contain markdown, and another too long to show whole
+  When each is shown in the Fields view and the JSON view
+  Then the first shows the full stored arguments with their hash and byte size, the Fields view lists the parsed keys and shows markdown both as text and rendered and sanitized, neither view hides, reorders or truncates content, and the second request can't be approved
+
+Scenario: Shortcuts need a second press
+  Given a focused pending request and focus outside any text field
+  When the reviewer presses ⌘↵ once and waits more than 2 s, then presses ⌘⌫ twice within 2 s
+  Then the single ⌘↵ is announced as needing a second press and decides nothing, the ⌘⌫ pair rejects the request bound to the hash shown, and with focus in a text field neither shortcut acts
+
+Scenario: Sidebar badge from a count
+  Given two pending approvals and more approvals in total than fit on one page
+  When any screen renders the sidebar
+  Then the Approvals link shows 2 with the accessible text "2 waiting", read from a count endpoint rather than from a listed page
+```
+
+Dependencies:
+- US-5.3
+- US-11.7
+- US-13.1
+- US-14.3
+
+Tasks:
+- [ ] Add decided statuses, tab counts, `decided_at` and `decided_by`, the run goal, the served plan task found through the tool use's operation ID, and the stored arguments' byte size to the approval read model.
+- [ ] Add a pending-count endpoint and the extended views in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
+- [ ] Forward both through the BFF.
+- [ ] Build the tabs, the list beside the detail, the Fields and JSON views with sanitized markdown, J and K, and ⌘↵ and ⌘⌫ with a second press and a live announcement.
+- [ ] Add the sidebar badge.
+- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+
+Open Questions:
+- None.
+
+### US-15.6: Expert card facts and filters
+
+Status: READY
+
+As a workspace member
+I want each Expert's role, model, tools, usage and approval needs on its card, with filters
+So that I can pick the right Expert and see which ones can change things outside this Mac.
+
+Source:
+- [Decision 0022, D14–D17](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [Experts, EX-01 to EX-03](PRD-Studio.md#experts)
+- [Expert identity](PRD-LangChain-Deep-Agents.md#82-expert-identity-versus-subagent-execution)
+- [Catalog contract](PRD-Tool-Catalog.md#catalog-contract)
+- [MP-07](PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Card facts
+  Given an Expert whose latest version binds the executor to a profile and grants six tools, and which has three runs
+  When a member opens Experts
+  Then its card shows the executor role and profile, the first four tools followed by "+2", a run count of 3 with the time of the last run, and Start run
+
+Scenario: Start run discloses first
+  Given an Expert's card
+  When the member activates Start run
+  Then run creation for that Expert shows the MP-07 disclosure, and nothing is sent until Run is pressed
+
+Scenario: Can change things outside
+  Given Experts that grant a consequential tool and Experts that grant none
+  When the member picks Can change things outside, then types part of a name in the search
+  Then each filter shows its count, Can change things outside lists exactly the Experts with a consequential tool, and the search narrows the list by name
+
+Scenario: Approval note
+  Given an Expert granting a tool that needs approval on every call, such as create_github_issue
+  When its card renders
+  Then the card says so in words, such as "Approval on every issue"
+
+Scenario: Read only is the complement
+  Given an Expert whose only writing tool is save_artifact and another granting create_github_issue
+  When the person picks Read only, then Can change things outside
+  Then the first Expert is listed under Read only, the second under Can change things outside, and the two counts add up to All
+```
+
+Dependencies:
+- US-5.1
+- US-14.2
+- US-11.5
+
+Tasks:
+- [ ] Add each Expert's run count and last run time to the Expert read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
+- [ ] Render the card facts, Start run, the approval note, the filters with counts and the search on Experts.
+- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+
+Open Questions:
+- None.
+
+### US-15.7: Tools side panel, Granted to and Copy schema
+
+Status: READY
+
+As a workspace member
+I want the tool list grouped with counts, each tool's detail beside it with who it's granted to, and its input schema one press away
+So that I can see where a tool is used without leaving the list.
+
+Source:
+- [Tools, TL-01 to TL-03](PRD-Studio.md#tools)
+- [Tools screen](PRD-Tool-Catalog.md#tools-screen)
+- [Catalog contract](PRD-Tool-Catalog.md#catalog-contract)
+- [Workflow IR](PRD-LangChain-Deep-Agents.md#73-workflowdataflow-loop-application-owned)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Group list and side panel
+  Given a catalog with tools in several groups
+  When a member opens Tools, filters by text and by provider and availability, and selects a row
+  Then each group shows its count, the filters stay in the URL, the row's detail opens in a side panel, and /tools/{tool_id} still opens the same detail as a page
+
+Scenario: Granted to
+  Given an Expert whose latest version grants the tool, another Expert whose only grant of it is in an older version, and a published workflow whose agent step uses the first Expert
+  When the tool's detail opens
+  Then it lists the first Expert and the published workflow, and not the Expert whose grant is only in an older version
+
+Scenario: Copy schema
+  Given a tool's detail showing one of its versions
+  When the member presses Copy schema
+  Then the clipboard holds exactly that version's input JSON Schema
+```
+
+Dependencies:
+- US-14.2
+- US-5.1
+- US-6.1
+
+Tasks:
+- [ ] Derive Granted to from the latest Expert versions and the agent steps of published workflows in the application layer, and expose it in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
+- [ ] Render the group list with counts, the text filter, the side panel and Copy schema, keeping `/tools/{tool_id}`.
+- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+
+Open Questions:
+- None.
+
+### US-15.8: Model catalog facts, binding source and form actions
+
+Status: READY
+
+As a workspace owner
+I want each approved profile's catalog prices and capabilities, where each role's binding comes from, and Discard and Reset all
+So that I choose models knowing what they cost and why a role uses one.
+
+Source:
+- [Models, MD-01 to MD-03](PRD-Studio.md#models)
+- [MP-01](PRD-Model-Providers.md#mp-01-approved-models-and-selection)
+- [MP-02](PRD-Model-Providers.md#mp-02-catalog-and-request-contract)
+- [MP-04](PRD-Model-Providers.md#mp-04-settings-flow-and-states)
+- [SP-006](docs/engineering/option-b-contract.md#sp-006--approved-model-profiles)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Catalog facts apart from qualification
+  Given a fresh catalog fetch with prices and supported parameters for each approved profile
+  When the owner opens Models
+  Then each profile shows its input and output price per 1M tokens, its supported parameters as capabilities labelled "from the catalog" and kept separate from its qualification, and the catalog's fetch time
+
+Scenario: Where each binding comes from
+  Given a workspace with no saved default and one workspace role override, and a run admitted with a run role override
+  When Models and that run's role map are shown
+  Then each role says whether its binding comes from a run override, a workspace override, the workspace default or the built-in default, and researcher reads Sol from the built-in default where nothing else names it
+
+Scenario: Discard and Reset all
+  Given unsaved edits on the form and two saved role overrides
+  When the owner presses Discard, then Reset all, and then Reset all again from a screen loaded before that reset
+  Then Discard returns the form to its saved state, the first Reset all clears both overrides with the expected version, the stale one is refused with a reload message, and the summary's count of roles that follow the workspace default matches the saved policy
+```
+
+Dependencies:
+- US-11.6
+- US-14.15
+- US-3.4
+
+Tasks:
+- [ ] Add catalog prices per 1M tokens, supported parameters, the fetch time and each role binding's source to the model read models in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
+- [ ] Add a Reset all write that clears role overrides under the expected version.
+- [ ] Render the facts, sources, Discard, Reset all and the summary on Models, and the binding source in the run's role map.
+- [ ] Cover the scenarios with a fake catalog on a disposable stack and in browser specs with axe.
+
+Open Questions:
+- None.
+
+### US-15.9: Composer chips, run preview and budget
+
+Status: READY
+
+As a goal's owner
+I want to choose an Expert, a budget and models from chips, and see which profiles and tools the run would use before I press Run
+So that I start a bounded run knowing what it will use and spend.
+
+Source:
+- [Home, HM-02 and HM-03](PRD-Studio.md#home)
+- [Decision 0022, D11](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [MP-07](PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
+- [Direct sessions](PRD-LangChain-Deep-Agents.md#82-expert-identity-versus-subagent-execution)
+- [File tools](PRD-Tool-Catalog.md#file-tools)
+- [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Budget choices within the daily cap
+  Given a workspace with US$2.10 left in its daily cap
+  When the owner opens the budget chip and starts a run with US$1.50
+  Then the chip offers US$0.25 to US$2.00 in steps of US$0.25 with US$1.00 selected first, the disclosure shows the chosen budget, and the admitted run freezes a US$1.50 limit
+
+Scenario: A budget outside the range is refused
+  Given run requests with budgets of US$5.25, US$0.10, US$1.10 and one above the remaining daily cap
+  When each is submitted through the BFF
+  Then each is refused with a typed code, no run starts, and the draft is kept
+
+Scenario: An Expert chip starts a direct session first
+  Given the composer once with one Expert chosen and once with no Expert
+  When the owner presses Run each time
+  Then the first starts a direct session with that Expert before admission and the run belongs to it, and the second is admitted as a goal run
+
+Scenario: Preview what the run would use
+  Given a goal, a budget and a model choice in the composer
+  When the preview loads
+  Then chips show each profile with the roles that resolve to it, such as "Terra · 13 roles" and "Sol · researcher", and the tools the run would be granted, all from the preview endpoint, and nothing is sent to OpenRouter until Run
+
+Scenario: Attached files as chips
+  Given two attached text files
+  When the composer shows them
+  Then each chip shows the file's name, type and size
+```
+
+Dependencies:
+- US-11.9
+- US-14.9
+- US-14.15
+- US-5.1
+- US-3.3
+
+Tasks:
+- [ ] Add the allowed budget range and the remaining daily cap to run intent, and the profiles by role and the default tool grants to a preview, in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
+- [ ] Validate and freeze a chosen budget at admission, refusing values outside US$0.25–5.00, off the US$0.25 step or above the remaining daily cap.
+- [ ] Forward intent, preview and budget through the BFF.
+- [ ] Add the Expert, budget and models chips, the preview chips and the file chips to Home's composer.
+- [ ] Cover the scenarios on a disposable stack with a fake transport and in browser specs with axe.
+
+Open Questions:
+- None.
+
+### US-15.10: Home greeting, Needs you and recent runs
+
+Status: BLOCKED
+
+As a workspace member
+I want Home to greet me, show what's waiting for me and list my recent runs
+So that I can pick up what needs me before starting something new.
+
+Source:
+- [Decision 0022, D14–D17](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [Home, HM-01 and HM-04](PRD-Studio.md#home)
+- [Decision 0022, D9 and D10](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Greeting by the workspace's timezone
+  Given a workspace whose timezone is America/Costa_Rica and a member whose display name is Ada
+  When Home loads at 09:00, 14:00 and 20:00 local time
+  Then it reads "Good morning", "Good afternoon" and "Good evening" in turn, each followed by "Ada", and then the heading "What should we work on?"
+
+Scenario: Needs you
+  Given a pending approval, a run in waiting_input and a paused run
+  When Home loads
+  Then Needs you lists the approval with a link to its Review and the waiting run with a link to Reply on the run, and doesn't list the paused run
+
+Scenario: Recent runs
+  Given seven runs in the workspace
+  When Home loads
+  Then Recent runs lists the five newest, each with its state, its progress or spend, and a relative time
+
+Scenario: Greeting boundaries
+  Given the workspace timezone and local times 04:59, 05:00, 11:59, 12:00, 17:59 and 18:00
+  When Home renders at each time
+  Then it reads evening, morning, morning, afternoon, afternoon and evening
+```
+
+Dependencies:
+- US-15.2
+- US-15.4
+- US-15.5
+
+Tasks:
+- [ ] Render the greeting from the workspace's timezone and the display name.
+- [ ] Render Needs you from pending approvals and the run list's Needs you group, and Recent runs from the run list.
+- [ ] Cover the scenarios in browser specs with axe on a disposable stack.
+
+Open Questions:
+- None.
+
+### US-15.11: Workflow description and node labels
+
+Status: READY
+
+As an automation builder
+I want an optional description on a workflow and an optional label on each graph node
+So that lists and previews can say what a workflow and each of its steps do.
+
+Source:
+- [Workflows, WF-06](PRD-Studio.md#workflows)
+- [Workflow IR](PRD-LangChain-Deep-Agents.md#73-workflowdataflow-loop-application-owned)
+- [SP-009](docs/engineering/option-b-contract.md#sp-009--types-and-ownership)
+- [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
+- [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Optional description
+  Given one workflow saved with a description and another saved without one
+  When both are read through the BFF
+  Then the first returns its description, the second returns none, and both stay valid
+
+Scenario: Labels bump the IR version
+  Given a graph whose nodes carry optional labels, and a graph at the previous IR version with no labels
+  When each is validated and published
+  Then the first is stored at the new IR version with its labels, and the second still validates, publishes and runs unchanged
+
+Scenario: Versions published before the change are untouched
+  Given a version published before the migration
+  When a run binds it after the migration
+  Then the run references the same version and hash as before
+```
+
+Dependencies:
+- US-6.1
+- US-6.3
+
+Tasks:
+- [ ] Add a nullable workflow description by migration.
+- [ ] Add an optional node `label` in a new Workflow IR version in the domain, keeping the previous version valid, with shared fixtures for both versions.
+- [ ] Expose both in the Pydantic contracts and FastAPI routes, then regenerate OpenAPI and the TypeScript client.
+- [ ] Edit the description and the labels in the workflow editor.
+- [ ] Cover the scenarios on a disposable stack.
+
+Open Questions:
+- None.
+
+### US-15.12: Workflow drafts
+
+Status: READY
+
+As an automation builder
+I want one saved draft beside a workflow's published versions
+So that I can prepare the next version without changing what runs use.
+
+Source:
+- [Workflows, WF-02](PRD-Studio.md#workflows)
+- [Decision 0022, D8](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [Workflow IR](PRD-LangChain-Deep-Agents.md#73-workflowdataflow-loop-application-owned)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+- [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: One saved draft
+  Given a published workflow in a workspace
+  When the owner saves a draft graph twice and a member who isn't the owner tries to save one
+  Then the workflow holds one draft with the owner's second graph, and the member's save is refused with a typed code
+
+Scenario: Publish from the draft
+  Given a draft beside published version 3
+  When the owner publishes it with expected version 3, and another publish names expected version 2
+  Then the first validates the draft and creates immutable version 4, and the second is refused as stale and creates nothing
+
+Scenario: Discard leaves published versions alone
+  Given a draft beside published versions
+  When the owner discards the draft
+  Then the draft is gone, and every published version and its hash is unchanged
+
+Scenario: Runs bind only published versions
+  Given a workflow with a draft
+  When a run or a routine names the draft, and an execution names a published version
+  Then the first two are refused with a typed code, and the execution binds the published version's hash
+```
+
+Dependencies:
+- US-6.1
+- US-6.3
+- US-7.1
+
+Tasks:
+- [ ] Add one draft per workflow by migration, with RLS that lets only the owner write it, and negative tests.
+- [ ] Add saving a draft, publishing it with an expected version and discarding it in the application layer, and refuse a draft wherever a run or routine binds a version.
+- [ ] Expose them in Pydantic and FastAPI, regenerate OpenAPI and the TypeScript client, and forward them through the BFF.
+- [ ] Save, publish and discard the draft from the workflow editor.
+- [ ] Cover the scenarios on a disposable stack and in browser specs.
+
+Open Questions:
+- None.
+
+### US-15.13: Workflow list, preview, executions and budget
+
+Status: BLOCKED
+
+As an automation builder
+I want each workflow's Experts, versions, steps, last execution and run count in the list, a preview of a version's steps, its recent executions, and a budget for each execution
+So that I can pick and run a workflow knowing what it does and what it costs.
+
+Source:
+- [Workflows, WF-01 and WF-03 to WF-05](PRD-Studio.md#workflows)
+- [Decision 0022, D11](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [MP-07](PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
+- [Workflow editor and monitor](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: List with tabs and search
+  Given one workflow with a published version and a draft, and another with published versions only
+  When a member opens Workflows, switches between All, Published and Drafts, and searches by name
+  Then each row shows the name, the description, its Experts in step order such as "Research analyst → Brief writer", the published version and any draft, the number of steps, the last execution's state and time, and a run count, Drafts lists only the first workflow, and the search narrows the list by name
+
+Scenario: Preview a version
+  Given a selected workflow with a published version and a draft
+  When the member uses the version switch
+  Then the panel shows the chosen version's steps in order, each agent step with its label, Expert, model and granted tools, and the approval gate marked in words
+
+Scenario: Recent executions
+  Given executions of several versions, some with reported spend and some with estimated spend
+  When the panel lists recent executions
+  Then each shows its version, state, spend labelled estimated or reported, and duration
+
+Scenario: A budget per execution
+  Given a workspace with more than US$5.00 left in its daily cap
+  When one execution is started with US$2.50 and another with US$5.25
+  Then the first's run freezes a US$2.50 limit, and the second is refused with a typed code and starts nothing
+```
+
+Dependencies:
+- US-15.11
+- US-15.12
+- US-14.4
+
+Tasks:
+- [ ] Add per-workflow executions with version, state, spend and duration, the Experts in step order, the step count, the last execution and the run count to the workflow read models in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
+- [ ] Accept and freeze an execution budget from US$0.25 to US$5.00 in steps of US$0.25, never above the remaining daily cap.
+- [ ] Render the tabs, search, rows, preview panel with its version switch, and recent executions on Workflows.
+- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+
+Open Questions:
+- None.
+
+### US-15.14: GitHub read tools and issue labels on one repository
+
+Status: READY
+
+As a goal's owner
+I want four read-only GitHub tools, and labels on new issues, all on one configured repository
+So that Experts can triage issues, read CI failures, list pull requests and read files without ever choosing a repository.
+
+Source:
+- [GitHub tools, GH-01 to GH-05 and GH-07](PRD-Studio.md#github-tools)
+- [Decision 0022, D6 and D12](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [Decision 0007, amended](docs/engineering/decisions/0007-first-connector-github-issues.md#amended)
+- [Decision 0017, C5](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
+- [Catalog contract](PRD-Tool-Catalog.md#catalog-contract)
+- [Tool-use record](PRD-Tool-Catalog.md#tool-use-record)
+- [Provider keys](PRD-Tool-Catalog.md#provider-keys)
+- [URL guard](PRD-Tool-Catalog.md#url-guard)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+
+Codebase Context:
+- [GitHub integration](CODEBASE.md#integration-points): `create_github_issue` creates an issue on one configured repository, is granted per Expert, and reads back its marker.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Read tools against a fake transport
+  Given GITHUB_REPOSITORY and a fake GITHUB_TOKEN set, a fake GitHub transport, and an Expert granting the four read tools
+  When the model calls github_list_pull_requests, github_list_workflow_runs, github_search_issues and github_read_file with allowed inputs
+  Then each returns validated output with the fields its requirement lists, every request targets only the configured repository, the search is restricted to it, and each call is recorded as a read-only tool use
+
+Scenario: Bounded inputs, and no repository argument
+  Given the same tools on a fake transport
+  When a call names a repository, a state outside its allowed set or a limit above 100, and when github_read_file meets a file over 1 MiB
+  Then the first three are refused before any request, the oversized file fails with a typed code, and no tool schema offers a repository input
+
+Scenario: File content stays private
+  Given a github_read_file call that returns text
+  When its tool use is listed and the run's screens render it
+  Then the content appears only as a digest and size, with its SHA and size, and never as text
+
+Scenario: Labels on new issues, version 1 kept
+  Given create_github_issue version 2, an Expert version that pinned version 1, and a fake transport
+  When version 2 is approved and called with 10 labels, version 2 is proposed with 11 labels, and version 1 is approved and called with a title and body
+  Then the first creates the issue with those labels, the second is refused before any approval request or request to GitHub, and version 1 behaves as before
+
+Scenario: Key missing until both are set
+  Given only one of GITHUB_REPOSITORY and GITHUB_TOKEN set
+  When the catalog is read
+  Then every GitHub tool reads key_missing, and the repair names both variables, the token's scopes and a restart, and never a value
+```
+
+Dependencies:
+- US-7.2
+- US-14.3
+- US-14.5
+- US-14.8
+
+Tasks:
+- [ ] Add the four read tools as plain `httpx` adapters with an injectable transport over the shared repository configuration, with schema ceilings, public fields and recorded fixtures.
+- [ ] Register `create_github_issue` version 2 with optional `labels`, up to 10, keeping version 1 unchanged.
+- [ ] Report `key_missing` for every GitHub tool until both variables are set, with a repair naming them, the token's scopes and a restart, and update the operations runbook with the fine-grained scopes D6 lists.
+- [ ] Cover the scenarios with fake transports only.
+
+Open Questions:
+- None.
+
+### US-15.15: Approval-gated pull-request connector
+
+Status: BLOCKED
+
+As a goal's owner
+I want an Expert to propose a pull request that a person approves with its full diff
+So that code changes reach the repository only as reviewed pull requests that are safe to retry.
+
+Source:
+- [Decision 0022, D14–D17](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [GitHub tools, GH-06](PRD-Studio.md#github-tools)
+- [Decision 0022, D6 and D7](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [Decision 0007, marker readback](docs/engineering/decisions/0007-first-connector-github-issues.md#why)
+- [Decision 0017, C5](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
+- [PRD 9.2](PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
+- [SP-012](docs/engineering/option-b-contract.md#sp-012--durable-job-ownership-and-recovery)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: The approval shows each file's diff
+  Given an Expert granting github_open_pull_request and a fake transport that holds the base branch
+  When the model proposes a pull request with a title, body, base branch and file changes
+  Then the run waits for approval, the request shows the title, the base branch and each file's diff against the base, and no request that writes has been sent
+
+Scenario: Bounded changes
+  Given proposals with 21 files, with more than 1 MiB in total, and with a repository argument
+  When each is validated
+  Then each is refused with a typed code before any approval request or request to GitHub
+
+Scenario: Branch, commits and marker
+  Given an approved proposal whose operation ID is op_1, on a fake transport
+  When the connector runs
+  Then it creates the branch autobots/op_1, commits only the named paths, opens the pull request with op_1 as a marker in its body, and offers no merge
+
+Scenario: A retry returns the existing pull request
+  Given an approved call whose pull request was opened but whose response was lost, on a fake transport
+  When the worker retries
+  Then it first reads back the branch and any open pull request from it, returns the existing pull request, and opens no second one
+
+Scenario: A moved base is refused
+  Given an approved pull request and a fake transport whose base branch head has moved since approval
+  When the connector runs
+  Then it stops with base_moved, opens nothing, and a new approval shows the diff against the new head
+```
+
+Dependencies:
+- US-15.14
+- US-15.5
+- US-5.4
+
+Tasks:
+- [ ] Add `github_open_pull_request` as a consequential connector with approval on every call, limits of 20 files and 1 MiB in total, and no repository input.
+- [ ] Compute each file's diff against the base for the approval request, binding the approval to the exact request.
+- [ ] Create `autobots/<operation_id>`, commit only the named paths, open the pull request with the operation-ID marker, and read back the branch and pull request before any retry.
+- [ ] Cover the scenarios with fake transports only, including a lost response.
+
+Open Questions:
+- None.
+
+### US-15.16: Live GitHub qualification on the configured repository
+
+Status: BLOCKED
+
+As a workspace owner
+I want each GitHub tool run once against josoroma/bot-test with my token, within a cap I authorize
+So that the read tools, labels and pull-request connector are seen working live, and not only on fakes.
+
+Source:
+- [Decision 0022, D6, D7 and D12](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [Decision 0022, what this doesn't establish](docs/engineering/decisions/0022-studio-product-surfaces.md#what-this-doesnt-establish)
+- [Decision 0007, what this doesn't establish](docs/engineering/decisions/0007-first-connector-github-issues.md#what-this-doesnt-establish)
+- [Decision 0017, C5](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
+- [GitHub tools](PRD-Studio.md#github-tools)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: One live pass per tool on the owner's repository
+  Given the owner's fine-grained token for josoroma/bot-test in the worker environment and the owner's capped authorization
+  When the qualification runner calls each read tool, creates one labelled issue, and opens one pull request after approval
+  Then each returns validated output from GitHub, the issue and the pull request carry their operation markers, a retry of the pull request returns the existing one, and the redacted record holds no token
+
+Scenario: Not run without the owner
+  Given no recorded authorization or no token in the environment
+  When the runner starts
+  Then it refuses before any request to GitHub
+```
+
+Dependencies:
+- US-15.14
+- US-15.15
+- External: the owner's fine-grained GITHUB_TOKEN for josoroma/bot-test in the worker environment, and a separate capped authorization for the live calls (Decision 0022 D12).
+
+Tasks:
+- [ ] Extend the GitHub qualification runner, in no verification profile, to the read tools, labels and pull requests, refusing to start without the token and the recorded authorization.
+- [ ] Run it once and record redacted evidence: the outputs' shapes, the markers, the retry readback and the absence of the token.
+
+Open Questions:
+- None.
+
+### US-15.17: Run side panel and plan task timing
+
+Status: BLOCKED
+
+As a run's owner
+I want a side panel on the run list with the plan's progress, each task's tools and wall time, spend and controls
+So that I can follow and steer a run without leaving the list.
+
+Source:
+- [Runs, RN-04 and RN-05](PRD-Studio.md#runs)
+- [Decision 0017, Q4 metered calls](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
+- [Pause, cancel and resume](PRD-LangChain-Deep-Agents.md#103-pause-cancel-and-resume)
+- [SP-010](docs/engineering/option-b-contract.md#sp-010--canonical-run-states-and-transitions)
+- [SP-012](docs/engineering/option-b-contract.md#sp-012--durable-job-ownership-and-recovery)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Task times on the fenced path
+  Given a running run whose current worker starts and finishes plan tasks, and a stale worker that has lost its lease
+  When each records a task's start or finish
+  Then the current worker's times are stored in database time, the stale worker's write is refused, and the current task is the earliest open task that has started
+
+Scenario: The panel
+  Given a running run with one done task, one current task and one to-do task, tool uses, and three metered tool calls in its root tree
+  When a member selects its row on Runs
+  Then a panel shows the state badge, title, Expert and start time, the plan with done, current and to-do markers in words, each task's tools and wall time, the spend, the tokens and "3 of 20 metered tool calls"
+
+Scenario: Controls with the expected version
+  Given the panel of a running run whose version changed after the panel loaded
+  When the person presses Pause, then reloads and presses Pause again
+  Then the first is refused as stale with a reload message, the second pauses the run through its canonical transition, and a terminal run's panel offers no Pause, Resume or Cancel
+```
+
+Dependencies:
+- US-15.4
+- US-4.2
+- US-4.3
+- US-11.4
+- US-14.3
+
+Tasks:
+- [ ] Add plan task start and finish times by migration, written only on the worker's fenced path in database time.
+- [ ] Add the current task, task times, per-task tools, tokens and the root tree's metered-call count to the run read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
+- [ ] Build the side panel on Runs with Open run, Pause, Resume and Cancel through the existing commands and expected-version guard.
+- [ ] Cover the scenarios, including the stale worker, on a disposable stack with a scripted model, and in browser specs with axe.
+
+Open Questions:
+- None.
+
+### US-15.18: Operations verdict and check detail
+
+Status: READY
+
+As an operator
+I want a one-line verdict and each check's measured value on Operations
+So that I can see how the local install is doing without reading logs.
+
+Source:
+- [Operations, OP-01, OP-02 and OP-04](PRD-Studio.md#operations)
+- [Decision 0022, D5](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [Decision 0013, amended](docs/engineering/decisions/0013-release-closure.md#amended)
+- [PRD 12.1 Operations](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [SP-018](docs/engineering/option-b-contract.md#sp-018--local-operations-and-runbooks)
+
+Codebase Context:
+- [Operations](CODEBASE.md#current-capabilities): the status page already reports database, schema, Storage, disk, queue, delayed routines, catalog availability, restore history and route qualification.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Verdict
+  Given a disposable stack with all checks but one passing, two workers and no installation hold
+  When an operator opens Operations
+  Then it shows the readiness sentence, "N of M checks pass" with N and M matching the checks shown, a worker count of 2 and the hold state
+
+Scenario: Values beside checks
+  Given at least 20 recorded readiness probes, applied migrations, stored objects, leased and queued jobs, a catalog fetch and a loopback-bound service
+  When the checks render
+  Then they show the database answer time as the p95 of the last 20 probes, the applied migrations, storage bytes, disk free and total as numbers, leased and queued jobs, the checkpoint adapter, the catalog's fetch time, and the loopback-only bind check
+
+Scenario: Numbers only, and nothing more
+  Given the Operations status response
+  When it is inspected
+  Then it holds no path and no secret, and no measured value beyond those D5 lists, and producing it sends nothing off the Mac
+
+Scenario: Existing sections stay
+  Given delayed schedules, a backup, a restore, model routes and retention settings
+  When Operations loads
+  Then the delayed schedules, backups, restores, tracing, model routes and retention sections still show
+```
+
+Dependencies:
+- US-9.1
+- US-9.2
+- US-11.8
+
+Tasks:
+- [ ] Record each readiness probe's database answer time and keep the last 20 for a p95, with no tracing.
+- [ ] Add the worker count, applied migrations, storage and disk bytes, leased and queued jobs, checkpoint adapter, catalog fetch time and loopback check to the status read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
+- [ ] Render the verdict and the values on Operations.
+- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+
+Open Questions:
+- None.
+
+### US-15.19: Operations jobs chart
+
+Status: BLOCKED
+
+As an operator
+I want jobs per hour over the last 24 hours, with a text table
+So that I can see how much work ran and how it ended.
+
+Source:
+- [Decision 0022, D14–D17](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [Operations, OP-03](PRD-Studio.md#operations)
+- [Decision 0022, D5](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [Decision 0013, amended](docs/engineering/decisions/0013-release-closure.md#amended)
+- [DS-04](PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Jobs per hour with a text alternative
+  Given jobs on a disposable stack that succeeded, waited for a person and failed during the last 24 hours
+  When Operations loads
+  Then a chart shows jobs per hour for 24 hours split into those three outcomes, marked with labels or patterns as well as color, and a text table gives the same counts
+
+Scenario: Counts only
+  Given the jobs chart's read
+  When its response is inspected
+  Then it holds hourly counts by outcome only, with no identifier and no goal text
+
+Scenario: Buckets and series
+  Given jobs in the last 24 hours that succeeded, entered waiting_approval or waiting_input, failed, were cancelled, and are paused or running
+  When the chart is read in the workspace timezone
+  Then each hour counts succeeded, waited for a person, failed with cancelled included, and in progress, and the text table gives the same numbers
+```
+
+Dependencies:
+- US-15.18
+
+Tasks:
+- [ ] Add an hourly job count by outcome over 24 hours in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
+- [ ] Render the chart with chart tokens and its text table on Operations.
+- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+
+Open Questions:
+- None.
+
+### US-15.20: Appearance preferences with a System theme
+
+Status: READY
+
+As a person using the app
+I want System, Light or Dark, serif documents, a density and reduced motion, kept in this browser
+So that the app reads the way I like without changing any run.
+
+Source:
+- [Settings, SE-03](PRD-Studio.md#settings)
+- [DS-02 as amended](PRD-Design-System.md#ds-02--dark-is-the-default)
+- [Decision 0022, D2](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [DS-04](PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
+- [DS-05](PRD-Design-System.md#ds-05--verification-and-design-evidence)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: System follows the OS only once chosen
+  Given a fresh browser whose OS prefers light
+  When the app loads, the person picks System, the OS switches to dark, and the page reloads
+  Then the first load renders dark, choosing System renders light, the switch renders dark, and the reload restores System before paint
+
+Scenario: Invalid or unavailable storage falls back to dark
+  Given an invalid stored theme value, or browser storage that can't be written
+  When the app loads
+  Then it renders dark without crashing
+
+Scenario: Presentation preferences
+  Given Settings → Appearance in a fresh browser, with serif documents on
+  When the person turns serif documents off, picks Compact density, forces reduced motion on and reloads
+  Then documents use the non-serif stack, spacing is compact, motion stops even though the OS allows it, each choice survives the reload, and with nothing forced, motion follows the OS
+
+Scenario: Presentation only
+  Given a running run and a pending approval
+  When the person changes every appearance preference
+  Then no model or task request is issued, and no run, approval or workflow state changes
+```
+
+Dependencies:
+- US-11.11
+- US-3.2
+
+Tasks:
+- [ ] Offer System, Light and Dark in the theme provider: dark for a first visit and for a missing, invalid or unavailable value, and System following the OS only when chosen.
+- [ ] Add the serif, density and reduce-motion preferences, stored in the browser and changing presentation only.
+- [ ] Update `appearance.spec.ts` for System and the new preferences, under both OS schemes and with invalid and unavailable storage.
+- [ ] Cover the scenarios in browser specs with axe in both themes.
+
+Open Questions:
+- None.
+
+### US-15.21: Settings sub-pages for notifications, data and keyboard
+
+Status: BLOCKED
+
+As a workspace member
+I want Settings divided into Appearance, Notifications, Account, Data on this Mac and Keyboard
+So that each preference and fact has one place.
+
+Source:
+- [Settings, SE-02 and SE-05 to SE-07](PRD-Studio.md#settings)
+- [Decision 0022, D3](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [PRD 12.1 Settings](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Sub-navigation
+  Given a member signed in
+  When they open Settings
+  Then the sub-navigation lists Appearance, Notifications, Account, Data on this Mac and Keyboard, and links to Models and Operations
+
+Scenario: Notify while the app is open
+  Given "Tell me when a run waits for me" turned on and the browser's permission granted
+  When one run enters waiting_approval and another enters waiting_input while the app is open
+  Then the browser shows a notification for each, nothing is sent off the Mac, and with the permission denied or the setting off none is shown
+
+Scenario: Data on this Mac
+  Given a member who isn't the owner, and the owner
+  When each opens Data on this Mac
+  Then both read the retention summary with no way to change it, and only the owner sees the link to Operations
+
+Scenario: Keyboard
+  Given Settings → Keyboard
+  When it opens
+  Then it lists each shortcut the app offers, with its keys and what it does
+```
+
+Dependencies:
+- US-15.2
+- US-15.4
+- US-15.5
+- US-15.20
+
+Tasks:
+- [ ] Add a member-readable retention summary in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client and forward it through the BFF.
+- [ ] Add the Settings sub-navigation and the Notifications, Data on this Mac and Keyboard pages.
+- [ ] Raise browser notifications for runs entering waiting_approval or waiting_input while the app is open, only with the browser's permission and the setting on.
+- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+
+Open Questions:
+- None.
+
+### US-15.22: Search palette
+
+Status: BLOCKED
+
+As a workspace member
+I want ⌘K to open one search over runs, Experts, workflows and tools
+So that I can jump to anything in this workspace from the keyboard.
+
+Source:
+- [Search, SR-01](PRD-Studio.md#search)
+- [Shell, SH-02](PRD-Studio.md#shell)
+- [Decision 0022, D3](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [DS-04](PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Typed results within the workspace
+  Given runs, Experts, workflows and tools in this workspace, and runs and Experts in another workspace
+  When a member searches for a term that matches a run's goal and the names of an Expert, a workflow and a tool
+  Then one endpoint returns typed results of each kind from this workspace only, and nothing from the other workspace
+
+Scenario: ⌘K and the shell button
+  Given focus outside any text field, on a screen where the skip link is the first tab stop
+  When the member presses ⌘K, and separately activates the Search button placed after the skip link with its visible key hint
+  Then each opens the palette as a dialog with a listbox, and with focus in a text field ⌘K does nothing
+
+Scenario: Keyboard and focus
+  Given the open palette with results
+  When the member moves with the arrow keys, opens a result with Enter, then reopens the palette and closes it with Escape
+  Then the active option is announced, Enter navigates to that result, and Escape returns focus to where it was before the palette opened
+```
+
+Dependencies:
+- US-15.4
+- US-15.6
+- US-15.13
+
+Tasks:
+- [ ] Add one workspace-scoped search over run goals and the names of Experts, workflows and tools, with typed results, in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client and forward it through the BFF.
+- [ ] Add the Search button with its key hint after the skip link, the ⌘K handler that ignores text fields, and the palette dialog with a listbox.
+- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+
+Open Questions:
+- None.
+
+### US-15.23: New run shortcut
+
+Status: BLOCKED
+
+As a goal's owner
+I want a New run button with the ⇧⌘O hint in the shell
+So that I can start a goal from any screen.
+
+Source:
+- [Decision 0022, D14–D17](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [Shell, SH-02](PRD-Studio.md#shell)
+- [Decision 0022, D3](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [DS-04](PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: New run from the shell
+  Given any screen, with the skip link as the first tab stop
+  When the person activates the New run button that follows it and shows its key hint
+  Then Home's composer opens with focus in the goal, and nothing is sent
+
+Scenario: Not in a text field
+  Given focus in a text field
+  When the person presses the New run shortcut
+  Then the app takes no action and the field keeps its content and focus
+
+Scenario: The shortcut is shift-command-O
+  Given focus outside a text field
+  When the person presses ⇧⌘O
+  Then Home's composer opens with focus in the goal, and the button's hint reads ⇧⌘O
+```
+
+Dependencies:
+- US-15.1
+
+Tasks:
+- [ ] Add the New run button with its key hint after the skip link, and the shortcut handler that ignores text fields.
+- [ ] Update `appearance.spec.ts`'s tab-order assertion so the skip link stays first.
+- [ ] Cover the scenarios in browser specs with axe.
+
+Open Questions:
+- None.
+
+### US-15.24: Streaming result text
+
+Status: BLOCKED
+
+As a run's owner
+I want to see the final result while it's being written, and a preference to turn that off
+So that long results appear sooner without changing what's stored.
+
+Source:
+- [Streaming, ST-01](PRD-Studio.md#streaming)
+- [Settings, SE-03](PRD-Studio.md#settings)
+- [Decision 0022, D4](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [Public event envelope](PRD-LangChain-Deep-Agents.md#113-public-event-envelope)
+- [Decision 0017, Q13 event compatibility](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
+- [SP-011](docs/engineering/option-b-contract.md#sp-011--plans-graph-state-and-events)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Result deltas, ephemeral and coalesced
+  Given a run writing its final result with a scripted model on a disposable stack
+  When its owner watches the run
+  Then result.text.delta events carry result text only, coalesced, at schema_version 1, none is stored as a durable event, and the text shown when the result completes equals the stored artifact
+
+Scenario: Reconnect rebuilds from the artifact
+  Given a stream cut while the result is being written
+  When the browser reconnects and the result completes
+  Then the view is rebuilt from durable events and the stored artifact, and the final text equals the artifact
+
+Scenario: Nothing private is streamed
+  Given a scripted model that also produces reasoning, tool arguments and framework values while writing
+  When the deltas are inspected
+  Then none carries reasoning, a tool argument or a raw framework value
+
+Scenario: The preference turns live text off
+  Given "Stream text as it's written" turned off in Settings → Appearance
+  When a result is written
+  Then the browser shows no live text, and shows the result once its artifact is stored
+```
+
+Dependencies:
+- US-15.20
+- US-4.3
+- US-4.6
+
+Tasks:
+- [ ] Emit ephemeral, coalesced `result.text.delta` events for the final result's text only, on the live stream and never into durable events.
+- [ ] Add the event type to the typed union, the generated client and the consumer in the same change, with the consumer ignoring unknown types.
+- [ ] Add the "Stream text as it's written" preference to Appearance, and honor it in the run view.
+- [ ] Cover the scenarios with a scripted model on a disposable stack, including a scan for reasoning, tool arguments and secrets.
+
+Open Questions:
+- None.
+
+### US-15.25: Concept Experts and workflows seed
+
+Status: BLOCKED
+
+As a workspace owner
+I want an optional seed of the five concept Experts and six workflows in a workspace I choose
+So that I can start from working examples instead of an empty app.
+
+Source:
+- [Decision 0022, D14–D17](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [Seed, SD-02](PRD-Studio.md#seed)
+- [Seed, SD-01](PRD-Studio.md#seed)
+- [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
+- [Provider keys](PRD-Tool-Catalog.md#provider-keys)
+- [Decision 0022, D8](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Repeatable and separate from migrations
+  Given a disposable stack after migrations, and a chosen workspace
+  When the seed runs twice
+  Then the workspace holds once each the Experts Market watcher, Research analyst, Brief writer, Issue triager and Code maintainer, and the workflows Weekly competitor brief, Monthly FX and inflation note, Nightly test triage, Interview synthesis, Release notes from merged PRs and Vendor due diligence, and running migrations alone creates none of them
+
+Scenario: No secrets and no pending work
+  Given the seed's files and the database after it runs
+  When they are scanned
+  Then they hold no key, token or password, and no job, run or routine occurrence is pending
+
+Scenario: Unavailable tools seed a draft
+  Given the GitHub variables not set
+  When the seed runs
+  Then each workflow that needs an unavailable tool exists only as a draft, and the others are published
+
+Scenario: Seed follows SD-02
+  Given a workspace without the GitHub variables set
+  When the seed runs
+  Then the five Experts and six workflows of SD-02 exist, Issue triager and Code maintainer are saved without their unavailable GitHub tools and say so in their purpose, Nightly test triage, Release notes from merged PRs and Interview synthesis are drafts, and the other three are published
+```
+
+Dependencies:
+- US-15.11
+- US-15.12
+- US-15.14
+- US-2.4
+
+Tasks:
+- [ ] Add a repeatable seed, kept apart from migrations, that targets a named workspace with bounded upserts and no user-edit overwrites.
+- [ ] Seed a workflow as a draft when a tool it needs is unavailable.
+- [ ] Cover the scenarios on a disposable stack, including a double seed and a secret scan.
 
 Open Questions:
 - None.

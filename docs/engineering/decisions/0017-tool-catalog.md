@@ -60,3 +60,7 @@ That any provider tool works against its live service. Fake transports and recor
 ## Reversal
 
 Each tool can be removed from the registry. Saved runs that pinned its version would stop as `incompatible_version`, with a linked new run as the way forward. Tool-use rows stay under workspace retention.
+
+## Amended
+
+[Decision 0022](0022-studio-product-surfaces.md) D2 moves Tools under **Build**, after Workflows, in place of C9's position directly before Settings.
