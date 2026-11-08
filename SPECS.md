@@ -124,6 +124,12 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
   - [US-15.23: New run shortcut](#us-1523-new-run-shortcut)
   - [US-15.24: Streaming result text](#us-1524-streaming-result-text)
   - [US-15.25: Concept Experts and workflows seed](#us-1525-concept-experts-and-workflows-seed)
+- [EPIC-16: A current install with real examples](#epic-16-a-current-install-with-real-examples)
+  - [US-16.1: Sober control borders](#us-161-sober-control-borders)
+  - [US-16.2: Schema readiness against every shipped migration](#us-162-schema-readiness-against-every-shipped-migration)
+  - [US-16.3: Workspace choice for members of several workspaces](#us-163-workspace-choice-for-members-of-several-workspaces)
+  - [US-16.4: A current install with Sol's live qualification](#us-164-a-current-install-with-sols-live-qualification)
+  - [US-16.5: Real examples on the install](#us-165-real-examples-on-the-install)
 
 ## Work Item Status
 
@@ -559,6 +565,29 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.25#1 | Add a repeatable seed, kept apart from migrations, that targets a named workspace with bounded upserts and no user-edit overwrites. | DONE | US-15.25 |
 | US-15.25#2 | Seed a workflow as a draft when a tool it needs is unavailable. | DONE | US-15.25 |
 | US-15.25#3 | Cover the scenarios on a disposable stack, including a double seed and a secret scan. | DONE | US-15.25 |
+| EPIC-16 | A current install with real examples | — | — |
+| US-16.1 | Sober control borders | READY | EPIC-16 |
+| US-16.1#1 | Replace the inset underline with a `--control-border` token for all four sides, at 3:1 in both themes. | TODO | US-16.1 |
+| US-16.1#2 | Give the composer's goal field the shared rounded border. | TODO | US-16.1 |
+| US-16.1#3 | Measure boundaries and focus in both themes with the visual walk. | TODO | US-16.1 |
+| US-16.2 | Schema readiness against every shipped migration | READY | EPIC-16 |
+| US-16.2#1 | Record the shipped migration count and newest name, with a check that they match the directory. | TODO | US-16.2 |
+| US-16.2#2 | Compare the applied count in readiness, with schema_behind and schema_ahead. | TODO | US-16.2 |
+| US-16.2#3 | Extend the required relations and columns through migration 49. | TODO | US-16.2 |
+| US-16.2#4 | Show applied against shipped in Operations, and cover the scenarios on a disposable stack. | TODO | US-16.2 |
+| US-16.3 | Workspace choice for members of several workspaces | READY | EPIC-16 |
+| US-16.3#1 | Add a same-origin, CSRF-checked route that keeps the choice in an HttpOnly cookie. | TODO | US-16.3 |
+| US-16.3#2 | Send the choice from the BFF and the event stream as `X-Autobots-Workspace`. | TODO | US-16.3 |
+| US-16.3#3 | Add the sidebar chooser for members of several workspaces. | TODO | US-16.3 |
+| US-16.3#4 | Cover the scenarios in the browser on a disposable stack. | TODO | US-16.3 |
+| US-16.4 | A current install with Sol's live qualification | BLOCKED | EPIC-16 |
+| US-16.4#1 | Back up the install, then apply the pending migrations through the guarded path. | TODO | US-16.4 |
+| US-16.4#2 | Run Sol's corpus live within its ledger, and record the report. | TODO | US-16.4 |
+| US-16.4#3 | Record today's qualification in a migration, apply it, and check Settings → Models. | TODO | US-16.4 |
+| US-16.5 | Real examples on the install | BLOCKED | EPIC-16 |
+| US-16.5#1 | Seed the concept Experts and workflows into the owner workspace. | TODO | US-16.5 |
+| US-16.5#2 | Add a guarded command that runs the example goals and workflow live under the shared ledger. | TODO | US-16.5 |
+| US-16.5#3 | Check Runs, Experts, Workflows and Approvals show them. | TODO | US-16.5 |
 
 ## Dependency Diagram
 
@@ -698,6 +727,13 @@ flowchart TD
     US_15_23["US-15.23: New run shortcut"]
     US_15_24["US-15.24: Streaming result text"]
     US_15_25["US-15.25: Concept Experts and workflows seed"]
+  end
+  subgraph EPIC_16["EPIC-16: A current install with real examples"]
+    US_16_1["US-16.1: Sober control borders"]
+    US_16_2["US-16.2: Schema readiness against every shipped migration"]
+    US_16_3["US-16.3: Workspace choice for members of several workspaces"]
+    US_16_4["US-16.4: A current install with Sol&#x27;s live qualification"]
+    US_16_5["US-16.5: Real examples on the install"]
   end
   US_1_1 -.-> US_1_2
   US_1_1 -.-> US_1_3
@@ -993,6 +1029,8 @@ flowchart TD
   US_15_12 -.-> US_15_25
   US_15_14 -.-> US_15_25
   US_2_4 -.-> US_15_25
+  US_16_2 -.-> US_16_4
+  US_16_4 -.-> US_16_5
 ```
 
 ```mermaid
@@ -1807,6 +1845,51 @@ flowchart TD
     US_15_25 --> T_15_25_2
     T_15_25_3["US-15.25#3: Cover the scenarios on a disposable stack, including a double seed and a secret scan."]
     US_15_25 --> T_15_25_3
+  end
+```
+
+```mermaid
+flowchart TD
+  subgraph EPIC_16["EPIC-16 tasks"]
+    US_16_1["US-16.1: Sober control borders"]
+    T_16_1_1["US-16.1#1: Replace the inset underline with a `--control-border` token for all four sides, at 3:1 in both themes."]
+    US_16_1 --> T_16_1_1
+    T_16_1_2["US-16.1#2: Give the composer&#x27;s goal field the shared rounded border."]
+    US_16_1 --> T_16_1_2
+    T_16_1_3["US-16.1#3: Measure boundaries and focus in both themes with the visual walk."]
+    US_16_1 --> T_16_1_3
+    US_16_2["US-16.2: Schema readiness against every shipped migration"]
+    T_16_2_1["US-16.2#1: Record the shipped migration count and newest name, with a check that they match the directory."]
+    US_16_2 --> T_16_2_1
+    T_16_2_2["US-16.2#2: Compare the applied count in readiness, with schema_behind and schema_ahead."]
+    US_16_2 --> T_16_2_2
+    T_16_2_3["US-16.2#3: Extend the required relations and columns through migration 49."]
+    US_16_2 --> T_16_2_3
+    T_16_2_4["US-16.2#4: Show applied against shipped in Operations, and cover the scenarios on a disposable stack."]
+    US_16_2 --> T_16_2_4
+    US_16_3["US-16.3: Workspace choice for members of several workspaces"]
+    T_16_3_1["US-16.3#1: Add a same-origin, CSRF-checked route that keeps the choice in an HttpOnly cookie."]
+    US_16_3 --> T_16_3_1
+    T_16_3_2["US-16.3#2: Send the choice from the BFF and the event stream as `X-Autobots-Workspace`."]
+    US_16_3 --> T_16_3_2
+    T_16_3_3["US-16.3#3: Add the sidebar chooser for members of several workspaces."]
+    US_16_3 --> T_16_3_3
+    T_16_3_4["US-16.3#4: Cover the scenarios in the browser on a disposable stack."]
+    US_16_3 --> T_16_3_4
+    US_16_4["US-16.4: A current install with Sol&#x27;s live qualification"]
+    T_16_4_1["US-16.4#1: Back up the install, then apply the pending migrations through the guarded path."]
+    US_16_4 --> T_16_4_1
+    T_16_4_2["US-16.4#2: Run Sol&#x27;s corpus live within its ledger, and record the report."]
+    US_16_4 --> T_16_4_2
+    T_16_4_3["US-16.4#3: Record today&#x27;s qualification in a migration, apply it, and check Settings → Models."]
+    US_16_4 --> T_16_4_3
+    US_16_5["US-16.5: Real examples on the install"]
+    T_16_5_1["US-16.5#1: Seed the concept Experts and workflows into the owner workspace."]
+    US_16_5 --> T_16_5_1
+    T_16_5_2["US-16.5#2: Add a guarded command that runs the example goals and workflow live under the shared ledger."]
+    US_16_5 --> T_16_5_2
+    T_16_5_3["US-16.5#3: Check Runs, Experts, Workflows and Approvals show them."]
+    US_16_5 --> T_16_5_3
   end
 ```
 
@@ -7281,6 +7364,247 @@ Tasks:
 - [x] Add a repeatable seed, kept apart from migrations, that targets a named workspace with bounded upserts and no user-edit overwrites.
 - [x] Seed a workflow as a draft when a tool it needs is unavailable.
 - [x] Cover the scenarios on a disposable stack, including a double seed and a secret scan.
+
+Open Questions:
+- None.
+
+# EPIC-16: A current install with real examples
+
+Scheduled by [Decision 0023](docs/engineering/decisions/0023-install-current-and-real-examples.md#decision), from the owner's four requests of 2026-11-08 and the two risks the refreshed `CODEBASE.md` recorded. Three stories change the product: control borders, schema readiness and workspace choice. Two act on the persistent install, which needs its own backup first and only the guarded apply. Spend is capped per story, and no story establishes H1 or product acceptance ([what Decision 0023 doesn't establish](docs/engineering/decisions/0023-install-current-and-real-examples.md#what-this-doesnt-establish)).
+
+### US-16.1: Sober control borders
+
+Status: READY
+
+As a workspace member
+I want text fields and menus drawn with one even, quiet border like the other components
+So that forms read calmly, without a heavy line at the bottom.
+
+Source:
+- [Decision 0023, E1](docs/engineering/decisions/0023-install-current-and-real-examples.md#decision)
+- [DS-03](PRD-Design-System.md#ds-03--apply-semantic-tokens-across-the-whole-ui)
+- [Decision 0021](docs/engineering/decisions/0021-studio-interface-redesign.md#decision)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: One even border and no underline
+  Given any Input, Textarea or Select in either theme
+  When it is shown without keyboard focus
+  Then it has no inset bottom line, and its border is the same width and color on all four sides
+
+Scenario: The composer's goal field matches
+  Given Home's composer
+  When it is shown
+  Then the goal field has the same rounded, even border as the other controls
+
+Scenario: Still accessible
+  Given every screen the visual walk covers, in dark and light
+  When control boundaries and focus are measured
+  Then each control's border reaches 3:1 against what is around it, and keyboard focus stays visible
+```
+
+Dependencies:
+- None
+
+Tasks:
+- [ ] Replace the inset underline with a `--control-border` token for all four sides, at 3:1 in both themes.
+- [ ] Give the composer's goal field the shared rounded border.
+- [ ] Measure boundaries and focus in both themes with the visual walk.
+
+Open Questions:
+- None.
+
+### US-16.2: Schema readiness against every shipped migration
+
+Status: READY
+
+As an operator
+I want readiness to compare the database's applied migrations with the ones this release ships
+So that a database behind the code is reported as behind, whatever the newest migration added.
+
+Source:
+- [Decision 0023, E2](docs/engineering/decisions/0023-install-current-and-real-examples.md#decision)
+- [Decision 0022, D5](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Fewer applied migrations is behind
+  Given a disposable database that has applied fewer migrations than the release ships
+  When readiness is read
+  Then the schema check is unavailable with schema_behind, admission stops, and Operations shows the applied count against the shipped count
+
+Scenario: All applied is ready
+  Given a disposable database with every shipped migration applied
+  When readiness is read
+  Then the schema check is ok, and Operations shows the two counts equal
+
+Scenario: More applied is ahead, not blocking
+  Given a database that has applied more migrations than the release ships
+  When readiness is read
+  Then the schema check is degraded with schema_ahead, and admission isn't stopped by it
+
+Scenario: The shipped count can't drift
+  Given the release's recorded migration count and newest name
+  When the harness checks run
+  Then they fail unless both match supabase/migrations
+
+Scenario: Newer objects are required without a history
+  Given a database with no readable migration history
+  When readiness is read
+  Then the relations and columns that migrations 38 to 49 add are among those it requires
+```
+
+Dependencies:
+- None
+
+Tasks:
+- [ ] Record the shipped migration count and newest name, with a check that they match the directory.
+- [ ] Compare the applied count in readiness, with schema_behind and schema_ahead.
+- [ ] Extend the required relations and columns through migration 49.
+- [ ] Show applied against shipped in Operations, and cover the scenarios on a disposable stack.
+
+Open Questions:
+- None.
+
+### US-16.3: Workspace choice for members of several workspaces
+
+Status: READY
+
+As a member of more than one workspace
+I want to choose which workspace I'm working in, and change it
+So that member screens work instead of asking me to choose a workspace with no way to.
+
+Source:
+- [Decision 0023, E3](docs/engineering/decisions/0023-install-current-and-real-examples.md#decision)
+- [Shell, SH-01](PRD-Studio.md#shell)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Choose, then work
+  Given a member of two workspaces, signed in with no workspace chosen
+  When they choose one in the sidebar
+  Then member screens show that workspace's data, and the choice survives a reload
+
+Scenario: Change the workspace
+  Given that member working in one workspace
+  When they choose the other
+  Then member screens show the other workspace's data
+
+Scenario: The browser's choice is still checked
+  Given a session whose chosen workspace is one the user isn't a member of
+  When a member screen is requested
+  Then the API refuses it, and no data of that workspace is returned
+
+Scenario: Only a same-origin, CSRF-checked request sets the choice
+  Given a request to set the workspace without a valid origin or CSRF token
+  When it is sent
+  Then it is refused and the choice is unchanged
+
+Scenario: One workspace needs no choice
+  Given a member of exactly one workspace
+  When they sign in
+  Then no workspace chooser asks for a choice, and member screens work as before
+```
+
+Dependencies:
+- None
+
+Tasks:
+- [ ] Add a same-origin, CSRF-checked route that keeps the choice in an HttpOnly cookie.
+- [ ] Send the choice from the BFF and the event stream as `X-Autobots-Workspace`.
+- [ ] Add the sidebar chooser for members of several workspaces.
+- [ ] Cover the scenarios in the browser on a disposable stack.
+
+Open Questions:
+- None.
+
+### US-16.4: A current install with Sol's live qualification
+
+Status: BLOCKED
+
+As an owner
+I want my persistent install brought up to the code's migrations, and Sol's route qualified live today
+So that Settings → Models shows Sol qualified from a real pass on this install.
+
+Source:
+- [Decision 0023, E4 and E5](docs/engineering/decisions/0023-install-current-and-real-examples.md#decision)
+- [Decision 0019, S4](docs/engineering/decisions/0019-sol-profile-and-browser-use.md#decision)
+- [Local Supabase runbook, the persistent install](docs/engineering/runbooks/local-supabase.md#the-persistent-install)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Backed up, then current
+  Given the persistent install behind the shipped migrations
+  When it is backed up and the guarded apply runs
+  Then a verified backup exists from before the apply, and readiness reports the schema ready with every shipped migration applied
+
+Scenario: A live pass inside the authorized cap
+  Given Sol's qualification ledger and its US$1.20 cap
+  When the full corpus runs live on Sol
+  Then every call was reserved at its worst case before it was sent, the committed total stays within the cap, and the report records each fixture's outcome
+
+Scenario: Today's result on Settings → Models
+  Given a passing live pass
+  When the owner opens Settings → Models
+  Then Sol shows qualified with limits, dated from today's pass, with its findings
+```
+
+Dependencies:
+- US-16.2
+
+Tasks:
+- [ ] Back up the install, then apply the pending migrations through the guarded path.
+- [ ] Run Sol's corpus live within its ledger, and record the report.
+- [ ] Record today's qualification in a migration, apply it, and check Settings → Models.
+
+Open Questions:
+- None.
+
+### US-16.5: Real examples on the install
+
+Status: BLOCKED
+
+As an owner
+I want real Experts, workflows, runs and an approval in my app
+So that every screen shows what the system actually does, like the Studio concepts.
+
+Source:
+- [Decision 0023, E6](docs/engineering/decisions/0023-install-current-and-real-examples.md#decision)
+- [Seed, SD-02](PRD-Studio.md#seed)
+- [Decision 0022, D1](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Experts and workflows
+  Given the install's owner workspace
+  When the concept seed runs
+  Then the Experts and workflows of SD-02 are there, and what the owner already had is unchanged
+
+Scenario: Real runs under a cap
+  Given US$0.45 reserved from the shared ledger
+  When two goal runs and one workflow execution run live, each limited to US$0.15
+  Then the runs end with their real outcome and artifacts, the spend stays within the reservation, and no key appears in stored rows or logs
+
+Scenario: A pending approval
+  Given the workflow execution reaching its approval gate
+  When the owner opens Approvals
+  Then the request is waiting, with its requester, run and exact fields
+```
+
+Dependencies:
+- US-16.4
+
+Tasks:
+- [ ] Seed the concept Experts and workflows into the owner workspace.
+- [ ] Add a guarded command that runs the example goals and workflow live under the shared ledger.
+- [ ] Check Runs, Experts, Workflows and Approvals show them.
 
 Open Questions:
 - None.
