@@ -537,11 +537,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.20#2 | Add the serif, density and reduce-motion preferences, stored in the browser and changing presentation only. | DONE | US-15.20 |
 | US-15.20#3 | Update `appearance.spec.ts` for System and the new preferences, under both OS schemes and with invalid and unavailable storage. | DONE | US-15.20 |
 | US-15.20#4 | Cover the scenarios in browser specs with axe in both themes. | DONE | US-15.20 |
-| US-15.21 | Settings sub-pages for notifications, data and keyboard | READY | EPIC-15 |
-| US-15.21#1 | Add a member-readable retention summary in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client and forward it through the BFF. | TODO | US-15.21 |
-| US-15.21#2 | Add the Settings sub-navigation and the Notifications, Data on this Mac and Keyboard pages. | TODO | US-15.21 |
-| US-15.21#3 | Raise browser notifications for runs entering waiting_approval or waiting_input while the app is open, only with the browser's permission and the setting on. | TODO | US-15.21 |
-| US-15.21#4 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.21 |
+| US-15.21 | Settings sub-pages for notifications, data and keyboard | DONE | EPIC-15 |
+| US-15.21#1 | Add a member-readable retention summary in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client and forward it through the BFF. | DONE | US-15.21 |
+| US-15.21#2 | Add the Settings sub-navigation and the Notifications, Data on this Mac and Keyboard pages. | DONE | US-15.21 |
+| US-15.21#3 | Raise browser notifications for runs entering waiting_approval or waiting_input while the app is open, only with the browser's permission and the setting on. | DONE | US-15.21 |
+| US-15.21#4 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.21 |
 | US-15.22 | Search palette | READY | EPIC-15 |
 | US-15.22#1 | Add one workspace-scoped search over run goals and the names of Experts, workflows and tools, with typed results, in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client and forward it through the BFF. | TODO | US-15.22 |
 | US-15.22#2 | Add the Search button with its key hint after the skip link, the ⌘K handler that ignores text fields, and the palette dialog with a listbox. | TODO | US-15.22 |
@@ -7030,7 +7030,8 @@ Open Questions:
 
 ### US-15.21: Settings sub-pages for notifications, data and keyboard
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-15-21-settings-sub-pages-notifications/`
 
 As a workspace member
 I want Settings divided into Appearance, Notifications, Account, Data on this Mac and Keyboard
@@ -7073,10 +7074,10 @@ Dependencies:
 - US-15.20
 
 Tasks:
-- [ ] Add a member-readable retention summary in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client and forward it through the BFF.
-- [ ] Add the Settings sub-navigation and the Notifications, Data on this Mac and Keyboard pages.
-- [ ] Raise browser notifications for runs entering waiting_approval or waiting_input while the app is open, only with the browser's permission and the setting on.
-- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+- [x] Add a member-readable retention summary in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client and forward it through the BFF.
+- [x] Add the Settings sub-navigation and the Notifications, Data on this Mac and Keyboard pages.
+- [x] Raise browser notifications for runs entering waiting_approval or waiting_input while the app is open, only with the browser's permission and the setting on.
+- [x] Cover the scenarios on a disposable stack and in browser specs with axe.
 
 Open Questions:
 - None.

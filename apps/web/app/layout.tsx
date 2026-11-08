@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { ThemeProvider } from "@/components/theme-provider";
+import { WaitingNotifier } from "@/components/waiting-notifier";
 
 import "./globals.css";
 
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <ThemeProvider>
           <AppShell>{children}</AppShell>
+          <WaitingNotifier />
         </ThemeProvider>
       </body>
     </html>

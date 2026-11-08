@@ -3621,6 +3621,57 @@ export const schemas = {
     "title": "RetentionSettings",
     "type": "object"
   },
+  "RetentionSummary": {
+    "additionalProperties": false,
+    "description": "PRD-Studio SE-06: the workspace's retention windows, which any member may read, and the\nreader's own role, so a page offers Operations to the owner only. Nothing here changes them.",
+    "properties": {
+      "receipt_days": {
+        "anyOf": [
+          {
+            "minimum": 1.0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Receipt Days"
+      },
+      "run_days": {
+        "anyOf": [
+          {
+            "minimum": 1.0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Run Days"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "viewer_role": {
+        "enum": [
+          "owner",
+          "member"
+        ],
+        "title": "Viewer Role",
+        "type": "string"
+      }
+    },
+    "required": [
+      "schema_version",
+      "run_days",
+      "receipt_days",
+      "viewer_role"
+    ],
+    "title": "RetentionSummary",
+    "type": "object"
+  },
   "RoleBinding": {
     "additionalProperties": false,
     "properties": {
@@ -8013,6 +8064,17 @@ export function parseRetentionSettings(value: unknown): RetentionSettings {
   return parseWith(schemas, "RetentionSettings", value) as RetentionSettings;
 }
 
+export interface RetentionSummary {
+  receipt_days: number | null;
+  run_days: number | null;
+  schema_version: 1;
+  viewer_role: "owner" | "member";
+}
+
+export function parseRetentionSummary(value: unknown): RetentionSummary {
+  return parseWith(schemas, "RetentionSummary", value) as RetentionSummary;
+}
+
 export interface RoleBinding {
   canonical_id: string;
   profile: ModelProfileId;
@@ -8960,6 +9022,10 @@ export async function updateProfile(options: ClientOptions, body: ProfileUpdate)
 
 export async function getReadiness(options: ClientOptions): Promise<MemberReadiness> {
   return parseMemberReadiness(await requestJson(options, "GET", `/v1/readiness`));
+}
+
+export async function getRetentionSummary(options: ClientOptions): Promise<RetentionSummary> {
+  return parseRetentionSummary(await requestJson(options, "GET", `/v1/retention`));
 }
 
 export async function listRoutines(options: ClientOptions): Promise<RoutineList> {

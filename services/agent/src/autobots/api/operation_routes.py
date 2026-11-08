@@ -55,6 +55,7 @@ from autobots.contracts.operations import (
     RestoreRecord,
     RetentionApplied,
     RetentionSettings,
+    RetentionSummary,
     ServiceReadiness,
 )
 from autobots.contracts.settings import RouteQualification
@@ -215,6 +216,24 @@ async def get_jobs_chart(request: Request, workspace_id: Owner) -> JobsChart:
             )
             for item in hours
         ],
+    )
+
+
+@router.get("/retention", operation_id="getRetentionSummary", response_model=RetentionSummary)
+async def get_retention_summary(
+    request: Request,
+    user_id: User,
+    workspace_id: Annotated[UUID, Depends(current_workspace)],
+) -> RetentionSummary:
+    """PRD-Studio SE-06: read-only for any member. Only the owner changes it, on Operations."""
+    role = await request.app.state.membership.role_in(user_id, workspace_id)
+    async with _pool(request).connection() as connection:
+        policy = await read_policy(connection, workspace_id)
+    return RetentionSummary(
+        schema_version=1,
+        run_days=policy.run_days,
+        receipt_days=policy.receipt_days,
+        viewer_role="owner" if role == "owner" else "member",
     )
 
 

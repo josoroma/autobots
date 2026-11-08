@@ -50,6 +50,18 @@ class RetentionSettings(BaseModel):
         return self
 
 
+class RetentionSummary(BaseModel):
+    """PRD-Studio SE-06: the workspace's retention windows, which any member may read, and the
+    reader's own role, so a page offers Operations to the owner only. Nothing here changes them."""
+
+    model_config = VIEW
+
+    schema_version: Literal[1]
+    run_days: int | None = Field(ge=1)
+    receipt_days: int | None = Field(ge=1)
+    viewer_role: Literal["owner", "member"]
+
+
 class DelayedOccurrence(BaseModel):
     """A routine occurrence that didn't run at its time, and the code for why."""
 

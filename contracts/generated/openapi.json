@@ -3620,6 +3620,57 @@
         "title": "RetentionSettings",
         "type": "object"
       },
+      "RetentionSummary": {
+        "additionalProperties": false,
+        "description": "PRD-Studio SE-06: the workspace's retention windows, which any member may read, and the\nreader's own role, so a page offers Operations to the owner only. Nothing here changes them.",
+        "properties": {
+          "receipt_days": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Days"
+          },
+          "run_days": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Days"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "viewer_role": {
+            "enum": [
+              "owner",
+              "member"
+            ],
+            "title": "Viewer Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "run_days",
+          "receipt_days",
+          "viewer_role"
+        ],
+        "title": "RetentionSummary",
+        "type": "object"
+      },
       "RoleBinding": {
         "additionalProperties": false,
         "properties": {
@@ -8996,6 +9047,86 @@
           }
         },
         "summary": "Get Readiness"
+      }
+    },
+    "/v1/retention": {
+      "get": {
+        "description": "PRD-Studio SE-06: read-only for any member. Only the owner changes it, on Operations.",
+        "operationId": "getRetentionSummary",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Retention Summary"
       }
     },
     "/v1/routines": {

@@ -256,3 +256,35 @@ def test_the_jobs_chart_holds_hourly_counts_by_outcome_only() -> None:
                 "in_progress": 0,
             }
         )
+
+
+class MemberOnly(Membership):
+    async def role_in(self, user_id: UUID, workspace_id: UUID) -> str | None:
+        return "member" if user_id == OWNER else None
+
+
+def test_any_member_reads_the_retention_summary_and_their_own_role(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def policy(_connection: object, _workspace: UUID) -> RetentionPolicy:
+        return RetentionPolicy(run_days=30, receipt_days=60)
+
+    monkeypatch.setattr(operation_routes, "read_policy", policy)
+    claims = {"sub": str(OWNER), "aud": "authenticated", "exp": time.time() + 60}
+    headers = {
+        "X-Autobots-Internal": INTERNAL,
+        "Authorization": f"Bearer {jwt.encode(claims, SECRET, algorithm='HS256')}",
+    }
+    for membership, role in ((MemberOnly(), "member"), (Membership(), "owner")):
+        app = create_app(SETTINGS, membership=membership)
+        app.state.pool = Pool()
+        client = TestClient(app, raise_server_exceptions=False)
+        reply = client.get("/v1/retention", headers=headers)
+        assert reply.status_code == 200, reply.text
+        assert reply.json() == {
+            "schema_version": 1,
+            "run_days": 30,
+            "receipt_days": 60,
+            "viewer_role": role,
+        }
+        assert client.put("/v1/retention", headers=headers, json={}).status_code == 405
