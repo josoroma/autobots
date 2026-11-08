@@ -566,10 +566,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.25#2 | Seed a workflow as a draft when a tool it needs is unavailable. | DONE | US-15.25 |
 | US-15.25#3 | Cover the scenarios on a disposable stack, including a double seed and a secret scan. | DONE | US-15.25 |
 | EPIC-16 | A current install with real examples | — | — |
-| US-16.1 | Sober control borders | READY | EPIC-16 |
-| US-16.1#1 | Replace the inset underline with a `--control-border` token for all four sides, at 3:1 in both themes. | TODO | US-16.1 |
-| US-16.1#2 | Give the composer's goal field the shared rounded border. | TODO | US-16.1 |
-| US-16.1#3 | Measure boundaries and focus in both themes with the visual walk. | TODO | US-16.1 |
+| US-16.1 | Sober control borders | DONE | EPIC-16 |
+| US-16.1#1 | Replace the inset underline with a `--control-border` token for all four sides, at 3:1 in both themes. | DONE | US-16.1 |
+| US-16.1#2 | Give the composer's goal field the shared rounded border, and drop the composer and sign-in cards' shadow. | DONE | US-16.1 |
+| US-16.1#3 | Measure boundaries and focus in both themes with the visual walk. | DONE | US-16.1 |
 | US-16.2 | Schema readiness against every shipped migration | READY | EPIC-16 |
 | US-16.2#1 | Record the shipped migration count and newest name, with a check that they match the directory. | TODO | US-16.2 |
 | US-16.2#2 | Compare the applied count in readiness, with schema_behind and schema_ahead. | TODO | US-16.2 |
@@ -1854,7 +1854,7 @@ flowchart TD
     US_16_1["US-16.1: Sober control borders"]
     T_16_1_1["US-16.1#1: Replace the inset underline with a `--control-border` token for all four sides, at 3:1 in both themes."]
     US_16_1 --> T_16_1_1
-    T_16_1_2["US-16.1#2: Give the composer&#x27;s goal field the shared rounded border."]
+    T_16_1_2["US-16.1#2: Give the composer&#x27;s goal field the shared rounded border, and drop the composer and sign-in cards&#x27; shadow."]
     US_16_1 --> T_16_1_2
     T_16_1_3["US-16.1#3: Measure boundaries and focus in both themes with the visual walk."]
     US_16_1 --> T_16_1_3
@@ -7374,7 +7374,8 @@ Scheduled by [Decision 0023](docs/engineering/decisions/0023-install-current-and
 
 ### US-16.1: Sober control borders
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-16-1-sober-control-borders/`
 
 As a workspace member
 I want text fields and menus drawn with one even, quiet border like the other components
@@ -7396,7 +7397,7 @@ Scenario: One even border and no underline
 Scenario: The composer's goal field matches
   Given Home's composer
   When it is shown
-  Then the goal field has the same rounded, even border as the other controls
+  Then the goal field has the same rounded, even border as the other controls, and the composer card, like the sign-in card, has no drop shadow, as other cards don't
 
 Scenario: Still accessible
   Given every screen the visual walk covers, in dark and light
@@ -7408,9 +7409,9 @@ Dependencies:
 - None
 
 Tasks:
-- [ ] Replace the inset underline with a `--control-border` token for all four sides, at 3:1 in both themes.
-- [ ] Give the composer's goal field the shared rounded border.
-- [ ] Measure boundaries and focus in both themes with the visual walk.
+- [x] Replace the inset underline with a `--control-border` token for all four sides, at 3:1 in both themes.
+- [x] Give the composer's goal field the shared rounded border, and drop the composer and sign-in cards' shadow.
+- [x] Measure boundaries and focus in both themes with the visual walk.
 
 Open Questions:
 - None.

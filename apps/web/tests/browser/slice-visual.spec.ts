@@ -59,6 +59,7 @@ interface Measured {
   text_failures: unknown[];
   boundaries: unknown[];
   boundary_failures: unknown[];
+  shadowed_cards: string[];
   raw_controls: unknown[];
   focus_stops: unknown[];
   focus_failures: unknown[];
@@ -176,7 +177,12 @@ window.__contrast = (() => {
         const underline = shadow ? over(rgba(shadow), behind(element)) : null;
         const ratios = [ratio(border, outside)];
         if (underline) ratios.push(ratio(underline, behind(element)));
-        return { slot: element.dataset.slot || "raw", label: element.id || element.name || element.tagName, ratio: Math.max(...ratios), border: ratios[0] };
+        // Decision 0023 E1: one even border on all four sides, and no inset underline.
+        const sides = [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth];
+        const colors = [style.borderTopColor, style.borderRightColor, style.borderBottomColor, style.borderLeftColor];
+        const even = new Set(sides).size === 1 && new Set(colors).size === 1 && parseFloat(sides[0]) > 0;
+        return { slot: element.dataset.slot || "raw", label: element.id || element.name || element.tagName, ratio: Math.max(...ratios), border: ratios[0],
+                 underline: shadow !== undefined && document.activeElement !== element, even };
       });
   const rawControls = () =>
     [...document.querySelectorAll("input:not([type=hidden]), select, textarea")]
@@ -661,7 +667,14 @@ async function measure(
   // First, from the top of the page. Any focus before this would move where Tab starts from.
   const keyboard = await walkKeyboard(page);
   type Text = { sample: string; ratio: number; need: number };
-  type Boundary = { slot: string; label: string; ratio: number };
+  type Boundary = {
+    slot: string;
+    label: string;
+    ratio: number;
+    border: number;
+    underline: boolean;
+    even: boolean;
+  };
   type Stop = { element: string; outline_width: string; ratio: number };
   const text = (await page.evaluate("window.__contrast.text()")) as Text[];
   const boundaries = (await page.evaluate(
@@ -724,8 +737,11 @@ async function measure(
     text_failures: text.filter((item) => item.ratio < item.need),
     boundaries,
     boundary_failures: boundaries.filter(
-      (item) => item.ratio < NON_TEXT_MINIMUM,
+      (item) => item.border < NON_TEXT_MINIMUM || item.underline || !item.even,
     ),
+    shadowed_cards: (await page.evaluate(
+      "[...document.querySelectorAll('main section')].filter((element) => getComputedStyle(element).boxShadow !== 'none').map((element) => element.getAttribute('aria-labelledby') || element.className.slice(0, 60))",
+    )) as string[],
     raw_controls: raw,
     focus_stops: stops,
     focus_failures: stops.filter((item) => item.ratio < NON_TEXT_MINIMUM),
@@ -809,6 +825,7 @@ test("every named surface is captured in both themes, with measured contrast and
     (item) =>
       item.text_failures.length ||
       item.boundary_failures.length ||
+      item.shadowed_cards.length ||
       item.focus_failures.length ||
       (item.hover !== null && item.hover.ratio < TEXT_MINIMUM) ||
       item.axe_violations.length ||

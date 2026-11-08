@@ -8,7 +8,7 @@ export default function SignInPage() {
       <h1 className="text-center text-[32px] leading-tight">Sign in</h1>
       <Card
         aria-labelledby="sign-in-heading"
-        className="border-input space-y-5 rounded-2xl p-6 shadow-lg dark:shadow-black/60"
+        className="space-y-5 rounded-2xl p-6"
       >
         <div className="space-y-1">
           <h2 id="sign-in-heading" className="text-base font-medium">

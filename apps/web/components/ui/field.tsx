@@ -6,8 +6,9 @@ import { cn } from "@/lib/utils";
 // Every form control in the app, DS-03: `input`, `border` and `ring`, with visible keyboard focus. Focus
 // itself comes from `:focus-visible` in globals.css. `data-slot` lets a check tell these from a raw control.
 // Studio shapes (Decision 0021): controls sit on the page surface in light and a muted fill in dark.
+// Decision 0023 E1: one even border on all four sides, just at DS-03's 3:1, and no inset underline.
 const CONTROL =
-  "bg-background dark:bg-muted/60 text-foreground border-input control-boundary block w-full border px-3 py-2 text-sm disabled:opacity-60";
+  "bg-background dark:bg-muted/60 text-foreground border-control block w-full border px-3 py-2 text-sm disabled:opacity-60";
 
 export function Input({ className, ...props }: ComponentProps<"input">) {
   return (

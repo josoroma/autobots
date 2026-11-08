@@ -343,7 +343,7 @@ export function GoalComposer() {
   return (
     <Card
       aria-labelledby="composer-heading"
-      className="border-input flex flex-col rounded-2xl p-0 shadow-lg dark:shadow-black/60"
+      className="flex flex-col rounded-2xl p-0"
     >
       <CardHeader className="px-5 pt-5">
         <div className="min-w-0 flex-1 space-y-0.5">
@@ -369,7 +369,7 @@ export function GoalComposer() {
           value={draft}
           onChange={(event) => update(event.target.value)}
           rows={4}
-          className="min-h-28 resize-y rounded-none border-transparent bg-transparent px-0 text-base leading-relaxed dark:bg-transparent"
+          className="min-h-28 resize-y text-base leading-relaxed"
         />
       </div>
       <div

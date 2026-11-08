@@ -4,13 +4,19 @@
  * for a person (pending approvals, requested input, drafts) and always sits beside words.
  * Measured (WCAG 2.1): light 5.8:1 on --background, 5.3:1 on --muted; dark 11.5:1 on --background,
  * 10.4:1 on --card. --attention-foreground on --attention: light 5.8:1, dark 10.3:1.
+ *
+ * Decision 0023 E1: `--control-border` is the one even border of Input, Textarea and Select, set no
+ * stronger than DS-03's 3:1 non-text contrast needs. Light 3.4:1 on --background and --card, 3.1:1 on
+ * --muted; dark 4.2:1 on --background, 3.8:1 on --card, 3.2:1 on --muted.
  */
 :root {
   --attention: oklch(0.52 0.13 55);
   --attention-foreground: oklch(1 0 0);
+  --control-border: oklch(0.64 0 0);
 }
 
 .dark {
   --attention: oklch(0.828 0.189 84.429);
   --attention-foreground: oklch(0.21 0.02 70);
+  --control-border: oklch(0.556 0 0);
 }

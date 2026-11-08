@@ -47,6 +47,7 @@ html[data-density="compact"] {
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-control: var(--control-border);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -100,9 +101,6 @@ html[data-density="compact"] {
   }
   /* US-11.11: `--input` as a border measures 1.26:1 in light and 1.57:1 in dark, under 3:1. It stays,
      and this edge is what identifies the control. Focus replaces it with the indicator above. */
-  .control-boundary:not(:focus-visible) {
-    box-shadow: inset 0 -1px 0 var(--muted-foreground);
-  }
   @media (prefers-reduced-motion: reduce) {
     * {
       transition-duration: 0.01ms !important;
