@@ -40,6 +40,13 @@ The repository turned out to have no commits, so a pull request had nothing to b
 
 The runner reads only those two variables from `.env`, into its own process, and prints neither. It still refuses a public repository or a token with classic scopes. This authorizes that one pass, not later live use.
 
+## Streaming decision
+
+On 2026-11-08 the owner decided, for US-15.24, that the worker sends **every** model call as a streamed request, so a result's text can be shown while it's written (D4).
+- **Accounting:** spend is still settled from the assembled reply's reported usage and cost.
+- **Failures:** a stream that fails after its first chunk is classed `partial_stream`, so it is reconciled, never retried blind.
+- **Not yet qualified live:** streamed product calls aren't qualified against a live route. That needs its own capped authorization, and no paid call is made for this story.
+
 ## What this gives up
 
 - **DS-02's single dark default for everyone.** A person who picks System gets light whenever their Mac is light.

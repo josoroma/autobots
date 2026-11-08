@@ -5,7 +5,7 @@ rotation reaches the next call without a restart, and no key or client can reach
 """
 
 import logging
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -174,6 +174,23 @@ class AttemptModel:
             target = client.bind_tools(self._tools, **self._tool_options)
         try:
             return await target.ainvoke(messages, stop=stop, **kwargs)
+        except Exception as error:
+            if getattr(error, "status_code", None) == 401:
+                await self._source.reject_key(self._workspace_id, used)
+            raise
+
+    async def astream(self, messages: Any, stop: Any = None, **kwargs: Any) -> AsyncIterator[Any]:
+        """The same attempt, streamed (Decision 0022's streaming decision). The caller assembles the
+        chunks, so the ledger settles from the same usage and cost the whole reply reports."""
+        client, used = await self._source.open_attempt(
+            self._workspace_id, self._policy, reserved_micro_usd=self._reserved, role=self._role
+        )
+        target = client
+        if self._tools is not None:
+            target = client.bind_tools(self._tools, **self._tool_options)
+        try:
+            async for chunk in target.astream(messages, stop=stop, **kwargs):
+                yield chunk
         except Exception as error:
             if getattr(error, "status_code", None) == 401:
                 await self._source.reject_key(self._workspace_id, used)

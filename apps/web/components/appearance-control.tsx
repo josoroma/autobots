@@ -81,16 +81,18 @@ const OPTION =
 
 // PRD-Studio SE-03: presentation only, stored in this browser. The page applies a saved choice before
 // paint (see app/layout.tsx), and each change here sets the same attribute on the root element.
-type Preference = "serif" | "density" | "motion";
+type Preference = "serif" | "density" | "motion" | "stream";
 const DEFAULTS: Record<Preference, string> = {
   serif: "on",
   density: "comfortable",
   motion: "system",
+  stream: "on",
 };
 const ATTRIBUTE_VALUE: Record<Preference, string> = {
   serif: "off",
   density: "compact",
   motion: "reduce",
+  stream: "off",
 };
 
 function read(preference: Preference): string {
@@ -148,6 +150,7 @@ export function AppearanceControl() {
   const [serif, setSerif] = usePreference("serif", mounted);
   const [density, setDensity] = usePreference("density", mounted);
   const [motion, setMotion] = usePreference("motion", mounted);
+  const [stream, setStream] = usePreference("stream", mounted);
   return (
     <div className="min-w-0 space-y-6">
       <fieldset className="min-w-0">
@@ -186,6 +189,15 @@ export function AppearanceControl() {
             onChange={(event) => setSerif(event.target.checked ? "on" : "off")}
           />
           Serif for documents
+        </label>
+        <label className={cn(OPTION, "mt-2.5 max-w-lg")}>
+          <Choice
+            type="checkbox"
+            checked={stream === "on"}
+            disabled={!mounted}
+            onChange={(event) => setStream(event.target.checked ? "on" : "off")}
+          />
+          Stream text as it&apos;s written
         </label>
         <p
           data-field="document-sample"

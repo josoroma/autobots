@@ -9,6 +9,7 @@ import math
 import os
 import shutil
 import socket
+import stat
 import time
 from collections import deque
 from dataclasses import dataclass
@@ -355,35 +356,35 @@ def loopback_only(fds: Any = None) -> bool | None:
         return None
     bound: list[str] = []
     for fd in descriptors:
+        # Only sockets are looked at, and none is duplicated or closed: macOS kills a process that
+        # duplicates or closes one of its guarded descriptors, such as the event loop's kqueue.
         try:
-            # A duplicate, so closing it leaves the process's own descriptor alone.
-            duplicate = os.dup(fd)
+            if not stat.S_ISSOCK(os.fstat(fd).st_mode):
+                continue
+            probe = socket.socket(fileno=fd)
         except OSError:
-            continue
-        try:
-            probe = socket.socket(fileno=duplicate)
-        except OSError:
-            os.close(duplicate)
             continue
         address: Any = None
-        with probe:
-            try:
-                if probe.type != socket.SOCK_STREAM or probe.family not in (
-                    socket.AF_INET,
-                    socket.AF_INET6,
-                ):
-                    continue
-                address = probe.getsockname()
-                if address[1] == 0:
-                    continue
-                # A connection has a peer. A bound socket without one is a listener, since macOS
-                # doesn't answer SO_ACCEPTCONN.
-                probe.getpeername()
+        try:
+            if probe.type != socket.SOCK_STREAM or probe.family not in (
+                socket.AF_INET,
+                socket.AF_INET6,
+            ):
                 continue
-            except OSError as error:
-                if error.errno != errno.ENOTCONN or address is None:
-                    continue
+            address = probe.getsockname()
+            if address[1] == 0:
+                continue
+            # A connection has a peer. A bound socket without one is a listener, since macOS
+            # doesn't answer SO_ACCEPTCONN.
+            probe.getpeername()
+            continue
+        except OSError as error:
+            if error.errno != errno.ENOTCONN or address is None:
+                continue
             bound.append(str(address[0]))
+        finally:
+            # Hands the descriptor back untouched, as this probe never owned it.
+            probe.detach()
     if not bound:
         return None
     return all(_is_loopback(address) for address in bound)

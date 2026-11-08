@@ -111,6 +111,19 @@ class ToolUseCompleted(BaseModel):
     operation_id: str | None
 
 
+class ResultTextDelta(BaseModel):
+    """US-15.24, PRD-Studio ST-01: result text while it's written. Ephemeral and coalesced: it is
+    only ever sent live and never stored, and the stored artifact is what counts. `segment` numbers
+    each result file a run writes; `offset` is where in that file's text this piece begins."""
+
+    model_config = STRICT_CONTRACT
+
+    type: Literal["result.text.delta"]
+    segment: int = Field(ge=1)
+    offset: int = Field(ge=0)
+    text: str = Field(min_length=1, max_length=2000)
+
+
 class RunEvent(BaseModel):
     """The sanitized public envelope from SP-011. Payloads are typed, so nothing raw can pass."""
 
@@ -130,6 +143,7 @@ class RunEvent(BaseModel):
         | EffectReconciled
         | ToolUseStarted
         | ToolUseCompleted
+        | ResultTextDelta
     )
 
 

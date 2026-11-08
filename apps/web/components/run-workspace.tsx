@@ -108,9 +108,36 @@ function describe(event: RunEvent): string {
   if (payload.type === "tool.use.completed") {
     return `Tool ${payload.tool_id} ${payload.outcome}${payload.code ? ` (${payload.code})` : ""}`;
   }
+  if (payload.type === "result.text.delta") return "Result text";
   return payload.type === "artifact.published"
     ? `Artifact ${payload.name} published`
     : `Artifact ${payload.name} is missing`;
+}
+
+// US-15.24, PRD-Studio SE-03: "Stream text as it's written", on unless turned off in this browser.
+// The Appearance control and the before-paint script both set this root attribute.
+function streamWanted(): boolean {
+  return document.documentElement.dataset.stream !== "off";
+}
+
+type LiveText = { segment: number; text: string; joined: boolean };
+
+// A live piece extends the text only where it continues it. One that starts later, after a reconnect,
+// is shown as joined partway, and the stored artifact replaces it all once it's published.
+function withDelta(
+  current: LiveText | null,
+  delta: { segment: number; offset: number; text: string },
+): LiveText {
+  if (current === null || current.segment !== delta.segment)
+    return {
+      segment: delta.segment,
+      text: delta.text,
+      joined: delta.offset > 0,
+    };
+  if (delta.offset + delta.text.length <= current.text.length) return current;
+  if (delta.offset === current.text.length)
+    return { ...current, text: current.text + delta.text };
+  return { ...current, text: current.text + delta.text, joined: true };
 }
 
 // Decision 0017 Q13: an event type this page doesn't know is skipped, never an error.
@@ -131,6 +158,12 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
   const [unavailable, setUnavailable] = useState(false);
   const [gap, setGap] = useState(false);
   const [refreshes, setRefreshes] = useState(0);
+  const [live, setLive] = useState<LiveText | null>(null);
+  const [result, setResult] = useState<{
+    id: string;
+    name: string;
+    text: string;
+  } | null>(null);
 
   useEffect(() => {
     let closed = false;
@@ -175,6 +208,15 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
         if (event === null || event.sequence <= cursor) return;
         add([event]);
         void refresh();
+      });
+      // US-15.24: result text while it's written. Never stored, so never part of the timeline.
+      source.addEventListener("live", (message) => {
+        const event = known(JSON.parse(message.data as string));
+        if (event === null || event.payload.type !== "result.text.delta")
+          return;
+        if (!streamWanted()) return;
+        const delta = event.payload;
+        setLive((current) => withDelta(current, delta));
       });
       source.addEventListener("cursor", (message) => {
         cursor = Math.max(
@@ -236,6 +278,40 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
       source?.close();
     };
   }, [runId]);
+
+  // The stored artifact is the result: the newest published one replaces any live text.
+  const published = [...events.values()]
+    .filter((event) => event.payload.type === "artifact.published")
+    .sort((a, b) => b.sequence - a.sequence)[0];
+  const publishedId =
+    published?.payload.type === "artifact.published"
+      ? published.payload.artifact_id
+      : null;
+  const publishedName =
+    published?.payload.type === "artifact.published"
+      ? published.payload.name
+      : "";
+  useEffect(() => {
+    if (publishedId === null) return;
+    let active = true;
+    fetch(`/api/v1/artifacts/${encodeURIComponent(publishedId)}/download`, {
+      cache: "no-store",
+    })
+      .then(async (reply) => {
+        if (!active || !reply.ok) return;
+        const type = reply.headers.get("content-type") ?? "";
+        if (!type.startsWith("text/") && !type.startsWith("application/json"))
+          return;
+        const text = await reply.text();
+        if (!active) return;
+        setResult({ id: publishedId, name: publishedName, text });
+        setLive(null);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [publishedId, publishedName]);
 
   // After a page's own action, without waiting for the next event.
   useEffect(() => {
@@ -394,6 +470,46 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
                   </div>
                 </div>
               )}
+            </Section>
+          )}
+          {result === null && live === null ? null : (
+            <Section id="result-heading" title="Result">
+              {result !== null ? (
+                <div className="space-y-1.5">
+                  <p className="text-muted-foreground text-[12.5px]">
+                    {result.name}, as stored.
+                  </p>
+                  <pre
+                    data-field="result-text"
+                    className="font-document max-h-[60vh] overflow-auto text-[15px] leading-relaxed break-words whitespace-pre-wrap"
+                    tabIndex={0}
+                    role="region"
+                    aria-label={`Result ${result.name}`}
+                  >
+                    {result.text}
+                  </pre>
+                </div>
+              ) : live !== null ? (
+                <div className="space-y-1.5">
+                  <p
+                    data-field="live-note"
+                    className="text-muted-foreground text-[12.5px]"
+                  >
+                    {live.joined
+                      ? "Being written. Joined partway; the stored result replaces this."
+                      : "Being written. The stored result replaces this when it's saved."}
+                  </p>
+                  <pre
+                    data-field="live-result"
+                    className="font-document max-h-[60vh] overflow-auto text-[15px] leading-relaxed break-words whitespace-pre-wrap"
+                    tabIndex={0}
+                    role="region"
+                    aria-label="Result being written"
+                  >
+                    {live.text}
+                  </pre>
+                </div>
+              ) : null}
             </Section>
           )}
           <Section id="goal-heading" title="Goal">

@@ -550,11 +550,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.23#1 | Add the New run button with its key hint after the skip link, and the shortcut handler that ignores text fields. | DONE | US-15.23 |
 | US-15.23#2 | Update `appearance.spec.ts`'s tab-order assertion so the skip link stays first. | DONE | US-15.23 |
 | US-15.23#3 | Cover the scenarios in browser specs with axe. | DONE | US-15.23 |
-| US-15.24 | Streaming result text | READY | EPIC-15 |
-| US-15.24#1 | Emit ephemeral, coalesced `result.text.delta` events for the final result's text only, on the live stream and never into durable events. | TODO | US-15.24 |
-| US-15.24#2 | Add the event type to the typed union, the generated client and the consumer in the same change, with the consumer ignoring unknown types. | TODO | US-15.24 |
-| US-15.24#3 | Add the "Stream text as it's written" preference to Appearance, and honor it in the run view. | TODO | US-15.24 |
-| US-15.24#4 | Cover the scenarios with a scripted model on a disposable stack, including a scan for reasoning, tool arguments and secrets. | TODO | US-15.24 |
+| US-15.24 | Streaming result text | DONE | EPIC-15 |
+| US-15.24#1 | Emit ephemeral, coalesced `result.text.delta` events for the final result's text only, on the live stream and never into durable events. | DONE | US-15.24 |
+| US-15.24#2 | Add the event type to the typed union, the generated client and the consumer in the same change, with the consumer ignoring unknown types. | DONE | US-15.24 |
+| US-15.24#3 | Add the "Stream text as it's written" preference to Appearance, and honor it in the run view. | DONE | US-15.24 |
+| US-15.24#4 | Cover the scenarios with a scripted model on a disposable stack, including a scan for reasoning, tool arguments and secrets. | DONE | US-15.24 |
 | US-15.25 | Concept Experts and workflows seed | READY | EPIC-15 |
 | US-15.25#1 | Add a repeatable seed, kept apart from migrations, that targets a named workspace with bounded upserts and no user-edit overwrites. | TODO | US-15.25 |
 | US-15.25#2 | Seed a workflow as a draft when a tool it needs is unavailable. | TODO | US-15.25 |
@@ -7177,7 +7177,8 @@ Open Questions:
 
 ### US-15.24: Streaming result text
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-15-24-streaming-result-text/`
 
 As a run's owner
 I want to see the final result while it's being written, and a preference to turn that off
@@ -7221,10 +7222,10 @@ Dependencies:
 - US-4.6
 
 Tasks:
-- [ ] Emit ephemeral, coalesced `result.text.delta` events for the final result's text only, on the live stream and never into durable events.
-- [ ] Add the event type to the typed union, the generated client and the consumer in the same change, with the consumer ignoring unknown types.
-- [ ] Add the "Stream text as it's written" preference to Appearance, and honor it in the run view.
-- [ ] Cover the scenarios with a scripted model on a disposable stack, including a scan for reasoning, tool arguments and secrets.
+- [x] Emit ephemeral, coalesced `result.text.delta` events for the final result's text only, on the live stream and never into durable events.
+- [x] Add the event type to the typed union, the generated client and the consumer in the same change, with the consumer ignoring unknown types.
+- [x] Add the "Stream text as it's written" preference to Appearance, and honor it in the run view.
+- [x] Cover the scenarios with a scripted model on a disposable stack, including a scan for reasoning, tool arguments and secrets.
 
 Open Questions:
 - None.

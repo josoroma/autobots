@@ -1012,12 +1012,18 @@ test("changing appearance sends no model or task request, and changes no run or 
   await page.getByRole("checkbox", { name: "Serif for documents" }).uncheck();
   await page.getByRole("radio", { name: "Compact" }).check();
   await page.getByRole("radio", { name: "Always reduce motion" }).check();
+  await page
+    .getByRole("checkbox", { name: "Stream text as it's written" })
+    .uncheck();
   await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
   await expect(page.locator("html")).toHaveAttribute("data-motion", "reduce");
   await expect(page.locator("html")).toHaveAttribute("data-serif", "off");
   await page.getByRole("checkbox", { name: "Serif for documents" }).check();
   await page.getByRole("radio", { name: "Comfortable" }).check();
   await page.getByRole("radio", { name: "Follow this Mac" }).check();
+  await page
+    .getByRole("checkbox", { name: "Stream text as it's written" })
+    .check();
   await page.getByLabel("Dark").check();
   await expect(page.locator("html")).toHaveClass(/dark/);
   await page.waitForTimeout(500);

@@ -3539,6 +3539,41 @@
         "title": "RestoreRecord",
         "type": "object"
       },
+      "ResultTextDelta": {
+        "additionalProperties": false,
+        "description": "US-15.24, PRD-Studio ST-01: result text while it's written. Ephemeral and coalesced: it is\nonly ever sent live and never stored, and the stored artifact is what counts. `segment` numbers\neach result file a run writes; `offset` is where in that file's text this piece begins.",
+        "properties": {
+          "offset": {
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          },
+          "segment": {
+            "minimum": 1,
+            "title": "Segment",
+            "type": "integer"
+          },
+          "text": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          },
+          "type": {
+            "const": "result.text.delta",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "segment",
+          "offset",
+          "text"
+        ],
+        "title": "ResultTextDelta",
+        "type": "object"
+      },
       "RetentionApplied": {
         "additionalProperties": false,
         "properties": {
@@ -4215,6 +4250,9 @@
               },
               {
                 "$ref": "#/components/schemas/ToolUseCompleted"
+              },
+              {
+                "$ref": "#/components/schemas/ResultTextDelta"
               }
             ],
             "title": "Payload"

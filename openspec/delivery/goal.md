@@ -35,24 +35,24 @@ markers are preserved across refreshes.
 | 14 | US-15.14 | us-15-14-github-read-tools-issue | DONE | GitHub read tools and issue labels on one repository |
 | 15 | US-15.15 | us-15-15-approval-gated-pull-request | DONE | Approval-gated pull-request connector |
 | 16 | US-15.16 | us-15-16-live-github-qualification-configured | DONE | Live GitHub qualification on the configured repository |
-| 17 | US-15.17 | us-15-17-run-side-panel-plan | IN PROGRESS | Run side panel and plan task timing |
-| 18 | US-15.18 | us-15-18-operations-verdict-check-detail | READY | Operations verdict and check detail |
-| 19 | US-15.19 | us-15-19-operations-jobs-chart | BLOCKED | Operations jobs chart |
-| 20 | US-15.20 | us-15-20-appearance-preferences-system-theme | READY | Appearance preferences with a System theme |
-| 21 | US-15.21 | us-15-21-settings-sub-pages-notifications | BLOCKED | Settings sub-pages for notifications, data and keyboard |
-| 22 | US-15.22 | us-15-22-search-palette | READY | Search palette |
-| 23 | US-15.23 | us-15-23-new-run-shortcut | READY | New run shortcut |
-| 24 | US-15.24 | us-15-24-streaming-result-text | BLOCKED | Streaming result text |
+| 17 | US-15.17 | us-15-17-run-side-panel-plan | DONE | Run side panel and plan task timing |
+| 18 | US-15.18 | us-15-18-operations-verdict-check-detail | DONE | Operations verdict and check detail |
+| 19 | US-15.19 | us-15-19-operations-jobs-chart | DONE | Operations jobs chart |
+| 20 | US-15.20 | us-15-20-appearance-preferences-system-theme | DONE | Appearance preferences with a System theme |
+| 21 | US-15.21 | us-15-21-settings-sub-pages-notifications | DONE | Settings sub-pages for notifications, data and keyboard |
+| 22 | US-15.22 | us-15-22-search-palette | DONE | Search palette |
+| 23 | US-15.23 | us-15-23-new-run-shortcut | DONE | New run shortcut |
+| 24 | US-15.24 | us-15-24-streaming-result-text | IN PROGRESS | Streaming result text |
 | 25 | US-15.25 | us-15-25-concept-experts-workflows-seed | READY | Concept Experts and workflows seed |
 
 ## Next Action
 
-Action: implement
-Story: US-15.17
-Change: us-15-17-run-side-panel-plan
+Action: propose
+Story: US-15.24
+Change: us-15-24-streaming-result-text
 Owner: main-session
-Command: /ohmyorch:opsx-apply us-15-17-run-side-panel-plan
-Reason: gate implementation: 3/4 tasks complete
+Command: /ohmyorch:opsx-propose us-15-24-streaming-result-text
+Reason: gate planning: missing: proposal.md, specs/, tasks.md
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

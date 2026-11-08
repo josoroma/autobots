@@ -72,6 +72,7 @@ sys.addaudithook(guarded_connect)
 from autobots.adapters.models.factory import default_sdk_client  # noqa: E402
 from autobots.application.compaction import SUMMARY_MARKER  # noqa: E402
 from autobots.domain.models import PROFILES, ModelProfileId  # noqa: E402
+from autobots.operations.fake_stream import completion_to_sse  # noqa: E402
 from autobots.operations.reasoning_trial import continuation_result  # noqa: E402
 from autobots.operations.worker import main  # noqa: E402
 
@@ -191,8 +192,12 @@ def handle(request: httpx.Request) -> httpx.Response:
         # Cut off mid tool call, as a real model could be: its arguments aren't valid JSON.
         cut = {'id': 'call-cut', 'type': 'function', 'function': {'name': 'save_artifact', 'arguments': '{"path": "outputs/rep'}}
         choice = {'index': 0, 'finish_reason': 'length', 'message': {'role': 'assistant', 'content': None, 'tool_calls': [cut]}}
-    return httpx.Response(200, json={'id': 'fake', 'object': 'chat.completion', 'created': 1, 'model': body['model'],
-                                     'system_fingerprint': 'fake', 'choices': [choice], 'usage': usage})
+    completion = {'id': 'fake', 'object': 'chat.completion', 'created': 1, 'model': body['model'],
+                  'system_fingerprint': 'fake', 'choices': [choice], 'usage': usage}
+    if body.get('stream'):
+        # Every worker call streams (Decision 0022's streaming decision), so this answers in chunks.
+        return httpx.Response(200, content=completion_to_sse(completion), headers={'content-type': 'text/event-stream'})
+    return httpx.Response(200, json=completion)
 
 
 def client_factory(key: str) -> Any:

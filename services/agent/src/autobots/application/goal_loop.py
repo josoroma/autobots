@@ -36,6 +36,7 @@ from autobots.adapters.loop_middleware import (
 )
 from autobots.adapters.market_data import MARKET_TOOLS
 from autobots.adapters.remote_files import STORE_REMOTE_FILE
+from autobots.adapters.result_stream import ResultTap, reset_tap, use_tap
 from autobots.adapters.tavily import TAVILY_TOOLS
 from autobots.adapters.tool_middleware import GatewayMiddleware, visible_tools
 from autobots.application.approvals import expire_due
@@ -345,7 +346,14 @@ async def run_goal(
             )
             state = await agent.aget_state(run_config)
             payload = None if state.next else {"messages": [HumanMessage(_opening(goal))]}
-            await agent.ainvoke(payload, run_config, durability=DURABILITY)
+            # US-15.24: this run's result text, live, while its model calls stream.
+            tap = ResultTap(lease.run_id, database_url)
+            tapped = use_tap(tap)
+            try:
+                await agent.ainvoke(payload, run_config, durability=DURABILITY)
+            finally:
+                reset_tap(tapped)
+                await tap.close()
     except LoopStopped as stopped:
         code = stopped.code
     except GraphRecursionError:

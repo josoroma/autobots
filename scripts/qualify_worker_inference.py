@@ -44,7 +44,8 @@ RETRY_AFTER = 3
 
 
 # What a Terra request may carry, MP-07's unadvertised sampler and parallel-tool flags left out.
-REQUEST_FIELDS = frozenset({'model', 'messages', 'tools', 'tool_choice', 'max_tokens', 'provider', 'stream'})
+# Every call streams (Decision 0022's streaming decision), asking for usage in its last chunk.
+REQUEST_FIELDS = frozenset({'model', 'messages', 'tools', 'tool_choice', 'max_tokens', 'provider', 'stream', 'stream_options'})
 REASONING_EFFORTS = frozenset({'minimal', 'low', 'medium', 'high'})
 
 

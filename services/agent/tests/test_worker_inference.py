@@ -84,6 +84,7 @@ from autobots.domain.models import (
     UnknownModelProfile,
 )
 from autobots.operations import worker
+from autobots.operations.fake_stream import completion_to_sse
 from autobots.operations.logs import JsonFormatter, redact
 from fake_openrouter import ARRANGED_KEY, DEEPSEEK_WIRE_ID, TERRA_WIRE_ID
 
@@ -272,18 +273,23 @@ class Fake:
             ],
         }
         choice = {"index": 0, "finish_reason": "tool_calls", "message": message}
-        return httpx.Response(
-            200,
-            json={
-                "id": "fake",
-                "object": "chat.completion",
-                "created": 1,
-                "model": self.bodies[-1]["model"],
-                "system_fingerprint": "fake",
-                "choices": [choice],
-                "usage": usage,
-            },
-        )
+        completion = {
+            "id": "fake",
+            "object": "chat.completion",
+            "created": 1,
+            "model": self.bodies[-1]["model"],
+            "system_fingerprint": "fake",
+            "choices": [choice],
+            "usage": usage,
+        }
+        if self.bodies[-1].get("stream"):
+            # Every worker call streams (Decision 0022's streaming decision).
+            return httpx.Response(
+                200,
+                content=completion_to_sse(completion),
+                headers={"content-type": "text/event-stream"},
+            )
+        return httpx.Response(200, json=completion)
 
     def client(self, key: str) -> openrouter.OpenRouter:
         self.clients += 1

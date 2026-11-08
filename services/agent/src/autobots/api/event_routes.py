@@ -3,12 +3,15 @@
 import asyncio
 import json
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from typing import Annotated, Any
 from uuid import UUID
 
+import psycopg
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 
+from autobots.adapters.result_stream import CHANNEL as RESULT_CHANNEL
 from autobots.api.errors import ApiError
 from autobots.api.security import require_internal
 from autobots.api.settings_routes import current_workspace
@@ -29,7 +32,7 @@ from autobots.contracts.run_workspace import (
     RunListGroup,
     RunWorkspace,
 )
-from autobots.contracts.runs import ToolUseList
+from autobots.contracts.runs import ResultTextDelta, RunEvent, ToolUseList
 from autobots.domain.models import ModelProfileId
 from autobots.domain.runs import TERMINAL, RunStatus
 
@@ -124,8 +127,63 @@ async def get_tool_uses(
     return found
 
 
+async def _listener(request: Request) -> Any:
+    """US-15.24: this stream's own connection, listening for live result text. None when the API
+    has no database address, as under a test client; then only durable events flow."""
+    settings = getattr(request.app.state, "settings", None)
+    url = settings.database_url.get_secret_value() if settings is not None else ""
+    if not url:
+        return None
+    try:
+        connection = await psycopg.AsyncConnection.connect(url, autocommit=True)
+        await connection.execute(f"listen {RESULT_CHANNEL}")
+    except psycopg.Error:
+        return None
+    return connection
+
+
+def _live_frame(run_id: UUID, cursor: int, payload: str) -> str | None:
+    """Only this run's text, re-validated as the typed delta. Sent as `live`, with no `id:`, so it
+    never moves the browser's replay cursor; `sequence` names the durable event it follows."""
+    try:
+        note = json.loads(payload)
+    except ValueError:
+        return None
+    if not isinstance(note, dict) or note.get("run_id") != str(run_id) or cursor < 1:
+        return None
+    try:
+        event = RunEvent(
+            schema_version=1,
+            run_id=run_id,
+            sequence=cursor,
+            causal_ids=[],
+            occurred_at=datetime.now(UTC),
+            payload=ResultTextDelta(
+                type="result.text.delta",
+                segment=note["segment"],
+                offset=note["offset"],
+                text=note["text"],
+            ),
+        )
+    except (KeyError, ValueError):
+        return None
+    return f"event: live\ndata: {event.model_dump_json()}\n\n"
+
+
 async def _frames(
     request: Request, pool: Any, workspace_id: UUID, run_id: UUID, after: int
+) -> AsyncIterator[str]:
+    listener = await _listener(request)
+    try:
+        async for frame in _durable_and_live(request, pool, workspace_id, run_id, after, listener):
+            yield frame
+    finally:
+        if listener is not None:
+            await listener.close()
+
+
+async def _durable_and_live(
+    request: Request, pool: Any, workspace_id: UUID, run_id: UUID, after: int, listener: Any
 ) -> AsyncIterator[str]:
     cursor = after
     loop = asyncio.get_running_loop()
@@ -154,7 +212,15 @@ async def _frames(
         if loop.time() - last_sent >= KEEPALIVE_SECONDS:
             yield ": keepalive\n\n"
             last_sent = loop.time()
-        await asyncio.sleep(POLL_SECONDS)
+        if listener is None:
+            await asyncio.sleep(POLL_SECONDS)
+            continue
+        # Waits as the poll did, passing on this run's live text as it arrives.
+        async for note in listener.notifies(timeout=POLL_SECONDS):
+            frame = _live_frame(run_id, cursor, note.payload)
+            if frame is not None:
+                yield frame
+                last_sent = loop.time()
 
 
 @router.get("/runs/{run_id}/events/stream", include_in_schema=False)

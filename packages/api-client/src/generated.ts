@@ -3540,6 +3540,41 @@ export const schemas = {
     "title": "RestoreRecord",
     "type": "object"
   },
+  "ResultTextDelta": {
+    "additionalProperties": false,
+    "description": "US-15.24, PRD-Studio ST-01: result text while it's written. Ephemeral and coalesced: it is\nonly ever sent live and never stored, and the stored artifact is what counts. `segment` numbers\neach result file a run writes; `offset` is where in that file's text this piece begins.",
+    "properties": {
+      "offset": {
+        "minimum": 0,
+        "title": "Offset",
+        "type": "integer"
+      },
+      "segment": {
+        "minimum": 1,
+        "title": "Segment",
+        "type": "integer"
+      },
+      "text": {
+        "maxLength": 2000,
+        "minLength": 1,
+        "title": "Text",
+        "type": "string"
+      },
+      "type": {
+        "const": "result.text.delta",
+        "title": "Type",
+        "type": "string"
+      }
+    },
+    "required": [
+      "type",
+      "segment",
+      "offset",
+      "text"
+    ],
+    "title": "ResultTextDelta",
+    "type": "object"
+  },
   "RetentionApplied": {
     "additionalProperties": false,
     "properties": {
@@ -4216,6 +4251,9 @@ export const schemas = {
           },
           {
             "$ref": "#/components/schemas/ToolUseCompleted"
+          },
+          {
+            "$ref": "#/components/schemas/ResultTextDelta"
           }
         ],
         "title": "Payload"
@@ -8120,6 +8158,17 @@ export function parseRestoreRecord(value: unknown): RestoreRecord {
   return parseWith(schemas, "RestoreRecord", value) as RestoreRecord;
 }
 
+export interface ResultTextDelta {
+  offset: number;
+  segment: number;
+  text: string;
+  type: "result.text.delta";
+}
+
+export function parseResultTextDelta(value: unknown): ResultTextDelta {
+  return parseWith(schemas, "ResultTextDelta", value) as ResultTextDelta;
+}
+
 export interface RetentionApplied {
   keys_expired: number;
   objects_pending: number;
@@ -8319,7 +8368,7 @@ export function parseRunCommandResult(value: unknown): RunCommandResult {
 export interface RunEvent {
   causal_ids: string[];
   occurred_at: string;
-  payload: RunStatusChanged | ArtifactPublished | ArtifactMissing | ApprovalRequested | ApprovalDecided | EffectReconciled | ToolUseStarted | ToolUseCompleted;
+  payload: RunStatusChanged | ArtifactPublished | ArtifactMissing | ApprovalRequested | ApprovalDecided | EffectReconciled | ToolUseStarted | ToolUseCompleted | ResultTextDelta;
   run_id: string;
   schema_version: 1;
   sequence: number;

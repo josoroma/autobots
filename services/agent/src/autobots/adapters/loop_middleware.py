@@ -14,12 +14,23 @@ from uuid import UUID
 import httpx
 from langchain.agents.middleware.types import AgentMiddleware
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+    InvalidToolCall,
+    ToolCall,
+    ToolMessage,
+    message_chunk_to_message,
+)
+from langchain_core.messages.tool import invalid_tool_call as make_invalid_tool_call
+from langchain_core.messages.tool import tool_call as make_tool_call
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.utils.function_calling import convert_to_openai_tool
 from pydantic import ConfigDict
 
 from autobots.adapters.models.catalog import RESERVED_PROMPT_TOKENS
+from autobots.adapters.result_stream import current_tap
 from autobots.application.compaction import (
     CompactionPolicy,
     StoredSummary,
@@ -125,8 +136,73 @@ class AdmittedModel(BaseChatModel):
         if not _ADMITTED.get():
             raise UnadmittedModelCall("this model call was not admitted")
         target = self.bound if self.bound is not None else self.delegate
-        message = await target.ainvoke(messages, stop=stop, **kwargs)
+        message = await _streamed(target, messages, stop=stop, **kwargs)
         return ChatResult(generations=[ChatGeneration(message=message)])
+
+
+async def _streamed(target: Any, messages: Any, **kwargs: Any) -> BaseMessage:
+    """Decision 0022's streaming decision: every call streams, and the reply is the assembled
+    message, so usage, cost and tool calls settle exactly as before. The result tap, when a run has
+    one, sees each chunk. A stream that fails after its first chunk was accepted and may be
+    charged, so it is `partial_stream`, which is reconciled rather than retried."""
+    if not hasattr(target, "astream"):
+        # A delegate that can only answer whole, such as a test double.
+        message: BaseMessage = await target.ainvoke(messages, **kwargs)
+        return message
+    tap = current_tap()
+    if tap is not None:
+        tap.begin()
+    assembled: Any = None
+    try:
+        async for chunk in target.astream(messages, **kwargs):
+            assembled = chunk if assembled is None else assembled + chunk
+            if tap is not None:
+                await tap.feed(chunk)
+    except ProviderFailure:
+        raise
+    except Exception:
+        if assembled is not None:
+            raise ProviderFailure(FailureClass.PARTIAL_STREAM) from None
+        raise
+    finally:
+        if tap is not None:
+            await tap.finish()
+    if assembled is None:
+        raise ProviderFailure(FailureClass.PARTIAL_STREAM)
+    return _strictly_parsed(assembled)
+
+
+def _strictly_parsed(assembled: Any) -> BaseMessage:
+    """The assembled reply, with each tool call's arguments parsed as a whole reply's would be.
+    Assembly repairs partial JSON, so a call cut off mid-argument would otherwise pass for a real
+    one with truncated arguments. Here it stays an invalid tool call, as it is without streaming."""
+    message = message_chunk_to_message(assembled)
+    pieces = getattr(assembled, "tool_call_chunks", None) or []
+    if not pieces or not isinstance(message, AIMessage):
+        return message
+    calls: list[ToolCall] = []
+    invalid: list[InvalidToolCall] = []
+    for piece in pieces:
+        raw = piece.get("args") or ""
+        try:
+            arguments = json.loads(raw) if raw.strip() else {}
+        except ValueError:
+            arguments = None
+        if isinstance(arguments, dict):
+            # The factories set each call's `type`, which the tool node relies on.
+            calls.append(
+                make_tool_call(name=piece.get("name") or "", args=arguments, id=piece.get("id"))
+            )
+        else:
+            invalid.append(
+                make_invalid_tool_call(
+                    name=piece.get("name"),
+                    args=raw,
+                    id=piece.get("id"),
+                    error="the arguments are not a complete JSON object",
+                )
+            )
+    return message.model_copy(update={"tool_calls": calls, "invalid_tool_calls": invalid})
 
 
 @dataclass(frozen=True)
