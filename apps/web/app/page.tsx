@@ -3,6 +3,8 @@ import Link from "next/link";
 
 import { AboutServices } from "@/components/about-services";
 import { GoalComposer } from "@/components/goal-composer";
+import { HomeActivity } from "@/components/home-activity";
+import { HomeGreeting } from "@/components/home-greeting";
 import { ServiceChips } from "@/components/readiness";
 import { ServiceStatusBadge } from "@/components/service-status-badge";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -35,8 +37,14 @@ export default async function HomePage() {
   return (
     <div className="mx-auto w-full max-w-[780px] md:pt-10">
       <header className="mb-8 space-y-3 text-center">
+        {session === null ? null : (
+          <HomeGreeting
+            name={session.display_name}
+            timeZone={session.workspaces[0]?.timezone ?? "UTC"}
+          />
+        )}
         <h1 className="text-4xl leading-[1.1] md:text-[44px]">
-          Local workbench
+          What should we work on?
         </h1>
         <p className="text-muted-foreground mx-auto max-w-xl text-[15px]">
           Start a goal, see what it would use, and check the services on this
@@ -44,6 +52,7 @@ export default async function HomePage() {
         </p>
       </header>
       <GoalComposer />
+      {session === null ? null : <HomeActivity />}
       <div className="mt-14 grid gap-10 md:grid-cols-2 md:gap-8">
         <section aria-labelledby="account-heading" className={LOWER_SECTION}>
           <div className={LOWER_HEAD}>

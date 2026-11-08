@@ -4851,12 +4851,17 @@
             ],
             "title": "Role",
             "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
           }
         },
         "required": [
           "id",
           "name",
-          "role"
+          "role",
+          "timezone"
         ],
         "title": "SessionWorkspace",
         "type": "object"

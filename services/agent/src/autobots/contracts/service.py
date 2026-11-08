@@ -31,6 +31,8 @@ class SessionWorkspace(BaseModel):
     id: Identifier
     name: str
     role: Literal["owner", "member"]
+    # An IANA zone, for times shown in the workspace's own day (Decision 0022 D14).
+    timezone: str
 
 
 class SessionSummary(BaseModel):

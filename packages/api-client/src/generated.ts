@@ -4852,12 +4852,17 @@ export const schemas = {
         ],
         "title": "Role",
         "type": "string"
+      },
+      "timezone": {
+        "title": "Timezone",
+        "type": "string"
       }
     },
     "required": [
       "id",
       "name",
-      "role"
+      "role",
+      "timezone"
     ],
     "title": "SessionWorkspace",
     "type": "object"
@@ -7572,6 +7577,7 @@ export interface SessionWorkspace {
   id: string;
   name: string;
   role: "owner" | "member";
+  timezone: string;
 }
 
 export function parseSessionWorkspace(value: unknown): SessionWorkspace {

@@ -269,7 +269,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
                                      'AUTOBOTS_TEST_SERVICE_KEY': stack.values['SERVICE_ROLE_KEY'], 'AUTOBOTS_WEB_REPORT': str(report),
                                      'AUTOBOTS_WEB_OUTPUT': str(root / '.checks/identity/results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots),
                                      'AUTOBOTS_TEST_VISUAL_DIR': str(root / '.checks/identity/visual')}
-        result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'browser/operations', 'approvals', 'effects', 'experts', 'models', 'composer', 'identity', 'settings', 'runs', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
+        result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'browser/operations', 'approvals', 'effects', 'experts', 'models', 'composer', 'home', 'identity', 'settings', 'runs', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=240, check=False,
                                 env=browser_env)
         # A real restart, then Settings reads the stored records. Then one is removed, under the same key.
         stop(processes[0])
@@ -511,6 +511,37 @@ def qualify(root: Path) -> int:
         cases.check('the composer workspace is arranged', 'exit 0', f'exit {arranged_spend.returncode}: {arranged_spend.stderr[-200:]}', arranged_spend.returncode == 0)
         artifacts = {**artifacts, 'AUTOBOTS_TEST_COMPOSER_EMAIL': email_j, 'AUTOBOTS_TEST_COMPOSER_PASSWORD': password_j,
                      'AUTOBOTS_TEST_COMPOSER_WORKSPACE': composed, 'AUTOBOTS_TEST_COMPOSER_EXPERT': helper}
+        # US-15.10, arranged: a Costa Rica workspace whose owner is named Ada, with seven runs a minute apart.
+        # The newest waits for input, the next is paused and the third waits on two pending approvals. One
+        # has a plan with one of two tasks done and one was charged US$0.07.
+        email_k, password_k = 'home-k@example.invalid', secrets.token_urlsafe(24)
+        greeter = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_k, password_k)
+        homed = greeter['workspace_id']
+        home_runs = [f'77777777-7777-4777-8777-00000000000{index}' for index in range(1, 8)]
+        home_rows = (('waiting_input', 'Answer the rate question'), ('paused', 'Compare paused rates'), ('waiting_approval', 'Send the brief'),
+                     ('running', 'Plan two tasks'), ('succeeded', 'Spent seven cents'), ('succeeded', 'Older sixth run'), ('failed', 'Oldest seventh run'))
+        approvals_k = ('77777777-7777-4777-8777-0000000000a1', '77777777-7777-4777-8777-0000000000a2')
+        # As the superuser, since the runtime role can't rename a workspace's zone or write a profile.
+        arranged_home = stack.sql(
+            f"update public.workspaces set timezone = 'America/Costa_Rica' where id = '{homed}';\n"
+            f"insert into public.user_profiles (user_id, display_name) values ('{greeter['user_id']}', 'Ada');\n"
+            + ''.join(f"insert into public.runs (id, workspace_id, status, goal_summary, limit_micro_usd, policy_snapshot, created_at, updated_at) values "
+                      f"('{home_runs[index]}', '{homed}', '{status}', '{goal}', 1000000, '{{}}', now() - interval '{index + 1} minutes', now() - interval '{index + 1} minutes');\n"
+                      for index, (status, goal) in enumerate(home_rows))
+            + ''.join("insert into public.approval_requests (id, workspace_id, run_id, operation_id, tool_id, tool_version, operation_class, argument_hash, arguments, "
+                      "scope_hash, expires_at, created_at) values "
+                      f"('{approval}', '{homed}', '{home_runs[2]}', 'home-k-{order}', 'create_github_issue', 1, 'consequential_external_write', 'hash-{order}', "
+                      f"'{{\"title\": \"Brief {order}\"}}', 'scope', now() + interval '1 day', now() - interval '{3 - order} minutes');\n"
+                      for order, approval in enumerate(approvals_k, start=1))
+            + f"insert into app_private.plan_versions (run_id, version, tasks) values ('{home_runs[3]}', 1, "
+              "'[{\"id\": \"t1\", \"title\": \"One\", \"criteria\": []}, {\"id\": \"t2\", \"title\": \"Two\", \"criteria\": []}]');\n"
+            + f"insert into app_private.plan_evidence (run_id, task_id, evidence, summary) values ('{home_runs[3]}', 't1', '[]', 'done');\n"
+            + "insert into app_private.model_invocations (id, workspace_id, root_run_id, run_id, role, profile, wire_id, attempt, spend_day, reserved_micro_usd, "
+              f"charged_micro_usd, status) values (gen_random_uuid(), '{homed}', '{home_runs[4]}', '{home_runs[4]}', 'executor', 'openrouter_terra', 'w', 1, "
+              "current_date, 0, 70000, 'succeeded');\n")
+        cases.check('the home workspace is arranged', 'exit 0', f'exit {arranged_home.returncode}: {arranged_home.stderr[-200:]}', arranged_home.returncode == 0)
+        artifacts = {**artifacts, 'AUTOBOTS_TEST_HOME_EMAIL': email_k, 'AUTOBOTS_TEST_HOME_PASSWORD': password_k,
+                     'AUTOBOTS_TEST_HOME_RUNS': ','.join(home_runs), 'AUTOBOTS_TEST_HOME_APPROVALS': ','.join(approvals_k)}
         # Its own workspace with no key, as the one above asserts that it holds exactly one run.
         email_e, password_e = 'owner-e@example.invalid', secrets.token_urlsafe(24)
         owner_e = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_e, password_e)

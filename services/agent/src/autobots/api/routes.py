@@ -56,9 +56,12 @@ async def get_session(
         email=email,
         workspaces=[
             SessionWorkspace(
-                id=workspace_id, name=name, role=cast(Literal["owner", "member"], role)
+                id=workspace_id,
+                name=name,
+                role=cast(Literal["owner", "member"], role),
+                timezone=timezone,
             )
-            for workspace_id, name, role in detail
+            for workspace_id, name, role, timezone in detail
         ],
     )
 

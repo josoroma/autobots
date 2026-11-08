@@ -121,11 +121,16 @@ function typing(target: EventTarget | null): boolean {
 
 // PRD-Studio AP-01 to AP-04: Waiting and Decided with counts, the list beside the selected request,
 // J and K to move, and ⌘↵ or ⌘⌫ pressed twice within 2 s to decide.
-export function ApprovalsPanel() {
+export function ApprovalsPanel({
+  initial = null,
+}: {
+  // HM-04: Home's Review link opens with its request selected, when it's still waiting.
+  initial?: string | null;
+}) {
   const [tab, setTab] = useState<Tab>("waiting");
   const [list, setList] = useState<ApprovalList | null>(null);
   const [counts, setCounts] = useState<ApprovalList["counts"] | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(initial);
   const [failed, setFailed] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [armed, setArmed] = useState<{

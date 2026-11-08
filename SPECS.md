@@ -484,10 +484,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.9#3 | Forward intent, preview and budget through the BFF. | DONE | US-15.9 |
 | US-15.9#4 | Add the Expert, budget and models chips, the preview chips and the file chips to Home's composer. | DONE | US-15.9 |
 | US-15.9#5 | Cover the scenarios on a disposable stack with a fake transport and in browser specs with axe. | DONE | US-15.9 |
-| US-15.10 | Home greeting, Needs you and recent runs | READY | EPIC-15 |
-| US-15.10#1 | Render the greeting from the workspace's timezone and the display name. | TODO | US-15.10 |
-| US-15.10#2 | Render Needs you from pending approvals and the run list's Needs you group, and Recent runs from the run list. | TODO | US-15.10 |
-| US-15.10#3 | Cover the scenarios in browser specs with axe on a disposable stack. | TODO | US-15.10 |
+| US-15.10 | Home greeting, Needs you and recent runs | DONE | EPIC-15 |
+| US-15.10#1 | Render the greeting from the workspace's timezone and the display name. | DONE | US-15.10 |
+| US-15.10#2 | Render Needs you from pending approvals and the run list's Needs you group, and Recent runs from the run list. | DONE | US-15.10 |
+| US-15.10#3 | Cover the scenarios in browser specs with axe on a disposable stack. | DONE | US-15.10 |
 | US-15.11 | Workflow description and node labels | READY | EPIC-15 |
 | US-15.11#1 | Add a nullable workflow description by migration. | TODO | US-15.11 |
 | US-15.11#2 | Add an optional node `label` in a new Workflow IR version in the domain, keeping the previous version valid, with shared fixtures for both versions. | TODO | US-15.11 |
@@ -6444,7 +6444,8 @@ Open Questions:
 
 ### US-15.10: Home greeting, Needs you and recent runs
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-15-10-home-greeting-needs-you/`
 
 As a workspace member
 I want Home to greet me, show what's waiting for me and list my recent runs
@@ -6486,9 +6487,9 @@ Dependencies:
 - US-15.5
 
 Tasks:
-- [ ] Render the greeting from the workspace's timezone and the display name.
-- [ ] Render Needs you from pending approvals and the run list's Needs you group, and Recent runs from the run list.
-- [ ] Cover the scenarios in browser specs with axe on a disposable stack.
+- [x] Render the greeting from the workspace's timezone and the display name.
+- [x] Render Needs you from pending approvals and the run list's Needs you group, and Recent runs from the run list.
+- [x] Cover the scenarios in browser specs with axe on a disposable stack.
 
 Open Questions:
 - None.

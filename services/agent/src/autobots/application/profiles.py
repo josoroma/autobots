@@ -51,14 +51,14 @@ async def save_name(pool: Any, user_id: UUID, name: str) -> str:
         return str(row[0])
 
 
-async def workspaces_with_roles(pool: Any, user_id: UUID) -> list[tuple[UUID, str, str]]:
+async def workspaces_with_roles(pool: Any, user_id: UUID) -> list[tuple[UUID, str, str, str]]:
     if pool is None:
         return []
     async with pool.connection() as connection:
         cursor = await connection.execute(
-            "select w.id, w.name, m.role from public.workspace_members m "
+            "select w.id, w.name, m.role, w.timezone from public.workspace_members m "
             "join public.workspaces w on w.id = m.workspace_id "
             "where m.user_id = %s order by w.id",
             (user_id,),
         )
-        return [(row[0], str(row[1]), str(row[2])) for row in await cursor.fetchall()]
+        return [(row[0], str(row[1]), str(row[2]), str(row[3])) for row in await cursor.fetchall()]

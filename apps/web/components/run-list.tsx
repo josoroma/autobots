@@ -10,7 +10,7 @@ import { Input, Select } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { cn } from "@/lib/utils";
 
-const STATUS_TEXT: Record<string, string> = {
+export const STATUS_TEXT: Record<string, string> = {
   queued: "Queued",
   running: "Running",
   waiting_input: "Waiting for input",
