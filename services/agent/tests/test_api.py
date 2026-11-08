@@ -101,11 +101,15 @@ def test_only_a_member_reaches_a_workspace() -> None:
 
 
 def test_the_session_route_reports_verified_identity_and_membership() -> None:
-    reply = client().get("/v1/session", headers=headers(token()))
+    reply = client().get("/v1/session", headers=headers(token(email="ada@example.com")))
     assert reply.json() == {
         "schema_version": 1,
         "user_id": str(USER_A),
         "workspace_ids": [str(WORKSPACE)],
+        "display_name": "ada",
+        "display_name_saved": False,
+        "email": "ada@example.com",
+        "workspaces": [],
     }
     assert client().get("/v1/session", headers=headers(token(USER_B))).json()["workspace_ids"] == []
     assert client().get("/v1/session", headers=headers()).status_code == 401
@@ -203,3 +207,30 @@ def test_requests_cannot_own_long_running_work() -> None:
             if isinstance(node, ast.Attribute | ast.Name)
         }
         assert not (names & forbidden), path.name
+
+
+def test_a_name_falls_back_to_the_email_then_member() -> None:
+    """US-15.2: without a saved name, the email's local part, and "Member" without an email."""
+    with_email = client().get("/v1/profile", headers=headers(token(email="ada@example.com")))
+    assert with_email.json() == {
+        "schema_version": 1,
+        "display_name": "ada",
+        "saved": False,
+        "email": "ada@example.com",
+    }
+    without = client().get("/v1/profile", headers=headers(token()))
+    assert without.json()["display_name"] == "Member"
+    assert without.json()["email"] is None
+
+
+@pytest.mark.parametrize("name", ["", "   ", "x" * 61])
+def test_an_invalid_display_name_is_refused_with_a_typed_code(name: str) -> None:
+    reply = client().put("/v1/profile", headers=headers(token()), json={"display_name": name})
+    assert reply.status_code == 422
+    assert reply.json()["code"] == "display_name_invalid"
+
+
+def test_saving_a_name_needs_the_database_and_a_session() -> None:
+    body = {"display_name": "Ada"}
+    assert client().put("/v1/profile", headers=headers(token()), json=body).status_code == 503
+    assert client().put("/v1/profile", headers=headers(), json=body).status_code == 401

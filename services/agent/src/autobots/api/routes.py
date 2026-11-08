@@ -1,12 +1,33 @@
 """HTTP routes do small, bounded work. A request never owns a run or a background task."""
 
-from typing import Annotated
+from typing import Annotated, Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
 
-from autobots.api.security import current_user, require_internal, require_workspace_member
-from autobots.contracts.service import ServiceHealth, SessionSummary, WorkspaceSummary
+from autobots.api.errors import ApiError
+from autobots.api.security import (
+    current_user,
+    require_internal,
+    require_workspace_member,
+    session_email,
+)
+from autobots.application.profiles import (
+    DisplayNameInvalid,
+    fallback_name,
+    normalize_display_name,
+    save_name,
+    saved_name,
+    workspaces_with_roles,
+)
+from autobots.contracts.service import (
+    ProfileUpdate,
+    ProfileView,
+    ServiceHealth,
+    SessionSummary,
+    SessionWorkspace,
+    WorkspaceSummary,
+)
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 
@@ -18,10 +39,63 @@ async def health() -> ServiceHealth:
 
 @router.get("/session", operation_id="getSession", response_model=SessionSummary)
 async def get_session(
-    request: Request, user_id: Annotated[UUID, Depends(current_user)]
+    request: Request,
+    user_id: Annotated[UUID, Depends(current_user)],
+    email: Annotated[str | None, Depends(session_email)],
 ) -> SessionSummary:
     workspaces = await request.app.state.membership.workspaces_for(user_id)
-    return SessionSummary(schema_version=1, user_id=user_id, workspace_ids=workspaces)
+    pool = request.app.state.pool
+    saved = await saved_name(pool, user_id)
+    detail = await workspaces_with_roles(pool, user_id)
+    return SessionSummary(
+        schema_version=1,
+        user_id=user_id,
+        workspace_ids=workspaces,
+        display_name=saved if saved is not None else fallback_name(email),
+        display_name_saved=saved is not None,
+        email=email,
+        workspaces=[
+            SessionWorkspace(
+                id=workspace_id, name=name, role=cast(Literal["owner", "member"], role)
+            )
+            for workspace_id, name, role in detail
+        ],
+    )
+
+
+@router.get("/profile", operation_id="getProfile", response_model=ProfileView)
+async def get_profile(
+    request: Request,
+    user_id: Annotated[UUID, Depends(current_user)],
+    email: Annotated[str | None, Depends(session_email)],
+) -> ProfileView:
+    saved = await saved_name(request.app.state.pool, user_id)
+    return ProfileView(
+        schema_version=1,
+        display_name=saved if saved is not None else fallback_name(email),
+        saved=saved is not None,
+        email=email,
+    )
+
+
+@router.put("/profile", operation_id="updateProfile", response_model=ProfileView)
+async def update_profile(
+    body: ProfileUpdate,
+    request: Request,
+    user_id: Annotated[UUID, Depends(current_user)],
+    email: Annotated[str | None, Depends(session_email)],
+) -> ProfileView:
+    try:
+        name = normalize_display_name(body.display_name)
+    except DisplayNameInvalid as error:
+        raise ApiError(
+            422, "display_name_invalid", "A display name needs 1 to 60 characters."
+        ) from error
+    pool = request.app.state.pool
+    if pool is None:
+        raise ApiError(503, "service_unavailable", "The database is unavailable.")
+    saved = await save_name(pool, user_id, name)
+    return ProfileView(schema_version=1, display_name=saved, saved=True, email=email)
 
 
 @router.get(

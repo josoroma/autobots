@@ -19,8 +19,8 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-15.1 | us-15-1-sidebar-groups-tools-under | READY | Sidebar groups with Tools under Build |
-| 2 | US-15.2 | us-15-2-display-name-workspace-role | READY | Display name, workspace role and account |
+| 1 | US-15.1 | us-15-1-sidebar-groups-tools-under | DONE | Sidebar groups with Tools under Build |
+| 2 | US-15.2 | us-15-2-display-name-workspace-role | IN PROGRESS | Display name, workspace role and account |
 | 3 | US-15.3 | us-15-3-member-readable-readiness-health | READY | Member-readable readiness, health line and service chips |
 | 4 | US-15.4 | us-15-4-run-list-projection-filters | READY | Run list projection, filters and spend |
 | 5 | US-15.5 | us-15-5-approvals-inbox-count-badge | READY | Approvals inbox, count badge and decision shortcuts |
@@ -41,18 +41,18 @@ markers are preserved across refreshes.
 | 20 | US-15.20 | us-15-20-appearance-preferences-system-theme | READY | Appearance preferences with a System theme |
 | 21 | US-15.21 | us-15-21-settings-sub-pages-notifications | BLOCKED | Settings sub-pages for notifications, data and keyboard |
 | 22 | US-15.22 | us-15-22-search-palette | BLOCKED | Search palette |
-| 23 | US-15.23 | us-15-23-new-run-shortcut | BLOCKED | New run shortcut |
+| 23 | US-15.23 | us-15-23-new-run-shortcut | READY | New run shortcut |
 | 24 | US-15.24 | us-15-24-streaming-result-text | BLOCKED | Streaming result text |
 | 25 | US-15.25 | us-15-25-concept-experts-workflows-seed | BLOCKED | Concept Experts and workflows seed |
 
 ## Next Action
 
-Action: select
-Story: US-15.1
-Change: us-15-1-sidebar-groups-tools-under
+Action: implement
+Story: US-15.2
+Change: us-15-2-display-name-workspace-role
 Owner: main-session
-Command: openspec new change us-15-1-sidebar-groups-tools-under; set US-15.1 to IN PROGRESS with a Change: line
-Reason: US-15.1 is READY and has no OpenSpec change
+Command: /ohmyorch:opsx-apply us-15-2-display-name-workspace-role
+Reason: gate implementation: 7/9 tasks complete
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

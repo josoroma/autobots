@@ -187,6 +187,12 @@ export interface SessionsRow {
   created_at: string;
 }
 
+export interface UserProfilesRow {
+  user_id: string;
+  display_name: string;
+  updated_at: string;
+}
+
 export interface WorkflowEmissionsRow {
   execution_id: string;
   instance_key: string;

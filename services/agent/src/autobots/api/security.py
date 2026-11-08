@@ -67,6 +67,23 @@ def current_user(
         raise ApiError(401, "unauthorized", "This request is not authorized.") from error
 
 
+def session_email(
+    settings: Annotated[Settings, Depends(app_settings)],
+    _user: Annotated[UUID, Depends(current_user)],
+    authorization: Annotated[str | None, Header()] = None,
+) -> str | None:
+    """The verified session's own email claim, after `current_user` accepted the token."""
+    token = (authorization or "").partition(" ")[2]
+    claims = jwt.decode(
+        token,
+        settings.jwt_secret.get_secret_value(),
+        algorithms=["HS256"],
+        audience="authenticated",
+    )
+    email = claims.get("email")
+    return email if isinstance(email, str) and email else None
+
+
 async def require_workspace_member(
     workspace_id: UUID,
     request: Request,

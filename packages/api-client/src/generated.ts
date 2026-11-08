@@ -2448,6 +2448,59 @@ export const schemas = {
     "title": "PlanSummary",
     "type": "object"
   },
+  "ProfileUpdate": {
+    "additionalProperties": false,
+    "description": "A new display name. The route checks 1 to 60 characters after trimming.",
+    "properties": {
+      "display_name": {
+        "title": "Display Name",
+        "type": "string"
+      }
+    },
+    "required": [
+      "display_name"
+    ],
+    "title": "ProfileUpdate",
+    "type": "object"
+  },
+  "ProfileView": {
+    "additionalProperties": false,
+    "description": "The session's own profile: the shown name, and whether it is saved or a fallback.",
+    "properties": {
+      "display_name": {
+        "title": "Display Name",
+        "type": "string"
+      },
+      "email": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Email"
+      },
+      "saved": {
+        "title": "Saved",
+        "type": "boolean"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "display_name",
+      "saved",
+      "email"
+    ],
+    "title": "ProfileView",
+    "type": "object"
+  },
   "ProviderStatus": {
     "additionalProperties": false,
     "description": "Source, authentication, catalog and qualification are independent facts, MP-04.",
@@ -4103,8 +4156,27 @@ export const schemas = {
   },
   "SessionSummary": {
     "additionalProperties": false,
-    "description": "Who the verified session is, and the workspaces membership grants it.",
+    "description": "Who the verified session is, and the workspaces membership grants it.\n\n`display_name` is the saved profile name, else the local part of the session's email, else\n\"Member\" (PRD-Studio ID-01). `email` is the session's own address and is never another user's.",
     "properties": {
+      "display_name": {
+        "title": "Display Name",
+        "type": "string"
+      },
+      "display_name_saved": {
+        "title": "Display Name Saved",
+        "type": "boolean"
+      },
+      "email": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Email"
+      },
       "schema_version": {
         "const": 1,
         "title": "Schema Version",
@@ -4122,12 +4194,23 @@ export const schemas = {
         },
         "title": "Workspace Ids",
         "type": "array"
+      },
+      "workspaces": {
+        "items": {
+          "$ref": "#/components/schemas/SessionWorkspace"
+        },
+        "title": "Workspaces",
+        "type": "array"
       }
     },
     "required": [
       "schema_version",
       "user_id",
-      "workspace_ids"
+      "workspace_ids",
+      "display_name",
+      "display_name_saved",
+      "email",
+      "workspaces"
     ],
     "title": "SessionSummary",
     "type": "object"
@@ -4168,6 +4251,36 @@ export const schemas = {
       "options"
     ],
     "title": "SessionView",
+    "type": "object"
+  },
+  "SessionWorkspace": {
+    "additionalProperties": false,
+    "description": "A workspace the session belongs to, with its name and the session's role in it.",
+    "properties": {
+      "id": {
+        "format": "uuid",
+        "title": "Id",
+        "type": "string"
+      },
+      "name": {
+        "title": "Name",
+        "type": "string"
+      },
+      "role": {
+        "enum": [
+          "owner",
+          "member"
+        ],
+        "title": "Role",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "role"
+    ],
+    "title": "SessionWorkspace",
     "type": "object"
   },
   "TaskView": {
@@ -6199,6 +6312,25 @@ export function parsePlanSummary(value: unknown): PlanSummary {
   return parseWith(schemas, "PlanSummary", value) as PlanSummary;
 }
 
+export interface ProfileUpdate {
+  display_name: string;
+}
+
+export function parseProfileUpdate(value: unknown): ProfileUpdate {
+  return parseWith(schemas, "ProfileUpdate", value) as ProfileUpdate;
+}
+
+export interface ProfileView {
+  display_name: string;
+  email: string | null;
+  saved: boolean;
+  schema_version: 1;
+}
+
+export function parseProfileView(value: unknown): ProfileView {
+  return parseWith(schemas, "ProfileView", value) as ProfileView;
+}
+
 export interface ProviderStatus {
   auth_status: "missing" | "configured" | "invalid" | "unavailable";
   catalog_status: "available" | "unavailable" | "unknown";
@@ -6666,9 +6798,13 @@ export function parseSessionExpert(value: unknown): SessionExpert {
 }
 
 export interface SessionSummary {
+  display_name: string;
+  display_name_saved: boolean;
+  email: string | null;
   schema_version: 1;
   user_id: string;
   workspace_ids: string[];
+  workspaces: SessionWorkspace[];
 }
 
 export function parseSessionSummary(value: unknown): SessionSummary {
@@ -6684,6 +6820,16 @@ export interface SessionView {
 
 export function parseSessionView(value: unknown): SessionView {
   return parseWith(schemas, "SessionView", value) as SessionView;
+}
+
+export interface SessionWorkspace {
+  id: string;
+  name: string;
+  role: "owner" | "member";
+}
+
+export function parseSessionWorkspace(value: unknown): SessionWorkspace {
+  return parseWith(schemas, "SessionWorkspace", value) as SessionWorkspace;
 }
 
 export interface TaskView {
@@ -7076,6 +7222,14 @@ export async function setRetention(options: ClientOptions, body: RetentionSettin
 
 export async function applyRetention(options: ClientOptions): Promise<RetentionApplied> {
   return parseRetentionApplied(await requestJson(options, "POST", `/v1/operations/retention/apply`));
+}
+
+export async function getProfile(options: ClientOptions): Promise<ProfileView> {
+  return parseProfileView(await requestJson(options, "GET", `/v1/profile`));
+}
+
+export async function updateProfile(options: ClientOptions, body: ProfileUpdate): Promise<ProfileView> {
+  return parseProfileView(await requestJson(options, "PUT", `/v1/profile`, body));
 }
 
 export async function listRoutines(options: ClientOptions): Promise<RoutineList> {

@@ -2447,6 +2447,59 @@
         "title": "PlanSummary",
         "type": "object"
       },
+      "ProfileUpdate": {
+        "additionalProperties": false,
+        "description": "A new display name. The route checks 1 to 60 characters after trimming.",
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "display_name"
+        ],
+        "title": "ProfileUpdate",
+        "type": "object"
+      },
+      "ProfileView": {
+        "additionalProperties": false,
+        "description": "The session's own profile: the shown name, and whether it is saved or a fallback.",
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "saved": {
+            "title": "Saved",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "display_name",
+          "saved",
+          "email"
+        ],
+        "title": "ProfileView",
+        "type": "object"
+      },
       "ProviderStatus": {
         "additionalProperties": false,
         "description": "Source, authentication, catalog and qualification are independent facts, MP-04.",
@@ -4102,8 +4155,27 @@
       },
       "SessionSummary": {
         "additionalProperties": false,
-        "description": "Who the verified session is, and the workspaces membership grants it.",
+        "description": "Who the verified session is, and the workspaces membership grants it.\n\n`display_name` is the saved profile name, else the local part of the session's email, else\n\"Member\" (PRD-Studio ID-01). `email` is the session's own address and is never another user's.",
         "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "display_name_saved": {
+            "title": "Display Name Saved",
+            "type": "boolean"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
           "schema_version": {
             "const": 1,
             "title": "Schema Version",
@@ -4121,12 +4193,23 @@
             },
             "title": "Workspace Ids",
             "type": "array"
+          },
+          "workspaces": {
+            "items": {
+              "$ref": "#/components/schemas/SessionWorkspace"
+            },
+            "title": "Workspaces",
+            "type": "array"
           }
         },
         "required": [
           "schema_version",
           "user_id",
-          "workspace_ids"
+          "workspace_ids",
+          "display_name",
+          "display_name_saved",
+          "email",
+          "workspaces"
         ],
         "title": "SessionSummary",
         "type": "object"
@@ -4167,6 +4250,36 @@
           "options"
         ],
         "title": "SessionView",
+        "type": "object"
+      },
+      "SessionWorkspace": {
+        "additionalProperties": false,
+        "description": "A workspace the session belongs to, with its name and the session's role in it.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "owner",
+              "member"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "role"
+        ],
+        "title": "SessionWorkspace",
         "type": "object"
       },
       "TaskView": {
@@ -7100,6 +7213,138 @@
           }
         },
         "summary": "Post Retention Apply"
+      }
+    },
+    "/v1/profile": {
+      "get": {
+        "operationId": "getProfile",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Profile"
+      },
+      "put": {
+        "operationId": "updateProfile",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Profile"
       }
     },
     "/v1/routines": {

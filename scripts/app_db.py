@@ -114,8 +114,9 @@ def seed(stack: AppStack, root: Path) -> subprocess.CompletedProcess[str]:
 def reset(stack: AppStack) -> None:
     require_marker(stack)
     result = stack.sql('drop schema if exists app_private cascade;\ndrop schema if exists agent_runtime cascade;\n'
-                       'drop table if exists public.knowledge_heads, public.knowledge_versions, public.improvement_candidates, public.memory_items, public.routine_occurrences, public.routine_versions, public.routines, public.workflow_emissions, public.workflow_node_instances, public.workflow_executions, public.workflow_versions, public.workflows, public.approval_requests, public.artifacts, public.run_events, public.runs, public.sessions, public.expert_versions, public.experts, public.model_profiles, public.workspace_members, '
+                       'drop table if exists public.user_profiles, public.knowledge_heads, public.knowledge_versions, public.improvement_candidates, public.memory_items, public.routine_occurrences, public.routine_versions, public.routines, public.workflow_emissions, public.workflow_node_instances, public.workflow_executions, public.workflow_versions, public.workflows, public.approval_requests, public.artifacts, public.run_events, public.runs, public.sessions, public.expert_versions, public.experts, public.model_profiles, public.workspace_members, '
                        'public.workspaces cascade;\ndrop function if exists public.is_workspace_member(uuid);\n'
+                       'drop function if exists public.shares_workspace_with(uuid);\n'
                        'truncate autobots_disposable.migrations;\n')
     if result.returncode:
         raise Unavailable(f'the disposable reset failed: {result.stderr[-200:]}')
@@ -213,6 +214,36 @@ def access_cases(stack: AppStack, cases: Cases) -> None:
     cases.check('a member reads its workspace runs', '1', own, own == '1')
     other = last_line(stack.as_role('authenticated', USER_B, f"select count(id) from public.runs where id = '{RUN_A}'"))
     cases.check('another workspace reads no run', '0', other, other == '0')
+
+
+def profile_cases(stack: AppStack, cases: Cases) -> None:
+    """US-15.2: a user writes only their own display name; a shared workspace's member reads it."""
+    user_c = 'c5555555-5555-4555-8555-555555555555'
+    setup = (f"insert into public.workspace_members (workspace_id, user_id) values ('{WORKSPACE_A}', '{user_c}');\n"
+             f"insert into public.user_profiles (user_id, display_name) values ('{USER_A}', 'Ada'), ('{user_c}', 'Cy'), "
+             f"('{USER_B}', 'Bo');\n")
+
+    def as_user(role: str, user: str | None, statement: str) -> subprocess.CompletedProcess[str]:
+        claims = json.dumps({'role': role, **({'sub': user} if user else {})})
+        return stack.sql(f"begin;\n{setup}set local role {role};\nselect set_config('request.jwt.claims', '{claims}', true), "
+                         f"set_config('request.jwt.claim.sub', '{user or ''}', true);\n{statement};\nrollback;\n")
+
+    names = last_line(as_user('authenticated', USER_A, 'select string_agg(display_name, \',\' order by display_name) from public.user_profiles'))
+    cases.check('a member reads its own and a shared member\'s name', 'Ada,Cy', names, names == 'Ada,Cy')
+    outsider = last_line(as_user('authenticated', USER_B, f"select count(*) from public.user_profiles where user_id in ('{USER_A}', '{user_c}')"))
+    cases.check('another workspace reads no name', '0', outsider, outsider == '0')
+    own = as_user('authenticated', USER_A, f"update public.user_profiles set display_name = 'Ada L' where user_id = '{USER_A}' returning display_name")
+    cases.check('a user updates their own name', 'Ada L', own.stdout.strip()[-80:], own.returncode == 0 and 'Ada L' in own.stdout)
+    for label, user, target in (('a shared member', user_c, USER_A), ('another workspace', USER_B, USER_A)):
+        changed = last_line(as_user('authenticated', user, f"with changed as (update public.user_profiles set display_name = 'X' "
+                                                            f"where user_id = '{target}' returning 1) select count(*) from changed"))
+        cases.check(f"{label} can't change someone else's name", '0', changed, changed == '0')
+    forged = as_user('authenticated', USER_B, f"insert into public.user_profiles (user_id, display_name) values ('{user_c}', 'Forged')")
+    cases.denied("a user can't create someone else's profile", forged, 'row-level security')
+    cases.denied('anonymous cannot read names', stack.as_role('anon', None, 'select * from public.user_profiles'), 'permission denied')
+    for label, value in (('an empty name', ''), ('a 61-character name', 'x' * 61), ('untrimmed spaces', ' Ada ')):
+        refused = as_user('authenticated', USER_A, f"update public.user_profiles set display_name = '{value}' where user_id = '{USER_A}'")
+        cases.denied(f'the schema refuses {label}', refused, 'check constraint')
 
 
 def authority_cases(stack: AppStack, cases: Cases) -> None:
@@ -549,6 +580,7 @@ def qualify(root: Path, write_types: bool = False) -> int:
         seed_cases(stack, cases, root)
         constraint_cases(stack, cases)
         access_cases(stack, cases)
+        profile_cases(stack, cases)
         authority_cases(stack, cases)
         framework_cases(stack, cases, root, db_port)
         credential_cases(stack, cases, root, db_port)

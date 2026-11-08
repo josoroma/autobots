@@ -441,12 +441,12 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.1#1 | Regroup the sidebar's links in the web shell, keeping link names, roles and data hooks. | DONE | US-15.1 |
 | US-15.1#2 | Update `tools.spec.ts` to Tools under Build after Workflows, and any `appearance.spec.ts` assertion of the old placement. | DONE | US-15.1 |
 | US-15.1#3 | Cover the scenarios in browser specs with axe. | DONE | US-15.1 |
-| US-15.2 | Display name, workspace role and account | READY | EPIC-15 |
-| US-15.2#1 | Add a per-user profile by migration with a display name checked to 1–60 characters, and RLS that lets a user write their own name and members of a shared workspace read it, with negative tests for anonymous, other-user and other-workspace roles. | TODO | US-15.2 |
-| US-15.2#2 | Add the role and workspace name to `SessionSummary`, and a profile read and update, in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.2 |
-| US-15.2#3 | Forward both through the BFF with the existing session and request checks. | TODO | US-15.2 |
-| US-15.2#4 | Add the shell's account footer and menu, and Settings → Account. | TODO | US-15.2 |
-| US-15.2#5 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.2 |
+| US-15.2 | Display name, workspace role and account | DONE | EPIC-15 |
+| US-15.2#1 | Add a per-user profile by migration with a display name checked to 1–60 characters, and RLS that lets a user write their own name and members of a shared workspace read it, with negative tests for anonymous, other-user and other-workspace roles. | DONE | US-15.2 |
+| US-15.2#2 | Add the role and workspace name to `SessionSummary`, and a profile read and update, in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | DONE | US-15.2 |
+| US-15.2#3 | Forward both through the BFF with the existing session and request checks. | DONE | US-15.2 |
+| US-15.2#4 | Add the shell's account footer and menu, and Settings → Account. | DONE | US-15.2 |
+| US-15.2#5 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.2 |
 | US-15.3 | Member-readable readiness, health line and service chips | READY | EPIC-15 |
 | US-15.3#1 | Add a member-readable readiness read in the application layer, holding only the API, worker, database and OpenRouter authentication states. | TODO | US-15.3 |
 | US-15.3#2 | Add its Pydantic contract and FastAPI route, regenerate OpenAPI and the TypeScript client, and forward it through the BFF. | TODO | US-15.3 |
@@ -5986,7 +5986,8 @@ Open Questions:
 
 ### US-15.2: Display name, workspace role and account
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-15-2-display-name-workspace-role/`
 
 As a workspace member
 I want an editable display name, and my role and each workspace's name in my session
@@ -6040,11 +6041,11 @@ Dependencies:
 - US-2.5
 
 Tasks:
-- [ ] Add a per-user profile by migration with a display name checked to 1–60 characters, and RLS that lets a user write their own name and members of a shared workspace read it, with negative tests for anonymous, other-user and other-workspace roles.
-- [ ] Add the role and workspace name to `SessionSummary`, and a profile read and update, in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
-- [ ] Forward both through the BFF with the existing session and request checks.
-- [ ] Add the shell's account footer and menu, and Settings → Account.
-- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+- [x] Add a per-user profile by migration with a display name checked to 1–60 characters, and RLS that lets a user write their own name and members of a shared workspace read it, with negative tests for anonymous, other-user and other-workspace roles.
+- [x] Add the role and workspace name to `SessionSummary`, and a profile read and update, in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
+- [x] Forward both through the BFF with the existing session and request checks.
+- [x] Add the shell's account footer and menu, and Settings → Account.
+- [x] Cover the scenarios on a disposable stack and in browser specs with axe.
 
 Open Questions:
 - None.

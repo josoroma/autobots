@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 const OWNER_EMAIL = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
@@ -5,6 +6,8 @@ const OWNER_PASSWORD = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
 const WORKSPACE_A = process.env.AUTOBOTS_TEST_WORKSPACE_A ?? "";
 const WORKSPACE_B = process.env.AUTOBOTS_TEST_WORKSPACE_B ?? "";
 const SERVICE_KEY = process.env.AUTOBOTS_TEST_SERVICE_KEY ?? "";
+const MEMBER_EMAIL = process.env.AUTOBOTS_TEST_MEMBER_EMAIL ?? "";
+const MEMBER_PASSWORD = process.env.AUTOBOTS_TEST_MEMBER_PASSWORD ?? "";
 
 async function signIn(
   page: Page,
@@ -95,4 +98,74 @@ test("signing in needs the origin and CSRF checks", async ({ request }) => {
     data: { email: OWNER_EMAIL, password: OWNER_PASSWORD },
   });
   expect(reply.status()).toBe(403);
+});
+
+// US-15.2: member-c owns their own workspace and is a member of workspace A.
+test("the account footer, the Account page and the display name", async ({
+  page,
+}) => {
+  await signIn(page, MEMBER_EMAIL, MEMBER_PASSWORD);
+  await expect(
+    page.getByText(/Signed in, with access to 2 workspaces/),
+  ).toBeVisible();
+  const local = MEMBER_EMAIL.split("@")[0] ?? "";
+  const me = await (await page.request.get("/api/v1/session")).json();
+  expect(me.display_name).toBe(local);
+  expect(me.display_name_saved).toBe(false);
+  expect(me.email).toBe(MEMBER_EMAIL);
+  expect(me.workspaces).toHaveLength(2);
+  expect(
+    me.workspaces.map((item: { role: string }) => item.role).sort(),
+  ).toEqual(["member", "owner"]);
+  for (const item of me.workspaces as { name: string }[])
+    expect(item.name.length).toBeGreaterThan(0);
+
+  const footer = page.locator("[data-account]");
+  await expect(footer.locator('[data-field="display-name"]')).toHaveText(local);
+  await expect(footer.locator('[data-field="role"]')).toHaveText(
+    me.workspaces[0].role === "owner" ? "Owner" : "Member",
+  );
+  await expect(footer).toContainText("this Mac");
+  await footer.locator("summary").click();
+  await expect(footer.getByRole("link", { name: "Account" })).toBeVisible();
+  await expect(footer.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await footer.getByRole("link", { name: "Account" }).click();
+  await expect(page).toHaveURL(/\/settings\/account$/);
+
+  await expect(
+    page.getByRole("heading", { name: "Account", level: 1 }),
+  ).toBeVisible();
+  const field = page.getByLabel("Display name");
+  await expect(field).toBeEditable();
+  await expect(page.locator('[data-field="email"]')).toHaveText(MEMBER_EMAIL);
+  await expect(page.locator("main")).toContainText("Owner");
+  await expect(page.locator("main")).toContainText("Member");
+  await expect(
+    page.locator("main").getByRole("button", { name: "Sign out" }),
+  ).toBeVisible();
+  const axe = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(axe.violations.map((item) => item.id)).toEqual([]);
+
+  await field.fill("Cy Member");
+  await page.getByRole("button", { name: "Save name" }).click();
+  await expect(page.locator('[data-message="profile"]')).toHaveText("Saved.");
+  await expect(footer.locator('[data-field="display-name"]')).toHaveText(
+    "Cy Member",
+  );
+  for (const refused of ["", "x".repeat(61)]) {
+    await field.fill(refused);
+    await page.getByRole("button", { name: "Save name" }).click();
+    await expect(page.locator('[data-message="profile"]')).toContainText(
+      "needs 1 to 60 characters",
+    );
+  }
+  const after = await (await page.request.get("/api/v1/session")).json();
+  expect(after.display_name).toBe("Cy Member");
+  expect(after.display_name_saved).toBe(true);
+  await page.reload();
+  await expect(footer.locator('[data-field="display-name"]')).toHaveText(
+    "Cy Member",
+  );
 });
