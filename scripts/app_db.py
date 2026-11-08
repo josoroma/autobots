@@ -398,6 +398,15 @@ def tool_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
     else:
         for case in json.loads(sol.stdout.strip().splitlines()[-1])['cases']:
             cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+    # US-15.4: the run list's facts, groups, filters and paging, in workspaces of its own.
+    listed = subprocess.run([str(root / 'services/agent/.venv/bin/python'), str(root / 'tests/db/run_list_check.py')],
+                            env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
+                            capture_output=True, text=True, timeout=180, check=False, cwd=root)
+    if listed.returncode:
+        cases.check('the run list check ran', 'exit 0', f'exit {listed.returncode}: {listed.stderr.strip()[-700:]}', False)
+    else:
+        for case in json.loads(listed.stdout.strip().splitlines()[-1])['cases']:
+            cases.check(case['id'], case['expected'], case['observed'], case['passed'])
     # US-14.14: the browsing loop's steps through real admission on the researcher route.
     browsing = subprocess.run([str(root / 'services/agent/.venv/bin/python'), str(root / 'tests/db/browsing_loop_check.py'), WORKSPACE_A],
                               env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},

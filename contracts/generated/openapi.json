@@ -3528,6 +3528,35 @@
         "title": "RunEvent",
         "type": "object"
       },
+      "RunGroupCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "integer"
+          },
+          "all": {
+            "title": "All",
+            "type": "integer"
+          },
+          "finished": {
+            "title": "Finished",
+            "type": "integer"
+          },
+          "needs_you": {
+            "title": "Needs You",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "all",
+          "active",
+          "needs_you",
+          "finished"
+        ],
+        "title": "RunGroupCounts",
+        "type": "object"
+      },
       "RunInputRequest": {
         "additionalProperties": false,
         "properties": {
@@ -3646,11 +3675,25 @@
       },
       "RunList": {
         "additionalProperties": false,
-        "description": "The newest of a workspace's runs. `has_more` says older ones aren't in this page.",
+        "description": "A page of a workspace's runs, newest first, with server counts per status group.\n\n`total` counts the selected group under the same filters. `next_cursor` continues the list\nafter this page's last row, and `has_more` says that more rows exist.",
         "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/RunGroupCounts"
+          },
           "has_more": {
             "title": "Has More",
             "type": "boolean"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
           },
           "runs": {
             "items": {
@@ -3663,19 +3706,31 @@
             "const": 1,
             "title": "Schema Version",
             "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
           }
         },
         "required": [
           "schema_version",
           "runs",
-          "has_more"
+          "has_more",
+          "next_cursor",
+          "total",
+          "counts"
         ],
         "title": "RunList",
         "type": "object"
       },
       "RunListItem": {
         "additionalProperties": false,
+        "description": "One run's facts for the list (PRD-Studio RN-01). Spend is from the ledger: `charged` is\nreported or entered, `reserved` is held for calls not yet settled, and `unreported` marks a call\nwhose charge was never reported. Either of the last two makes the amount an estimate.",
         "properties": {
+          "charged_micro_usd": {
+            "title": "Charged Micro Usd",
+            "type": "integer"
+          },
           "created_at": {
             "format": "date-time",
             "pattern": "^.+(Z|[+-]00:00)$",
@@ -3691,6 +3746,31 @@
             "title": "Id",
             "type": "string"
           },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "label_kind": {
+            "enum": [
+              "goal",
+              "expert",
+              "session",
+              "workflow"
+            ],
+            "title": "Label Kind",
+            "type": "string"
+          },
+          "limit_micro_usd": {
+            "title": "Limit Micro Usd",
+            "type": "integer"
+          },
           "parent_run_id": {
             "anyOf": [
               {
@@ -3703,8 +3783,48 @@
             ],
             "title": "Parent Run Id"
           },
+          "profiles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Profiles",
+            "type": "array"
+          },
+          "reserved_micro_usd": {
+            "title": "Reserved Micro Usd",
+            "type": "integer"
+          },
           "status": {
             "$ref": "#/components/schemas/RunStatus"
+          },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Reason"
+          },
+          "tasks_complete": {
+            "title": "Tasks Complete",
+            "type": "integer"
+          },
+          "tasks_total": {
+            "title": "Tasks Total",
+            "type": "integer"
+          },
+          "unreported": {
+            "title": "Unreported",
+            "type": "boolean"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
+            "title": "Updated At",
+            "type": "string"
           }
         },
         "required": [
@@ -3712,7 +3832,18 @@
           "parent_run_id",
           "status",
           "goal_summary",
-          "created_at"
+          "created_at",
+          "updated_at",
+          "label_kind",
+          "label",
+          "stop_reason",
+          "tasks_complete",
+          "tasks_total",
+          "profiles",
+          "charged_micro_usd",
+          "reserved_micro_usd",
+          "unreported",
+          "limit_micro_usd"
         ],
         "title": "RunListItem",
         "type": "object"
@@ -7969,8 +8100,87 @@
     },
     "/v1/runs": {
       "get": {
+        "description": "PRD-Studio RN-01 and RN-02: status groups with server counts, filters and a keyset cursor.",
         "operationId": "listRuns",
         "parameters": [
+          {
+            "in": "query",
+            "name": "group",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "enum": [
+                "all",
+                "active",
+                "needs_you",
+                "finished"
+              ],
+              "title": "Group",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "profile",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ModelProfileId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Profile"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
           {
             "in": "header",
             "name": "x-autobots-internal",

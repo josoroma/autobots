@@ -13,6 +13,8 @@ from autobots.api.errors import ApiError
 from autobots.api.security import require_internal
 from autobots.api.settings_routes import current_workspace
 from autobots.application.run_projection import (
+    RUN_LIST_SIZE,
+    InvalidCursor,
     read_events,
     read_inspector,
     read_run_list,
@@ -20,8 +22,15 @@ from autobots.application.run_projection import (
 )
 from autobots.application.runs import RunNotFound
 from autobots.application.tool_uses import list_tool_uses
-from autobots.contracts.run_workspace import EventPage, RunInspector, RunList, RunWorkspace
+from autobots.contracts.run_workspace import (
+    EventPage,
+    RunInspector,
+    RunList,
+    RunListGroup,
+    RunWorkspace,
+)
 from autobots.contracts.runs import ToolUseList
+from autobots.domain.models import ModelProfileId
 from autobots.domain.runs import TERMINAL, RunStatus
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
@@ -65,9 +74,29 @@ async def get_workspace(run_id: UUID, request: Request, workspace_id: Workspace)
 
 
 @router.get("/runs", operation_id="listRuns", response_model=RunList)
-async def get_runs(request: Request, workspace_id: Workspace) -> RunList:
+async def get_runs(
+    request: Request,
+    workspace_id: Workspace,
+    group: RunListGroup = "all",
+    q: Annotated[str | None, Query(max_length=200)] = None,
+    profile: ModelProfileId | None = None,
+    cursor: Annotated[str | None, Query(max_length=200)] = None,
+    limit: Annotated[int, Query(ge=1, le=RUN_LIST_SIZE)] = RUN_LIST_SIZE,
+) -> RunList:
+    """PRD-Studio RN-01 and RN-02: status groups with server counts, filters and a keyset cursor."""
     async with _pool(request).connection() as connection:
-        return await read_run_list(connection, workspace_id)
+        try:
+            return await read_run_list(
+                connection,
+                workspace_id,
+                limit,
+                group=group,
+                query=q,
+                profile=profile.value if profile is not None else None,
+                cursor=cursor,
+            )
+        except InvalidCursor:
+            raise ApiError(422, "invalid_cursor", "That page cursor is not valid.") from None
 
 
 @router.get("/runs/{run_id}/inspector", operation_id="getRunInspector", response_model=RunInspector)

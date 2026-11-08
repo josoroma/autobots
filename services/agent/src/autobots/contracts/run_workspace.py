@@ -152,7 +152,14 @@ class RunWorkspace(BaseModel):
     can_continue: bool
 
 
+RunListGroup = Literal["all", "active", "needs_you", "finished"]
+
+
 class RunListItem(BaseModel):
+    """One run's facts for the list (PRD-Studio RN-01). Spend is from the ledger: `charged` is
+    reported or entered, `reserved` is held for calls not yet settled, and `unreported` marks a call
+    whose charge was never reported. Either of the last two makes the amount an estimate."""
+
     model_config = VIEW
 
     id: Identifier
@@ -160,16 +167,43 @@ class RunListItem(BaseModel):
     status: RunStatus
     goal_summary: str
     created_at: UtcTimestamp
+    updated_at: UtcTimestamp
+    label_kind: Literal["goal", "expert", "session", "workflow"]
+    label: str | None
+    stop_reason: str | None
+    tasks_complete: int
+    tasks_total: int
+    profiles: list[str]
+    charged_micro_usd: int
+    reserved_micro_usd: int
+    unreported: bool
+    limit_micro_usd: int
+
+
+class RunGroupCounts(BaseModel):
+    model_config = VIEW
+
+    all: int
+    active: int
+    needs_you: int
+    finished: int
 
 
 class RunList(BaseModel):
-    """The newest of a workspace's runs. `has_more` says older ones aren't in this page."""
+    """A page of a workspace's runs, newest first, with server counts per status group.
+
+    `total` counts the selected group under the same filters. `next_cursor` continues the list
+    after this page's last row, and `has_more` says that more rows exist.
+    """
 
     model_config = VIEW
 
     schema_version: Literal[1]
     runs: list[RunListItem]
     has_more: bool
+    next_cursor: str | None
+    total: int
+    counts: RunGroupCounts
 
 
 class ModelCallView(BaseModel):

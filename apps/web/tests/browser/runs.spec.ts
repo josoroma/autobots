@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
@@ -232,4 +233,81 @@ test("a workspace with no key cannot admit a run", async ({ page }) => {
   });
   expect(refused.status()).toBe(409);
   expect((await refused.json()).code).toBe("credentials_required");
+});
+
+// US-15.4: an arranged workspace with 101 runs and three with known spend (scripts/qualify_identity.py).
+const RUNS_EMAIL = process.env.AUTOBOTS_TEST_RUNS_EMAIL ?? "";
+const RUNS_PASSWORD = process.env.AUTOBOTS_TEST_RUNS_PASSWORD ?? "";
+const HELD = "44444444-4444-4444-8444-000000000001";
+const UNREPORTED = "44444444-4444-4444-8444-000000000002";
+const REPORTED = "44444444-4444-4444-8444-000000000003";
+
+test("status tabs, filters, paging and estimated spend on Runs", async ({
+  page,
+}) => {
+  await signIn(page, RUNS_EMAIL, RUNS_PASSWORD);
+  await page.goto("/runs");
+  const tab = (id: string) => page.locator(`[data-group="${id}"]`);
+  await expect(tab("all")).toHaveText("All 101");
+  await expect(tab("active")).toHaveText("Active 50");
+  await expect(tab("needs_you")).toHaveText("Needs you 24");
+  await expect(tab("finished")).toHaveText("Finished 27");
+  await expect(tab("all")).toHaveAttribute("aria-pressed", "true");
+
+  const rows = page.locator("[data-run]");
+  await expect(rows).toHaveCount(100);
+  await expect(page.locator('[data-state="shown"]')).toHaveText(
+    "Showing 100 of 101",
+  );
+  await page.getByRole("button", { name: "Load more" }).click();
+  await expect(rows).toHaveCount(101);
+  const ids = await rows.evaluateAll((items) =>
+    items.map((item) => item.getAttribute("data-run")),
+  );
+  expect(new Set(ids).size).toBe(101);
+  await expect(page.getByRole("button", { name: "Load more" })).toHaveCount(0);
+
+  const spend = (id: string) =>
+    page.locator(`[data-run="${id}"] [data-field="spend"]`);
+  await expect(spend(HELD)).toContainText("≈");
+  await expect(spend(HELD)).toContainText("US$0.18");
+  await expect(spend(HELD)).toContainText("estimated, of US$1.00");
+  await expect(spend(UNREPORTED)).toContainText("≈");
+  await expect(spend(UNREPORTED)).toContainText("estimated");
+  await expect(spend(REPORTED)).not.toContainText("≈");
+  await expect(spend(REPORTED)).not.toContainText("estimated");
+  await expect(spend(REPORTED)).toContainText("US$0.07");
+  await expect(spend(REPORTED)).toContainText("of US$1.00");
+
+  const axe = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(axe.violations.map((item) => item.id)).toEqual([]);
+
+  await tab("needs_you").click();
+  await expect(tab("needs_you")).toHaveAttribute("aria-pressed", "true");
+  await expect(rows).toHaveCount(24);
+  for (const status of await rows.evaluateAll((items) =>
+    items.map((item) => item.getAttribute("data-status")),
+  ))
+    expect(status).toBe("waiting_input");
+  await expect(page.locator('[data-state="shown"]')).toHaveText(
+    "Showing 24 of 24",
+  );
+
+  await tab("all").click();
+  await page
+    .getByPlaceholder("Filter by goal or Expert")
+    .fill("fully reported");
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toHaveAttribute("data-run", REPORTED);
+  await expect(tab("all")).toHaveText("All 1");
+
+  await page.getByPlaceholder("Filter by goal or Expert").fill("");
+  await page.getByLabel("Model").selectOption("openrouter_sol");
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toHaveAttribute("data-run", HELD);
+  await expect(
+    page.locator(`[data-run="${HELD}"] [data-field="models"]`),
+  ).toContainText("Sol");
 });

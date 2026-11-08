@@ -452,12 +452,12 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.3#2 | Add its Pydantic contract and FastAPI route, regenerate OpenAPI and the TypeScript client, and forward it through the BFF. | DONE | US-15.3 |
 | US-15.3#3 | Add the shell's health line and Home's service chips. | DONE | US-15.3 |
 | US-15.3#4 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.3 |
-| US-15.4 | Run list projection, filters and spend | READY | EPIC-15 |
-| US-15.4#1 | Extend the run list projection in the application layer with labels, stop_reason, plan progress, frozen profiles and ledger spend. | TODO | US-15.4 |
-| US-15.4#2 | Add status-group, text and profile filters, per-tab counts, a keyset cursor and a total in the Pydantic contract and FastAPI route, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.4 |
-| US-15.4#3 | Forward the filters and the cursor through the BFF. | TODO | US-15.4 |
-| US-15.4#4 | Render the tabs, filters, Load more, labels, the "≈" spend and the meter on Runs. | TODO | US-15.4 |
-| US-15.4#5 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.4 |
+| US-15.4 | Run list projection, filters and spend | DONE | EPIC-15 |
+| US-15.4#1 | Extend the run list projection in the application layer with labels, stop_reason, plan progress, frozen profiles and ledger spend. | DONE | US-15.4 |
+| US-15.4#2 | Add status-group, text and profile filters, per-tab counts, a keyset cursor and a total in the Pydantic contract and FastAPI route, then regenerate OpenAPI and the TypeScript client. | DONE | US-15.4 |
+| US-15.4#3 | Forward the filters and the cursor through the BFF. | DONE | US-15.4 |
+| US-15.4#4 | Render the tabs, filters, Load more, labels, the "≈" spend and the meter on Runs. | DONE | US-15.4 |
+| US-15.4#5 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.4 |
 | US-15.5 | Approvals inbox, count badge and decision shortcuts | READY | EPIC-15 |
 | US-15.5#1 | Add decided statuses, tab counts, `decided_at` and `decided_by`, the run goal, the served plan task found through the tool use's operation ID, and the stored arguments' byte size to the approval read model. | TODO | US-15.5 |
 | US-15.5#2 | Add a pending-count endpoint and the extended views in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.5 |
@@ -518,7 +518,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.16 | Live GitHub qualification on the configured repository | BLOCKED | EPIC-15 |
 | US-15.16#1 | Extend the GitHub qualification runner, in no verification profile, to the read tools, labels and pull requests, refusing to start without the token and the recorded authorization. | TODO | US-15.16 |
 | US-15.16#2 | Run it once and record redacted evidence: the outputs' shapes, the markers, the retry readback and the absence of the token. | TODO | US-15.16 |
-| US-15.17 | Run side panel and plan task timing | BLOCKED | EPIC-15 |
+| US-15.17 | Run side panel and plan task timing | READY | EPIC-15 |
 | US-15.17#1 | Add plan task start and finish times by migration, written only on the worker's fenced path in database time. | TODO | US-15.17 |
 | US-15.17#2 | Add the current task, task times, per-task tools, tokens and the root tree's metered-call count to the run read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.17 |
 | US-15.17#3 | Build the side panel on Runs with Open run, Pause, Resume and Cancel through the existing commands and expected-version guard. | TODO | US-15.17 |
@@ -6105,7 +6105,8 @@ Open Questions:
 
 ### US-15.4: Run list projection, filters and spend
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-15-4-run-list-projection-filters/`
 
 As a workspace member
 I want each run in the list to show what it is, how far it got, its models and its spend, with filters and paging
@@ -6150,11 +6151,11 @@ Dependencies:
 - US-6.3
 
 Tasks:
-- [ ] Extend the run list projection in the application layer with labels, stop_reason, plan progress, frozen profiles and ledger spend.
-- [ ] Add status-group, text and profile filters, per-tab counts, a keyset cursor and a total in the Pydantic contract and FastAPI route, then regenerate OpenAPI and the TypeScript client.
-- [ ] Forward the filters and the cursor through the BFF.
-- [ ] Render the tabs, filters, Load more, labels, the "≈" spend and the meter on Runs.
-- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+- [x] Extend the run list projection in the application layer with labels, stop_reason, plan progress, frozen profiles and ledger spend.
+- [x] Add status-group, text and profile filters, per-tab counts, a keyset cursor and a total in the Pydantic contract and FastAPI route, then regenerate OpenAPI and the TypeScript client.
+- [x] Forward the filters and the cursor through the BFF.
+- [x] Render the tabs, filters, Load more, labels, the "≈" spend and the meter on Runs.
+- [x] Cover the scenarios on a disposable stack and in browser specs with axe.
 
 Open Questions:
 - None.
@@ -6812,7 +6813,7 @@ Open Questions:
 
 ### US-15.17: Run side panel and plan task timing
 
-Status: BLOCKED
+Status: READY
 
 As a run's owner
 I want a side panel on the run list with the plan's progress, each task's tools and wall time, spend and controls

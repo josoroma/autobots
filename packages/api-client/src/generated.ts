@@ -3529,6 +3529,35 @@ export const schemas = {
     "title": "RunEvent",
     "type": "object"
   },
+  "RunGroupCounts": {
+    "additionalProperties": false,
+    "properties": {
+      "active": {
+        "title": "Active",
+        "type": "integer"
+      },
+      "all": {
+        "title": "All",
+        "type": "integer"
+      },
+      "finished": {
+        "title": "Finished",
+        "type": "integer"
+      },
+      "needs_you": {
+        "title": "Needs You",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "all",
+      "active",
+      "needs_you",
+      "finished"
+    ],
+    "title": "RunGroupCounts",
+    "type": "object"
+  },
   "RunInputRequest": {
     "additionalProperties": false,
     "properties": {
@@ -3647,11 +3676,25 @@ export const schemas = {
   },
   "RunList": {
     "additionalProperties": false,
-    "description": "The newest of a workspace's runs. `has_more` says older ones aren't in this page.",
+    "description": "A page of a workspace's runs, newest first, with server counts per status group.\n\n`total` counts the selected group under the same filters. `next_cursor` continues the list\nafter this page's last row, and `has_more` says that more rows exist.",
     "properties": {
+      "counts": {
+        "$ref": "#/components/schemas/RunGroupCounts"
+      },
       "has_more": {
         "title": "Has More",
         "type": "boolean"
+      },
+      "next_cursor": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Next Cursor"
       },
       "runs": {
         "items": {
@@ -3664,19 +3707,31 @@ export const schemas = {
         "const": 1,
         "title": "Schema Version",
         "type": "integer"
+      },
+      "total": {
+        "title": "Total",
+        "type": "integer"
       }
     },
     "required": [
       "schema_version",
       "runs",
-      "has_more"
+      "has_more",
+      "next_cursor",
+      "total",
+      "counts"
     ],
     "title": "RunList",
     "type": "object"
   },
   "RunListItem": {
     "additionalProperties": false,
+    "description": "One run's facts for the list (PRD-Studio RN-01). Spend is from the ledger: `charged` is\nreported or entered, `reserved` is held for calls not yet settled, and `unreported` marks a call\nwhose charge was never reported. Either of the last two makes the amount an estimate.",
     "properties": {
+      "charged_micro_usd": {
+        "title": "Charged Micro Usd",
+        "type": "integer"
+      },
       "created_at": {
         "format": "date-time",
         "pattern": "^.+(Z|[+-]00:00)$",
@@ -3692,6 +3747,31 @@ export const schemas = {
         "title": "Id",
         "type": "string"
       },
+      "label": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Label"
+      },
+      "label_kind": {
+        "enum": [
+          "goal",
+          "expert",
+          "session",
+          "workflow"
+        ],
+        "title": "Label Kind",
+        "type": "string"
+      },
+      "limit_micro_usd": {
+        "title": "Limit Micro Usd",
+        "type": "integer"
+      },
       "parent_run_id": {
         "anyOf": [
           {
@@ -3704,8 +3784,48 @@ export const schemas = {
         ],
         "title": "Parent Run Id"
       },
+      "profiles": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Profiles",
+        "type": "array"
+      },
+      "reserved_micro_usd": {
+        "title": "Reserved Micro Usd",
+        "type": "integer"
+      },
       "status": {
         "$ref": "#/components/schemas/RunStatus"
+      },
+      "stop_reason": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Stop Reason"
+      },
+      "tasks_complete": {
+        "title": "Tasks Complete",
+        "type": "integer"
+      },
+      "tasks_total": {
+        "title": "Tasks Total",
+        "type": "integer"
+      },
+      "unreported": {
+        "title": "Unreported",
+        "type": "boolean"
+      },
+      "updated_at": {
+        "format": "date-time",
+        "pattern": "^.+(Z|[+-]00:00)$",
+        "title": "Updated At",
+        "type": "string"
       }
     },
     "required": [
@@ -3713,7 +3833,18 @@ export const schemas = {
       "parent_run_id",
       "status",
       "goal_summary",
-      "created_at"
+      "created_at",
+      "updated_at",
+      "label_kind",
+      "label",
+      "stop_reason",
+      "tasks_complete",
+      "tasks_total",
+      "profiles",
+      "charged_micro_usd",
+      "reserved_micro_usd",
+      "unreported",
+      "limit_micro_usd"
     ],
     "title": "RunListItem",
     "type": "object"
@@ -6705,6 +6836,17 @@ export function parseRunEvent(value: unknown): RunEvent {
   return parseWith(schemas, "RunEvent", value) as RunEvent;
 }
 
+export interface RunGroupCounts {
+  active: number;
+  all: number;
+  finished: number;
+  needs_you: number;
+}
+
+export function parseRunGroupCounts(value: unknown): RunGroupCounts {
+  return parseWith(schemas, "RunGroupCounts", value) as RunGroupCounts;
+}
+
 export interface RunInputRequest {
   expected_version: number;
   value: string;
@@ -6740,9 +6882,12 @@ export function parseRunIntentCheck(value: unknown): RunIntentCheck {
 }
 
 export interface RunList {
+  counts: RunGroupCounts;
   has_more: boolean;
+  next_cursor: string | null;
   runs: RunListItem[];
   schema_version: 1;
+  total: number;
 }
 
 export function parseRunList(value: unknown): RunList {
@@ -6750,11 +6895,22 @@ export function parseRunList(value: unknown): RunList {
 }
 
 export interface RunListItem {
+  charged_micro_usd: number;
   created_at: string;
   goal_summary: string;
   id: string;
+  label: string | null;
+  label_kind: "goal" | "expert" | "session" | "workflow";
+  limit_micro_usd: number;
   parent_run_id: string | null;
+  profiles: string[];
+  reserved_micro_usd: number;
   status: RunStatus;
+  stop_reason: string | null;
+  tasks_complete: number;
+  tasks_total: number;
+  unreported: boolean;
+  updated_at: string;
 }
 
 export function parseRunListItem(value: unknown): RunListItem {

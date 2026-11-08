@@ -424,6 +424,27 @@ def qualify(root: Path) -> int:
         stack.runtime(f"insert into public.workspace_members (workspace_id, user_id, role) values ('{owner_a['workspace_id']}', '{reader['user_id']}', 'member');\n"
                       f"delete from public.workspace_members where workspace_id = '{reader['workspace_id']}' and user_id = '{reader['user_id']}';\n")
         artifacts = {**artifacts, 'AUTOBOTS_TEST_READER_EMAIL': email_f, 'AUTOBOTS_TEST_READER_PASSWORD': password_f}
+        # US-15.4, arranged: an owner whose workspace holds 101 runs, so a second page exists, and three
+        # with spend: one reserved, one with an unreported charge and one fully reported.
+        email_g, password_g = 'runs-g@example.invalid', secrets.token_urlsafe(24)
+        lister = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_g, password_g)
+        listed = lister['workspace_id']
+        spend_runs = ('44444444-4444-4444-8444-000000000001', '44444444-4444-4444-8444-000000000002', '44444444-4444-4444-8444-000000000003')
+        stack.runtime(
+            "insert into public.runs (id, workspace_id, status, goal_summary, limit_micro_usd, created_at, policy_snapshot) "
+            f"select gen_random_uuid(), '{listed}', (array['queued','succeeded','paused','waiting_input'])[1 + n % 4], "
+            "'Filler run ' || n, 1000000, now() - make_interval(mins => 200 + n), "
+            "'{\"bindings\": {\"executor\": \"openrouter_terra\"}}'::jsonb from generate_series(1, 98) n;\n"
+            "insert into public.runs (id, workspace_id, status, goal_summary, limit_micro_usd, created_at, policy_snapshot) values "
+            f"('{spend_runs[0]}', '{listed}', 'running', 'Spend held in reserve', 1000000, now() - interval '3 minutes', '{{\"bindings\": {{\"researcher\": \"openrouter_sol\"}}}}'), "
+            f"('{spend_runs[1]}', '{listed}', 'failed', 'Spend never reported', 1000000, now() - interval '2 minutes', '{{}}'), "
+            f"('{spend_runs[2]}', '{listed}', 'succeeded', 'Spend fully reported', 1000000, now() - interval '1 minute', '{{}}');\n"
+            "insert into app_private.model_invocations (id, workspace_id, root_run_id, run_id, role, profile, wire_id, attempt, spend_day, "
+            "reserved_micro_usd, charged_micro_usd, status, failure_class) values "
+            f"(gen_random_uuid(), '{listed}', '{spend_runs[0]}', '{spend_runs[0]}', 'executor', 'openrouter_terra', 'w', 1, current_date, 180000, null, 'reserved', null), "
+            f"(gen_random_uuid(), '{listed}', '{spend_runs[1]}', '{spend_runs[1]}', 'executor', 'openrouter_terra', 'w', 1, current_date, 30000, null, 'uncertain', 'charge_not_reported'), "
+            f"(gen_random_uuid(), '{listed}', '{spend_runs[2]}', '{spend_runs[2]}', 'executor', 'openrouter_terra', 'w', 1, current_date, 0, 70000, 'succeeded', null);\n")
+        artifacts = {**artifacts, 'AUTOBOTS_TEST_RUNS_EMAIL': email_g, 'AUTOBOTS_TEST_RUNS_PASSWORD': password_g}
         # Its own workspace with no key, as the one above asserts that it holds exactly one run.
         email_e, password_e = 'owner-e@example.invalid', secrets.token_urlsafe(24)
         owner_e = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_e, password_e)

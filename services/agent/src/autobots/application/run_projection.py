@@ -1,6 +1,8 @@
 """The public view of a run, SP-011. Nothing here reads checkpoints or graph state."""
 
+import base64
 import re
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -25,8 +27,10 @@ from autobots.contracts.run_workspace import (
     OutstandingSummary,
     PlanSummary,
     RunBudgets,
+    RunGroupCounts,
     RunInspector,
     RunList,
+    RunListGroup,
     RunListItem,
     RunWorkspace,
     TaskView,
@@ -315,14 +319,129 @@ async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> R
     )
 
 
-async def read_run_list(connection: Any, workspace_id: UUID, limit: int = RUN_LIST_SIZE) -> RunList:
+GROUPS: dict[str, tuple[str, ...]] = {
+    "active": ("queued", "running", "verifying", "paused", "cancelling"),
+    "needs_you": ("waiting_approval", "waiting_input"),
+    "finished": ("succeeded", "failed", "cancelled"),
+}
+MAX_QUERY = 200
+
+
+class InvalidCursor(ValueError):
+    """A cursor this API didn't issue."""
+
+
+def encode_cursor(created_at: datetime, run_id: UUID) -> str:
+    raw = f"{created_at.isoformat()}|{run_id}".encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def decode_cursor(cursor: str) -> tuple[datetime, UUID]:
+    try:
+        raw = base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)).decode()
+        stamp, _, identifier = raw.partition("|")
+        moment = datetime.fromisoformat(stamp)
+        if moment.tzinfo is None:
+            raise ValueError("naive")
+        return moment, UUID(identifier)
+    except (ValueError, UnicodeDecodeError) as error:
+        raise InvalidCursor("invalid_cursor") from error
+
+
+def _like(text: str) -> str:
+    escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
+# One row per run (PRD-Studio RN-01). The joins only label a run; they never widen the workspace.
+_LIST_FROM = (
+    "from public.runs r "
+    "left join public.experts e on e.id = r.expert_id and e.workspace_id = r.workspace_id "
+    "left join public.sessions s on s.id = r.session_id and s.workspace_id = r.workspace_id "
+    "left join public.workflow_executions x on x.run_id = r.id and x.workspace_id = r.workspace_id "
+    "left join public.workflows w on w.id = x.workflow_id and w.workspace_id = r.workspace_id "
+    "where r.workspace_id = %(workspace)s "
+    "and (%(like)s::text is null or r.goal_summary ilike %(like)s or e.name ilike %(like)s "
+    "or w.name ilike %(like)s) "
+    "and (%(profile)s::text is null or exists (select 1 from "
+    "jsonb_each_text(coalesce(r.policy_snapshot -> 'bindings', '{}'::jsonb)) b "
+    "where b.value = %(profile)s)) "
+)
+_LIST_SELECT = (
+    "select r.id, r.parent_run_id, r.status, r.goal_summary, r.created_at, r.updated_at, "
+    "case when x.id is not null then 'workflow' when s.kind = 'coordinator' then 'session' "
+    "when e.id is not null then 'expert' else 'goal' end, "
+    "case when x.id is not null then w.name || ', version ' || x.workflow_version "
+    "when s.kind = 'coordinator' then 'Coordinator session' else e.name end, "
+    "(select u.stop_reason from app_private.run_usage u where u.run_id = r.id), "
+    "coalesce((select jsonb_array_length(p.tasks) from app_private.plan_versions p "
+    "where p.run_id = r.id order by p.version desc limit 1), 0), "
+    "(select count(*) from app_private.plan_evidence v where v.run_id = r.id and v.task_id in "
+    "(select t ->> 'id' from app_private.plan_versions p, jsonb_array_elements(p.tasks) t "
+    "where p.run_id = r.id and p.version = (select max(version) from app_private.plan_versions q "
+    "where q.run_id = r.id))), "
+    "array(select distinct b.value from "
+    "jsonb_each_text(coalesce(r.policy_snapshot -> 'bindings', '{}'::jsonb)) b order by 1), "
+    "(select coalesce(sum(coalesce(i.charged_micro_usd, 0)), 0)::bigint "
+    "from app_private.model_invocations i where i.root_run_id = r.id or i.run_id = r.id), "
+    "(select coalesce(sum(i.reserved_micro_usd) filter (where i.status in "
+    "('reserved', 'dispatched', 'uncertain') and i.reconciled_at is null), 0)::bigint "
+    "from app_private.model_invocations i where i.root_run_id = r.id or i.run_id = r.id), "
+    "exists (select 1 from app_private.model_invocations i where (i.root_run_id = r.id "
+    "or i.run_id = r.id) and i.status = 'uncertain' and i.reconciled_at is null "
+    "and i.failure_class = 'charge_not_reported'), "
+    "r.limit_micro_usd "
+)
+
+
+async def read_run_list(
+    connection: Any,
+    workspace_id: UUID,
+    limit: int = RUN_LIST_SIZE,
+    *,
+    group: RunListGroup = "all",
+    query: str | None = None,
+    profile: str | None = None,
+    cursor: str | None = None,
+) -> RunList:
     """Only this workspace's, newest first. A read, so it starts nothing and needs no key."""
-    cursor = await connection.execute(
-        "select id, parent_run_id, status, goal_summary, created_at from public.runs "
-        "where workspace_id = %s order by created_at desc, id desc limit %s",
-        (workspace_id, limit + 1),
+    text = (query or "").strip()[:MAX_QUERY]
+    params: dict[str, Any] = {
+        "workspace": workspace_id,
+        "like": _like(text) if text else None,
+        "profile": profile,
+    }
+    counted = await connection.execute(
+        "select count(*), "
+        "count(*) filter (where r.status = any(%(active)s)), "
+        "count(*) filter (where r.status = any(%(needs)s)), "
+        "count(*) filter (where r.status = any(%(finished)s)) " + _LIST_FROM,
+        {
+            **params,
+            "active": list(GROUPS["active"]),
+            "needs": list(GROUPS["needs_you"]),
+            "finished": list(GROUPS["finished"]),
+        },
     )
-    rows = await cursor.fetchall()
+    totals = await counted.fetchone()
+    counts = RunGroupCounts(
+        all=int(totals[0]), active=int(totals[1]), needs_you=int(totals[2]), finished=int(totals[3])
+    )
+    where = ""
+    page_params = {**params, "limit": limit + 1}
+    if group != "all":
+        where += "and r.status = any(%(statuses)s) "
+        page_params["statuses"] = list(GROUPS[group])
+    if cursor is not None:
+        moment, after = decode_cursor(cursor)
+        where += "and (r.created_at, r.id) < (%(moment)s, %(after)s) "
+        page_params["moment"], page_params["after"] = moment, after
+    page = await connection.execute(
+        _LIST_SELECT + _LIST_FROM + where + "order by r.created_at desc, r.id desc limit %(limit)s",
+        page_params,
+    )
+    rows = await page.fetchall()
+    shown = rows[:limit]
     return RunList(
         schema_version=1,
         runs=[
@@ -332,10 +451,24 @@ async def read_run_list(connection: Any, workspace_id: UUID, limit: int = RUN_LI
                 status=row[2],
                 goal_summary=public_text(row[3]),
                 created_at=row[4],
+                updated_at=row[5],
+                label_kind=row[6],
+                label=public_text(row[7]) if row[7] else None,
+                stop_reason=row[8],
+                tasks_complete=int(row[10]),
+                tasks_total=int(row[9]),
+                profiles=list(row[11]),
+                charged_micro_usd=int(row[12]),
+                reserved_micro_usd=int(row[13]),
+                unreported=bool(row[14]),
+                limit_micro_usd=int(row[15]),
             )
-            for row in rows[:limit]
+            for row in shown
         ],
         has_more=len(rows) > limit,
+        next_cursor=encode_cursor(shown[-1][4], shown[-1][0]) if len(rows) > limit else None,
+        total=getattr(counts, group),
+        counts=counts,
     )
 
 
