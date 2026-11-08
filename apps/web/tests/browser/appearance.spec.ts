@@ -226,7 +226,8 @@ test("an explicit dark choice persists too", async ({ browser }) => {
   await context.close();
 });
 
-for (const stored of ["system", "garbage", ""]) {
+// "system" is a choice now (Decision 0022 D2). Any other value, even "System", is not.
+for (const stored of ["garbage", "", "System"]) {
   test(`an invalid saved value "${stored}" falls back to dark`, async ({
     browser,
   }) => {
@@ -343,11 +344,185 @@ test("the settings radios have labels and are usable by keyboard", async ({
   const context = await browser.newContext();
   const page = await context.newPage();
   await visit(page, "/settings");
+  // System, Light, Dark: one step back from the first visit's Dark is Light.
   await page.getByRole("radio", { name: "Dark" }).focus();
-  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowUp");
   await expect(page.getByRole("radio", { name: "Light" })).toBeChecked();
   await expect(page.locator("html")).toHaveClass(/light/);
   await page.setViewportSize({ width: 640, height: 800 });
   await expect(page.getByRole("radio", { name: "Dark" })).toBeVisible();
   await context.close();
+});
+
+// US-15.20, PRD-Studio SE-03 and DS-02 as amended by Decision 0022 D2.
+test("System follows the OS only once chosen, and a reload restores it before paint", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ colorScheme: "light" });
+  const page = await context.newPage();
+  const problems = failOnHydrationProblem(page);
+  await visit(page, "/settings");
+  // A first visit is dark, whatever the OS prefers.
+  await expectConsistent(page, "dark");
+  await expect(page.getByRole("radio", { name: "Dark" })).toBeChecked();
+  await page.getByRole("radio", { name: "System" }).check();
+  await expect(page.locator("html")).toHaveClass(/light/);
+  expect(
+    await page.evaluate(() => localStorage.getItem("autobots.theme")),
+  ).toBe("system");
+  // The OS switches while the page is open.
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await expect(page.locator("html")).not.toHaveClass(/light/);
+  await page.reload();
+  await page.waitForLoadState("networkidle");
+  await expectConsistent(page, "dark");
+  await expect(page.getByRole("radio", { name: "System" })).toBeChecked();
+  // And back, so System is seen following the OS both ways, before paint.
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.reload();
+  await page.waitForLoadState("networkidle");
+  await expectConsistent(page, "light");
+  await page.screenshot({
+    path: `${SCREENSHOTS}/settings-system-light.png`,
+    fullPage: true,
+  });
+  expect(problems).toEqual([]);
+  await context.close();
+});
+
+async function presentation(page: Page): Promise<{
+  font: string;
+  padding: number;
+  transition: string;
+}> {
+  const font = await page
+    .locator('[data-field="document-sample"]')
+    .evaluate((element) => getComputedStyle(element).fontFamily);
+  const padding = await page
+    .locator('section[aria-labelledby="appearance-heading"]')
+    .evaluate((element) => parseFloat(getComputedStyle(element).paddingTop));
+  // A probe with its own transition: forced or OS reduced motion shortens it to 0.01 ms.
+  const transition = await page.evaluate(() => {
+    const probe = document.createElement("div");
+    probe.style.transition = "color 300ms linear";
+    document.body.append(probe);
+    const duration = getComputedStyle(probe).transitionDuration;
+    probe.remove();
+    return duration;
+  });
+  return { font, padding, transition };
+}
+
+test("serif documents, density and forced reduced motion apply, survive a reload, and motion otherwise follows the OS", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ reducedMotion: "no-preference" });
+  const page = await context.newPage();
+  const problems = failOnHydrationProblem(page);
+  const requests: string[] = [];
+  await visit(page, "/settings");
+  page.on("request", (request) =>
+    requests.push(`${request.method()} ${request.url()}`),
+  );
+  const fresh = await presentation(page);
+  // Serif documents are on by default, comfortable, and motion runs as the OS allows.
+  await expect(
+    page.getByRole("checkbox", { name: "Serif for documents" }),
+  ).toBeChecked();
+  expect(fresh.font).toContain("Georgia");
+  expect(fresh.padding).toBe(20);
+  expect(fresh.transition).toBe("0.3s");
+
+  await page.getByRole("checkbox", { name: "Serif for documents" }).uncheck();
+  await page.getByRole("radio", { name: "Compact" }).check();
+  await page.getByRole("radio", { name: "Always reduce motion" }).check();
+  const chosen = await presentation(page);
+  expect(chosen.font).not.toContain("Georgia");
+  expect(chosen.font).toMatch(/sans-serif|system-ui/);
+  expect(chosen.padding).toBe(16);
+  expect(chosen.transition).toBe("1e-05s");
+  await page.waitForTimeout(300);
+  expect(requests, "presentation choices issue no request").toEqual([]);
+
+  await page.reload();
+  await page.waitForLoadState("networkidle");
+  expect(await presentation(page)).toEqual(chosen);
+  await expect(
+    page.getByRole("checkbox", { name: "Serif for documents" }),
+  ).not.toBeChecked();
+  await expect(page.getByRole("radio", { name: "Compact" })).toBeChecked();
+  await expect(
+    page.getByRole("radio", { name: "Always reduce motion" }),
+  ).toBeChecked();
+  expect(
+    await page.evaluate(() => document.documentElement.dataset.motion),
+  ).toBe("reduce");
+
+  // With nothing forced, motion follows the OS.
+  await page.getByRole("radio", { name: "Follow this Mac" }).check();
+  expect((await presentation(page)).transition).toBe("0.3s");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect((await presentation(page)).transition).toBe("1e-05s");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  expect((await presentation(page)).transition).toBe("0.3s");
+  for (const theme of ["dark", "light"] as const) {
+    await page
+      .getByRole("radio", { name: theme === "dark" ? "Dark" : "Light" })
+      .check();
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+      .analyze();
+    expect(
+      results.violations.map((item) => `${item.id}: ${item.nodes.length}`),
+      `${theme}, compact and sans documents`,
+    ).toEqual([]);
+  }
+  expect(problems).toEqual([]);
+  await context.close();
+});
+
+test("invalid stored preferences are ignored, and unwritable storage keeps a choice for the page", async ({
+  browser,
+}) => {
+  const invalid = await browser.newContext({ reducedMotion: "no-preference" });
+  await invalid.addInitScript(() => {
+    localStorage.setItem("autobots.serif", "maybe");
+    localStorage.setItem("autobots.density", "huge");
+    localStorage.setItem("autobots.motion", "fast");
+  });
+  const page = await invalid.newPage();
+  await visit(page, "/settings");
+  const shown = await presentation(page);
+  expect(shown.font).toContain("Georgia");
+  expect(shown.padding).toBe(20);
+  expect(shown.transition).toBe("0.3s");
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await invalid.close();
+
+  const unavailable = await browser.newContext({
+    colorScheme: "light",
+    reducedMotion: "no-preference",
+  });
+  await unavailable.addInitScript(() => {
+    Object.defineProperty(window, "localStorage", {
+      get() {
+        throw new Error("storage is unavailable");
+      },
+    });
+  });
+  const blocked = await unavailable.newPage();
+  const errors: string[] = [];
+  blocked.on("pageerror", (error) => errors.push(error.message));
+  await blocked.goto("/settings");
+  await blocked.waitForLoadState("networkidle");
+  await expect(blocked.locator("html")).toHaveClass(/dark/);
+  await blocked.getByRole("radio", { name: "Compact" }).check();
+  expect((await presentation(blocked)).padding).toBe(16);
+  await blocked
+    .getByRole("checkbox", { name: "Serif for documents" })
+    .uncheck();
+  expect((await presentation(blocked)).font).not.toContain("Georgia");
+  expect(errors).toEqual([]);
+  await unavailable.close();
 });

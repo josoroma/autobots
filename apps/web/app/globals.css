@@ -13,6 +13,15 @@
   --live-text: var(--primary);
   --serif:
     ui-serif, "New York", "Iowan Old Style", Charter, Georgia, Cambria, serif;
+  /* PRD-Studio SE-03: what a run's documents are read in. Serif unless the person turns it off. */
+  --document: var(--serif);
+}
+html[data-serif="off"] {
+  --document: var(--font-sans);
+}
+/* SE-03: compact density tightens every spacing utility, which all derive from this one step. */
+html[data-density="compact"] {
+  --spacing: 0.2rem;
 }
 .dark {
   --success-text: var(--chart-2);
@@ -56,6 +65,7 @@
   --color-success-text: var(--success-text);
   --color-live-text: var(--live-text);
   --font-serif: var(--serif);
+  --font-document: var(--document);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -98,5 +108,11 @@
       transition-duration: 0.01ms !important;
       animation-duration: 0.01ms !important;
     }
+  }
+  /* SE-03: reduced motion forced on in this browser, whatever the OS allows. */
+  html[data-motion="reduce"] * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

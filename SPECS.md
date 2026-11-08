@@ -532,12 +532,12 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.19#1 | Add an hourly job count by outcome over 24 hours in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | DONE | US-15.19 |
 | US-15.19#2 | Render the chart with chart tokens and its text table on Operations. | DONE | US-15.19 |
 | US-15.19#3 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.19 |
-| US-15.20 | Appearance preferences with a System theme | READY | EPIC-15 |
-| US-15.20#1 | Offer System, Light and Dark in the theme provider: dark for a first visit and for a missing, invalid or unavailable value, and System following the OS only when chosen. | TODO | US-15.20 |
-| US-15.20#2 | Add the serif, density and reduce-motion preferences, stored in the browser and changing presentation only. | TODO | US-15.20 |
-| US-15.20#3 | Update `appearance.spec.ts` for System and the new preferences, under both OS schemes and with invalid and unavailable storage. | TODO | US-15.20 |
-| US-15.20#4 | Cover the scenarios in browser specs with axe in both themes. | TODO | US-15.20 |
-| US-15.21 | Settings sub-pages for notifications, data and keyboard | BLOCKED | EPIC-15 |
+| US-15.20 | Appearance preferences with a System theme | DONE | EPIC-15 |
+| US-15.20#1 | Offer System, Light and Dark in the theme provider: dark for a first visit and for a missing, invalid or unavailable value, and System following the OS only when chosen. | DONE | US-15.20 |
+| US-15.20#2 | Add the serif, density and reduce-motion preferences, stored in the browser and changing presentation only. | DONE | US-15.20 |
+| US-15.20#3 | Update `appearance.spec.ts` for System and the new preferences, under both OS schemes and with invalid and unavailable storage. | DONE | US-15.20 |
+| US-15.20#4 | Cover the scenarios in browser specs with axe in both themes. | DONE | US-15.20 |
+| US-15.21 | Settings sub-pages for notifications, data and keyboard | READY | EPIC-15 |
 | US-15.21#1 | Add a member-readable retention summary in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client and forward it through the BFF. | TODO | US-15.21 |
 | US-15.21#2 | Add the Settings sub-navigation and the Notifications, Data on this Mac and Keyboard pages. | TODO | US-15.21 |
 | US-15.21#3 | Raise browser notifications for runs entering waiting_approval or waiting_input while the app is open, only with the browser's permission and the setting on. | TODO | US-15.21 |
@@ -550,7 +550,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.23#1 | Add the New run button with its key hint after the skip link, and the shortcut handler that ignores text fields. | TODO | US-15.23 |
 | US-15.23#2 | Update `appearance.spec.ts`'s tab-order assertion so the skip link stays first. | TODO | US-15.23 |
 | US-15.23#3 | Cover the scenarios in browser specs with axe. | TODO | US-15.23 |
-| US-15.24 | Streaming result text | BLOCKED | EPIC-15 |
+| US-15.24 | Streaming result text | READY | EPIC-15 |
 | US-15.24#1 | Emit ephemeral, coalesced `result.text.delta` events for the final result's text only, on the live stream and never into durable events. | TODO | US-15.24 |
 | US-15.24#2 | Add the event type to the typed union, the generated client and the consumer in the same change, with the consumer ignoring unknown types. | TODO | US-15.24 |
 | US-15.24#3 | Add the "Stream text as it's written" preference to Appearance, and honor it in the run view. | TODO | US-15.24 |
@@ -6977,7 +6977,8 @@ Open Questions:
 
 ### US-15.20: Appearance preferences with a System theme
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-15-20-appearance-preferences-system-theme/`
 
 As a person using the app
 I want System, Light or Dark, serif documents, a density and reduced motion, kept in this browser
@@ -7019,17 +7020,17 @@ Dependencies:
 - US-3.2
 
 Tasks:
-- [ ] Offer System, Light and Dark in the theme provider: dark for a first visit and for a missing, invalid or unavailable value, and System following the OS only when chosen.
-- [ ] Add the serif, density and reduce-motion preferences, stored in the browser and changing presentation only.
-- [ ] Update `appearance.spec.ts` for System and the new preferences, under both OS schemes and with invalid and unavailable storage.
-- [ ] Cover the scenarios in browser specs with axe in both themes.
+- [x] Offer System, Light and Dark in the theme provider: dark for a first visit and for a missing, invalid or unavailable value, and System following the OS only when chosen.
+- [x] Add the serif, density and reduce-motion preferences, stored in the browser and changing presentation only.
+- [x] Update `appearance.spec.ts` for System and the new preferences, under both OS schemes and with invalid and unavailable storage.
+- [x] Cover the scenarios in browser specs with axe in both themes.
 
 Open Questions:
 - None.
 
 ### US-15.21: Settings sub-pages for notifications, data and keyboard
 
-Status: BLOCKED
+Status: READY
 
 As a workspace member
 I want Settings divided into Appearance, Notifications, Account, Data on this Mac and Keyboard
@@ -7173,7 +7174,7 @@ Open Questions:
 
 ### US-15.24: Streaming result text
 
-Status: BLOCKED
+Status: READY
 
 As a run's owner
 I want to see the final result while it's being written, and a preference to turn that off

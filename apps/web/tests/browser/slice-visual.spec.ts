@@ -1007,9 +1007,28 @@ test("changing appearance sends no model or task request, and changes no run or 
   });
   await page.getByLabel("Light").check();
   await expect(page.locator("html")).toHaveClass(/light/);
+  // US-15.20: every preference, each changed and then put back, while a run runs and approvals wait.
+  await page.getByRole("radio", { name: "System" }).check();
+  await page.getByRole("checkbox", { name: "Serif for documents" }).uncheck();
+  await page.getByRole("radio", { name: "Compact" }).check();
+  await page.getByRole("radio", { name: "Always reduce motion" }).check();
+  await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
+  await expect(page.locator("html")).toHaveAttribute("data-motion", "reduce");
+  await expect(page.locator("html")).toHaveAttribute("data-serif", "off");
+  await page.getByRole("checkbox", { name: "Serif for documents" }).check();
+  await page.getByRole("radio", { name: "Comfortable" }).check();
+  await page.getByRole("radio", { name: "Follow this Mac" }).check();
   await page.getByLabel("Dark").check();
   await expect(page.locator("html")).toHaveClass(/dark/);
   await page.waitForTimeout(500);
   expect(requests).toEqual([]);
   expect(await state()).toEqual(before);
+  expect(
+    before.runs.some((run: { status: string }) => run.status === "running"),
+  ).toBe(true);
+  expect(
+    before.approvals.some(
+      (item: { status: string }) => item.status === "pending",
+    ),
+  ).toBe(true);
 });

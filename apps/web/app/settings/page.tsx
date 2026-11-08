@@ -1,8 +1,8 @@
 import { AppearanceControl } from "@/components/appearance-control";
 import { PageHeader } from "@/components/ui/page-header";
 
-// Decision 0021: one settings section, a label column on the left and its control on the right. Only what
-// exists is shown, so there's no sub-navigation and no density, motion or reading settings (R6).
+// Decision 0021: one settings section, a label column on the left and its control on the right. PRD-Studio
+// SE-03 (Decision 0022) adds System, serif documents, density and reduced motion to Appearance.
 export default function SettingsPage() {
   return (
     <div className="max-w-3xl space-y-8">
@@ -16,7 +16,8 @@ export default function SettingsPage() {
             Appearance
           </h2>
           <p className="text-muted-foreground text-[12.5px] leading-relaxed">
-            This choice is stored in this browser. It changes presentation only.
+            These choices are stored in this browser. They change presentation
+            only, never a run, an approval or a workflow.
           </p>
         </div>
         <AppearanceControl />

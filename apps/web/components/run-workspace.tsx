@@ -397,7 +397,7 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
             </Section>
           )}
           <Section id="goal-heading" title="Goal">
-            <p className="font-serif text-[17px] leading-relaxed break-words">
+            <p className="font-document text-[17px] leading-relaxed break-words">
               {snapshot.objective ?? "No goal is recorded."}
             </p>
             {snapshot.criteria.length === 0 ? null : (

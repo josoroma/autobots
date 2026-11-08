@@ -70,7 +70,7 @@ export function RunInspectorView({ runId }: { runId: string }) {
       <header className="space-y-2">
         <h1 className="text-[32px] leading-tight">Run inspector</h1>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          <span className="text-foreground font-serif text-[17px] break-words">
+          <span className="text-foreground font-document text-[17px] break-words">
             {view.goal_summary === "" ? "Untitled run" : view.goal_summary}.
           </span>{" "}
           <Link
@@ -228,7 +228,7 @@ export function RunInspectorView({ runId }: { runId: string }) {
                     </span>
                     :
                   </span>{" "}
-                  <span className="font-serif text-[15px] leading-relaxed">
+                  <span className="font-document text-[15px] leading-relaxed">
                     {item.summary}
                   </span>
                 </p>
