@@ -570,17 +570,17 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-16.1#1 | Replace the inset underline with a `--control-border` token for all four sides, at 3:1 in both themes. | DONE | US-16.1 |
 | US-16.1#2 | Give the composer's goal field the shared rounded border, and drop the composer and sign-in cards' shadow. | DONE | US-16.1 |
 | US-16.1#3 | Measure boundaries and focus in both themes with the visual walk. | DONE | US-16.1 |
-| US-16.2 | Schema readiness against every shipped migration | READY | EPIC-16 |
-| US-16.2#1 | Record the shipped migration count and newest name, with a check that they match the directory. | TODO | US-16.2 |
-| US-16.2#2 | Compare the applied count in readiness, with schema_behind and schema_ahead. | TODO | US-16.2 |
-| US-16.2#3 | Extend the required relations and columns through migration 49. | TODO | US-16.2 |
-| US-16.2#4 | Show applied against shipped in Operations, and cover the scenarios on a disposable stack. | TODO | US-16.2 |
+| US-16.2 | Schema readiness against every shipped migration | DONE | EPIC-16 |
+| US-16.2#1 | Record the shipped migration count and newest name, with a check that they match the directory. | DONE | US-16.2 |
+| US-16.2#2 | Compare the applied count in readiness, with schema_behind and schema_ahead. | DONE | US-16.2 |
+| US-16.2#3 | Extend the required relations and columns through migration 49. | DONE | US-16.2 |
+| US-16.2#4 | Show applied against shipped in Operations, and cover the scenarios on a disposable stack. | DONE | US-16.2 |
 | US-16.3 | Workspace choice for members of several workspaces | READY | EPIC-16 |
 | US-16.3#1 | Add a same-origin, CSRF-checked route that keeps the choice in an HttpOnly cookie. | TODO | US-16.3 |
 | US-16.3#2 | Send the choice from the BFF and the event stream as `X-Autobots-Workspace`. | TODO | US-16.3 |
 | US-16.3#3 | Add the sidebar chooser for members of several workspaces. | TODO | US-16.3 |
 | US-16.3#4 | Cover the scenarios in the browser on a disposable stack. | TODO | US-16.3 |
-| US-16.4 | A current install with Sol's live qualification | BLOCKED | EPIC-16 |
+| US-16.4 | A current install with Sol's live qualification | READY | EPIC-16 |
 | US-16.4#1 | Back up the install, then apply the pending migrations through the guarded path. | TODO | US-16.4 |
 | US-16.4#2 | Run Sol's corpus live within its ledger, and record the report. | TODO | US-16.4 |
 | US-16.4#3 | Record today's qualification in a migration, apply it, and check Settings → Models. | TODO | US-16.4 |
@@ -7418,7 +7418,8 @@ Open Questions:
 
 ### US-16.2: Schema readiness against every shipped migration
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-16-2-schema-readiness-against-every/`
 
 As an operator
 I want readiness to compare the database's applied migrations with the ones this release ships
@@ -7462,10 +7463,10 @@ Dependencies:
 - None
 
 Tasks:
-- [ ] Record the shipped migration count and newest name, with a check that they match the directory.
-- [ ] Compare the applied count in readiness, with schema_behind and schema_ahead.
-- [ ] Extend the required relations and columns through migration 49.
-- [ ] Show applied against shipped in Operations, and cover the scenarios on a disposable stack.
+- [x] Record the shipped migration count and newest name, with a check that they match the directory.
+- [x] Compare the applied count in readiness, with schema_behind and schema_ahead.
+- [x] Extend the required relations and columns through migration 49.
+- [x] Show applied against shipped in Operations, and cover the scenarios on a disposable stack.
 
 Open Questions:
 - None.
@@ -7526,7 +7527,7 @@ Open Questions:
 
 ### US-16.4: A current install with Sol's live qualification
 
-Status: BLOCKED
+Status: READY
 
 As an owner
 I want my persistent install brought up to the code's migrations, and Sol's route qualified live today

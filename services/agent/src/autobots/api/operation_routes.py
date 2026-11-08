@@ -43,6 +43,7 @@ from autobots.application.retention import (
     write_policy,
 )
 from autobots.application.run_projection import public_text
+from autobots.application.schema_release import SHIPPED_MIGRATIONS
 from autobots.contracts.operations import (
     DelayedOccurrence,
     JobHour,
@@ -184,6 +185,7 @@ async def get_local_status(
             database_p95_ms=probes.p95(),
             database_probes=probes.count(),
             applied_migrations=migrations,
+            shipped_migrations=SHIPPED_MIGRATIONS,
             storage_bytes=storage_used,
             disk_free_bytes=disk[0] if disk else None,
             disk_total_bytes=disk[1] if disk else None,

@@ -19,6 +19,7 @@ from typing import Any
 from uuid import UUID
 
 from autobots.adapters.checkpoints import adapter_identity, adapter_qualified
+from autobots.application.schema_release import SHIPPED_MIGRATIONS
 from autobots.operations.logs import log_event
 
 logger = logging.getLogger("autobots.operations")
@@ -40,6 +41,11 @@ REQUIRED_RELATIONS = (
     "app_private.improvement_replay_runs",
     "agent_runtime.adapter_qualifications",
     "agent_runtime.route_qualifications",
+    # Migrations 38 to 49 (Decision 0023 E2), for a database with no readable history.
+    "app_private.tool_uses",
+    "public.user_profiles",
+    "public.workflow_drafts",
+    "app_private.plan_task_times",
 )
 # A migration can add only columns, which a relation check can't see. The newest code relies on.
 REQUIRED_COLUMNS = (
@@ -52,7 +58,12 @@ REQUIRED_COLUMNS = (
     ("app_private.tool_receipts", "failure_code"),
     ("app_private.model_invocations", "finish_reason"),
     ("app_private.model_invocations", "charge_source"),
+    ("app_private.tool_uses", "instance_key"),
+    ("public.workflows", "description"),
+    ("public.approval_requests", "review_detail"),
 )
+# Decision 0023 E2: the one function that counts the applied history, migration 49.
+COUNT_FUNCTION = "app_private.applied_migration_count()"
 RESTORES_SHOWN = 5
 RESTORE_FIELDS = {"at", "result", "checks_passed", "checks_total"}
 DELAYED_SHOWN = 10
@@ -127,6 +138,7 @@ async def database_conditions(
                 ([item[0] for item in REQUIRED_COLUMNS], [item[1] for item in REQUIRED_COLUMNS]),
             )
             missing_columns = int((await cursor.fetchone())[0])
+            applied = await _applied_if_readable(connection)
             held = False
             qualified = False
             if int(row[0]) == 0:
@@ -149,9 +161,7 @@ async def database_conditions(
     missing = int(row[0]) + missing_columns
     return (
         Condition("database", "ok", "database_ready"),
-        Condition("schema", "ok", "schema_ready")
-        if missing == 0
-        else Condition("schema", "unavailable", "schema_behind"),
+        schema_condition(missing, applied),
         Condition("hold", "unavailable", "restore_hold")
         if held
         else Condition("hold", "ok", "no_hold"),
@@ -159,6 +169,28 @@ async def database_conditions(
         if qualified
         else Condition("adapter", "unavailable", "adapter_unqualified"),
     )
+
+
+def schema_condition(missing: int, applied: int | None) -> Condition:
+    """Behind when a required object is missing or fewer migrations are applied than this release
+    ships. Ahead, which only degrades, when more are: older code on a newer database. With no
+    readable history, the required objects decide."""
+    if missing or (applied is not None and applied < SHIPPED_MIGRATIONS):
+        return Condition("schema", "unavailable", "schema_behind")
+    if applied is not None and applied > SHIPPED_MIGRATIONS:
+        return Condition("schema", "degraded", "schema_ahead")
+    return Condition("schema", "ok", "schema_ready")
+
+
+async def _applied_if_readable(connection: Any) -> int | None:
+    """The applied count, when the counting function exists. Its absence is not an error here."""
+    cursor = await connection.execute("select to_regprocedure(%s) is not null", (COUNT_FUNCTION,))
+    present = await cursor.fetchone()
+    if not present or not present[0]:
+        return None
+    cursor = await connection.execute(f"select {COUNT_FUNCTION}")
+    row = await cursor.fetchone()
+    return None if row is None or row[0] is None else int(row[0])
 
 
 async def storage_condition(store: Any) -> Condition:
@@ -454,5 +486,13 @@ async def job_hours(connection: Any, workspace_id: UUID) -> tuple[str, list[JobH
     return (str(zone[0]) if zone else "UTC"), rows
 
 
+# Decision 0023 E2: a newer database than this code is shown, and doesn't stop admission.
+NOT_BLOCKING = frozenset({"schema_ahead"})
+
+
 def is_ready(conditions: tuple[Condition, ...] | list[Condition]) -> bool:
-    return all(item.state == "ok" for item in conditions if item.name in BLOCKING)
+    return all(
+        item.state == "ok" or item.code in NOT_BLOCKING
+        for item in conditions
+        if item.name in BLOCKING
+    )

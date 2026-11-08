@@ -11,7 +11,7 @@ const OPS_PASSWORD = process.env.AUTOBOTS_TEST_OPS_PASSWORD ?? "";
 const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
 const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
 const BACKUPS = process.env.AUTOBOTS_TEST_BACKUP_DIR ?? "";
-// Decision 0022 D5's values, exactly.
+// Decision 0022 D5's values, exactly, and Decision 0023 E2's shipped count.
 const D5 = [
   "applied_migrations",
   "catalog_fetch_ms",
@@ -23,6 +23,7 @@ const D5 = [
   "leased_jobs",
   "loopback_only",
   "queued_jobs",
+  "shipped_migrations",
   "storage_bytes",
   "workers",
 ];
@@ -101,7 +102,7 @@ test("the verdict counts the checks shown, two workers and the hold, and each ch
     /^p95 \d+ ms over the last 20 probes\.$/,
   );
   await expect(page.locator('[data-field="value-schema"]')).toHaveText(
-    `${MIGRATIONS} migrations applied.`,
+    `${MIGRATIONS} of ${MIGRATIONS} migrations applied.`,
   );
   await expect(page.locator('[data-field="value-storage"]')).toHaveText(
     "3,345 bytes in published artifacts.",

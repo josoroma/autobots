@@ -31,6 +31,7 @@ import { JobsChart } from "@/components/jobs-chart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { schemaValue } from "@/lib/schema-value";
 import { cn } from "@/lib/utils";
 
 const CONDITIONS: Record<string, string> = {
@@ -39,6 +40,8 @@ const CONDITIONS: Record<string, string> = {
   database_not_configured: "No database is configured.",
   schema_ready: "The schema has what this version needs.",
   schema_behind: "Migrations are behind this version. New work is refused.",
+  schema_ahead:
+    "This database is newer than this version. New work still runs.",
   schema_unknown: "The schema can't be checked without the database.",
   no_hold: "Nothing is holding work.",
   restore_hold:
@@ -122,9 +125,7 @@ function valueFor(name: string, values: Values): string | null {
         ? "No probe timed yet."
         : `p95 ${values.database_p95_ms} ms over the last ${values.database_probes} probes.`;
     case "schema":
-      return values.applied_migrations === null
-        ? null
-        : `${count.format(values.applied_migrations)} migrations applied.`;
+      return schemaValue(values.applied_migrations, values.shipped_migrations);
     case "adapter":
       // The package and its release. Its name holds the database's, so the page names it plainly.
       return `LangGraph checkpoint adapter ${values.checkpoint_adapter.split(" ").at(-1) ?? ""}.`;

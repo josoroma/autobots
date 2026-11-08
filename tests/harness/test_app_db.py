@@ -18,6 +18,16 @@ class Migrations(unittest.TestCase):
         for name in names:
             self.assertRegex(name, app_db.MIGRATION_NAME)
 
+    def test_the_shipped_record_matches_the_migration_files(self):
+        """Decision 0023 E2: readiness compares the applied count with this record, so it can't drift."""
+        names = sorted(path.name for path in (ROOT / app_db.MIGRATIONS).glob('*.sql'))
+        text = (ROOT / 'services/agent/src/autobots/application/schema_release.py').read_text()
+        shipped = re.search(r'^SHIPPED_MIGRATIONS = (\d+)$', text, re.MULTILINE)
+        newest = re.search(r'^NEWEST_MIGRATION = "([^"]+)"$', text, re.MULTILINE)
+        self.assertIsNotNone(shipped)
+        self.assertIsNotNone(newest)
+        self.assertEqual((int(shipped.group(1)), newest.group(1)), (len(names), names[-1]))
+
     def test_seeds_hold_no_ddl_secrets_or_jobs(self):
         text = (ROOT / app_db.SEEDS).read_text().lower()
         for word in ('create table', 'alter table', 'drop ', 'password', 'api_key', 'runs'):

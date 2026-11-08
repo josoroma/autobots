@@ -36,8 +36,10 @@ WORKSPACE = UUID("a0000000-0000-4000-8000-000000000001")
 SETTINGS = Settings(
     internal_token=SecretStr(INTERNAL), jwt_secret=SecretStr(SECRET), allowed_hosts=("testserver",)
 )
-# Exactly what D5 lists, as fields. A new measured value needs a decision first.
+# Exactly what D5 lists, as fields, and Decision 0023 E2's shipped count. A new measured value
+# needs a decision first.
 D5_VALUES = {
+    "shipped_migrations",
     "database_p95_ms",
     "database_probes",
     "applied_migrations",

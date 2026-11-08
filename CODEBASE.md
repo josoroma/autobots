@@ -184,7 +184,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
   - credentials, policies, spend limits, idempotency receipts;
   - heartbeats, retention, `installation_holds`.
 - **`agent_runtime`:** LangGraph checkpoints, `adapter_qualifications`, `route_qualifications`.
-- **Schema readiness:** `application/operations.py` checks `REQUIRED_RELATIONS` and `REQUIRED_COLUMNS`, which cover objects up to migration 37. Operations displays the applied-migration count but does not compare it against the files.
+- **Schema readiness:** `application/operations.py` checks `REQUIRED_RELATIONS` and `REQUIRED_COLUMNS` (through migration 49), and compares `app_private.applied_migration_count()` with `SHIPPED_MIGRATIONS` in `application/schema_release.py`: fewer is `schema_behind` and blocks, more is `schema_ahead`, degraded and not blocking. A harness test (`tests/harness/test_app_db.py`) and `services/agent/tests/test_schema_release.py` fail unless that record matches `supabase/migrations`. Operations shows "N of M migrations applied" (`lib/schema-value.ts`). Changed by US-16.2, after the analyzed revision.
 - **Install-only schema:** `autobots_install` holds the install's identity and applied-migration digests (`scripts/persistent_install.py`).
 - **Ephemeral channel:** Postgres `NOTIFY autobots_result_text`. Nothing is stored.
 - **Objects and files:**
@@ -389,7 +389,6 @@ Accepted limits, by decision:
 
 Observed risks:
 - **Workspace selection:** a member of more than one workspace gets `workspace_required` on member routes, because no client sends `X-Autobots-Workspace`.
-- **Schema readiness:** `REQUIRED_RELATIONS` and `REQUIRED_COLUMNS` (`application/operations.py:29–55`) name nothing created by migrations 38–49. The applied-migration count is displayed but not compared. How a database missing those objects behaves was not examined.
 - **Input-size estimate:** a reservation's input size is a byte-based estimate, because no tokenizer is pinned.
 - **Uncertain calls not logged:** `charge_not_reported`, `cancelled_after_dispatch` and a cut drain emit no `worker.call_uncertain`.
 - **Duplicate issues:** `create_github_issue` has no idempotency key (Decision 0007). The PR connector uses a branch name and marker instead.

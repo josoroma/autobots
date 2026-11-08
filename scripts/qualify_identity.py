@@ -185,6 +185,45 @@ def artifact_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port
             extra_env.update(output.get('browser_env', {}))
             for case in output['cases']:
                 cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+    # US-16.2: each schema state is arranged as the admin, read as the runtime role, then restored.
+    def schema_state(state: str) -> None:
+        probed = subprocess.run([str(root / PYTHON), str(root / 'tests/db/schema_release_check.py'), state],
+                                env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
+                                capture_output=True, text=True, errors='replace', timeout=60, check=False)
+        if probed.returncode or not probed.stdout.strip():
+            cases.check(f'the schema check ran for {state}', 'exit 0', f'exit {probed.returncode}: {probed.stderr.strip()[-300:]}', False)
+            return
+        for case in json.loads(probed.stdout.strip().splitlines()[-1])['cases']:
+            cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+
+    history = 'autobots_disposable.migrations'
+    newest = sorted(path.name for path in (root / 'supabase/migrations').glob('*.sql'))[-1]
+    future = '29991231000000_a_later_release.sql'
+    schema_state('equal')
+    held = stack.sql(f"select sha256 from {history} where name = '{newest}';\n").stdout.strip()
+    arranged = [stack.sql(f"delete from {history} where name = '{newest}';\n").returncode == 0]
+    try:
+        schema_state('behind')
+    finally:
+        arranged.append(stack.sql(f"insert into {history} (name, sha256) values ('{newest}', '{held}');\n").returncode == 0)
+    arranged.append(stack.sql(f"insert into {history} (name, sha256) values ('{future}', repeat('0', 64));\n").returncode == 0)
+    try:
+        schema_state('ahead')
+    finally:
+        arranged.append(stack.sql(f"delete from {history} where name = '{future}';\n").returncode == 0)
+    arranged.append(stack.sql(f"alter table {history} rename to migrations_hidden;\n").returncode == 0)
+    try:
+        schema_state('no-history')
+        arranged.append(stack.sql('alter table app_private.plan_task_times rename to plan_task_times_hidden;\n').returncode == 0)
+        try:
+            schema_state('no-history-missing')
+        finally:
+            arranged.append(stack.sql('alter table app_private.plan_task_times_hidden rename to plan_task_times;\n').returncode == 0)
+    finally:
+        arranged.append(stack.sql(f"alter table {history.split('.')[0]}.migrations_hidden rename to migrations;\n").returncode == 0)
+    restored = stack.sql(f"select count(*) from {history} where name ~ '^[0-9]{{14}}_'; select to_regclass('app_private.plan_task_times') is not null;\n").stdout.split()
+    cases.check('each schema state was arranged and then restored', f'every step exit 0, {len(list((root / "supabase/migrations").glob("*.sql")))} rows, the table back',
+                (arranged, restored), all(arranged) and restored == [str(len(list((root / 'supabase/migrations').glob('*.sql')))), 't'])
     # US-13.1: an older request, arranged as the migration finds one. Only the superuser bypasses the trigger.
     legacy = extra_env.get('AUTOBOTS_TEST_APPROVAL_LEGACY')
     if legacy:

@@ -2966,6 +2966,11 @@
             ],
             "title": "Queued Jobs"
           },
+          "shipped_migrations": {
+            "minimum": 0.0,
+            "title": "Shipped Migrations",
+            "type": "integer"
+          },
           "storage_bytes": {
             "anyOf": [
               {
@@ -2995,6 +3000,7 @@
           "database_p95_ms",
           "database_probes",
           "applied_migrations",
+          "shipped_migrations",
           "storage_bytes",
           "disk_free_bytes",
           "disk_total_bytes",

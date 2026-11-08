@@ -2967,6 +2967,11 @@ export const schemas = {
         ],
         "title": "Queued Jobs"
       },
+      "shipped_migrations": {
+        "minimum": 0.0,
+        "title": "Shipped Migrations",
+        "type": "integer"
+      },
       "storage_bytes": {
         "anyOf": [
           {
@@ -2996,6 +3001,7 @@ export const schemas = {
       "database_p95_ms",
       "database_probes",
       "applied_migrations",
+      "shipped_migrations",
       "storage_bytes",
       "disk_free_bytes",
       "disk_total_bytes",
@@ -7988,6 +7994,7 @@ export interface OperationValues {
   leased_jobs: number | null;
   loopback_only: boolean | null;
   queued_jobs: number | null;
+  shipped_migrations: number;
   storage_bytes: number | null;
   workers: number | null;
 }

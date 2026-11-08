@@ -94,6 +94,8 @@ class OperationValues(BaseModel):
     database_p95_ms: int | None = Field(ge=0)
     database_probes: int = Field(ge=0)
     applied_migrations: int | None = Field(ge=0)
+    # Decision 0023 E2: how many migrations this release ships, to read the applied count against.
+    shipped_migrations: int = Field(ge=0)
     # This workspace's published artifact bytes in Storage.
     storage_bytes: int | None = Field(ge=0)
     disk_free_bytes: int | None = Field(ge=0)
