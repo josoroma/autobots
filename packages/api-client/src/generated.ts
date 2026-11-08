@@ -1559,6 +1559,19 @@ export const schemas = {
         "title": "Id",
         "type": "string"
       },
+      "last_run_at": {
+        "anyOf": [
+          {
+            "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Last Run At"
+      },
       "latest_version": {
         "title": "Latest Version",
         "type": "integer"
@@ -1566,6 +1579,10 @@ export const schemas = {
       "name": {
         "title": "Name",
         "type": "string"
+      },
+      "run_count": {
+        "title": "Run Count",
+        "type": "integer"
       },
       "schema_version": {
         "const": 1,
@@ -1585,7 +1602,9 @@ export const schemas = {
       "id",
       "name",
       "latest_version",
-      "versions"
+      "versions",
+      "run_count",
+      "last_run_at"
     ],
     "title": "ExpertView",
     "type": "object"
@@ -6361,8 +6380,10 @@ export function parseExpertVersionView(value: unknown): ExpertVersionView {
 
 export interface ExpertView {
   id: string;
+  last_run_at: string | null;
   latest_version: number;
   name: string;
+  run_count: number;
   schema_version: 1;
   versions: ExpertVersionView[];
 }

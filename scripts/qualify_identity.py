@@ -445,6 +445,23 @@ def qualify(root: Path) -> int:
             f"(gen_random_uuid(), '{listed}', '{spend_runs[1]}', '{spend_runs[1]}', 'executor', 'openrouter_terra', 'w', 1, current_date, 30000, null, 'uncertain', 'charge_not_reported'), "
             f"(gen_random_uuid(), '{listed}', '{spend_runs[2]}', '{spend_runs[2]}', 'executor', 'openrouter_terra', 'w', 1, current_date, 0, 70000, 'succeeded', null);\n")
         artifacts = {**artifacts, 'AUTOBOTS_TEST_RUNS_EMAIL': email_g, 'AUTOBOTS_TEST_RUNS_PASSWORD': password_g}
+        # US-15.6, arranged by SQL, as a grant naming an unconfigured connector is refused at save:
+        # three Experts with known tools, one with three runs.
+        email_h, password_h = 'experts-h@example.invalid', secrets.token_urlsafe(24)
+        curator = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_h, password_h)
+        curated = curator['workspace_id']
+        expert_rows = (('55555555-5555-4555-8555-000000000001', 'Market watcher',
+                        '{"tools": ["market_history", "inflation_rates", "calculate", "read_csv", "save_artifact", "read_run_file"], "role_bindings": {"executor": "openrouter_terra"}}'),
+                       ('55555555-5555-4555-8555-000000000002', 'Issue triager', '{"tools": ["read_csv", "create_github_issue"]}'),
+                       ('55555555-5555-4555-8555-000000000003', 'Brief writer', '{"tools": ["save_artifact"]}'))
+        stack.runtime(''.join(
+            f"insert into public.experts (id, workspace_id, name, latest_version) values ('{identifier}', '{curated}', '{name}', 1);\n"
+            f"insert into public.expert_versions (expert_id, version, config, created_by) values ('{identifier}', 1, '{config}', '{curator['user_id']}');\n"
+            for identifier, name, config in expert_rows)
+            + "insert into public.runs (id, workspace_id, status, goal_summary, limit_micro_usd, expert_id, created_at) "
+              f"select gen_random_uuid(), '{curated}', 'succeeded', 'Watch ' || n, 1000000, '{expert_rows[0][0]}', now() - make_interval(mins => 10 * n) "
+              "from generate_series(1, 3) n;\n")
+        artifacts = {**artifacts, 'AUTOBOTS_TEST_EXPERTS_EMAIL': email_h, 'AUTOBOTS_TEST_EXPERTS_PASSWORD': password_h}
         # Its own workspace with no key, as the one above asserts that it holds exactly one run.
         email_e, password_e = 'owner-e@example.invalid', secrets.token_urlsafe(24)
         owner_e = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_e, password_e)

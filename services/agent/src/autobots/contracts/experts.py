@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from autobots.contracts.primitives import Identifier
+from autobots.contracts.primitives import Identifier, UtcTimestamp
 from autobots.contracts.tools import ToolGroupName
 from autobots.domain.models import ModelProfileId
 
@@ -55,6 +55,9 @@ class ExpertView(BaseModel):
     name: str
     latest_version: int
     versions: list[ExpertVersionView]
+    # PRD-Studio EX-01: runs started with this Expert in this workspace, and the newest one's start.
+    run_count: int
+    last_run_at: UtcTimestamp | None
 
 
 class ExpertList(BaseModel):

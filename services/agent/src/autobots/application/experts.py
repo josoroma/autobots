@@ -75,8 +75,18 @@ async def _view(connection: Any, expert_id: UUID, name: str, latest: int) -> Exp
         ExpertVersionView(version=row[0], config=ExpertConfig.model_validate(row[1]))
         for row in await cursor.fetchall()
     ]
+    cursor = await connection.execute(
+        "select count(*), max(created_at) from public.runs where expert_id = %s", (expert_id,)
+    )
+    runs = await cursor.fetchone()
     return ExpertView(
-        schema_version=1, id=expert_id, name=name, latest_version=latest, versions=versions
+        schema_version=1,
+        id=expert_id,
+        name=name,
+        latest_version=latest,
+        versions=versions,
+        run_count=int(runs[0]),
+        last_run_at=runs[1],
     )
 
 

@@ -504,3 +504,76 @@ test("US-14.5: a missing key refuses only a run or version that grants its tool"
   }
   expect(JSON.stringify(catalog)).not.toContain("ghp_");
 });
+
+// US-15.6: three Experts arranged by SQL in their own workspace (scripts/qualify_identity.py).
+const EXPERTS_EMAIL = process.env.AUTOBOTS_TEST_EXPERTS_EMAIL ?? "";
+const EXPERTS_PASSWORD = process.env.AUTOBOTS_TEST_EXPERTS_PASSWORD ?? "";
+
+function cardOf(page: Page, name: string) {
+  return page
+    .locator("li")
+    .filter({ has: page.getByRole("link", { name, exact: true }) });
+}
+
+test("Expert cards show their facts, filters and the approval note", async ({
+  page,
+}) => {
+  await signIn(page, EXPERTS_EMAIL, EXPERTS_PASSWORD);
+  await page.goto("/experts");
+  const filter = (id: string) => page.locator(`[data-filter="${id}"]`);
+  await expect(filter("all")).toHaveText("All 3");
+  await expect(filter("outside")).toHaveText("Can change things outside 1");
+  await expect(filter("read_only")).toHaveText("Read only 2");
+
+  const watcher = cardOf(page, "Market watcher");
+  await expect(watcher.locator('[data-field="role"]')).toHaveText(
+    "executor · Terra · version 1",
+  );
+  await expect(watcher).toContainText("market_history");
+  await expect(watcher).toContainText("+2");
+  await expect(watcher.locator('[data-field="runs"]')).toHaveText(
+    /^3 runs · last \d+ min ago$/,
+  );
+  await expect(
+    watcher.getByRole("button", { name: "Start run with Market watcher" }),
+  ).toBeVisible();
+  await expect(
+    cardOf(page, "Issue triager").locator('[data-field="approval"]'),
+  ).toHaveText("Approval on every issue");
+  await expect(
+    cardOf(page, "Brief writer").locator('[data-field="approval"]'),
+  ).toHaveCount(0);
+  const axe = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(axe.violations.map((item) => item.id)).toEqual([]);
+
+  const names = async () =>
+    (await page.locator("main li a[href^='/experts/']").allTextContents()).map(
+      (text) => text.trim(),
+    );
+  await filter("outside").click();
+  expect(await names()).toEqual(["Issue triager"]);
+  await filter("read_only").click();
+  expect((await names()).sort()).toEqual(["Brief writer", "Market watcher"]);
+  await filter("all").click();
+  await page.getByPlaceholder("Search Experts").fill("brief");
+  expect(await names()).toEqual(["Brief writer"]);
+});
+
+test("Start run opens run creation with the disclosure, and sends nothing", async ({
+  page,
+}) => {
+  await signIn(page, EXPERTS_EMAIL, EXPERTS_PASSWORD);
+  const before = (await (await page.request.get("/api/v1/runs")).json()).total;
+  await page.goto("/experts");
+  await cardOf(page, "Brief writer")
+    .getByRole("button", { name: "Start run with Brief writer" })
+    .click();
+  await expect(page).toHaveURL(/\/sessions\//);
+  await expect(page.locator('[data-field="disclosure"]')).toContainText(
+    "Nothing is sent until you press Run",
+  );
+  const after = (await (await page.request.get("/api/v1/runs")).json()).total;
+  expect(after).toBe(before);
+});

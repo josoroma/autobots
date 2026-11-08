@@ -465,10 +465,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.5#4 | Build the tabs, the list beside the detail, the Fields and JSON views with sanitized markdown, J and K, and ⌘↵ and ⌘⌫ with a second press and a live announcement. | DONE | US-15.5 |
 | US-15.5#5 | Add the sidebar badge. | DONE | US-15.5 |
 | US-15.5#6 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.5 |
-| US-15.6 | Expert card facts and filters | READY | EPIC-15 |
-| US-15.6#1 | Add each Expert's run count and last run time to the Expert read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.6 |
-| US-15.6#2 | Render the card facts, Start run, the approval note, the filters with counts and the search on Experts. | TODO | US-15.6 |
-| US-15.6#3 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.6 |
+| US-15.6 | Expert card facts and filters | DONE | EPIC-15 |
+| US-15.6#1 | Add each Expert's run count and last run time to the Expert read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | DONE | US-15.6 |
+| US-15.6#2 | Render the card facts, Start run, the approval note, the filters with counts and the search on Experts. | DONE | US-15.6 |
+| US-15.6#3 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.6 |
 | US-15.7 | Tools side panel, Granted to and Copy schema | READY | EPIC-15 |
 | US-15.7#1 | Derive Granted to from the latest Expert versions and the agent steps of published workflows in the application layer, and expose it in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.7 |
 | US-15.7#2 | Render the group list with counts, the text filter, the side panel and Copy schema, keeping `/tools/{tool_id}`. | TODO | US-15.7 |
@@ -6225,7 +6225,8 @@ Open Questions:
 
 ### US-15.6: Expert card facts and filters
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-15-6-expert-card-facts-filters/`
 
 As a workspace member
 I want each Expert's role, model, tools, usage and approval needs on its card, with filters
@@ -6274,9 +6275,9 @@ Dependencies:
 - US-11.5
 
 Tasks:
-- [ ] Add each Expert's run count and last run time to the Expert read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
-- [ ] Render the card facts, Start run, the approval note, the filters with counts and the search on Experts.
-- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+- [x] Add each Expert's run count and last run time to the Expert read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
+- [x] Render the card facts, Start run, the approval note, the filters with counts and the search on Experts.
+- [x] Cover the scenarios on a disposable stack and in browser specs with axe.
 
 Open Questions:
 - None.

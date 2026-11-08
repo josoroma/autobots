@@ -3,18 +3,21 @@
 import {
   parseExpertList,
   parseExpertView,
+  parseToolCatalog,
   type ExpertView,
+  type ToolDescriptor,
 } from "@autobots/api-client";
-import { ArrowRight, Plus } from "lucide-react";
+import { ArrowRight, Plus, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { IconTile } from "@/components/ui/card";
 import { Choice, Input } from "@/components/ui/field";
 import { SectionLabel } from "@/components/ui/page-header";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { cn } from "@/lib/utils";
 
 export function ExpertsPanel() {
   const router = useRouter();
@@ -23,6 +26,11 @@ export function ExpertsPanel() {
   const [name, setName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [routed, setRouted] = useState<ReadonlySet<string>>(() => new Set());
+  const [catalog, setCatalog] = useState<ReadonlyMap<string, ToolDescriptor>>(
+    () => new Map(),
+  );
+  const [filter, setFilter] = useState<Filter>("all");
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -35,10 +43,63 @@ export function ExpertsPanel() {
       .catch(() => {
         if (active) setFailed(true);
       });
+    // PRD-Studio EX-02 and EX-03: tool classes and approval come from the catalog.
+    fetch("/api/v1/tools", { cache: "no-store" })
+      .then(async (reply) => {
+        if (!active || !reply.ok) return;
+        const tools = parseToolCatalog(await reply.json()).tools;
+        setCatalog(new Map(tools.map((tool) => [tool.tool_id, tool])));
+      })
+      .catch(() => undefined);
     return () => {
       active = false;
     };
   }, []);
+
+  const classified = useMemo(
+    () =>
+      (experts ?? []).map((expert) => ({
+        expert,
+        outside: latestTools(expert).some(
+          (tool) =>
+            catalog.get(tool)?.operation_class ===
+            "consequential_external_write",
+        ),
+      })),
+    [experts, catalog],
+  );
+  const counts = {
+    all: classified.length,
+    outside: classified.filter((item) => item.outside).length,
+    read_only: classified.filter((item) => !item.outside).length,
+  };
+  const needle = search.trim().toLowerCase();
+  const shown = classified.filter(
+    (item) =>
+      (filter === "all" ||
+        (filter === "outside" ? item.outside : !item.outside)) &&
+      (needle === "" || item.expert.name.toLowerCase().includes(needle)),
+  );
+
+  async function startRun(expertId: string): Promise<void> {
+    const reply = await csrfFetch("/api/v1/sessions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": crypto.randomUUID(),
+      },
+      body: JSON.stringify({
+        kind: "direct",
+        experts: [{ expert_id: expertId }],
+      }),
+    }).catch(() => null);
+    if (reply?.ok === true) {
+      const session = (await reply.json()) as { id: string };
+      router.push(`/sessions/${session.id}`);
+    } else {
+      setMessage("That session could not be started.");
+    }
+  }
 
   async function create(event: FormEvent): Promise<void> {
     event.preventDefault();
@@ -114,18 +175,59 @@ export function ExpertsPanel() {
     <>
       <section aria-labelledby="list-heading" className="space-y-4">
         <SectionLabel id="list-heading">Your Experts</SectionLabel>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div
+            role="group"
+            aria-label="Show"
+            className="bg-muted/60 inline-flex w-fit flex-wrap gap-0.5 rounded-lg p-[3px]"
+          >
+            {FILTERS.map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                data-filter={id}
+                aria-pressed={filter === id}
+                onClick={() => setFilter(id)}
+                className={cn(
+                  "text-foreground/80 inline-flex h-7 items-center gap-1.5 rounded-md border border-transparent px-3 text-[13px]",
+                  filter === id &&
+                    "bg-background text-foreground border-border font-medium dark:bg-accent",
+                )}
+              >
+                {label} <span className="tabular-nums">{counts[id]}</span>
+              </button>
+            ))}
+          </div>
+          <span className="hidden flex-1 sm:block" />
+          <label className="block">
+            <span className="sr-only">Search Experts</span>
+            <Input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search Experts"
+              className="h-8 w-full sm:w-60"
+            />
+          </label>
+        </div>
         {experts.length === 0 ? (
           <p className="text-muted-foreground rounded-xl border border-dashed p-6 text-sm">
             No Experts yet.
           </p>
+        ) : shown.length === 0 ? (
+          <p className="text-muted-foreground rounded-xl border border-dashed p-6 text-sm">
+            No Experts match.
+          </p>
         ) : (
           <ul className="grid gap-3.5 @xl:grid-cols-2 @4xl:grid-cols-3">
-            {experts.map((expert) => (
+            {shown.map(({ expert }) => (
               <ExpertCard
                 key={expert.id}
                 expert={expert}
+                catalog={catalog}
                 checked={routed.has(expert.id)}
                 onToggle={() => toggle(expert.id)}
+                onStart={() => void startRun(expert.id)}
               />
             ))}
           </ul>
@@ -184,18 +286,52 @@ export function ExpertsPanel() {
 const SHOWN_TOOLS = 4;
 
 // One Expert as a card: what its latest version says, from the list already loaded.
+type Filter = "all" | "outside" | "read_only";
+const FILTERS: [Filter, string][] = [
+  ["all", "All"],
+  ["outside", "Can change things outside"],
+  ["read_only", "Read only"],
+];
+const PROFILE_NAMES: Record<string, string> = {
+  openrouter_terra: "Terra",
+  openrouter_sol: "Sol",
+  openrouter_deepseek_flash: "DeepSeek Flash",
+};
+// The noun each always-approved tool decides on, for "Approval on every issue".
+const APPROVAL_NOUN: Record<string, string> = {
+  create_github_issue: "issue",
+  github_open_pull_request: "pull request",
+};
+
+function latestTools(expert: ExpertView): readonly string[] {
+  return expert.versions.at(-1)?.config.tools ?? [];
+}
+
+function lastRun(iso: string): string {
+  const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (minutes < 60) return `${Math.max(minutes, 0)} min ago`;
+  if (minutes < 60 * 24) return `${Math.round(minutes / 60)} h ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
 function ExpertCard({
   expert,
+  catalog,
   checked,
   onToggle,
+  onStart,
 }: {
   expert: ExpertView;
+  catalog: ReadonlyMap<string, ToolDescriptor>;
   checked: boolean;
   onToggle: () => void;
+  onStart: () => void;
 }) {
   const latest = expert.versions.at(-1)?.config;
-  const bindings = Object.entries(latest?.role_bindings ?? {}).map(
-    ([role, profile]) => `${role}: ${String(profile)}`,
+  const executor = (latest?.role_bindings as Record<string, string> | undefined)
+    ?.executor;
+  const approvals = (latest?.tools ?? []).filter(
+    (tool) => catalog.get(tool)?.approval === "always",
   );
   const tools = latest?.tools ?? [];
   const groups = latest?.tool_groups ?? [];
@@ -216,13 +352,26 @@ function ExpertCard({
           >
             {expert.name}
           </Link>
-          <p className="text-muted-foreground font-mono text-[11.5px] wrap-anywhere">
-            <span>Version {expert.latest_version}</span>
-            {bindings.length === 0 ? null : (
-              <span> · {bindings.join(", ")}</span>
-            )}
+          <p
+            data-field="role"
+            className="text-muted-foreground font-mono text-[11.5px] wrap-anywhere"
+          >
+            executor ·{" "}
+            {executor === undefined
+              ? "Workspace default"
+              : (PROFILE_NAMES[executor] ?? executor)}{" "}
+            · version {expert.latest_version}
           </p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+          onClick={onStart}
+        >
+          Start run
+          <span className="sr-only"> with {expert.name}</span>
+        </Button>
         <Choice
           type="checkbox"
           id={`route-${expert.id}`}
@@ -235,6 +384,27 @@ function ExpertCard({
       {purpose === "" ? null : (
         <p className="text-muted-foreground text-[13.5px] leading-normal">
           {purpose}
+        </p>
+      )}
+      <p data-field="runs" className="text-muted-foreground text-[12.5px]">
+        {expert.run_count === 0
+          ? "No runs yet"
+          : `${expert.run_count} ${expert.run_count === 1 ? "run" : "runs"}${
+              expert.last_run_at === null
+                ? ""
+                : ` · last ${lastRun(expert.last_run_at)}`
+            }`}
+      </p>
+      {approvals.length === 0 ? null : (
+        <p
+          data-field="approval"
+          className="text-attention flex items-center gap-1.5 text-[12.5px]"
+        >
+          <ShieldAlert aria-hidden="true" className="size-3.5" />
+          Approval on every{" "}
+          {approvals.length === 1
+            ? (APPROVAL_NOUN[approvals[0] ?? ""] ?? "call")
+            : "call to these tools"}
         </p>
       )}
       <div className="mt-auto flex flex-wrap gap-1.5 border-t pt-3">
