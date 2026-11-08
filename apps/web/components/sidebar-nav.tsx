@@ -67,7 +67,7 @@ function current(pathname: string): string | undefined {
 }
 
 // The current page is marked by its fill, its weight and aria-current, not by color alone.
-export function SidebarNav() {
+export function SidebarNav({ pending = null }: { pending?: number | null }) {
   const active = current(usePathname());
   return (
     <div className="space-y-4">
@@ -107,6 +107,20 @@ export function SidebarNav() {
                       )}
                     />
                     {text}
+                    {href === "/approvals" &&
+                    pending !== null &&
+                    pending > 0 ? (
+                      <>
+                        {" "}
+                        <span
+                          data-approvals-badge
+                          className="bg-attention text-attention-foreground ml-auto grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11.5px] font-semibold tabular-nums"
+                        >
+                          {pending}
+                          <span className="sr-only"> waiting</span>
+                        </span>
+                      </>
+                    ) : null}
                   </Link>
                 </li>
               );

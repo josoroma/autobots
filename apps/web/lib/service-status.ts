@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  countPendingApprovals,
   getHealth,
   getReadiness,
   getSession,
@@ -56,6 +57,22 @@ export async function fetchReadiness(): Promise<MemberReadiness | null> {
     return token === null
       ? null
       : await getReadiness(client({ Authorization: `Bearer ${token}` }));
+  } catch {
+    return null;
+  }
+}
+
+/** PRD-Studio SH-03: the number of pending approvals, from a count rather than a listed page. */
+export async function fetchPendingApprovals(): Promise<number | null> {
+  try {
+    const token = await accessToken();
+    return token === null
+      ? null
+      : (
+          await countPendingApprovals(
+            client({ Authorization: `Bearer ${token}` }),
+          )
+        ).pending;
   } catch {
     return null;
   }

@@ -1,6 +1,25 @@
 {
   "components": {
     "schemas": {
+      "ApprovalCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "decided": {
+            "title": "Decided",
+            "type": "integer"
+          },
+          "waiting": {
+            "title": "Waiting",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "waiting",
+          "decided"
+        ],
+        "title": "ApprovalCounts",
+        "type": "object"
+      },
       "ApprovalDecided": {
         "additionalProperties": false,
         "properties": {
@@ -67,6 +86,9 @@
             "title": "Approvals",
             "type": "array"
           },
+          "counts": {
+            "$ref": "#/components/schemas/ApprovalCounts"
+          },
           "schema_version": {
             "const": 1,
             "title": "Schema Version",
@@ -75,7 +97,8 @@
         },
         "required": [
           "schema_version",
-          "approvals"
+          "approvals",
+          "counts"
         ],
         "title": "ApprovalList",
         "type": "object"
@@ -249,9 +272,50 @@
             "title": "Arguments",
             "type": "string"
           },
+          "arguments_bytes": {
+            "title": "Arguments Bytes",
+            "type": "integer"
+          },
           "arguments_truncated": {
             "title": "Arguments Truncated",
             "type": "boolean"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "enum": [
+                  "you",
+                  "member"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By"
+          },
+          "decided_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By Name"
           },
           "expires_at": {
             "title": "Expires At",
@@ -324,6 +388,17 @@
             ],
             "title": "Resource Target"
           },
+          "run_goal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Goal"
+          },
           "run_id": {
             "format": "uuid",
             "title": "Run Id",
@@ -342,6 +417,17 @@
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "task_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Title"
           },
           "tool_id": {
             "title": "Tool Id",
@@ -368,7 +454,13 @@
           "requester",
           "scope_snapshot",
           "policy_version",
-          "policy_rule"
+          "policy_rule",
+          "run_goal",
+          "task_title",
+          "decided_at",
+          "decided_by",
+          "decided_by_name",
+          "arguments_bytes"
         ],
         "title": "ApprovalView",
         "type": "object"
@@ -2440,6 +2532,27 @@
           "unreported_charges"
         ],
         "title": "OutstandingSummary",
+        "type": "object"
+      },
+      "PendingApprovals": {
+        "additionalProperties": false,
+        "description": "The sidebar badge's number (PRD-Studio SH-03), counted on the server.",
+        "properties": {
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "pending"
+        ],
+        "title": "PendingApprovals",
         "type": "object"
       },
       "PlanSummary": {
@@ -5802,6 +5915,7 @@
   "paths": {
     "/v1/approvals": {
       "get": {
+        "description": "`decided` lists approved, rejected, expired and withdrawn requests together (AP-01).",
         "operationId": "listApprovals",
         "parameters": [
           {
@@ -5812,6 +5926,7 @@
               "default": "pending",
               "enum": [
                 "pending",
+                "decided",
                 "approved",
                 "rejected",
                 "expired",
@@ -5894,6 +6009,85 @@
           }
         },
         "summary": "Get Approvals"
+      }
+    },
+    "/v1/approvals/count": {
+      "get": {
+        "operationId": "countPendingApprovals",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingApprovals"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Pending Count"
       }
     },
     "/v1/approvals/{approval_id}/decision": {

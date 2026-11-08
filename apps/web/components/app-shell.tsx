@@ -4,11 +4,15 @@ import type { ReactNode } from "react";
 import { AccountFooter } from "@/components/account-footer";
 import { HealthLine } from "@/components/readiness";
 import { SidebarNav } from "@/components/sidebar-nav";
-import { fetchReadiness } from "@/lib/service-status";
+import { fetchPendingApprovals, fetchReadiness } from "@/lib/service-status";
 
 // Decision 0021 and PRD-Studio SH-05: the Studio frame. A quiet sidebar with the grouped sections
 // and an account footer that names the person and says where the app runs. Home holds the goal composer, so the first link after the skip link is Home.
 // Pages own their width and padding inside <main>.
+async function ShellNav() {
+  return <SidebarNav pending={await fetchPendingApprovals()} />;
+}
+
 async function ShellHealth() {
   return <HealthLine readiness={await fetchReadiness()} />;
 }
@@ -34,7 +38,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="font-serif text-lg tracking-tight">Autobots</span>
           </p>
           <nav aria-label="Main" className="pt-1">
-            <SidebarNav />
+            <ShellNav />
           </nav>
           <div className="mt-auto space-y-3">
             <ShellHealth />

@@ -2,6 +2,25 @@
 import { type ClientOptions, parseWith, requestJson } from './runtime.ts';
 
 export const schemas = {
+  "ApprovalCounts": {
+    "additionalProperties": false,
+    "properties": {
+      "decided": {
+        "title": "Decided",
+        "type": "integer"
+      },
+      "waiting": {
+        "title": "Waiting",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "waiting",
+      "decided"
+    ],
+    "title": "ApprovalCounts",
+    "type": "object"
+  },
   "ApprovalDecided": {
     "additionalProperties": false,
     "properties": {
@@ -68,6 +87,9 @@ export const schemas = {
         "title": "Approvals",
         "type": "array"
       },
+      "counts": {
+        "$ref": "#/components/schemas/ApprovalCounts"
+      },
       "schema_version": {
         "const": 1,
         "title": "Schema Version",
@@ -76,7 +98,8 @@ export const schemas = {
     },
     "required": [
       "schema_version",
-      "approvals"
+      "approvals",
+      "counts"
     ],
     "title": "ApprovalList",
     "type": "object"
@@ -250,9 +273,50 @@ export const schemas = {
         "title": "Arguments",
         "type": "string"
       },
+      "arguments_bytes": {
+        "title": "Arguments Bytes",
+        "type": "integer"
+      },
       "arguments_truncated": {
         "title": "Arguments Truncated",
         "type": "boolean"
+      },
+      "decided_at": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Decided At"
+      },
+      "decided_by": {
+        "anyOf": [
+          {
+            "enum": [
+              "you",
+              "member"
+            ],
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Decided By"
+      },
+      "decided_by_name": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Decided By Name"
       },
       "expires_at": {
         "title": "Expires At",
@@ -325,6 +389,17 @@ export const schemas = {
         ],
         "title": "Resource Target"
       },
+      "run_goal": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Run Goal"
+      },
       "run_id": {
         "format": "uuid",
         "title": "Run Id",
@@ -343,6 +418,17 @@ export const schemas = {
       "status": {
         "title": "Status",
         "type": "string"
+      },
+      "task_title": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Task Title"
       },
       "tool_id": {
         "title": "Tool Id",
@@ -369,7 +455,13 @@ export const schemas = {
       "requester",
       "scope_snapshot",
       "policy_version",
-      "policy_rule"
+      "policy_rule",
+      "run_goal",
+      "task_title",
+      "decided_at",
+      "decided_by",
+      "decided_by_name",
+      "arguments_bytes"
     ],
     "title": "ApprovalView",
     "type": "object"
@@ -2441,6 +2533,27 @@ export const schemas = {
       "unreported_charges"
     ],
     "title": "OutstandingSummary",
+    "type": "object"
+  },
+  "PendingApprovals": {
+    "additionalProperties": false,
+    "description": "The sidebar badge's number (PRD-Studio SH-03), counted on the server.",
+    "properties": {
+      "pending": {
+        "title": "Pending",
+        "type": "integer"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "pending"
+    ],
+    "title": "PendingApprovals",
     "type": "object"
   },
   "PlanSummary": {
@@ -5795,6 +5908,15 @@ export const schemas = {
   }
 } as const;
 
+export interface ApprovalCounts {
+  decided: number;
+  waiting: number;
+}
+
+export function parseApprovalCounts(value: unknown): ApprovalCounts {
+  return parseWith(schemas, "ApprovalCounts", value) as ApprovalCounts;
+}
+
 export interface ApprovalDecided {
   approval_id: string;
   decision: "approved" | "rejected" | "expired";
@@ -5816,6 +5938,7 @@ export function parseApprovalDecision(value: unknown): ApprovalDecision {
 
 export interface ApprovalList {
   approvals: ApprovalView[];
+  counts: ApprovalCounts;
   schema_version: 1;
 }
 
@@ -5869,7 +5992,11 @@ export function parseApprovalScope(value: unknown): ApprovalScope {
 export interface ApprovalView {
   argument_hash: string;
   arguments: string;
+  arguments_bytes: number;
   arguments_truncated: boolean;
+  decided_at: string | null;
+  decided_by: "you" | "member" | null;
+  decided_by_name: string | null;
   expires_at: string;
   id: string;
   operation_class: string;
@@ -5878,9 +6005,11 @@ export interface ApprovalView {
   policy_version: string | null;
   requester: ApprovalRequester | null;
   resource_target: string | null;
+  run_goal: string | null;
   run_id: string;
   scope_snapshot: ApprovalScope | null;
   status: string;
+  task_title: string | null;
   tool_id: string;
   tool_version: number;
 }
@@ -6506,6 +6635,15 @@ export interface OutstandingSummary {
 
 export function parseOutstandingSummary(value: unknown): OutstandingSummary {
   return parseWith(schemas, "OutstandingSummary", value) as OutstandingSummary;
+}
+
+export interface PendingApprovals {
+  pending: number;
+  schema_version: 1;
+}
+
+export function parsePendingApprovals(value: unknown): PendingApprovals {
+  return parseWith(schemas, "PendingApprovals", value) as PendingApprovals;
 }
 
 export interface PlanSummary {
@@ -7395,6 +7533,10 @@ export function parseWorkspaceSummary(value: unknown): WorkspaceSummary {
 
 export async function listApprovals(options: ClientOptions): Promise<ApprovalList> {
   return parseApprovalList(await requestJson(options, "GET", `/v1/approvals`));
+}
+
+export async function countPendingApprovals(options: ClientOptions): Promise<PendingApprovals> {
+  return parsePendingApprovals(await requestJson(options, "GET", `/v1/approvals/count`));
 }
 
 export async function decideApproval(options: ClientOptions, approval_id: string, body: ApprovalDecision): Promise<ApprovalResult> {

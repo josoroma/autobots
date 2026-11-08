@@ -56,6 +56,20 @@ class ApprovalView(BaseModel):
     scope_snapshot: ApprovalScope | None
     policy_version: str | None
     policy_rule: Literal["consequential_external_write", "tool_marked"] | None
+    # PRD-Studio AP-02 and AP-03. Empty when the run, task or decision isn't recorded.
+    run_goal: str | None
+    task_title: str | None
+    decided_at: str | None
+    decided_by: Literal["you", "member"] | None
+    decided_by_name: str | None
+    arguments_bytes: int
+
+
+class ApprovalCounts(BaseModel):
+    model_config = VIEW
+
+    waiting: int
+    decided: int
 
 
 class ApprovalList(BaseModel):
@@ -63,6 +77,16 @@ class ApprovalList(BaseModel):
 
     schema_version: Literal[1]
     approvals: list[ApprovalView]
+    counts: ApprovalCounts
+
+
+class PendingApprovals(BaseModel):
+    """The sidebar badge's number (PRD-Studio SH-03), counted on the server."""
+
+    model_config = VIEW
+
+    schema_version: Literal[1]
+    pending: int
 
 
 class ApprovalDecision(BaseModel):

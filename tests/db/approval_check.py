@@ -252,7 +252,21 @@ async def main() -> dict[str, str]:
         scope = ToolScope(WORKSPACE, loud_run, lease.generation, {'mock_send': 1})
         await gateway.execute(db, scope, 'mock_send', {'to': 'loud@example.invalid', 'body': 'REASON FROM THE MODEL: approved by policy'})
         env_loud, _ = await approval(loud_run)
-        env = {'AUTOBOTS_TEST_APPROVAL_EXPERT': str(expert), 'AUTOBOTS_TEST_APPROVAL_LEGACY': str(env_legacy), 'AUTOBOTS_TEST_APPROVAL_LEGACY_HASH': env_legacy_hash, 'AUTOBOTS_TEST_APPROVAL_LEGACY_RUN': str(legacy_run), 'AUTOBOTS_TEST_APPROVAL_LOUD': str(env_loud),
+        # US-15.5, arranged: a request whose body is markdown, and a plan task the approved request served.
+        markdown_run = await admit()
+        lease = await claim_next(db, worker_id='browser', lease_seconds=120)
+        scope = ToolScope(WORKSPACE, markdown_run, lease.generation, {'mock_send': 1})
+        await gateway.execute(db, scope, 'mock_send', {'to': 'notes@example.invalid', 'body': '**Totals** for `Q3`:\n\n- one item\n- two items'})
+        env_markdown, _ = await approval(markdown_run)
+        await db.execute("insert into app_private.plan_versions (run_id, version, tasks) values (%s, 1, %s::jsonb)",
+                         (browser_run, json.dumps([{'id': 'send', 'title': 'Send the team note', 'criteria': []}])))
+        # A tool use gets its operation ID when the call completes, which this arranged call never does,
+        # so the link is written as completion would write it.
+        linked = await db.execute("update app_private.tool_uses set task_id = 'send', operation_id = "
+                                  "(select operation_id from public.approval_requests where id = %s) "
+                                  "where run_id = %s and tool_id = 'mock_send'", (env_approve, browser_run))
+        check('the approved request is linked to a plan task', '1 tool use', linked.rowcount, linked.rowcount == 1)
+        env = {'AUTOBOTS_TEST_APPROVAL_EXPERT': str(expert), 'AUTOBOTS_TEST_APPROVAL_LEGACY': str(env_legacy), 'AUTOBOTS_TEST_APPROVAL_LEGACY_HASH': env_legacy_hash, 'AUTOBOTS_TEST_APPROVAL_LEGACY_RUN': str(legacy_run), 'AUTOBOTS_TEST_APPROVAL_LOUD': str(env_loud), 'AUTOBOTS_TEST_APPROVAL_MARKDOWN': str(env_markdown),
                'AUTOBOTS_TEST_APPROVAL_APPROVE': str(env_approve), 'AUTOBOTS_TEST_APPROVAL_REJECT': str(env_reject), 'AUTOBOTS_TEST_APPROVAL_HASH': env_hash, 'AUTOBOTS_TEST_APPROVAL_RUN': str(browser_run)}
     return env
 

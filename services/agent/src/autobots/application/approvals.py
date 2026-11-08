@@ -310,16 +310,34 @@ async def decide(
     return DecisionResult(approval_id, wanted, False)
 
 
-async def list_approvals(connection: Any, workspace_id: UUID, status: str) -> list[dict[str, Any]]:
+DECIDED = ("approved", "rejected", "expired", "withdrawn")
+
+
+async def list_approvals(
+    connection: Any, workspace_id: UUID, statuses: str | tuple[str, ...]
+) -> list[dict[str, Any]]:
+    """PRD-Studio AP-01 and AP-02: requests in these statuses, with the run's goal, the plan task
+    the call served (through its tool use's operation ID), who decided it and when, and the size of
+    the stored arguments."""
     cursor = await connection.execute(
         "select a.id, a.run_id, a.tool_id, a.tool_version, a.operation_class, a.argument_hash, "
         "a.arguments::text, a.status, a.expires_at, a.policy_reason, a.resource_target, "
         "a.requested_by, a.requested_by_agent, a.scope_snapshot, a.policy_version, "
-        "a.policy_rule, e.name "
+        "a.policy_rule, e.name, r.goal_summary, "
+        "(select t ->> 'title' from app_private.tool_uses u "
+        "join app_private.plan_versions p on p.run_id = u.run_id, "
+        "jsonb_array_elements(p.tasks) t "
+        "where u.operation_id = a.operation_id and t ->> 'id' = u.task_id "
+        "order by p.version desc limit 1), "
+        "a.decided_at, a.decided_by, d.display_name, "
+        "octet_length(a.arguments::text) "
         "from public.approval_requests a left join public.experts e "
         "on e.id = (a.requested_by_agent ->> 'id')::uuid and e.workspace_id = a.workspace_id "
-        "where a.workspace_id = %s and a.status = %s order by a.created_at desc limit 200",
-        (workspace_id, status),
+        "left join public.runs r on r.id = a.run_id and r.workspace_id = a.workspace_id "
+        "left join public.user_profiles d on d.user_id = a.decided_by "
+        "where a.workspace_id = %s and a.status = any(%s) "
+        "order by coalesce(a.decided_at, a.created_at) desc limit 200",
+        (workspace_id, [statuses] if isinstance(statuses, str) else list(statuses)),
     )
     names = (
         "id",
@@ -339,5 +357,23 @@ async def list_approvals(connection: Any, workspace_id: UUID, status: str) -> li
         "policy_version",
         "policy_rule",
         "expert_name",
+        "run_goal",
+        "task_title",
+        "decided_at",
+        "decided_by",
+        "decided_by_name",
+        "arguments_bytes",
     )
     return [dict(zip(names, row, strict=True)) for row in await cursor.fetchall()]
+
+
+async def approval_counts(connection: Any, workspace_id: UUID) -> tuple[int, int]:
+    """Waiting and decided counts, so a tab or badge never counts a listed page."""
+    cursor = await connection.execute(
+        "select count(*) filter (where status = 'pending'), "
+        "count(*) filter (where status = any(%s)) "
+        "from public.approval_requests where workspace_id = %s",
+        (list(DECIDED), workspace_id),
+    )
+    row = await cursor.fetchone()
+    return int(row[0]), int(row[1])

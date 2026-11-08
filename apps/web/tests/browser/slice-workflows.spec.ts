@@ -177,9 +177,12 @@ test("a graph is validated, published, run and monitored, and the monitor only r
   // Approving continues it through the inbox.
   await page.goto("/approvals");
   await page
-    .locator("[data-approval]")
+    .locator("[data-approval-item]")
     .filter({ hasText: "workflow_approval" })
     .first()
+    .click();
+  await page
+    .locator("[data-approval]")
     .getByRole("button", { name: "Approve" })
     .click();
   await expect(page.locator('[data-message="decision"]')).toContainText(

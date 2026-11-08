@@ -10,7 +10,9 @@ from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, require_owner
 from autobots.application.approvals import (
     ARGUMENT_LIMIT,
+    DECIDED,
     ApprovalRefused,
+    approval_counts,
     decide,
     exceeds_review_limit,
     list_approvals,
@@ -18,12 +20,14 @@ from autobots.application.approvals import (
 from autobots.application.run_projection import public_text
 from autobots.application.runs import IdempotencyConflict
 from autobots.contracts.approvals import (
+    ApprovalCounts,
     ApprovalDecision,
     ApprovalList,
     ApprovalRequester,
     ApprovalResult,
     ApprovalScope,
     ApprovalView,
+    PendingApprovals,
 )
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
@@ -59,11 +63,14 @@ async def get_approvals(
     workspace: Annotated[UUID, Depends(current_workspace)],
     user: Annotated[UUID, Depends(current_user)],
     status: Annotated[
-        Literal["pending", "approved", "rejected", "expired", "withdrawn"], Query()
+        Literal["pending", "decided", "approved", "rejected", "expired", "withdrawn"], Query()
     ] = "pending",
 ) -> ApprovalList:
+    """`decided` lists approved, rejected, expired and withdrawn requests together (AP-01)."""
+    statuses = DECIDED if status == "decided" else (status,)
     async with _pool(request).connection() as connection:
-        rows = await list_approvals(connection, workspace, status)
+        rows = await list_approvals(connection, workspace, statuses)
+        waiting, decided = await approval_counts(connection, workspace)
     return ApprovalList(
         schema_version=1,
         approvals=[
@@ -89,10 +96,30 @@ async def get_approvals(
                 else ApprovalScope.model_validate(row["scope_snapshot"]),
                 policy_version=row["policy_version"],
                 policy_rule=row["policy_rule"],
+                run_goal=public_text(row["run_goal"]) if row["run_goal"] else None,
+                task_title=public_text(row["task_title"]) if row["task_title"] else None,
+                decided_at=row["decided_at"].isoformat() if row["decided_at"] else None,
+                decided_by=None
+                if row["decided_by"] is None
+                else ("you" if row["decided_by"] == user else "member"),
+                decided_by_name=row["decided_by_name"],
+                arguments_bytes=int(row["arguments_bytes"]),
             )
             for row in rows
         ],
+        counts=ApprovalCounts(waiting=waiting, decided=decided),
     )
+
+
+@router.get(
+    "/approvals/count", operation_id="countPendingApprovals", response_model=PendingApprovals
+)
+async def get_pending_count(
+    request: Request, workspace: Annotated[UUID, Depends(current_workspace)]
+) -> PendingApprovals:
+    async with _pool(request).connection() as connection:
+        waiting, _decided = await approval_counts(connection, workspace)
+    return PendingApprovals(schema_version=1, pending=waiting)
 
 
 @router.post(

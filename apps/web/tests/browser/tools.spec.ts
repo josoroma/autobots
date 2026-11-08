@@ -29,7 +29,10 @@ test("Tools sits under Build after Workflows and lists tools by group", async ({
   await signedIn(page, "/");
   const navigation = page.getByRole("navigation");
   const labels = await navigation.getByRole("link").allTextContents();
-  const trimmed = labels.map((label) => label.trim());
+  // A pending-approvals badge reads "N waiting" after its link name (US-15.5).
+  const trimmed = labels.map((label) =>
+    label.replace(/\s*\d+ waiting$/, "").trim(),
+  );
   // US-15.1: three groups, in order, with Tools directly after Workflows.
   expect(trimmed).toEqual([
     "Home",
@@ -50,7 +53,9 @@ test("Tools sits under Build after Workflows and lists tools by group", async ({
     const list = navigation.getByRole("list", { name: group });
     await expect(list).toBeVisible();
     expect(
-      (await list.getByRole("link").allTextContents()).map((l) => l.trim()),
+      (await list.getByRole("link").allTextContents()).map((l) =>
+        l.replace(/\s*\d+ waiting$/, "").trim(),
+      ),
     ).toEqual([...links]);
   }
   await expect(

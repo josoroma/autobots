@@ -458,13 +458,13 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.4#3 | Forward the filters and the cursor through the BFF. | DONE | US-15.4 |
 | US-15.4#4 | Render the tabs, filters, Load more, labels, the "≈" spend and the meter on Runs. | DONE | US-15.4 |
 | US-15.4#5 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.4 |
-| US-15.5 | Approvals inbox, count badge and decision shortcuts | READY | EPIC-15 |
-| US-15.5#1 | Add decided statuses, tab counts, `decided_at` and `decided_by`, the run goal, the served plan task found through the tool use's operation ID, and the stored arguments' byte size to the approval read model. | TODO | US-15.5 |
-| US-15.5#2 | Add a pending-count endpoint and the extended views in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.5 |
-| US-15.5#3 | Forward both through the BFF. | TODO | US-15.5 |
-| US-15.5#4 | Build the tabs, the list beside the detail, the Fields and JSON views with sanitized markdown, J and K, and ⌘↵ and ⌘⌫ with a second press and a live announcement. | TODO | US-15.5 |
-| US-15.5#5 | Add the sidebar badge. | TODO | US-15.5 |
-| US-15.5#6 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.5 |
+| US-15.5 | Approvals inbox, count badge and decision shortcuts | DONE | EPIC-15 |
+| US-15.5#1 | Add decided statuses, tab counts, `decided_at` and `decided_by`, the run goal, the served plan task found through the tool use's operation ID, and the stored arguments' byte size to the approval read model. | DONE | US-15.5 |
+| US-15.5#2 | Add a pending-count endpoint and the extended views in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | DONE | US-15.5 |
+| US-15.5#3 | Forward both through the BFF. | DONE | US-15.5 |
+| US-15.5#4 | Build the tabs, the list beside the detail, the Fields and JSON views with sanitized markdown, J and K, and ⌘↵ and ⌘⌫ with a second press and a live announcement. | DONE | US-15.5 |
+| US-15.5#5 | Add the sidebar badge. | DONE | US-15.5 |
+| US-15.5#6 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.5 |
 | US-15.6 | Expert card facts and filters | READY | EPIC-15 |
 | US-15.6#1 | Add each Expert's run count and last run time to the Expert read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.6 |
 | US-15.6#2 | Render the card facts, Start run, the approval note, the filters with counts and the search on Experts. | TODO | US-15.6 |
@@ -484,7 +484,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.9#3 | Forward intent, preview and budget through the BFF. | TODO | US-15.9 |
 | US-15.9#4 | Add the Expert, budget and models chips, the preview chips and the file chips to Home's composer. | TODO | US-15.9 |
 | US-15.9#5 | Cover the scenarios on a disposable stack with a fake transport and in browser specs with axe. | TODO | US-15.9 |
-| US-15.10 | Home greeting, Needs you and recent runs | BLOCKED | EPIC-15 |
+| US-15.10 | Home greeting, Needs you and recent runs | READY | EPIC-15 |
 | US-15.10#1 | Render the greeting from the workspace's timezone and the display name. | TODO | US-15.10 |
 | US-15.10#2 | Render Needs you from pending approvals and the run list's Needs you group, and Recent runs from the run list. | TODO | US-15.10 |
 | US-15.10#3 | Cover the scenarios in browser specs with axe on a disposable stack. | TODO | US-15.10 |
@@ -6162,7 +6162,8 @@ Open Questions:
 
 ### US-15.5: Approvals inbox, count badge and decision shortcuts
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-07-us-15-5-approvals-inbox-count-badge/`
 
 As a reviewer
 I want waiting and decided requests beside their full context, a count in the sidebar, and keyboard shortcuts that need confirming
@@ -6212,12 +6213,12 @@ Dependencies:
 - US-14.3
 
 Tasks:
-- [ ] Add decided statuses, tab counts, `decided_at` and `decided_by`, the run goal, the served plan task found through the tool use's operation ID, and the stored arguments' byte size to the approval read model.
-- [ ] Add a pending-count endpoint and the extended views in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
-- [ ] Forward both through the BFF.
-- [ ] Build the tabs, the list beside the detail, the Fields and JSON views with sanitized markdown, J and K, and ⌘↵ and ⌘⌫ with a second press and a live announcement.
-- [ ] Add the sidebar badge.
-- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+- [x] Add decided statuses, tab counts, `decided_at` and `decided_by`, the run goal, the served plan task found through the tool use's operation ID, and the stored arguments' byte size to the approval read model.
+- [x] Add a pending-count endpoint and the extended views in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client.
+- [x] Forward both through the BFF.
+- [x] Build the tabs, the list beside the detail, the Fields and JSON views with sanitized markdown, J and K, and ⌘↵ and ⌘⌫ with a second press and a live announcement.
+- [x] Add the sidebar badge.
+- [x] Cover the scenarios on a disposable stack and in browser specs with axe.
 
 Open Questions:
 - None.
@@ -6439,7 +6440,7 @@ Open Questions:
 
 ### US-15.10: Home greeting, Needs you and recent runs
 
-Status: BLOCKED
+Status: READY
 
 As a workspace member
 I want Home to greet me, show what's waiting for me and list my recent runs
