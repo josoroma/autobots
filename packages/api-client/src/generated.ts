@@ -5033,6 +5033,84 @@ export const schemas = {
     "title": "SearchHit",
     "type": "object"
   },
+  "SearchResult": {
+    "additionalProperties": false,
+    "properties": {
+      "detail": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Detail"
+      },
+      "href": {
+        "pattern": "^/[a-z]+/[A-Za-z0-9_-]+$",
+        "title": "Href",
+        "type": "string"
+      },
+      "id": {
+        "maxLength": 100,
+        "minLength": 1,
+        "title": "Id",
+        "type": "string"
+      },
+      "kind": {
+        "enum": [
+          "run",
+          "expert",
+          "workflow",
+          "tool"
+        ],
+        "title": "Kind",
+        "type": "string"
+      },
+      "title": {
+        "title": "Title",
+        "type": "string"
+      }
+    },
+    "required": [
+      "kind",
+      "id",
+      "title",
+      "detail",
+      "href"
+    ],
+    "title": "SearchResult",
+    "type": "object"
+  },
+  "SearchResults": {
+    "additionalProperties": false,
+    "properties": {
+      "query": {
+        "title": "Query",
+        "type": "string"
+      },
+      "results": {
+        "items": {
+          "$ref": "#/components/schemas/SearchResult"
+        },
+        "title": "Results",
+        "type": "array"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "query",
+      "results"
+    ],
+    "title": "SearchResults",
+    "type": "object"
+  },
   "ServiceHealth": {
     "additionalProperties": false,
     "description": "Liveness only. Holds no address, version or secret.",
@@ -8431,6 +8509,28 @@ export function parseSearchHit(value: unknown): SearchHit {
   return parseWith(schemas, "SearchHit", value) as SearchHit;
 }
 
+export interface SearchResult {
+  detail: string | null;
+  href: string;
+  id: string;
+  kind: "run" | "expert" | "workflow" | "tool";
+  title: string;
+}
+
+export function parseSearchResult(value: unknown): SearchResult {
+  return parseWith(schemas, "SearchResult", value) as SearchResult;
+}
+
+export interface SearchResults {
+  query: string;
+  results: SearchResult[];
+  schema_version: 1;
+}
+
+export function parseSearchResults(value: unknown): SearchResults {
+  return parseWith(schemas, "SearchResults", value) as SearchResults;
+}
+
 export interface ServiceHealth {
   schema_version: 1;
   status: "ok";
@@ -9110,6 +9210,10 @@ export async function listRunToolUses(options: ClientOptions, run_id: string): P
 
 export async function getRunWorkspace(options: ClientOptions, run_id: string): Promise<RunWorkspace> {
   return parseRunWorkspace(await requestJson(options, "GET", `/v1/runs/${encodeURIComponent(run_id)}/workspace`));
+}
+
+export async function search(options: ClientOptions): Promise<SearchResults> {
+  return parseSearchResults(await requestJson(options, "GET", `/v1/search`));
 }
 
 export async function getSession(options: ClientOptions): Promise<SessionSummary> {

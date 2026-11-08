@@ -25,6 +25,7 @@ def test_the_schema_builds_without_any_connection() -> None:
         "/v1/improvements",
         "/v1/operations/jobs",
         "/v1/retention",
+        "/v1/search",
         "/v1/operations/local-status",
         "/v1/operations/retention",
         "/v1/operations/retention/apply",

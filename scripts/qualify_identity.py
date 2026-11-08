@@ -272,7 +272,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
                                      'AUTOBOTS_TEST_SERVICE_KEY': stack.values['SERVICE_ROLE_KEY'], 'AUTOBOTS_WEB_REPORT': str(report),
                                      'AUTOBOTS_WEB_OUTPUT': str(root / '.checks/identity/results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots),
                                      'AUTOBOTS_TEST_VISUAL_DIR': str(root / '.checks/identity/visual')}
-        result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'browser/operations', 'approvals', 'effects', 'experts', 'models', 'composer', 'home', 'workflow-list', 'identity', 'settings', 'runs', 'run-panel', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=480, check=False,
+        result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'browser/operations', 'approvals', 'effects', 'experts', 'models', 'composer', 'home', 'workflow-list', 'identity', 'settings', 'runs', 'run-panel', 'search', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=480, check=False,
                                 env=browser_env)
         # A real restart, then Settings reads the stored records. Then one is removed, under the same key.
         stop(processes[0])
@@ -626,6 +626,23 @@ def qualify(root: Path) -> int:
                     arranged_ops.returncode == 0 and zoned.returncode == 0)
         artifacts = {**artifacts, 'AUTOBOTS_TEST_OPS_EMAIL': email_n, 'AUTOBOTS_TEST_OPS_PASSWORD': password_n, 'AUTOBOTS_TEST_OPS_WORKSPACE': ops_ws,
                      'AUTOBOTS_TEST_OPS_HELPER': str(root / 'tests/db/operations_live.py')}
+        # US-15.22, arranged: "read" names a run's goal, an Expert and a workflow in the ops-n workspace, and a
+        # run and an Expert in the workflows workspace, which a search from ops-n must not return.
+        search_ids = {'run': '99999999-9999-4999-8999-0000000000d1', 'expert': '99999999-9999-4999-8999-0000000000d2',
+                      'workflow': '99999999-9999-4999-8999-0000000000d3', 'other_run': '88888888-8888-4888-8888-0000000000d4',
+                      'other_expert': '88888888-8888-4888-8888-0000000000d5'}
+        arranged_search = stack.sql(
+            f"insert into public.runs (id, workspace_id, status, goal_summary, limit_micro_usd, policy_snapshot) values "
+            f"('{search_ids['run']}', '{ops_ws}', 'succeeded', 'Read the quarter notes', 1000000, '{{}}'), "
+            f"('{search_ids['other_run']}', '{flows_ws}', 'succeeded', 'Read another workspace plan', 1000000, '{{}}');\n"
+            f"insert into public.experts (id, workspace_id, name, latest_version) values ('{search_ids['expert']}', '{ops_ws}', 'Reading analyst', 1), "
+            f"('{search_ids['other_expert']}', '{flows_ws}', 'Reader elsewhere', 1);\n"
+            f"insert into public.expert_versions (expert_id, version, config, created_by) values "
+            f"('{search_ids['expert']}', 1, '{{\"tools\": [\"calculate\"]}}', '{operator['user_id']}'), "
+            f"('{search_ids['other_expert']}', 1, '{{\"tools\": [\"calculate\"]}}', '{flows_user}');\n"
+            f"insert into public.workflows (id, workspace_id, name, description, latest_version) values ('{search_ids['workflow']}', '{ops_ws}', 'Read and summarize', null, 0);\n")
+        cases.check('the search records are arranged', 'exit 0', f'exit {arranged_search.returncode}: {arranged_search.stderr[-300:]}', arranged_search.returncode == 0)
+        artifacts = {**artifacts, 'AUTOBOTS_TEST_SEARCH_IDS': json.dumps(search_ids)}
         # Its own workspace with no key, as the one above asserts that it holds exactly one run.
         email_e, password_e = 'owner-e@example.invalid', secrets.token_urlsafe(24)
         owner_e = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_e, password_e)

@@ -5,6 +5,15 @@ export type ShortcutGroup = { where: string; shortcuts: Shortcut[] };
 
 export const SHORTCUTS: ShortcutGroup[] = [
   {
+    where: "Anywhere",
+    shortcuts: [
+      {
+        keys: ["⌘", "K"],
+        action: "Search runs, Experts, workflows and tools. Ctrl works for ⌘",
+      },
+    ],
+  },
+  {
     where: "Approvals",
     shortcuts: [
       { keys: ["J"], action: "Select the next request" },

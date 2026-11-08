@@ -542,10 +542,10 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.21#2 | Add the Settings sub-navigation and the Notifications, Data on this Mac and Keyboard pages. | DONE | US-15.21 |
 | US-15.21#3 | Raise browser notifications for runs entering waiting_approval or waiting_input while the app is open, only with the browser's permission and the setting on. | DONE | US-15.21 |
 | US-15.21#4 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.21 |
-| US-15.22 | Search palette | READY | EPIC-15 |
-| US-15.22#1 | Add one workspace-scoped search over run goals and the names of Experts, workflows and tools, with typed results, in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client and forward it through the BFF. | TODO | US-15.22 |
-| US-15.22#2 | Add the Search button with its key hint after the skip link, the ⌘K handler that ignores text fields, and the palette dialog with a listbox. | TODO | US-15.22 |
-| US-15.22#3 | Cover the scenarios on a disposable stack and in browser specs with axe. | TODO | US-15.22 |
+| US-15.22 | Search palette | DONE | EPIC-15 |
+| US-15.22#1 | Add one workspace-scoped search over run goals and the names of Experts, workflows and tools, with typed results, in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client and forward it through the BFF. | DONE | US-15.22 |
+| US-15.22#2 | Add the Search button with its key hint after the skip link, the ⌘K handler that ignores text fields, and the palette dialog with a listbox. | DONE | US-15.22 |
+| US-15.22#3 | Cover the scenarios on a disposable stack and in browser specs with axe. | DONE | US-15.22 |
 | US-15.23 | New run shortcut | READY | EPIC-15 |
 | US-15.23#1 | Add the New run button with its key hint after the skip link, and the shortcut handler that ignores text fields. | TODO | US-15.23 |
 | US-15.23#2 | Update `appearance.spec.ts`'s tab-order assertion so the skip link stays first. | TODO | US-15.23 |
@@ -7084,7 +7084,8 @@ Open Questions:
 
 ### US-15.22: Search palette
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-15-22-search-palette/`
 
 As a workspace member
 I want ⌘K to open one search over runs, Experts, workflows and tools
@@ -7122,9 +7123,9 @@ Dependencies:
 - US-15.13
 
 Tasks:
-- [ ] Add one workspace-scoped search over run goals and the names of Experts, workflows and tools, with typed results, in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client and forward it through the BFF.
-- [ ] Add the Search button with its key hint after the skip link, the ⌘K handler that ignores text fields, and the palette dialog with a listbox.
-- [ ] Cover the scenarios on a disposable stack and in browser specs with axe.
+- [x] Add one workspace-scoped search over run goals and the names of Experts, workflows and tools, with typed results, in the application layer, Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client and forward it through the BFF.
+- [x] Add the Search button with its key hint after the skip link, the ⌘K handler that ignores text fields, and the palette dialog with a listbox.
+- [x] Cover the scenarios on a disposable stack and in browser specs with axe.
 
 Open Questions:
 - None.

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { AccountFooter } from "@/components/account-footer";
 import { HealthLine } from "@/components/readiness";
+import { SearchPalette } from "@/components/search-palette";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { fetchPendingApprovals, fetchReadiness } from "@/lib/service-status";
 
@@ -37,6 +38,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             </span>
             <span className="font-serif text-lg tracking-tight">Autobots</span>
           </p>
+          {/* Decision 0022 D3: the first stop after the skip link. */}
+          <SearchPalette />
           <nav aria-label="Main" className="pt-1">
             <ShellNav />
           </nav>

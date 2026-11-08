@@ -18,6 +18,7 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, INNER_BOX } from "@/components/ui/card";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { typing } from "@/lib/keyboard";
 import { cn } from "@/lib/utils";
 
 const MESSAGES: Record<string, string> = {
@@ -109,14 +110,6 @@ function decidedText(approval: ApprovalView): string {
       ? ""
       : ` at ${new Date(approval.decided_at).toLocaleString()}`;
   return `${outcome}${who}${when}.`;
-}
-
-function typing(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return (
-    target.isContentEditable ||
-    ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)
-  );
 }
 
 // PRD-Studio AP-01 to AP-04: Waiting and Decided with counts, the list beside the selected request,
