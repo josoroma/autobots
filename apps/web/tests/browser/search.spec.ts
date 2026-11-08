@@ -87,10 +87,14 @@ test("⌘K and the Search button after the skip link open the palette, and ⌘K 
   await page.keyboard.press("Escape");
   await expect(button).toBeFocused();
 
-  // With focus in a text field, ⌘K does nothing.
-  await page
-    .getByRole("searchbox", { name: "Filter by goal or Expert" })
-    .focus();
+  // With focus in a text field, ⌘K does nothing. The list settles first, so its arrival can't take the
+  // focus back from the field before the key is pressed.
+  await page.waitForLoadState("networkidle");
+  const filter = page.getByRole("searchbox", {
+    name: "Filter by goal or Expert",
+  });
+  await filter.focus();
+  await expect(filter).toBeFocused();
   await page.keyboard.press(`${MODIFIER}+k`);
   await page.waitForTimeout(300);
   await expect(dialog).toBeHidden();

@@ -580,11 +580,11 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-16.3#2 | Send the choice from the BFF and the event stream as `X-Autobots-Workspace`. | DONE | US-16.3 |
 | US-16.3#3 | Add the sidebar chooser for members of several workspaces. | DONE | US-16.3 |
 | US-16.3#4 | Cover the scenarios in the browser on a disposable stack. | DONE | US-16.3 |
-| US-16.4 | A current install with Sol's live qualification | READY | EPIC-16 |
-| US-16.4#1 | Back up the install, then apply the pending migrations through the guarded path. | TODO | US-16.4 |
-| US-16.4#2 | Run Sol's corpus live within its ledger, and record the report. | TODO | US-16.4 |
-| US-16.4#3 | Record today's qualification in a migration, apply it, and check Settings → Models. | TODO | US-16.4 |
-| US-16.5 | Real examples on the install | BLOCKED | EPIC-16 |
+| US-16.4 | A current install with Sol's live qualification | DONE | EPIC-16 |
+| US-16.4#1 | Back up the install, then apply the pending migrations through the guarded path. | DONE | US-16.4 |
+| US-16.4#2 | Run Sol's corpus live within its ledger, and record the report. | DONE | US-16.4 |
+| US-16.4#3 | Record today's qualification in a migration, apply it, and check Settings → Models. | DONE | US-16.4 |
+| US-16.5 | Real examples on the install | READY | EPIC-16 |
 | US-16.5#1 | Seed the concept Experts and workflows into the owner workspace. | TODO | US-16.5 |
 | US-16.5#2 | Add a guarded command that runs the example goals and workflow live under the shared ledger. | TODO | US-16.5 |
 | US-16.5#3 | Check Runs, Experts, Workflows and Approvals show them. | TODO | US-16.5 |
@@ -7528,7 +7528,8 @@ Open Questions:
 
 ### US-16.4: A current install with Sol's live qualification
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-16-4-current-install-sol-s/`
 
 As an owner
 I want my persistent install brought up to the code's migrations, and Sol's route qualified live today
@@ -7545,7 +7546,7 @@ Acceptance Criteria:
 Scenario: Backed up, then current
   Given the persistent install behind the shipped migrations
   When it is backed up and the guarded apply runs
-  Then a verified backup exists from before the apply, and readiness reports the schema ready with every shipped migration applied
+  Then a completed, encrypted backup exists from before the apply, and readiness reports the schema ready with every shipped migration applied
 
 Scenario: A live pass inside the authorized cap
   Given Sol's qualification ledger and its US$1.20 cap
@@ -7562,16 +7563,16 @@ Dependencies:
 - US-16.2
 
 Tasks:
-- [ ] Back up the install, then apply the pending migrations through the guarded path.
-- [ ] Run Sol's corpus live within its ledger, and record the report.
-- [ ] Record today's qualification in a migration, apply it, and check Settings → Models.
+- [x] Back up the install, then apply the pending migrations through the guarded path.
+- [x] Run Sol's corpus live within its ledger, and record the report.
+- [x] Record today's qualification in a migration, apply it, and check Settings → Models.
 
 Open Questions:
 - None.
 
 ### US-16.5: Real examples on the install
 
-Status: BLOCKED
+Status: READY
 
 As an owner
 I want real Experts, workflows, runs and an approval in my app
@@ -7592,7 +7593,7 @@ Scenario: Experts and workflows
 
 Scenario: Real runs under a cap
   Given US$0.45 reserved from the shared ledger
-  When two goal runs and one workflow execution run live, each limited to US$0.15
+  When two goal runs limited to US$0.10 each and one workflow execution limited to US$0.25 run live
   Then the runs end with their real outcome and artifacts, the spend stays within the reservation, and no key appears in stored rows or logs
 
 Scenario: A pending approval

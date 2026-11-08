@@ -151,7 +151,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
 
 ## Data and Persistence
 
-- **Migrations:** `supabase/migrations/` holds 49 ordered files, from `20261105000001_workspaces.sql` to `20261108000049_applied_migration_count.sql`, in the schemas `public`, `app_private` and `agent_runtime`. Since migration 35:
+- **Migrations:** `supabase/migrations/` holds 50 ordered files, from `20261105000001_workspaces.sql` to `20261108000050_sol_route_requalified.sql` (US-16.4's record of Sol's 2026-11-08 live pass, after the analyzed revision), in the schemas `public`, `app_private` and `agent_runtime`. Since migration 35:
 
 | Migration | Change |
 |---|---|

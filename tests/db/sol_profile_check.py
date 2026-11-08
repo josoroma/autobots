@@ -32,8 +32,8 @@ async def main() -> None:
 
         row = await value("select canonical_id || ' ' || wire_id || ' ' || label from public.model_profiles where profile_id = 'openrouter_sol'")
         qualified = await value("select status || ' ' || qualified_on::text || ' ' || evidence from agent_runtime.route_qualifications where profile = 'openrouter_sol'")
-        check("Sol's profile row and its route qualification are stored", 'Sol row, qualified_with_limits on 2026-11-07',
-              (row, qualified), row == 'openai/gpt-6.1-sol-20260929 openai/gpt-6.1-sol Sol' and qualified == 'qualified_with_limits 2026-11-07 US-14.15')
+        check("Sol's profile row and its route qualification are stored", 'Sol row, qualified_with_limits on 2026-11-08, from US-14.15 and US-16.4',
+              (row, qualified), row == 'openai/gpt-6.1-sol-20260929 openai/gpt-6.1-sol Sol' and qualified == 'qualified_with_limits 2026-11-08 US-14.15, US-16.4')
 
         async def admitted(policy: Any) -> dict[str, Any]:
             require_offered(policy.bindings.values())

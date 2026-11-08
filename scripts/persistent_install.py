@@ -476,6 +476,37 @@ def goal(root: Path, record: Record, requested: str, key_file: Path, limit: int,
     return 0 if report.get('status') == 'succeeded' and 'after_run_check_failed' not in report and not leaked else 1
 
 
+def screens(root: Path, record: Record, requested: str, grep: str) -> int:
+    """Decision 0023: read-only browser checks of the running install, signed in as its owner. The
+    owner's values are read here and passed only to the browser process, never printed or logged."""
+    stack = install_stack(root, record)
+    require_install(stack, record, requested)
+    sys.path.insert(0, str(root / 'scripts'))
+    from qualify_web import BROWSERS  # noqa: PLC0415
+    from toolchain import child_env, find_tools  # noqa: PLC0415
+    browsers = root / BROWSERS
+    if not any(browsers.glob('chromium-*')):
+        raise Unavailable(f'no browser under {BROWSERS}; install the pinned one deliberately')
+    owner = read_values(record.directory / 'owner.env')
+    out = root / '.checks/install-screens'
+    out.mkdir(parents=True, exist_ok=True)
+    report = out / 'playwright.json'
+    report.unlink(missing_ok=True)
+    env = {**child_env(root, find_tools(root), verifying=True), 'PLAYWRIGHT_BROWSERS_PATH': str(browsers),
+           'AUTOBOTS_WEB_URL': f'http://127.0.0.1:{record.web_port}', 'AUTOBOTS_WEB_REPORT': str(report), 'AUTOBOTS_WEB_OUTPUT': str(out / 'results'),
+           'AUTOBOTS_TEST_SCREENSHOTS': str(out), 'AUTOBOTS_TEST_OWNER_EMAIL': owner['OWNER_EMAIL'], 'AUTOBOTS_TEST_OWNER_PASSWORD': owner['OWNER_PASSWORD']}
+    argv = [str(root / 'apps/web/node_modules/.bin/playwright'), 'test', 'browser/install-current', '--config', 'playwright.config.ts']
+    if grep:
+        argv += ['-g', grep]
+    done = subprocess.run(argv, env=env, cwd=root / 'apps/web', capture_output=True, text=True, errors='replace', timeout=600, check=False)
+    passwords = (owner['OWNER_PASSWORD'],)
+    output = done.stdout[-4000:]
+    for value in passwords:
+        output = output.replace(value, '[redacted]')
+    print(output)
+    return 0 if done.returncode == 0 else 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--install-dir', type=Path, default=DEFAULT_DIR)
@@ -490,6 +521,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     apply.add_argument('--project', required=True)
     apply.add_argument('--restored-copy', action='store_true', help='the target is a restored, held copy of this install')
     apply.add_argument('--reset', action='store_true', help='always refused')
+    shown = commands.add_parser('screens', help='read-only browser checks of the running install, as its owner')
+    shown.add_argument('--project', required=True)
+    shown.add_argument('--grep', default='')
     paid = commands.add_parser('goal', help='one real goal, under the shared cap. It spends money')
     paid.add_argument('--project', required=True)
     paid.add_argument('--paid', action='store_true')
@@ -527,6 +561,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             target: AppStack = restored_copy_stack(root, record, arguments.project) if arguments.restored_copy else install_stack(root, record)
             print(json.dumps(guarded_apply(target, root, record, arguments.project, restored_copy=arguments.restored_copy)))
             return 0
+        if arguments.command == 'screens':
+            return screens(root, record, arguments.project, arguments.grep)
         if not arguments.paid:
             raise Refused('this makes billed calls, and needs --paid')
         from live_goal import GOAL, REQUIRED  # noqa: PLC0415
