@@ -1,0 +1,15 @@
+{
+  "story": "US-15.16",
+  "repository": "josoroma/bot-test",
+  "granted_by": "workspace owner, in the delivery session",
+  "granted_on": "2026-11-08",
+  "source": "docs/engineering/decisions/0022-studio-product-surfaces.md#live-authorization",
+  "max_requests": 40,
+  "allowed": [
+    "one call each of github_list_pull_requests, github_list_workflow_runs, github_search_issues and github_read_file",
+    "one issue with a label and its marker, then closed",
+    "one pull request of one new file after the owner approves its diff, one retry, then closed and its branch deleted",
+    "one first commit creating README.md on main, because the repository had no commits, authorized by the owner on 2026-11-08"
+  ],
+  "model_calls": 0
+}

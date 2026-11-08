@@ -26,6 +26,20 @@ This decision approves [PRD-Studio.md](../../../PRD-Studio.md) and schedules EPI
 | **D17. Seed** | The coordinator drafts the seed definitions in PRD-Studio SD-02 from the concepts, and the owner reviews them. An Expert whose tool is unavailable is seeded without that tool and says so in its purpose. Interview synthesis is seeded as a draft until a workflow execution can carry files |
 | **D13. Later** | The model-assisted features stay out of EPIC-15: suggested tools for a new Expert, and "Generate from a run". Each needs its own plan, caps and consent text |
 
+## Live authorization
+
+On 2026-11-08 the owner set `GITHUB_REPOSITORY=josoroma/bot-test` and a fine-grained `GITHUB_TOKEN` in the repository's ignored `.env`, and authorized one live pass for US-15.16 within this cap:
+
+- **Reads:** one call each of `github_list_pull_requests`, `github_list_workflow_runs`, `github_search_issues` and `github_read_file`.
+- **One issue:** created with a label and its operation marker, then closed.
+- **One pull request:** a single new file on branch `autobots/<operation>`, opened only after the owner approves its diff, with one retry that must return the same pull request. It's then closed and its branch deleted. Nothing is merged.
+- **At most 40 GitHub API requests in all**, counted before each is sent. No model call and no OpenRouter spend.
+- **The record is redacted:** output shapes, markers and the retry, checked to hold no token.
+
+The repository turned out to have no commits, so a pull request had nothing to branch from. The owner then authorized one more write within the same cap: creating `README.md` on `main` as its first commit.
+
+The runner reads only those two variables from `.env`, into its own process, and prints neither. It still refuses a public repository or a token with classic scopes. This authorizes that one pass, not later live use.
+
 ## What this gives up
 
 - **DS-02's single dark default for everyone.** A person who picks System gets light whenever their Mac is light.

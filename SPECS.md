@@ -515,9 +515,9 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-15.15#2 | Compute each file's diff against the base for the approval request, binding the approval to the exact request. | DONE | US-15.15 |
 | US-15.15#3 | Create `autobots/<operation_id>`, commit only the named paths, open the pull request with the operation-ID marker, and read back the branch and pull request before any retry. | DONE | US-15.15 |
 | US-15.15#4 | Cover the scenarios with fake transports only, including a lost response. | DONE | US-15.15 |
-| US-15.16 | Live GitHub qualification on the configured repository | BLOCKED | EPIC-15 |
-| US-15.16#1 | Extend the GitHub qualification runner, in no verification profile, to the read tools, labels and pull requests, refusing to start without the token and the recorded authorization. | TODO | US-15.16 |
-| US-15.16#2 | Run it once and record redacted evidence: the outputs' shapes, the markers, the retry readback and the absence of the token. | TODO | US-15.16 |
+| US-15.16 | Live GitHub qualification on the configured repository | DONE | EPIC-15 |
+| US-15.16#1 | Extend the GitHub qualification runner, in no verification profile, to the read tools, labels and pull requests, refusing to start without the token and the recorded authorization. | DONE | US-15.16 |
+| US-15.16#2 | Run it once and record redacted evidence: the outputs' shapes, the markers, the retry readback and the absence of the token. | DONE | US-15.16 |
 | US-15.17 | Run side panel and plan task timing | READY | EPIC-15 |
 | US-15.17#1 | Add plan task start and finish times by migration, written only on the worker's fenced path in database time. | TODO | US-15.17 |
 | US-15.17#2 | Add the current task, task times, per-task tools, tokens and the root tree's metered-call count to the run read model in Pydantic and FastAPI, then regenerate OpenAPI and the TypeScript client. | TODO | US-15.17 |
@@ -967,8 +967,6 @@ flowchart TD
   US_5_4 -.-> US_15_15
   US_15_14 -.-> US_15_16
   US_15_15 -.-> US_15_16
-  EXT_US_15_16_1["External: the owner&#x27;s fine-grained GITHUB_TOKEN for josoroma/bot-test in the worker environment, and a separate capped authorization for the live calls (Decision 0022 D12)."]
-  EXT_US_15_16_1 -.-> US_15_16
   US_15_4 -.-> US_15_17
   US_4_2 -.-> US_15_17
   US_4_3 -.-> US_15_17
@@ -6783,7 +6781,8 @@ Open Questions:
 
 ### US-15.16: Live GitHub qualification on the configured repository
 
-Status: BLOCKED
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-15-16-live-github-qualification-configured/`
 
 As a workspace owner
 I want each GitHub tool run once against josoroma/bot-test with my token, within a cap I authorize
@@ -6791,6 +6790,7 @@ So that the read tools, labels and pull-request connector are seen working live,
 
 Source:
 - [Decision 0022, D6, D7 and D12](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
+- [Decision 0022, live authorization](docs/engineering/decisions/0022-studio-product-surfaces.md#live-authorization)
 - [Decision 0022, what this doesn't establish](docs/engineering/decisions/0022-studio-product-surfaces.md#what-this-doesnt-establish)
 - [Decision 0007, what this doesn't establish](docs/engineering/decisions/0007-first-connector-github-issues.md#what-this-doesnt-establish)
 - [Decision 0017, C5](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
@@ -6813,11 +6813,10 @@ Scenario: Not run without the owner
 Dependencies:
 - US-15.14
 - US-15.15
-- External: the owner's fine-grained GITHUB_TOKEN for josoroma/bot-test in the worker environment, and a separate capped authorization for the live calls (Decision 0022 D12).
 
 Tasks:
-- [ ] Extend the GitHub qualification runner, in no verification profile, to the read tools, labels and pull requests, refusing to start without the token and the recorded authorization.
-- [ ] Run it once and record redacted evidence: the outputs' shapes, the markers, the retry readback and the absence of the token.
+- [x] Extend the GitHub qualification runner, in no verification profile, to the read tools, labels and pull requests, refusing to start without the token and the recorded authorization.
+- [x] Run it once and record redacted evidence: the outputs' shapes, the markers, the retry readback and the absence of the token.
 
 Open Questions:
 - None.
