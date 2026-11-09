@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from dataclasses import replace
 
 import pytest
 from pydantic import ValidationError
@@ -108,7 +109,7 @@ def test_the_approval_policy_version_names_these_rules() -> None:
         for kind in (OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE, OperationClass.READ_ONLY)
     }
     assert (APPROVAL_POLICY_VERSION, rules) == (
-        "approval-policy/1",
+        "approval-policy/2",
         {
             OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE: (
                 "consequential_external_write",
@@ -121,6 +122,10 @@ def test_the_approval_policy_version_names_these_rules() -> None:
             ),
         },
     )
+    by_action = replace(
+        _tool(OperationClass.REVERSIBLE_INTERNAL_WRITE), approval_when=lambda _: True
+    )
+    assert _approval_rule(by_action) == "action_marked"
     snapshot = scope_snapshot({"b": 2, "a": 1}, ("outputs",))
     assert snapshot == {"tools": {"b": 2, "a": 1}, "paths": ["outputs"]}
     digest = hashlib.sha256(json.dumps(snapshot, sort_keys=True).encode()).hexdigest()

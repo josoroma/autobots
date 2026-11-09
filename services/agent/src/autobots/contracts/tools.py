@@ -273,6 +273,7 @@ ToolGroupName = Literal[
     "connectors",
     "delegation",
     "learning",
+    "automation",
 ]
 ToolProviderName = Literal["autobots", "tavily", "jina", "yahoo_finance", "world_bank", "github"]
 OperationClassName = Literal[
@@ -332,7 +333,8 @@ class ToolDescriptor(BaseModel):
     cost_class: Literal["free_local", "metered_provider"]
     cost_note: str | None
     key_requirement: KeyRequirementView | None
-    approval: Literal["never", "always"]
+    # Decision 0026 C9: `by_action` when only some of a tool's actions wait for a person.
+    approval: Literal["never", "always", "by_action"]
     input_schema: dict[str, Any]
     output_schema: dict[str, Any]
     fields: list[FieldDescriptor]

@@ -113,7 +113,7 @@ test("each request shows who asked, its scope and its policy version, as stored 
     "Scope when asked: tools mock_send version 1",
   );
   await expect(card.locator("[data-approval-policy]")).toHaveText(
-    "Policy version: approval-policy/1, rule consequential external write.",
+    "Policy version: approval-policy/2, rule consequential external write.",
   );
   const listed = await (await page.request.get("/api/v1/approvals")).json();
   const shown = listed.approvals.find(

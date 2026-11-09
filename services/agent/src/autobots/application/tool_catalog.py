@@ -169,7 +169,9 @@ def describe(tool: ToolDefinition, environ: Mapping[str, str]) -> ToolDescriptor
             if requirement
             else None
         ),
-        approval="always" if approval else "never",
+        approval=(
+            "always" if approval else "by_action" if tool.approval_when is not None else "never"
+        ),
         input_schema=input_schema,
         output_schema=output_schema,
         fields=[

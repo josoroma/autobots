@@ -1584,7 +1584,8 @@ export const schemas = {
             "code",
             "connectors",
             "delegation",
-            "learning"
+            "learning",
+            "automation"
           ],
           "type": "string"
         },
@@ -5724,7 +5725,8 @@ export const schemas = {
       "approval": {
         "enum": [
           "never",
-          "always"
+          "always",
+          "by_action"
         ],
         "title": "Approval",
         "type": "string"
@@ -5806,7 +5808,8 @@ export const schemas = {
           "code",
           "connectors",
           "delegation",
-          "learning"
+          "learning",
+          "automation"
         ],
         "title": "Group",
         "type": "string"
@@ -5980,7 +5983,8 @@ export const schemas = {
           "code",
           "connectors",
           "delegation",
-          "learning"
+          "learning",
+          "automation"
         ],
         "title": "Group",
         "type": "string"
@@ -7754,7 +7758,7 @@ export interface ExpertConfig {
   purpose?: string;
   role_bindings?: Record<string, unknown>;
   skills?: string[];
-  tool_groups?: ("planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning")[];
+  tool_groups?: ("planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning" | "automation")[];
   tools?: string[];
 }
 
@@ -8858,7 +8862,7 @@ export function parseToolCatalog(value: unknown): ToolCatalog {
 }
 
 export interface ToolDescriptor {
-  approval: "never" | "always";
+  approval: "never" | "always" | "by_action";
   availability: "available" | "key_missing" | "disabled_by_policy" | "not_qualified";
   availability_reason: string | null;
   cost_class: "free_local" | "metered_provider";
@@ -8866,7 +8870,7 @@ export interface ToolDescriptor {
   description: string;
   fields: FieldDescriptor[];
   grantable_to: ("goal" | "expert" | "workflow_node" | "coordinator")[];
-  group: "planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning";
+  group: "planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning" | "automation";
   input_schema: Record<string, unknown>;
   key_requirement: KeyRequirementView | null;
   limits: ToolLimits | null;
@@ -8898,7 +8902,7 @@ export function parseToolGrants(value: unknown): ToolGrants {
 
 export interface ToolGroupDescriptor {
   description: string;
-  group: "planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning";
+  group: "planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning" | "automation";
   title: string;
   tool_ids: string[];
 }

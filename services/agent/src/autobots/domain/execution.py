@@ -17,6 +17,7 @@ TOOL_VERSIONS: Mapping[str, int] = {
     "calculate": 1,
     "complete_task": 1,
     "create_github_issue": 2,
+    "cronjob": 1,
     "extract_website_content": 1,
     "github_list_pull_requests": 1,
     "github_list_workflow_runs": 1,

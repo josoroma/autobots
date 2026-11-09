@@ -11,9 +11,9 @@ Everything in PRD §9 still applies: grants pin versions, discovery never grants
 - The **developer and screen view** lists every catalogued tool and version, granted or not, with its availability in this install.
 - The **agent view** stays the registry's scope-filtered catalog: granted tools only. Discovery never grants, and a model can't reach the developer view.
 
-**TC-02. Descriptor.** Each `(tool_id, version)` has a descriptor with: `tool_id` (snake_case, `^[a-z][a-z0-9_]{2,63}$`), `version`, `title`, `description` (the text the model sees), `group`, `provider`, `operation_class`, `side_effects` (derived from the class), `network`, `cost_class` (`free_local` or `metered_provider`), an optional owner-maintained `cost_note`, an optional `key_requirement` naming the credential and its environment **variable name**, `approval` (`never`, `always`), `input_schema` and `output_schema` (JSON Schema from the Pydantic models), flattened `fields` (path, direction, type, required, description, constraints, public), `limits` (timeout, retries, output bytes), `grantable_to` (`goal`, `expert`, `workflow_node`, `coordinator`), and `availability` with a typed `availability_reason`.
+**TC-02. Descriptor.** Each `(tool_id, version)` has a descriptor with: `tool_id` (snake_case, `^[a-z][a-z0-9_]{2,63}$`), `version`, `title`, `description` (the text the model sees), `group`, `provider`, `operation_class`, `side_effects` (derived from the class), `network`, `cost_class` (`free_local` or `metered_provider`), an optional owner-maintained `cost_note`, an optional `key_requirement` naming the credential and its environment **variable name**, `approval` (`never`, `always`, or `by_action` for a tool whose actions differ, Decision 0026 C9), `input_schema` and `output_schema` (JSON Schema from the Pydantic models), flattened `fields` (path, direction, type, required, description, constraints, public), `limits` (timeout, retries, output bytes), `grantable_to` (`goal`, `expert`, `workflow_node`, `coordinator`), and `availability` with a typed `availability_reason`.
 
-**TC-03. Groups.** `planning`, `general`, `web_search`, `web_extraction`, `web_crawling`, `files`, `market_data`, `browsing`, `code`, `connectors`, `delegation`, `learning`. One group per tool. Providers: `autobots`, `tavily`, `jina`, `yahoo_finance`, `world_bank`, `github`.
+**TC-03. Groups.** `planning`, `general`, `web_search`, `web_extraction`, `web_crawling`, `files`, `market_data`, `browsing`, `code`, `connectors`, `delegation`, `learning`, and `automation` (Decision 0026). One group per tool. Providers: `autobots`, `tavily`, `jina`, `yahoo_finance`, `world_bank`, `github`.
 
 **TC-04. Availability.** `available`, `key_missing`, `disabled_by_policy` or `not_qualified`, computed per request from the worker-facing configuration and never stored. It shows whether a key is set, never its value, prefix, length or hash.
 
@@ -179,3 +179,27 @@ Output: `summary` (labelled third-party, cut to the shared text budget), `visite
 **AB-03.** A refused action ends the call at once with `stopped: refused_action`: a navigation outside `allowed_domains`, a typing or submission action, or a request the egress proxy refuses for an action the agent chose. Nothing more is requested and no further model step is taken; the output keeps the summary so far, the URLs visited and the steps used. A page's own subresource the proxy refuses is counted and doesn't end the call (Decision 0018).
 
 **AB-02.** It stays `arbitrary_execution`. The registry admits that class only for a tool whose executor reports qualified. The owner's switch is resolved per workspace by PK-07, and a saved `disabled` turns it off for that workspace. It is granted only through an Expert, every call waits for a person's approval, it counts as one metered call, and each of its steps counts as the run's model spend.
+
+## Automation
+
+By [Decision 0026](docs/engineering/decisions/0026-cronjob-tool-and-tool-guide.md), C1 to C8.
+
+**CJ-01.** `cronjob` v1, in the group Automation, manages the workspace's routines (US-7.1) through the routine service. It takes the action `list`, `create`, `update`, `pause`, `resume`, `run` or `remove`, and it stays in the run's workspace.
+
+**CJ-02.** `list` runs without approval. Every other action waits for a person's approval, which shows the action, the routine and its schedule. The descriptor's `approval` is `by_action` (TC-02 gains that value). The tool is granted only through an Expert.
+
+**CJ-03.** `create` and `update` apply the routine service's validation and codes. `pause` and `resume` set `enabled`. `run` admits one occurrence now, with the scheduled path's overlap and admission rules. `remove` marks a routine removed: disabled, hidden and never evaluated, with its history kept and its name free. An action naming a removed routine is refused `routine_not_found`, and `run` on a paused routine `routine_paused`.
+
+**CJ-04.** Its public fields are `action`, `routine_id` and `name`, and the outcome's `routine_id`, `status` and `run_id`. A goal's text and inputs stay out of the tool-use record.
+
+## Tool guide
+
+**TG-01.** Every tool carries a guide of three short texts: what it does, when to use it, and why it's useful. The catalog exposes them as `guide`, and a test fails for a tool without one.
+
+**TG-02.** On the Tools page, choosing a tool opens a modal dialog instead of the side panel. It shows:
+- the tool's title, availability and repair;
+- What, When and Why;
+- its inputs and outputs, with name, type, required and whether each is shown in records;
+- Granted to, Copy schema and a link to the full detail page.
+
+It keeps `?tool=<id>` in the URL. Escape, Close and a click outside close it, focus returns to the tool's link, and it passes axe in both themes.

@@ -151,7 +151,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
 
 ## Data and Persistence
 
-- **Migrations:** `supabase/migrations/` holds 52 ordered files, from `20261105000001_workspaces.sql` to `20261108000052_keys_and_vars.sql` (US-14.17's Tavily and Jina providers and `app_private.tool_key_settings`, and US-14.18's GitHub provider and saved values, after the analyzed revision), in the schemas `public`, `app_private` and `agent_runtime`. Since migration 35:
+- **Migrations:** `supabase/migrations/` holds 53 ordered files, from `20261105000001_workspaces.sql` to `20261108000053_routine_removal.sql` (US-14.17's Tavily and Jina providers and `app_private.tool_key_settings`, US-14.18's GitHub provider and saved values, and US-14.19's `routines.removed_at` and `action_marked` approval rule, after the analyzed revision), in the schemas `public`, `app_private` and `agent_runtime`. Since migration 35:
 
 | Migration | Change |
 |---|---|
@@ -176,7 +176,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
   - runs, `run_events`, `artifacts`, `approval_requests`;
   - Experts and their versions, `sessions`;
   - workflows with versions, drafts, executions, node instances and emissions;
-  - routines with versions and occurrences;
+  - routines with versions and occurrences. Since US-14.19, after the analyzed revision, a removed routine keeps them with `removed_at` set, and the Expert-only `cronjob` tool (`application/cronjob_tool.py`, group Automation, approval `by_action`) lists, creates, updates, pauses, resumes, runs now and removes them through `application/routines.py`;
   - `memory_items`, the improvement and knowledge tables, `model_profiles`.
 - **Private tables:**
   - jobs, goal specs, plans, `plan_task_times`, usage, verifications;
@@ -184,7 +184,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
   - credentials, policies, spend limits, idempotency receipts;
   - heartbeats, retention, `installation_holds`.
 - **`agent_runtime`:** LangGraph checkpoints, `adapter_qualifications`, `route_qualifications`.
-- **Schema readiness:** `application/operations.py` checks `REQUIRED_RELATIONS` and `REQUIRED_COLUMNS` (through migration 52), and compares `app_private.applied_migration_count()` with `SHIPPED_MIGRATIONS` in `application/schema_release.py`: fewer is `schema_behind` and blocks, more is `schema_ahead`, degraded and not blocking. A harness test (`tests/harness/test_app_db.py`) and `services/agent/tests/test_schema_release.py` fail unless that record matches `supabase/migrations`. Operations shows "N of M migrations applied" (`lib/schema-value.ts`). Changed by US-16.2, after the analyzed revision.
+- **Schema readiness:** `application/operations.py` checks `REQUIRED_RELATIONS` and `REQUIRED_COLUMNS` (through migration 53), and compares `app_private.applied_migration_count()` with `SHIPPED_MIGRATIONS` in `application/schema_release.py`: fewer is `schema_behind` and blocks, more is `schema_ahead`, degraded and not blocking. A harness test (`tests/harness/test_app_db.py`) and `services/agent/tests/test_schema_release.py` fail unless that record matches `supabase/migrations`. Operations shows "N of M migrations applied" (`lib/schema-value.ts`). Changed by US-16.2, after the analyzed revision.
 - **Install-only schema:** `autobots_install` holds the install's identity and applied-migration digests (`scripts/persistent_install.py`).
 - **Ephemeral channel:** Postgres `NOTIFY autobots_result_text`. Nothing is stored.
 - **Objects and files:**

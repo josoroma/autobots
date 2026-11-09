@@ -41,7 +41,7 @@ REQUIRED_RELATIONS = (
     "app_private.improvement_replay_runs",
     "agent_runtime.adapter_qualifications",
     "agent_runtime.route_qualifications",
-    # Migrations 38 to 52 (Decision 0023 E2), for a database with no readable history.
+    # Migrations 38 to 53 (Decision 0023 E2), for a database with no readable history.
     "app_private.tool_uses",
     "public.user_profiles",
     "public.workflow_drafts",
@@ -62,6 +62,7 @@ REQUIRED_COLUMNS = (
     ("app_private.tool_uses", "instance_key"),
     ("public.workflows", "description"),
     ("app_private.tool_key_settings", "value"),
+    ("public.routines", "removed_at"),
     ("public.approval_requests", "review_detail"),
 )
 # Decision 0023 E2: the one function that counts the applied history, migration 49.

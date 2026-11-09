@@ -7,7 +7,7 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-14.18 |
+| Target | US-14.19 |
 | Kind | story |
 | Focus | - |
 | Status | ACTIVE |
@@ -19,16 +19,16 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-14.18 | us-14-18-settings-keys-vars-github | READY | Settings → Keys & vars, with the GitHub token, repository and browsing switch per workspace |
+| 1 | US-14.19 | us-14-19-cronjob-tool-manages-workspace | READY | The cronjob tool manages the workspace's routines |
 
 ## Next Action
 
 Action: select
-Story: US-14.18
-Change: us-14-18-settings-keys-vars-github
+Story: US-14.19
+Change: us-14-19-cronjob-tool-manages-workspace
 Owner: main-session
-Command: openspec new change us-14-18-settings-keys-vars-github; set US-14.18 to IN PROGRESS with a Change: line
-Reason: US-14.18 is READY and has no OpenSpec change
+Command: openspec new change us-14-19-cronjob-tool-manages-workspace; set US-14.19 to IN PROGRESS with a Change: line
+Reason: US-14.19 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

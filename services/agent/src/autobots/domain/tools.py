@@ -57,6 +57,8 @@ EXPERT_TOOLS = {
     **PROVIDER_TOOLS,
     # Arbitrary execution in the isolated browser, only while it's qualified (US-14.12).
     "browse_goal": 1,
+    # Manages the workspace's routines, every action but `list` approved (Decision 0026).
+    "cronjob": 1,
 }
 LOOP_TOOL_GRANTS = {**PLAN_TOOLS, **GENERAL_TOOLS}
 # Only a coordinator session's runs get this, and an Expert's own configuration can't name it.

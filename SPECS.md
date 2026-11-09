@@ -100,6 +100,8 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
   - [US-14.16: Live browse trial with Sol](#us-1416-live-browse-trial-with-sol)
   - [US-14.17: Tool-provider keys from .env, overridden in Settings](#us-1417-tool-provider-keys-from-env-overridden-in-settings)
   - [US-14.18: Settings → Keys & vars, with the GitHub token, repository and browsing switch per workspace](#us-1418-settings--keys--vars-with-the-github-token-repository-and-browsing-switch-per-workspace)
+  - [US-14.19: The cronjob tool manages the workspace's routines](#us-1419-the-cronjob-tool-manages-the-workspaces-routines)
+  - [US-14.20: Tool guide, shown in a modal on the Tools page](#us-1420-tool-guide-shown-in-a-modal-on-the-tools-page)
 - [EPIC-15: Studio product surfaces](#epic-15-studio-product-surfaces)
   - [US-15.1: Sidebar groups with Tools under Build](#us-151-sidebar-groups-with-tools-under-build)
   - [US-15.2: Display name, workspace role and account](#us-152-display-name-workspace-role-and-account)
@@ -465,6 +467,20 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.18#8 | Extend `make start` and its `.env` parsing script to pass `GITHUB_REPOSITORY` and `GITHUB_TOKEN` as data, with the existing Tavily, Jina and switch rules. | DONE | US-14.18 |
 | US-14.18#9 | Cover the scenarios with unit tests on fake transports, a disposable database check including the secret scan and the approval binding, the web suite with axe, and the Makefile parsing test. | DONE | US-14.18 |
 | US-14.18#10 | Update the operations runbook (including the owner's `make migrate`, then `make stop && make start`), README, `.env.example` and `CODEBASE.md`. | DONE | US-14.18 |
+| US-14.19 | The cronjob tool manages the workspace's routines | DONE | EPIC-14 |
+| US-14.19#1 | Add migration 53 with `removed_at` on routines and a name unique only among live routines, and make removal disable the routine, hide it from the service's lists, leave it out of evaluation and free its name, deleting nothing. Update the schema-readiness record. Verify on disposable targets only, and leave applying it to the persistent install to the owner. | DONE | US-14.19 |
+| US-14.19#2 | Register `cronjob` v1 with Pydantic input and output schemas for the seven actions, provider `autobots`, class `reversible_internal_write` with receipts, `free_local`, no network, Expert-only grant, approval `by_action` and C8's public fields. | DONE | US-14.19 |
+| US-14.19#3 | Route `create`, `update`, `pause`, `resume`, `run` and `remove` through the routine service and its typed codes, keep every action in the run's workspace, record the run's starter as creator, and admit `run` through the scheduled path's admission. | DONE | US-14.19 |
+| US-14.19#4 | Require argument-bound approval for every action except `list`, showing the action, the routine and its schedule. | DONE | US-14.19 |
+| US-14.19#5 | Add the group Automation and the approval value `by_action` to the catalog's Pydantic contract and the Tools screen's labels, then regenerate OpenAPI and the TypeScript client. | DONE | US-14.19 |
+| US-14.19#6 | Cover the scenarios with unit tests and a disposable database check with no model, including the scan for goal text and inputs. | DONE | US-14.19 |
+| US-14.19#7 | Update the operations runbook (including the owner's `make migrate`) and `CODEBASE.md`. | DONE | US-14.19 |
+| US-14.20 | Tool guide, shown in a modal on the Tools page | READY | EPIC-14 |
+| US-14.20#1 | Add a guide with what, when and why texts to every registered tool and every planned descriptor, `cronjob` included, and expose it as `guide` in the catalog's Pydantic contract. Regenerate OpenAPI and the TypeScript client. | TODO | US-14.20 |
+| US-14.20#2 | Add a test that fails, naming the tool, when a tool's guide is missing or has an empty text. | TODO | US-14.20 |
+| US-14.20#3 | Replace the Tools page's side panel with a native `dialog` modal labelled by the tool's title. Keep `?tool=<id>`, Granted to, Copy schema and the link to `/tools/{tool_id}`. Close it on Escape, Close and an outside click, returning focus to the tool's link. | TODO | US-14.20 |
+| US-14.20#4 | Update the browser suites for the Tools page and Granted to, with axe in both themes. | TODO | US-14.20 |
+| US-14.20#5 | Update `CODEBASE.md`. | TODO | US-14.20 |
 | EPIC-15 | Studio product surfaces | — | — |
 | US-15.1 | Sidebar groups with Tools under Build | DONE | EPIC-15 |
 | US-15.1#1 | Regroup the sidebar's links in the web shell, keeping link names, roles and data hooks. | DONE | US-15.1 |
@@ -726,6 +742,8 @@ flowchart TD
     US_14_16["US-14.16: Live browse trial with Sol"]
     US_14_17["US-14.17: Tool-provider keys from .env, overridden in Settings"]
     US_14_18["US-14.18: Settings → Keys &amp; vars, with the GitHub token, repository and browsing switch per workspace"]
+    US_14_19["US-14.19: The cronjob tool manages the workspace&#x27;s routines"]
+    US_14_20["US-14.20: Tool guide, shown in a modal on the Tools page"]
   end
   subgraph EPIC_15["EPIC-15: Studio product surfaces"]
     US_15_1["US-15.1: Sidebar groups with Tools under Build"]
@@ -991,6 +1009,18 @@ flowchart TD
   US_15_14 -.-> US_14_18
   US_15_15 -.-> US_14_18
   US_14_12 -.-> US_14_18
+  US_7_1 -.-> US_14_19
+  US_5_1 -.-> US_14_19
+  US_5_3 -.-> US_14_19
+  US_14_1 -.-> US_14_19
+  US_14_3 -.-> US_14_19
+  US_14_12 -.-> US_14_19
+  US_16_2 -.-> US_14_19
+  US_14_1 -.-> US_14_20
+  US_14_2 -.-> US_14_20
+  US_15_7 -.-> US_14_20
+  US_11_11 -.-> US_14_20
+  US_14_19 -.-> US_14_20
   US_14_2 -.-> US_15_1
   US_11_11 -.-> US_15_1
   US_2_2 -.-> US_15_2
@@ -1700,6 +1730,32 @@ flowchart TD
     US_14_18 --> T_14_18_9
     T_14_18_10["US-14.18#10: Update the operations runbook (including the owner&#x27;s `make migrate`, then `make stop &amp;&amp; make start`), README, `.env.example` and `CODEBASE.md`."]
     US_14_18 --> T_14_18_10
+    US_14_19["US-14.19: The cronjob tool manages the workspace&#x27;s routines"]
+    T_14_19_1["US-14.19#1: Add migration 53 with `removed_at` on routines and a name unique only among live routines, and make removal disable the routine, hide it from the service&#x27;s lists, leave it out of evaluation and free its name, deleting nothing. Update the schema-readiness record. Verify on disposable targets only, and leave applying it to the persistent install to the owner."]
+    US_14_19 --> T_14_19_1
+    T_14_19_2["US-14.19#2: Register `cronjob` v1 with Pydantic input and output schemas for the seven actions, provider `autobots`, class `reversible_internal_write` with receipts, `free_local`, no network, Expert-only grant, approval `by_action` and C8&#x27;s public fields."]
+    US_14_19 --> T_14_19_2
+    T_14_19_3["US-14.19#3: Route `create`, `update`, `pause`, `resume`, `run` and `remove` through the routine service and its typed codes, keep every action in the run&#x27;s workspace, record the run&#x27;s starter as creator, and admit `run` through the scheduled path&#x27;s admission."]
+    US_14_19 --> T_14_19_3
+    T_14_19_4["US-14.19#4: Require argument-bound approval for every action except `list`, showing the action, the routine and its schedule."]
+    US_14_19 --> T_14_19_4
+    T_14_19_5["US-14.19#5: Add the group Automation and the approval value `by_action` to the catalog&#x27;s Pydantic contract and the Tools screen&#x27;s labels, then regenerate OpenAPI and the TypeScript client."]
+    US_14_19 --> T_14_19_5
+    T_14_19_6["US-14.19#6: Cover the scenarios with unit tests and a disposable database check with no model, including the scan for goal text and inputs."]
+    US_14_19 --> T_14_19_6
+    T_14_19_7["US-14.19#7: Update the operations runbook (including the owner&#x27;s `make migrate`) and `CODEBASE.md`."]
+    US_14_19 --> T_14_19_7
+    US_14_20["US-14.20: Tool guide, shown in a modal on the Tools page"]
+    T_14_20_1["US-14.20#1: Add a guide with what, when and why texts to every registered tool and every planned descriptor, `cronjob` included, and expose it as `guide` in the catalog&#x27;s Pydantic contract. Regenerate OpenAPI and the TypeScript client."]
+    US_14_20 --> T_14_20_1
+    T_14_20_2["US-14.20#2: Add a test that fails, naming the tool, when a tool&#x27;s guide is missing or has an empty text."]
+    US_14_20 --> T_14_20_2
+    T_14_20_3["US-14.20#3: Replace the Tools page&#x27;s side panel with a native `dialog` modal labelled by the tool&#x27;s title. Keep `?tool=&lt;id&gt;`, Granted to, Copy schema and the link to `/tools/{tool_id}`. Close it on Escape, Close and an outside click, returning focus to the tool&#x27;s link."]
+    US_14_20 --> T_14_20_3
+    T_14_20_4["US-14.20#4: Update the browser suites for the Tools page and Granted to, with axe in both themes."]
+    US_14_20 --> T_14_20_4
+    T_14_20_5["US-14.20#5: Update `CODEBASE.md`."]
+    US_14_20 --> T_14_20_5
   end
 ```
 
@@ -6287,6 +6343,175 @@ Tasks:
 - [x] Extend `make start` and its `.env` parsing script to pass `GITHUB_REPOSITORY` and `GITHUB_TOKEN` as data, with the existing Tavily, Jina and switch rules.
 - [x] Cover the scenarios with unit tests on fake transports, a disposable database check including the secret scan and the approval binding, the web suite with axe, and the Makefile parsing test.
 - [x] Update the operations runbook (including the owner's `make migrate`, then `make stop && make start`), README, `.env.example` and `CODEBASE.md`.
+
+Open Questions:
+- None.
+
+### US-14.19: The cronjob tool manages the workspace's routines
+
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-14-19-cronjob-tool-manages-workspace/`
+
+As a workspace owner whose Expert runs goals
+I want an Expert to list, create, update, pause, resume, run and remove the workspace's routines through one tool, with a person approving every action that can start or change work
+So that an agent can manage scheduled work through the same rules as the Routines API, without a second scheduler and without starting paid work on its own.
+
+Source:
+- [Decision 0026, C1 to C10](docs/engineering/decisions/0026-cronjob-tool-and-tool-guide.md#cronjob)
+- [Decision 0026, what this doesn't establish](docs/engineering/decisions/0026-cronjob-tool-and-tool-guide.md#what-this-doesnt-establish)
+- [Automation, CJ-01 to CJ-04](PRD-Tool-Catalog.md#automation)
+- [Catalog contract, TC-01 to TC-03 and TC-06](PRD-Tool-Catalog.md#catalog-contract)
+- [Tool-use record, TU-01, TU-03 and TU-04](PRD-Tool-Catalog.md#tool-use-record)
+- [Autonomous browsing, AB-02, the Expert-only pattern](PRD-Tool-Catalog.md#autonomous-browsing)
+- [Routines and scheduled work](PRD-LangChain-Deep-Agents.md#104-routines-and-scheduled-work)
+- [Tool contract](PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [Approval contract and replay](PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+- [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
+- [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
+
+Codebase Context:
+- [Current capabilities](CODEBASE.md#current-capabilities): routines are explicit, with immutable versions, and the maintenance step admits them with a unique key (`application/routines.py`). They have API routes and no screen. `browse_goal` is Expert-only. Not product intent.
+- [Data and Persistence](CODEBASE.md#data-and-persistence): schema readiness compares `SHIPPED_MIGRATIONS` and `REQUIRED_COLUMNS` with the applied migrations.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: The catalog lists cronjob under Automation
+  Given a disposable stack and a workspace member
+  When the member reads the catalog and filters it by the Automation group
+  Then cronjob v1 appears exactly once, in the group Automation described as "Scheduled tasks that start goals and workflows", with provider autobots, operation class reversible_internal_write, cost class free_local, no network, approval by_action and grantable only to an Expert
+
+Scenario: list runs without approval and stays in the run's workspace
+  Given a disposable database, a workspace with two routines, another workspace with one routine, and a run in the first workspace whose Expert grants cronjob, dispatched through the gateway with no model
+  When the run calls cronjob with the action list
+  Then it returns the first workspace's routines, no approval request is created, and the other workspace's routine isn't listed
+
+Scenario: Every other action waits for a person's approval
+  Given the same run and an existing routine in its workspace
+  When it calls cronjob with each of create, update, pause, resume, run and remove, one call is rejected, and an approval granted for one call is presented for a call with different arguments
+  Then each call creates an approval request bound to its arguments that shows the action, the routine and its schedule, no routine changes and no occurrence is admitted before approval, the rejected call changes nothing, and the approval doesn't authorize the call with different arguments
+
+Scenario: create and update follow the routine service's validation
+  Given approved cronjob calls in a run of the first workspace, a target Expert in that workspace, and one in the other workspace
+  When create names the other workspace's target, grants tools beyond its target's, or sets an invalid trigger or timezone, update sends a stale expected_version, and then a valid create and a valid update are approved
+  Then each invalid call is refused with the routine service's typed code and saves nothing, the valid create saves a routine whose creator is the run's starter, and the valid update saves a new routine version
+
+Scenario: pause and resume set enabled
+  Given an enabled routine
+  When an approved pause is applied, an approved run of the paused routine is attempted, and then an approved resume is applied
+  Then pause sets enabled to false, run is refused routine_paused and admits nothing, and resume sets enabled to true
+
+Scenario: run admits one occurrence now, by the scheduled path's rules
+  Given a disposable database, a routine with no active run, a routine whose earlier run is still active, and a routine whose workspace has no usable key
+  When an approved cronjob run is applied to each
+  Then the first admits exactly one occurrence through the same admission as a scheduled one and returns its run_id, the second is skipped for overlap and says so, the third is blocked and says why, and no model call is made
+
+Scenario: remove marks a routine removed and keeps its history
+  Given a routine with versions and occurrences on a disposable database migrated through migration 53
+  When an approved remove is applied, the routines are then listed through cronjob and through the routine service, routines are evaluated, another action names the removed routine, and an approved create reuses its name
+  Then the routine has removed_at set and enabled false, it appears in neither list, no occurrence is admitted for it, the other action is refused routine_not_found, its versions and occurrences remain, and the new routine with the same name is saved
+
+Scenario: Granted only through an Expert
+  Given a run with no Expert behind it that names cronjob, and a run whose Expert grants cronjob
+  When each proposes a cronjob call
+  Then the first is refused expert_grant_required before any approval request or routine change, and the Expert's call proceeds to its action's rule
+
+Scenario: Only public fields reach the tool-use record
+  Given approved cronjob create and update calls whose goal text and inputs hold distinctive fake strings, and a list call
+  When their tool-use rows, tool.use events and the tool-use listing are read
+  Then each tool use shows only action, routine_id and name as inputs and the outcome's routine_id, status and run_id as outputs, and the fake goal text and inputs appear in none of them
+```
+
+Dependencies:
+- US-7.1
+- US-5.1
+- US-5.3
+- US-14.1
+- US-14.3
+- US-14.12
+- US-16.2
+
+Tasks:
+- [x] Add migration 53 with `removed_at` on routines and a name unique only among live routines, and make removal disable the routine, hide it from the service's lists, leave it out of evaluation and free its name, deleting nothing. Update the schema-readiness record. Verify on disposable targets only, and leave applying it to the persistent install to the owner.
+- [x] Register `cronjob` v1 with Pydantic input and output schemas for the seven actions, provider `autobots`, class `reversible_internal_write` with receipts, `free_local`, no network, Expert-only grant, approval `by_action` and C8's public fields.
+- [x] Route `create`, `update`, `pause`, `resume`, `run` and `remove` through the routine service and its typed codes, keep every action in the run's workspace, record the run's starter as creator, and admit `run` through the scheduled path's admission.
+- [x] Require argument-bound approval for every action except `list`, showing the action, the routine and its schedule.
+- [x] Add the group Automation and the approval value `by_action` to the catalog's Pydantic contract and the Tools screen's labels, then regenerate OpenAPI and the TypeScript client.
+- [x] Cover the scenarios with unit tests and a disposable database check with no model, including the scan for goal text and inputs.
+- [x] Update the operations runbook (including the owner's `make migrate`) and `CODEBASE.md`.
+
+Open Questions:
+- None.
+
+### US-14.20: Tool guide, shown in a modal on the Tools page
+
+Status: READY
+
+As a workspace member
+I want every tool to say what it does, when to use it and why it's useful, and choosing a tool on the Tools page to open a modal with that guide and its inputs and outputs
+So that I can understand a tool without leaving the list.
+
+Source:
+- [Decision 0026, G1 to G3](docs/engineering/decisions/0026-cronjob-tool-and-tool-guide.md#tool-guide)
+- [Tool guide, TG-01 and TG-02](PRD-Tool-Catalog.md#tool-guide)
+- [Catalog contract, TC-01, TC-02 and TC-05](PRD-Tool-Catalog.md#catalog-contract)
+- [Tools screen, TS-02 and TS-03](PRD-Tool-Catalog.md#tools-screen)
+- [Tools, TL-01 to TL-03](PRD-Studio.md#tools)
+- [DS-04 usability and state meaning](PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
+- [DS-05 verification in both themes](PRD-Design-System.md#ds-05--verification-and-design-evidence)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+
+Codebase Context:
+- [Current capabilities](CODEBASE.md#current-capabilities): the catalog is derived from the registry (`application/tool_catalog.py`). The Tools page has group counts, a filter, and a side panel at `?tool=<id>` with Granted to and Copy schema (`components/tool-catalog.tsx`). Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Every tool carries a guide
+  Given the registry's tools and the planned descriptors the catalog lists as disabled_by_policy
+  When GET /v1/tools and each GET /v1/tools/{tool_id}/versions/{version} are read
+  Then every descriptor carries a guide with non-empty what, when and why texts, and the Pydantic contract, the generated OpenAPI document and the TypeScript client include guide
+
+Scenario: A tool without a guide fails a test
+  Given a test registry holding a tool definition whose guide is missing or has an empty text
+  When the catalog's guide test runs
+  Then it fails and names that tool
+
+Scenario: Choosing a tool opens its modal
+  Given a member on the Tools page of a disposable stack, with an available tool and a key_missing tool in the catalog
+  When the member chooses each tool from the list, and separately opens /tools?tool=<id> directly
+  Then a modal dialog opens with ?tool=<id> in the URL, showing the tool's title and availability, the repair for the unavailable tool, then What, When and Why, then Inputs and Outputs giving each field's name, type, required and whether it is shown in records, and no side panel is rendered
+
+Scenario: Granted to, Copy schema and the full page from the modal
+  Given the modal open for a tool that an Expert's latest version grants
+  When the member reads Granted to, presses Copy schema and follows the link to the full detail page
+  Then Granted to lists that Expert, the clipboard holds exactly the shown version's input JSON Schema, and /tools/{tool_id} opens the full detail as a page
+
+Scenario: Closing returns focus to the tool's link
+  Given the modal opened from a tool's link in the list
+  When it is closed with Escape, then reopened and closed with the Close button, then reopened and closed with a click outside the dialog
+  Then the dialog closes each time and focus returns to the link of the tool that opened it
+
+Scenario: Accessible in both themes
+  Given the modal open in the light theme and in the dark theme
+  When axe scans the page and a keyboard user tabs through the dialog
+  Then axe reports no violations in either theme, and the dialog is a native dialog element labelled by the tool's title
+```
+
+Dependencies:
+- US-14.1
+- US-14.2
+- US-15.7
+- US-11.11
+- US-14.19
+
+Tasks:
+- [ ] Add a guide with what, when and why texts to every registered tool and every planned descriptor, `cronjob` included, and expose it as `guide` in the catalog's Pydantic contract. Regenerate OpenAPI and the TypeScript client.
+- [ ] Add a test that fails, naming the tool, when a tool's guide is missing or has an empty text.
+- [ ] Replace the Tools page's side panel with a native `dialog` modal labelled by the tool's title. Keep `?tool=<id>`, Granted to, Copy schema and the link to `/tools/{tool_id}`. Close it on Escape, Close and an outside click, returning focus to the tool's link.
+- [ ] Update the browser suites for the Tools page and Granted to, with axe in both themes.
+- [ ] Update `CODEBASE.md`.
 
 Open Questions:
 - None.

@@ -142,6 +142,7 @@ export interface RoutinesRow {
   enabled: boolean;
   evaluated_until: string;
   created_at: string;
+  removed_at: string | null;
 }
 
 export interface RunEventsRow {

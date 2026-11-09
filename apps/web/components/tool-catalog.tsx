@@ -28,6 +28,7 @@ import {
   Users,
   Wallet,
   Wrench,
+  CalendarClock,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -112,6 +113,13 @@ export function repair(tool: ToolDescriptor): string | null {
   return null;
 }
 
+// Decision 0026 C9: `by_action` tools hold only some actions for a person.
+const APPROVAL_TEXT: Record<ToolDescriptor["approval"], string> = {
+  always: "Every call waits for a person",
+  by_action: "Some actions wait for a person",
+  never: "Not needed",
+};
+
 // Decorative: the group heading and the tool's title carry the meaning.
 const GROUP_ICONS: Record<string, LucideIcon> = {
   planning: ListTodo,
@@ -126,6 +134,7 @@ const GROUP_ICONS: Record<string, LucideIcon> = {
   connectors: Plug,
   delegation: Users,
   learning: GraduationCap,
+  automation: CalendarClock,
 };
 
 function Availability({ tool }: { tool: ToolDescriptor }) {
@@ -396,12 +405,12 @@ export function ToolCatalogPanel() {
                             </div>
                             <div className="col-start-2 flex flex-wrap items-center gap-1.5 sm:col-start-3 sm:flex-col sm:items-end">
                               <Availability tool={tool} />
-                              {tool.approval === "always" ? (
+                              {tool.approval === "never" ? null : (
                                 <Badge variant="attention">
                                   <ShieldAlert aria-hidden="true" />
-                                  Every call waits for a person
+                                  {APPROVAL_TEXT[tool.approval]}
                                 </Badge>
-                              ) : null}
+                              )}
                             </div>
                           </li>
                         );
@@ -565,7 +574,7 @@ export function ToolDetail({ toolId }: { toolId: string }) {
     versions.versions.find((item) => item.version === chosen) ?? newest;
   const fix = repair(tool);
   const Icon = GROUP_ICONS[tool.group] ?? Wrench;
-  const approval = tool.approval === "always";
+  const approval = tool.approval !== "never";
   return (
     <div className="space-y-5">
       <Card aria-labelledby="tool-heading" className="space-y-5">
@@ -604,7 +613,7 @@ export function ToolDetail({ toolId }: { toolId: string }) {
             term="Approval"
             className={approval ? "text-attention font-medium" : undefined}
           >
-            {approval ? "Every call waits for a person" : "Not needed"}
+            {approval ? APPROVAL_TEXT[tool.approval] : "Not needed"}
           </Fact>
           <Fact icon={Clock} term="Limits">
             {tool.limits

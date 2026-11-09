@@ -44,6 +44,7 @@ from autobots.application.artifacts import publish_tool, reconcile_run
 from autobots.application.assignments import Delegation, assign_tool
 from autobots.application.code_tools import CODE_TOOLS
 from autobots.application.compaction import CompactionPolicy
+from autobots.application.cronjob_tool import CRONJOB
 from autobots.application.improvements import PROPOSE_IMPROVEMENT
 from autobots.application.memory import READ_OFFLOAD, SEARCH_MEMORY
 from autobots.application.plans import load_goal, plan_tools, plan_view
@@ -183,6 +184,7 @@ def loop_registry(
         *JINA_TOOLS,
         *MARKET_TOOLS,
         *CODE_TOOLS,
+        CRONJOB,
     )
     for tool in (*tools, *plan_tools(limits)):
         registry.register(tool)

@@ -25,6 +25,7 @@ class ToolGroup(StrEnum):
     CONNECTORS = "connectors"
     DELEGATION = "delegation"
     LEARNING = "learning"
+    AUTOMATION = "automation"
 
 
 GROUP_TITLES: Mapping[ToolGroup, tuple[str, str]] = {
@@ -43,6 +44,7 @@ GROUP_TITLES: Mapping[ToolGroup, tuple[str, str]] = {
     ),
     ToolGroup.DELEGATION: ("Delegation", "Assign bounded work to an Expert."),
     ToolGroup.LEARNING: ("Learning", "Propose memory or skill changes for review."),
+    ToolGroup.AUTOMATION: ("Automation", "Scheduled tasks that start goals and workflows."),
 }
 
 

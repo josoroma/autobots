@@ -197,6 +197,16 @@ Qualify it against a throwaway private repository. The script refuses a broad to
 PYTHONPATH=services/agent/src services/agent/.venv/bin/python scripts/qualify_github_connector.py --live --repository owner/throwaway --token-file /path/outside/this/repository
 ```
 
+## The cronjob tool
+
+`cronjob` ([Decision 0026](../decisions/0026-cronjob-tool-and-tool-guide.md), US-14.19) lets an Expert manage this workspace's routines.
+- **Actions:** list, create, update, pause, resume, run now and remove. They go through the same service as the Routines API.
+- **Approval:** `list` runs without approval. Every other action waits in Approvals, showing the action, the routine and its schedule, because a routine can start paid runs.
+- **Who can use it:** only an Expert can grant it.
+- **Run now:** it follows the scheduled path. An active run skips it (`skipped_overlap`), and a workspace with no usable key blocks it. A paused routine is refused with `routine_paused`.
+- **Remove:** a removed routine is hidden and never evaluated again. Its versions, occurrences and runs stay, and its name can be reused.
+- **Migration:** removal needs migration 53. Run `make migrate`, then `make stop && make start`.
+
 ## Reading health
 
 | Condition | Code | Admission | What to do |

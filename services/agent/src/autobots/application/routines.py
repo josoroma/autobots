@@ -128,7 +128,8 @@ _COLUMNS = "id, name, enabled, latest_version"
 
 async def get_routine(connection: Any, workspace_id: UUID, routine_id: UUID) -> RoutineView:
     cursor = await connection.execute(
-        f"select {_COLUMNS} from public.routines where id = %s and workspace_id = %s",
+        f"select {_COLUMNS} from public.routines "
+        "where id = %s and workspace_id = %s and removed_at is null",
         (routine_id, workspace_id),
     )
     row = await cursor.fetchone()
@@ -139,7 +140,8 @@ async def get_routine(connection: Any, workspace_id: UUID, routine_id: UUID) -> 
 
 async def list_routines(connection: Any, workspace_id: UUID) -> list[RoutineView]:
     cursor = await connection.execute(
-        f"select {_COLUMNS} from public.routines where workspace_id = %s order by name",
+        f"select {_COLUMNS} from public.routines where workspace_id = %s and removed_at is null "
+        "order by name",
         (workspace_id,),
     )
     return [await _view(connection, row) for row in await cursor.fetchall()]
@@ -164,7 +166,8 @@ async def create_routine(
         if existing is not None:
             return await get_routine(connection, workspace_id, UUID(existing["routine_id"]))
         cursor = await connection.execute(
-            "select 1 from public.routines where workspace_id = %s and name = %s",
+            "select 1 from public.routines where workspace_id = %s and name = %s "
+            "and removed_at is null",
             (workspace_id, name),
         )
         if await cursor.fetchone() is not None:
@@ -205,7 +208,7 @@ async def add_routine_version(
             return await get_routine(connection, workspace_id, routine_id)
         cursor = await connection.execute(
             "select latest_version from public.routines "
-            "where id = %s and workspace_id = %s for update",
+            "where id = %s and workspace_id = %s and removed_at is null for update",
             (routine_id, workspace_id),
         )
         row = await cursor.fetchone()
@@ -233,12 +236,67 @@ async def set_enabled(
     cursor = await connection.execute(
         "update public.routines set enabled = %s, evaluated_until = case when %s and not enabled "
         "then clock_timestamp() else evaluated_until end "
-        "where id = %s and workspace_id = %s returning id",
+        "where id = %s and workspace_id = %s and removed_at is null returning id",
         (enabled, enabled, routine_id, workspace_id),
     )
     if await cursor.fetchone() is None:
         raise RoutineRefused("routine_not_found")
     return await get_routine(connection, workspace_id, routine_id)
+
+
+async def remove_routine(connection: Any, workspace_id: UUID, routine_id: UUID) -> None:
+    """Decision 0026 C7: disabled, hidden and never evaluated again, with nothing deleted. Its
+    versions, occurrences and runs stay, and its name is free for a new routine."""
+    cursor = await connection.execute(
+        "update public.routines set removed_at = clock_timestamp(), enabled = false "
+        "where id = %s and workspace_id = %s and removed_at is null returning id",
+        (routine_id, workspace_id),
+    )
+    if await cursor.fetchone() is None:
+        raise RoutineRefused("routine_not_found")
+
+
+async def run_routine_now(
+    connection: Any, workspace_id: UUID, routine_id: UUID, credential_check: CredentialCheck
+) -> tuple[str, str | None, UUID | None]:
+    """Decision 0026 C6: one occurrence now, by the scheduled path's own checks, in order.
+
+    Returns `(status, reason, run_id)`: `admitted` with its run, `skipped_overlap` while an earlier
+    run is active, or `blocked` with why. A paused routine is refused, so a person resumes it first.
+    """
+    async with connection.transaction():
+        cursor = await connection.execute(
+            "select latest_version, enabled from public.routines "
+            "where id = %s and workspace_id = %s and removed_at is null for update",
+            (routine_id, workspace_id),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            raise RoutineRefused("routine_not_found")
+        version, enabled = row
+        if not enabled:
+            raise RoutineRefused("routine_paused")
+        moment = (await (await connection.execute("select clock_timestamp()")).fetchone())[0]
+        cursor = await connection.execute(
+            "select config from public.routine_versions where routine_id = %s and version = %s",
+            (routine_id, version),
+        )
+        config = RoutineConfig.model_validate((await cursor.fetchone())[0])
+        if await _has_active_run(connection, routine_id):
+            await _record(connection, routine_id, moment, version, "skipped_overlap", "run_active")
+            return "skipped_overlap", "run_active", None
+        if await _needs_model(config, connection):
+            code = await credential_check(workspace_id)
+            if code != "ready":
+                await _record(connection, routine_id, moment, version, "blocked", code)
+                return "blocked", code, None
+        try:
+            run_id = await _admit(connection, workspace_id, routine_id, version, config, moment)
+        except (RoutineRefused, WorkflowRefused, IdempotencyConflict, ExpertRefused) as refused:
+            await _record(connection, routine_id, moment, version, "blocked", refused.code)
+            return "blocked", refused.code, None
+        await _record(connection, routine_id, moment, version, "admitted", None, run_id)
+        return "admitted", None, run_id
 
 
 async def _has_active_run(connection: Any, routine_id: UUID) -> bool:
@@ -357,7 +415,7 @@ async def _evaluate_one(
         row = await (
             await connection.execute(
                 "select workspace_id, latest_version, evaluated_until from public.routines "
-                "where id = %s and enabled for update skip locked",
+                "where id = %s and enabled and removed_at is null for update skip locked",
                 (routine_id,),
             )
         ).fetchone()
@@ -412,7 +470,9 @@ async def evaluate_routines(
     After time away, everything but the latest due occurrence is recorded as missed, and only the
     latest catches up. While an earlier run is active, an occurrence is skipped, and says so.
     """
-    cursor = await connection.execute("select id from public.routines where enabled")
+    cursor = await connection.execute(
+        "select id from public.routines where enabled and removed_at is null"
+    )
     admitted = 0
     for (routine_id,) in await cursor.fetchall():
         try:

@@ -76,6 +76,8 @@ class ToolDefinition:
     retries: int = 0
     max_output_bytes: int = 300_000
     approval_required: bool = False
+    # Decision 0026 C3: approval for some calls only, decided from the parsed arguments.
+    approval_when: Callable[[Any], bool] | None = None
     # What a reviewer is told this touches, from the arguments or server configuration.
     resource_target: Callable[[Any], str | None] = lambda _: None
     # Decision 0025 V7: the target resolved for this call's workspace. When set, it is what the
@@ -180,13 +182,16 @@ def _hash(arguments: BaseModel) -> str:
 
 # Decision 0015. Change it whenever `_approval_rule`, `_approval_reason` or the condition that asks
 # for approval changes, so a request names the rules it was held under. A unit test pins it.
-APPROVAL_POLICY_VERSION = "approval-policy/1"
+# Version 2 adds a tool's per-call condition, `approval_when` (Decision 0026 C3).
+APPROVAL_POLICY_VERSION = "approval-policy/2"
 
 
 def _approval_rule(tool: ToolDefinition) -> str:
     """Which of the policy's rules held this call."""
     if tool.operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE:
         return "consequential_external_write"
+    if not tool.approval_required and tool.approval_when is not None:
+        return "action_marked"
     return "tool_marked"
 
 
@@ -341,8 +346,10 @@ class ToolGateway:
             return _denied(refusal)
         if tool.expert_only and not await _expert_behind(connection, scope):
             return _denied("expert_grant_required")
-        if tool.approval_required or (
-            tool.operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE
+        if (
+            tool.approval_required
+            or tool.operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE
+            or (tool.approval_when is not None and tool.approval_when(parsed))
         ):
             detail = None
             reviewing = ToolContext(connection, scope, _operation_id(scope, tool, parsed))

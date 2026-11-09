@@ -106,8 +106,8 @@ async def main() -> dict[str, str]:
               person == ACTOR and agent == {'kind': 'coordinator'})
         check('the scope snapshot is the granted tools and paths, and hashes to the stored scope', 'mock_send version 1 with the run\'s paths; same hash',
               (snapshot, digest == stored_scope), snapshot['tools'].get('mock_send') == 1 and isinstance(snapshot['paths'], list) and digest == stored_scope)
-        check('the request names the policy version and rule, beside its argument hash', 'approval-policy/1, consequential_external_write',
-              (version, rule, len(stored_hash)), version == 'approval-policy/1' and rule == 'consequential_external_write' and stored_hash == argument_hash)
+        check('the request names the policy version and rule, beside its argument hash', 'approval-policy/2, consequential_external_write',
+              (version, rule, len(stored_hash)), version == 'approval-policy/2' and rule == 'consequential_external_write' and stored_hash == argument_hash)
         for column, changed in (('requested_by', str(uuid4())), ('requested_by_agent', '{"kind": "expert"}'), ('scope_snapshot', '{"tools": {}, "paths": ["inputs"]}'),
                               ('policy_version', 'approval-policy/0'), ('policy_rule', 'tool_marked')):
             try:

@@ -136,7 +136,7 @@ The concepts' sample data is illustrative. Each screen shows only real data.
 
 ## Tools
 
-**TL-01. Layout.** A group list with counts, a text filter, and the existing provider and availability filters. Selecting a row opens its detail in a side panel. The `/tools/{tool_id}` page stays as the deep link.
+**TL-01. Layout.** A group list with counts, a text filter, and the existing provider and availability filters. Selecting a row opens its detail in a side panel, which is a modal dialog since [Decision 0026](docs/engineering/decisions/0026-cronjob-tool-and-tool-guide.md) G2 (PRD-Tool-Catalog TG-02). The `/tools/{tool_id}` page stays as the deep link.
 
 **TL-02. Granted to.** The detail lists the Experts whose latest version grants the tool, and the published workflows that reach it through their Experts.
 

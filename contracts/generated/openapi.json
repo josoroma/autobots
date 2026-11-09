@@ -1583,7 +1583,8 @@
                 "code",
                 "connectors",
                 "delegation",
-                "learning"
+                "learning",
+                "automation"
               ],
               "type": "string"
             },
@@ -5723,7 +5724,8 @@
           "approval": {
             "enum": [
               "never",
-              "always"
+              "always",
+              "by_action"
             ],
             "title": "Approval",
             "type": "string"
@@ -5805,7 +5807,8 @@
               "code",
               "connectors",
               "delegation",
-              "learning"
+              "learning",
+              "automation"
             ],
             "title": "Group",
             "type": "string"
@@ -5979,7 +5982,8 @@
               "code",
               "connectors",
               "delegation",
-              "learning"
+              "learning",
+              "automation"
             ],
             "title": "Group",
             "type": "string"
@@ -12784,7 +12788,8 @@
                     "code",
                     "connectors",
                     "delegation",
-                    "learning"
+                    "learning",
+                    "automation"
                   ],
                   "type": "string"
                 },
