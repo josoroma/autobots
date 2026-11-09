@@ -11,6 +11,7 @@ from autobots.api.security import require_internal
 from autobots.api.settings_routes import current_workspace
 from autobots.application.run_projection import public_text
 from autobots.application.search import search
+from autobots.application.tool_keys import key_sources
 from autobots.contracts.search import SearchResult, SearchResults
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
@@ -30,7 +31,8 @@ async def get_search(
     if pool is None:
         raise ApiError(503, "service_unavailable", "The database is unavailable.")
     async with pool.connection() as connection:
-        hits = await search(connection, workspace_id, query, os.environ)
+        keys = await key_sources(connection, workspace_id, os.environ)
+        hits = await search(connection, workspace_id, query, keys)
     return SearchResults(
         schema_version=1,
         query=query,

@@ -72,9 +72,30 @@ export const AVAILABILITY: Record<string, string> = {
 
 const AVAILABILITY_FILTERS = ["available", "key_missing", "disabled_by_policy"];
 
+// Decision 0024: these keys can also be saved per workspace in Settings → Tool keys.
+const SAVABLE_KEYS: Record<string, string> = { tavily: "Tavily", jina: "Jina" };
+
+// PK-05: where an available tool's key comes from, never the key.
+export function keySource(tool: ToolDescriptor): string | null {
+  const requirement = tool.key_requirement;
+  if (!requirement) return null;
+  const names = requirement.variables.join(", ");
+  if (requirement.source === "settings") {
+    return "Key saved in Settings → Tool keys for this workspace";
+  }
+  if (requirement.source === "environment") {
+    return `${names}, from the server environment or .env`;
+  }
+  return `${names}, not set`;
+}
+
 export function repair(tool: ToolDescriptor): string | null {
   if (tool.availability === "key_missing" && tool.key_requirement) {
     const names = tool.key_requirement.variables.join(" and ");
+    const savable = SAVABLE_KEYS[tool.key_requirement.credential];
+    if (savable !== undefined) {
+      return `Save a ${savable} key in Settings → Tool keys, or set ${names} in .env, then restart the worker and the API.`;
+    }
     // PRD-Studio GH-07: names and permissions only, never a value.
     const scopes =
       tool.key_requirement.scopes.length === 0
@@ -358,6 +379,10 @@ export function ToolCatalogPanel() {
                                     ? "Leaves this Mac"
                                     : "Stays on this Mac"}{" "}
                                   · {COSTS[tool.cost_class] ?? tool.cost_class}
+                                  {tool.availability === "available" &&
+                                  tool.key_requirement?.source
+                                    ? ` · Key from ${tool.key_requirement.source === "settings" ? "Settings" : "the environment"}`
+                                    : null}
                                 </span>
                               </p>
                               <p className="text-[13px] leading-relaxed">
@@ -618,9 +643,7 @@ export function ToolDetail({ toolId }: { toolId: string }) {
           <dd>{CLASSES[tool.operation_class] ?? tool.operation_class}</dd>
           <dt className="text-muted-foreground">Key</dt>
           <dd data-field="key" className="break-words">
-            {tool.key_requirement
-              ? `${tool.key_requirement.variables.join(", ")}, from the worker's environment`
-              : "None"}
+            {keySource(tool) ?? "None"}
           </dd>
         </dl>
         <dl className="space-y-2 border-t pt-4">

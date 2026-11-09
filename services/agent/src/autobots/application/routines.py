@@ -309,10 +309,11 @@ async def _admit(
     except ProfileNotOffered as refused:
         raise RoutineRefused(refused.code) from None
     from autobots.application.tool_catalog import ToolsUnavailable, require_available
+    from autobots.application.tool_keys import key_sources
 
     try:
         # PK-02: a missing key refuses this occurrence, before a run exists.
-        require_available(tools, os.environ)
+        require_available(tools, await key_sources(connection, workspace_id, os.environ))
     except ToolsUnavailable as refused:
         raise RoutineRefused(refused.code) from None
     admitted = await admit_run(

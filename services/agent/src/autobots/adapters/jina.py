@@ -12,7 +12,7 @@ from typing import Any
 
 import httpx
 
-from autobots.adapters.provider_http import failure_for, fit, provider_client, provider_key
+from autobots.adapters.provider_http import attempt_key, failure_for, fit, provider_client
 from autobots.adapters.url_guard import Resolver, check_url, system_resolver
 from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed
 from autobots.contracts.web_tools import (
@@ -44,8 +44,10 @@ def jina_tools(
     environ: Mapping[str, str] = os.environ,
     resolver: Resolver = system_resolver,
 ) -> tuple[ToolDefinition, ToolDefinition]:
-    async def call(base: str, body: dict[str, Any], headers: Mapping[str, str]) -> Any:
-        key = provider_key(JINA_KEY, environ)["JINA_API_KEY"]
+    async def call(
+        context: ToolContext, base: str, body: dict[str, Any], headers: Mapping[str, str]
+    ) -> Any:
+        key = await attempt_key(context, JINA_KEY, environ)
         async with provider_client(
             base, {"Authorization": f"Bearer {key}", **headers}, transport
         ) as client:
@@ -60,8 +62,9 @@ def jina_tools(
         except ValueError:
             raise ToolFailed("provider_reply_malformed") from None
 
-    async def search(arguments: SearchWebInput, _: ToolContext) -> SearchWebOutput:
+    async def search(arguments: SearchWebInput, context: ToolContext) -> SearchWebOutput:
         reply = await call(
+            context,
             SEARCH_URL,
             {"q": arguments.query, "num": arguments.max_results},
             {"Accept": "application/json", "X-Retain-Images": "none"},
@@ -79,10 +82,13 @@ def jina_tools(
         ]
         return SearchWebOutput(results=results, result_count=len(results), truncated=truncated)
 
-    async def extract(arguments: ExtractWebsiteInput, _: ToolContext) -> ExtractWebsiteOutput:
+    async def extract(arguments: ExtractWebsiteInput, context: ToolContext) -> ExtractWebsiteOutput:
         await check_url(arguments.url, resolver)
         reply = await call(
-            READER_URL, {"url": arguments.url}, {**READER_HEADERS, "X-With-Links-Summary": "true"}
+            context,
+            READER_URL,
+            {"url": arguments.url},
+            {**READER_HEADERS, "X-With-Links-Summary": "true"},
         )
         data = reply.get("data") if isinstance(reply, dict) else None
         if not isinstance(data, dict):

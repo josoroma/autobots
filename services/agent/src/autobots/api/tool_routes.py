@@ -1,6 +1,7 @@
 """Tool discovery, PRD-Tool-Catalog TC-05. Read-only, member-readable, and never a secret."""
 
 import os
+from collections.abc import Mapping
 from typing import Annotated
 from uuid import UUID
 
@@ -11,6 +12,7 @@ from autobots.api.security import require_internal
 from autobots.api.settings_routes import current_workspace
 from autobots.application.tool_catalog import all_descriptors, tool_catalog
 from autobots.application.tool_grants import tool_grants
+from autobots.application.tool_keys import key_sources
 from autobots.contracts.tools import (
     AvailabilityName,
     GrantedTo,
@@ -26,26 +28,38 @@ router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 Member = Annotated[UUID, Depends(current_workspace)]
 
 
+async def _keys(request: Request, workspace: UUID) -> Mapping[str, str]:
+    """PK-04: availability is the workspace's, since it may have saved a tool's key in Settings."""
+    pool = request.app.state.pool
+    if pool is None:
+        return os.environ
+    async with pool.connection() as connection:
+        return await key_sources(connection, workspace, os.environ)
+
+
 @router.get("/tools", operation_id="listTools", response_model=ToolCatalog)
 async def list_tools(
-    _: Member,
+    request: Request,
+    workspace: Member,
     group: ToolGroupName | None = None,
     availability: AvailabilityName | None = None,
     provider: ToolProviderName | None = None,
 ) -> ToolCatalog:
-    return tool_catalog(os.environ, group=group, availability=availability, provider=provider)
+    keys = await _keys(request, workspace)
+    return tool_catalog(keys, group=group, availability=availability, provider=provider)
 
 
-def _versions(tool_id: str) -> list[ToolDescriptor]:
-    found = [item for item in all_descriptors(os.environ) if item.tool_id == tool_id]
+async def _versions(request: Request, workspace: UUID, tool_id: str) -> list[ToolDescriptor]:
+    keys = await _keys(request, workspace)
+    found = [item for item in all_descriptors(keys) if item.tool_id == tool_id]
     if not found:
         raise ApiError(404, "tool_not_found", "That tool isn't in the catalog.")
     return found
 
 
 @router.get("/tools/{tool_id}", operation_id="getToolVersions", response_model=ToolVersions)
-async def get_tool(tool_id: str, _: Member) -> ToolVersions:
-    return ToolVersions(tool_id=tool_id, versions=_versions(tool_id))
+async def get_tool(tool_id: str, request: Request, workspace: Member) -> ToolVersions:
+    return ToolVersions(tool_id=tool_id, versions=await _versions(request, workspace, tool_id))
 
 
 @router.get(
@@ -53,8 +67,10 @@ async def get_tool(tool_id: str, _: Member) -> ToolVersions:
     operation_id="getToolVersion",
     response_model=ToolDescriptor,
 )
-async def get_tool_version(tool_id: str, version: int, _: Member) -> ToolDescriptor:
-    for item in _versions(tool_id):
+async def get_tool_version(
+    tool_id: str, version: int, request: Request, workspace: Member
+) -> ToolDescriptor:
+    for item in await _versions(request, workspace, tool_id):
         if item.version == version:
             return item
     raise ApiError(404, "tool_version_not_found", "That tool version isn't in the catalog.")
@@ -62,7 +78,7 @@ async def get_tool_version(tool_id: str, version: int, _: Member) -> ToolDescrip
 
 @router.get("/tools/{tool_id}/grants", operation_id="getToolGrants", response_model=ToolGrants)
 async def get_tool_grants(tool_id: str, request: Request, workspace: Member) -> ToolGrants:
-    _versions(tool_id)
+    await _versions(request, workspace, tool_id)
     pool = request.app.state.pool
     if pool is None:
         raise ApiError(503, "service_unavailable", "The database is unavailable.")

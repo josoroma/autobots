@@ -270,6 +270,8 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
     config_root = Path(tempfile.mkdtemp(prefix='autobots-config-'))
     # The arranged installation key. Only workspace B is granted it, so A exercises the app store.
     (config_root / '.env.local').write_text('OPENROUTER_API_KEY=sk-or-valid-arranged-installation\\n')
+    # US-14.17: a Jina key in the configuration root's lowest-priority .env, and no Tavily key anywhere.
+    (config_root / '.env').write_text('JINA_API_KEY=jina_fixtureConfigRoot0001')
     stack.sql(f"insert into app_private.installation_credential_grants values ('{workspace_b}');\\n")
     if artifacts.get('AUTOBOTS_TEST_COMPOSER_WORKSPACE'):
         stack.sql(f"insert into app_private.installation_credential_grants values ('{artifacts['AUTOBOTS_TEST_COMPOSER_WORKSPACE']}');\\n")
@@ -307,7 +309,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
         browser_env = {**env, **artifacts, 'AUTOBOTS_WEB_URL': web_url, 'AUTOBOTS_TEST_OWNER_EMAIL': email, 'AUTOBOTS_TEST_OWNER_PASSWORD': password,
                                      'AUTOBOTS_TEST_WORKSPACE_A': workspace_a, 'AUTOBOTS_TEST_WORKSPACE_B': workspace_b,
                                      'AUTOBOTS_TEST_OWNER_B_EMAIL': email_b, 'AUTOBOTS_TEST_OWNER_B_PASSWORD': password_b,
-                                     'AUTOBOTS_TEST_MEMBER_EMAIL': email_c, 'AUTOBOTS_TEST_MEMBER_PASSWORD': password_c,
+                                     'AUTOBOTS_TEST_MEMBER_EMAIL': email_c, 'AUTOBOTS_TEST_MEMBER_PASSWORD': password_c, 'AUTOBOTS_TEST_CONFIG_DOTENV': str(config_root / '.env'),
                                      'AUTOBOTS_TEST_UPSTREAM_LOG': str(upstream_log), 'AUTOBOTS_TEST_CATALOG_DOWN': str(catalog_down), 'AUTOBOTS_TEST_BACKUP_DIR': str(backups),
                                      'AUTOBOTS_TEST_SERVICE_KEY': stack.values['SERVICE_ROLE_KEY'], 'AUTOBOTS_WEB_REPORT': str(report),
                                      'AUTOBOTS_WEB_OUTPUT': str(root / '.checks/identity/results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots),

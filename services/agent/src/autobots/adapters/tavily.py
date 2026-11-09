@@ -13,7 +13,7 @@ from typing import Any
 import httpx
 from pydantic import BaseModel
 
-from autobots.adapters.provider_http import failure_for, fit, provider_client, provider_key
+from autobots.adapters.provider_http import attempt_key, failure_for, fit, provider_client
 from autobots.adapters.url_guard import Resolver, check_url, system_resolver
 from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed
 from autobots.contracts.web_tools import (
@@ -44,8 +44,8 @@ def tavily_tools(
     environ: Mapping[str, str] = os.environ,
     resolver: Resolver = system_resolver,
 ) -> tuple[ToolDefinition, ...]:
-    async def call(path: str, body: dict[str, Any]) -> Any:
-        key = provider_key(TAVILY_KEY, environ)["TAVILY_API_KEY"]
+    async def call(context: ToolContext, path: str, body: dict[str, Any]) -> Any:
+        key = await attempt_key(context, TAVILY_KEY, environ)
         async with provider_client(
             API_URL, {"Authorization": f"Bearer {key}"}, transport
         ) as client:
@@ -60,10 +60,10 @@ def tavily_tools(
         except ValueError:
             raise ToolFailed("provider_reply_malformed") from None
 
-    async def search(arguments: TavilySearchInput, _: ToolContext) -> TavilySearchOutput:
+    async def search(arguments: TavilySearchInput, context: ToolContext) -> TavilySearchOutput:
         body = arguments.model_dump(exclude_none=True)
         reply = await call(
-            "/search", {**body, "include_raw_content": False, "include_images": False}
+            context, "/search", {**body, "include_raw_content": False, "include_images": False}
         )
         items = [item for item in reply.get("results", []) if isinstance(item, dict)]
         contents, truncated = fit([str(item.get("content", "")) for item in items])
@@ -78,10 +78,11 @@ def tavily_tools(
         ]
         return TavilySearchOutput(results=results, result_count=len(results), truncated=truncated)
 
-    async def extract(arguments: TavilyExtractInput, _: ToolContext) -> TavilyExtractOutput:
+    async def extract(arguments: TavilyExtractInput, context: ToolContext) -> TavilyExtractOutput:
         for url in arguments.urls:
             await check_url(url, resolver)
         reply = await call(
+            context,
             "/extract",
             {
                 "urls": arguments.urls,
@@ -115,18 +116,19 @@ def tavily_tools(
             "exclude_paths": arguments.exclude_paths,
         }
 
-    async def map_site(arguments: TavilyMapInput, _: ToolContext) -> TavilyMapOutput:
+    async def map_site(arguments: TavilyMapInput, context: ToolContext) -> TavilyMapOutput:
         await check_url(arguments.url, resolver)
-        reply = await call("/map", site(arguments))
+        reply = await call(context, "/map", site(arguments))
         urls = [str(url) for url in reply.get("results", []) if isinstance(url, str)]
         urls = urls[: arguments.limit]
         return TavilyMapOutput(
             base_url=str(reply.get("base_url", arguments.url)), urls=urls, result_count=len(urls)
         )
 
-    async def crawl(arguments: TavilyCrawlInput, _: ToolContext) -> TavilyCrawlOutput:
+    async def crawl(arguments: TavilyCrawlInput, context: ToolContext) -> TavilyCrawlOutput:
         await check_url(arguments.url, resolver)
         reply = await call(
+            context,
             "/crawl",
             {**site(arguments), "extract_depth": arguments.extract_depth, "format": "markdown"},
         )

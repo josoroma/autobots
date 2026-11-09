@@ -375,7 +375,7 @@ def goal(root: Path, record: Record, requested: str, key_file: Path, limit: int,
             raise Unavailable(f'the owner could not sign in: {code}')
         token = json.loads(reply)['access_token']
         workspace = sql("select workspace_id from public.workspace_members where role = 'owner' limit 1;")
-        if sql(f"select count(*) from app_private.provider_credentials where workspace_id = '{workspace}' and status = 'active';") == '0':
+        if sql(f"select count(*) from app_private.provider_credentials where workspace_id = '{workspace}' and provider = 'openrouter' and status = 'active';") == '0':
             helper('save', str(key_file), workspace)
         started_at = sql('select clock_timestamp();')
         if not started_at:
@@ -587,7 +587,7 @@ def examples(root: Path, record: Record, requested: str, key_file: Path, ledger_
         report['cancelled_from_an_earlier_attempt'] = cancel_unstarted(sql, api, headers, workspace, [spec['goal_text'] for spec in EXAMPLE_RUNS])
         refuse_other_work(sql("select (select count(*) from app_private.run_jobs where status in ('queued', 'claimed')) + (select count(*) from public.routines where enabled);"))
         report['key_usage_before_usd'] = float(helper('usage', str(key_file)))
-        if sql(f"select count(*) from app_private.provider_credentials where workspace_id = '{workspace}' and status = 'active';") == '0':
+        if sql(f"select count(*) from app_private.provider_credentials where workspace_id = '{workspace}' and provider = 'openrouter' and status = 'active';") == '0':
             helper('save', str(key_file), workspace)
         seeded = subprocess.run([str(root / PYTHON), '-m', 'autobots.operations.concept_seed', '--workspace', workspace], env=env,
                                 capture_output=True, text=True, errors='replace', timeout=120, check=False)

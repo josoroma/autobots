@@ -61,6 +61,28 @@ class ExpectedVersion(BaseModel):
     expected_version: int = Field(ge=0)
 
 
+ToolKeyProvider = Literal["tavily", "jina"]
+
+
+class ToolKeyStatus(BaseModel):
+    """Where one tool key comes from for this workspace, PK-05. Never a value, prefix, length or
+    hash."""
+
+    model_config = STRICT_CONTRACT
+
+    provider: ToolKeyProvider
+    variable: str
+    source: Literal["settings", "environment"] | None
+    version: int
+
+
+class ToolKeyList(BaseModel):
+    model_config = STRICT_CONTRACT
+
+    schema_version: Literal[1]
+    keys: list[ToolKeyStatus]
+
+
 class ModelAvailability(BaseModel):
     model_config = STRICT_CONTRACT
 

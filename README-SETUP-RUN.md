@@ -90,9 +90,14 @@ grep OWNER_ ~/.local/share/autobots-install/owner.env
 
 Go to **Settings → Models → OpenRouter → Save & validate**. The key is checked, encrypted and stored. Saving it doesn't start a run or spend money.
 
-The app does **not** read `.env` in the repository root. Only the paid qualification scripts use that file. The app reads its environment and any `.env` files in `~/.local/share/autobots-install/config`, but an environment key only applies to a workspace that has been granted it, so use Settings.
+The app doesn't read the OpenRouter key from `.env` in the repository root. Only the paid qualification scripts use that file for it. The app reads its environment and any `.env` files in `~/.local/share/autobots-install/config`, but an environment key only applies to a workspace that has been granted it, so use Settings.
 
 Without a key, sign-in, settings and drafts still work, and **Run** answers `credentials_required`.
+
+The Tavily and Jina keys are different ([Decision 0024](docs/engineering/decisions/0024-tool-keys-from-env-and-settings.md)):
+- `make start` passes `TAVILY_API_KEY` and `JINA_API_KEY` from the repository's `.env` to the API and the worker, and nothing else from that file.
+- A key saved at **Settings → Tool keys** wins over `.env` for its workspace, from the next tool call. Only the owner can save or remove one, and removing it falls back to `.env`.
+- Saving a key needs migration 51, so on an older install run `make migrate`, then `make stop && make start`.
 
 ### 5. Set up backups
 

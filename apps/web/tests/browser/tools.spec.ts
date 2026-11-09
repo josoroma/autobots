@@ -149,7 +149,7 @@ test("a tool's detail lists its versions and every field", async ({ page }) => {
 
   await signedIn(page, "/tools/create_github_issue");
   await expect(page.locator('[data-field="key"]')).toHaveText(
-    "GITHUB_REPOSITORY, GITHUB_TOKEN, from the worker's environment",
+    "GITHUB_REPOSITORY, GITHUB_TOKEN, not set",
   );
   await expect(page.getByText("Unavailable: key not set")).toBeVisible();
 });

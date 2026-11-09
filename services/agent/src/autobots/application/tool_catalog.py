@@ -7,7 +7,7 @@ Availability is computed per request from configuration and never stored.
 import hashlib
 import json
 from collections.abc import Iterable, Mapping
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from autobots.application.assignments import Delegation
 from autobots.application.goal_loop import loop_registry
@@ -28,6 +28,7 @@ from autobots.domain.tool_catalog import (
     GROUP_TITLES,
     PLANNED_TOOLS,
     SIDE_EFFECTS,
+    KeyRequirement,
     PlannedTool,
     ToolAvailability,
     grant_sites,
@@ -118,6 +119,16 @@ def _fields(
     return fields
 
 
+def _key_source(
+    requirement: KeyRequirement, environ: Mapping[str, str]
+) -> Literal["settings", "environment"]:
+    """`settings` when the workspace saved the key (PK-04). A `KeySources` view says so, and
+    a plain environment means the key is in the environment."""
+    sources = getattr(environ, "sources", {})
+    found = {sources.get(variable, "environment") for variable in requirement.variables}
+    return "settings" if "settings" in found else "environment"
+
+
 def describe(tool: ToolDefinition, environ: Mapping[str, str]) -> ToolDescriptor:
     input_schema = tool.input_model.model_json_schema()
     output_schema = tool.output_model.model_json_schema()
@@ -143,7 +154,11 @@ def describe(tool: ToolDefinition, environ: Mapping[str, str]) -> ToolDescriptor
                 credential=requirement.credential,
                 variables=list(requirement.variables),
                 scopes=list(requirement.scopes),
-                source="environment",
+                source=(
+                    _key_source(requirement, environ)
+                    if availability is ToolAvailability.AVAILABLE
+                    else None
+                ),
             )
             if requirement
             else None
@@ -207,11 +222,14 @@ def all_descriptors(
 
 
 def catalog_digest(descriptors: list[ToolDescriptor]) -> str:
-    """Identifies the catalog itself, so availability, which varies per install, is left out."""
-    stable = [
-        item.model_dump(mode="json", exclude={"availability", "availability_reason"})
-        for item in descriptors
-    ]
+    """Identifies the catalog itself, so availability and a key's source, which vary per install
+    and workspace (PK-04), are left out."""
+    left_out: Any = {
+        "availability": True,
+        "availability_reason": True,
+        "key_requirement": {"source": True},
+    }
+    stable = [item.model_dump(mode="json", exclude=left_out) for item in descriptors]
     encoded = json.dumps(stable, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode()).hexdigest()
 

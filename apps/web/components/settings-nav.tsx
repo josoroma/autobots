@@ -16,6 +16,7 @@ const SECTIONS = [
 
 const ELSEWHERE = [
   { href: "/settings/models", label: "Models" },
+  { href: "/settings/tool-keys", label: "Tool keys" },
   { href: "/operations", label: "Operations" },
 ] as const;
 

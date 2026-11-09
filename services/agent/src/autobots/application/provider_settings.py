@@ -204,7 +204,7 @@ class ProviderSettings:
             self._check_version(current, expected)
             await self._connection.execute(
                 "update app_private.provider_credentials set status = 'deleted' "
-                "where workspace_id = %s and status = 'active'",
+                "where workspace_id = %s and provider = 'openrouter' and status = 'active'",
                 (workspace_id,),
             )
             await self._record(workspace_id, "missing")

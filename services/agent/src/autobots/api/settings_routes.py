@@ -1,5 +1,6 @@
 """The exact MP-05 routes, behind the BFF. Changes need owner authority and a version."""
 
+import os
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
 from uuid import UUID
@@ -21,6 +22,7 @@ from autobots.application.provider_settings import (
     ValidationUnavailable,
     policy_overrides_json,
 )
+from autobots.application.tool_key_settings import ToolKeySettings
 from autobots.contracts.models import effective_policy
 from autobots.contracts.settings import (
     CredentialDraft,
@@ -30,6 +32,9 @@ from autobots.contracts.settings import (
     ModelPolicyUpdate,
     ProviderStatus,
     RunIntentCheck,
+    ToolKeyList,
+    ToolKeyProvider,
+    ToolKeyStatus,
     budget_range,
 )
 from autobots.domain.models import (
@@ -163,6 +168,74 @@ async def validate_credential(
     except HANDLED as error:
         raise as_api_error(error) from None
     return await settings.status(workspace_id)
+
+
+async def tool_key_settings(request: Request) -> AsyncIterator[ToolKeySettings]:
+    pool = request.app.state.pool
+    context = request.app.state.provider_context
+    if pool is None or context is None:
+        raise ApiError(503, "service_unavailable", "Tool key settings are unavailable.")
+    async with pool.connection() as connection:
+        yield ToolKeySettings(connection, context.master_key_file, os.environ)
+
+
+ToolKeys = Annotated[ToolKeySettings, Depends(tool_key_settings)]
+
+
+async def _tool_keys(keys: ToolKeySettings, workspace_id: UUID) -> ToolKeyList:
+    states = await keys.status(workspace_id)
+    return ToolKeyList(
+        schema_version=1,
+        keys=[
+            ToolKeyStatus.model_validate(
+                {
+                    "provider": state.provider,
+                    "variable": state.variable,
+                    "source": state.source,
+                    "version": state.version,
+                }
+            )
+            for state in states
+        ],
+    )
+
+
+@router.get("/settings/tool-keys", operation_id="getToolKeys", response_model=ToolKeyList)
+async def get_tool_keys(
+    keys: ToolKeys, workspace_id: Annotated[UUID, Depends(current_workspace)]
+) -> ToolKeyList:
+    """Every member sees where each key comes from, never the key (PK-05)."""
+    return await _tool_keys(keys, workspace_id)
+
+
+@router.put("/settings/tool-keys/{provider}", operation_id="putToolKey", response_model=ToolKeyList)
+async def put_tool_key(
+    provider: ToolKeyProvider,
+    body: CredentialDraft,
+    keys: ToolKeys,
+    workspace_id: Annotated[UUID, Depends(require_owner)],
+) -> ToolKeyList:
+    try:
+        await keys.save(workspace_id, provider, body.draft_key, body.expected_version)
+    except HANDLED as error:
+        raise as_api_error(error) from None
+    return await _tool_keys(keys, workspace_id)
+
+
+@router.delete(
+    "/settings/tool-keys/{provider}", operation_id="deleteToolKey", response_model=ToolKeyList
+)
+async def delete_tool_key(
+    provider: ToolKeyProvider,
+    body: ExpectedVersion,
+    keys: ToolKeys,
+    workspace_id: Annotated[UUID, Depends(require_owner)],
+) -> ToolKeyList:
+    try:
+        await keys.remove(workspace_id, provider, body.expected_version)
+    except HANDLED as error:
+        raise as_api_error(error) from None
+    return await _tool_keys(keys, workspace_id)
 
 
 @router.get("/models", operation_id="getModels", response_model=ModelList)

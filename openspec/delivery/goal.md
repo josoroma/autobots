@@ -7,8 +7,8 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | EPIC-16 |
-| Kind | epic |
+| Target | US-14.17 |
+| Kind | story |
 | Focus | - |
 | Status | ACTIVE |
 | Reason | - |
@@ -19,20 +19,16 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-16.1 | us-16-1-sober-control-borders | DONE | Sober control borders |
-| 2 | US-16.2 | us-16-2-schema-readiness-against-every | DONE | Schema readiness against every shipped migration |
-| 3 | US-16.3 | us-16-3-workspace-choice-members-several | DONE | Workspace choice for members of several workspaces |
-| 4 | US-16.4 | us-16-4-current-install-sol-s | DONE | A current install with Sol's live qualification |
-| 5 | US-16.5 | us-16-5-real-examples-install | IN PROGRESS | Real examples on the install |
+| 1 | US-14.17 | us-14-17-tool-provider-keys-env | READY | Tool-provider keys from .env, overridden in Settings |
 
 ## Next Action
 
-Action: mark-done
-Story: US-16.5
-Change: us-16-5-real-examples-install
+Action: select
+Story: US-14.17
+Change: us-14-17-tool-provider-keys-env
 Owner: main-session
-Command: set 'Status: DONE' for US-16.5 in SPECS.md (guarded by /Users/josoroma/sites/autobots/research/upstream/OhMyOrch/plugins/ohmyorch/bin/ohmyorch --project-root /Users/josoroma/sites/autobots --session-id 83761c99-86bc-4edb-8e5c-4daa148cd3a5 guard-story-done)
-Reason: change us-16-5-real-examples-install is archived but US-16.5 is IN PROGRESS
+Command: openspec new change us-14-17-tool-provider-keys-env; set US-14.17 to IN PROGRESS with a Change: line
+Reason: US-14.17 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

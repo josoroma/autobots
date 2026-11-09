@@ -98,6 +98,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
   - [US-14.14: Admitted model for the browsing loop](#us-1414-admitted-model-for-the-browsing-loop)
   - [US-14.15: Sol profile and route qualification](#us-1415-sol-profile-and-route-qualification)
   - [US-14.16: Live browse trial with Sol](#us-1416-live-browse-trial-with-sol)
+  - [US-14.17: Tool-provider keys from .env, overridden in Settings](#us-1417-tool-provider-keys-from-env-overridden-in-settings)
 - [EPIC-15: Studio product surfaces](#epic-15-studio-product-surfaces)
   - [US-15.1: Sidebar groups with Tools under Build](#us-151-sidebar-groups-with-tools-under-build)
   - [US-15.2: Display name, workspace role and account](#us-152-display-name-workspace-role-and-account)
@@ -442,6 +443,16 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.16 | Live browse trial with Sol | DONE | EPIC-14 |
 | US-14.16#1 | Add the trial runner, in no verification profile, reading the owner's key file in its own process and refusing a repeat without the owner's request. | DONE | US-14.16 |
 | US-14.16#2 | Run the trial once and record the redacted evidence: the summary's label, visited URLs, model calls, receipts, spend and the hosts the proxy connected to. | DONE | US-14.16 |
+| US-14.17 | Tool-provider keys from .env, overridden in Settings | DONE | EPIC-14 |
+| US-14.17#1 | Add a migration admitting the providers `tavily` and `jina` in `app_private.provider_credentials`. Verify it on disposable targets only, record it as shipped for schema readiness, and leave applying it to the persistent install to the owner. | DONE | US-14.17 |
+| US-14.17#2 | Resolve the Tavily and Jina keys in K1's order from the run's workspace inside each attempt, and pass the key only to the adapter's HTTP client. | DONE | US-14.17 |
+| US-14.17#3 | Apply the same resolution to catalog availability, run admission and Expert, routine and workflow save, with the key's source on available key-backed tools. | DONE | US-14.17 |
+| US-14.17#4 | Add owner-only, versioned save, replace and remove routes for the two keys, with a shape check only, plus a members' source-only read. Put them behind the existing session, CSRF and workspace checks, add the Pydantic contract, and regenerate OpenAPI and the TypeScript client. | DONE | US-14.17 |
+| US-14.17#5 | Add the Settings → Tool keys page through the BFF, with transient password inputs and source-only display for members. | DONE | US-14.17 |
+| US-14.17#6 | Update the Tools page's repair text to name Settings → Tool keys and `.env`, and show the key's source on available key-backed tools. | DONE | US-14.17 |
+| US-14.17#7 | Make `make start` parse the repository `.env` as data and pass only `TAVILY_API_KEY` and `JINA_API_KEY` to the API and worker, passing nothing for a blank value. | DONE | US-14.17 |
+| US-14.17#8 | Cover the scenarios with unit tests on fake transports, a disposable database check including the secret scan, the web suite with axe, and a Makefile parsing test. | DONE | US-14.17 |
+| US-14.17#9 | Update the operations runbook (including the owner's `make migrate`, then `make stop && make start`), README, `.env.example` and `CODEBASE.md`. | DONE | US-14.17 |
 | EPIC-15 | Studio product surfaces | — | — |
 | US-15.1 | Sidebar groups with Tools under Build | DONE | EPIC-15 |
 | US-15.1#1 | Regroup the sidebar's links in the web shell, keeping link names, roles and data hooks. | DONE | US-15.1 |
@@ -701,6 +712,7 @@ flowchart TD
     US_14_14["US-14.14: Admitted model for the browsing loop"]
     US_14_15["US-14.15: Sol profile and route qualification"]
     US_14_16["US-14.16: Live browse trial with Sol"]
+    US_14_17["US-14.17: Tool-provider keys from .env, overridden in Settings"]
   end
   subgraph EPIC_15["EPIC-15: Studio product surfaces"]
     US_15_1["US-15.1: Sidebar groups with Tools under Build"]
@@ -952,6 +964,15 @@ flowchart TD
   US_12_1 -.-> US_14_15
   US_14_12 -.-> US_14_16
   US_14_15 -.-> US_14_16
+  US_3_1 -.-> US_14_17
+  US_3_2 -.-> US_14_17
+  US_11_3 -.-> US_14_17
+  US_14_2 -.-> US_14_17
+  US_14_5 -.-> US_14_17
+  US_14_6 -.-> US_14_17
+  US_14_7 -.-> US_14_17
+  US_16_2 -.-> US_14_17
+  US_16_3 -.-> US_14_17
   US_14_2 -.-> US_15_1
   US_11_11 -.-> US_15_1
   US_2_2 -.-> US_15_2
@@ -1621,6 +1642,25 @@ flowchart TD
     US_14_16 --> T_14_16_1
     T_14_16_2["US-14.16#2: Run the trial once and record the redacted evidence: the summary&#x27;s label, visited URLs, model calls, receipts, spend and the hosts the proxy connected to."]
     US_14_16 --> T_14_16_2
+    US_14_17["US-14.17: Tool-provider keys from .env, overridden in Settings"]
+    T_14_17_1["US-14.17#1: Add a migration admitting the providers `tavily` and `jina` in `app_private.provider_credentials`. Verify it on disposable targets only, record it as shipped for schema readiness, and leave applying it to the persistent install to the owner."]
+    US_14_17 --> T_14_17_1
+    T_14_17_2["US-14.17#2: Resolve the Tavily and Jina keys in K1&#x27;s order from the run&#x27;s workspace inside each attempt, and pass the key only to the adapter&#x27;s HTTP client."]
+    US_14_17 --> T_14_17_2
+    T_14_17_3["US-14.17#3: Apply the same resolution to catalog availability, run admission and Expert, routine and workflow save, with the key&#x27;s source on available key-backed tools."]
+    US_14_17 --> T_14_17_3
+    T_14_17_4["US-14.17#4: Add owner-only, versioned save, replace and remove routes for the two keys, with a shape check only, plus a members&#x27; source-only read. Put them behind the existing session, CSRF and workspace checks, add the Pydantic contract, and regenerate OpenAPI and the TypeScript client."]
+    US_14_17 --> T_14_17_4
+    T_14_17_5["US-14.17#5: Add the Settings → Tool keys page through the BFF, with transient password inputs and source-only display for members."]
+    US_14_17 --> T_14_17_5
+    T_14_17_6["US-14.17#6: Update the Tools page&#x27;s repair text to name Settings → Tool keys and `.env`, and show the key&#x27;s source on available key-backed tools."]
+    US_14_17 --> T_14_17_6
+    T_14_17_7["US-14.17#7: Make `make start` parse the repository `.env` as data and pass only `TAVILY_API_KEY` and `JINA_API_KEY` to the API and worker, passing nothing for a blank value."]
+    US_14_17 --> T_14_17_7
+    T_14_17_8["US-14.17#8: Cover the scenarios with unit tests on fake transports, a disposable database check including the secret scan, the web suite with axe, and a Makefile parsing test."]
+    US_14_17 --> T_14_17_8
+    T_14_17_9["US-14.17#9: Update the operations runbook (including the owner&#x27;s `make migrate`, then `make stop &amp;&amp; make start`), README, `.env.example` and `CODEBASE.md`."]
+    US_14_17 --> T_14_17_9
   end
 ```
 
@@ -6010,6 +6050,100 @@ Dependencies:
 Tasks:
 - [x] Add the trial runner, in no verification profile, reading the owner's key file in its own process and refusing a repeat without the owner's request.
 - [x] Run the trial once and record the redacted evidence: the summary's label, visited URLs, model calls, receipts, spend and the hosts the proxy connected to.
+
+Open Questions:
+- None.
+
+### US-14.17: Tool-provider keys from .env, overridden in Settings
+
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-14-17-tool-provider-keys-env/`
+
+As a workspace owner
+I want the Tavily and Jina keys read from my `.env`, and a place in Settings to save a key that takes precedence over it
+So that the Tavily and Jina tools are available on the install without editing its environment, and a saved key takes effect on the next call without a restart.
+
+Source:
+- [Decision 0024, K1 to K6](docs/engineering/decisions/0024-tool-keys-from-env-and-settings.md#decision)
+- [Decision 0024, what was found](docs/engineering/decisions/0024-tool-keys-from-env-and-settings.md#what-was-found)
+- [Decision 0024, owner steps after delivery](docs/engineering/decisions/0024-tool-keys-from-env-and-settings.md#owner-steps-after-delivery)
+- [Decision 0024, what this doesn't establish](docs/engineering/decisions/0024-tool-keys-from-env-and-settings.md#what-this-doesnt-establish)
+- [Provider keys, PK-01 and PK-03 to PK-06](PRD-Tool-Catalog.md#provider-keys)
+- [Tools screen, TS-03](PRD-Tool-Catalog.md#tools-screen)
+- [Catalog contract, TC-04](PRD-Tool-Catalog.md#catalog-contract)
+- [Tool-use record, TU-04](PRD-Tool-Catalog.md#tool-use-record)
+- [MP-03 file order](PRD-Model-Providers.md#mp-03-configuration-precedence)
+- [MP-05 owner-only versioned credential routes, as the pattern](PRD-Model-Providers.md#mp-05-application-apis-and-authorization)
+- [MP-06 sealed storage](PRD-Model-Providers.md#mp-06-secret-storage-and-durable-execution)
+- [SP-005](docs/engineering/option-b-contract.md#sp-005--local-services-and-isolation)
+- [SP-007](docs/engineering/option-b-contract.md#sp-007--credentials-and-configuration-ux)
+- [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
+- [Operations runbook, tool-provider keys](docs/engineering/runbooks/operations.md#tool-provider-keys)
+
+Codebase Context:
+- [Integration points](CODEBASE.md#integration-points): `adapters/provider_http.py` reads a provider key from the process environment for each attempt. Not product intent.
+- [Data and Persistence](CODEBASE.md#data-and-persistence): keys are sealed under the master key file in `application/credentials/`. The `app_private.provider_credentials` check admits only `openrouter` (migration 4).
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Settings, then the environment, then .env
+  Given fake Tavily and Jina keys set in combinations of a workspace's saved key, the process environment and the .env files under the configuration root, some of them blank or whitespace-only
+  When each provider's key is resolved for that workspace
+  Then the saved key wins over the process environment, the process environment wins over the .env files, the .env files are read in MP-03's file order, and a blank or whitespace-only value is skipped in favor of the next source
+
+Scenario: Resolved per attempt from the run's workspace
+  Given two workspaces, one with a fake Tavily key saved in Settings and one without, a different fake key in the process environment, and a fake transport for each adapter
+  When a granted Tavily tool is called in a run of each workspace, the saved key is then replaced, and the first workspace's run calls the tool again without a restart
+  Then each request carries its own workspace's key, with the environment key for the workspace that has no saved key, and the second call in the first workspace carries the replacement, with each key reaching only the adapter's HTTP client
+
+Scenario: Owner saves, replaces and removes, and members see only the source
+  Given a workspace with an owner and a member who isn't an owner, and a fake transport that records any provider request
+  When the owner saves, replaces and removes a Tavily or Jina key with the expected version, the owner submits a stale version or a malformed value, the member tries to save or remove a key, and each of them reads Settings → Tool keys
+  Then the owner's changes succeed and advance the version, the stale version is refused as a conflict and the malformed value is refused by the shape check, each leaving the saved key unchanged, the member is refused, both of them see each key's source as settings, environment or none and never its value, prefix, length or hash, and no request reaches Tavily or Jina
+
+Scenario: Removing falls back to the environment
+  Given a workspace with a saved Jina key and a different fake key in the configuration root's .env
+  When the owner removes the saved key
+  Then the next resolution for that workspace uses the environment's key, the source reads environment, and every .env file is byte-for-byte unchanged
+
+Scenario: Availability follows the same order
+  Given a workspace with a key saved for one provider, an environment key only for the other, and a third arrangement with neither
+  When the Tools page is read, a run granting each provider's tools is admitted, and an Expert, routine and workflow granting them are saved, all for that workspace
+  Then availability, admission and save agree with the resolution order, a tool with no key reads key_missing with a repair naming Settings → Tool keys and the provider's variable in .env, and an available key-backed tool shows its key's source as Settings or environment
+
+Scenario: make start passes only the two keys, as data
+  Given a repository .env holding fake TAVILY_API_KEY and JINA_API_KEY values, another variable, and a value containing shell syntax, and separately one where both keys are blank
+  When make start's environment for the API and the worker is built against a disposable target
+  Then only the two keys are passed, the value with shell syntax is passed literally and nothing in it runs, the other variable isn't passed, and a blank key passes nothing
+
+Scenario: The sealed key stays out of durable state
+  Given a disposable database, a fake key saved in Settings for each provider, and runs whose granted Tavily and Jina tools call fake transports
+  When the runs finish and a scan reads their scopes, checkpoints, graph state, events, tool-use rows, receipts, logs and evidence
+  Then the fake keys appear in none of them, the provider_credentials rows hold only sealed material, and no API or BFF response contains a key
+```
+
+Dependencies:
+- US-3.1
+- US-3.2
+- US-11.3
+- US-14.2
+- US-14.5
+- US-14.6
+- US-14.7
+- US-16.2
+- US-16.3
+
+Tasks:
+- [x] Add a migration admitting the providers `tavily` and `jina` in `app_private.provider_credentials`. Verify it on disposable targets only, record it as shipped for schema readiness, and leave applying it to the persistent install to the owner.
+- [x] Resolve the Tavily and Jina keys in K1's order from the run's workspace inside each attempt, and pass the key only to the adapter's HTTP client.
+- [x] Apply the same resolution to catalog availability, run admission and Expert, routine and workflow save, with the key's source on available key-backed tools.
+- [x] Add owner-only, versioned save, replace and remove routes for the two keys, with a shape check only, plus a members' source-only read. Put them behind the existing session, CSRF and workspace checks, add the Pydantic contract, and regenerate OpenAPI and the TypeScript client.
+- [x] Add the Settings → Tool keys page through the BFF, with transient password inputs and source-only display for members.
+- [x] Update the Tools page's repair text to name Settings → Tool keys and `.env`, and show the key's source on available key-backed tools.
+- [x] Make `make start` parse the repository `.env` as data and pass only `TAVILY_API_KEY` and `JINA_API_KEY` to the API and worker, passing nothing for a blank value.
+- [x] Cover the scenarios with unit tests on fake transports, a disposable database check including the secret scan, the web suite with axe, and a Makefile parsing test.
+- [x] Update the operations runbook (including the owner's `make migrate`, then `make stop && make start`), README, `.env.example` and `CODEBASE.md`.
 
 Open Questions:
 - None.

@@ -33,6 +33,7 @@ from autobots.application.runs import (
     store_receipt,
 )
 from autobots.application.tool_catalog import ToolsUnavailable, require_available
+from autobots.application.tool_keys import key_sources
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.run_commands import (
     EffectEvidence,
@@ -226,7 +227,9 @@ async def post_run(
                 raise ApiError(status_code, error.code, "That routing isn't available.") from None
             try:
                 # PK-02: only a run that grants an unavailable tool is refused, before it exists.
-                require_available(binding.tools, os.environ)
+                require_available(
+                    binding.tools, await key_sources(connection, workspace_id, os.environ)
+                )
             except ToolsUnavailable as refused:
                 raise ApiError(
                     409,

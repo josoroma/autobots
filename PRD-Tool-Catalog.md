@@ -27,7 +27,7 @@ Everything in PRD §9 still applies: grants pin versions, discovery never grants
 
 **TS-02.** `/tools/{tool_id}` shows the description, limits, approval, the key requirement by variable name, and two field tables, inputs and outputs, each with path, type, required, constraints, description and whether the field appears on run screens. The raw JSON Schema sits in a disclosure. Every registered version is listed.
 
-**TS-03.** An unavailable tool shows its reason and its repair, such as "Set `TAVILY_API_KEY` in the worker's environment and restart the worker", or "Disabled until an isolated executor is qualified".
+**TS-03.** An unavailable tool shows its reason and its repair, such as "Save a Tavily key in Settings → Tool keys, or set `TAVILY_API_KEY` in `.env` and restart", or "Disabled until an isolated executor is qualified". An available tool that needs a key shows where its key comes from (PK-05).
 
 **TS-04.** The Expert editor picks tools from the same catalog, singly or by group, shows the expansion before saving, and refuses unavailable tools.
 
@@ -57,7 +57,7 @@ Everything in PRD §9 still applies: grants pin versions, discovery never grants
 
 ## Provider keys
 
-**PK-01.** Tool-provider keys are read from the worker's environment inside each attempt and passed to the adapter's HTTP client only. They never enter a scope, checkpoint, graph state, prompt, tool schema, event, tool-use row, receipt, log line or evidence. Tool inputs have no credential field.
+**PK-01.** Tool-provider keys are resolved inside each attempt, from the worker's environment or, for Tavily and Jina, by PK-04's order, and passed to the adapter's HTTP client only. They never enter a scope, checkpoint, graph state, prompt, tool schema, event, tool-use row, receipt, log line or evidence. Tool inputs have no credential field.
 
 | Variable | Tools |
 |---|---|
@@ -68,6 +68,12 @@ Everything in PRD §9 still applies: grants pin versions, discovery never grants
 **PK-02.** A missing key makes only that provider's tools `key_missing`. A run or Expert that grants an unavailable tool is refused at admission or save with a typed code; other runs are unaffected.
 
 **PK-03.** No live key check runs automatically. Tests use fake transports even when a real key is present.
+
+**PK-04.** By [Decision 0024](docs/engineering/decisions/0024-tool-keys-from-env-and-settings.md), the Tavily and Jina keys resolve in this order, highest first: the workspace's key saved in Settings, then the process environment, then the `.env` files under the configuration root in MP-03's file order. The first non-blank value wins. Each call resolves its key inside the attempt from the run's workspace, and availability, admission and save-time checks follow the same order for that workspace.
+
+**PK-05.** Settings → Tool keys lets the workspace owner save, replace or remove a Tavily or Jina key, with an expected version. The value is sealed with the master key like the OpenRouter key, and saving checks its shape only. Members see each key's source (`settings`, `environment` or none), never its value, prefix, length or hash. Removing a saved key falls back to the environment.
+
+**PK-06.** `make start` passes `TAVILY_API_KEY` and `JINA_API_KEY` from the repository's `.env` to the persistent install's API and worker. It parses the file as data, never sources it, and takes no other variable from it.
 
 ## URL guard
 

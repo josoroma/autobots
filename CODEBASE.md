@@ -151,7 +151,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
 
 ## Data and Persistence
 
-- **Migrations:** `supabase/migrations/` holds 50 ordered files, from `20261105000001_workspaces.sql` to `20261108000050_sol_route_requalified.sql` (US-16.4's record of Sol's 2026-11-08 live pass, after the analyzed revision), in the schemas `public`, `app_private` and `agent_runtime`. Since migration 35:
+- **Migrations:** `supabase/migrations/` holds 51 ordered files, from `20261105000001_workspaces.sql` to `20261108000051_tool_provider_keys.sql` (US-14.17's Tavily and Jina providers and `app_private.tool_key_settings`, after the analyzed revision), in the schemas `public`, `app_private` and `agent_runtime`. Since migration 35:
 
 | Migration | Change |
 |---|---|
@@ -184,12 +184,12 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
   - credentials, policies, spend limits, idempotency receipts;
   - heartbeats, retention, `installation_holds`.
 - **`agent_runtime`:** LangGraph checkpoints, `adapter_qualifications`, `route_qualifications`.
-- **Schema readiness:** `application/operations.py` checks `REQUIRED_RELATIONS` and `REQUIRED_COLUMNS` (through migration 49), and compares `app_private.applied_migration_count()` with `SHIPPED_MIGRATIONS` in `application/schema_release.py`: fewer is `schema_behind` and blocks, more is `schema_ahead`, degraded and not blocking. A harness test (`tests/harness/test_app_db.py`) and `services/agent/tests/test_schema_release.py` fail unless that record matches `supabase/migrations`. Operations shows "N of M migrations applied" (`lib/schema-value.ts`). Changed by US-16.2, after the analyzed revision.
+- **Schema readiness:** `application/operations.py` checks `REQUIRED_RELATIONS` and `REQUIRED_COLUMNS` (through migration 51), and compares `app_private.applied_migration_count()` with `SHIPPED_MIGRATIONS` in `application/schema_release.py`: fewer is `schema_behind` and blocks, more is `schema_ahead`, degraded and not blocking. A harness test (`tests/harness/test_app_db.py`) and `services/agent/tests/test_schema_release.py` fail unless that record matches `supabase/migrations`. Operations shows "N of M migrations applied" (`lib/schema-value.ts`). Changed by US-16.2, after the analyzed revision.
 - **Install-only schema:** `autobots_install` holds the install's identity and applied-migration digests (`scripts/persistent_install.py`).
 - **Ephemeral channel:** Postgres `NOTIFY autobots_result_text`. Nothing is stored.
 - **Objects and files:**
   - Artifacts live in private Supabase Storage (`adapters/object_storage.py`).
-  - Provider keys are sealed with AES-256-GCM under a master key file (`application/credentials/`).
+  - Provider keys are sealed with AES-256-GCM under a master key file (`application/credentials/`). Since US-14.17, after the analyzed revision, the same store also holds a workspace's Tavily and Jina keys, saved at Settings → Tool keys (`application/tool_key_settings.py`).
   - Backups are cold and encrypted, with a signed manifest, and restore only into a new held disposable project.
   - The shared ledger is `.checks/decision-0009/ledger.json` (ignored).
   - The install's record, secrets and logs are at `~/.local/share/autobots-install` (Makefile `INSTALL_DIR`). This analysis did not read them.
@@ -214,7 +214,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
 - **Tavily** (`adapters/tavily.py`): `tavily_search`, `tavily_extract`, `tavily_map`, `tavily_crawl`. Read-only, metered, with Tavily's inference options off.
 - **Jina** (`adapters/jina.py`): `search_web`, `extract_website_content` (reader mode).
 - **Market data** (`adapters/market_data.py`): `market_history` (Yahoo chart endpoint over `httpx`) and `inflation_rates` (World Bank `FP.CPI.TOTL.ZG`), both keyless.
-- **Fetch guard:** `adapters/url_guard.py` admits only `https` URLs whose every DNS answer is global, revalidates up to 3 redirects, and caps size and time. `adapters/provider_http.py` reads a provider key per attempt.
+- **Fetch guard:** `adapters/url_guard.py` admits only `https` URLs whose every DNS answer is global, revalidates up to 3 redirects, and caps size and time. `adapters/provider_http.py` reads a provider key per attempt. For Tavily and Jina, `application/tool_keys.py` resolves it from the run's workspace: the key saved in Settings, then the process environment, then the configuration root's `.env` files (US-14.17, after the analyzed revision). `make start` passes those two keys from the repository's `.env` through `scripts/tool_keys_env.py`.
 - **Browser:** `adapters/browser_executor.py` runs one hardened Chromium container per call behind `egress_proxy.py`, which allows only `CONNECT` to named hosts and gates DevTools with a token. `browser_page.py` reads pages over CDP.
 - **Supabase:** Auth, Storage and PostgREST, self-hosted and loopback-bound.
 - **MCP:** `langchain-mcp-adapters` is pinned but not imported under `src/`.
@@ -270,7 +270,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
   - Models shows the facts, binding sources, Discard, Reset all (`POST /v1/settings/model-policy/reset`), and the follow-the-default summary.
 - **Goal execution:** versioned plans and evidence, required artifacts, verification from artifacts and checks, staged and verified publication, cursor replay, and a live SSE stream.
 - **Tools:**
-  - The catalog (`application/tool_catalog.py`) is derived from the registry, and availability is computed per request.
+  - The catalog (`application/tool_catalog.py`) is derived from the registry, and availability is computed per request, for the request's workspace, with each key's source (US-14.17).
   - Registered tools:
     - plan tools, `calculate`, `read_run_file` v1 and v2, `read_csv`, `read_offload`;
     - `save_artifact`, `publish_artifact`, `search_memory`, `propose_improvement`;

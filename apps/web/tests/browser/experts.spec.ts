@@ -480,13 +480,14 @@ test("US-14.5: a missing key refuses only a run or version that grants its tool"
   );
   expect(dropped.status()).toBe(201);
 
-  // No provider key is set for this suite's API, so exactly the keyed tools read key_missing, and
-  // every tool needing no key is unaffected.
+  // This suite's API has no provider key but the Jina one arranged in its configuration root's .env
+  // (US-14.17), so exactly the keyed tools with no key source read key_missing, and every tool
+  // needing no key is unaffected.
   const catalog = await (await page.request.get("/api/v1/tools")).json();
   type Tool = {
     tool_id: string;
     availability: string;
-    key_requirement: { credential: string } | null;
+    key_requirement: { credential: string; source: string | null } | null;
   };
   const tools = catalog.tools as Tool[];
   const missing = tools
@@ -494,11 +495,20 @@ test("US-14.5: a missing key refuses only a run or version that grants its tool"
     .map((tool) => tool.tool_id)
     .sort();
   const keyed = tools
-    .filter((tool) => tool.key_requirement !== null)
+    .filter(
+      (tool) =>
+        tool.key_requirement !== null && tool.key_requirement.source === null,
+    )
     .map((tool) => tool.tool_id)
     .sort();
   expect(missing).toContain("create_github_issue");
   expect(missing).toEqual(keyed);
+  expect(
+    tools
+      .filter((tool) => tool.key_requirement?.source === "environment")
+      .map((tool) => tool.tool_id)
+      .sort(),
+  ).toEqual(["extract_website_content", "search_web"]);
   for (const tool of tools.filter((item) => item.key_requirement === null)) {
     expect(["available", "disabled_by_policy"]).toContain(tool.availability);
   }

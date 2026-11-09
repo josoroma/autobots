@@ -305,7 +305,8 @@ class KeyRequirementView(BaseModel):
     variables: list[str]
     # What the credential must be allowed to do, for the repair to name. Never a value.
     scopes: list[str]
-    source: Literal["environment"]
+    # Where this workspace's key comes from (PK-05), and null while it has none. Never a value.
+    source: Literal["settings", "environment"] | None
 
 
 class ToolLimits(BaseModel):

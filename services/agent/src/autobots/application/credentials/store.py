@@ -80,9 +80,10 @@ def resolve_for_attempt_blocked_check(candidate: EnvironmentCandidate) -> None:
 class ProviderCredentialStore:
     """Takes an open async connection with the restricted runtime role."""
 
-    def __init__(self, connection: Any, key_path: Path) -> None:
+    def __init__(self, connection: Any, key_path: Path, provider: str = PROVIDER) -> None:
         self._connection = connection
         self._key_path = key_path
+        self._provider = provider
 
     async def _encrypted_rows_exist(self) -> bool:
         cursor = await self._connection.execute(
@@ -111,7 +112,7 @@ class ProviderCredentialStore:
             cursor = await self._connection.execute(
                 "select credential_id, version from app_private.provider_credentials "
                 "where workspace_id = %s and provider = %s and status = 'active' for update",
-                (workspace_id, PROVIDER),
+                (workspace_id, self._provider),
             )
             active = await cursor.fetchone()
             credential_id = active[0] if active else uuid4()
@@ -122,7 +123,7 @@ class ProviderCredentialStore:
                     "where credential_id = %s and version = %s",
                     (credential_id, active[1]),
                 )
-            aad = associated_data(workspace_id, PROVIDER, credential_id, version)
+            aad = associated_data(workspace_id, self._provider, credential_id, version)
             sealed = seal(key, plaintext, aad)
             await self._connection.execute(
                 "insert into app_private.provider_credentials (credential_id, version, "
@@ -132,7 +133,7 @@ class ProviderCredentialStore:
                     credential_id,
                     version,
                     workspace_id,
-                    PROVIDER,
+                    self._provider,
                     sealed.ciphertext,
                     sealed.nonce,
                     sealed.tag,
@@ -146,7 +147,7 @@ class ProviderCredentialStore:
             "select credential_id, version, ciphertext, nonce, tag "
             "from app_private.provider_credentials "
             "where workspace_id = %s and provider = %s and status = 'active'",
-            (workspace_id, PROVIDER),
+            (workspace_id, self._provider),
         )
         row = await cursor.fetchone()
         if row is None:
@@ -155,7 +156,7 @@ class ProviderCredentialStore:
             key = load_master_key(self._key_path)
         except MasterKeyUnavailable as error:
             raise CredentialStorageUnavailable("the master key is unavailable") from error
-        aad = associated_data(workspace_id, PROVIDER, row[0], row[1])
+        aad = associated_data(workspace_id, self._provider, row[0], row[1])
         plaintext = unseal(key, Sealed(bytes(row[2]), bytes(row[3]), bytes(row[4])), aad)
         return ResolvedCredential(CredentialReference("app", row[0], row[1]), plaintext)
 

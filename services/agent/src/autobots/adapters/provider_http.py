@@ -1,16 +1,17 @@
 """Tool-provider keys and HTTP, PRD-Tool-Catalog PK-01 to PK-03 and Decision 0017 Q1.
 
-A key is read from the worker's environment inside each attempt and handed to this attempt's HTTP
-client only. It never enters a scope, a tool's arguments or schema, graph state, an event, a
-tool-use row, a receipt or a log line. Nothing here checks a key against its provider: that would be
-a paid call, and only an owner's explicit task makes one. Tests pass a fake transport.
+A key is resolved inside each attempt, for Tavily and Jina by PK-04's order (Decision 0024), and
+handed to this attempt's HTTP client only. It never enters a scope, a tool's arguments or schema,
+graph state, an event, a tool-use row, a receipt or a log line. Nothing here checks a key against
+its provider: that would be a paid call, and only an owner's explicit task makes one. Tests pass a
+fake transport.
 """
 
 from collections.abc import Mapping
 
 import httpx
 
-from autobots.application.tool_gateway import ToolFailed
+from autobots.application.tool_gateway import ToolContext, ToolFailed
 from autobots.domain.tool_catalog import KeyRequirement
 
 DEFAULT_SECONDS = 20.0
@@ -22,6 +23,21 @@ def provider_key(requirement: KeyRequirement, environ: Mapping[str, str]) -> dic
     if not all(values.values()):
         raise ToolFailed(f"{requirement.credential}_key_missing")
     return values
+
+
+async def attempt_key(
+    context: ToolContext, requirement: KeyRequirement, environ: Mapping[str, str]
+) -> str:
+    """This attempt's key by PK-04's order, for the run's workspace. A failure names the credential,
+    never the value, and the key goes to the caller's HTTP client only."""
+    from autobots.application.tool_keys import ToolKeyMissing, ToolKeyUnavailable, resolve_tool_key
+
+    try:
+        return await resolve_tool_key(
+            context.connection, context.scope.workspace_id, requirement, environ
+        )
+    except (ToolKeyMissing, ToolKeyUnavailable) as error:
+        raise ToolFailed(error.code) from None
 
 
 def provider_client(

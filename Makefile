@@ -106,8 +106,14 @@ strays_web    = lsof -nP -t -iTCP:$(WEB_PORT) -sTCP:LISTEN 2>/dev/null
 strays_worker = pgrep -f 'autobots[.]operations[.]worker' 2>/dev/null | grep -vx "$$$$"
 stray_pids    = held="$$($(strays_$(1)) | tr '\n' ' ' | sed 's/ *$$//')"
 
-# $(call launch,name,command): start in the background, with the install's environment.
-# It refuses beside an untracked copy and never stops one itself, as a worker may be in a paid call.
+# Decision 0024 K2: the Tavily and Jina keys from this repository's .env, for the API and the worker.
+# The script parses the file as data and prints only those two names, shell-quoted, so evaluating its
+# output runs nothing from the file. A blank or missing key prints nothing.
+TOOL_KEYS := eval "$$($(PY) scripts/tool_keys_env.py .env)";
+
+# $(call launch,name,command[,keys]): start in the background, with the install's environment, and
+# with the tool keys when keys is given. It refuses beside an untracked copy and never stops one
+# itself, as a worker may be in a paid call.
 define launch
 	@mkdir -p "$(RUN_DIR)" "$(LOG_DIR)"; \
 	if $(call running,$(1)); then \
@@ -119,6 +125,7 @@ define launch
 		exit 1; \
 	else \
 		set -a; . "$(APP_ENV)"; set +a; \
+		$(if $(3),$(TOOL_KEYS)) \
 		PYTHONPATH=services/agent/src PATH="$(NODE_BIN):$$PATH" NEXT_TELEMETRY_DISABLED=1 AUTOBOTS_WORKER_INFERENCE="$(INFERENCE)" \
 			nohup $(2) >> "$(LOG_DIR)/$(1).log" 2>&1 < /dev/null & \
 		pid=$$!; { echo "$$pid"; $(call start_time,$$pid); } > "$(RUN_DIR)/$(1).pid"; \
@@ -145,14 +152,14 @@ start-stack:
 	$(INSTALL) up --project $(PROJECT)
 
 start-api:
-	$(call launch,api,$(PY) -m uvicorn --factory autobots.api.main:create_configured_app --host 127.0.0.1 --port $(API_PORT) --no-access-log)
+	$(call launch,api,$(PY) -m uvicorn --factory autobots.api.main:create_configured_app --host 127.0.0.1 --port $(API_PORT) --no-access-log,keys)
 
 start-web:
 	@test -f apps/web/.next/BUILD_ID || { echo 'The web app is not built. Use: make build'; exit 1; }
 	$(call launch,web,$(NEXT) start apps/web -H 127.0.0.1 -p $(WEB_PORT))
 
 start-worker:
-	$(call launch,worker,$(PY) -m autobots.operations.worker)
+	$(call launch,worker,$(PY) -m autobots.operations.worker,keys)
 	@sleep 2
 	@if $(call running,worker); then :; else echo 'worker: exited. Read $(LOG_DIR)/worker.log'; exit 1; fi
 

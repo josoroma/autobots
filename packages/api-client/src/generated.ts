@@ -2089,9 +2089,19 @@ export const schemas = {
         "type": "array"
       },
       "source": {
-        "const": "environment",
-        "title": "Source",
-        "type": "string"
+        "anyOf": [
+          {
+            "enum": [
+              "settings",
+              "environment"
+            ],
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Source"
       },
       "variables": {
         "items": {
@@ -5881,6 +5891,74 @@ export const schemas = {
     "title": "ToolGroupDescriptor",
     "type": "object"
   },
+  "ToolKeyList": {
+    "additionalProperties": false,
+    "properties": {
+      "keys": {
+        "items": {
+          "$ref": "#/components/schemas/ToolKeyStatus"
+        },
+        "title": "Keys",
+        "type": "array"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "keys"
+    ],
+    "title": "ToolKeyList",
+    "type": "object"
+  },
+  "ToolKeyStatus": {
+    "additionalProperties": false,
+    "description": "Where one tool key comes from for this workspace, PK-05. Never a value, prefix, length or\nhash.",
+    "properties": {
+      "provider": {
+        "enum": [
+          "tavily",
+          "jina"
+        ],
+        "title": "Provider",
+        "type": "string"
+      },
+      "source": {
+        "anyOf": [
+          {
+            "enum": [
+              "settings",
+              "environment"
+            ],
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Source"
+      },
+      "variable": {
+        "title": "Variable",
+        "type": "string"
+      },
+      "version": {
+        "title": "Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "provider",
+      "variable",
+      "source",
+      "version"
+    ],
+    "title": "ToolKeyStatus",
+    "type": "object"
+  },
   "ToolLimits": {
     "additionalProperties": false,
     "properties": {
@@ -7788,7 +7866,7 @@ export function parseJobsChart(value: unknown): JobsChart {
 export interface KeyRequirementView {
   credential: string;
   scopes: string[];
-  source: "environment";
+  source: "settings" | "environment" | null;
   variables: string[];
 }
 
@@ -8751,6 +8829,26 @@ export function parseToolGroupDescriptor(value: unknown): ToolGroupDescriptor {
   return parseWith(schemas, "ToolGroupDescriptor", value) as ToolGroupDescriptor;
 }
 
+export interface ToolKeyList {
+  keys: ToolKeyStatus[];
+  schema_version: 1;
+}
+
+export function parseToolKeyList(value: unknown): ToolKeyList {
+  return parseWith(schemas, "ToolKeyList", value) as ToolKeyList;
+}
+
+export interface ToolKeyStatus {
+  provider: "tavily" | "jina";
+  source: "settings" | "environment" | null;
+  variable: string;
+  version: number;
+}
+
+export function parseToolKeyStatus(value: unknown): ToolKeyStatus {
+  return parseWith(schemas, "ToolKeyStatus", value) as ToolKeyStatus;
+}
+
 export interface ToolLimits {
   max_output_bytes: number;
   retries: number;
@@ -9310,6 +9408,18 @@ export async function deleteOpenRouterCredential(options: ClientOptions, body: E
 
 export async function validateOpenRouter(options: ClientOptions): Promise<ProviderStatus> {
   return parseProviderStatus(await requestJson(options, "POST", `/v1/settings/model-providers/openrouter/validate`));
+}
+
+export async function getToolKeys(options: ClientOptions): Promise<ToolKeyList> {
+  return parseToolKeyList(await requestJson(options, "GET", `/v1/settings/tool-keys`));
+}
+
+export async function putToolKey(options: ClientOptions, provider: string, body: CredentialDraft): Promise<ToolKeyList> {
+  return parseToolKeyList(await requestJson(options, "PUT", `/v1/settings/tool-keys/${encodeURIComponent(provider)}`, body));
+}
+
+export async function deleteToolKey(options: ClientOptions, provider: string, body: ExpectedVersion): Promise<ToolKeyList> {
+  return parseToolKeyList(await requestJson(options, "DELETE", `/v1/settings/tool-keys/${encodeURIComponent(provider)}`, body));
 }
 
 export async function listTools(options: ClientOptions): Promise<ToolCatalog> {

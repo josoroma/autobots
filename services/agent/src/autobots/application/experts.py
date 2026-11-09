@@ -48,6 +48,13 @@ def expand_groups(config: ExpertConfig, environ: Mapping[str, str] = os.environ)
     return config.model_copy(update={"tools": tools})
 
 
+async def _workspace_keys(connection: Any, workspace_id: UUID) -> Mapping[str, str]:
+    """PK-04: a tool's key may be saved for this workspace, so availability is the workspace's."""
+    from autobots.application.tool_keys import key_sources
+
+    return await key_sources(connection, workspace_id, os.environ)
+
+
 def validate_config(config: ExpertConfig, environ: Mapping[str, str] = os.environ) -> None:
     """A revision can only name what exists and is available. Anything else is refused, not
     dropped."""
@@ -119,8 +126,9 @@ async def create_expert(
     config: ExpertConfig,
 ) -> ExpertView:
     fingerprint = request_hash({"name": name, "config": config.model_dump(mode="json")})
-    config = expand_groups(config)
-    validate_config(config)
+    keys = await _workspace_keys(connection, workspace_id)
+    config = expand_groups(config, keys)
+    validate_config(config, keys)
     scope = (workspace_id, actor_id, "create_expert", str(workspace_id), idempotency_key)
     async with connection.transaction():
         existing = await existing_receipt(connection, scope, fingerprint)
@@ -160,8 +168,9 @@ async def add_version(
     fingerprint = request_hash(
         {"expected": expected_version, "config": config.model_dump(mode="json")}
     )
-    config = expand_groups(config)
-    validate_config(config)
+    keys = await _workspace_keys(connection, workspace_id)
+    config = expand_groups(config, keys)
+    validate_config(config, keys)
     scope = (workspace_id, actor_id, "add_expert_version", str(expert_id), idempotency_key)
     async with connection.transaction():
         existing = await existing_receipt(connection, scope, fingerprint)
