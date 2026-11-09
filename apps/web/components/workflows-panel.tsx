@@ -12,7 +12,7 @@ import {
 import { Plus, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { STATUS_TEXT } from "@/components/run-list";
 import { Badge } from "@/components/ui/badge";
@@ -450,6 +450,21 @@ function WorkflowPreviewPanel({
   const [executions, setExecutions] = useState<WorkflowExecutionList | null>(
     null,
   );
+  const heading = useRef<HTMLHeadingElement>(null);
+
+  // The preview sits under the list, often below the fold, and the Preview link doesn't scroll.
+  // So choosing a workflow brings its preview into view and moves focus to its heading, which
+  // also tells a screen reader where it went. Changing the version keeps the place.
+  useEffect(() => {
+    const target = heading.current;
+    if (target === null) return;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({
+      block: "start",
+      behavior: still ? "auto" : "smooth",
+    });
+  }, [workflow.id]);
 
   useEffect(() => {
     let active = true;
@@ -498,7 +513,12 @@ function WorkflowPreviewPanel({
       className="space-y-5 rounded-xl border p-5"
     >
       <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
-        <h2 id="preview-heading" className="text-[15px] font-semibold">
+        <h2
+          id="preview-heading"
+          ref={heading}
+          tabIndex={-1}
+          className="scroll-mt-4 text-[15px] font-semibold outline-none"
+        >
           Preview: {workflow.name}
         </h2>
         {shown === null ? null : (

@@ -96,6 +96,10 @@ test("the preview's version switch shows each version's steps in order", async (
   await page.goto("/workflows");
   await page.getByRole("link", { name: "Preview Weekly brief" }).click();
   const panel = page.locator(`[data-panel="${BRIEF}"]`);
+  // The preview sits under the list: choosing it brings it into view, with focus on its heading.
+  const heading = panel.getByRole("heading", { name: "Preview: Weekly brief" });
+  await expect(heading).toBeFocused();
+  await expect(heading).toBeInViewport();
   const version = panel.getByLabel("Version");
   await expect(version).toHaveValue("2");
   await expect(version.locator("option")).toHaveText([
