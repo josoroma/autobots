@@ -7,7 +7,7 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-14.19 |
+| Target | US-14.20 |
 | Kind | story |
 | Focus | - |
 | Status | ACTIVE |
@@ -19,16 +19,16 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-14.19 | us-14-19-cronjob-tool-manages-workspace | READY | The cronjob tool manages the workspace's routines |
+| 1 | US-14.20 | us-14-20-tool-guide-shown-modal | READY | Tool guide, shown in a modal on the Tools page |
 
 ## Next Action
 
 Action: select
-Story: US-14.19
-Change: us-14-19-cronjob-tool-manages-workspace
+Story: US-14.20
+Change: us-14-20-tool-guide-shown-modal
 Owner: main-session
-Command: openspec new change us-14-19-cronjob-tool-manages-workspace; set US-14.19 to IN PROGRESS with a Change: line
-Reason: US-14.19 is READY and has no OpenSpec change
+Command: openspec new change us-14-20-tool-guide-shown-modal; set US-14.20 to IN PROGRESS with a Change: line
+Reason: US-14.20 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

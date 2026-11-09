@@ -5814,6 +5814,9 @@ export const schemas = {
         "title": "Group",
         "type": "string"
       },
+      "guide": {
+        "$ref": "#/components/schemas/ToolGuideView"
+      },
       "input_schema": {
         "additionalProperties": true,
         "title": "Input Schema",
@@ -5905,6 +5908,7 @@ export const schemas = {
       "version",
       "title",
       "description",
+      "guide",
       "group",
       "provider",
       "operation_class",
@@ -6008,6 +6012,34 @@ export const schemas = {
       "tool_ids"
     ],
     "title": "ToolGroupDescriptor",
+    "type": "object"
+  },
+  "ToolGuideView": {
+    "additionalProperties": false,
+    "description": "Decision 0026 G1: what a tool does, when to use it and why. Describes, never grants.",
+    "properties": {
+      "what": {
+        "minLength": 1,
+        "title": "What",
+        "type": "string"
+      },
+      "when": {
+        "minLength": 1,
+        "title": "When",
+        "type": "string"
+      },
+      "why": {
+        "minLength": 1,
+        "title": "Why",
+        "type": "string"
+      }
+    },
+    "required": [
+      "what",
+      "when",
+      "why"
+    ],
+    "title": "ToolGuideView",
     "type": "object"
   },
   "ToolLimits": {
@@ -8871,6 +8903,7 @@ export interface ToolDescriptor {
   fields: FieldDescriptor[];
   grantable_to: ("goal" | "expert" | "workflow_node" | "coordinator")[];
   group: "planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning" | "automation";
+  guide: ToolGuideView;
   input_schema: Record<string, unknown>;
   key_requirement: KeyRequirementView | null;
   limits: ToolLimits | null;
@@ -8909,6 +8942,16 @@ export interface ToolGroupDescriptor {
 
 export function parseToolGroupDescriptor(value: unknown): ToolGroupDescriptor {
   return parseWith(schemas, "ToolGroupDescriptor", value) as ToolGroupDescriptor;
+}
+
+export interface ToolGuideView {
+  what: string;
+  when: string;
+  why: string;
+}
+
+export function parseToolGuideView(value: unknown): ToolGuideView {
+  return parseWith(schemas, "ToolGuideView", value) as ToolGuideView;
 }
 
 export interface ToolLimits {

@@ -154,8 +154,8 @@ test("a tool's detail lists its versions and every field", async ({ page }) => {
   await expect(page.getByText("Unavailable: key not set")).toBeVisible();
 });
 
-// US-15.7: group counts, a text filter in the URL, the side panel and Copy schema.
-test("group counts, text filter, side panel and Copy schema", async ({
+// US-15.7 and US-14.20: group counts, a text filter in the URL, the tool's modal and Copy schema.
+test("group counts, text filter, the tool modal and Copy schema", async ({
   page,
   context,
 }) => {
@@ -172,20 +172,42 @@ test("group counts, text filter, side panel and Copy schema", async ({
   await expect(page.locator("[data-tool]")).toHaveCount(1);
   await expect(page.locator('[data-tool="calculate"]')).toBeVisible();
 
-  await page
+  const link = page
     .locator('[data-tool="calculate"]')
-    .getByRole("link", { name: "Calculate" })
-    .click();
+    .getByRole("link", { name: "Calculate" });
+  await link.click();
   await expect(page).toHaveURL(/[?&]tool=calculate/);
   await expect(page).toHaveURL(/[?&]q=calculate/);
-  const panel = page.locator('[data-panel="calculate"]');
-  await expect(panel.getByRole("heading", { name: "Calculate" })).toBeVisible();
+  const dialog = page.getByRole("dialog", { name: "Calculate" });
+  await expect(dialog).toBeVisible();
+  expect(
+    await dialog.evaluate((element) => element.tagName.toLowerCase()),
+  ).toBe("dialog");
   await expect(
-    panel.getByRole("link", { name: "Open as a page" }),
+    page.getByRole("complementary", { name: "Tool detail" }),
+  ).toHaveCount(0);
+  // Decision 0026 G1: what, when and why, then the inputs and outputs.
+  await expect(dialog.locator('[data-guide="what"]')).toHaveText(
+    "Computes the sum, mean, minimum or maximum of a list of numbers.",
+  );
+  await expect(dialog.locator('[data-guide="when"]')).not.toBeEmpty();
+  await expect(dialog.locator('[data-guide="why"]')).not.toBeEmpty();
+  const inputs = dialog.locator('[data-fields="input"]');
+  await expect(inputs.locator('[data-field-path="operation"]')).toContainText(
+    "Required",
+  );
+  await expect(inputs.locator('[data-field-path="operation"]')).toContainText(
+    "Shown",
+  );
+  await expect(
+    dialog.locator('[data-fields="output"] [data-field-path="result"]'),
+  ).toContainText("Required");
+  await expect(
+    dialog.getByRole("link", { name: "Open as a page" }),
   ).toHaveAttribute("href", "/tools/calculate");
 
-  await panel.getByRole("button", { name: "Copy schema" }).click();
-  await expect(panel.locator('[data-message="copied"]')).toHaveText(
+  await dialog.getByRole("button", { name: "Copy schema" }).click();
+  await expect(dialog.locator('[data-message="copied"]')).toHaveText(
     "Copied the input schema of version 1.",
   );
   const copied = await page.evaluate(() => navigator.clipboard.readText());
@@ -193,8 +215,50 @@ test("group counts, text filter, side panel and Copy schema", async ({
     await page.request.get("/api/v1/tools/calculate/versions/1")
   ).json();
   expect(JSON.parse(copied)).toEqual(version.input_schema);
+  expect(version.guide.what).toBe(
+    "Computes the sum, mean, minimum or maximum of a list of numbers.",
+  );
   await noViolations(page);
+
+  // Escape, Close and a click on the backdrop each close it, and focus returns to the link.
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(page).not.toHaveURL(/[?&]tool=/);
+  await expect(link).toBeFocused();
+  await link.click();
+  await page
+    .getByRole("dialog", { name: "Calculate" })
+    .getByRole("button", { name: "Close" })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(link).toBeFocused();
+  await link.click();
+  await expect(page.getByRole("dialog", { name: "Calculate" })).toBeVisible();
+  await page.mouse.click(4, 4);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(link).toBeFocused();
 
   await page.goto("/tools/calculate");
   await expect(page.getByRole("heading", { name: "Calculate" })).toBeVisible();
+  await expect(page.locator('[data-guide="what"]')).toBeVisible();
+});
+
+test("a tool's modal opens from its URL and passes axe in both themes", async ({
+  page,
+}) => {
+  for (const theme of ["light", "dark"] as const) {
+    await page.addInitScript(
+      (stored) => window.localStorage.setItem("autobots.theme", stored),
+      theme,
+    );
+    await signedIn(page, "/tools?tool=create_github_issue");
+    const dialog = page.getByRole("dialog", { name: "Create GitHub issue" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('[data-field="repair"]')).toContainText(
+      "Settings → Keys & vars",
+    );
+    await expect(dialog.locator('[data-guide="when"]')).not.toBeEmpty();
+    await expect(page.locator("html")).toHaveClass(new RegExp(theme));
+    await noViolations(page);
+  }
 });

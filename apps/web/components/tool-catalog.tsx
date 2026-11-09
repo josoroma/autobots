@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, IconTile } from "@/components/ui/card";
@@ -313,12 +313,7 @@ export function ToolCatalogPanel() {
           .
         </p>
       </div>
-      <div
-        className={cn(
-          "grid gap-6",
-          selected !== null && "lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]",
-        )}
-      >
+      <div className="grid gap-6">
         <div className="min-w-0 space-y-5">
           {catalog.groups
             .filter((item) => shown.some((tool) => tool.group === item.group))
@@ -421,31 +416,67 @@ export function ToolCatalogPanel() {
             })}
         </div>
         {selected === null ? null : (
-          <aside
-            aria-label="Tool detail"
-            data-panel={selected}
-            className="min-w-0 space-y-3 lg:sticky lg:top-6 lg:self-start"
-          >
-            <div className="flex items-center gap-3 text-[13px]">
-              <Link
-                href={`/tools/${encodeURIComponent(selected)}`}
-                className="underline underline-offset-4"
-              >
-                Open as a page
-              </Link>
-              <Link
-                href={closeHref()}
-                scroll={false}
-                className="text-muted-foreground ml-auto underline underline-offset-4"
-              >
-                Close
-              </Link>
-            </div>
-            <ToolDetail key={selected} toolId={selected} />
-          </aside>
+          <ToolDialog
+            key={selected}
+            toolId={selected}
+            onClosed={() => {
+              router.replace(closeHref(), { scroll: false });
+              // Back to the link that opened it, or the list's first link for a deep link.
+              const opener = document.querySelector<HTMLAnchorElement>(
+                `[data-tool="${CSS.escape(selected)}"] a`,
+              );
+              opener?.focus();
+            }}
+          />
         )}
       </div>
     </div>
+  );
+}
+
+// Decision 0026 G2 and G3: the detail in a native modal dialog, which makes the page behind it inert
+// and traps focus. Escape, Close and a click on the backdrop close it, and the URL keeps ?tool=.
+function ToolDialog({
+  toolId,
+  onClosed,
+}: {
+  toolId: string;
+  onClosed: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const element = dialog.current;
+    if (element !== null && !element.open) element.showModal();
+  }, []);
+  return (
+    <dialog
+      ref={dialog}
+      data-panel={toolId}
+      aria-labelledby="tool-heading"
+      onClose={onClosed}
+      onClick={(event) => {
+        // The content fills the dialog's box, so a click on the dialog itself is the backdrop.
+        if (event.target === event.currentTarget) event.currentTarget.close();
+      }}
+      className="bg-background text-foreground border-border m-auto max-h-[min(92vh,60rem)] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto overscroll-contain rounded-2xl border p-0 shadow-lg backdrop:bg-black/60"
+    >
+      <div className="space-y-3 p-5 sm:p-6">
+        <div className="flex items-center gap-3 text-[13px]">
+          <Link
+            href={`/tools/${encodeURIComponent(toolId)}`}
+            className="underline underline-offset-4"
+          >
+            Open as a page
+          </Link>
+          <form method="dialog" className="ml-auto">
+            <Button type="submit" variant="outline" size="sm">
+              Close
+            </Button>
+          </form>
+        </div>
+        <ToolDetail toolId={toolId} />
+      </div>
+    </dialog>
   );
 }
 
@@ -600,6 +631,30 @@ export function ToolDetail({ toolId }: { toolId: string }) {
             </p>
           )}
         </div>
+        <dl
+          data-field="guide"
+          className="grid gap-3 border-t pt-4 sm:grid-cols-3"
+        >
+          {(
+            [
+              ["What", tool.guide.what],
+              ["When", tool.guide.when],
+              ["Why", tool.guide.why],
+            ] as const
+          ).map(([term, text]) => (
+            <div key={term} className="space-y-1">
+              <dt className="text-muted-foreground text-xs font-semibold tracking-wide">
+                {term}
+              </dt>
+              <dd
+                data-guide={term.toLowerCase()}
+                className="text-[13.5px] leading-relaxed"
+              >
+                {text}
+              </dd>
+            </div>
+          ))}
+        </dl>
         <dl className="grid gap-2 sm:grid-cols-2">
           <Fact icon={Globe} term="Network">
             {tool.network ? "Leaves this Mac" : "Stays on this Mac"}

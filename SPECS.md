@@ -475,12 +475,12 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.19#5 | Add the group Automation and the approval value `by_action` to the catalog's Pydantic contract and the Tools screen's labels, then regenerate OpenAPI and the TypeScript client. | DONE | US-14.19 |
 | US-14.19#6 | Cover the scenarios with unit tests and a disposable database check with no model, including the scan for goal text and inputs. | DONE | US-14.19 |
 | US-14.19#7 | Update the operations runbook (including the owner's `make migrate`) and `CODEBASE.md`. | DONE | US-14.19 |
-| US-14.20 | Tool guide, shown in a modal on the Tools page | READY | EPIC-14 |
-| US-14.20#1 | Add a guide with what, when and why texts to every registered tool and every planned descriptor, `cronjob` included, and expose it as `guide` in the catalog's Pydantic contract. Regenerate OpenAPI and the TypeScript client. | TODO | US-14.20 |
-| US-14.20#2 | Add a test that fails, naming the tool, when a tool's guide is missing or has an empty text. | TODO | US-14.20 |
-| US-14.20#3 | Replace the Tools page's side panel with a native `dialog` modal labelled by the tool's title. Keep `?tool=<id>`, Granted to, Copy schema and the link to `/tools/{tool_id}`. Close it on Escape, Close and an outside click, returning focus to the tool's link. | TODO | US-14.20 |
-| US-14.20#4 | Update the browser suites for the Tools page and Granted to, with axe in both themes. | TODO | US-14.20 |
-| US-14.20#5 | Update `CODEBASE.md`. | TODO | US-14.20 |
+| US-14.20 | Tool guide, shown in a modal on the Tools page | DONE | EPIC-14 |
+| US-14.20#1 | Add a guide with what, when and why texts to every registered tool and every planned descriptor, `cronjob` included, and expose it as `guide` in the catalog's Pydantic contract. Regenerate OpenAPI and the TypeScript client. | DONE | US-14.20 |
+| US-14.20#2 | Add a test that fails, naming the tool, when a tool's guide is missing or has an empty text. | DONE | US-14.20 |
+| US-14.20#3 | Replace the Tools page's side panel with a native `dialog` modal labelled by the tool's title. Keep `?tool=<id>`, Granted to, Copy schema and the link to `/tools/{tool_id}`. Close it on Escape, Close and an outside click, returning focus to the tool's link. | DONE | US-14.20 |
+| US-14.20#4 | Update the browser suites for the Tools page and Granted to, with axe in both themes. | DONE | US-14.20 |
+| US-14.20#5 | Update `CODEBASE.md`. | DONE | US-14.20 |
 | EPIC-15 | Studio product surfaces | — | — |
 | US-15.1 | Sidebar groups with Tools under Build | DONE | EPIC-15 |
 | US-15.1#1 | Regroup the sidebar's links in the web shell, keeping link names, roles and data hooks. | DONE | US-15.1 |
@@ -6446,7 +6446,8 @@ Open Questions:
 
 ### US-14.20: Tool guide, shown in a modal on the Tools page
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-14-20-tool-guide-shown-modal/`
 
 As a workspace member
 I want every tool to say what it does, when to use it and why it's useful, and choosing a tool on the Tools page to open a modal with that guide and its inputs and outputs
@@ -6507,11 +6508,11 @@ Dependencies:
 - US-14.19
 
 Tasks:
-- [ ] Add a guide with what, when and why texts to every registered tool and every planned descriptor, `cronjob` included, and expose it as `guide` in the catalog's Pydantic contract. Regenerate OpenAPI and the TypeScript client.
-- [ ] Add a test that fails, naming the tool, when a tool's guide is missing or has an empty text.
-- [ ] Replace the Tools page's side panel with a native `dialog` modal labelled by the tool's title. Keep `?tool=<id>`, Granted to, Copy schema and the link to `/tools/{tool_id}`. Close it on Escape, Close and an outside click, returning focus to the tool's link.
-- [ ] Update the browser suites for the Tools page and Granted to, with axe in both themes.
-- [ ] Update `CODEBASE.md`.
+- [x] Add a guide with what, when and why texts to every registered tool and every planned descriptor, `cronjob` included, and expose it as `guide` in the catalog's Pydantic contract. Regenerate OpenAPI and the TypeScript client.
+- [x] Add a test that fails, naming the tool, when a tool's guide is missing or has an empty text.
+- [x] Replace the Tools page's side panel with a native `dialog` modal labelled by the tool's title. Keep `?tool=<id>`, Granted to, Copy schema and the link to `/tools/{tool_id}`. Close it on Escape, Close and an outside click, returning focus to the tool's link.
+- [x] Update the browser suites for the Tools page and Granted to, with axe in both themes.
+- [x] Update `CODEBASE.md`.
 
 Open Questions:
 - None.

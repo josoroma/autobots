@@ -22,6 +22,7 @@ from autobots.contracts.tools import (
     ToolCatalog,
     ToolDescriptor,
     ToolGroupDescriptor,
+    ToolGuideView,
     ToolLimits,
 )
 from autobots.domain.tool_catalog import (
@@ -34,6 +35,7 @@ from autobots.domain.tool_catalog import (
     grant_sites,
     key_availability,
 )
+from autobots.domain.tool_guides import TOOL_GUIDES
 from autobots.domain.tools import OperationClass
 
 _SCHEMA_KEYS = (
@@ -135,6 +137,34 @@ def _key_source(
     return "settings" if "settings" in found else "environment"
 
 
+class MissingGuide(LookupError):
+    """TG-01: every tool needs a guide. Raised with the tool's id, so a test names it."""
+
+
+NOT_DESCRIBED = "Not described yet."
+
+
+def has_guide(tool_id: str) -> bool:
+    found = TOOL_GUIDES.get(tool_id)
+    return found is not None and all(text.strip() for text in (found.what, found.when, found.why))
+
+
+def require_guides(tool_ids: Iterable[str]) -> None:
+    """TG-01's test: raises naming the first tool without a full guide."""
+    for tool_id in tool_ids:
+        if not has_guide(tool_id):
+            raise MissingGuide(tool_id)
+
+
+def guide_for(tool_id: str) -> ToolGuideView:
+    """A shipped tool always has one, by the test above. A test fixture's tool reads as not yet
+    described, so a fixture never breaks the catalog it is checked through."""
+    if not has_guide(tool_id):
+        return ToolGuideView(what=NOT_DESCRIBED, when=NOT_DESCRIBED, why=NOT_DESCRIBED)
+    found = TOOL_GUIDES[tool_id]
+    return ToolGuideView(what=found.what, when=found.when, why=found.why)
+
+
 def describe(tool: ToolDefinition, environ: Mapping[str, str]) -> ToolDescriptor:
     input_schema = tool.input_model.model_json_schema()
     output_schema = tool.output_model.model_json_schema()
@@ -145,6 +175,7 @@ def describe(tool: ToolDefinition, environ: Mapping[str, str]) -> ToolDescriptor
     )
     return ToolDescriptor(
         tool_id=tool.tool_id,
+        guide=guide_for(tool.tool_id),
         version=tool.version,
         title=tool.title or tool.tool_id,
         description=tool.description,
@@ -194,6 +225,7 @@ def describe_planned(tool: PlannedTool) -> ToolDescriptor:
     empty: dict[str, Any] = {"type": "object", "properties": {}}
     return ToolDescriptor(
         tool_id=tool.tool_id,
+        guide=guide_for(tool.tool_id),
         version=tool.version,
         title=tool.title,
         description=tool.description,

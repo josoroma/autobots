@@ -318,6 +318,16 @@ class ToolLimits(BaseModel):
     max_output_bytes: int
 
 
+class ToolGuideView(BaseModel):
+    """Decision 0026 G1: what a tool does, when to use it and why. Describes, never grants."""
+
+    model_config = STRICT_CONTRACT
+
+    what: str = Field(min_length=1)
+    when: str = Field(min_length=1)
+    why: str = Field(min_length=1)
+
+
 class ToolDescriptor(BaseModel):
     model_config = STRICT_CONTRACT
 
@@ -325,6 +335,7 @@ class ToolDescriptor(BaseModel):
     version: int = Field(ge=1)
     title: str
     description: str
+    guide: ToolGuideView
     group: ToolGroupName
     provider: ToolProviderName
     operation_class: OperationClassName

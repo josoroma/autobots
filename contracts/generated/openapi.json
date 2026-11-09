@@ -5813,6 +5813,9 @@
             "title": "Group",
             "type": "string"
           },
+          "guide": {
+            "$ref": "#/components/schemas/ToolGuideView"
+          },
           "input_schema": {
             "additionalProperties": true,
             "title": "Input Schema",
@@ -5904,6 +5907,7 @@
           "version",
           "title",
           "description",
+          "guide",
           "group",
           "provider",
           "operation_class",
@@ -6007,6 +6011,34 @@
           "tool_ids"
         ],
         "title": "ToolGroupDescriptor",
+        "type": "object"
+      },
+      "ToolGuideView": {
+        "additionalProperties": false,
+        "description": "Decision 0026 G1: what a tool does, when to use it and why. Describes, never grants.",
+        "properties": {
+          "what": {
+            "minLength": 1,
+            "title": "What",
+            "type": "string"
+          },
+          "when": {
+            "minLength": 1,
+            "title": "When",
+            "type": "string"
+          },
+          "why": {
+            "minLength": 1,
+            "title": "Why",
+            "type": "string"
+          }
+        },
+        "required": [
+          "what",
+          "when",
+          "why"
+        ],
+        "title": "ToolGuideView",
         "type": "object"
       },
       "ToolLimits": {

@@ -30,7 +30,7 @@ A cron job here is an existing routine (US-7.1): a schedule that starts an Exper
 
 | # | Choice |
 |---|---|
-| **G1. What, when and why** | Every tool carries a guide with three short texts, and the catalog contract gains a `guide` object with all three:<ul><li>**What** it does.</li><li>**When** to use it.</li><li>**Why** it's useful.</li></ul>The texts describe; they grant nothing, and are never a value or a secret. A tool without a guide fails a test |
+| **G1. What, when and why** | Every tool carries a guide with three short texts, and the catalog contract gains a `guide` object with all three:<ul><li>**What** it does.</li><li>**When** to use it.</li><li>**Why** it's useful.</li></ul>The texts describe; they grant nothing, and are never a value or a secret. A shipped tool without a guide fails a test. A test fixture's tool, which ships nowhere, reads "Not described yet.", so it never breaks the catalog it is checked through |
 | **G2. Modal** | On the Tools page, choosing a tool opens a modal dialog. It shows the tool's title, availability and repair, then What, When and Why, then its inputs and outputs, each with name, type, required and whether it is shown in records. It replaces the side panel. The modal keeps everything the panel had: its URL (`?tool=<id>`), Granted to, Copy schema and the link to the full detail page. Escape, the Close button and a click outside close it, and focus returns to the tool's link |
 | **G3. Accessibility** | A native `dialog` element, labelled by the tool's title. The focus trap is the browser's. It passes axe in both themes |
 

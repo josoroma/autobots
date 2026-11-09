@@ -279,7 +279,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
     - the provider tools above.
   - `browse_goal` (`application/browsing_tool.py`) is registered only while `AUTOBOTS_BROWSER_EXECUTOR=enabled` and the executor's qualification is current. It is approved on every call and runs the read-only loop in `browsing_loop.py` on the `researcher` route.
   - Every gateway dispatch writes a `tool_uses` row, and the API serves `GET /v1/runs/{id}/tool-uses`.
-  - `/v1/tools/{id}/grants` lists the Experts and published workflows using a tool. The Tools page has group counts, a filter, and a side panel with Granted to and Copy schema.
+  - `/v1/tools/{id}/grants` lists the Experts and published workflows using a tool. The Tools page has group counts and a filter. Since US-14.20, after the analyzed revision, choosing a tool opens a native `dialog` modal (`components/tool-catalog.tsx` `ToolDialog`). It holds each tool's What, When and Why guide (`domain/tool_guides.py`, exposed as the descriptor's `guide`), its inputs and outputs, Granted to and Copy schema.
 - **Approvals:** `/v1/approvals` lists pending or decided requests with goal, task, decider and argument size. The screen pairs a list with the selected request's detail (JSON or Fields view, a PR diff from `review_detail`), and decides with ⌘↵ or ⌘⌫ pressed twice.
 - **Experts:**
   - Cards show the executor's profile, tools with "+N", `run_count` and `last_run_at`, an approval note, and Start run.
