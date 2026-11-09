@@ -117,13 +117,13 @@ test("unavailable tools say so in words, with their repair", async ({
     const github = page.locator(`[data-tool="${id}"]`);
     await expect(github).toContainText("Unavailable: key not set");
     await expect(github.locator('[data-field="repair"]')).toHaveText(
-      "Set GITHUB_REPOSITORY and GITHUB_TOKEN in the worker's environment. The token needs these permissions on that repository only: Issues: read and write, Pull requests: read and write, Contents: read and write, Actions: read, Metadata: read. Then restart the worker and the API.",
+      "Save them in Settings → Keys & vars, or set GITHUB_REPOSITORY and GITHUB_TOKEN in .env. The token needs these permissions on that repository only: Issues: read and write, Pull requests: read and write, Contents: read and write, Actions: read, Metadata: read. After a change to .env, restart the worker and the API.",
     );
   }
   const browse = page.locator('[data-tool="browse_goal"]');
   await expect(browse).toContainText("Unavailable: disabled by policy");
   await expect(browse.locator('[data-field="repair"]')).toHaveText(
-    "Disabled until the isolated browser executor is qualified and turned on. See the operations runbook.",
+    "Disabled until the isolated browser executor is qualified and browsing is turned on in Settings → Keys & vars or .env. See the operations runbook.",
   );
 });
 

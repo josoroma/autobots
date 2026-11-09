@@ -88,7 +88,7 @@ JINA_API_KEY=<for search_web and extract_website_content>
 
 Set them for both the worker and the API, since the API reports availability from its own environment, then restart both. On the persistent install, `make start` passes `TAVILY_API_KEY` and `JINA_API_KEY` from the repository's `.env` to both. It parses the file as data, never sources it, and takes nothing else from it.
 
-By [Decision 0024](../decisions/0024-tool-keys-from-env-and-settings.md), the Tavily and Jina keys can also be saved per workspace at Settings → Tool keys. The order, highest first:
+By [Decision 0024](../decisions/0024-tool-keys-from-env-and-settings.md), the Tavily and Jina keys can also be saved per workspace at Settings → Keys & vars (Settings → Tool keys until [Decision 0025](../decisions/0025-keys-and-vars.md)). The order, highest first:
 1. The workspace's key saved in Settings, sealed with the master key like the OpenRouter key.
 2. The process environment.
 3. The `.env` files under `AUTOBOTS_CONFIG_ROOT`, in MP-03's order.
@@ -130,7 +130,7 @@ docker ps -a --filter label=autobots.browser=1
 AUTOBOTS_BROWSER_EXECUTOR=enabled
 ```
 
-Then restart both. On the persistent install, set it in the repository's `.env`: `make start` passes it to the API and the worker when it is exactly `enabled` ([Decision 0024](../decisions/0024-tool-keys-from-env-and-settings.md) K7), then `make stop && make start`. The Tools screen lists it as available, and an Expert can grant it. Plain goals and workflows can't, and a run with no Expert behind it is refused `expert_grant_required`. Every call waits for a person's approval, which shows its task, start URL, domains and limits, before any container starts. Each step is a paid model call on the run's `researcher` route, admitted against the run's budget, and the call counts as one metered tool call. Unset the variable, or let the qualification go stale, and it is disabled again at the next call.
+Then restart both. A workspace can also save `enabled` or `disabled` at Settings → Keys & vars, which wins over the environment for that workspace ([Decision 0025](../decisions/0025-keys-and-vars.md) V4). On the persistent install, set it in the repository's `.env`: `make start` passes it to the API and the worker when it is exactly `enabled` ([Decision 0024](../decisions/0024-tool-keys-from-env-and-settings.md) K7), then `make stop && make start`. The Tools screen lists it as available, and an Expert can grant it. Plain goals and workflows can't, and a run with no Expert behind it is refused `expert_grant_required`. Every call waits for a person's approval, which shows its task, start URL, domains and limits, before any container starts. Each step is a paid model call on the run's `researcher` route, admitted against the run's budget, and the call counts as one metered tool call. Unset the variable, or let the qualification go stale, and it is disabled again at the next call.
 
 To check it end to end without a model, on a disposable database, against `https://example.com/`:
 
@@ -149,6 +149,13 @@ python3.12 scripts/browse_trial.py --key-file .env
 Its record is `.checks/browse-trial/result.json`. Started again, it refuses before anything starts. A repeat needs the owner's request, given as `--owner-requested-repeat`.
 
 ## The GitHub tools
+
+The repository and token resolve per workspace by [Decision 0025](../decisions/0025-keys-and-vars.md):
+1. The values saved at Settings → Keys & vars (the token sealed, the repository as `owner/name`).
+2. The process environment, where `make start` passes them from `.env`.
+3. The configuration root's `.env` files.
+
+An approved write keeps the repository its approval recorded. If the setting changes before it runs, it is refused `approval_target_changed` and nothing is written. Saving them needs migration 52.
 
 All on one configured repository, by [Decision 0007](../decisions/0007-first-connector-github-issues.md), widened by [Decision 0022](../decisions/0022-studio-product-surfaces.md#decision) D6. An owner grants them per Expert, and goals without an Expert don't get them. No tool takes a repository from the model.
 

@@ -20,7 +20,9 @@ import httpx
 
 from autobots.adapters.github_issues import (
     GITHUB_KEY,
-    configured_target,
+    TARGET_PREFIX,
+    approval_target,
+    attempt_target,
     github_client,
     marker,
 )
@@ -111,9 +113,9 @@ def github_pull_request_tool(
             files.append({"path": item.path, "change": change, "diff": diff})
         return {"base_branch": arguments.base, "base_sha": base_sha, "files": files}
 
-    async def review(arguments: GithubOpenPullRequestInput) -> dict[str, Any]:
+    async def review(arguments: GithubOpenPullRequestInput, context: ToolContext) -> dict[str, Any]:
         """Before any approval: reads only, so nothing is written for an unapproved call."""
-        repository, token = configured_target(environ)
+        repository, token = await attempt_target(context, environ)
         async with github_client(token, transport) as http:
             return await detail_against(http, repository, arguments)
 
@@ -184,7 +186,7 @@ def github_pull_request_tool(
     async def open_pull_request(
         arguments: GithubOpenPullRequestInput, context: ToolContext
     ) -> GithubOpenPullRequestOutput:
-        repository, token = configured_target(environ)
+        repository, token = await attempt_target(context, environ)
         approved = await approved_detail(context)
         branch = branch_for(context.operation_id)
         async with github_client(token, transport) as http:
@@ -248,7 +250,7 @@ def github_pull_request_tool(
         _: GithubOpenPullRequestInput, context: ToolContext
     ) -> GithubOpenPullRequestOutput:
         """The branch, then any open pull request from it. Neither means nothing was opened."""
-        repository, token = configured_target(environ)
+        repository, token = await attempt_target(context, environ)
         branch = branch_for(context.operation_id)
         async with github_client(token, transport) as http:
             found = await existing(http, repository, branch)
@@ -258,7 +260,10 @@ def github_pull_request_tool(
 
     def review_target(_arguments: Any) -> str | None:
         repository = environ.get("GITHUB_REPOSITORY", "")
-        return f"GitHub repository {repository}" if repository else None
+        return f"{TARGET_PREFIX}{repository}" if repository else None
+
+    async def resolve_target(arguments: Any, context: ToolContext) -> str:
+        return await approval_target(arguments, context, environ)
 
     return ToolDefinition(
         tool_id=TOOL_ID,
@@ -280,6 +285,7 @@ def github_pull_request_tool(
         reconcile=readback,
         review_detail=review,
         resource_target=review_target,
+        target_resolver=resolve_target,
         timeout_seconds=60.0,
         max_output_bytes=10_000,
         public_input_fields=("title", "base"),

@@ -95,6 +95,8 @@ class Saved:
     """A connection whose workspace saved a Tavily key, and nothing else."""
 
     async def execute(self, query: str, params: Any = None) -> Cursor:
+        if "tool_key_settings" in query:
+            return Cursor([])
         assert "provider_credentials" in query
         return Cursor([("tavily",)])
 
@@ -219,3 +221,111 @@ def test_saving_seals_the_key_and_opens_no_connection(
     ]
     assert len(inserted) == 1 and inserted[0][3] == "tavily"
     assert all("tvly-fixtureSealed0001" not in repr(params) for _, params in connection.writes)
+
+
+class Approvals:
+    """A receipt table and an approval table, as `_target_unchanged` reads them."""
+
+    def __init__(self, receipt: str | None, recorded: str | None) -> None:
+        self.receipt, self.recorded = receipt, recorded
+
+    async def execute(self, query: str, params: Any = None) -> Any:
+        row = (
+            (self.receipt,)
+            if "tool_receipts" in query and self.receipt
+            else ((self.recorded,) if "approval_requests" in query else None)
+        )
+
+        class One:
+            async def fetchone(self) -> Any:
+                return row
+
+        return One()
+
+
+@pytest.mark.parametrize(
+    ("receipt", "recorded", "now", "runs"),
+    [
+        (None, "GitHub repository owner/a", "GitHub repository owner/a", True),
+        (None, "GitHub repository owner/a", "GitHub repository owner/b", False),
+        (None, None, "GitHub repository owner/a", False),
+        (None, "", "GitHub repository owner/a", False),
+        ("failed", "GitHub repository owner/a", "GitHub repository owner/b", False),
+        ("succeeded", "GitHub repository owner/a", "GitHub repository owner/b", True),
+    ],
+)
+def test_an_approved_write_runs_only_against_its_recorded_target(
+    receipt: str | None, recorded: str | None, now: str, runs: bool
+) -> None:
+    """Decision 0025 V7 and V8. An empty recorded target fails closed. One already sent is left
+    to its receipt, and its readback uses the recorded repository."""
+    from autobots.application.tool_gateway import _target_unchanged
+
+    assert asyncio.run(_target_unchanged(Approvals(receipt, recorded), "op", now)) is runs
+
+
+def test_a_write_uses_the_repository_its_approval_recorded() -> None:
+    from autobots.adapters.github_issues import attempt_target
+
+    class Recorded(Approvals):
+        async def execute(self, query: str, params: Any = None) -> Any:
+            if "tool_key_settings" in query or "provider_credentials" in query:
+
+                class Nothing:
+                    async def fetchone(self) -> None:
+                        return None
+
+                return Nothing()
+            return await super().execute(query, params)
+
+    scope = ToolScope(uuid4(), uuid4(), 1, {"create_github_issue": 1})
+    context = ToolContext(Recorded(None, "GitHub repository owner/approved"), scope, "op")
+    environ = {"GITHUB_REPOSITORY": "owner/now", "GITHUB_TOKEN": "github_pat_fixture0001"}
+    assert asyncio.run(attempt_target(context, environ)) == (
+        "owner/approved",
+        "github_pat_fixture0001",
+    )
+
+
+@pytest.mark.parametrize(
+    ("name", "value", "accepted"),
+    [
+        ("github_repository", "owner/name", True),
+        ("github_repository", " owner/name ", True),
+        ("github_repository", "owner", False),
+        ("github_repository", "../owner/name", False),
+        ("github_repository", "https://github.com/owner/name", False),
+        ("browser_executor", "enabled", True),
+        ("browser_executor", "disabled", True),
+        ("browser_executor", "Enabled", False),
+        ("browser_executor", "true", False),
+        ("github_token", "github_pat_fixture0001", True),
+        ("github_token", "short", False),
+    ],
+)
+def test_each_item_has_its_own_check(name: str, value: str, accepted: bool) -> None:
+    from autobots.application.tool_key_settings import checked
+    from autobots.application.tool_keys import ITEMS
+
+    if accepted:
+        assert checked(ITEMS[name], value) == value.strip() or ITEMS[name].secret
+    else:
+        with pytest.raises(InvalidKey):
+            checked(ITEMS[name], value)
+
+
+def test_the_view_holds_values_and_markers_and_a_saved_switch_wins(tmp_path: Path) -> None:
+    class Both:
+        async def execute(self, query: str, params: Any = None) -> Cursor:
+            if "tool_key_settings" in query:
+                return Cursor(
+                    [("browser_executor", "disabled"), ("github_repository", "owner/saved")]
+                )
+            return Cursor([("github",)])
+
+    environ = {"AUTOBOTS_BROWSER_EXECUTOR": "enabled", "GITHUB_REPOSITORY": "owner/env"}
+    view = asyncio.run(key_sources(Both(), uuid4(), environ))
+    assert view["AUTOBOTS_BROWSER_EXECUTOR"] == "disabled"
+    assert view["GITHUB_REPOSITORY"] == "owner/saved"
+    assert view["GITHUB_TOKEN"] == "<settings>"
+    assert view.sources["AUTOBOTS_BROWSER_EXECUTOR"] == "settings"

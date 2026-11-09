@@ -1,12 +1,16 @@
-"""Where the Tavily and Jina keys come from, Decision 0024 and PRD-Tool-Catalog PK-04 to PK-06.
+"""Settings → Keys & vars: where each key and value comes from, Decisions 0024 and 0025.
 
-Highest first: the workspace's key saved in Settings, the process environment, then the `.env`
-files under the configuration root in MP-03's order. The first non-blank value wins. A call resolves
-its key inside the attempt (PK-01), so a change applies to the next call without a restart.
-Availability needs only where a key comes from, so it never unseals one.
+Five items, per workspace: the Tavily key, the Jina key and the GitHub token, which are secrets, and
+the GitHub repository and the browsing switch, which aren't. Highest first: the value saved in
+Settings, the process environment, then the `.env` files under the configuration root in MP-03's
+order. The first non-blank value wins. A call resolves its item inside the attempt (PK-01), so a
+change applies to the next call without a restart. Availability needs only where a secret comes
+from, so it never unseals one.
 """
 
+import re
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -20,11 +24,38 @@ from autobots.application.credentials.store import (
 )
 from autobots.domain.tool_catalog import KeyRequirement
 
-# The providers a workspace may save a key for, and the variable each is read from otherwise.
-TOOL_KEY_PROVIDERS: dict[str, str] = {"tavily": "TAVILY_API_KEY", "jina": "JINA_API_KEY"}
 SETTINGS = "settings"
 ENVIRONMENT = "environment"
 DEFAULT_KEY_FILE = "Library/Application Support/Autobots/secrets/provider-master.key"
+REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+SWITCH_VALUES = ("enabled", "disabled")
+
+
+@dataclass(frozen=True)
+class Item:
+    name: str
+    variable: str
+    # The sealed credential's provider for a secret, and None for a value that isn't secret.
+    credential: str | None
+
+    @property
+    def secret(self) -> bool:
+        return self.credential is not None
+
+
+ITEMS: dict[str, Item] = {
+    item.name: item
+    for item in (
+        Item("tavily", "TAVILY_API_KEY", "tavily"),
+        Item("jina", "JINA_API_KEY", "jina"),
+        Item("github_token", "GITHUB_TOKEN", "github"),
+        Item("github_repository", "GITHUB_REPOSITORY", None),
+        Item("browser_executor", "AUTOBOTS_BROWSER_EXECUTOR", None),
+    )
+}
+BY_CREDENTIAL = {item.credential: item for item in ITEMS.values() if item.credential}
+# Kept for the Tavily and Jina adapters, whose requirement names the credential.
+TOOL_KEY_PROVIDERS: dict[str, str] = {"tavily": "TAVILY_API_KEY", "jina": "JINA_API_KEY"}
 
 
 class ToolKeyMissing(Exception):
@@ -36,7 +67,7 @@ class ToolKeyMissing(Exception):
 
 
 class ToolKeyUnavailable(Exception):
-    """A saved key exists and can't be unsealed. It never falls through to the environment."""
+    """A saved secret exists and can't be unsealed. It never falls through to the environment."""
 
     def __init__(self, provider: str) -> None:
         super().__init__(f"{provider}_key_unavailable")
@@ -64,26 +95,58 @@ def environment_key(variable: str, environ: Mapping[str, str]) -> str | None:
     return None
 
 
-async def saved_providers(connection: Any, workspace_id: UUID) -> set[str]:
+@dataclass(frozen=True)
+class Saved:
+    """What a workspace saved: which secrets exist, and each value's setting."""
+
+    secrets: frozenset[str]
+    values: Mapping[str, str]
+
+
+async def saved_items(connection: Any, workspace_id: UUID) -> Saved:
     cursor = await connection.execute(
         "select provider from app_private.provider_credentials "
         "where workspace_id = %s and provider = any(%s) and status = 'active'",
-        (workspace_id, list(TOOL_KEY_PROVIDERS)),
+        (workspace_id, list(BY_CREDENTIAL)),
     )
-    return {str(row[0]) for row in await cursor.fetchall()}
+    secrets = frozenset(BY_CREDENTIAL[str(row[0])].name for row in await cursor.fetchall())
+    cursor = await connection.execute(
+        "select provider, value from app_private.tool_key_settings "
+        "where workspace_id = %s and value is not null",
+        (workspace_id,),
+    )
+    values = {str(row[0]): str(row[1]) for row in await cursor.fetchall()}
+    return Saved(secrets, values)
+
+
+async def saved_providers(connection: Any, workspace_id: UUID) -> set[str]:
+    """The Tavily and Jina providers this workspace saved a key for (US-14.17)."""
+    saved = await saved_items(connection, workspace_id)
+    return {name for name in saved.secrets if name in TOOL_KEY_PROVIDERS}
+
+
+def resolve_item(
+    item: Item, saved: Saved, environ: Mapping[str, str]
+) -> tuple[str | None, str | None]:
+    """(source, value). A secret's value is never returned: it is unsealed only for a call."""
+    if item.secret:
+        if item.name in saved.secrets:
+            return SETTINGS, None
+        return (ENVIRONMENT, None) if environment_key(item.variable, environ) else (None, None)
+    if item.name in saved.values:
+        return SETTINGS, saved.values[item.name]
+    value = environment_key(item.variable, environ)
+    return (ENVIRONMENT, value) if value is not None else (None, None)
 
 
 def key_source(provider: str, saved: set[str], environ: Mapping[str, str]) -> str | None:
-    if provider in saved:
-        return SETTINGS
-    if environment_key(TOOL_KEY_PROVIDERS[provider], environ) is not None:
-        return ENVIRONMENT
-    return None
+    return resolve_item(ITEMS[provider], Saved(frozenset(saved), {}), environ)[0]
 
 
 class KeySources(dict[str, str]):
-    """An environment for availability only. Each tool-key variable holds a marker, never a value,
-    so it can't be handed to an adapter by mistake, and `sources` says where the key comes from."""
+    """An environment for availability only. A secret's variable holds a marker, never a value, so
+    it can't reach an adapter by mistake. A value's variable holds its resolved value, which isn't
+    secret. `sources` says where each item comes from."""
 
     sources: dict[str, str]
 
@@ -91,17 +154,31 @@ class KeySources(dict[str, str]):
 async def key_sources(
     connection: Any, workspace_id: UUID, environ: Mapping[str, str]
 ) -> KeySources:
-    """The workspace's view of the variables key requirements name, in PK-04's order."""
-    saved = await saved_providers(connection, workspace_id)
+    """The workspace's view of every Keys & vars item, in PK-04's order."""
+    saved = await saved_items(connection, workspace_id)
     view = KeySources(environ)
     view.sources = {}
-    for provider, variable in TOOL_KEY_PROVIDERS.items():
-        source = key_source(provider, saved, environ)
-        view.pop(variable, None)
+    for item in ITEMS.values():
+        source, value = resolve_item(item, saved, environ)
+        view.pop(item.variable, None)
         if source is not None:
-            view[variable] = f"<{source}>"
-            view.sources[variable] = source
+            view[item.variable] = f"<{source}>" if item.secret else str(value)
+            view.sources[item.variable] = source
     return view
+
+
+async def _saved_secret(
+    connection: Any, workspace_id: UUID, item: Item, environ: Mapping[str, str]
+) -> str | None:
+    assert item.credential is not None
+    store = ProviderCredentialStore(connection, master_key_file(environ), item.credential)
+    try:
+        resolved = await store.load_active(workspace_id)
+    except CredentialMissing:
+        return None
+    except (CredentialStorageUnavailable, CredentialDecryptionError):
+        raise ToolKeyUnavailable(item.credential) from None
+    return resolved.client_secret().get_secret_value()
 
 
 async def resolve_tool_key(
@@ -111,16 +188,48 @@ async def resolve_tool_key(
     provider = requirement.credential
     variable = requirement.variables[0]
     if provider in TOOL_KEY_PROVIDERS and connection is not None:
-        store = ProviderCredentialStore(connection, master_key_file(environ), provider)
-        try:
-            resolved = await store.load_active(workspace_id)
-        except CredentialMissing:
-            pass
-        except (CredentialStorageUnavailable, CredentialDecryptionError):
-            raise ToolKeyUnavailable(provider) from None
-        else:
-            return resolved.client_secret().get_secret_value()
+        saved = await _saved_secret(connection, workspace_id, ITEMS[provider], environ)
+        if saved is not None:
+            return saved
     value = environment_key(variable, environ)
     if value is None:
         raise ToolKeyMissing(provider)
     return value
+
+
+async def resolve_value(
+    connection: Any, workspace_id: UUID | None, name: str, environ: Mapping[str, str]
+) -> str | None:
+    """One attempt's value for an item that isn't secret, by PK-07's order."""
+    item = ITEMS[name]
+    if connection is not None and workspace_id is not None:
+        cursor = await connection.execute(
+            "select value from app_private.tool_key_settings "
+            "where workspace_id = %s and provider = %s and value is not null",
+            (workspace_id, item.name),
+        )
+        row = await cursor.fetchone()
+        if row is not None:
+            return str(row[0])
+    return environment_key(item.variable, environ)
+
+
+async def github_repository(
+    connection: Any, workspace_id: UUID | None, environ: Mapping[str, str]
+) -> str | None:
+    """The workspace's repository, or None when it isn't a valid `owner/name`."""
+    repository = await resolve_value(connection, workspace_id, "github_repository", environ)
+    return repository if repository and REPOSITORY.fullmatch(repository) else None
+
+
+async def github_target(
+    connection: Any, workspace_id: UUID | None, environ: Mapping[str, str]
+) -> tuple[str | None, str | None]:
+    """(repository, token) for one attempt, by PK-07's order. Either is None when not configured."""
+    repository = await github_repository(connection, workspace_id, environ)
+    token = None
+    if connection is not None and workspace_id is not None:
+        token = await _saved_secret(connection, workspace_id, ITEMS["github_token"], environ)
+    if token is None:
+        token = environment_key("GITHUB_TOKEN", environ)
+    return repository, token

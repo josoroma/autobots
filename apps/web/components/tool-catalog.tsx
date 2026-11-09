@@ -72,7 +72,7 @@ export const AVAILABILITY: Record<string, string> = {
 
 const AVAILABILITY_FILTERS = ["available", "key_missing", "disabled_by_policy"];
 
-// Decision 0024: these keys can also be saved per workspace in Settings → Tool keys.
+// Decisions 0024 and 0025: these keys can also be saved per workspace in Settings → Keys & vars.
 const SAVABLE_KEYS: Record<string, string> = { tavily: "Tavily", jina: "Jina" };
 
 // PK-05: where an available tool's key comes from, never the key.
@@ -81,7 +81,7 @@ export function keySource(tool: ToolDescriptor): string | null {
   if (!requirement) return null;
   const names = requirement.variables.join(", ");
   if (requirement.source === "settings") {
-    return "Key saved in Settings → Tool keys for this workspace";
+    return "Key saved in Settings → Keys & vars for this workspace";
   }
   if (requirement.source === "environment") {
     return `${names}, from the server environment or .env`;
@@ -94,17 +94,17 @@ export function repair(tool: ToolDescriptor): string | null {
     const names = tool.key_requirement.variables.join(" and ");
     const savable = SAVABLE_KEYS[tool.key_requirement.credential];
     if (savable !== undefined) {
-      return `Save a ${savable} key in Settings → Tool keys, or set ${names} in .env, then restart the worker and the API.`;
+      return `Save a ${savable} key in Settings → Keys & vars, or set ${names} in .env, then restart the worker and the API.`;
     }
     // PRD-Studio GH-07: names and permissions only, never a value.
     const scopes =
       tool.key_requirement.scopes.length === 0
         ? ""
         : ` The token needs these permissions on that repository only: ${tool.key_requirement.scopes.join(", ")}.`;
-    return `Set ${names} in the worker's environment.${scopes} Then restart the worker and the API.`;
+    return `Save them in Settings → Keys & vars, or set ${names} in .env.${scopes} After a change to .env, restart the worker and the API.`;
   }
   if (tool.availability_reason === "isolated_executor_not_qualified") {
-    return "Disabled until the isolated browser executor is qualified and turned on. See the operations runbook.";
+    return "Disabled until the isolated browser executor is qualified and browsing is turned on in Settings → Keys & vars or .env. See the operations runbook.";
   }
   if (tool.availability === "not_qualified") {
     return "Waits for its provider's qualification.";

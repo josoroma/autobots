@@ -151,7 +151,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
 
 ## Data and Persistence
 
-- **Migrations:** `supabase/migrations/` holds 51 ordered files, from `20261105000001_workspaces.sql` to `20261108000051_tool_provider_keys.sql` (US-14.17's Tavily and Jina providers and `app_private.tool_key_settings`, after the analyzed revision), in the schemas `public`, `app_private` and `agent_runtime`. Since migration 35:
+- **Migrations:** `supabase/migrations/` holds 52 ordered files, from `20261105000001_workspaces.sql` to `20261108000052_keys_and_vars.sql` (US-14.17's Tavily and Jina providers and `app_private.tool_key_settings`, and US-14.18's GitHub provider and saved values, after the analyzed revision), in the schemas `public`, `app_private` and `agent_runtime`. Since migration 35:
 
 | Migration | Change |
 |---|---|
@@ -184,12 +184,12 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
   - credentials, policies, spend limits, idempotency receipts;
   - heartbeats, retention, `installation_holds`.
 - **`agent_runtime`:** LangGraph checkpoints, `adapter_qualifications`, `route_qualifications`.
-- **Schema readiness:** `application/operations.py` checks `REQUIRED_RELATIONS` and `REQUIRED_COLUMNS` (through migration 51), and compares `app_private.applied_migration_count()` with `SHIPPED_MIGRATIONS` in `application/schema_release.py`: fewer is `schema_behind` and blocks, more is `schema_ahead`, degraded and not blocking. A harness test (`tests/harness/test_app_db.py`) and `services/agent/tests/test_schema_release.py` fail unless that record matches `supabase/migrations`. Operations shows "N of M migrations applied" (`lib/schema-value.ts`). Changed by US-16.2, after the analyzed revision.
+- **Schema readiness:** `application/operations.py` checks `REQUIRED_RELATIONS` and `REQUIRED_COLUMNS` (through migration 52), and compares `app_private.applied_migration_count()` with `SHIPPED_MIGRATIONS` in `application/schema_release.py`: fewer is `schema_behind` and blocks, more is `schema_ahead`, degraded and not blocking. A harness test (`tests/harness/test_app_db.py`) and `services/agent/tests/test_schema_release.py` fail unless that record matches `supabase/migrations`. Operations shows "N of M migrations applied" (`lib/schema-value.ts`). Changed by US-16.2, after the analyzed revision.
 - **Install-only schema:** `autobots_install` holds the install's identity and applied-migration digests (`scripts/persistent_install.py`).
 - **Ephemeral channel:** Postgres `NOTIFY autobots_result_text`. Nothing is stored.
 - **Objects and files:**
   - Artifacts live in private Supabase Storage (`adapters/object_storage.py`).
-  - Provider keys are sealed with AES-256-GCM under a master key file (`application/credentials/`). Since US-14.17, after the analyzed revision, the same store also holds a workspace's Tavily and Jina keys, saved at Settings → Tool keys (`application/tool_key_settings.py`).
+  - Provider keys are sealed with AES-256-GCM under a master key file (`application/credentials/`). Since US-14.17, after the analyzed revision, the same store also holds a workspace's Tavily and Jina keys, and, since US-14.18, the GitHub token, saved at Settings → Keys & vars (`application/tool_key_settings.py`). The GitHub repository and the browsing switch are saved there too, as plain values in `app_private.tool_key_settings.value`.
   - Backups are cold and encrypted, with a signed manifest, and restore only into a new held disposable project.
   - The shared ledger is `.checks/decision-0009/ledger.json` (ignored).
   - The install's record, secrets and logs are at `~/.local/share/autobots-install` (Makefile `INSTALL_DIR`). This analysis did not read them.
@@ -214,7 +214,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
 - **Tavily** (`adapters/tavily.py`): `tavily_search`, `tavily_extract`, `tavily_map`, `tavily_crawl`. Read-only, metered, with Tavily's inference options off.
 - **Jina** (`adapters/jina.py`): `search_web`, `extract_website_content` (reader mode).
 - **Market data** (`adapters/market_data.py`): `market_history` (Yahoo chart endpoint over `httpx`) and `inflation_rates` (World Bank `FP.CPI.TOTL.ZG`), both keyless.
-- **Fetch guard:** `adapters/url_guard.py` admits only `https` URLs whose every DNS answer is global, revalidates up to 3 redirects, and caps size and time. `adapters/provider_http.py` reads a provider key per attempt. For Tavily and Jina, `application/tool_keys.py` resolves it from the run's workspace: the key saved in Settings, then the process environment, then the configuration root's `.env` files (US-14.17, after the analyzed revision). `make start` passes those two keys from the repository's `.env` through `scripts/tool_keys_env.py`.
+- **Fetch guard:** `adapters/url_guard.py` admits only `https` URLs whose every DNS answer is global, revalidates up to 3 redirects, and caps size and time. `adapters/provider_http.py` reads a provider key per attempt. For Tavily and Jina, `application/tool_keys.py` resolves it from the run's workspace: the key saved in Settings, then the process environment, then the configuration root's `.env` files (US-14.17, after the analyzed revision). `make start` passes those two keys, the GitHub pair and an exact `enabled` browsing switch from the repository's `.env` through `scripts/tool_keys_env.py`. Since US-14.18 the GitHub adapters resolve their repository and token the same way, per attempt (`adapters/github_issues.py` `attempt_target`). The gateway refuses an approved write whose target now resolves differently, `approval_target_changed`. The worker binds `browse_goal` only when the run's workspace resolves the switch to `enabled`.
 - **Browser:** `adapters/browser_executor.py` runs one hardened Chromium container per call behind `egress_proxy.py`, which allows only `CONNECT` to named hosts and gates DevTools with a token. `browser_page.py` reads pages over CDP.
 - **Supabase:** Auth, Storage and PostgREST, self-hosted and loopback-bound.
 - **MCP:** `langchain-mcp-adapters` is pinned but not imported under `src/`.

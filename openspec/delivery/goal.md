@@ -7,10 +7,10 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-14.17 |
+| Target | US-14.18 |
 | Kind | story |
 | Focus | - |
-| Status | COMPLETE |
+| Status | ACTIVE |
 | Reason | - |
 | Started | 2026-11-08 |
 | Updated | 2026-11-08 |
@@ -19,16 +19,16 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-14.17 | us-14-17-tool-provider-keys-env | DONE | Tool-provider keys from .env, overridden in Settings |
+| 1 | US-14.18 | us-14-18-settings-keys-vars-github | READY | Settings → Keys & vars, with the GitHub token, repository and browsing switch per workspace |
 
 ## Next Action
 
-Action: complete
-Story: -
-Change: -
+Action: select
+Story: US-14.18
+Change: us-14-18-settings-keys-vars-github
 Owner: main-session
-Command: none — every story in the goal is DONE
-Reason: all 1 story/stories are DONE
+Command: openspec new change us-14-18-settings-keys-vars-github; set US-14.18 to IN PROGRESS with a Change: line
+Reason: US-14.18 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

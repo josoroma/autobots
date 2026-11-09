@@ -30,3 +30,5 @@ Remove the tool and its grant. Saved runs that recorded the tool's version would
 ## Amended
 
 [Decision 0022](0022-studio-product-surfaces.md) D6 and D7 widen this to one configured repository, with four read-only GitHub tools, `labels` on issues, and an approval-gated pull-request connector, all under a fine-grained token for that repository.
+
+[Decision 0025](0025-keys-and-vars.md) lets the workspace owner also save the token, sealed with the master key, and the repository at Settings → Keys & vars. The saved values win over the environment for that workspace. The token is still never stored in plaintext, a checkpoint or evidence, and an approved write is bound to the repository it was approved for (V7, V8).

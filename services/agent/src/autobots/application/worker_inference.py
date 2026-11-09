@@ -5,6 +5,7 @@ rotation reaches the next call without a restart, and no key or client can reach
 """
 
 import logging
+import os
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
@@ -322,14 +323,25 @@ class InferenceSource:
         """`browse_goal`, bound to this run's researcher route, while the executor is qualified."""
         from autobots.application.browsing_tool import BrowsingRuntime, browse_tool, executor_ready
 
-        if self.browser is None or not executor_ready():
+        if self.browser is None:
+            return ()
+        from autobots.application.tool_keys import key_sources
+
+        # Decision 0025 V6: the run's workspace decides, by its saved switch, then the environment.
+        view = await key_sources(connection, lease.workspace_id, os.environ)
+        if not executor_ready(environ=view):
             return ()
         bound = await self.role_route(connection, lease, ModelRole.RESEARCHER)
         if isinstance(bound, str):
             _log_refusal("browsing", UnknownModelProfile(bound))
             return ()
         model, route = bound
-        return (browse_tool(BrowsingRuntime(self.browser, model, route)),)
+        return (
+            browse_tool(
+                BrowsingRuntime(self.browser, model, route),
+                qualified=lambda: executor_ready(environ=view),
+            ),
+        )
 
     async def role_route(
         self, connection: Any, lease: Lease, role: ModelRole

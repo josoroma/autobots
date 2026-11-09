@@ -15,7 +15,7 @@ from urllib.parse import quote
 
 import httpx
 
-from autobots.adapters.github_issues import GITHUB_KEY, configured_target, github_client
+from autobots.adapters.github_issues import GITHUB_KEY, attempt_target, github_client
 from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed
 from autobots.contracts.tools import (
     GithubFailingJob,
@@ -62,8 +62,8 @@ def github_read_tools(
     transport: httpx.AsyncBaseTransport | None = None,
     environ: Mapping[str, str] = os.environ,
 ) -> tuple[ToolDefinition, ...]:
-    async def get(path: str, params: Mapping[str, Any] | None = None) -> Any:
-        repository, token = configured_target(environ)
+    async def get(context: ToolContext, path: str, params: Mapping[str, Any] | None = None) -> Any:
+        repository, token = await attempt_target(context, environ)
         async with github_client(token, transport) as http:
             try:
                 reply = await http.get(path.format(repository=repository), params=params)
@@ -72,7 +72,7 @@ def github_read_tools(
         return _checked(reply)
 
     async def pull_requests(
-        arguments: GithubListPullRequestsInput, _: ToolContext
+        arguments: GithubListPullRequestsInput, context: ToolContext
     ) -> GithubListPullRequestsOutput:
         # GitHub's own states are open and closed. Merged is a closed one with a merge time.
         params: dict[str, Any] = {
@@ -83,7 +83,7 @@ def github_read_tools(
         }
         if arguments.base is not None:
             params["base"] = arguments.base
-        found = await get("/repos/{repository}/pulls", params)
+        found = await get(context, "/repos/{repository}/pulls", params)
         listed = [
             GithubPullRequest(
                 number=int(item["number"]),
@@ -100,7 +100,7 @@ def github_read_tools(
         return GithubListPullRequestsOutput(pull_requests=listed[: arguments.limit])
 
     async def workflow_runs(
-        arguments: GithubListWorkflowRunsInput, _: ToolContext
+        arguments: GithubListWorkflowRunsInput, context: ToolContext
     ) -> GithubListWorkflowRunsOutput:
         params: dict[str, Any] = {"per_page": arguments.limit}
         if arguments.branch is not None:
@@ -114,7 +114,7 @@ def github_read_tools(
             if arguments.workflow is not None
             else "/repos/{repository}/actions/runs"
         )
-        found = (await get(path, params)).get("workflow_runs") or []
+        found = (await get(context, path, params)).get("workflow_runs") or []
         runs = []
         with_jobs = 0
         for item in found[: arguments.limit]:
@@ -122,7 +122,7 @@ def github_read_tools(
             if item.get("conclusion") == "failure" and with_jobs < FAILED_RUNS_WITH_JOBS:
                 with_jobs += 1
                 jobs = (
-                    await get(f"/repos/{{repository}}/actions/runs/{int(item['id'])}/jobs")
+                    await get(context, f"/repos/{{repository}}/actions/runs/{int(item['id'])}/jobs")
                 ).get("jobs") or []
                 failing = [
                     GithubFailingJob(
@@ -149,15 +149,17 @@ def github_read_tools(
         return GithubListWorkflowRunsOutput(runs=runs)
 
     async def search_issues(
-        arguments: GithubSearchIssuesInput, _: ToolContext
+        arguments: GithubSearchIssuesInput, context: ToolContext
     ) -> GithubSearchIssuesOutput:
-        repository, _token = configured_target(environ)
+        repository, _token = await attempt_target(context, environ)
         # The repository is added here, after the model's text, which can't name another one.
         qualifiers = [f"repo:{repository}", "is:issue"]
         if arguments.state is not None:
             qualifiers.append(f"state:{arguments.state}")
         found = await get(
-            "/search/issues", {"q": f"{arguments.query} {' '.join(qualifiers)}", "per_page": 50}
+            context,
+            "/search/issues",
+            {"q": f"{arguments.query} {' '.join(qualifiers)}", "per_page": 50},
         )
         return GithubSearchIssuesOutput(
             issues=[
@@ -172,9 +174,13 @@ def github_read_tools(
             ]
         )
 
-    async def read_file(arguments: GithubReadFileInput, _: ToolContext) -> GithubReadFileOutput:
+    async def read_file(
+        arguments: GithubReadFileInput, context: ToolContext
+    ) -> GithubReadFileOutput:
         params = {"ref": arguments.ref} if arguments.ref is not None else None
-        found = await get(f"/repos/{{repository}}/contents/{quote(arguments.path)}", params)
+        found = await get(
+            context, f"/repos/{{repository}}/contents/{quote(arguments.path)}", params
+        )
         if not isinstance(found, dict) or found.get("type") != "file":
             raise ToolFailed("github_path_not_a_file")
         size = int(found.get("size") or 0)

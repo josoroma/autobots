@@ -78,6 +78,9 @@ class ToolDefinition:
     approval_required: bool = False
     # What a reviewer is told this touches, from the arguments or server configuration.
     resource_target: Callable[[Any], str | None] = lambda _: None
+    # Decision 0025 V7: the target resolved for this call's workspace. When set, it is what the
+    # approval records, and an approved call whose target now resolves differently is refused.
+    target_resolver: Callable[[Any, "ToolContext"], Awaitable[str | None]] | None = None
     # Why policy asks, when this tool has a reason of its own. Never from the model.
     approval_reason: str | None = None
     # What the arguments touch, checked against the scope's path grants.
@@ -99,7 +102,7 @@ class ToolDefinition:
     # Top-level fields a run's screens may show, TU-04. The default shows none.
     # PRD-Studio GH-06: what the reviewer sees beyond the arguments, read before the approval
     # request exists. It may read the destination, never write it.
-    review_detail: Callable[[Any], Awaitable[dict[str, Any]]] | None = None
+    review_detail: Callable[[Any, "ToolContext"], Awaitable[dict[str, Any]]] | None = None
     public_input_fields: tuple[str, ...] = ()
     public_output_fields: tuple[str, ...] = ()
     # AB-02: an `arbitrary_execution` tool exists only while its executor reports qualified.
@@ -203,6 +206,25 @@ def _operation_id(scope: ToolScope, tool: ToolDefinition, parsed: BaseModel) -> 
     place = f"|{scope.instance}" if scope.instance else ""
     identity = f"{scope.run_id}{place}|{tool.tool_id}|{tool.version}|{_hash(parsed)}"
     return hashlib.sha256(identity.encode()).hexdigest()
+
+
+async def _target_unchanged(connection: Any, operation_id: str, target: str | None) -> bool:
+    """Decision 0025 V7 and V8: an approved effect runs only against the target it was approved
+    for, and an empty recorded target fails closed. One already sent, or possibly sent, is left to
+    its receipt and reconciliation, as refusing it would report an effect that happened as not."""
+    cursor = await connection.execute(
+        "select status from app_private.tool_receipts where operation_id = %s", (operation_id,)
+    )
+    receipt = await cursor.fetchone()
+    if receipt is not None and receipt[0] != "failed":
+        return True
+    cursor = await connection.execute(
+        "select resource_target from public.approval_requests "
+        "where operation_id = %s and status = 'approved'",
+        (operation_id,),
+    )
+    row = await cursor.fetchone()
+    return row is not None and bool(row[0]) and row[0] == target
 
 
 async def _has_approval(connection: Any, operation_id: str) -> bool:
@@ -323,12 +345,20 @@ class ToolGateway:
             tool.operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE
         ):
             detail = None
+            reviewing = ToolContext(connection, scope, _operation_id(scope, tool, parsed))
+            target = tool.resource_target(parsed)
+            if tool.target_resolver is not None:
+                try:
+                    target = await tool.target_resolver(parsed, reviewing)
+                except ToolFailed as error:
+                    # Nothing to approve: the destination isn't configured for this workspace.
+                    return _denied(str(error) or "connector_not_configured")
             if tool.review_detail is not None and not await _has_approval(
                 connection, _operation_id(scope, tool, parsed)
             ):
                 try:
                     detail = await asyncio.wait_for(
-                        tool.review_detail(parsed), tool.timeout_seconds
+                        tool.review_detail(parsed, reviewing), tool.timeout_seconds
                     )
                 except ToolFailed as error:
                     return _denied(str(error) or "review_unavailable")
@@ -347,7 +377,7 @@ class ToolGateway:
                 arguments=tool.redact(parsed.model_dump(mode="json")),
                 current_scope_hash=scope_hash(scope.tools, scope.paths),
                 policy_reason=_approval_reason(tool),
-                resource_target=tool.resource_target(parsed),
+                resource_target=target,
                 scope=scope_snapshot(scope.tools, scope.paths),
                 policy_version=APPROVAL_POLICY_VERSION,
                 policy_rule=_approval_rule(tool),
@@ -355,6 +385,10 @@ class ToolGateway:
             )
             if code is not None:
                 return _denied(code)
+            if tool.target_resolver is not None and not await _target_unchanged(
+                connection, _operation_id(scope, tool, parsed), target
+            ):
+                return _denied("approval_target_changed")
         if tool.cost_class is CostClass.METERED_PROVIDER:
             # Decision 0017 Q4: counted per root run tree, before any request leaves. After
             # approval, so a call waiting for a person isn't counted twice.

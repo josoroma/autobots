@@ -2074,6 +2074,98 @@ export const schemas = {
     "title": "JobsChart",
     "type": "object"
   },
+  "KeyOrVar": {
+    "additionalProperties": false,
+    "description": "One Settings \u2192 Keys & vars item for this workspace, PK-07. A secret never carries its value,\nprefix, length or hash. A value carries its resolved value, which isn't secret.",
+    "properties": {
+      "kind": {
+        "enum": [
+          "secret",
+          "value"
+        ],
+        "title": "Kind",
+        "type": "string"
+      },
+      "name": {
+        "enum": [
+          "tavily",
+          "jina",
+          "github_token",
+          "github_repository",
+          "browser_executor"
+        ],
+        "title": "Name",
+        "type": "string"
+      },
+      "source": {
+        "anyOf": [
+          {
+            "enum": [
+              "settings",
+              "environment"
+            ],
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Source"
+      },
+      "value": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Value"
+      },
+      "variable": {
+        "title": "Variable",
+        "type": "string"
+      },
+      "version": {
+        "title": "Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "name",
+      "variable",
+      "kind",
+      "source",
+      "value",
+      "version"
+    ],
+    "title": "KeyOrVar",
+    "type": "object"
+  },
+  "KeyOrVarDraft": {
+    "additionalProperties": false,
+    "description": "Transient. A secret is checked and sealed, and never returned, logged or echoed.",
+    "properties": {
+      "expected_version": {
+        "minimum": 0.0,
+        "title": "Expected Version",
+        "type": "integer"
+      },
+      "value": {
+        "maxLength": 512,
+        "minLength": 1,
+        "title": "Value",
+        "type": "string"
+      }
+    },
+    "required": [
+      "value",
+      "expected_version"
+    ],
+    "title": "KeyOrVarDraft",
+    "type": "object"
+  },
   "KeyRequirementView": {
     "additionalProperties": false,
     "properties": {
@@ -2118,6 +2210,29 @@ export const schemas = {
       "source"
     ],
     "title": "KeyRequirementView",
+    "type": "object"
+  },
+  "KeysAndVars": {
+    "additionalProperties": false,
+    "properties": {
+      "items": {
+        "items": {
+          "$ref": "#/components/schemas/KeyOrVar"
+        },
+        "title": "Items",
+        "type": "array"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "items"
+    ],
+    "title": "KeysAndVars",
     "type": "object"
   },
   "KnowledgeHead": {
@@ -5891,74 +6006,6 @@ export const schemas = {
     "title": "ToolGroupDescriptor",
     "type": "object"
   },
-  "ToolKeyList": {
-    "additionalProperties": false,
-    "properties": {
-      "keys": {
-        "items": {
-          "$ref": "#/components/schemas/ToolKeyStatus"
-        },
-        "title": "Keys",
-        "type": "array"
-      },
-      "schema_version": {
-        "const": 1,
-        "title": "Schema Version",
-        "type": "integer"
-      }
-    },
-    "required": [
-      "schema_version",
-      "keys"
-    ],
-    "title": "ToolKeyList",
-    "type": "object"
-  },
-  "ToolKeyStatus": {
-    "additionalProperties": false,
-    "description": "Where one tool key comes from for this workspace, PK-05. Never a value, prefix, length or\nhash.",
-    "properties": {
-      "provider": {
-        "enum": [
-          "tavily",
-          "jina"
-        ],
-        "title": "Provider",
-        "type": "string"
-      },
-      "source": {
-        "anyOf": [
-          {
-            "enum": [
-              "settings",
-              "environment"
-            ],
-            "type": "string"
-          },
-          {
-            "type": "null"
-          }
-        ],
-        "title": "Source"
-      },
-      "variable": {
-        "title": "Variable",
-        "type": "string"
-      },
-      "version": {
-        "title": "Version",
-        "type": "integer"
-      }
-    },
-    "required": [
-      "provider",
-      "variable",
-      "source",
-      "version"
-    ],
-    "title": "ToolKeyStatus",
-    "type": "object"
-  },
   "ToolLimits": {
     "additionalProperties": false,
     "properties": {
@@ -7863,6 +7910,28 @@ export function parseJobsChart(value: unknown): JobsChart {
   return parseWith(schemas, "JobsChart", value) as JobsChart;
 }
 
+export interface KeyOrVar {
+  kind: "secret" | "value";
+  name: "tavily" | "jina" | "github_token" | "github_repository" | "browser_executor";
+  source: "settings" | "environment" | null;
+  value: string | null;
+  variable: string;
+  version: number;
+}
+
+export function parseKeyOrVar(value: unknown): KeyOrVar {
+  return parseWith(schemas, "KeyOrVar", value) as KeyOrVar;
+}
+
+export interface KeyOrVarDraft {
+  expected_version: number;
+  value: string;
+}
+
+export function parseKeyOrVarDraft(value: unknown): KeyOrVarDraft {
+  return parseWith(schemas, "KeyOrVarDraft", value) as KeyOrVarDraft;
+}
+
 export interface KeyRequirementView {
   credential: string;
   scopes: string[];
@@ -7872,6 +7941,15 @@ export interface KeyRequirementView {
 
 export function parseKeyRequirementView(value: unknown): KeyRequirementView {
   return parseWith(schemas, "KeyRequirementView", value) as KeyRequirementView;
+}
+
+export interface KeysAndVars {
+  items: KeyOrVar[];
+  schema_version: 1;
+}
+
+export function parseKeysAndVars(value: unknown): KeysAndVars {
+  return parseWith(schemas, "KeysAndVars", value) as KeysAndVars;
 }
 
 export interface KnowledgeHead {
@@ -8829,26 +8907,6 @@ export function parseToolGroupDescriptor(value: unknown): ToolGroupDescriptor {
   return parseWith(schemas, "ToolGroupDescriptor", value) as ToolGroupDescriptor;
 }
 
-export interface ToolKeyList {
-  keys: ToolKeyStatus[];
-  schema_version: 1;
-}
-
-export function parseToolKeyList(value: unknown): ToolKeyList {
-  return parseWith(schemas, "ToolKeyList", value) as ToolKeyList;
-}
-
-export interface ToolKeyStatus {
-  provider: "tavily" | "jina";
-  source: "settings" | "environment" | null;
-  variable: string;
-  version: number;
-}
-
-export function parseToolKeyStatus(value: unknown): ToolKeyStatus {
-  return parseWith(schemas, "ToolKeyStatus", value) as ToolKeyStatus;
-}
-
 export interface ToolLimits {
   max_output_bytes: number;
   retries: number;
@@ -9382,6 +9440,18 @@ export async function getWorkSession(options: ClientOptions, session_id: string)
   return parseSessionView(await requestJson(options, "GET", `/v1/sessions/${encodeURIComponent(session_id)}`));
 }
 
+export async function getKeysAndVars(options: ClientOptions): Promise<KeysAndVars> {
+  return parseKeysAndVars(await requestJson(options, "GET", `/v1/settings/keys-and-vars`));
+}
+
+export async function putKeyOrVar(options: ClientOptions, name: string, body: KeyOrVarDraft): Promise<KeysAndVars> {
+  return parseKeysAndVars(await requestJson(options, "PUT", `/v1/settings/keys-and-vars/${encodeURIComponent(name)}`, body));
+}
+
+export async function deleteKeyOrVar(options: ClientOptions, name: string, body: ExpectedVersion): Promise<KeysAndVars> {
+  return parseKeysAndVars(await requestJson(options, "DELETE", `/v1/settings/keys-and-vars/${encodeURIComponent(name)}`, body));
+}
+
 export async function getModelPolicy(options: ClientOptions): Promise<ModelPolicyState> {
   return parseModelPolicyState(await requestJson(options, "GET", `/v1/settings/model-policy`));
 }
@@ -9408,18 +9478,6 @@ export async function deleteOpenRouterCredential(options: ClientOptions, body: E
 
 export async function validateOpenRouter(options: ClientOptions): Promise<ProviderStatus> {
   return parseProviderStatus(await requestJson(options, "POST", `/v1/settings/model-providers/openrouter/validate`));
-}
-
-export async function getToolKeys(options: ClientOptions): Promise<ToolKeyList> {
-  return parseToolKeyList(await requestJson(options, "GET", `/v1/settings/tool-keys`));
-}
-
-export async function putToolKey(options: ClientOptions, provider: string, body: CredentialDraft): Promise<ToolKeyList> {
-  return parseToolKeyList(await requestJson(options, "PUT", `/v1/settings/tool-keys/${encodeURIComponent(provider)}`, body));
-}
-
-export async function deleteToolKey(options: ClientOptions, provider: string, body: ExpectedVersion): Promise<ToolKeyList> {
-  return parseToolKeyList(await requestJson(options, "DELETE", `/v1/settings/tool-keys/${encodeURIComponent(provider)}`, body));
 }
 
 export async function listTools(options: ClientOptions): Promise<ToolCatalog> {

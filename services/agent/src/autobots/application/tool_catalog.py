@@ -56,13 +56,19 @@ async def _never(*_: Any) -> Any:  # pragma: no cover - the catalog never drives
     raise RuntimeError("the catalog registry is for description only")
 
 
-def catalog_registry() -> ToolRegistry:
-    """Every tool any run can be granted, built as the worker builds it, without its resources."""
+def catalog_registry(environ: Mapping[str, str] | None = None) -> ToolRegistry:
+    """Every tool any run can be granted, built as the worker builds it, without its resources.
+
+    `environ` is the workspace's view (Decision 0025 V6), so its browsing switch decides whether
+    `browse_goal` is registered for it. Without one, the process environment decides."""
     delegation = Delegation(drive=_never, limits=RootLimits(), lease_seconds=0.0)
     from autobots.application.browsing_tool import browse_tool, executor_ready
 
     # AB-02: browse_goal is registered, and so described, only while its executor is qualified.
-    browsing = (browse_tool(None),) if executor_ready() else ()
+    ready = executor_ready(environ=environ)
+    browsing = (
+        (browse_tool(None, qualified=lambda: executor_ready(environ=environ)),) if ready else ()
+    )
     return loop_registry(
         RootLimits(),
         object_store=object(),
@@ -212,7 +218,7 @@ def describe_planned(tool: PlannedTool) -> ToolDescriptor:
 def all_descriptors(
     environ: Mapping[str, str], registry: ToolRegistry | None = None
 ) -> list[ToolDescriptor]:
-    registry = registry or catalog_registry()
+    registry = registry or catalog_registry(environ)
     described = [describe(tool, environ) for tool in registry.definitions()]
     registered = {item.tool_id for item in described}
     described += [

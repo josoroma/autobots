@@ -2073,6 +2073,98 @@
         "title": "JobsChart",
         "type": "object"
       },
+      "KeyOrVar": {
+        "additionalProperties": false,
+        "description": "One Settings \u2192 Keys & vars item for this workspace, PK-07. A secret never carries its value,\nprefix, length or hash. A value carries its resolved value, which isn't secret.",
+        "properties": {
+          "kind": {
+            "enum": [
+              "secret",
+              "value"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "enum": [
+              "tavily",
+              "jina",
+              "github_token",
+              "github_repository",
+              "browser_executor"
+            ],
+            "title": "Name",
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "settings",
+                  "environment"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "variable": {
+            "title": "Variable",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "variable",
+          "kind",
+          "source",
+          "value",
+          "version"
+        ],
+        "title": "KeyOrVar",
+        "type": "object"
+      },
+      "KeyOrVarDraft": {
+        "additionalProperties": false,
+        "description": "Transient. A secret is checked and sealed, and never returned, logged or echoed.",
+        "properties": {
+          "expected_version": {
+            "minimum": 0.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "value": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "expected_version"
+        ],
+        "title": "KeyOrVarDraft",
+        "type": "object"
+      },
       "KeyRequirementView": {
         "additionalProperties": false,
         "properties": {
@@ -2117,6 +2209,29 @@
           "source"
         ],
         "title": "KeyRequirementView",
+        "type": "object"
+      },
+      "KeysAndVars": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/KeyOrVar"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "items"
+        ],
+        "title": "KeysAndVars",
         "type": "object"
       },
       "KnowledgeHead": {
@@ -5888,74 +6003,6 @@
           "tool_ids"
         ],
         "title": "ToolGroupDescriptor",
-        "type": "object"
-      },
-      "ToolKeyList": {
-        "additionalProperties": false,
-        "properties": {
-          "keys": {
-            "items": {
-              "$ref": "#/components/schemas/ToolKeyStatus"
-            },
-            "title": "Keys",
-            "type": "array"
-          },
-          "schema_version": {
-            "const": 1,
-            "title": "Schema Version",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "schema_version",
-          "keys"
-        ],
-        "title": "ToolKeyList",
-        "type": "object"
-      },
-      "ToolKeyStatus": {
-        "additionalProperties": false,
-        "description": "Where one tool key comes from for this workspace, PK-05. Never a value, prefix, length or\nhash.",
-        "properties": {
-          "provider": {
-            "enum": [
-              "tavily",
-              "jina"
-            ],
-            "title": "Provider",
-            "type": "string"
-          },
-          "source": {
-            "anyOf": [
-              {
-                "enum": [
-                  "settings",
-                  "environment"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source"
-          },
-          "variable": {
-            "title": "Variable",
-            "type": "string"
-          },
-          "version": {
-            "title": "Version",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "provider",
-          "variable",
-          "source",
-          "version"
-        ],
-        "title": "ToolKeyStatus",
         "type": "object"
       },
       "ToolLimits": {
@@ -11835,6 +11882,294 @@
         "summary": "Read Session"
       }
     },
+    "/v1/settings/keys-and-vars": {
+      "get": {
+        "description": "Every member sees each item's source and a value's value, never a secret (PK-07).",
+        "operationId": "getKeysAndVars",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeysAndVars"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Keys And Vars"
+      }
+    },
+    "/v1/settings/keys-and-vars/{name}": {
+      "delete": {
+        "operationId": "deleteKeyOrVar",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "enum": [
+                "tavily",
+                "jina",
+                "github_token",
+                "github_repository",
+                "browser_executor"
+              ],
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeysAndVars"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Key Or Var"
+      },
+      "put": {
+        "operationId": "putKeyOrVar",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "enum": [
+                "tavily",
+                "jina",
+                "github_token",
+                "github_repository",
+                "browser_executor"
+              ],
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-internal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Internal"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-autobots-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Autobots-Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyOrVarDraft"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeysAndVars"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Key Or Var"
+      }
+    },
     "/v1/settings/model-policy": {
       "get": {
         "description": "What a new run would freeze. No row yet means version 0, naming no workspace default, so\neach role reads its built-in default as admission resolves it (MD-02).",
@@ -12424,288 +12759,6 @@
           }
         },
         "summary": "Validate Credential"
-      }
-    },
-    "/v1/settings/tool-keys": {
-      "get": {
-        "description": "Every member sees where each key comes from, never the key (PK-05).",
-        "operationId": "getToolKeys",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "x-autobots-internal",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Autobots-Internal"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-autobots-workspace",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Autobots-Workspace"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ToolKeyList"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Get Tool Keys"
-      }
-    },
-    "/v1/settings/tool-keys/{provider}": {
-      "delete": {
-        "operationId": "deleteToolKey",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "provider",
-            "required": true,
-            "schema": {
-              "enum": [
-                "tavily",
-                "jina"
-              ],
-              "title": "Provider",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-autobots-internal",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Autobots-Internal"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-autobots-workspace",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Autobots-Workspace"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ExpectedVersion"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ToolKeyList"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Delete Tool Key"
-      },
-      "put": {
-        "operationId": "putToolKey",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "provider",
-            "required": true,
-            "schema": {
-              "enum": [
-                "tavily",
-                "jina"
-              ],
-              "title": "Provider",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-autobots-internal",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Autobots-Internal"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-autobots-workspace",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Autobots-Workspace"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CredentialDraft"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ToolKeyList"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Put Tool Key"
       }
     },
     "/v1/tools": {

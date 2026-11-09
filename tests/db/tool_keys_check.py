@@ -125,7 +125,7 @@ async def main() -> None:
 
         async def sources(workspace: UUID) -> dict[str, tuple[str | None, int]]:
             return {
-                state.provider: (state.source, state.version)
+                state.name: (state.source, state.version)
                 for state in await settings.status(workspace)
             }
 

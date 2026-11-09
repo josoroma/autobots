@@ -27,14 +27,15 @@ from autobots.contracts.models import effective_policy
 from autobots.contracts.settings import (
     CredentialDraft,
     ExpectedVersion,
+    KeyOrVar,
+    KeyOrVarDraft,
+    KeyOrVarName,
+    KeysAndVars,
     ModelList,
     ModelPolicyState,
     ModelPolicyUpdate,
     ProviderStatus,
     RunIntentCheck,
-    ToolKeyList,
-    ToolKeyProvider,
-    ToolKeyStatus,
     budget_range,
 )
 from autobots.domain.models import (
@@ -170,28 +171,41 @@ async def validate_credential(
     return await settings.status(workspace_id)
 
 
-async def tool_key_settings(request: Request) -> AsyncIterator[ToolKeySettings]:
+async def keys_and_vars_settings(request: Request) -> AsyncIterator[ToolKeySettings]:
     pool = request.app.state.pool
     context = request.app.state.provider_context
     if pool is None or context is None:
-        raise ApiError(503, "service_unavailable", "Tool key settings are unavailable.")
+        raise ApiError(503, "service_unavailable", "Keys & vars settings are unavailable.")
     async with pool.connection() as connection:
         yield ToolKeySettings(connection, context.master_key_file, os.environ)
 
 
-ToolKeys = Annotated[ToolKeySettings, Depends(tool_key_settings)]
+KeysAndVarsSettings = Annotated[ToolKeySettings, Depends(keys_and_vars_settings)]
+_KEY_REFUSED = ("invalid_key", "That key was not accepted. The previous key is unchanged.")
+REFUSED_VALUE: dict[str, tuple[str, str]] = {
+    "tavily": _KEY_REFUSED,
+    "jina": _KEY_REFUSED,
+    "github_token": _KEY_REFUSED,
+    "github_repository": ("invalid_value", "Use owner/name. The previous value is unchanged."),
+    "browser_executor": (
+        "invalid_value",
+        "Use enabled or disabled. The previous value is unchanged.",
+    ),
+}
 
 
-async def _tool_keys(keys: ToolKeySettings, workspace_id: UUID) -> ToolKeyList:
-    states = await keys.status(workspace_id)
-    return ToolKeyList(
+async def _keys_and_vars(settings: ToolKeySettings, workspace_id: UUID) -> KeysAndVars:
+    states = await settings.status(workspace_id)
+    return KeysAndVars(
         schema_version=1,
-        keys=[
-            ToolKeyStatus.model_validate(
+        items=[
+            KeyOrVar.model_validate(
                 {
-                    "provider": state.provider,
+                    "name": state.name,
                     "variable": state.variable,
+                    "kind": state.kind,
                     "source": state.source,
+                    "value": state.value,
                     "version": state.version,
                 }
             )
@@ -200,42 +214,47 @@ async def _tool_keys(keys: ToolKeySettings, workspace_id: UUID) -> ToolKeyList:
     )
 
 
-@router.get("/settings/tool-keys", operation_id="getToolKeys", response_model=ToolKeyList)
-async def get_tool_keys(
-    keys: ToolKeys, workspace_id: Annotated[UUID, Depends(current_workspace)]
-) -> ToolKeyList:
-    """Every member sees where each key comes from, never the key (PK-05)."""
-    return await _tool_keys(keys, workspace_id)
+@router.get("/settings/keys-and-vars", operation_id="getKeysAndVars", response_model=KeysAndVars)
+async def get_keys_and_vars(
+    settings: KeysAndVarsSettings, workspace_id: Annotated[UUID, Depends(current_workspace)]
+) -> KeysAndVars:
+    """Every member sees each item's source and a value's value, never a secret (PK-07)."""
+    return await _keys_and_vars(settings, workspace_id)
 
 
-@router.put("/settings/tool-keys/{provider}", operation_id="putToolKey", response_model=ToolKeyList)
-async def put_tool_key(
-    provider: ToolKeyProvider,
-    body: CredentialDraft,
-    keys: ToolKeys,
+@router.put(
+    "/settings/keys-and-vars/{name}", operation_id="putKeyOrVar", response_model=KeysAndVars
+)
+async def put_key_or_var(
+    name: KeyOrVarName,
+    body: KeyOrVarDraft,
+    settings: KeysAndVarsSettings,
     workspace_id: Annotated[UUID, Depends(require_owner)],
-) -> ToolKeyList:
+) -> KeysAndVars:
     try:
-        await keys.save(workspace_id, provider, body.draft_key, body.expected_version)
+        await settings.save(workspace_id, name, body.value, body.expected_version)
+    except InvalidKey:
+        # Fixed text per item, so nothing submitted is echoed back.
+        raise ApiError(422, *REFUSED_VALUE[name]) from None
     except HANDLED as error:
         raise as_api_error(error) from None
-    return await _tool_keys(keys, workspace_id)
+    return await _keys_and_vars(settings, workspace_id)
 
 
 @router.delete(
-    "/settings/tool-keys/{provider}", operation_id="deleteToolKey", response_model=ToolKeyList
+    "/settings/keys-and-vars/{name}", operation_id="deleteKeyOrVar", response_model=KeysAndVars
 )
-async def delete_tool_key(
-    provider: ToolKeyProvider,
+async def delete_key_or_var(
+    name: KeyOrVarName,
     body: ExpectedVersion,
-    keys: ToolKeys,
+    settings: KeysAndVarsSettings,
     workspace_id: Annotated[UUID, Depends(require_owner)],
-) -> ToolKeyList:
+) -> KeysAndVars:
     try:
-        await keys.remove(workspace_id, provider, body.expected_version)
+        await settings.remove(workspace_id, name, body.expected_version)
     except HANDLED as error:
         raise as_api_error(error) from None
-    return await _tool_keys(keys, workspace_id)
+    return await _keys_and_vars(settings, workspace_id)
 
 
 @router.get("/models", operation_id="getModels", response_model=ModelList)

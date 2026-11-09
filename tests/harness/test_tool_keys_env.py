@@ -1,5 +1,5 @@
-"""US-14.17, Decision 0024 K2 and K7 and PK-06: `make start` passes only the Tavily and Jina keys
-and the exact browsing switch, as data.
+"""US-14.17, Decision 0024 K2 and K7 and PK-06: `make start` passes only the Tavily and Jina keys,
+the GitHub repository and token (Decision 0025 V5) and the exact browsing switch, as data.
 
 Runs the Makefile's own TOOL_KEYS and BROWSER_SWITCH lines in a shell, against fixture `.env` files in a temporary
 directory, so nothing reads the repository's real `.env`.
@@ -46,19 +46,22 @@ class ToolKeysEnv(unittest.TestCase):
             self.assertNotIn('AUTOBOTS_BROWSER_EXECUTOR', env, value)
             self.assertEqual(sorted(path.name for path in work.iterdir()), ['.env'])
 
-    def test_only_the_two_keys_are_passed_and_shell_syntax_stays_data(self):
+    def test_only_the_listed_variables_are_passed_and_shell_syntax_stays_data(self):
         hostile = "tvly-fixture$(touch pwned)`touch pwned2`'\"; touch pwned3"
-        env, work = launch_env(f"TAVILY_API_KEY='{hostile}'\nJINA_API_KEY=jina_fixtureOnly0001\nOPENROUTER_API_KEY=sk-or-fixture\nOTHER=1\n")
+        env, work = launch_env(f"TAVILY_API_KEY='{hostile}'\nJINA_API_KEY=jina_fixtureOnly0001\nOPENROUTER_API_KEY=sk-or-fixture\nOTHER=1\n"
+                               "GITHUB_REPOSITORY=owner/throwaway\nGITHUB_TOKEN='github_pat_fixture; touch pwned4'\n")
         self.assertEqual(env.get('TAVILY_API_KEY'), hostile.strip("'"))
         self.assertEqual(env.get('JINA_API_KEY'), 'jina_fixtureOnly0001')
+        self.assertEqual(env.get('GITHUB_REPOSITORY'), 'owner/throwaway')
+        self.assertEqual(env.get('GITHUB_TOKEN'), 'github_pat_fixture; touch pwned4')
         self.assertNotIn('OPENROUTER_API_KEY', env)
         self.assertNotIn('OTHER', env)
         self.assertEqual(sorted(path.name for path in work.iterdir()), ['.env'])
 
     def test_blank_keys_and_a_missing_file_pass_nothing(self):
-        env, _ = launch_env('TAVILY_API_KEY=\nJINA_API_KEY=   \n')
-        self.assertNotIn('TAVILY_API_KEY', env)
-        self.assertNotIn('JINA_API_KEY', env)
+        env, _ = launch_env('TAVILY_API_KEY=\nJINA_API_KEY=   \nGITHUB_REPOSITORY=\nGITHUB_TOKEN= \n')
+        for name in ('TAVILY_API_KEY', 'JINA_API_KEY', 'GITHUB_REPOSITORY', 'GITHUB_TOKEN'):
+            self.assertNotIn(name, env)
         missing = subprocess.run([sys.executable, str(SCRIPT), '/nonexistent/.env'], capture_output=True, text=True, check=False)
         self.assertEqual((missing.returncode, missing.stdout, missing.stderr), (0, '', ''))
 

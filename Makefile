@@ -106,9 +106,10 @@ strays_web    = lsof -nP -t -iTCP:$(WEB_PORT) -sTCP:LISTEN 2>/dev/null
 strays_worker = pgrep -f 'autobots[.]operations[.]worker' 2>/dev/null | grep -vx "$$$$"
 stray_pids    = held="$$($(strays_$(1)) | tr '\n' ' ' | sed 's/ *$$//')"
 
-# Decision 0024 K2: the Tavily and Jina keys from this repository's .env, for the API and the worker.
-# The script parses the file as data and prints only those two names, shell-quoted, so evaluating its
-# output runs nothing from the file. A blank or missing key prints nothing.
+# Decisions 0024 K2 and 0025 V5: the Tavily and Jina keys and the GitHub repository and token from
+# this repository's .env, for the API and the worker. The script parses the file as data and prints
+# only those four names, shell-quoted, so evaluating its output runs nothing from the file. A blank or
+# missing value prints nothing. A value saved at Settings → Keys & vars still wins for its workspace.
 TOOL_KEYS := eval "$$($(PY) scripts/tool_keys_env.py .env)";
 # Decision 0024 K7: AUTOBOTS_BROWSER_EXECUTOR=enabled from the same .env, and nothing but that exact
 # value. browse_goal still needs a passing executor qualification at the current code.

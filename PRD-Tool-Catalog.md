@@ -27,7 +27,7 @@ Everything in PRD §9 still applies: grants pin versions, discovery never grants
 
 **TS-02.** `/tools/{tool_id}` shows the description, limits, approval, the key requirement by variable name, and two field tables, inputs and outputs, each with path, type, required, constraints, description and whether the field appears on run screens. The raw JSON Schema sits in a disclosure. Every registered version is listed.
 
-**TS-03.** An unavailable tool shows its reason and its repair, such as "Save a Tavily key in Settings → Tool keys, or set `TAVILY_API_KEY` in `.env` and restart", or "Disabled until an isolated executor is qualified". An available tool that needs a key shows where its key comes from (PK-05).
+**TS-03.** An unavailable tool shows its reason and its repair, such as "Save a Tavily key in Settings → Keys & vars, or set `TAVILY_API_KEY` in `.env` and restart", or "Disabled until an isolated executor is qualified". An available tool that needs a key shows where its key comes from (PK-05).
 
 **TS-04.** The Expert editor picks tools from the same catalog, singly or by group, shows the expansion before saving, and refuses unavailable tools.
 
@@ -63,7 +63,7 @@ Everything in PRD §9 still applies: grants pin versions, discovery never grants
 |---|---|
 | `TAVILY_API_KEY` | `tavily_search`, `tavily_extract`, `tavily_map`, `tavily_crawl` |
 | `JINA_API_KEY` | `search_web`, `extract_website_content` |
-| `GITHUB_REPOSITORY`, `GITHUB_TOKEN` | `create_github_issue` (Decision 0007, names by the owner's rename) |
+| `GITHUB_REPOSITORY`, `GITHUB_TOKEN` | `create_github_issue` and the GitHub tools of PRD-Studio (Decision 0007, names by the owner's rename; PK-07 for Settings) |
 
 **PK-02.** A missing key makes only that provider's tools `key_missing`. A run or Expert that grants an unavailable tool is refused at admission or save with a typed code; other runs are unaffected.
 
@@ -71,9 +71,17 @@ Everything in PRD §9 still applies: grants pin versions, discovery never grants
 
 **PK-04.** By [Decision 0024](docs/engineering/decisions/0024-tool-keys-from-env-and-settings.md), the Tavily and Jina keys resolve in this order, highest first: the workspace's key saved in Settings, then the process environment, then the `.env` files under the configuration root in MP-03's file order. The first non-blank value wins. Each call resolves its key inside the attempt from the run's workspace, and availability, admission and save-time checks follow the same order for that workspace.
 
-**PK-05.** Settings → Tool keys lets the workspace owner save, replace or remove a Tavily or Jina key, with an expected version. The value is sealed with the master key like the OpenRouter key, and saving checks its shape only. Members see each key's source (`settings`, `environment` or none), never its value, prefix, length or hash. Removing a saved key falls back to the environment.
+**PK-05.** Settings → Tool keys (since PK-07, Settings → Keys & vars) lets the workspace owner save, replace or remove a Tavily or Jina key, with an expected version. The value is sealed with the master key like the OpenRouter key, and saving checks its shape only. Members see each key's source (`settings`, `environment` or none), never its value, prefix, length or hash. Removing a saved key falls back to the environment.
 
 **PK-06.** `make start` passes `TAVILY_API_KEY` and `JINA_API_KEY` from the repository's `.env` to the persistent install's API and worker. It parses the file as data, never sources it, and takes no other variable from it, except that it also passes `AUTOBOTS_BROWSER_EXECUTOR=enabled` when the file sets exactly that value (Decision 0024 K7).
+
+**PK-07.** By [Decision 0025](docs/engineering/decisions/0025-keys-and-vars.md), Settings → Tool keys becomes **Settings → Keys & vars**.
+- **What it holds.** It adds the GitHub token as a third secret. It also holds two values that aren't secret: the GitHub repository (`owner/name`) and the browsing switch (`enabled` or `disabled`).
+- **Order.** All five follow PK-04's order for the workspace, with PK-05's owner-only, versioned save and removal. Members see a value's current value, never a secret.
+- **`make start`.** It also passes `GITHUB_REPOSITORY` and `GITHUB_TOKEN` from `.env`, by PK-06's rules.
+- **Per attempt.** GitHub tools resolve their repository and token per attempt from the run's workspace.
+
+**PK-08.** A GitHub write's approval binds the repository resolved when the approval was requested. If the approved call later resolves a different repository, it is refused `approval_target_changed` before any request, and nothing is written.
 
 ## URL guard
 
@@ -170,4 +178,4 @@ Output: `summary` (labelled third-party, cut to the shared text budget), `visite
 
 **AB-03.** A refused action ends the call at once with `stopped: refused_action`: a navigation outside `allowed_domains`, a typing or submission action, or a request the egress proxy refuses for an action the agent chose. Nothing more is requested and no further model step is taken; the output keeps the summary so far, the URLs visited and the steps used. A page's own subresource the proxy refuses is counted and doesn't end the call (Decision 0018).
 
-**AB-02.** It stays `arbitrary_execution`. The registry admits that class only for a tool whose executor reports qualified. It is granted only through an Expert, every call waits for a person's approval, it counts as one metered call, and each of its steps counts as the run's model spend.
+**AB-02.** It stays `arbitrary_execution`. The registry admits that class only for a tool whose executor reports qualified. The owner's switch is resolved per workspace by PK-07, and a saved `disabled` turns it off for that workspace. It is granted only through an Expert, every call waits for a person's approval, it counts as one metered call, and each of its steps counts as the run's model spend.

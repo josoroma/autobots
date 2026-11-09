@@ -61,12 +61,67 @@ def marker(operation_id: str | None) -> str:
 
 
 def configured_target(environ: Mapping[str, str]) -> tuple[str, str]:
-    """The one repository and the token, read per attempt from server configuration only."""
+    """The one repository and the token from an environment alone, for callers with no workspace."""
     repository = environ.get(REPOSITORY_VARIABLE, "")
     token = environ.get(TOKEN_VARIABLE, "")
     if not token or not _REPOSITORY.fullmatch(repository):
         raise ToolFailed("connector_not_configured")
     return repository, token
+
+
+TARGET_PREFIX = "GitHub repository "
+
+
+async def attempt_target(
+    context: ToolContext | None, environ: Mapping[str, str]
+) -> tuple[str, str]:
+    """This attempt's repository and token, for the run's workspace by Decision 0025's order.
+
+    A write that already has an approval uses the repository that approval recorded (V7), so
+    neither a fresh attempt nor a readback can be pointed at another repository by a changed
+    setting. The gateway refuses a fresh approved call whose repository now resolves differently.
+    """
+    from autobots.application.tool_keys import ToolKeyUnavailable, github_target
+
+    connection = context.connection if context is not None else None
+    workspace = context.scope.workspace_id if context is not None else None
+    try:
+        repository, token = await github_target(connection, workspace, environ)
+    except ToolKeyUnavailable as error:
+        raise ToolFailed(error.code) from None
+    if connection is not None and context is not None and context.operation_id:
+        approved = await approved_repository(connection, context.operation_id)
+        if approved is not None:
+            repository = approved
+    if not token or not repository or not _REPOSITORY.fullmatch(repository):
+        raise ToolFailed("connector_not_configured")
+    return repository, token
+
+
+async def approved_repository(connection: Any, operation_id: str) -> str | None:
+    cursor = await connection.execute(
+        "select resource_target from public.approval_requests "
+        "where operation_id = %s and status = 'approved'",
+        (operation_id,),
+    )
+    row = await cursor.fetchone()
+    target = str(row[0]) if row is not None and row[0] else ""
+    return target.removeprefix(TARGET_PREFIX) if target.startswith(TARGET_PREFIX) else None
+
+
+async def approval_target(_arguments: Any, context: ToolContext, environ: Mapping[str, str]) -> str:
+    """What a GitHub write's approval records: the repository resolved for this workspace now."""
+    from autobots.application.tool_keys import ToolKeyUnavailable, github_target
+
+    try:
+        repository, token = await github_target(
+            context.connection, context.scope.workspace_id, environ
+        )
+    except ToolKeyUnavailable as error:
+        raise ToolFailed(error.code) from None
+    if not token or not repository:
+        raise ToolFailed("connector_not_configured")
+    return f"{TARGET_PREFIX}{repository}"
 
 
 def github_client(token: str, transport: httpx.AsyncBaseTransport | None) -> httpx.AsyncClient:
@@ -99,10 +154,13 @@ def github_issue_tool(
     def review_target(_arguments: Any) -> str | None:
         """Server configuration only, so a reviewer sees where it goes whatever a model asked."""
         repository = environ.get(REPOSITORY_VARIABLE, "")
-        return f"GitHub repository {repository}" if _REPOSITORY.fullmatch(repository) else None
+        return f"{TARGET_PREFIX}{repository}" if _REPOSITORY.fullmatch(repository) else None
 
-    def target() -> tuple[str, str]:
-        return configured_target(environ)
+    async def target(context: ToolContext) -> tuple[str, str]:
+        return await attempt_target(context, environ)
+
+    async def resolve_target(arguments: Any, context: ToolContext) -> str:
+        return await approval_target(arguments, context, environ)
 
     def client(token: str) -> httpx.AsyncClient:
         return github_client(token, transport)
@@ -110,7 +168,7 @@ def github_issue_tool(
     async def create(
         arguments: CreateGithubIssueInput | CreateGithubIssueV2Input, context: ToolContext
     ) -> CreateGithubIssueOutput:
-        repository, token = target()
+        repository, token = await target(context)
         body = f"{arguments.body}\n\n{marker(context.operation_id)}"
         labels = getattr(arguments, "labels", None)
         payload: dict[str, Any] = {"title": arguments.title, "body": body}
@@ -132,7 +190,7 @@ def github_issue_tool(
         _: CreateGithubIssueInput | CreateGithubIssueV2Input, context: ToolContext
     ) -> CreateGithubIssueOutput:
         """Reads the list, which lags less than search, and gives a new issue time to appear."""
-        repository, token = target()
+        repository, token = await target(context)
         expected = marker(context.operation_id)
         async with client(token) as http:
             for wait in (0.0, *settle_seconds):
@@ -177,6 +235,7 @@ def github_issue_tool(
         timeout_seconds=30.0,
         reconcile=readback,
         resource_target=review_target,
+        target_resolver=resolve_target,
     )
 
 

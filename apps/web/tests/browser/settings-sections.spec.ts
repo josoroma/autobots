@@ -40,7 +40,7 @@ async function axe(page: Page): Promise<void> {
   expect(scan.violations).toEqual([]);
 }
 
-test("Settings lists its sections and links to Models, Tool keys and Operations", async ({
+test("Settings lists its sections and links to Models, Keys & vars and Operations", async ({
   page,
 }) => {
   await signIn(page, EMAIL_C, PASSWORD_C);
@@ -59,7 +59,7 @@ test("Settings lists its sections and links to Models, Tool keys and Operations"
   );
   await expect(nav.locator('[data-field="settings-elsewhere"] a')).toHaveText([
     "Models",
-    "Tool keys",
+    "Keys & vars",
     "Operations",
   ]);
   for (const [name, path] of [
@@ -68,7 +68,7 @@ test("Settings lists its sections and links to Models, Tool keys and Operations"
     ["Data on this Mac", "/settings/data"],
     ["Keyboard", "/settings/keyboard"],
     ["Models", "/settings/models"],
-    ["Tool keys", "/settings/tool-keys"],
+    ["Keys & vars", "/settings/keys-and-vars"],
     ["Operations", "/operations"],
   ] as const)
     await expect(nav.getByRole("link", { name, exact: true })).toHaveAttribute(

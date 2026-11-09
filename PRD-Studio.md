@@ -144,7 +144,7 @@ The concepts' sample data is illustrative. Each screen shows only real data.
 
 ## GitHub tools
 
-All of these use one configured repository (`GITHUB_REPOSITORY`) and the worker-environment `GITHUB_TOKEN`, under the TC and TU requirements, the URL guard and fake-transport tests. No input names a repository.
+All of these use one configured repository (`GITHUB_REPOSITORY`) and one `GITHUB_TOKEN`. Both resolve per workspace by [Decision 0025](docs/engineering/decisions/0025-keys-and-vars.md): the value saved at Settings → Keys & vars, then the worker's environment, then `.env`. They apply under the TC and TU requirements, the URL guard and fake-transport tests. No input names a repository.
 
 **GH-01. `github_list_pull_requests`.** Read only. Inputs: state (`open`, `closed` or `merged`), base branch, a since date, and a limit of up to 100. Outputs: number, title, author login, merged time, labels and URL.
 
@@ -164,7 +164,7 @@ All of these use one configured repository (`GITHUB_REPOSITORY`) and the worker-
 - If the base branch's head moved after approval, it stops with `base_moved`, and a new approval is needed (Decision 0022 D15).
 - Merging is not offered.
 
-**GH-07. Keys.** Availability is `key_missing` until both variables are set. The repair names them, the token's scopes, and a restart.
+**GH-07. Keys.** Availability is `key_missing` until both variables are set. The repair names them, the token's scopes, and a restart, or saving them at Settings → Keys & vars (Decision 0025).
 
 ## Seed
 

@@ -99,6 +99,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
   - [US-14.15: Sol profile and route qualification](#us-1415-sol-profile-and-route-qualification)
   - [US-14.16: Live browse trial with Sol](#us-1416-live-browse-trial-with-sol)
   - [US-14.17: Tool-provider keys from .env, overridden in Settings](#us-1417-tool-provider-keys-from-env-overridden-in-settings)
+  - [US-14.18: Settings → Keys & vars, with the GitHub token, repository and browsing switch per workspace](#us-1418-settings--keys--vars-with-the-github-token-repository-and-browsing-switch-per-workspace)
 - [EPIC-15: Studio product surfaces](#epic-15-studio-product-surfaces)
   - [US-15.1: Sidebar groups with Tools under Build](#us-151-sidebar-groups-with-tools-under-build)
   - [US-15.2: Display name, workspace role and account](#us-152-display-name-workspace-role-and-account)
@@ -453,6 +454,17 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.17#7 | Make `make start` parse the repository `.env` as data and pass only `TAVILY_API_KEY` and `JINA_API_KEY` to the API and worker, passing nothing for a blank value. | DONE | US-14.17 |
 | US-14.17#8 | Cover the scenarios with unit tests on fake transports, a disposable database check including the secret scan, the web suite with axe, and a Makefile parsing test. | DONE | US-14.17 |
 | US-14.17#9 | Update the operations runbook (including the owner's `make migrate`, then `make stop && make start`), README, `.env.example` and `CODEBASE.md`. | DONE | US-14.17 |
+| US-14.18 | Settings → Keys & vars, with the GitHub token, repository and browsing switch per workspace | DONE | EPIC-14 |
+| US-14.18#1 | Add migration 52, admitting the GitHub token as a sealed provider credential and storing each workspace's GitHub repository and browsing switch as versioned non-secret values. Update the schema-readiness record, verify on disposable targets only, and leave applying it to the persistent install to the owner. | DONE | US-14.18 |
+| US-14.18#2 | Generalize the resolver to all five items in K1's order per workspace, with each item's source, and the repository and switch values exposed to members. | DONE | US-14.18 |
+| US-14.18#3 | Resolve the GitHub token and repository inside each attempt from the run's workspace in every GitHub adapter, passing the token only to the adapter's HTTP client. | DONE | US-14.18 |
+| US-14.18#4 | Record the resolved repository on each GitHub write's approval request, and refuse with `approval_target_changed` before any request when the approved call resolves a different repository or its recorded target is empty. | DONE | US-14.18 |
+| US-14.18#5 | Resolve the browsing switch per workspace for catalog availability, run and routine admission, Expert save and the worker's per-job binding of `browse_goal`, still requiring an executor that reports qualified. | DONE | US-14.18 |
+| US-14.18#6 | Replace `/v1/settings/tool-keys` with `/v1/settings/keys-and-vars` (owner-only versioned save, replace and remove, the shape, `owner/name` and `enabled`\|`disabled` checks, and members' source and value read), behind the existing session, CSRF and workspace checks. Update the Pydantic contract, and regenerate OpenAPI and the TypeScript client. | DONE | US-14.18 |
+| US-14.18#7 | Rename the web page to `/settings/keys-and-vars` and its nav label to Keys & vars, add the two values' inputs beside the transient secret inputs, remove the former page, and update the Tools page's repair text. | DONE | US-14.18 |
+| US-14.18#8 | Extend `make start` and its `.env` parsing script to pass `GITHUB_REPOSITORY` and `GITHUB_TOKEN` as data, with the existing Tavily, Jina and switch rules. | DONE | US-14.18 |
+| US-14.18#9 | Cover the scenarios with unit tests on fake transports, a disposable database check including the secret scan and the approval binding, the web suite with axe, and the Makefile parsing test. | DONE | US-14.18 |
+| US-14.18#10 | Update the operations runbook (including the owner's `make migrate`, then `make stop && make start`), README, `.env.example` and `CODEBASE.md`. | DONE | US-14.18 |
 | EPIC-15 | Studio product surfaces | — | — |
 | US-15.1 | Sidebar groups with Tools under Build | DONE | EPIC-15 |
 | US-15.1#1 | Regroup the sidebar's links in the web shell, keeping link names, roles and data hooks. | DONE | US-15.1 |
@@ -713,6 +725,7 @@ flowchart TD
     US_14_15["US-14.15: Sol profile and route qualification"]
     US_14_16["US-14.16: Live browse trial with Sol"]
     US_14_17["US-14.17: Tool-provider keys from .env, overridden in Settings"]
+    US_14_18["US-14.18: Settings → Keys &amp; vars, with the GitHub token, repository and browsing switch per workspace"]
   end
   subgraph EPIC_15["EPIC-15: Studio product surfaces"]
     US_15_1["US-15.1: Sidebar groups with Tools under Build"]
@@ -973,6 +986,11 @@ flowchart TD
   US_14_7 -.-> US_14_17
   US_16_2 -.-> US_14_17
   US_16_3 -.-> US_14_17
+  US_14_17 -.-> US_14_18
+  US_7_2 -.-> US_14_18
+  US_15_14 -.-> US_14_18
+  US_15_15 -.-> US_14_18
+  US_14_12 -.-> US_14_18
   US_14_2 -.-> US_15_1
   US_11_11 -.-> US_15_1
   US_2_2 -.-> US_15_2
@@ -1661,6 +1679,27 @@ flowchart TD
     US_14_17 --> T_14_17_8
     T_14_17_9["US-14.17#9: Update the operations runbook (including the owner&#x27;s `make migrate`, then `make stop &amp;&amp; make start`), README, `.env.example` and `CODEBASE.md`."]
     US_14_17 --> T_14_17_9
+    US_14_18["US-14.18: Settings → Keys &amp; vars, with the GitHub token, repository and browsing switch per workspace"]
+    T_14_18_1["US-14.18#1: Add migration 52, admitting the GitHub token as a sealed provider credential and storing each workspace&#x27;s GitHub repository and browsing switch as versioned non-secret values. Update the schema-readiness record, verify on disposable targets only, and leave applying it to the persistent install to the owner."]
+    US_14_18 --> T_14_18_1
+    T_14_18_2["US-14.18#2: Generalize the resolver to all five items in K1&#x27;s order per workspace, with each item&#x27;s source, and the repository and switch values exposed to members."]
+    US_14_18 --> T_14_18_2
+    T_14_18_3["US-14.18#3: Resolve the GitHub token and repository inside each attempt from the run&#x27;s workspace in every GitHub adapter, passing the token only to the adapter&#x27;s HTTP client."]
+    US_14_18 --> T_14_18_3
+    T_14_18_4["US-14.18#4: Record the resolved repository on each GitHub write&#x27;s approval request, and refuse with `approval_target_changed` before any request when the approved call resolves a different repository or its recorded target is empty."]
+    US_14_18 --> T_14_18_4
+    T_14_18_5["US-14.18#5: Resolve the browsing switch per workspace for catalog availability, run and routine admission, Expert save and the worker&#x27;s per-job binding of `browse_goal`, still requiring an executor that reports qualified."]
+    US_14_18 --> T_14_18_5
+    T_14_18_6["US-14.18#6: Replace `/v1/settings/tool-keys` with `/v1/settings/keys-and-vars` (owner-only versioned save, replace and remove, the shape, `owner/name` and `enabled`|`disabled` checks, and members&#x27; source and value read), behind the existing session, CSRF and workspace checks. Update the Pydantic contract, and regenerate OpenAPI and the TypeScript client."]
+    US_14_18 --> T_14_18_6
+    T_14_18_7["US-14.18#7: Rename the web page to `/settings/keys-and-vars` and its nav label to Keys &amp; vars, add the two values&#x27; inputs beside the transient secret inputs, remove the former page, and update the Tools page&#x27;s repair text."]
+    US_14_18 --> T_14_18_7
+    T_14_18_8["US-14.18#8: Extend `make start` and its `.env` parsing script to pass `GITHUB_REPOSITORY` and `GITHUB_TOKEN` as data, with the existing Tavily, Jina and switch rules."]
+    US_14_18 --> T_14_18_8
+    T_14_18_9["US-14.18#9: Cover the scenarios with unit tests on fake transports, a disposable database check including the secret scan and the approval binding, the web suite with axe, and the Makefile parsing test."]
+    US_14_18 --> T_14_18_9
+    T_14_18_10["US-14.18#10: Update the operations runbook (including the owner&#x27;s `make migrate`, then `make stop &amp;&amp; make start`), README, `.env.example` and `CODEBASE.md`."]
+    US_14_18 --> T_14_18_10
   end
 ```
 
@@ -6143,6 +6182,110 @@ Tasks:
 - [x] Update the Tools page's repair text to name Settings → Tool keys and `.env`, and show the key's source on available key-backed tools.
 - [x] Make `make start` parse the repository `.env` as data and pass only `TAVILY_API_KEY` and `JINA_API_KEY` to the API and worker, passing nothing for a blank value.
 - [x] Cover the scenarios with unit tests on fake transports, a disposable database check including the secret scan, the web suite with axe, and a Makefile parsing test.
+- [x] Update the operations runbook (including the owner's `make migrate`, then `make stop && make start`), README, `.env.example` and `CODEBASE.md`.
+
+Open Questions:
+- None.
+
+### US-14.18: Settings → Keys & vars, with the GitHub token, repository and browsing switch per workspace
+
+Status: DONE
+Change: `openspec/changes/archive/2026-11-08-us-14-18-settings-keys-vars-github/`
+
+As a workspace owner
+I want Settings → Tool keys renamed to Keys & vars, holding the GitHub token as a third secret and the GitHub repository and browsing switch as values, all resolved per workspace in the same order
+So that GitHub tools and browsing can be configured in the app without editing the install's environment, and a changed setting can never redirect a GitHub write that was already approved.
+
+Source:
+- [Decision 0025, V1 to V9](docs/engineering/decisions/0025-keys-and-vars.md#decision)
+- [Decision 0025, owner steps after delivery](docs/engineering/decisions/0025-keys-and-vars.md#owner-steps-after-delivery)
+- [Decision 0025, what this doesn't establish](docs/engineering/decisions/0025-keys-and-vars.md#what-this-doesnt-establish)
+- [Decision 0024, K1, K2 and K7, the rules extended](docs/engineering/decisions/0024-tool-keys-from-env-and-settings.md#decision)
+- [Decision 0007, amended](docs/engineering/decisions/0007-first-connector-github-issues.md#amended)
+- [Provider keys, PK-01 and PK-04 to PK-08](PRD-Tool-Catalog.md#provider-keys)
+- [Tools screen, TS-03](PRD-Tool-Catalog.md#tools-screen)
+- [Autonomous browsing, AB-02](PRD-Tool-Catalog.md#autonomous-browsing)
+- [Catalog contract, TC-04](PRD-Tool-Catalog.md#catalog-contract)
+- [Tool-use record, TU-04](PRD-Tool-Catalog.md#tool-use-record)
+- [GitHub tools, GH-07](PRD-Studio.md#github-tools)
+- [Approval contract and replay](PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
+- [MP-03 file order](PRD-Model-Providers.md#mp-03-configuration-precedence)
+- [MP-06 sealed storage](PRD-Model-Providers.md#mp-06-secret-storage-and-durable-execution)
+- [SP-007](docs/engineering/option-b-contract.md#sp-007--credentials-and-configuration-ux)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+- [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
+- [Operations runbook, tool-provider keys](docs/engineering/runbooks/operations.md#tool-provider-keys)
+
+Codebase Context:
+- [Integration points](CODEBASE.md#integration-points): `application/tool_keys.py` resolves the Tavily and Jina keys from the run's workspace in K1's order. The GitHub adapters use the process environment's `GITHUB_REPOSITORY` and `GITHUB_TOKEN`. Not product intent.
+- [Data and Persistence](CODEBASE.md#data-and-persistence): the Tavily and Jina keys are sealed in the master-key store and saved at Settings → Tool keys (`application/tool_key_settings.py`). Approval requests record a `resource_target`.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Settings → Keys & vars replaces Tool keys
+  Given a workspace with an owner and a member who isn't an owner, signed in on a disposable stack
+  When each opens Settings and follows its Keys & vars entry, then requests the former /settings/tool-keys page and /v1/settings/tool-keys routes, and the Tools page is read with no Tavily or Jina key resolved
+  Then the entry is labelled Keys & vars and opens /settings/keys-and-vars, which lists the Tavily key, the Jina key and the GitHub token as secrets and the GitHub repository and the browsing switch as values, the former page and routes answer 404, and a Tavily or Jina tool's key_missing repair names Settings → Keys & vars
+
+Scenario: Settings, then the environment, then .env, for all five
+  Given fake values for the Tavily key, the Jina key, the GitHub token, the GitHub repository and the browsing switch set in combinations of a workspace's saved value, the process environment and the .env files under the configuration root, some of them blank or whitespace-only
+  When each item is resolved for that workspace, and the owner and a member read Settings → Keys & vars
+  Then the saved value wins over the process environment, the process environment wins over the .env files, the .env files are read in MP-03's file order, a blank or whitespace-only value is skipped in favor of the next source, both of them see each item's source as settings, environment or none, both see the resolved GitHub repository and browsing switch values, and neither sees a secret's value, prefix, length or hash
+
+Scenario: Owner-only versioned save and removal, checked without a provider request
+  Given a workspace with an owner and a member who isn't an owner, and fake transports that record any GitHub, Tavily or Jina request
+  When the owner saves, replaces and removes the GitHub token, the GitHub repository and the browsing switch with the expected version, the owner submits a stale version, a token that fails the shape check, a repository that isn't owner/name and a switch other than enabled or disabled, and the member tries to save or remove any of the five items
+  Then the owner's changes succeed and advance the version, removing falls back to the environment and leaves every .env file byte-for-byte unchanged, the stale version is refused as a conflict, each malformed value is refused by its check, each refusal leaves the saved value unchanged, the member is refused, and no request reaches GitHub, Tavily or Jina
+
+Scenario: GitHub tools resolve the token and repository per attempt from the run's workspace
+  Given two workspaces, one with a fake GitHub token and repository saved in Settings and one without, a different fake token and repository in the process environment, and a fake GitHub transport
+  When a granted GitHub read tool is called in a run of each workspace, the first workspace's saved token and repository are then removed, and its run calls the read tool again without a restart
+  Then each request carries its own workspace's token and targets its own workspace's repository, with the environment's for the workspace that has no saved values, the call after removal uses the environment's token and repository, and the token reaches only the adapter's HTTP client
+
+Scenario: A saved disabled switch turns browsing off for its workspace
+  Given an executor that reports qualified, AUTOBOTS_BROWSER_EXECUTOR set to enabled in the environment, a workspace whose saved browsing switch is disabled, and another workspace with no saved switch
+  When each workspace's catalog is read, an Expert version granting browse_goal is saved, a run granting it is admitted, and the worker binds tools for a job of each workspace
+  Then browse_goal reads disabled_by_policy in the first workspace, its Expert save is refused expert_tool_unavailable and its admission tool_unavailable, the worker doesn't bind browse_goal for its job, and the other workspace sees browse_goal available and its job binds it
+
+Scenario: A saved enabled switch turns browsing on for its workspace
+  Given AUTOBOTS_BROWSER_EXECUTOR not set in the environment or the .env files, a workspace whose saved browsing switch is enabled, and another workspace with no saved switch
+  When an executor that reports qualified is in place and each workspace's catalog is read, an Expert version granting browse_goal is saved in the first workspace and the worker binds tools for its job, and then the executor reports not qualified
+  Then browse_goal is available in the first workspace, the save succeeds, the worker binds browse_goal for that job, the other workspace sees disabled_by_policy, and once the executor reports not qualified the first workspace also sees disabled_by_policy
+
+Scenario: An approved GitHub write keeps its repository
+  Given a workspace whose resolved GitHub repository is owner/a, a run granted create_github_issue and github_open_pull_request, and a fake GitHub transport that records every request
+  When each proposes a call and its approval is requested and granted, the owner then saves owner/b as the workspace's repository before the approved calls run, separately an approved call whose workspace repository is unchanged runs, and an approved call whose recorded target is empty runs
+  Then each approval request records owner/a, each changed call and the call with an empty recorded target are refused approval_target_changed before any request, the transport receives no request for them and nothing is written, and the unchanged call runs against owner/a
+
+Scenario: make start passes only the listed variables, as data
+  Given a repository .env holding fake TAVILY_API_KEY, JINA_API_KEY, GITHUB_REPOSITORY and GITHUB_TOKEN values, AUTOBOTS_BROWSER_EXECUTOR set to enabled, another variable, and a value containing shell syntax, and separately one where those four are blank and the switch holds a value other than enabled
+  When make start's environment for the API and the worker is built against a disposable target
+  Then only those four variables and the switch are passed, the value with shell syntax is passed literally and nothing in it runs, the other variable isn't passed, a blank value passes nothing, and a switch other than exactly enabled passes nothing
+
+Scenario: The sealed secrets stay out of durable state
+  Given a disposable database, a fake Tavily key, Jina key and GitHub token saved in Settings for a workspace, and runs whose granted Tavily, Jina and GitHub tools, including an approved GitHub write, call fake transports
+  When the runs finish and a scan reads their scopes, checkpoints, events, tool-use rows, receipts, approval requests and logs
+  Then the fake secrets appear in none of them, the provider_credentials rows hold only sealed material, and no API or BFF response contains a secret, including the Keys & vars responses
+```
+
+Dependencies:
+- US-14.17
+- US-7.2
+- US-15.14
+- US-15.15
+- US-14.12
+
+Tasks:
+- [x] Add migration 52, admitting the GitHub token as a sealed provider credential and storing each workspace's GitHub repository and browsing switch as versioned non-secret values. Update the schema-readiness record, verify on disposable targets only, and leave applying it to the persistent install to the owner.
+- [x] Generalize the resolver to all five items in K1's order per workspace, with each item's source, and the repository and switch values exposed to members.
+- [x] Resolve the GitHub token and repository inside each attempt from the run's workspace in every GitHub adapter, passing the token only to the adapter's HTTP client.
+- [x] Record the resolved repository on each GitHub write's approval request, and refuse with `approval_target_changed` before any request when the approved call resolves a different repository or its recorded target is empty.
+- [x] Resolve the browsing switch per workspace for catalog availability, run and routine admission, Expert save and the worker's per-job binding of `browse_goal`, still requiring an executor that reports qualified.
+- [x] Replace `/v1/settings/tool-keys` with `/v1/settings/keys-and-vars` (owner-only versioned save, replace and remove, the shape, `owner/name` and `enabled`|`disabled` checks, and members' source and value read), behind the existing session, CSRF and workspace checks. Update the Pydantic contract, and regenerate OpenAPI and the TypeScript client.
+- [x] Rename the web page to `/settings/keys-and-vars` and its nav label to Keys & vars, add the two values' inputs beside the transient secret inputs, remove the former page, and update the Tools page's repair text.
+- [x] Extend `make start` and its `.env` parsing script to pass `GITHUB_REPOSITORY` and `GITHUB_TOKEN` as data, with the existing Tavily, Jina and switch rules.
+- [x] Cover the scenarios with unit tests on fake transports, a disposable database check including the secret scan and the approval binding, the web suite with axe, and the Makefile parsing test.
 - [x] Update the operations runbook (including the owner's `make migrate`, then `make stop && make start`), README, `.env.example` and `CODEBASE.md`.
 
 Open Questions:

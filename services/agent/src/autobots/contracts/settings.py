@@ -61,26 +61,37 @@ class ExpectedVersion(BaseModel):
     expected_version: int = Field(ge=0)
 
 
-ToolKeyProvider = Literal["tavily", "jina"]
+KeyOrVarName = Literal["tavily", "jina", "github_token", "github_repository", "browser_executor"]
 
 
-class ToolKeyStatus(BaseModel):
-    """Where one tool key comes from for this workspace, PK-05. Never a value, prefix, length or
-    hash."""
+class KeyOrVar(BaseModel):
+    """One Settings → Keys & vars item for this workspace, PK-07. A secret never carries its value,
+    prefix, length or hash. A value carries its resolved value, which isn't secret."""
 
     model_config = STRICT_CONTRACT
 
-    provider: ToolKeyProvider
+    name: KeyOrVarName
     variable: str
+    kind: Literal["secret", "value"]
     source: Literal["settings", "environment"] | None
+    value: str | None
     version: int
 
 
-class ToolKeyList(BaseModel):
+class KeysAndVars(BaseModel):
     model_config = STRICT_CONTRACT
 
     schema_version: Literal[1]
-    keys: list[ToolKeyStatus]
+    items: list[KeyOrVar]
+
+
+class KeyOrVarDraft(BaseModel):
+    """Transient. A secret is checked and sealed, and never returned, logged or echoed."""
+
+    model_config = STRICT_CONTRACT
+
+    value: str = Field(min_length=1, max_length=512)
+    expected_version: int = Field(ge=0)
 
 
 class ModelAvailability(BaseModel):
