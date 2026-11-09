@@ -16,6 +16,7 @@ The Tools page on the persistent install showed every Tavily and Jina tool as "U
 | **K4. No live check** | Saving checks the key's shape only, by the rule the OpenRouter key already uses: printable ASCII, no whitespace, at least 8 characters. By PK-03, nothing calls Tavily or Jina to test it, since that costs a request |
 | **K5. Per attempt and per workspace** | Each tool call resolves its key inside the attempt, from the run's workspace, so a change applies to the next call without a restart. Availability on the Tools page, at run admission and at Expert, routine and workflow save follows the same order for that workspace |
 | **K6. Removing** | Removing a saved key falls back to the environment. It never edits `.env` |
+| **K7. Browsing switch** | Added 2026-11-08 at the owner's request ("Yes, add it"), so `browse_goal` can be turned on from `.env` too. `make start` also passes `AUTOBOTS_BROWSER_EXECUTOR` to the API and the worker, and only when the repository's `.env` sets it to exactly `enabled`. Any other value passes nothing. Browsing still needs a passing executor qualification at the current code (AB-02), and every call still waits for approval |
 
 PK-01's other guarantees stay: a key reaches only the adapter's HTTP client, and never a scope, checkpoint, graph state, prompt, tool schema, event, tool-use row, receipt, log line or evidence.
 

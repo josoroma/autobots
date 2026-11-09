@@ -110,9 +110,12 @@ stray_pids    = held="$$($(strays_$(1)) | tr '\n' ' ' | sed 's/ *$$//')"
 # The script parses the file as data and prints only those two names, shell-quoted, so evaluating its
 # output runs nothing from the file. A blank or missing key prints nothing.
 TOOL_KEYS := eval "$$($(PY) scripts/tool_keys_env.py .env)";
+# Decision 0024 K7: AUTOBOTS_BROWSER_EXECUTOR=enabled from the same .env, and nothing but that exact
+# value. browse_goal still needs a passing executor qualification at the current code.
+BROWSER_SWITCH := eval "$$($(PY) scripts/tool_keys_env.py .env --browser-switch)";
 
 # $(call launch,name,command[,keys]): start in the background, with the install's environment, and
-# with the tool keys when keys is given. It refuses beside an untracked copy and never stops one
+# with the tool keys and the browsing switch when keys is given. It refuses beside an untracked copy and never stops one
 # itself, as a worker may be in a paid call.
 define launch
 	@mkdir -p "$(RUN_DIR)" "$(LOG_DIR)"; \
@@ -125,7 +128,7 @@ define launch
 		exit 1; \
 	else \
 		set -a; . "$(APP_ENV)"; set +a; \
-		$(if $(3),$(TOOL_KEYS)) \
+		$(if $(3),$(TOOL_KEYS) $(BROWSER_SWITCH)) \
 		PYTHONPATH=services/agent/src PATH="$(NODE_BIN):$$PATH" NEXT_TELEMETRY_DISABLED=1 AUTOBOTS_WORKER_INFERENCE="$(INFERENCE)" \
 			nohup $(2) >> "$(LOG_DIR)/$(1).log" 2>&1 < /dev/null & \
 		pid=$$!; { echo "$$pid"; $(call start_time,$$pid); } > "$(RUN_DIR)/$(1).pid"; \

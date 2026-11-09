@@ -97,6 +97,7 @@ Without a key, sign-in, settings and drafts still work, and **Run** answers `cre
 The Tavily and Jina keys are different ([Decision 0024](docs/engineering/decisions/0024-tool-keys-from-env-and-settings.md)):
 - `make start` passes `TAVILY_API_KEY` and `JINA_API_KEY` from the repository's `.env` to the API and the worker, and nothing else from that file.
 - A key saved at **Settings → Tool keys** wins over `.env` for its workspace, from the next tool call. Only the owner can save or remove one, and removing it falls back to `.env`.
+- `AUTOBOTS_BROWSER_EXECUTOR=enabled` in `.env` turns on `browse_goal` for the API and the worker at the next `make start`, if the browser executor is qualified. No other value turns it on. See [the operations runbook](docs/engineering/runbooks/operations.md#turning-on-browse_goal).
 - Saving a key needs migration 51, so on an older install run `make migrate`, then `make stop && make start`.
 
 ### 5. Set up backups

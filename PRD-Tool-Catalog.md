@@ -73,7 +73,7 @@ Everything in PRD §9 still applies: grants pin versions, discovery never grants
 
 **PK-05.** Settings → Tool keys lets the workspace owner save, replace or remove a Tavily or Jina key, with an expected version. The value is sealed with the master key like the OpenRouter key, and saving checks its shape only. Members see each key's source (`settings`, `environment` or none), never its value, prefix, length or hash. Removing a saved key falls back to the environment.
 
-**PK-06.** `make start` passes `TAVILY_API_KEY` and `JINA_API_KEY` from the repository's `.env` to the persistent install's API and worker. It parses the file as data, never sources it, and takes no other variable from it.
+**PK-06.** `make start` passes `TAVILY_API_KEY` and `JINA_API_KEY` from the repository's `.env` to the persistent install's API and worker. It parses the file as data, never sources it, and takes no other variable from it, except that it also passes `AUTOBOTS_BROWSER_EXECUTOR=enabled` when the file sets exactly that value (Decision 0024 K7).
 
 ## URL guard
 
