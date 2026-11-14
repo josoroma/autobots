@@ -1,49 +1,21 @@
-import AxeBuilder from "@axe-core/playwright";
-import {
-  expect,
-  test,
-  type Browser,
-  type BrowserContext,
-  type Page,
-} from "@playwright/test";
-import { execFileSync } from "node:child_process";
+import type { BrowserContext, Page } from "@playwright/test";
+
+import { expectNoA11yViolations, WCAG_22_AA } from "./support/a11y.ts";
+import { signIn, users, type Credentials } from "./support/auth.ts";
+import { need, webOrigin } from "./support/env.ts";
+import { objectOf, runDbHelper } from "./support/db-helpers.ts";
+import { expect, test } from "./support/fixtures.ts";
 
 // US-15.21, PRD-Studio SE-02 and SE-05 to SE-07.
-const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
-const EMAIL_C = process.env.AUTOBOTS_TEST_MEMBER_EMAIL ?? "";
-const PASSWORD_C = process.env.AUTOBOTS_TEST_MEMBER_PASSWORD ?? "";
-// A member of workspace A only, as a member of two would first have to choose one.
-const EMAIL_F = process.env.AUTOBOTS_TEST_READER_EMAIL ?? "";
-const PASSWORD_F = process.env.AUTOBOTS_TEST_READER_PASSWORD ?? "";
-const OPS_EMAIL = process.env.AUTOBOTS_TEST_OPS_EMAIL ?? "";
-const OPS_PASSWORD = process.env.AUTOBOTS_TEST_OPS_PASSWORD ?? "";
-const OPS_WORKSPACE = process.env.AUTOBOTS_TEST_OPS_WORKSPACE ?? "";
-const WEB = process.env.AUTOBOTS_WEB_URL ?? "";
-
-async function signIn(
-  page: Page,
-  email: string,
-  password: string,
-): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
-}
 
 async function axe(page: Page): Promise<void> {
-  const scan = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-    .analyze();
-  expect(scan.violations).toEqual([]);
+  await expectNoA11yViolations(page, { extraTags: WCAG_22_AA });
 }
 
 test("Settings lists its sections and links to Models, Keys & vars and Operations", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_C, PASSWORD_C);
+  await signIn(page, users.member);
   await page.goto("/settings");
   const nav = page.getByRole("navigation", { name: "Settings sections" });
   await expect(nav.locator('[data-field="settings-sections"] a')).toHaveText([
@@ -87,7 +59,7 @@ test("Settings lists its sections and links to Models, Keys & vars and Operation
 test("Keyboard lists each shortcut with its keys and what it does", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_C, PASSWORD_C);
+  await signIn(page, users.member);
   await page.goto("/settings/keyboard");
   const rows = page.locator("[data-shortcut]");
   await expect(rows).toHaveCount(8);
@@ -116,16 +88,15 @@ test("Keyboard lists each shortcut with its keys and what it does", async ({
 });
 
 test("Data on this Mac is read-only for a member and the owner, and only the owner is offered Operations", async ({
-  browser,
+  signedInPage,
 }) => {
+  // A member of workspace A only, as a member of two would first have to choose one.
   const texts: string[] = [];
-  for (const [email, password, owner] of [
-    [EMAIL_F, PASSWORD_F, false],
-    [EMAIL_A, PASSWORD_A, true],
+  for (const [user, owner] of [
+    [users.reader, false],
+    [users.owner, true],
   ] as const) {
-    const context = await browser.newContext();
-    const page = await context.newPage();
-    await signIn(page, email, password);
+    const page = await signedInPage(user);
     await page.goto("/settings/data");
     const summary = page.locator('[data-field="retention-summary"]');
     await expect(summary.locator('[data-field="run-retention"]')).toBeVisible();
@@ -152,7 +123,6 @@ test("Data on this Mac is read-only for a member and the owner, and only the own
     });
     expect(put.status()).toBeGreaterThanOrEqual(400);
     await axe(page);
-    await context.close();
   }
   expect(texts[0]).toBe(texts[1]);
 });
@@ -180,40 +150,28 @@ const SPY = (permission: string) => {
   });
 };
 
-function arrangeWaiting(label: string): Record<string, string> {
-  const printed = execFileSync(
-    process.env.AUTOBOTS_TEST_PYTHON ?? "",
-    [
-      (process.env.AUTOBOTS_TEST_OPS_HELPER ?? "").replace(
-        "operations_live.py",
-        "notify_live.py",
-      ),
-      OPS_WORKSPACE,
-      label,
-    ],
-    {
-      env: {
-        ...process.env,
-        AUTOBOTS_DATABASE_URL: process.env.AUTOBOTS_TEST_RUNTIME_URL ?? "",
-        PYTHONPATH: process.env.AUTOBOTS_TEST_PYTHONPATH ?? "",
-      },
-      encoding: "utf8",
-    },
+/** tests/db/notify_live.py makes two of the ops-n workspace's runs start waiting, and names them. */
+function arrangeWaiting(
+  label: string,
+): Promise<{ waiting_approval: string; waiting_input: string }> {
+  return runDbHelper(
+    "notify_live.py",
+    [need("AUTOBOTS_TEST_OPS_WORKSPACE"), label],
+    objectOf({ waiting_approval: "string", waiting_input: "string" }),
   );
-  return JSON.parse(printed.trim().split("\n").at(-1) ?? "{}");
 }
 
+/** A signed-in page whose notifications the spy records, on Home after its first poll. */
 async function watching(
-  browser: Browser,
-  granted: boolean,
-  settingOn: boolean,
-): Promise<{ context: BrowserContext; page: Page; requests: string[] }> {
-  const context = await browser.newContext();
+  context: BrowserContext,
+  user: Credentials,
+  { granted, settingOn }: { granted: boolean; settingOn: boolean },
+): Promise<{ page: Page; requests: string[] }> {
   await context.addInitScript(SPY, granted ? "granted" : "denied");
   const page = await context.newPage();
   const requests: string[] = [];
   page.on("request", (request) => requests.push(request.url()));
-  await signIn(page, OPS_EMAIL, OPS_PASSWORD);
+  await signIn(page, user);
   if (settingOn) {
     await page.goto("/settings/notifications");
     await page
@@ -226,15 +184,17 @@ async function watching(
   await page.goto("/");
   // One poll notes what already waits, so only what newly waits is told.
   await page.waitForTimeout(5_000);
-  return { context, page, requests };
+  return { page, requests };
 }
 
 test("with the setting on and permission granted, each run that starts waiting raises one notification, and nothing leaves the Mac", async ({
-  browser,
+  openContext,
 }) => {
-  expect(OPS_WORKSPACE, "the ops-n workspace is arranged").not.toBe("");
-  const { context, page, requests } = await watching(browser, true, true);
-  const made = arrangeWaiting("granted");
+  const { page, requests } = await watching(await openContext(), users.ops, {
+    granted: true,
+    settingOn: true,
+  });
+  const made = await arrangeWaiting("granted");
   await expect
     .poll(
       async () =>
@@ -268,24 +228,27 @@ test("with the setting on and permission granted, each run that starts waiting r
       () => (window as unknown as { __notes: unknown[] }).__notes.length,
     ),
   ).toBe(2);
-  const origin = new URL(WEB).origin;
+  const origin = webOrigin();
   expect(requests.filter((url) => !url.startsWith(origin))).toEqual([]);
-  await context.close();
 });
 
 for (const [label, granted, settingOn] of [
   ["permission not granted", false, true],
   ["setting off", true, false],
 ] as const) {
-  test(`with the ${label}, no notification is shown`, async ({ browser }) => {
-    const { context, page } = await watching(browser, granted, settingOn);
-    arrangeWaiting(label.replaceAll(" ", "-"));
+  test(`with the ${label}, no notification is shown`, async ({
+    openContext,
+  }) => {
+    const { page } = await watching(await openContext(), users.ops, {
+      granted,
+      settingOn,
+    });
+    await arrangeWaiting(label.replaceAll(" ", "-"));
     await page.waitForTimeout(10_000);
     expect(
       await page.evaluate(
         () => (window as unknown as { __notes: unknown[] }).__notes.length,
       ),
     ).toBe(0);
-    await context.close();
   });
 }

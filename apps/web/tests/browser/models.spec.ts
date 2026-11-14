@@ -1,29 +1,21 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import {
+  parseModelList,
+  parseModelPolicyState,
+  type ModelPolicyState,
+} from "@autobots/api-client";
+import type { Page } from "@playwright/test";
+
+import { expectNoA11yViolations } from "./support/a11y.ts";
+import { getJson } from "./support/api.ts";
+import { signIn, users } from "./support/auth.ts";
+import { need } from "./support/env.ts";
+import { expect, test } from "./support/fixtures.ts";
 
 // US-15.8, PRD-Studio MD-01 to MD-03, against the fixture catalog and an owner arranged by
 // scripts/qualify_identity.py: no saved default, a `coder` override, and a run whose Expert
 // binds the executor to Sol.
-const EMAIL = process.env.AUTOBOTS_TEST_MODELS_EMAIL ?? "";
-const PASSWORD = process.env.AUTOBOTS_TEST_MODELS_PASSWORD ?? "";
-const RUN = process.env.AUTOBOTS_TEST_MODELS_RUN ?? "";
 const TERRA = "openrouter_terra";
 const SOL = "openrouter_sol";
-
-async function signIn(page: Page): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(EMAIL);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
-}
-
-async function noViolations(page: Page): Promise<void> {
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa"])
-    .analyze();
-  expect(results.violations).toEqual([]);
-}
 
 function source(page: Page, role: string) {
   return page
@@ -32,12 +24,11 @@ function source(page: Page, role: string) {
     .locator("[data-binding-source]");
 }
 
-async function stored(page: Page): Promise<{
-  version: number;
-  default_profile: string | null;
-  role_overrides: Record<string, string>;
-}> {
-  return (await page.request.get("/api/settings/model-policy")).json();
+function stored(page: Page): Promise<ModelPolicyState> {
+  return getJson(page, {
+    path: "/api/settings/model-policy",
+    parse: parseModelPolicyState,
+  });
 }
 
 test.describe.configure({ mode: "serial" });
@@ -45,7 +36,7 @@ test.describe.configure({ mode: "serial" });
 test("each profile shows catalog prices, capabilities and the fetch time, apart from qualification", async ({
   page,
 }) => {
-  await signIn(page);
+  await signIn(page, users.models);
   await page.goto("/settings/models");
   const terra = page.locator(`[data-approved-model="${TERRA}"]`);
   await expect(terra.locator('[data-price="input"]')).toHaveText(
@@ -77,20 +68,23 @@ test("each profile shows catalog prices, capabilities and the fetch time, apart 
   await expect(fetched).toContainText(
     "Whether a route is qualified is recorded separately",
   );
-  const models = await (await page.request.get("/api/models")).json();
-  const reported = models.models.find(
-    (model: { profile: string }) => model.profile === TERRA,
+  const models = await getJson(page, {
+    path: "/api/models",
+    parse: parseModelList,
+  });
+  const reported = models.models.find((model) => model.profile === TERRA);
+  expect(reported?.input_per_million_micro_usd).toBe(1_250_000);
+  expect(reported?.output_per_million_micro_usd).toBe(10_000_000);
+  expect(Date.now() - Date.parse(models.fetched_at ?? "")).toBeLessThan(
+    120_000,
   );
-  expect(reported.input_per_million_micro_usd).toBe(1_250_000);
-  expect(reported.output_per_million_micro_usd).toBe(10_000_000);
-  expect(Date.now() - Date.parse(models.fetched_at)).toBeLessThan(120_000);
-  await noViolations(page);
+  await expectNoA11yViolations(page);
 });
 
 test("each role says where its binding comes from, on Models and in the run's role map", async ({
   page,
 }) => {
-  await signIn(page);
+  await signIn(page, users.models);
   await page.goto("/settings/models");
   await expect(page.getByLabel("Workspace default")).toHaveValue("");
   await expect(source(page, "coder")).toHaveAttribute(
@@ -108,7 +102,7 @@ test("each role says where its binding comes from, on Models and in the run's ro
   expect(policy.default_profile).toBeNull();
   expect(policy.role_overrides).toEqual({ coder: TERRA });
 
-  await page.goto(`/runs/${RUN}`);
+  await page.goto(`/runs/${need("AUTOBOTS_TEST_MODELS_RUN")}`);
   const map = page.locator('[data-field="role-map"]');
   const line = (role: string) =>
     map.locator("li").filter({ hasText: new RegExp(`^${role}:`) });
@@ -117,14 +111,14 @@ test("each role says where its binding comes from, on Models and in the run's ro
   await expect(line("coder")).toContainText("· workspace override");
   await expect(line("researcher")).toContainText("openai/gpt-6.1-sol-20260929");
   await expect(line("researcher")).toContainText("· built-in default");
-  await noViolations(page);
+  await expectNoA11yViolations(page);
 });
 
 test("Discard restores the saved form, Reset all clears overrides, and a stale Reset all is refused", async ({
   page,
-  browser,
+  openPage,
 }) => {
-  await signIn(page);
+  await signIn(page, users.models);
   await page.goto("/settings/models");
   const summary = page.locator('[data-field="policy-summary"]');
   await expect(summary).toHaveText(
@@ -153,9 +147,8 @@ test("Discard restores the saved form, Reset all clears overrides, and a stale R
   expect(await stored(page)).toEqual(saved);
 
   // A screen loaded before the reset.
-  const context = await browser.newContext();
-  const stale = await context.newPage();
-  await signIn(stale);
+  const stale = await openPage();
+  await signIn(stale, users.models);
   await stale.goto("/settings/models");
   await expect(stale.locator('[data-field="policy-summary"]')).toHaveText(
     "12 of 14 roles follow the workspace default",
@@ -190,10 +183,9 @@ test("Discard restores the saved form, Reset all clears overrides, and a stale R
     "This policy changed after you opened it, so nothing was reset. Reload the page and try again.",
   );
   expect(await stored(page)).toEqual(cleared);
-  await context.close();
   await page.reload();
   await expect(summary).toHaveText(
     "14 of 14 roles follow the workspace default",
   );
-  await noViolations(page);
+  await expectNoA11yViolations(page);
 });

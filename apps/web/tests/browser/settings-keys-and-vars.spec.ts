@@ -1,19 +1,20 @@
 import { readFileSync } from "node:fs";
 
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { parseKeysAndVars, type KeyOrVar } from "@autobots/api-client";
+import type { Page } from "@playwright/test";
+
+import { expectNoA11yViolations } from "./support/a11y.ts";
+import { csrfHeaders, expectRefusal } from "./support/api.ts";
+import { signIn, users } from "./support/auth.ts";
+import { need } from "./support/env.ts";
+import { expect, test } from "./support/fixtures.ts";
+import { expectNoPrivateValues } from "./support/leaks.ts";
 
 // US-14.17 and US-14.18, Decisions 0024 and 0025, against the disposable identity stack run by
 // scripts/qualify_identity.py. That stack's configuration root has a Jina key in its .env, and no
 // other key, repository or browsing switch anywhere. Every value below is a fixture, and each test
 // removes what it saved, since later suites expect no key.
 
-const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
-// A member of workspace A only, who isn't its owner.
-const EMAIL_READER = process.env.AUTOBOTS_TEST_READER_EMAIL ?? "";
-const PASSWORD_READER = process.env.AUTOBOTS_TEST_READER_PASSWORD ?? "";
-const CONFIG_DOTENV = process.env.AUTOBOTS_TEST_CONFIG_DOTENV ?? "";
 const TAVILY = "tvly-fixtureSavedInSettings0001";
 const JINA = "jina_fixtureSavedInSettings0001";
 const GITHUB = "github_pat_fixtureSavedInSettings0001";
@@ -21,50 +22,23 @@ const ENV_JINA = "jina_fixtureConfigRoot0001";
 const SECRETS = [TAVILY, JINA, GITHUB, ENV_JINA];
 const ROUTE = "/api/settings/keys-and-vars";
 
-async function signIn(
-  page: Page,
-  email: string,
-  password: string,
-): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
-}
-
-async function csrf(page: Page): Promise<Record<string, string>> {
-  const token = await (await page.request.get("/api/csrf")).json();
-  return {
-    [token.header]: token.token,
-    Origin: new URL(page.url()).origin,
-    "Content-Type": "application/json",
-  };
-}
-
-type Item = {
-  name: string;
-  kind: string;
-  source: string | null;
-  value: string | null;
-  version: number;
-};
-
-async function items(page: Page): Promise<Item[]> {
+async function items(page: Page): Promise<KeyOrVar[]> {
   const reply = await page.request.get(ROUTE);
   expect(reply.status()).toBe(200);
   const text = await reply.text();
-  for (const secret of SECRETS) expect(text).not.toContain(secret);
-  return (JSON.parse(text) as { items: Item[] }).items;
+  expectNoPrivateValues(text, { label: ROUTE, extra: SECRETS });
+  return parseKeysAndVars(JSON.parse(text)).items;
 }
 
-async function item(page: Page, name: string): Promise<Item> {
-  return (await items(page)).find((entry) => entry.name === name)!;
+async function item(page: Page, name: string): Promise<KeyOrVar> {
+  const found = (await items(page)).find((entry) => entry.name === name);
+  if (found === undefined) throw new Error(`${name} isn't in ${ROUTE}`);
+  return found;
 }
 
 async function put(page: Page, name: string, value: string, version?: number) {
   return page.request.put(`${ROUTE}/${name}`, {
-    headers: await csrf(page),
+    headers: await csrfHeaders(page),
     data: {
       value,
       expected_version: version ?? (await item(page, name)).version,
@@ -74,7 +48,7 @@ async function put(page: Page, name: string, value: string, version?: number) {
 
 async function remove(page: Page, name: string) {
   return page.request.delete(`${ROUTE}/${name}`, {
-    headers: await csrf(page),
+    headers: await csrfHeaders(page),
     data: { expected_version: (await item(page, name)).version },
   });
 }
@@ -86,8 +60,9 @@ function card(page: Page, name: string) {
 test("Keys & vars replaces Tool keys, and the owner saves and removes keys and values", async ({
   page,
 }) => {
-  const dotenvBefore = readFileSync(CONFIG_DOTENV);
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  const dotenv = need("AUTOBOTS_TEST_CONFIG_DOTENV");
+  const dotenvBefore = readFileSync(dotenv);
+  await signIn(page, users.owner);
 
   // The former page and routes are gone.
   expect((await page.goto("/settings/tool-keys"))?.status()).toBe(404);
@@ -118,12 +93,7 @@ test("Keys & vars replaces Tool keys, and the owner saves and removes keys and v
   await expect(
     card(page, "github_repository").locator('[data-field="source"]'),
   ).toHaveText("None. GITHUB_REPOSITORY isn't set");
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-    .analyze();
-  expect(
-    results.violations.map((entry) => `${entry.id}: ${entry.nodes.length}`),
-  ).toEqual([]);
+  await expectNoA11yViolations(page);
 
   // TS-03: the repair names Keys & vars and .env, and an environment key says where it comes from.
   await page.goto("/tools");
@@ -144,13 +114,12 @@ test("Keys & vars replaces Tool keys, and the owner saves and removes keys and v
     ["github_repository", "https://evil.example/owner/repo", "invalid_value"],
     ["browser_executor", "on", "invalid_value"],
   ] as const) {
-    const refused = await put(page, name, value);
-    expect(refused.status(), `${name} ${value}`).toBe(422);
-    expect((await refused.json()).code).toBe(code);
+    await expectRefusal(await put(page, name, value), { status: 422, code });
   }
-  const stale = await put(page, "tavily", TAVILY, 7);
-  expect(stale.status()).toBe(409);
-  expect((await stale.json()).code).toBe("stale_version");
+  await expectRefusal(await put(page, "tavily", TAVILY, 7), {
+    status: 409,
+    code: "stale_version",
+  });
   expect((await item(page, "tavily")).source).toBeNull();
 
   // Save through the form: a secret's field is cleared, and its source becomes Settings.
@@ -195,8 +164,10 @@ test("Keys & vars replaces Tool keys, and the owner saves and removes keys and v
     "Unavailable: disabled by policy",
   );
   const catalog = await page.request.get("/api/v1/tools");
-  const text = await catalog.text();
-  for (const secret of SECRETS) expect(text).not.toContain(secret);
+  expectNoPrivateValues(await catalog.text(), {
+    label: "the tool catalog",
+    extra: SECRETS,
+  });
 
   // A saved Jina key wins over the .env one, and removing it falls back to .env.
   expect((await put(page, "jina", JINA)).status()).toBe(200);
@@ -207,7 +178,7 @@ test("Keys & vars replaces Tool keys, and the owner saves and removes keys and v
   await expect(card(page, "jina").locator('[data-field="source"]')).toHaveText(
     "JINA_API_KEY from the server environment or .env",
   );
-  expect(readFileSync(CONFIG_DOTENV).equals(dotenvBefore)).toBe(true);
+  expect(readFileSync(dotenv).equals(dotenvBefore)).toBe(true);
 
   for (const name of [
     "tavily",
@@ -225,17 +196,16 @@ test("Keys & vars replaces Tool keys, and the owner saves and removes keys and v
 });
 
 test("a member sees each source and the values, never a secret, and can't change one", async ({
-  browser,
+  asOwner: owner,
+  signedInPage,
 }) => {
-  const owner = await (await browser.newContext()).newPage();
-  await signIn(owner, EMAIL_A, PASSWORD_A);
   expect(
     (await put(owner, "github_repository", "owner/visible")).status(),
   ).toBe(200);
   expect((await put(owner, "github_token", GITHUB)).status()).toBe(200);
 
-  const page = await (await browser.newContext()).newPage();
-  await signIn(page, EMAIL_READER, PASSWORD_READER);
+  // A member of workspace A only, who isn't its owner.
+  const page = await signedInPage(users.reader);
   await page.goto("/settings/keys-and-vars");
   await expect(
     card(page, "github_repository").locator('[data-field="value"]'),
@@ -250,14 +220,13 @@ test("a member sees each source and the values, never a secret, and can't change
   ]) {
     for (const method of ["put", "delete"] as const) {
       const refused = await page.request[method](`${ROUTE}/${name}`, {
-        headers: await csrf(page),
+        headers: await csrfHeaders(page),
         data:
           method === "put"
             ? { value: "owner/other", expected_version: 0 }
             : { expected_version: 0 },
       });
-      expect(refused.status(), `${method} ${name}`).toBe(403);
-      expect((await refused.json()).code).toBe("owner_required");
+      await expectRefusal(refused, { status: 403, code: "owner_required" });
     }
   }
 

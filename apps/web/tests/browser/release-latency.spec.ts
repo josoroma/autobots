@@ -1,5 +1,10 @@
 import { writeFileSync } from "node:fs";
-import { expect, test } from "@playwright/test";
+
+import { csrfToken } from "./support/api.ts";
+import { signIn, users } from "./support/auth.ts";
+import { optional } from "./support/env.ts";
+import { expect, test } from "./support/fixtures.ts";
+import { admitRun } from "./support/runs.ts";
 
 // US-10.1's timing, run only by scripts/qualify_release.py --ui, against the real API and web app with
 // the worker stopped. The clock starts before the cancel is sent, so it overstates the time since the
@@ -8,29 +13,15 @@ const SAMPLES = 40;
 
 test("a committed event reaches the page", async ({ page }) => {
   test.setTimeout(240_000);
-  await page.goto("/sign-in");
-  await page
-    .getByLabel("Email")
-    .fill(process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "");
-  await page
-    .getByLabel("Password")
-    .fill(process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "");
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
-  const csrf = await (await page.request.get("/api/csrf")).json();
+  await signIn(page, users.owner);
+  const csrf = await csrfToken(page);
   const timed: { ack_ms: number; shown_ms: number }[] = [];
   for (let index = 0; index < SAMPLES; index += 1) {
-    const reply = await page.request.post("/api/v1/runs", {
-      headers: {
-        [csrf.header]: csrf.token,
-        Origin: new URL(page.url()).origin,
-        "Content-Type": "application/json",
-        "Idempotency-Key": `latency-${index}`,
-      },
-      data: { goal_text: `Latency ${index}`, limit_micro_usd: 1000 },
-    });
-    expect(reply.status()).toBe(202);
-    const id = (await reply.json()).run_id as string;
+    const id = await admitRun(
+      page,
+      { goal_text: `Latency ${index}`, limit_micro_usd: 1000 },
+      { key: `latency-${index}` },
+    );
     await page.goto(`/runs/${id}`);
     await expect(page.locator("[data-connection]")).toHaveAttribute(
       "data-connection",
@@ -75,7 +66,7 @@ test("a committed event reaches the page", async ({ page }) => {
     timed.push({ ack_ms: sample.ack_ms, shown_ms: sample.shown_ms });
   }
   writeFileSync(
-    process.env.AUTOBOTS_RELEASE_LATENCY_OUT ?? "release-latency.json",
+    optional("AUTOBOTS_RELEASE_LATENCY_OUT", "release-latency.json"),
     JSON.stringify(timed),
   );
 });

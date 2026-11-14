@@ -1,33 +1,31 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
-const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
-const CATALOG_DOWN = process.env.AUTOBOTS_TEST_CATALOG_DOWN ?? "";
-const BACKUPS = process.env.AUTOBOTS_TEST_BACKUP_DIR ?? "";
-const NOT_ALLOWED = ["127.0.0.1", "postgres", "sk-or-", "eyj", "/users/"];
+import { signIn, users } from "./support/auth.ts";
+import { arranged } from "./support/env.ts";
+import { expect, test } from "./support/fixtures.ts";
+import { expectNoPrivateValues } from "./support/leaks.ts";
+
+const stack = arranged({
+  catalogDown: "AUTOBOTS_TEST_CATALOG_DOWN",
+  backups: "AUTOBOTS_TEST_BACKUP_DIR",
+});
 const AN_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/;
 
-async function signIn(page: Page): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(EMAIL_A);
-  await page.getByLabel("Password").fill(PASSWORD_A);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
-}
-
 async function expectNothingPrivate(page: Page): Promise<void> {
-  const text = (await page.locator("main").innerText()).toLowerCase();
-  for (const leak of NOT_ALLOWED) expect(text).not.toContain(leak);
-  expect(text).not.toMatch(AN_ID);
+  expectNoPrivateValues(await page.locator("main").innerText(), {
+    label: "Operations",
+    extra: ["postgres", AN_ID],
+    ignoreCase: true,
+  });
 }
 
 test("with no restore recorded and OpenRouter down, Operations says so and stays usable", async ({
   page,
 }) => {
-  await signIn(page);
-  writeFileSync(CATALOG_DOWN, "");
+  await signIn(page, users.owner);
+  writeFileSync(stack.catalogDown, "");
   try {
     await page.goto("/operations");
     await expect(page.locator('[data-field="openrouter"]')).toContainText(
@@ -44,14 +42,14 @@ test("with no restore recorded and OpenRouter down, Operations says so and stays
     await expect(page.getByText(/Saved\. Nothing is removed/)).toBeVisible();
     await expectNothingPrivate(page);
   } finally {
-    rmSync(CATALOG_DOWN);
+    rmSync(stack.catalogDown);
   }
 });
 
 test("Operations shows the delayed schedule, OpenRouter, the restore and each route's qualification", async ({
   page,
 }) => {
-  mkdirSync(`${BACKUPS}/arranged`, { recursive: true });
+  mkdirSync(`${stack.backups}/arranged`, { recursive: true });
   const record = {
     at: "2026-11-06T12:00:00+00:00",
     result: "passed",
@@ -59,11 +57,11 @@ test("Operations shows the delayed schedule, OpenRouter, the restore and each ro
     checks_total: 14,
   };
   writeFileSync(
-    `${BACKUPS}/arranged/restores.jsonl`,
+    `${stack.backups}/arranged/restores.jsonl`,
     `${JSON.stringify(record)}\n`,
   );
   try {
-    await signIn(page);
+    await signIn(page, users.owner);
     await page.goto("/operations");
     await expect(page.locator('[data-field="openrouter"]')).toContainText(
       "OpenRouter's catalog answered",
@@ -86,6 +84,6 @@ test("Operations shows the delayed schedule, OpenRouter, the restore and each ro
     }
     await expectNothingPrivate(page);
   } finally {
-    rmSync(`${BACKUPS}/arranged`, { recursive: true });
+    rmSync(`${stack.backups}/arranged`, { recursive: true });
   }
 });

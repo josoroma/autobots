@@ -1,40 +1,10 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { parseExecutionView, parseWorkflowList } from "@autobots/api-client";
 
-const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
-const EMAIL_B = process.env.AUTOBOTS_TEST_OWNER_B_EMAIL ?? "";
-const PASSWORD_B = process.env.AUTOBOTS_TEST_OWNER_B_PASSWORD ?? "";
-
-async function signIn(
-  page: Page,
-  email: string,
-  password: string,
-): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
-}
-
-const node = (id: string, block: string, config: object = {}) => ({
-  id,
-  block,
-  version: 1,
-  config,
-});
-const link = (
-  source: string,
-  sourcePort: string,
-  target: string,
-  targetPort: string,
-) => ({
-  source,
-  source_port: sourcePort,
-  target,
-  target_port: targetPort,
-});
+import { expectNoA11yViolations } from "./support/a11y.ts";
+import { getJson } from "./support/api.ts";
+import { signIn, users } from "./support/auth.ts";
+import { link, node } from "./support/builders.ts";
+import { expect, test } from "./support/fixtures.ts";
 
 const LOOP = {
   nodes: [
@@ -58,7 +28,7 @@ test("a graph is validated, published, run and monitored, and the monitor only r
   page,
 }) => {
   test.setTimeout(90_000);
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/workflows");
   await page.getByLabel("Name").fill("Monitored flow");
   await page.getByRole("button", { name: "Create" }).click();
@@ -90,10 +60,7 @@ test("a graph is validated, published, run and monitored, and the monitor only r
   await page.getByLabel("Graph").fill(JSON.stringify(LOOP));
   await page.getByRole("button", { name: "Validate" }).click();
   await expect(page.locator('[data-validation="valid"]')).toBeVisible();
-  const axe = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa"])
-    .analyze();
-  expect(axe.violations.map((violation) => violation.id)).toEqual([]);
+  await expectNoA11yViolations(page);
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(page.locator('[data-message="editor"]')).toContainText(
     "Published as version 1",
@@ -132,9 +99,12 @@ test("a graph is validated, published, run and monitored, and the monitor only r
   // A dropped connection and a reconnect read saved state, and start nothing.
   const url = page.url();
   const id = url.split("/").at(-1) ?? "";
-  const before = await (
-    await page.request.get(`/api/v1/workflow-executions/${id}`)
-  ).json();
+  const execution = () =>
+    getJson(page, {
+      path: `/api/v1/workflow-executions/${id}`,
+      parse: parseExecutionView,
+    });
+  const before = await execution();
   await page.route("**/api/v1/workflow-executions/**", (route) =>
     route.abort(),
   );
@@ -174,9 +144,7 @@ test("a graph is validated, published, run and monitored, and the monitor only r
   await expect(page.locator('[data-emission="up#0.value.0"]')).toContainText(
     "A",
   );
-  const after = await (
-    await page.request.get(`/api/v1/workflow-executions/${id}`)
-  ).json();
+  const after = await execution();
   expect(after.emissions).toEqual(before.emissions);
   expect(after.instances).toEqual(before.instances);
 
@@ -203,17 +171,14 @@ test("a graph is validated, published, run and monitored, and the monitor only r
   await expect(page.locator('[data-emission="out.value.0"]')).toContainText(
     '["A", "B"]',
   );
-  const axeMonitor = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa"])
-    .analyze();
-  expect(axeMonitor.violations.map((violation) => violation.id)).toEqual([]);
+  await expectNoA11yViolations(page);
 });
 
 test("a failed branch is shown as failed, with what it blocked", async ({
   page,
 }) => {
   test.setTimeout(60_000);
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/workflows");
   await page.getByLabel("Name").fill("Failing flow");
   await page.getByRole("button", { name: "Create" }).click();
@@ -255,14 +220,15 @@ test("a failed branch is shown as failed, with what it blocked", async ({
 });
 
 test("another workspace can't see a workflow or an execution", async ({
-  browser,
+  asOwner: owner,
+  asOwnerB: other,
 }) => {
-  const owner = await (await browser.newContext()).newPage();
-  await signIn(owner, EMAIL_A, PASSWORD_A);
-  const flows = await (await owner.request.get("/api/v1/workflows")).json();
+  const flows = await getJson(owner, {
+    path: "/api/v1/workflows",
+    parse: parseWorkflowList,
+  });
   const flow = flows.workflows[0];
-  const other = await (await browser.newContext()).newPage();
-  await signIn(other, EMAIL_B, PASSWORD_B);
+  if (flow === undefined) throw new Error("Workspace A has no workflow.");
   await other.goto(`/workflows/${flow.id}`);
   await expect(other.locator('[data-state="unavailable"]')).toBeVisible();
   await other.goto("/workflow-executions/00000000-0000-4000-8000-000000000000");

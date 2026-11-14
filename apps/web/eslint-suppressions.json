@@ -177,16 +177,6 @@
       "count": 1
     }
   },
-  "tests/browser/saved-choice.spec.ts": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "tests/browser/slice-run-details.spec.ts": {
-    "max-lines": {
-      "count": 1
-    }
-  },
   "tests/browser/slice-visual.spec.ts": {
     "complexity": {
       "count": 1

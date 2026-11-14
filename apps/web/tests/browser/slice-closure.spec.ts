@@ -1,47 +1,33 @@
-import { expect, test, type Page } from "@playwright/test";
+import {
+  parseApprovalList,
+  parseApprovalResult,
+  parseExpertView,
+  parseProviderStatus,
+  parseRunInspector,
+  parseRunList,
+  parseSessionView,
+} from "@autobots/api-client";
+import type { Page } from "@playwright/test";
 
-const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
-const EMAIL_E = process.env.AUTOBOTS_TEST_FILES_EMAIL ?? "";
-const PASSWORD_E = process.env.AUTOBOTS_TEST_FILES_PASSWORD ?? "";
-const KEYLESS_RUN = process.env.AUTOBOTS_TEST_FILES_RUN ?? "";
-const WAITING_RUN = process.env.AUTOBOTS_TEST_WAITING_RUN ?? "";
+import { expectRefusal, getJson, send, writeHeaders } from "./support/api.ts";
+import { signIn, users } from "./support/auth.ts";
+import { compactingGoal, delegatingGoal } from "./support/builders.ts";
+import { arranged } from "./support/env.ts";
+import { expect, test } from "./support/fixtures.ts";
+import { ensureProviderKey } from "./support/keys.ts";
+import { admitRun } from "./support/runs.ts";
 
-async function signIn(
-  page: Page,
-  email: string,
-  password: string,
-): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
-}
+const runs = arranged({
+  keyless: "AUTOBOTS_TEST_FILES_RUN",
+  waiting: "AUTOBOTS_TEST_WAITING_RUN",
+});
+const CLOSURE_KEY = "sk-or-valid-arranged-closure";
 
-async function write(page: Page, key: string): Promise<Record<string, string>> {
-  const token = await (await page.request.get("/api/csrf")).json();
-  return {
-    [token.header]: token.token,
-    Origin: new URL(page.url()).origin,
-    "Content-Type": "application/json",
-    "Idempotency-Key": key,
-  };
-}
-
-async function ensureKey(page: Page): Promise<void> {
-  await page.goto("/settings/models");
-  const source = page.locator('[data-field="source"]');
-  await expect(source).toBeVisible();
-  if ((await source.textContent())?.trim() === "None") {
-    await page
-      .getByLabel(/API key|Replace key/)
-      .fill("sk-or-valid-arranged-closure");
-    await page.getByRole("button", { name: "Save & validate" }).click();
-    await expect(page.locator('[data-field="auth"]')).toHaveText(
-      "The key authenticated.",
-    );
-  }
+function inspector(page: Page, run: string) {
+  return getJson(page, {
+    path: `/api/v1/runs/${run}/inspector`,
+    parse: parseRunInspector,
+  });
 }
 
 const finished = (page: Page, status: string) =>
@@ -55,28 +41,24 @@ test("the goal and its criteria read the same after a compaction as before it", 
   page,
 }) => {
   test.setTimeout(120_000);
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  await ensureKey(page);
+  await signIn(page, users.owner);
+  await ensureProviderKey(page, CLOSURE_KEY);
   await page.goto("/");
   const stamp = Date.now();
-  const goal = `slice-compact-${stamp}: keep this goal whole`;
+  const goal = `${compactingGoal(stamp)}: keep this goal whole`;
   const criterion = "The report states the total";
-  const reply = await page.request.post("/api/v1/runs", {
-    headers: await write(page, `compact-${stamp}`),
-    data: { goal_text: goal, acceptance_criteria: [criterion] },
-  });
-  expect(reply.status()).toBe(202);
-  const id = (await reply.json()).run_id;
+  const id = await admitRun(
+    page,
+    { goal_text: goal, acceptance_criteria: [criterion] },
+    { key: `compact-${stamp}` },
+  );
   await page.goto(`/runs/${id}`);
   const main = page.locator("main");
   await expect(main).toContainText(goal);
   await expect(main).toContainText(criterion);
   const summarized = async () =>
-    (
-      await (await page.request.get(`/api/v1/runs/${id}/inspector`)).json()
-    ).model_calls.filter(
-      (call: { role: string; status: string }) =>
-        call.role === "summarizer" && call.status === "succeeded",
+    (await inspector(page, id)).model_calls.filter(
+      (call) => call.role === "summarizer" && call.status === "succeeded",
     ).length;
   // This first read really is before it: the worker takes its time over the early steps.
   expect(await summarized()).toBe(0);
@@ -92,41 +74,42 @@ test("the Assignments card shows a child's Expert and outcome, and each run link
   page,
 }) => {
   test.setTimeout(120_000);
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  await ensureKey(page);
+  await signIn(page, users.owner);
+  await ensureProviderKey(page, CLOSURE_KEY);
   await page.goto("/");
   const stamp = Date.now();
   const tools = ["calculate", "save_artifact", "publish_artifact"];
   const expert = async (name: string): Promise<string> =>
     (
-      await (
-        await page.request.post("/api/v1/experts", {
-          headers: await write(page, `${name}-${stamp}`),
-          data: { name: `${name} ${stamp}`, config: { tools } },
-        })
-      ).json()
+      await send(page, {
+        path: "/api/v1/experts",
+        key: `${name}-${stamp}`,
+        data: { name: `${name} ${stamp}`, config: { tools } },
+        status: 201,
+        parse: parseExpertView,
+      })
     ).id;
   const lead = await expert("Closure lead");
   const helper = await expert("Closure helper");
-  const session = await (
-    await page.request.post("/api/v1/sessions", {
-      headers: await write(page, `closure-session-${stamp}`),
-      data: {
-        kind: "coordinator",
-        experts: [{ expert_id: lead }, { expert_id: helper }],
-      },
-    })
-  ).json();
-  const reply = await page.request.post("/api/v1/runs", {
-    headers: await write(page, `closure-run-${stamp}`),
+  const session = await send(page, {
+    path: "/api/v1/sessions",
+    key: `closure-session-${stamp}`,
     data: {
-      goal_text: `slice-delegate expert=${helper}`,
+      kind: "coordinator",
+      experts: [{ expert_id: lead }, { expert_id: helper }],
+    },
+    status: 201,
+    parse: parseSessionView,
+  });
+  const id = await admitRun(
+    page,
+    {
+      goal_text: delegatingGoal(helper),
       session_id: session.id,
       expert_id: lead,
     },
-  });
-  expect(reply.status()).toBe(202);
-  const id = (await reply.json()).run_id;
+    { key: `closure-run-${stamp}` },
+  );
   await page.goto(`/runs/${id}`);
   const card = page.getByRole("region", { name: "Assignments" });
   const item = card.locator('[data-assignment="finished"]');
@@ -143,8 +126,8 @@ test("the Assignments card shows a child's Expert and outcome, and each run link
 test("a run's plan, approval, artifact and status come back after the connection drops", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  await page.goto(`/runs/${WAITING_RUN}`);
+  await signIn(page, users.owner);
+  await page.goto(`/runs/${runs.waiting}`);
   await expect(page.locator("[data-run-status]")).toHaveAttribute(
     "data-run-status",
     "waiting_approval",
@@ -166,18 +149,22 @@ test("a run's plan, approval, artifact and status come back after the connection
     "reconnecting",
     { timeout: 15_000 },
   );
-  const pending = await (await page.request.get("/api/v1/approvals")).json();
+  const pending = await getJson(page, {
+    path: "/api/v1/approvals",
+    parse: parseApprovalList,
+  });
   const request = pending.approvals.find(
-    (item: { run_id: string }) => item.run_id === WAITING_RUN,
+    (item) => item.run_id === runs.waiting,
   );
-  const decided = await page.request.post(
-    `/api/v1/approvals/${request.id}/decision`,
-    {
-      headers: await write(page, `closure-decide-${Date.now()}`),
-      data: { decision: "reject", argument_hash: request.argument_hash },
-    },
-  );
-  expect(decided.status()).toBe(200);
+  if (request === undefined)
+    throw new Error("The run's request isn't waiting.");
+  await send(page, {
+    path: `/api/v1/approvals/${request.id}/decision`,
+    key: `closure-decide-${Date.now()}`,
+    data: { decision: "reject", argument_hash: request.argument_hash },
+    status: 200,
+    parse: parseApprovalResult,
+  });
   await page.context().setOffline(false);
   // This event was committed during the drop, so only a rebuild can show it.
   await expect(main).toContainText("Approval reject", { timeout: 20_000 });
@@ -212,34 +199,32 @@ test("a run's plan, approval, artifact and status come back after the connection
 test("with no key, a run's artifacts can be listed and downloaded, and inference is refused", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_E, PASSWORD_E);
-  const status = await (
-    await page.request.get("/api/settings/model-providers")
-  ).json();
+  await signIn(page, users.files);
+  const status = await getJson(page, {
+    path: "/api/settings/model-providers",
+    parse: parseProviderStatus,
+  });
   expect(status.source).toBe("none");
-  await page.goto(`/runs/${KEYLESS_RUN}`);
+  await page.goto(`/runs/${runs.keyless}`);
   const artifact = page.locator('[data-artifact-status="published"]');
   await expect(artifact).toContainText("report");
   const href = await artifact.getByRole("link").first().getAttribute("href");
   const download = await page.request.get(href ?? "");
   expect(download.status()).toBe(200);
   expect(await download.text()).toContain("Total: 5");
-  const callsBefore = (
-    await (
-      await page.request.get(`/api/v1/runs/${KEYLESS_RUN}/inspector`)
-    ).json()
-  ).model_calls.length;
+  const callsBefore = (await inspector(page, runs.keyless)).model_calls.length;
   const refused = await page.request.post("/api/v1/runs", {
-    headers: await write(page, `keyless-${Date.now()}`),
+    headers: await writeHeaders(page, `keyless-${Date.now()}`),
     data: { goal_text: "needs a model" },
   });
-  expect(refused.status()).toBe(409);
-  expect((await refused.json()).code).toBe("credentials_required");
+  await expectRefusal(refused, { status: 409, code: "credentials_required" });
   // Nothing started: the same one run, and no call added to its ledger.
-  const runs = await (await page.request.get("/api/v1/runs")).json();
-  expect(runs.runs.map((run: { id: string }) => run.id)).toEqual([KEYLESS_RUN]);
-  const inspector = await (
-    await page.request.get(`/api/v1/runs/${KEYLESS_RUN}/inspector`)
-  ).json();
-  expect(inspector.model_calls.length).toBe(callsBefore);
+  const listed = await getJson(page, {
+    path: "/api/v1/runs",
+    parse: parseRunList,
+  });
+  expect(listed.runs.map((run) => run.id)).toEqual([runs.keyless]);
+  expect((await inspector(page, runs.keyless)).model_calls.length).toBe(
+    callsBefore,
+  );
 });

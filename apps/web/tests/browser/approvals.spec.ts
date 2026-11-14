@@ -1,35 +1,47 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import {
+  parseApprovalList,
+  parseApprovalResult,
+  parsePendingApprovals,
+  type ApprovalList,
+} from "@autobots/api-client";
+import type { Page } from "@playwright/test";
 
-const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
-const EMAIL_B = process.env.AUTOBOTS_TEST_OWNER_B_EMAIL ?? "";
-const PASSWORD_B = process.env.AUTOBOTS_TEST_OWNER_B_PASSWORD ?? "";
-const EMAIL_C = process.env.AUTOBOTS_TEST_MEMBER_EMAIL ?? "";
-const PASSWORD_C = process.env.AUTOBOTS_TEST_MEMBER_PASSWORD ?? "";
-const APPROVE = process.env.AUTOBOTS_TEST_APPROVAL_APPROVE ?? "";
-const REJECT = process.env.AUTOBOTS_TEST_APPROVAL_REJECT ?? "";
-const HASH = process.env.AUTOBOTS_TEST_APPROVAL_HASH ?? "";
-const RUN = process.env.AUTOBOTS_TEST_APPROVAL_RUN ?? "";
-const LEGACY = process.env.AUTOBOTS_TEST_APPROVAL_LEGACY ?? "";
-const LEGACY_HASH = process.env.AUTOBOTS_TEST_APPROVAL_LEGACY_HASH ?? "";
-const LEGACY_RUN = process.env.AUTOBOTS_TEST_APPROVAL_LEGACY_RUN ?? "";
-const LOUD = process.env.AUTOBOTS_TEST_APPROVAL_LOUD ?? "";
-const MARKDOWN = process.env.AUTOBOTS_TEST_APPROVAL_MARKDOWN ?? "";
-const EXPERT = process.env.AUTOBOTS_TEST_APPROVAL_EXPERT ?? "";
+import { expectNoA11yViolations } from "./support/a11y.ts";
+import { expectRefusal, getJson, send, writeHeaders } from "./support/api.ts";
+import { signIn, users } from "./support/auth.ts";
+import { arranged } from "./support/env.ts";
+import { expect, test } from "./support/fixtures.ts";
+import { readRun } from "./support/runs.ts";
+
+// Arranged by tests/db/approval_check.py through scripts/qualify_identity.py.
+const approval = arranged({
+  approve: "AUTOBOTS_TEST_APPROVAL_APPROVE",
+  reject: "AUTOBOTS_TEST_APPROVAL_REJECT",
+  hash: "AUTOBOTS_TEST_APPROVAL_HASH",
+  run: "AUTOBOTS_TEST_APPROVAL_RUN",
+  legacy: "AUTOBOTS_TEST_APPROVAL_LEGACY",
+  legacyHash: "AUTOBOTS_TEST_APPROVAL_LEGACY_HASH",
+  legacyRun: "AUTOBOTS_TEST_APPROVAL_LEGACY_RUN",
+  loud: "AUTOBOTS_TEST_APPROVAL_LOUD",
+  markdown: "AUTOBOTS_TEST_APPROVAL_MARKDOWN",
+  expert: "AUTOBOTS_TEST_APPROVAL_EXPERT",
+});
 const POLICY_REASON =
   "This tool changes something outside this Mac, so policy holds each call for a person.";
 
-async function signIn(
-  page: Page,
-  email: string,
-  password: string,
-): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
+function approvals(page: Page, query = ""): Promise<ApprovalList> {
+  return getJson(page, {
+    path: `/api/v1/approvals${query}`,
+    parse: parseApprovalList,
+  });
+}
+
+async function listed(page: Page, id: string) {
+  const found = (await approvals(page)).approvals.find(
+    (item) => item.id === id,
+  );
+  if (found === undefined) throw new Error(`${id} isn't listed as waiting`);
+  return found;
 }
 
 // US-15.5: the inbox lists requests beside the selected one's detail, so a test selects it first.
@@ -40,49 +52,31 @@ async function open(page: Page, id: string) {
   return card;
 }
 
-async function write(page: Page, key: string): Promise<Record<string, string>> {
-  const token = await (await page.request.get("/api/csrf")).json();
-  return {
-    [token.header]: token.token,
-    Origin: new URL(page.url()).origin,
-    "Content-Type": "application/json",
-    "Idempotency-Key": key,
-  };
-}
-
-test("another workspace and a member can't decide", async ({ browser }) => {
-  const other = await (await browser.newContext()).newPage();
-  await signIn(other, EMAIL_B, PASSWORD_B);
-  const list = await (await other.request.get("/api/v1/approvals")).json();
-  expect(list.approvals.map((item: { id: string }) => item.id)).not.toContain(
-    APPROVE,
-  );
-  const foreign = await other.request.post(
-    `/api/v1/approvals/${APPROVE}/decision`,
-    {
-      headers: await write(other, "foreign"),
-      data: { decision: "approve", argument_hash: HASH },
-    },
-  );
+test("another workspace and a member can't decide", async ({
+  asOwnerB: other,
+  asMember: member,
+}) => {
+  const list = await approvals(other);
+  expect(list.approvals.map((item) => item.id)).not.toContain(approval.approve);
+  const decision = `/api/v1/approvals/${approval.approve}/decision`;
+  const foreign = await other.request.post(decision, {
+    headers: await writeHeaders(other, "foreign"),
+    data: { decision: "approve", argument_hash: approval.hash },
+  });
   expect(foreign.status()).toBe(404);
-  const member = await (await browser.newContext()).newPage();
-  await signIn(member, EMAIL_C, PASSWORD_C);
-  const denied = await member.request.post(
-    `/api/v1/approvals/${APPROVE}/decision`,
-    {
-      headers: await write(member, "member"),
-      data: { decision: "approve", argument_hash: HASH },
-    },
-  );
+  const denied = await member.request.post(decision, {
+    headers: await writeHeaders(member, "member"),
+    data: { decision: "approve", argument_hash: approval.hash },
+  });
   expect(denied.status()).toBe(403);
 });
 
 test("each request shows the policy's reason, its target, the exact action and its expiry", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/approvals");
-  const card = await open(page, APPROVE);
+  const card = await open(page, approval.approve);
   await expect(card.locator("[data-approval-reason]")).toHaveText(
     `Why it's asking: ${POLICY_REASON}`,
   );
@@ -93,7 +87,7 @@ test("each request shows the policy's reason, its target, the exact action and i
   await expect(card).toContainText(/Expires \d/);
 
   // What the model wrote stays in the request, and doesn't reach the reason.
-  const loud = await open(page, LOUD);
+  const loud = await open(page, approval.loud);
   await expect(loud.locator("pre")).toContainText("REASON FROM THE MODEL");
   await expect(loud.locator("[data-approval-reason]")).toHaveText(
     `Why it's asking: ${POLICY_REASON}`,
@@ -103,9 +97,9 @@ test("each request shows the policy's reason, its target, the exact action and i
 test("each request shows who asked, its scope and its policy version, as stored with it", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/approvals");
-  const card = await open(page, APPROVE);
+  const card = await open(page, approval.approve);
   await expect(card.locator("[data-approval-requester]")).toHaveText(
     'Requested by: you started this run, and Expert "Mail sender", version 2, proposed it.',
   );
@@ -115,20 +109,17 @@ test("each request shows who asked, its scope and its policy version, as stored 
   await expect(card.locator("[data-approval-policy]")).toHaveText(
     "Policy version: approval-policy/2, rule consequential external write.",
   );
-  const listed = await (await page.request.get("/api/v1/approvals")).json();
-  const shown = listed.approvals.find(
-    (item: { id: string }) => item.id === APPROVE,
-  );
-  expect(shown.argument_hash).toBe(HASH);
+  const shown = await listed(page, approval.approve);
+  expect(shown.argument_hash).toBe(approval.hash);
   expect(shown.requester).toMatchObject({
     person_is_viewer: true,
     agent: "expert",
-    expert_id: EXPERT,
+    expert_id: approval.expert,
     expert_version: 2,
   });
-  expect(shown.scope_snapshot.tools.mock_send).toBe(1);
+  expect(shown.scope_snapshot).toMatchObject({ tools: { mock_send: 1 } });
   // Another run in this workspace, with no Expert, names the coordinator.
-  const other = await open(page, REJECT);
+  const other = await open(page, approval.reject);
   await expect(other.locator("[data-approval-requester]")).toContainText(
     "the coordinator proposed it",
   );
@@ -137,9 +128,9 @@ test("each request shows who asked, its scope and its policy version, as stored 
 test("a request saved before these fields says so, and its decision stays bound to the hash shown", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/approvals");
-  const card = await open(page, LEGACY);
+  const card = await open(page, approval.legacy);
   await expect(card.locator("[data-approval-reason]")).toContainText(
     "not recorded",
   );
@@ -153,72 +144,64 @@ test("a request saved before these fields says so, and its decision stays bound 
   }
   await expect(card.locator("pre")).toContainText("old@example.invalid");
   const tampered = await page.request.post(
-    `/api/v1/approvals/${LEGACY}/decision`,
+    `/api/v1/approvals/${approval.legacy}/decision`,
     {
-      headers: await write(page, "legacy-tamper"),
+      headers: await writeHeaders(page, "legacy-tamper"),
       data: { decision: "approve", argument_hash: "0".repeat(64) },
     },
   );
-  expect(tampered.status()).toBe(409);
-  expect((await tampered.json()).code).toBe("approval_mismatch");
-  const listed = await (await page.request.get("/api/v1/approvals")).json();
-  const shown = listed.approvals.find(
-    (item: { id: string }) => item.id === LEGACY,
-  );
-  expect(shown.argument_hash).toBe(LEGACY_HASH);
+  await expectRefusal(tampered, { status: 409, code: "approval_mismatch" });
+  const shown = await listed(page, approval.legacy);
+  expect(shown.argument_hash).toBe(approval.legacyHash);
   await card.getByRole("button", { name: "Reject" }).click();
   await expect(page.locator('[data-message="decision"]')).toContainText(
     "Rejected.",
   );
-  const summary = await (
-    await page.request.get(`/api/v1/runs/${LEGACY_RUN}`)
-  ).json();
+  const summary = await readRun(page, approval.legacyRun);
   expect(summary.status).not.toBe("waiting_approval");
 });
 
 test("the inbox shows the exact request, and a tampered decision releases nothing", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/approvals");
-  const card = await open(page, APPROVE);
+  const card = await open(page, approval.approve);
   await expect(card).toContainText("mock_send, version 1");
   await expect(card).toContainText("team@example.invalid");
   await expect(card).toContainText("consequential external write");
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa"])
-    .analyze();
-  expect(results.violations.map((violation) => violation.id)).toEqual([]);
+  await expectNoA11yViolations(page);
 
   const tampered = await page.request.post(
-    `/api/v1/approvals/${APPROVE}/decision`,
+    `/api/v1/approvals/${approval.approve}/decision`,
     {
-      headers: await write(page, "tamper"),
+      headers: await writeHeaders(page, "tamper"),
       data: { decision: "approve", argument_hash: "0".repeat(64) },
     },
   );
-  expect(tampered.status()).toBe(409);
-  expect((await tampered.json()).code).toBe("approval_mismatch");
-  const summary = await (await page.request.get(`/api/v1/runs/${RUN}`)).json();
+  await expectRefusal(tampered, { status: 409, code: "approval_mismatch" });
+  const summary = await readRun(page, approval.run);
   expect(summary.status).toBe("waiting_approval");
 });
 
 test("an owner approves and rejects through the inbox, and a repeat changes nothing", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/approvals");
   await (
-    await open(page, APPROVE)
+    await open(page, approval.approve)
   )
     .getByRole("button", { name: "Approve" })
     .click();
   await expect(page.locator('[data-message="decision"]')).toContainText(
     "Only this exact request",
   );
-  await expect(page.locator(`[data-approval="${APPROVE}"]`)).toHaveCount(0);
+  await expect(
+    page.locator(`[data-approval="${approval.approve}"]`),
+  ).toHaveCount(0);
   await (
-    await open(page, REJECT)
+    await open(page, approval.reject)
   )
     .getByRole("button", { name: "Reject" })
     .click();
@@ -226,37 +209,33 @@ test("an owner approves and rejects through the inbox, and a repeat changes noth
     "won't run",
   );
 
-  const summary = await (await page.request.get(`/api/v1/runs/${RUN}`)).json();
+  const summary = await readRun(page, approval.run);
   expect(summary.status).toBe("queued");
-  const again = await page.request.post(
-    `/api/v1/approvals/${APPROVE}/decision`,
-    {
-      headers: await write(page, "again"),
-      data: { decision: "approve", argument_hash: HASH },
-    },
-  );
-  expect((await again.json()).replayed).toBe(true);
-  const opposite = await page.request.post(
-    `/api/v1/approvals/${APPROVE}/decision`,
-    {
-      headers: await write(page, "opposite"),
-      data: { decision: "reject", argument_hash: HASH },
-    },
-  );
-  expect(opposite.status()).toBe(409);
-  expect((await opposite.json()).code).toBe("approval_already_decided");
-  const history = await (
-    await page.request.get("/api/v1/approvals?status=approved")
-  ).json();
-  expect(history.approvals.map((item: { id: string }) => item.id)).toContain(
-    APPROVE,
-  );
+  const decision = `/api/v1/approvals/${approval.approve}/decision`;
+  const again = await send(page, {
+    path: decision,
+    key: "again",
+    data: { decision: "approve", argument_hash: approval.hash },
+    status: 200,
+    parse: parseApprovalResult,
+  });
+  expect(again.replayed).toBe(true);
+  const opposite = await page.request.post(decision, {
+    headers: await writeHeaders(page, "opposite"),
+    data: { decision: "reject", argument_hash: approval.hash },
+  });
+  await expectRefusal(opposite, {
+    status: 409,
+    code: "approval_already_decided",
+  });
+  const history = await approvals(page, "?status=approved");
+  expect(history.approvals.map((item) => item.id)).toContain(approval.approve);
 });
 
 test("a long request is shown whole, and one too long can't be approved", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/approvals");
   // The long requests aren't named by the fixture, so each listed one, in both tabs, is opened in turn.
   let whole = false;
@@ -306,10 +285,11 @@ test("a long request is shown whole, and one too long can't be approved", async 
 test("Waiting and Decided tabs with counts, J and K, and the badge", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  const counted = await (
-    await page.request.get("/api/v1/approvals/count")
-  ).json();
+  await signIn(page, users.owner);
+  const counted = await getJson(page, {
+    path: "/api/v1/approvals/count",
+    parse: parsePendingApprovals,
+  });
   const badge = page.locator("[data-approvals-badge]");
   await expect(badge).toHaveText(`${counted.pending} waiting`);
   await expect(
@@ -317,7 +297,7 @@ test("Waiting and Decided tabs with counts, J and K, and the badge", async ({
   ).toBeVisible();
 
   await page.goto("/approvals");
-  const waiting = await (await page.request.get("/api/v1/approvals")).json();
+  const waiting = await approvals(page);
   expect(waiting.counts.waiting).toBe(counted.pending);
   await expect(page.locator('[data-tab="waiting"]')).toHaveText(
     `Waiting ${waiting.counts.waiting}`,
@@ -339,11 +319,9 @@ test("Waiting and Decided tabs with counts, J and K, and the badge", async ({
   );
   await page.locator('[data-tab="decided"]').click();
   await loadedDecided;
-  const decided = await (
-    await page.request.get("/api/v1/approvals?status=decided")
-  ).json();
+  const decided = await approvals(page, "?status=decided");
   await expect(items).toHaveCount(decided.approvals.length);
-  for (const item of decided.approvals as { status: string }[])
+  for (const item of decided.approvals)
     expect(["approved", "rejected", "expired", "withdrawn"]).toContain(
       item.status,
     );
@@ -352,14 +330,14 @@ test("Waiting and Decided tabs with counts, J and K, and the badge", async ({
 test("a decided request shows its run, task, expiry and who decided", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/approvals");
   const loaded = page.waitForResponse((reply) =>
     reply.url().includes("/api/v1/approvals?status=decided"),
   );
   await page.locator('[data-tab="decided"]').click();
   await loaded;
-  const card = await open(page, APPROVE);
+  const card = await open(page, approval.approve);
   await expect(card.locator("[data-approval-task]")).toHaveText(
     "For task: Send the team note",
   );
@@ -375,19 +353,17 @@ test("a decided request shows its run, task, expiry and who decided", async ({
 });
 
 test("the exact request whole, in Fields and JSON views", async ({ page }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/approvals");
-  const card = await open(page, MARKDOWN);
-  const listed = (
-    await (await page.request.get("/api/v1/approvals")).json()
-  ).approvals.find((item: { id: string }) => item.id === MARKDOWN);
+  const card = await open(page, approval.markdown);
+  const shown = await listed(page, approval.markdown);
   await expect(card.locator("[data-approval-digest]")).toContainText(
-    `sha256 ${listed.argument_hash.slice(0, 8)}`,
+    `sha256 ${shown.argument_hash.slice(0, 8)}`,
   );
   await expect(card.locator("[data-approval-digest]")).toContainText(
-    `${listed.arguments_bytes.toLocaleString("en-US")} bytes`,
+    `${shown.arguments_bytes.toLocaleString("en-US")} bytes`,
   );
-  await expect(card.locator("pre")).toHaveText(listed.arguments);
+  await expect(card.locator("pre")).toHaveText(shown.arguments);
   await card.getByRole("button", { name: "Fields" }).click();
   const fields = card.locator("[data-approval-fields]");
   await expect(fields.locator("dt")).toHaveText(["to", "body"]);
@@ -398,20 +374,17 @@ test("the exact request whole, in Fields and JSON views", async ({ page }) => {
   await expect(rendered.locator("strong")).toHaveText("Totals");
   await expect(rendered.locator("code")).toHaveText("Q3");
   await expect(rendered.locator("li")).toHaveText(["one item", "two items"]);
-  const axe = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-    .analyze();
-  expect(axe.violations.map((item) => item.id)).toEqual([]);
+  await expectNoA11yViolations(page);
   await card.getByRole("button", { name: "JSON" }).click();
-  await expect(card.locator("pre")).toHaveText(listed.arguments);
+  await expect(card.locator("pre")).toHaveText(shown.arguments);
 });
 
 test("a shortcut needs a second press, and never acts while typing", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/approvals");
-  await open(page, MARKDOWN);
+  await open(page, approval.markdown);
   const said = page.locator('[data-message="shortcut"]');
   await page.locator("h1").click();
   await page.keyboard.press("Meta+Enter");
@@ -419,10 +392,9 @@ test("a shortcut needs a second press, and never acts while typing", async ({
   await page.waitForTimeout(2_500);
   await expect(said).toHaveText("Nothing was decided.");
   const pending = async () =>
-    (
-      (await (await page.request.get("/api/v1/approvals")).json())
-        .approvals as { id: string }[]
-    ).some((item) => item.id === MARKDOWN);
+    (await approvals(page)).approvals.some(
+      (item) => item.id === approval.markdown,
+    );
   expect(await pending()).toBe(true);
 
   await page.evaluate(() => {
@@ -466,11 +438,9 @@ test("a shortcut needs a second press, and never acts while typing", async ({
     "Rejected.",
   );
   expect(await pending()).toBe(false);
-  const rejected = await (
-    await page.request.get("/api/v1/approvals?status=rejected")
-  ).json();
-  expect(rejected.approvals.map((item: { id: string }) => item.id)).toContain(
-    MARKDOWN,
+  const rejected = await approvals(page, "?status=rejected");
+  expect(rejected.approvals.map((item) => item.id)).toContain(
+    approval.markdown,
   );
 });
 
@@ -479,17 +449,20 @@ test("a shortcut needs a second press, and never acts while typing", async ({
 test("after a lost Approve, Reject sends nothing and says the first choice may be recorded", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/approvals");
   const sent: { decision: string; key: string }[] = [];
-  await page.route(`**/api/v1/approvals/${LOUD}/decision`, async (route) => {
-    sent.push({
-      decision: route.request().postDataJSON().decision,
-      key: route.request().headers()["idempotency-key"] ?? "",
-    });
-    await route.abort("connectionreset");
-  });
-  const card = await open(page, LOUD);
+  await page.route(
+    `**/api/v1/approvals/${approval.loud}/decision`,
+    async (route) => {
+      sent.push({
+        decision: route.request().postDataJSON().decision,
+        key: route.request().headers()["idempotency-key"] ?? "",
+      });
+      await route.abort("connectionreset");
+    },
+  );
+  const card = await open(page, approval.loud);
   const said = page.locator('[data-message="decision"]');
   await card.getByRole("button", { name: "Approve" }).click();
   await expect(said).toContainText("may have been decided");
@@ -507,9 +480,9 @@ test("after a lost Approve, Reject sends nothing and says the first choice may b
   await expect(said).toContainText("may have been decided");
   expect(sent).toHaveLength(2);
   expect(sent[1]).toEqual(sent[0]);
-  await page.unroute(`**/api/v1/approvals/${LOUD}/decision`);
-  const listed = await (await page.request.get("/api/v1/approvals")).json();
-  expect(
-    listed.approvals.some((item: { id: string }) => item.id === LOUD),
-  ).toBe(true);
+  await page.unroute(`**/api/v1/approvals/${approval.loud}/decision`);
+  const waiting = await approvals(page);
+  expect(waiting.approvals.some((item) => item.id === approval.loud)).toBe(
+    true,
+  );
 });

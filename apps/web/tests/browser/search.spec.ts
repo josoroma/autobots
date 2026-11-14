@@ -1,52 +1,52 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { parseSearchResults } from "@autobots/api-client";
+import type { Route } from "@playwright/test";
+
+import { expectNoA11yViolations, WCAG_22_AA } from "./support/a11y.ts";
+import { getJson } from "./support/api.ts";
+import { signIn, users } from "./support/auth.ts";
+import { need } from "./support/env.ts";
+import { objectOf } from "./support/db-helpers.ts";
+import { expect, test } from "./support/fixtures.ts";
 
 // US-15.22, PRD-Studio SR-01 and Decision 0022 D3. scripts/qualify_identity.py names a run's goal, an
 // Expert and a workflow with "read" in the ops-n workspace, and a run and an Expert in another workspace.
-const OPS_EMAIL = process.env.AUTOBOTS_TEST_OPS_EMAIL ?? "";
-const OPS_PASSWORD = process.env.AUTOBOTS_TEST_OPS_PASSWORD ?? "";
-const IDS = JSON.parse(process.env.AUTOBOTS_TEST_SEARCH_IDS ?? "{}") as Record<
-  string,
-  string
->;
 const MODIFIER = process.platform === "darwin" ? "Meta" : "Control";
 
-async function signIn(page: Page): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(OPS_EMAIL);
-  await page.getByLabel("Password").fill(OPS_PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
+/** The arranged records' IDs, as qualify_identity passes them. */
+function searchIds() {
+  return objectOf({
+    run: "string",
+    expert: "string",
+    workflow: "string",
+    other_run: "string",
+    other_expert: "string",
+  })(JSON.parse(need("AUTOBOTS_TEST_SEARCH_IDS")));
 }
 
 test("one endpoint returns typed results of each kind from this workspace only", async ({
   page,
 }) => {
-  expect(IDS.run, "the search records are arranged").toBeTruthy();
-  await signIn(page);
-  const reply = await page.request.get("/api/v1/search?q=read");
-  expect(reply.status()).toBe(200);
-  const body = await reply.json();
-  const results = body.results as {
-    kind: string;
-    id: string;
-    title: string;
-    href: string;
-  }[];
+  const ids = searchIds();
+  await signIn(page, users.ops);
+  const body = await getJson(page, {
+    path: "/api/v1/search?q=read",
+    parse: parseSearchResults,
+  });
+  const results = body.results;
   const of = (kind: string) => results.filter((item) => item.kind === kind);
-  expect(of("run").map((item) => item.id)).toContain(IDS.run);
-  expect(of("expert").map((item) => item.id)).toEqual([IDS.expert]);
-  expect(of("workflow").map((item) => item.id)).toEqual([IDS.workflow]);
+  expect(of("run").map((item) => item.id)).toContain(ids.run);
+  expect(of("expert").map((item) => item.id)).toEqual([ids.expert]);
+  expect(of("workflow").map((item) => item.id)).toEqual([ids.workflow]);
   expect(of("tool").length).toBeGreaterThan(0);
   for (const tool of of("tool"))
     expect(`${tool.title} ${tool.id}`.toLowerCase()).toContain("read");
-  expect(of("run").find((item) => item.id === IDS.run)?.href).toBe(
-    `/runs/${IDS.run}`,
+  expect(of("run").find((item) => item.id === ids.run)?.href).toBe(
+    `/runs/${ids.run}`,
   );
   const text = JSON.stringify(body);
   for (const elsewhere of [
-    IDS.other_run,
-    IDS.other_expert,
+    ids.other_run,
+    ids.other_expert,
     "Read another workspace plan",
     "Reader elsewhere",
   ])
@@ -56,7 +56,7 @@ test("one endpoint returns typed results of each kind from this workspace only",
 test("⌘K and the Search button after the skip link open the palette, and ⌘K in a text field does nothing", async ({
   page,
 }) => {
-  await signIn(page);
+  await signIn(page, users.ops);
   await page.goto("/");
   const dialog = page.getByRole("dialog", { name: "Search" });
   await page.locator("body").click({ position: { x: 5, y: 5 } });
@@ -103,7 +103,7 @@ test("⌘K and the Search button after the skip link open the palette, and ⌘K 
 test("arrows move the announced option, Enter opens it, and Escape returns focus", async ({
   page,
 }) => {
-  await signIn(page);
+  await signIn(page, users.ops);
   await page.goto("/runs");
   await page.keyboard.press(`${MODIFIER}+k`);
   const dialog = page.getByRole("dialog", { name: "Search" });
@@ -136,12 +136,11 @@ test("arrows move the announced option, Enter opens it, and Escape returns focus
   for (let step = 0; step < target; step += 1)
     await page.keyboard.press("ArrowDown");
   await expect(options.nth(target)).toHaveAttribute("aria-selected", "true");
-  const scan = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-    .analyze();
-  expect(scan.violations).toEqual([]);
+  await expectNoA11yViolations(page, { extraTags: WCAG_22_AA });
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(new RegExp(`/workflows/${IDS.workflow}$`));
+  await expect(page).toHaveURL(
+    new RegExp(`/workflows/${searchIds().workflow}$`),
+  );
   await expect(dialog).toBeHidden();
 
   // Reopened from a focused link, Escape gives focus back to that link.
@@ -162,7 +161,7 @@ test("arrows move the announced option, Enter opens it, and Escape returns focus
 test("a search that fails says why, and Retry searches again", async ({
   page,
 }) => {
-  await signIn(page);
+  await signIn(page, users.ops);
   let arranged: Parameters<Route["fulfill"]>[0] | null = {
     status: 503,
     json: {

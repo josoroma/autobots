@@ -1,43 +1,35 @@
-import { expect, test, type Page } from "@playwright/test";
+import { parseArtifactList } from "@autobots/api-client";
 
-const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
-const EMAIL_B = process.env.AUTOBOTS_TEST_OWNER_B_EMAIL ?? "";
-const PASSWORD_B = process.env.AUTOBOTS_TEST_OWNER_B_PASSWORD ?? "";
-const RUN = process.env.AUTOBOTS_TEST_ARTIFACT_RUN ?? "";
-const ARTIFACT = process.env.AUTOBOTS_TEST_ARTIFACT_ID ?? "";
-const TEXT = process.env.AUTOBOTS_TEST_ARTIFACT_TEXT ?? "";
-const GONE = process.env.AUTOBOTS_TEST_ARTIFACT_GONE ?? "";
-const TAMPERED = process.env.AUTOBOTS_TEST_ARTIFACT_TAMPERED ?? "";
+import { getJson, expectRefusal } from "./support/api.ts";
+import { signIn, users } from "./support/auth.ts";
+import { arranged } from "./support/env.ts";
+import { expect, test } from "./support/fixtures.ts";
 
-async function signIn(
-  page: Page,
-  email: string,
-  password: string,
-): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
-}
+const fixture = arranged({
+  run: "AUTOBOTS_TEST_ARTIFACT_RUN",
+  artifact: "AUTOBOTS_TEST_ARTIFACT_ID",
+  text: "AUTOBOTS_TEST_ARTIFACT_TEXT",
+  gone: "AUTOBOTS_TEST_ARTIFACT_GONE",
+  tampered: "AUTOBOTS_TEST_ARTIFACT_TAMPERED",
+});
 
 test("a member lists a run's artifacts and downloads the verified bytes", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  const listed = await (
-    await page.request.get(`/api/v1/runs/${RUN}/artifacts`)
-  ).json();
+  await signIn(page, users.owner);
+  const listed = await getJson(page, {
+    path: `/api/v1/runs/${fixture.run}/artifacts`,
+    parse: parseArtifactList,
+  });
   expect(listed.artifacts).toHaveLength(1);
-  expect(listed.artifacts[0].id).toBe(ARTIFACT);
-  expect(listed.artifacts[0].status).toBe("published");
+  expect(listed.artifacts[0]?.id).toBe(fixture.artifact);
+  expect(listed.artifacts[0]?.status).toBe("published");
   expect(JSON.stringify(listed)).not.toContain("object_path");
   const download = await page.request.get(
-    `/api/v1/artifacts/${ARTIFACT}/download`,
+    `/api/v1/artifacts/${fixture.artifact}/download`,
   );
   expect(download.status()).toBe(200);
-  expect(await download.text()).toBe(TEXT);
+  expect(await download.text()).toBe(fixture.text);
   expect(download.headers()["content-disposition"]).toContain("attachment");
   expect(download.headers()["x-content-type-options"]).toBe("nosniff");
   expect(download.headers()["cache-control"]).toContain("no-store");
@@ -46,31 +38,35 @@ test("a member lists a run's artifacts and downloads the verified bytes", async 
 test("another workspace sees nothing and downloads nothing", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_B, PASSWORD_B);
-  const listed = await (
-    await page.request.get(`/api/v1/runs/${RUN}/artifacts`)
-  ).json();
+  await signIn(page, users.ownerB);
+  const listed = await getJson(page, {
+    path: `/api/v1/runs/${fixture.run}/artifacts`,
+    parse: parseArtifactList,
+  });
   expect(listed.artifacts).toEqual([]);
   const download = await page.request.get(
-    `/api/v1/artifacts/${ARTIFACT}/download`,
+    `/api/v1/artifacts/${fixture.artifact}/download`,
   );
   expect(download.status()).toBe(404);
-  expect(await download.text()).not.toContain(TEXT);
+  expect(await download.text()).not.toContain(fixture.text);
 });
 
 test("a missing or altered object is reported and never served", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  for (const id of [GONE, TAMPERED]) {
-    const download = await page.request.get(`/api/v1/artifacts/${id}/download`);
-    expect(download.status()).toBe(409);
-    expect((await download.json()).code).toBe("artifact_missing");
+  await signIn(page, users.owner);
+  for (const id of [fixture.gone, fixture.tampered]) {
+    await expectRefusal(
+      await page.request.get(`/api/v1/artifacts/${id}/download`),
+      { status: 409, code: "artifact_missing" },
+    );
   }
 });
 
 test("a signed-out request gets no bytes", async ({ request }) => {
-  const download = await request.get(`/api/v1/artifacts/${ARTIFACT}/download`);
+  const download = await request.get(
+    `/api/v1/artifacts/${fixture.artifact}/download`,
+  );
   expect(download.status()).toBe(401);
-  expect(await download.text()).not.toContain(TEXT);
+  expect(await download.text()).not.toContain(fixture.text);
 });

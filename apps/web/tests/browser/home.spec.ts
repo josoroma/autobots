@@ -1,30 +1,17 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page, type Route } from "@playwright/test";
+import type { Page, Route } from "@playwright/test";
+
+import { expectNoA11yViolations } from "./support/a11y.ts";
+import { signIn, users } from "./support/auth.ts";
+import { needList } from "./support/env.ts";
+import { expect, test } from "./support/fixtures.ts";
 
 // US-15.10, PRD-Studio HM-01 and HM-04 and Decision 0022 D9 and D14, against an owner arranged by
 // scripts/qualify_identity.py: an America/Costa_Rica workspace (UTC-6, no daylight saving), the
 // display name Ada and seven runs a minute apart, newest first:
 // waiting_input, paused, waiting_approval (two pending approvals), running with a plan,
 // succeeded with US$0.07 charged, succeeded, failed.
-const EMAIL = process.env.AUTOBOTS_TEST_HOME_EMAIL ?? "";
-const PASSWORD = process.env.AUTOBOTS_TEST_HOME_PASSWORD ?? "";
-const RUNS = (process.env.AUTOBOTS_TEST_HOME_RUNS ?? "").split(",");
-const APPROVALS = (process.env.AUTOBOTS_TEST_HOME_APPROVALS ?? "").split(",");
-
-async function signIn(page: Page): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(EMAIL);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
-}
-
-async function noViolations(page: Page): Promise<void> {
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa"])
-    .analyze();
-  expect(results.violations).toEqual([]);
-}
+const homeRuns = () => needList("AUTOBOTS_TEST_HOME_RUNS");
+const homeApprovals = () => needList("AUTOBOTS_TEST_HOME_APPROVALS");
 
 // A local Costa Rica time on 2026-11-09, as the instant the browser's clock is fixed to.
 function costaRica(hour: number, minute: number): Date {
@@ -44,7 +31,7 @@ test.describe.configure({ mode: "serial" });
 test("the greeting follows the workspace's timezone, then the heading", async ({
   page,
 }) => {
-  await signIn(page);
+  await signIn(page, users.home);
   for (const [hour, expected] of [
     [9, "Good morning, Ada"],
     [14, "Good afternoon, Ada"],
@@ -64,11 +51,11 @@ test("the greeting follows the workspace's timezone, then the heading", async ({
     });
     expect(order).toBeGreaterThan(0);
   }
-  await noViolations(page);
+  await expectNoA11yViolations(page);
 });
 
 test("the greeting's boundaries", async ({ page }) => {
-  await signIn(page);
+  await signIn(page, users.home);
   for (const [hour, minute, expected] of [
     [4, 59, "Good evening"],
     [5, 0, "Good morning"],
@@ -86,20 +73,22 @@ test("the greeting's boundaries", async ({ page }) => {
 test("Needs you lists pending approvals and a run waiting for input, not a paused run", async ({
   page,
 }) => {
-  await signIn(page);
+  await signIn(page, users.home);
+  const runs = homeRuns();
+  const pending = homeApprovals();
   await page.goto("/");
   const needs = page.locator('[data-field="needs-you"]');
   await expect(needs.locator("[data-needs-approval]")).toHaveCount(2);
   await expect(needs.locator("[data-needs-reply]")).toHaveCount(1);
-  const reply = needs.locator(`[data-needs-reply="${RUNS[0]}"]`);
+  const reply = needs.locator(`[data-needs-reply="${runs[0]}"]`);
   await expect(reply).toContainText("Answer the rate question");
   await expect(
     reply.getByRole("link", { name: "Reply on the run" }),
-  ).toHaveAttribute("href", `/runs/${RUNS[0]}`);
+  ).toHaveAttribute("href", `/runs/${runs[0]}`);
   // Paused counts as Active (D9), so it isn't here.
   await expect(needs).not.toContainText("Compare paused rates");
-  await expect(needs.locator(`[data-needs-reply="${RUNS[1]}"]`)).toHaveCount(0);
-  for (const approval of APPROVALS) {
+  await expect(needs.locator(`[data-needs-reply="${runs[1]}"]`)).toHaveCount(0);
+  for (const approval of pending) {
     const item = needs.locator(`[data-needs-approval="${approval}"]`);
     await expect(item).toContainText("create_github_issue");
     await expect(item).toContainText("Send the brief");
@@ -108,10 +97,10 @@ test("Needs you lists pending approvals and a run waiting for input, not a pause
       `/approvals?approval=${approval}`,
     );
   }
-  await noViolations(page);
+  await expectNoA11yViolations(page);
 
   // Review opens that request, including one that isn't first in the list.
-  for (const approval of [...APPROVALS].reverse()) {
+  for (const approval of [...pending].reverse()) {
     await page.goto("/");
     await needs
       .locator(`[data-needs-approval="${approval}"]`)
@@ -125,14 +114,14 @@ test("Needs you lists pending approvals and a run waiting for input, not a pause
 test("Recent runs lists the five newest with state, progress or spend, and a relative time", async ({
   page,
 }) => {
-  await signIn(page);
+  await signIn(page, users.home);
   await page.goto("/");
   const recent = page.locator('[data-field="recent-runs"] [data-recent-run]');
   await expect(recent).toHaveCount(5);
   const shown = await recent.evaluateAll((items) =>
     items.map((item) => item.getAttribute("data-recent-run")),
   );
-  expect(shown).toEqual(RUNS.slice(0, 5));
+  expect(shown).toEqual(homeRuns().slice(0, 5));
   const row = (index: number) => recent.nth(index);
   const expected = [
     ["Answer the rate question", "Waiting for input", "US$0.00 spent"],
@@ -157,7 +146,7 @@ test("Recent runs lists the five newest with state, progress or spend, and a rel
   await expect(page.locator('[data-field="recent-runs"]')).not.toContainText(
     "Oldest seventh run",
   );
-  await noViolations(page);
+  await expectNoA11yViolations(page);
 });
 
 // R-27: the three reads behind Needs you and Recent runs fail as one, say why, and Retry reads them
@@ -165,7 +154,7 @@ test("Recent runs lists the five newest with state, progress or spend, and a rel
 test("Needs you and Recent runs say why they can't be read, and Retry reads them again", async ({
   page,
 }) => {
-  await signIn(page);
+  await signIn(page, users.home);
   let arranged: Parameters<Route["fulfill"]>[0] | null = {
     status: 503,
     json: {

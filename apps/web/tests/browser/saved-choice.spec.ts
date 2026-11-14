@@ -1,34 +1,47 @@
-import { expect, test, type Page } from "@playwright/test";
+import {
+  parseExpertView,
+  parseModelPolicyState,
+  parseRunIntentCheck,
+  parseRunList,
+  parseWorkflowView,
+} from "@autobots/api-client";
+import type { Page } from "@playwright/test";
 
-const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
+import { expectRefusal, getJson, send, writeHeaders } from "./support/api.ts";
+import { signIn, users } from "./support/auth.ts";
+import { link, node } from "./support/builders.ts";
+import { need } from "./support/env.ts";
+import { expect, test } from "./support/fixtures.ts";
+
 const DEEPSEEK = "openrouter_deepseek_flash";
 const TERRA = "openrouter_terra";
 
 // Run by scripts/qualify_identity.py, which arranges each test's saved policy in the database first,
 // since a saved choice naming DeepSeek can't be made through the product any more.
-async function signIn(page: Page): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(EMAIL_A);
-  await page.getByLabel("Password").fill(PASSWORD_A);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
+
+function policy(page: Page) {
+  return getJson(page, {
+    path: "/api/settings/model-policy",
+    parse: parseModelPolicyState,
+  });
 }
 
-async function write(page: Page, key: string): Promise<Record<string, string>> {
-  const token = await (await page.request.get("/api/csrf")).json();
-  return {
-    [token.header]: token.token,
-    Origin: new URL(page.url()).origin,
-    "Content-Type": "application/json",
-    "Idempotency-Key": key,
-  };
+function runList(page: Page) {
+  return getJson(page, { path: "/api/v1/runs", parse: parseRunList });
+}
+
+async function refusedRun(page: Page, key: string, data: object) {
+  const reply = await page.request.post("/api/v1/runs", {
+    headers: await writeHeaders(page, key),
+    data,
+  });
+  return expectRefusal(reply, { status: 409, code: "model_not_offered" });
 }
 
 test("a saved default naming DeepSeek refuses new runs with no substitute, and isn't rewritten", async ({
   page,
 }) => {
-  await signIn(page);
+  await signIn(page, users.owner);
   await page.goto("/settings/models");
   await expect(page.locator('[data-field="not-offered"]')).toContainText(
     "isn't offered for new runs",
@@ -37,35 +50,25 @@ test("a saved default naming DeepSeek refuses new runs with no substitute, and i
   await expect(choice).toHaveValue(DEEPSEEK);
   await expect(choice.locator(`option[value="${DEEPSEEK}"]`)).toBeDisabled();
 
-  const before = await (
-    await page.request.get("/api/settings/model-policy")
-  ).json();
-  const runs = await (await page.request.get("/api/v1/runs")).json();
-  const refused = await page.request.post("/api/v1/runs", {
-    headers: await write(page, `saved-${Date.now()}`),
-    data: { goal_text: "saved default" },
+  const before = await policy(page);
+  const runs = await runList(page);
+  const body = await refusedRun(page, `saved-${Date.now()}`, {
+    goal_text: "saved default",
   });
-  expect(refused.status()).toBe(409);
-  const body = await refused.json();
-  expect(body.code).toBe("model_not_offered");
   expect(body.message).toContain("isn't offered for new runs");
-  expect((await (await page.request.get("/api/v1/runs")).json()).runs).toEqual(
-    runs.runs,
-  );
+  expect((await runList(page)).runs).toEqual(runs.runs);
 
-  const intent = await page.request.post("/api/v1/runs/intent", {
-    headers: await write(page, `intent-${Date.now()}`),
-  });
-  expect((await intent.json()).ready).toBe(false);
-  expect(
-    (
-      await (
-        await page.request.post("/api/v1/runs/intent", {
-          headers: await write(page, `intent-again-${Date.now()}`),
-        })
-      ).json()
-    ).code,
-  ).toBe("model_not_offered");
+  const intent = (key: string) =>
+    send(page, {
+      path: "/api/v1/runs/intent",
+      key,
+      status: 200,
+      parse: parseRunIntentCheck,
+    });
+  expect((await intent(`intent-${Date.now()}`)).ready).toBe(false);
+  expect((await intent(`intent-again-${Date.now()}`)).code).toBe(
+    "model_not_offered",
+  );
 
   await page.goto("/");
   // Before anyone presses Run, the page says this would start nothing, and names no route.
@@ -88,92 +91,56 @@ test("a saved default naming DeepSeek refuses new runs with no substitute, and i
     "kept draft",
   );
 
-  const after = await (
-    await page.request.get("/api/settings/model-policy")
-  ).json();
+  const after = await policy(page);
   expect(after.version).toBe(before.version);
   expect(after.default_profile).toBe(DEEPSEEK);
 
   // A workflow's editor says this only for a version that would call a model.
   const stamp = Date.now();
-  const flow = await (
-    await page.request.post("/api/v1/workflows", {
-      headers: await write(page, `saved-flow-${stamp}`),
-      data: { name: `Saved ${stamp}` },
-    })
-  ).json();
-  const input = {
-    id: "in",
-    block: "input",
-    version: 1,
-    config: { type: "string" },
-  };
-  const output = { id: "out", block: "output", version: 1, config: {} };
-  const plain = await page.request.post(
-    `/api/v1/workflows/${flow.id}/versions`,
-    {
-      headers: await write(page, `saved-plain-${stamp}`),
-      data: {
-        expected_version: 0,
-        graph: {
-          nodes: [input, output],
-          links: [
-            {
-              source: "in",
-              source_port: "value",
-              target: "out",
-              target_port: "value",
-            },
-          ],
-        },
+  const flow = await send(page, {
+    path: "/api/v1/workflows",
+    key: `saved-flow-${stamp}`,
+    data: { name: `Saved ${stamp}` },
+    status: 201,
+    parse: parseWorkflowView,
+  });
+  const input = node("in", "input", { type: "string" });
+  const output = node("out", "output");
+  const versions = `/api/v1/workflows/${flow.id}/versions`;
+  const plain = await page.request.post(versions, {
+    headers: await writeHeaders(page, `saved-plain-${stamp}`),
+    data: {
+      expected_version: 0,
+      graph: {
+        nodes: [input, output],
+        links: [link("in", "value", "out", "value")],
       },
     },
-  );
+  });
   expect(plain.status()).toBeLessThan(300);
   await page.goto(`/workflows/${flow.id}`);
   await expect(page.locator('[data-disclosure="consent"]')).toBeVisible();
   await expect(page.locator('[data-disclosure="not-offered"]')).toHaveCount(0);
-  const expert = await (
-    await page.request.post("/api/v1/experts", {
-      headers: await write(page, `saved-helper-${stamp}`),
-      data: { name: `Saved helper ${stamp}`, config: { tools: ["calculate"] } },
-    })
-  ).json();
-  const withAgent = await page.request.post(
-    `/api/v1/workflows/${flow.id}/versions`,
-    {
-      headers: await write(page, `saved-agent-${stamp}`),
-      data: {
-        expected_version: 1,
-        graph: {
-          nodes: [
-            input,
-            {
-              id: "ask",
-              block: "agent",
-              version: 1,
-              config: { expert_id: expert.id },
-            },
-            output,
-          ],
-          links: [
-            {
-              source: "in",
-              source_port: "value",
-              target: "ask",
-              target_port: "goal",
-            },
-            {
-              source: "ask",
-              source_port: "result",
-              target: "out",
-              target_port: "value",
-            },
-          ],
-        },
+  const expert = await send(page, {
+    path: "/api/v1/experts",
+    key: `saved-helper-${stamp}`,
+    data: { name: `Saved helper ${stamp}`, config: { tools: ["calculate"] } },
+    status: 201,
+    parse: parseExpertView,
+  });
+  const withAgent = await page.request.post(versions, {
+    headers: await writeHeaders(page, `saved-agent-${stamp}`),
+    data: {
+      expected_version: 1,
+      graph: {
+        nodes: [input, node("ask", "agent", { expert_id: expert.id }), output],
+        links: [
+          link("in", "value", "ask", "goal"),
+          link("ask", "result", "out", "value"),
+        ],
       },
     },
-  );
+  });
   expect(withAgent.status()).toBeLessThan(300);
   await page.goto(`/workflows/${flow.id}`);
   await page.getByLabel("Version", { exact: true }).selectOption("2");
@@ -194,7 +161,7 @@ test("a saved default naming DeepSeek refuses new runs with no substitute, and i
 test("a saved override on another role reads as not taking effect, and still refuses", async ({
   page,
 }) => {
-  await signIn(page);
+  await signIn(page, users.owner);
   await page.goto("/settings/models");
   const effect = page.locator('[data-field="role-effect"]');
   await expect(effect.locator('[data-role-effect="differs"]')).toHaveText(
@@ -204,18 +171,15 @@ test("a saved override on another role reads as not taking effect, and still ref
     0,
   );
   await expect(page.locator('[data-field="not-offered"]')).toBeVisible();
-  const refused = await page.request.post("/api/v1/runs", {
-    headers: await write(page, `override-${Date.now()}`),
-    data: { goal_text: "saved override" },
+  await refusedRun(page, `override-${Date.now()}`, {
+    goal_text: "saved override",
   });
-  expect(refused.status()).toBe(409);
-  expect((await refused.json()).code).toBe("model_not_offered");
 });
 
 test("a saved executor override says every other role differs, summarizer included", async ({
   page,
 }) => {
-  await signIn(page);
+  await signIn(page, users.owner);
   await page.goto("/settings/models");
   const effect = page.locator('[data-field="role-effect"]');
   await expect(effect.locator('[data-role-effect="differs"]')).toContainText(
@@ -227,22 +191,19 @@ test("a saved executor override says every other role differs, summarizer includ
 test("a saved Expert binding says settings won't change it, and the editor says what a save removes", async ({
   page,
 }) => {
-  await signIn(page);
-  await page.goto(`/sessions/${process.env.AUTOBOTS_TEST_STALE_SESSION ?? ""}`);
+  const session = need("AUTOBOTS_TEST_STALE_SESSION");
+  const staleExpert = need("AUTOBOTS_TEST_STALE_EXPERT");
+  await signIn(page, users.owner);
+  await page.goto(`/sessions/${session}`);
   const refusal = page.locator('[data-disclosure="not-offered"]');
   await expect(refusal).toContainText("settings won't change it");
   await expect(refusal).not.toContainText("Change it in settings");
-  const refused = await page.request.post("/api/v1/runs", {
-    headers: await write(page, `stale-${Date.now()}`),
-    data: {
-      goal_text: "on a stale Expert",
-      session_id: process.env.AUTOBOTS_TEST_STALE_SESSION,
-      expert_id: process.env.AUTOBOTS_TEST_STALE_EXPERT,
-    },
+  await refusedRun(page, `stale-${Date.now()}`, {
+    goal_text: "on a stale Expert",
+    session_id: session,
+    expert_id: staleExpert,
   });
-  expect(refused.status()).toBe(409);
-  expect((await refused.json()).code).toBe("model_not_offered");
-  await page.goto(`/experts/${process.env.AUTOBOTS_TEST_STALE_EXPERT ?? ""}`);
+  await page.goto(`/experts/${staleExpert}`);
   await expect(page.locator('[data-field="dropped-bindings"]')).toContainText(
     "coder",
   );

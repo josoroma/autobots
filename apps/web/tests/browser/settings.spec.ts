@@ -1,53 +1,51 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 
-import { expect, test, type Page } from "@playwright/test";
+import {
+  parseExpertList,
+  parseExpertView,
+  parseModelList,
+  parseModelPolicyState,
+  parseProviderStatus,
+  type ProviderStatus,
+} from "@autobots/api-client";
+import type { Page } from "@playwright/test";
 
-const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
-const EMAIL_B = process.env.AUTOBOTS_TEST_OWNER_B_EMAIL ?? "";
-const PASSWORD_B = process.env.AUTOBOTS_TEST_OWNER_B_PASSWORD ?? "";
-const EMAIL_C = process.env.AUTOBOTS_TEST_MEMBER_EMAIL ?? "";
-const PASSWORD_C = process.env.AUTOBOTS_TEST_MEMBER_PASSWORD ?? "";
-const WORKSPACE_A = process.env.AUTOBOTS_TEST_WORKSPACE_A ?? "";
-const CATALOG_DOWN = process.env.AUTOBOTS_TEST_CATALOG_DOWN ?? "";
+import {
+  csrfHeaders,
+  expectRefusal,
+  getJson,
+  send,
+  writeHeaders,
+} from "./support/api.ts";
+import { signIn, users } from "./support/auth.ts";
+import { arranged, need, screenshotPath } from "./support/env.ts";
+import { expect, test } from "./support/fixtures.ts";
+import { submitProviderKey, VALID_PROVIDER_KEY } from "./support/keys.ts";
+import { captureBodies } from "./support/leaks.ts";
+
+const stack = arranged({
+  workspaceA: "AUTOBOTS_TEST_WORKSPACE_A",
+  catalogDown: "AUTOBOTS_TEST_CATALOG_DOWN",
+});
 const CREDENTIAL = "/api/settings/model-providers/openrouter/credential";
 const DRAFT = "Summarize the quarterly notes";
-const VALID = "sk-or-valid-arranged-first";
+const VALID = VALID_PROVIDER_KEY;
 
-async function signIn(
-  page: Page,
-  email: string,
-  password: string,
-): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
+function models(page: Page) {
+  return getJson(page, { path: "/api/models", parse: parseModelList });
 }
 
-async function csrf(page: Page): Promise<Record<string, string>> {
-  const token = await (await page.request.get("/api/csrf")).json();
-  return {
-    [token.header]: token.token,
-    Origin: new URL(page.url()).origin,
-    "Content-Type": "application/json",
-  };
-}
-
-async function status(page: Page): Promise<Record<string, unknown>> {
-  return (await page.request.get("/api/settings/model-providers")).json();
-}
-
-async function submitKey(page: Page, key: string): Promise<void> {
-  await page.getByLabel(/API key|Replace key/).fill(key);
-  await page.getByRole("button", { name: "Save & validate" }).click();
+function status(page: Page): Promise<ProviderStatus> {
+  return getJson(page, {
+    path: "/api/settings/model-providers",
+    parse: parseProviderStatus,
+  });
 }
 
 test("without a key, local work stays usable and a model call is credentials_required, with the draft kept", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.getByRole("textbox", { name: "Goal" }).fill(DRAFT);
   const intents: string[] = [];
   page.on("request", (request) => {
@@ -69,7 +67,7 @@ test("without a key, local work stays usable and a model call is credentials_req
     "No key is configured",
   );
   await page.screenshot({
-    path: `${process.env.AUTOBOTS_WEB_SCREENSHOTS}/models-missing.png`,
+    path: screenshotPath("models-missing.png"),
     fullPage: true,
   });
 });
@@ -77,13 +75,13 @@ test("without a key, local work stays usable and a model call is credentials_req
 test("a rejected or uncheckable draft changes nothing and does not say more than it should", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/settings/models");
-  await submitKey(page, "sk-or-reject-arranged");
+  await submitProviderKey(page, "sk-or-reject-arranged");
   await expect(page.getByRole("status")).toContainText("was not accepted");
   await expect(page.getByLabel("API key")).toHaveValue("");
   expect((await status(page)).source).toBe("none");
-  await submitKey(page, "sk-or-down-arranged");
+  await submitProviderKey(page, "sk-or-down-arranged");
   await expect(page.getByRole("status")).toContainText("could not be checked");
   expect((await status(page)).source).toBe("none");
 });
@@ -91,16 +89,13 @@ test("a rejected or uncheckable draft changes nothing and does not say more than
 test("Save and validate encrypts, keeps statuses separate, returns to the draft and starts nothing", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.getByRole("textbox", { name: "Goal" }).fill(DRAFT);
   await page.goto("/settings/models");
-  const bodies: string[] = [];
+  const bodies = captureBodies(page);
   const requests: string[] = [];
-  page.on("response", async (response) =>
-    bodies.push(await response.text().catch(() => "")),
-  );
   page.on("request", (request) => requests.push(request.url()));
-  await submitKey(page, VALID);
+  await submitProviderKey(page, VALID);
   await expect(page.locator('[data-field="auth"]')).toHaveText(
     "The key authenticated.",
   );
@@ -113,8 +108,15 @@ test("Save and validate encrypts, keeps statuses separate, returns to the draft 
     "A configured key does not mean a route was tested",
   );
   await expect(page.locator('[data-field="version"]')).toHaveText("1");
-  await page.waitForTimeout(200);
-  for (const body of bodies) expect(body).not.toContain(VALID);
+  // Every body read so far, the save's own reply among them.
+  const read = await bodies();
+  expect(
+    read.some(
+      (reply) => reply.method === "PUT" && reply.url.endsWith(CREDENTIAL),
+    ),
+    "the credential save's reply was read",
+  ).toBe(true);
+  for (const reply of read) expect(reply.body, reply.url).not.toContain(VALID);
   const stored = await page.evaluate(() =>
     JSON.stringify({
       ...localStorage,
@@ -124,7 +126,7 @@ test("Save and validate encrypts, keeps statuses separate, returns to the draft 
   );
   expect(stored).not.toContain(VALID);
   await page.screenshot({
-    path: `${process.env.AUTOBOTS_WEB_SCREENSHOTS}/models-configured.png`,
+    path: screenshotPath("models-configured.png"),
     fullPage: true,
   });
   await page.getByRole("link", { name: "Return to your draft" }).click();
@@ -136,9 +138,9 @@ test("Save and validate encrypts, keeps statuses separate, returns to the draft 
 test("a bad replacement keeps the prior key, and a stale write is a conflict with no secret", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/settings/models");
-  await submitKey(page, "sk-or-reject-replacement");
+  await submitProviderKey(page, "sk-or-reject-replacement");
   await expect(page.getByRole("status")).toContainText(
     "previous key is unchanged",
   );
@@ -146,16 +148,14 @@ test("a bad replacement keeps the prior key, and a stale write is a conflict wit
   expect(after.source).toBe("app");
   expect(after.credential_version).toBe(1);
   const stale = await page.request.put(CREDENTIAL, {
-    headers: await csrf(page),
+    headers: await csrfHeaders(page),
     data: { draft_key: "sk-or-valid-stale-write", expected_version: 0 },
   });
-  expect(stale.status()).toBe(409);
-  const text = await stale.text();
-  expect(text).not.toContain("sk-or-valid-stale-write");
-  expect(JSON.parse(text).code).toBe("stale_version");
+  expect(await stale.text()).not.toContain("sk-or-valid-stale-write");
+  await expectRefusal(stale, { status: 409, code: "stale_version" });
   expect((await status(page)).credential_version).toBe(1);
   const removed = await page.request.delete(CREDENTIAL, {
-    headers: await csrf(page),
+    headers: await csrfHeaders(page),
     data: { expected_version: 0 },
   });
   expect(removed.status()).toBe(409);
@@ -165,13 +165,11 @@ test("a bad replacement keeps the prior key, and a stale write is a conflict wit
 test("a catalog outage does not undo an authentication-valid save, and is shown separately", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/settings/models");
-  await page.evaluate(() => undefined);
-  const { writeFileSync, rmSync } = await import("node:fs");
-  writeFileSync(CATALOG_DOWN, "");
+  writeFileSync(stack.catalogDown, "");
   try {
-    await submitKey(page, "sk-or-valid-during-outage");
+    await submitProviderKey(page, "sk-or-valid-during-outage");
     await expect(page.locator('[data-field="auth"]')).toHaveText(
       "The key authenticated.",
     );
@@ -179,20 +177,16 @@ test("a catalog outage does not undo an authentication-valid save, and is shown 
       "Unavailable",
     );
     await expect(page.locator('[data-field="version"]')).toHaveText("2");
-    const models = await (await page.request.get("/api/models")).json();
-    expect(models.catalog_status).toBe("unavailable");
-    expect(
-      models.models.every((model: { available: boolean }) => !model.available),
-    ).toBe(true);
+    const during = await models(page);
+    expect(during.catalog_status).toBe("unavailable");
+    expect(during.models.every((model) => !model.available)).toBe(true);
   } finally {
-    rmSync(CATALOG_DOWN);
+    rmSync(stack.catalogDown);
   }
   await page.reload();
   await expect(page.locator('[data-field="catalog"]')).toHaveText("Available");
-  const models = await (await page.request.get("/api/models")).json();
-  expect(
-    models.models.map((model: { profile: string }) => model.profile).sort(),
-  ).toEqual([
+  const after = await models(page);
+  expect(after.models.map((model) => model.profile).sort()).toEqual([
     "openrouter_deepseek_flash",
     "openrouter_sol",
     "openrouter_terra",
@@ -204,16 +198,14 @@ test("a catalog outage does not undo an authentication-valid save, and is shown 
   await expect(
     page.locator('[data-approved-model="openrouter_sol"]'),
   ).not.toContainText("not offered");
-  expect(
-    models.models.every((model: { available: boolean }) => model.available),
-  ).toBe(true);
-  expect(JSON.stringify(models)).not.toContain("sk-or");
+  expect(after.models.every((model) => model.available)).toBe(true);
+  expect(JSON.stringify(after)).not.toContain("sk-or");
 });
 
 test("Validate and Disconnect work, and disconnecting blocks model work again", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/settings/models");
   await page.getByRole("button", { name: "Validate", exact: true }).click();
   // R-19: Validate says it checked, not that it saved.
@@ -229,7 +221,7 @@ test("Validate and Disconnect work, and disconnecting blocks model work again", 
     page.locator('[data-outcome="credentials_required"]'),
   ).toBeVisible();
   await page.goto("/settings/models");
-  await submitKey(page, VALID);
+  await submitProviderKey(page, VALID);
   await expect(page.locator('[data-field="auth"]')).toHaveText(
     "The key authenticated.",
   );
@@ -238,7 +230,7 @@ test("Validate and Disconnect work, and disconnecting blocks model work again", 
 test("an environment-managed key shows no field, cannot be replaced or removed, and stays read-only", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_B, PASSWORD_B);
+  await signIn(page, users.ownerB);
   await page.goto("/settings/models");
   await expect(page.locator('[data-field="source"]')).toContainText(
     "server environment",
@@ -247,17 +239,16 @@ test("an environment-managed key shows no field, cannot be replaced or removed, 
   await expect(page.getByRole("button", { name: "Disconnect" })).toHaveCount(0);
   const before = await status(page);
   const refused = await page.request.put(CREDENTIAL, {
-    headers: await csrf(page),
+    headers: await csrfHeaders(page),
     data: {
       draft_key: "sk-or-valid-over-environment",
       expected_version: before.settings_version,
     },
   });
-  expect(refused.status()).toBe(409);
-  expect((await refused.json()).code).toBe("environment_managed");
+  await expectRefusal(refused, { status: 409, code: "environment_managed" });
   expect(JSON.stringify(await status(page))).not.toContain("sk-or");
   await page.screenshot({
-    path: `${process.env.AUTOBOTS_WEB_SCREENSHOTS}/models-environment.png`,
+    path: screenshotPath("models-environment.png"),
     fullPage: true,
   });
 });
@@ -265,20 +256,19 @@ test("an environment-managed key shows no field, cannot be replaced or removed, 
 test("only an owner can change settings, and a workspace header cannot cross workspaces", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_C, PASSWORD_C);
-  const header = { "X-Autobots-Workspace": WORKSPACE_A };
+  await signIn(page, users.member);
+  const header = { "X-Autobots-Workspace": stack.workspaceA };
   const readable = await page.request.get("/api/settings/model-providers", {
     headers: header,
   });
   expect(readable.status()).toBe(200);
   const refused = await page.request.put(CREDENTIAL, {
-    headers: { ...(await csrf(page)), ...header },
+    headers: { ...(await csrfHeaders(page)), ...header },
     data: { draft_key: "sk-or-valid-not-an-owner", expected_version: 0 },
   });
-  expect(refused.status()).toBe(403);
-  expect((await refused.json()).code).toBe("owner_required");
+  await expectRefusal(refused, { status: 403, code: "owner_required" });
   const policy = await page.request.put("/api/settings/model-policy", {
-    headers: { ...(await csrf(page)), ...header },
+    headers: { ...(await csrfHeaders(page)), ...header },
     data: {
       expected_version: 0,
       default_profile: "openrouter_terra",
@@ -291,9 +281,9 @@ test("only an owner can change settings, and a workspace header cannot cross wor
 test("a workspace outside the session's memberships is refused", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_B, PASSWORD_B);
+  await signIn(page, users.ownerB);
   const refused = await page.request.get("/api/settings/model-providers", {
-    headers: { "X-Autobots-Workspace": WORKSPACE_A },
+    headers: { "X-Autobots-Workspace": stack.workspaceA },
   });
   expect(refused.status()).toBe(403);
 });
@@ -301,23 +291,26 @@ test("a workspace outside the session's memberships is refused", async ({
 test("the model policy is versioned, and refuses an unapproved value", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  const headers = await csrf(page);
-  const saved = await page.request.put("/api/settings/model-policy", {
-    headers,
+  await signIn(page, users.owner);
+  const POLICY = "/api/settings/model-policy";
+  const headers = await csrfHeaders(page);
+  const state = await send(page, {
+    method: "PUT",
+    path: POLICY,
+    key: null,
     data: {
       expected_version: 0,
       default_profile: "openrouter_terra",
       role_overrides: { coder: "openrouter_terra" },
     },
+    status: 200,
+    parse: parseModelPolicyState,
   });
-  expect(saved.status()).toBe(200);
-  const state = await saved.json();
   expect(state.version).toBe(1);
   const coder = state.policy.bindings.find(
-    (binding: { role: string }) => binding.role === "coder",
+    (binding) => binding.role === "coder",
   );
-  expect(coder.profile).toBe("openrouter_terra");
+  expect(coder?.profile).toBe("openrouter_terra");
   // Named on a write, DeepSeek is refused with why, and nothing stored changes.
   for (const data of [
     {
@@ -331,59 +324,56 @@ test("the model policy is versioned, and refuses an unapproved value", async ({
       role_overrides: { coder: "openrouter_deepseek_flash" },
     },
   ]) {
-    const notOffered = await page.request.put("/api/settings/model-policy", {
-      headers,
-      data,
-    });
-    expect(notOffered.status()).toBe(422);
-    const refusal = await notOffered.json();
-    expect(refusal.code).toBe("model_not_offered");
+    const refusal = await expectRefusal(
+      await page.request.put(POLICY, { headers, data }),
+      { status: 422, code: "model_not_offered" },
+    );
     expect(refusal.message).toContain("isn't offered for new runs");
   }
-  const kept = await (
-    await page.request.get("/api/settings/model-policy")
-  ).json();
+  const kept = await getJson(page, {
+    path: POLICY,
+    parse: parseModelPolicyState,
+  });
   expect(kept.version).toBe(1);
   const namedRun = await page.request.post("/api/v1/runs", {
-    headers: { ...headers, "Idempotency-Key": `named-${Date.now()}` },
+    headers: await writeHeaders(page, `named-${Date.now()}`),
     data: { goal_text: "names it", run_profile: "openrouter_deepseek_flash" },
   });
-  expect(namedRun.status()).toBe(422);
-  expect((await namedRun.json()).code).toBe("model_not_offered");
+  await expectRefusal(namedRun, { status: 422, code: "model_not_offered" });
   const expert = await page.request.post("/api/v1/experts", {
-    headers: { ...headers, "Idempotency-Key": `expert-${Date.now()}` },
+    headers: await writeHeaders(page, `expert-${Date.now()}`),
     data: {
       name: "Names DeepSeek",
       config: { role_bindings: { executor: "openrouter_deepseek_flash" } },
     },
   });
-  expect(expert.status()).toBe(422);
-  expect((await expert.json()).code).toBe("model_not_offered");
-  const experts = await (await page.request.get("/api/v1/experts")).json();
+  await expectRefusal(expert, { status: 422, code: "model_not_offered" });
+  const experts = await getJson(page, {
+    path: "/api/v1/experts",
+    parse: parseExpertList,
+  });
   expect(
-    experts.experts.filter(
-      (item: { name: string }) => item.name === "Names DeepSeek",
-    ),
+    experts.experts.filter((item) => item.name === "Names DeepSeek"),
   ).toEqual([]);
-  const created = await (
-    await page.request.post("/api/v1/experts", {
-      headers: { ...headers, "Idempotency-Key": `plain-${Date.now()}` },
-      data: { name: `Plain ${Date.now()}`, config: {} },
-    })
-  ).json();
+  const created = await send(page, {
+    path: "/api/v1/experts",
+    key: `plain-${Date.now()}`,
+    data: { name: `Plain ${Date.now()}`, config: {} },
+    status: 201,
+    parse: parseExpertView,
+  });
   const revision = await page.request.post(
     `/api/v1/experts/${created.id}/versions`,
     {
-      headers: { ...headers, "Idempotency-Key": `revision-${Date.now()}` },
+      headers: await writeHeaders(page, `revision-${Date.now()}`),
       data: {
         expected_version: created.latest_version,
         config: { role_bindings: { executor: "openrouter_deepseek_flash" } },
       },
     },
   );
-  expect(revision.status()).toBe(422);
-  expect((await revision.json()).code).toBe("model_not_offered");
-  const stale = await page.request.put("/api/settings/model-policy", {
+  await expectRefusal(revision, { status: 422, code: "model_not_offered" });
+  const stale = await page.request.put(POLICY, {
     headers,
     data: {
       expected_version: 0,
@@ -392,7 +382,7 @@ test("the model policy is versioned, and refuses an unapproved value", async ({
     },
   });
   expect(stale.status()).toBe(409);
-  const unknown = await page.request.put("/api/settings/model-policy", {
+  const unknown = await page.request.put(POLICY, {
     headers,
     data: {
       expected_version: 1,
@@ -404,9 +394,6 @@ test("the model policy is versioned, and refuses an unapproved value", async ({
 });
 
 test("no secret ever appears in these logs", () => {
-  const log = readFileSync(
-    process.env.AUTOBOTS_TEST_UPSTREAM_LOG ?? "",
-    "utf8",
-  );
+  const log = readFileSync(need("AUTOBOTS_TEST_UPSTREAM_LOG"), "utf8");
   expect(log).not.toContain("sk-or");
 });

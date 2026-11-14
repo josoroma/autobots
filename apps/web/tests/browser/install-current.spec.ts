@@ -1,23 +1,24 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+import { signIn, users } from "./support/auth.ts";
+import { optional } from "./support/env.ts";
+import { expect, test } from "./support/fixtures.ts";
+import { expectNoPrivateValues } from "./support/leaks.ts";
 
 // Decision 0023, read-only on the persistent install: `persistent_install.py screens` runs it, signed in as
 // the owner from the install's own record. It writes nothing. No other suite runs it.
-const EMAIL = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
-const SHOTS = process.env.AUTOBOTS_TEST_SCREENSHOTS ?? "";
 
-async function signIn(page: Page): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(EMAIL);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
+// scripts/persistent_install.py names this directory, and a run by hand takes no screenshot.
+async function shoot(page: Page, file: string): Promise<void> {
+  const shots = optional("AUTOBOTS_TEST_SCREENSHOTS", "");
+  if (shots)
+    await page.screenshot({ path: `${shots}/${file}`, fullPage: true });
 }
 
 test("US-16.4: Settings → Models shows Sol qualified from today's live pass", async ({
   page,
 }) => {
-  await signIn(page);
+  await signIn(page, users.owner);
   await page.goto("/settings/models");
   const sol = page.locator('[data-route="openrouter_sol"]');
   await expect(sol.locator('[data-route-field="status"]')).toHaveText(
@@ -32,30 +33,27 @@ test("US-16.4: Settings → Models shows Sol qualified from today's live pass", 
   await expect(sol.locator('[data-route-field="configuration"]')).toContainText(
     "openai/gpt-6.1-sol",
   );
-  if (SHOTS)
-    await page.screenshot({ path: `${SHOTS}/models.png`, fullPage: true });
+  await shoot(page, "models.png");
 });
 
 test("US-16.4: Operations reads the schema ready, with every shipped migration applied", async ({
   page,
 }) => {
-  await signIn(page);
+  await signIn(page, users.owner);
   await page.goto("/operations");
   await expect(page.locator('[data-field="value-schema"]')).toHaveText(
     /^(\d+) of \1 migrations applied\.$/,
   );
-  const text = await page.locator("main").innerText();
-  for (const leak of ["127.0.0.1", "sk-or-", "eyJ"]) {
-    expect(text).not.toContain(leak);
-  }
-  if (SHOTS)
-    await page.screenshot({ path: `${SHOTS}/operations.png`, fullPage: true });
+  expectNoPrivateValues(await page.locator("main").innerText(), {
+    label: "Operations",
+  });
+  await shoot(page, "operations.png");
 });
 
 test("US-16.5: Experts and Workflows show the concept seed", async ({
   page,
 }) => {
-  await signIn(page);
+  await signIn(page, users.owner);
   await page.goto("/experts");
   for (const name of [
     "Market watcher",
@@ -66,8 +64,7 @@ test("US-16.5: Experts and Workflows show the concept seed", async ({
   ]) {
     await expect(page.getByText(name, { exact: true }).first()).toBeVisible();
   }
-  if (SHOTS)
-    await page.screenshot({ path: `${SHOTS}/experts.png`, fullPage: true });
+  await shoot(page, "experts.png");
   await page.goto("/workflows");
   for (const name of [
     "Weekly competitor brief",
@@ -79,14 +76,13 @@ test("US-16.5: Experts and Workflows show the concept seed", async ({
   ]) {
     await expect(page.getByText(name, { exact: true }).first()).toBeVisible();
   }
-  if (SHOTS)
-    await page.screenshot({ path: `${SHOTS}/workflows.png`, fullPage: true });
+  await shoot(page, "workflows.png");
 });
 
 test("US-16.5: Runs shows the real example runs with their outcomes", async ({
   page,
 }) => {
-  await signIn(page);
+  await signIn(page, users.owner);
   await page.goto("/runs");
   await expect(
     page.getByText(/Work out what US\$1,000 grows to/).first(),
@@ -97,14 +93,13 @@ test("US-16.5: Runs shows the real example runs with their outcomes", async ({
   await expect(
     page.getByText(/Workflow Vendor due diligence/).first(),
   ).toBeVisible();
-  if (SHOTS)
-    await page.screenshot({ path: `${SHOTS}/runs.png`, fullPage: true });
+  await shoot(page, "runs.png");
 });
 
 test("US-16.5: Approvals shows the workflow's request waiting, with requester, run and fields", async ({
   page,
 }) => {
-  await signIn(page);
+  await signIn(page, users.owner);
   await page.goto("/approvals");
   const main = page.locator("main");
   await expect(main.getByText(/workflow_approval/).first()).toBeVisible();
@@ -112,10 +107,6 @@ test("US-16.5: Approvals shows the workflow's request waiting, with requester, r
   await expect(main).toContainText(
     "This workflow has an approval step, so policy holds it for a person.",
   );
-  const text = await main.innerText();
-  for (const leak of ["sk-or-", "eyJ", "127.0.0.1"]) {
-    expect(text).not.toContain(leak);
-  }
-  if (SHOTS)
-    await page.screenshot({ path: `${SHOTS}/approvals.png`, fullPage: true });
+  expectNoPrivateValues(await main.innerText(), { label: "Approvals" });
+  await shoot(page, "approvals.png");
 });

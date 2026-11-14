@@ -1,16 +1,18 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
-import { execFileSync } from "node:child_process";
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+
+import { parseLocalStatus } from "@autobots/api-client";
+
+import { expectNoA11yViolations, WCAG_22_AA } from "./support/a11y.ts";
+import { getJson } from "./support/api.ts";
+import { signIn, users } from "./support/auth.ts";
+import { need } from "./support/env.ts";
+import { objectOf, runDbHelper } from "./support/db-helpers.ts";
+import { expect, test } from "./support/fixtures.ts";
+import { expectNoPrivateValues } from "./support/leaks.ts";
 
 // US-15.18, PRD-Studio OP-01, OP-02 and OP-04. scripts/qualify_identity.py arranges the ops-n workspace:
 // one job that lost its worker, one leased and one queued that no worker may take, and published
 // artifacts of 1,000 and 2,345 bytes. tests/db/operations_live.py adds two live worker heartbeats.
-const OPS_EMAIL = process.env.AUTOBOTS_TEST_OPS_EMAIL ?? "";
-const OPS_PASSWORD = process.env.AUTOBOTS_TEST_OPS_PASSWORD ?? "";
-const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
-const BACKUPS = process.env.AUTOBOTS_TEST_BACKUP_DIR ?? "";
 // Decision 0022 D5's values, exactly, and Decision 0023 E2's shipped count.
 const D5 = [
   "applied_migrations",
@@ -33,54 +35,35 @@ const MIGRATIONS = readdirSync("../../supabase/migrations").filter((name) =>
 
 test.describe.configure({ mode: "serial" });
 
-function heartbeats(action: "start" | "stop"): { live: number } {
-  const printed = execFileSync(
-    process.env.AUTOBOTS_TEST_PYTHON ?? "",
-    [process.env.AUTOBOTS_TEST_OPS_HELPER ?? "", action],
-    {
-      env: {
-        ...process.env,
-        AUTOBOTS_DATABASE_URL: process.env.AUTOBOTS_TEST_RUNTIME_URL ?? "",
-        PYTHONPATH: process.env.AUTOBOTS_TEST_PYTHONPATH ?? "",
-      },
-      encoding: "utf8",
-    },
+function heartbeats(action: "start" | "stop"): Promise<{ live: number }> {
+  return runDbHelper(
+    "operations_live.py",
+    [action],
+    objectOf({ live: "number" }),
   );
-  return JSON.parse(printed.trim().split("\n").at(-1) ?? "{}");
 }
 
-async function signIn(
-  page: Page,
-  email: string,
-  password: string,
-): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
-}
-
-test.beforeAll(() => {
-  expect(OPS_EMAIL, "the ops-n workspace is arranged").not.toBe("");
-  expect(heartbeats("start").live).toBe(2);
+test.beforeAll(async () => {
+  // The ops-n workspace is arranged, or this names the variable that's missing.
+  need("AUTOBOTS_TEST_OPS_EMAIL");
+  expect((await heartbeats("start")).live).toBe(2);
 });
 
 // A later suite expects no worker, so the two stop whatever happens here.
-test.afterAll(() => {
-  heartbeats("stop");
+test.afterAll(async () => {
+  await heartbeats("stop");
 });
 
 test("the verdict counts the checks shown, two workers and the hold, and each check shows its value", async ({
   page,
 }) => {
-  await signIn(page, OPS_EMAIL, OPS_PASSWORD);
+  await signIn(page, users.ops);
   // At least 20 readiness probes, so the database time is a p95 over a full window.
   for (let probe = 0; probe < 20; probe += 1) {
     const reply = await page.request.get("/api/v1/readiness");
     expect(reply.status()).toBe(200);
   }
-  heartbeats("start");
+  await heartbeats("start");
   await page.goto("/operations");
   await expect(page.getByText("Ready. New work can start.")).toBeVisible();
   const checks = page.locator('[data-field="checks"] > li');
@@ -125,56 +108,49 @@ test("the verdict counts the checks shown, two workers and the hold, and each ch
   await expect(page.locator('[data-field="loopback"]')).toContainText(
     "the API listens on this Mac's loopback only.",
   );
-  const scan = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-    .analyze();
-  expect(scan.violations).toEqual([]);
+  await expectNoA11yViolations(page, { extraTags: WCAG_22_AA });
 });
 
 test("the status response holds D5's values only, with no path or secret, and tracing off", async ({
   page,
 }) => {
-  await signIn(page, OPS_EMAIL, OPS_PASSWORD);
-  const reply = await page.request.get("/api/v1/operations/local-status");
-  expect(reply.status()).toBe(200);
-  const body = await reply.json();
+  await signIn(page, users.ops);
+  const body = await getJson(page, {
+    path: "/api/v1/operations/local-status",
+    parse: parseLocalStatus,
+  });
   expect(Object.keys(body.values).sort()).toEqual(D5);
-  const values = JSON.stringify(body.values);
-  for (const leak of ["/", "\\", "127.0.0.1", "localhost", "sk-or-", "eyJ"])
-    expect(values).not.toContain(leak);
-  const whole = JSON.stringify(body);
-  for (const leak of [
-    "/Users/",
-    "/private/",
-    "127.0.0.1",
-    "postgres://",
-    "postgresql://",
-    "sk-or-",
-    "eyJ",
-  ])
-    expect(whole).not.toContain(leak);
+  // The values hold no path at all, so neither separator may appear.
+  expectNoPrivateValues(JSON.stringify(body.values), {
+    label: "the values",
+    extra: ["/", "\\"],
+  });
+  expectNoPrivateValues(JSON.stringify(body), { label: "the status" });
   expect(body.remote_tracing).toBe("disabled");
-  expect(body.values.disk_free_bytes).toBeLessThanOrEqual(
-    body.values.disk_total_bytes,
-  );
+  const { disk_free_bytes: free, disk_total_bytes: total } = body.values;
+  expect(
+    free !== null && total !== null && free <= total,
+    `${free} of ${total} bytes free`,
+  ).toBe(true);
 });
 
 test("the delayed schedules, backups, restores, tracing, model routes and retention still show", async ({
   page,
 }) => {
-  mkdirSync(`${BACKUPS}/arranged-values`, { recursive: true });
+  const backup = `${need("AUTOBOTS_TEST_BACKUP_DIR")}/arranged-values`;
+  mkdirSync(backup, { recursive: true });
   writeFileSync(
-    `${BACKUPS}/arranged-values/manifest.json`,
+    `${backup}/manifest.json`,
     JSON.stringify({
       created_at: new Date(Date.now() - 3 * 3_600_000).toISOString(),
     }),
   );
   writeFileSync(
-    `${BACKUPS}/arranged-values/restores.jsonl`,
+    `${backup}/restores.jsonl`,
     `${JSON.stringify({ at: "2026-11-07T09:00:00+00:00", result: "passed", checks_passed: 12, checks_total: 12 })}\n`,
   );
   try {
-    await signIn(page, EMAIL_A, PASSWORD_A);
+    await signIn(page, users.owner);
     await page.goto("/operations");
     await expect(page.locator('[data-field="delayed"]')).toContainText(
       "Arranged nightly report",
@@ -192,6 +168,6 @@ test("the delayed schedules, backups, restores, tracing, model routes and retent
       /^\d+ of \d+ checks pass$/,
     );
   } finally {
-    rmSync(`${BACKUPS}/arranged-values`, { recursive: true });
+    rmSync(backup, { recursive: true });
   }
 });

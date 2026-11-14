@@ -1,66 +1,40 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
-import { spawn } from "node:child_process";
-import { createInterface } from "node:readline";
+import type { Page } from "@playwright/test";
+
+import { expectNoA11yViolations, WCAG_22_AA } from "./support/a11y.ts";
+import { signIn, users } from "./support/auth.ts";
+import { objectOf } from "./support/db-helpers.ts";
+import { need } from "./support/env.ts";
+import { expect, test, type StartDbStream } from "./support/fixtures.ts";
 
 // US-15.24, PRD-Studio ST-01 and Decision 0022 D4. tests/db/result_stream_live.py admits a run in the
 // ops-n workspace, prints its ID, waits for the page, then writes its result with a streaming scripted
 // model whose pieces are spaced out, and prints the outcome once the result is stored.
-const EMAIL = process.env.AUTOBOTS_TEST_OPS_EMAIL ?? "";
-const PASSWORD = process.env.AUTOBOTS_TEST_OPS_PASSWORD ?? "";
-const WORKSPACE = process.env.AUTOBOTS_TEST_OPS_WORKSPACE ?? "";
+const parseOutcome = objectOf({
+  run_id: "string",
+  status: "string",
+  durable_deltas: "number",
+  content: "string",
+});
+type Outcome = ReturnType<typeof parseOutcome>;
 
-type Outcome = {
-  run_id: string;
-  status: string;
-  durable_deltas: number;
-  content: string;
-};
-
+/** Starts the helper. Each promise rejects, naming the helper, if it ends before printing that line. */
 function launch(
+  start: StartDbStream,
   delay: number,
   wait: number,
 ): { runId: Promise<string>; done: Promise<Outcome> } {
-  const child = spawn(
-    process.env.AUTOBOTS_TEST_PYTHON ?? "",
-    [
-      process.env.AUTOBOTS_TEST_STREAM_HELPER ?? "",
-      WORKSPACE,
-      String(delay),
-      String(wait),
-    ],
+  const stream = start(
+    "result_stream_live.py",
+    [need("AUTOBOTS_TEST_OPS_WORKSPACE"), String(delay), String(wait)],
     {
-      env: {
-        ...process.env,
-        AUTOBOTS_DATABASE_URL: process.env.AUTOBOTS_TEST_RUNTIME_URL ?? "",
-        AUTOBOTS_STORAGE_BASE: process.env.AUTOBOTS_TEST_STORAGE_BASE ?? "",
-        AUTOBOTS_STORAGE_SERVICE: process.env.AUTOBOTS_TEST_SERVICE_KEY ?? "",
-        PYTHONPATH: process.env.AUTOBOTS_TEST_PYTHONPATH ?? "",
-      },
-      stdio: ["ignore", "pipe", "inherit"],
+      AUTOBOTS_STORAGE_BASE: need("AUTOBOTS_TEST_STORAGE_BASE"),
+      AUTOBOTS_STORAGE_SERVICE: need("AUTOBOTS_TEST_SERVICE_KEY"),
     },
   );
-  const lines = createInterface({ input: child.stdout });
-  const seen: string[] = [];
-  let first: (id: string) => void = () => undefined;
-  let last: (outcome: Outcome) => void = () => undefined;
-  const runId = new Promise<string>((resolve) => (first = resolve));
-  const done = new Promise<Outcome>((resolve) => (last = resolve));
-  lines.on("line", (line) => {
-    seen.push(line);
-    const parsed = JSON.parse(line) as Partial<Outcome>;
-    if (seen.length === 1) first(parsed.run_id ?? "");
-    else last(parsed as Outcome);
-  });
-  return { runId, done };
-}
-
-async function signIn(page: Page): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(EMAIL);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
+  const runId = stream
+    .next(objectOf({ run_id: "string" }))
+    .then((line) => line.run_id);
+  return { runId, done: stream.next(parseOutcome) };
 }
 
 const resultText = (page: Page) =>
@@ -68,11 +42,11 @@ const resultText = (page: Page) =>
 
 test("the result appears while it's written, and then the stored artifact replaces it exactly", async ({
   page,
+  dbStream,
 }) => {
   test.setTimeout(90_000);
-  expect(WORKSPACE, "the ops-n workspace is arranged").not.toBe("");
-  await signIn(page);
-  const { runId, done } = launch(0.02, 5);
+  await signIn(page, users.ops);
+  const { runId, done } = launch(dbStream, 0.02, 5);
   await page.goto(`/runs/${await runId}`);
   const live = page.locator('[data-field="live-result"]');
   await expect(live).toBeVisible({ timeout: 20_000 });
@@ -81,10 +55,7 @@ test("the result appears while it's written, and then the stored artifact replac
   await expect(page.locator('[data-field="live-note"]')).toContainText(
     "Being written.",
   );
-  const scan = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-    .analyze();
-  expect(scan.violations).toEqual([]);
+  await expectNoA11yViolations(page, { extraTags: WCAG_22_AA });
   const outcome = await done;
   expect(outcome.status).toBe("succeeded");
   expect(outcome.durable_deltas).toBe(0);
@@ -101,10 +72,11 @@ test("the result appears while it's written, and then the stored artifact replac
 test("after the stream is cut while the result is written, the view is rebuilt from the stored artifact", async ({
   page,
   context,
+  dbStream,
 }) => {
   test.setTimeout(90_000);
-  await signIn(page);
-  const { runId, done } = launch(0.02, 5);
+  await signIn(page, users.ops);
+  const { runId, done } = launch(dbStream, 0.02, 5);
   await page.goto(`/runs/${await runId}`);
   await expect(page.locator('[data-field="live-result"]')).toBeVisible({
     timeout: 20_000,
@@ -123,31 +95,33 @@ test("after the stream is cut while the result is written, the view is rebuilt f
 
 test("with Stream text as it's written off, no live text is shown, and the stored result is", async ({
   page,
+  dbStream,
 }) => {
   test.setTimeout(90_000);
   await page.addInitScript(() =>
     window.localStorage.setItem("autobots.stream", "off"),
   );
-  await signIn(page);
+  await signIn(page, users.ops);
   await page.goto("/settings");
   await expect(
     page.getByRole("checkbox", { name: "Stream text as it's written" }),
   ).not.toBeChecked();
-  const { runId, done } = launch(0.02, 5);
+  const { runId, done } = launch(dbStream, 0.02, 5);
   await page.goto(`/runs/${await runId}`);
   let shown = 0;
   let finished = false;
-  const outcome = done.then((value) => {
+  // Settled either way, so a helper that fails ends the loop instead of the test's timeout.
+  const outcome = done.finally(() => {
     finished = true;
-    return value;
   });
   while (!finished) {
     shown += await page.locator('[data-field="live-result"]').count();
     await page.waitForTimeout(200);
   }
+  const stored = await outcome;
   expect(shown).toBe(0);
   await expect(page.locator('[data-field="result-text"]')).toBeVisible({
     timeout: 20_000,
   });
-  expect(await resultText(page)).toBe((await outcome).content);
+  expect(await resultText(page)).toBe(stored.content);
 });

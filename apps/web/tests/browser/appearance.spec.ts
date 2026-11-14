@@ -1,15 +1,16 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import type { BrowserContext, Page } from "@playwright/test";
+
+import { expectNoA11yViolations, WCAG_22_AA } from "./support/a11y.ts";
+import { screenshotPath } from "./support/env.ts";
+import { expect, test } from "./support/fixtures.ts";
 
 const LUMA = readFileSync(
   join(__dirname, "../../../../docs/design/luma.css"),
   "utf8",
 );
-const SCREENSHOTS =
-  process.env.AUTOBOTS_WEB_SCREENSHOTS ?? "test-results/screenshots";
 const SEEN = `
   window.__seen = [];
   const record = () => {
@@ -88,26 +89,25 @@ async function setStored(
 
 for (const colorScheme of ["light", "dark"] as const) {
   test(`fresh visit renders dark with a ${colorScheme} operating system`, async ({
-    browser,
+    openContext,
   }) => {
-    const context = await browser.newContext({ colorScheme });
+    const context = await openContext({ colorScheme });
     const page = await context.newPage();
     const problems = failOnHydrationProblem(page);
     await visit(page);
     await expectConsistent(page, "dark");
     expect(problems).toEqual([]);
     await page.screenshot({
-      path: `${SCREENSHOTS}/first-visit-dark-os-${colorScheme}.png`,
+      path: screenshotPath(`first-visit-dark-os-${colorScheme}.png`),
       fullPage: true,
     });
-    await context.close();
   });
 }
 
 test("the server's HTML is already dark, before any script runs", async ({
-  browser,
+  openContext,
 }) => {
-  const context = await browser.newContext({
+  const context = await openContext({
     javaScriptEnabled: false,
     colorScheme: "light",
   });
@@ -123,7 +123,6 @@ test("the server's HTML is already dark, before any script runs", async ({
     return { actual: getComputedStyle(body).backgroundColor, wanted };
   });
   expect(colors.actual).toBe(colors.wanted);
-  await context.close();
 });
 
 test("the consumed tokens render exactly as the canonical file says, in both modes", async ({
@@ -182,9 +181,9 @@ test("there is one token definition, imported unedited", () => {
 });
 
 test("an explicit light choice persists across navigation and reload, before paint", async ({
-  browser,
+  openContext,
 }) => {
-  const context = await browser.newContext({ colorScheme: "dark" });
+  const context = await openContext({ colorScheme: "dark" });
   const page = await context.newPage();
   const problems = failOnHydrationProblem(page);
   const requests: string[] = [];
@@ -200,7 +199,7 @@ test("an explicit light choice persists across navigation and reload, before pai
     await page.evaluate(() => localStorage.getItem("autobots.theme")),
   ).toBe("light");
   await page.screenshot({
-    path: `${SCREENSHOTS}/settings-light.png`,
+    path: screenshotPath("settings-light.png"),
     fullPage: true,
   });
   await page.goto("/");
@@ -210,28 +209,26 @@ test("an explicit light choice persists across navigation and reload, before pai
   await page.waitForLoadState("networkidle");
   await expectConsistent(page, "light");
   await page.screenshot({
-    path: `${SCREENSHOTS}/home-light-after-reload.png`,
+    path: screenshotPath("home-light-after-reload.png"),
     fullPage: true,
   });
   expect(problems).toEqual([]);
-  await context.close();
 });
 
-test("an explicit dark choice persists too", async ({ browser }) => {
-  const context = await browser.newContext({ colorScheme: "light" });
+test("an explicit dark choice persists too", async ({ openContext }) => {
+  const context = await openContext({ colorScheme: "light" });
   await setStored(context, "dark");
   const page = await context.newPage();
   await visit(page);
   await expectConsistent(page, "dark");
-  await context.close();
 });
 
 // "system" is a choice now (Decision 0022 D2). Any other value, even "System", is not.
 for (const stored of ["garbage", "", "System"]) {
   test(`an invalid saved value "${stored}" falls back to dark`, async ({
-    browser,
+    openContext,
   }) => {
-    const context = await browser.newContext({ colorScheme: "light" });
+    const context = await openContext({ colorScheme: "light" });
     await setStored(context, stored);
     const page = await context.newPage();
     await visit(page);
@@ -240,14 +237,13 @@ for (const stored of ["garbage", "", "System"]) {
       new RegExp(`light${stored ? `|${stored}` : ""}`),
     );
     await expectConsistent(page, "dark");
-    await context.close();
   });
 }
 
 test("unavailable storage falls back to dark without crashing, and a choice works for the session", async ({
-  browser,
+  openContext,
 }) => {
-  const context = await browser.newContext({ colorScheme: "light" });
+  const context = await openContext({ colorScheme: "light" });
   await context.addInitScript(() => {
     Object.defineProperty(window, "localStorage", {
       get() {
@@ -267,30 +263,25 @@ test("unavailable storage falls back to dark without crashing, and a choice work
   await page.reload();
   await page.waitForLoadState("networkidle");
   await expect(page.locator("html")).toHaveClass(/dark/);
-  await context.close();
 });
 
 for (const theme of ["dark", "light"] as const) {
   for (const path of ["/", "/settings"]) {
     test(`no automated accessibility violation: ${path} in ${theme}`, async ({
-      browser,
+      openContext,
     }) => {
-      const context = await browser.newContext();
+      const context = await openContext();
       await setStored(context, theme);
       const page = await context.newPage();
       await visit(page, path);
-      const results = await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-        .analyze();
-      expect(
-        results.violations.map((item) => `${item.id}: ${item.nodes.length}`),
-      ).toEqual([]);
-      await context.close();
+      await expectNoA11yViolations(page);
     });
   }
 
-  test(`keyboard flow, focus and dialog in ${theme}`, async ({ browser }) => {
-    const context = await browser.newContext();
+  test(`keyboard flow, focus and dialog in ${theme}`, async ({
+    openContext,
+  }) => {
+    const context = await openContext();
     await setStored(context, theme);
     const page = await context.newPage();
     await visit(page);
@@ -325,11 +316,10 @@ for (const theme of ["dark", "light"] as const) {
       return { actual: getComputedStyle(element).backgroundColor, expected };
     });
     expect(surface.actual).toBe(surface.expected);
-    await page.screenshot({ path: `${SCREENSHOTS}/dialog-${theme}.png` });
+    await page.screenshot({ path: screenshotPath(`dialog-${theme}.png`) });
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
     await expect(opener).toBeFocused();
-    await context.close();
   });
 }
 
@@ -344,9 +334,9 @@ test("status meaning is in text and icon, not color alone", async ({
 });
 
 test("the settings radios have labels and are usable by keyboard", async ({
-  browser,
+  openContext,
 }) => {
-  const context = await browser.newContext();
+  const context = await openContext();
   const page = await context.newPage();
   await visit(page, "/settings");
   // System, Light, Dark: one step back from the first visit's Dark is Light.
@@ -356,14 +346,13 @@ test("the settings radios have labels and are usable by keyboard", async ({
   await expect(page.locator("html")).toHaveClass(/light/);
   await page.setViewportSize({ width: 640, height: 800 });
   await expect(page.getByRole("radio", { name: "Dark" })).toBeVisible();
-  await context.close();
 });
 
 // US-15.20, PRD-Studio SE-03 and DS-02 as amended by Decision 0022 D2.
 test("System follows the OS only once chosen, and a reload restores it before paint", async ({
-  browser,
+  openContext,
 }) => {
-  const context = await browser.newContext({ colorScheme: "light" });
+  const context = await openContext({ colorScheme: "light" });
   const page = await context.newPage();
   const problems = failOnHydrationProblem(page);
   await visit(page, "/settings");
@@ -389,11 +378,10 @@ test("System follows the OS only once chosen, and a reload restores it before pa
   await page.waitForLoadState("networkidle");
   await expectConsistent(page, "light");
   await page.screenshot({
-    path: `${SCREENSHOTS}/settings-system-light.png`,
+    path: screenshotPath("settings-system-light.png"),
     fullPage: true,
   });
   expect(problems).toEqual([]);
-  await context.close();
 });
 
 async function presentation(page: Page): Promise<{
@@ -420,9 +408,9 @@ async function presentation(page: Page): Promise<{
 }
 
 test("serif documents, density and forced reduced motion apply, survive a reload, and motion otherwise follows the OS", async ({
-  browser,
+  openContext,
 }) => {
-  const context = await browser.newContext({ reducedMotion: "no-preference" });
+  const context = await openContext({ reducedMotion: "no-preference" });
   const page = await context.newPage();
   const problems = failOnHydrationProblem(page);
   const requests: string[] = [];
@@ -475,22 +463,18 @@ test("serif documents, density and forced reduced motion apply, survive a reload
     await page
       .getByRole("radio", { name: theme === "dark" ? "Dark" : "Light" })
       .check();
-    const results = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-      .analyze();
-    expect(
-      results.violations.map((item) => `${item.id}: ${item.nodes.length}`),
-      `${theme}, compact and sans documents`,
-    ).toEqual([]);
+    await expectNoA11yViolations(page, {
+      extraTags: WCAG_22_AA,
+      label: `${theme}, compact and sans documents`,
+    });
   }
   expect(problems).toEqual([]);
-  await context.close();
 });
 
 test("invalid stored preferences are ignored, and unwritable storage keeps a choice for the page", async ({
-  browser,
+  openContext,
 }) => {
-  const invalid = await browser.newContext({ reducedMotion: "no-preference" });
+  const invalid = await openContext({ reducedMotion: "no-preference" });
   await invalid.addInitScript(() => {
     localStorage.setItem("autobots.serif", "maybe");
     localStorage.setItem("autobots.density", "huge");
@@ -503,9 +487,8 @@ test("invalid stored preferences are ignored, and unwritable storage keeps a cho
   expect(shown.padding).toBe(20);
   expect(shown.transition).toBe("0.3s");
   await expect(page.locator("html")).toHaveClass(/dark/);
-  await invalid.close();
 
-  const unavailable = await browser.newContext({
+  const unavailable = await openContext({
     colorScheme: "light",
     reducedMotion: "no-preference",
   });
@@ -529,5 +512,4 @@ test("invalid stored preferences are ignored, and unwritable storage keeps a cho
     .uncheck();
   expect((await presentation(blocked)).font).not.toContain("Georgia");
   expect(errors).toEqual([]);
-  await unavailable.close();
 });

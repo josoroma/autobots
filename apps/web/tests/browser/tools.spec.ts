@@ -1,16 +1,17 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { parseToolDescriptor } from "@autobots/api-client";
+import type { Page, Route } from "@playwright/test";
+
+import { expectNoA11yViolations } from "./support/a11y.ts";
+import { getJson } from "./support/api.ts";
+import { addSessionCookie } from "./support/auth.ts";
+import { need } from "./support/env.ts";
+import { expect, test } from "./support/fixtures.ts";
 
 // US-14.2 against the real API app with an arranged membership, run by scripts/qualify_web.py.
 // That API's environment has no GitHub variables, so create_github_issue reads key_missing.
 
-const ORIGIN = process.env.AUTOBOTS_WEB_URL ?? "";
-const SESSION_A = process.env.AUTOBOTS_TEST_SESSION_A ?? "";
-
 async function signedIn(page: Page, path: string): Promise<void> {
-  await page
-    .context()
-    .addCookies([{ name: "autobots.session", value: SESSION_A, url: ORIGIN }]);
+  await addSessionCookie(page, need("AUTOBOTS_TEST_SESSION_A"));
   await page.goto(path);
 }
 
@@ -23,15 +24,6 @@ const DOWN = {
     message: "The local API is unavailable.",
   },
 };
-
-async function noViolations(page: Page): Promise<void> {
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-    .analyze();
-  expect(
-    results.violations.map((item) => `${item.id}: ${item.nodes.length}`),
-  ).toEqual([]);
-}
 
 test("Tools sits under Build after Workflows and lists tools by group", async ({
   page,
@@ -95,7 +87,7 @@ test("Tools sits under Build after Workflows and lists tools by group", async ({
   await expect(calculate).toContainText("calculate v1");
   await expect(calculate).toContainText("Available");
   await expect(calculate).toContainText("Pure");
-  await noViolations(page);
+  await expectNoA11yViolations(page);
 });
 
 test("filters live in the URL, so a view can be linked", async ({ page }) => {
@@ -155,7 +147,7 @@ test("a tool's detail lists its versions and every field", async ({ page }) => {
   ).toContainText("Required");
   await page.getByText("JSON Schema").click();
   await expect(page.locator("pre")).toContainText('"CalculateInput"');
-  await noViolations(page);
+  await expectNoA11yViolations(page);
 
   await signedIn(page, "/tools/create_github_issue");
   await expect(page.locator('[data-field="key"]')).toHaveText(
@@ -221,14 +213,15 @@ test("group counts, text filter, the tool modal and Copy schema", async ({
     "Copied the input schema of version 1.",
   );
   const copied = await page.evaluate(() => navigator.clipboard.readText());
-  const version = await (
-    await page.request.get("/api/v1/tools/calculate/versions/1")
-  ).json();
+  const version = await getJson(page, {
+    path: "/api/v1/tools/calculate/versions/1",
+    parse: parseToolDescriptor,
+  });
   expect(JSON.parse(copied)).toEqual(version.input_schema);
   expect(version.guide.what).toBe(
     "Computes the sum, mean, minimum or maximum of a list of numbers.",
   );
-  await noViolations(page);
+  await expectNoA11yViolations(page);
 
   // Escape, Close and a click on the backdrop each close it, and focus returns to the link.
   await page.keyboard.press("Escape");
@@ -269,7 +262,7 @@ test("a tool's modal opens from its URL and passes axe in both themes", async ({
     );
     await expect(dialog.locator('[data-guide="when"]')).not.toBeEmpty();
     await expect(page.locator("html")).toHaveClass(new RegExp(theme));
-    await noViolations(page);
+    await expectNoA11yViolations(page);
   }
 });
 

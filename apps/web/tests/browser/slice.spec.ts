@@ -1,63 +1,43 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import {
+  parseReconciliationResult,
+  parseRunCommandResult,
+  parseRunWorkspace,
+} from "@autobots/api-client";
+import type { Page } from "@playwright/test";
 
-const EMAIL = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
-
-async function signIn(page: Page): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(EMAIL);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
-  await page.goto("/settings/models");
-  const source = page.locator('[data-field="source"]');
-  await expect(source).toBeVisible();
-  if ((await source.textContent())?.trim() === "None") {
-    await page
-      .getByLabel(/API key|Replace key/)
-      .fill("sk-or-valid-arranged-first");
-    await page.getByRole("button", { name: "Save & validate" }).click();
-    await expect(page.locator('[data-field="auth"]')).toHaveText(
-      "The key authenticated.",
-    );
-  }
-  await page.goto("/");
-}
-
-async function write(page: Page, key: string): Promise<Record<string, string>> {
-  const token = await (await page.request.get("/api/csrf")).json();
-  return {
-    [token.header]: token.token,
-    Origin: new URL(page.url()).origin,
-    "Content-Type": "application/json",
-    "Idempotency-Key": key,
-  };
-}
+import { expectNoA11yViolations } from "./support/a11y.ts";
+import { expectRefusal, getJson, send } from "./support/api.ts";
+import { signIn, users } from "./support/auth.ts";
+import { twoCountsRun, WorkerScenario } from "./support/builders.ts";
+import { expect, test } from "./support/fixtures.ts";
+import { ensureProviderKey } from "./support/keys.ts";
+import { admitRun, readRun, runCommand } from "./support/runs.ts";
 
 // Different every run, so nothing can pass by knowing the answer in advance.
 const FIRST = 100 + Math.floor(Math.random() * 800);
 const SECOND = 100 + Math.floor(Math.random() * 800);
 const TOTAL = `Total: ${FIRST + SECOND}`;
 
-async function admit(page: Page, goal: string): Promise<string> {
-  const reply = await page.request.post("/api/v1/runs", {
-    headers: await write(page, goal),
-    data: {
-      goal_text: `${goal}: report the total of the two counts`,
-      limit_micro_usd: 1000000,
-      acceptance_criteria: ["The report states the correct total"],
-      required_artifacts: [{ name: "report.md", must_contain: [TOTAL] }],
-      input_documents: [
-        {
-          path: "inputs/data.md",
-          content: `apples: ${FIRST}\npears: ${SECOND}\n`,
-        },
-      ],
+// Admission needs a usable key, so one is saved first if the workspace has none.
+async function signInWithKey(page: Page): Promise<void> {
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
+  await page.goto("/");
+}
+
+/** Admits the two-counts run for `scenario`, under the scenario as its key. */
+function admit(page: Page, scenario: string): Promise<string> {
+  return admitRun(
+    page,
+    twoCountsRun(scenario, { first: FIRST, second: SECOND }),
+    {
+      key: scenario,
     },
-  });
-  expect(reply.status()).toBe(202);
-  return (await reply.json()).run_id;
+  );
+}
+
+async function version(page: Page, id: string): Promise<number> {
+  return (await readRun(page, id)).version;
 }
 
 const status = (page: Page) => page.locator("[data-run-status]");
@@ -66,8 +46,8 @@ test("a goal is admitted, planned, executed, restarted and inspected, ending in 
   page,
 }) => {
   test.setTimeout(120_000);
-  await signIn(page);
-  const id = await admit(page, "slice-complete");
+  await signInWithKey(page);
+  const id = await admit(page, WorkerScenario.complete);
   await page.goto(`/runs/${id}`);
 
   // The worker is killed inside a model call. Its lease runs out, and recovery stops at the unknown.
@@ -78,27 +58,30 @@ test("a goal is admitted, planned, executed, restarted and inspected, ending in 
     "uncertain model call",
   );
   await expect(page.getByText("Write the totals report: open")).toBeVisible();
-  const refused = await page.request.post(`/api/v1/runs/${id}/resume`, {
-    headers: await write(page, "resume-early"),
-    data: { expected_version: await version(page, id) },
+  const refused = await runCommand(page, {
+    run: id,
+    command: "resume",
+    expectedVersion: await version(page, id),
+    key: "resume-early",
   });
-  expect(refused.status()).toBe(409);
-  expect((await refused.json()).code).toBe("uncertain_model_call");
+  await expectRefusal(refused, { status: 409, code: "uncertain_model_call" });
 
   // The owner reports the charge from the provider's account, and resumes.
-  const reconciled = await page.request.post(
-    `/api/v1/runs/${id}/model-calls/reconcile`,
-    {
-      headers: await write(page, "reconcile"),
-      data: { charged_micro_usd: 90 },
-    },
-  );
-  expect((await reconciled.json()).reconciled_calls).toBe(1);
-  const resumed = await page.request.post(`/api/v1/runs/${id}/resume`, {
-    headers: await write(page, "resume"),
-    data: { expected_version: await version(page, id) },
+  const reconciled = await send(page, {
+    path: `/api/v1/runs/${id}/model-calls/reconcile`,
+    key: "reconcile",
+    data: { charged_micro_usd: 90 },
+    status: 200,
+    parse: parseReconciliationResult,
   });
-  expect((await resumed.json()).status).toBe("queued");
+  expect(reconciled.reconciled_calls).toBe(1);
+  const resumed = await runCommand(page, {
+    run: id,
+    command: "resume",
+    expectedVersion: await version(page, id),
+    key: "resume",
+  });
+  expect(parseRunCommandResult(await resumed.json()).status).toBe("queued");
 
   await expect(status(page)).toHaveAttribute("data-run-status", "succeeded", {
     timeout: 40_000,
@@ -117,18 +100,19 @@ test("a goal is admitted, planned, executed, restarted and inspected, ending in 
   );
 
   // Inspected: the artifact is the verified bytes, once, and the record replays after a reload.
-  const workspace = await (
-    await page.request.get(`/api/v1/runs/${id}/workspace`)
-  ).json();
+  const workspace = await getJson(page, {
+    path: `/api/v1/runs/${id}/workspace`,
+    parse: parseRunWorkspace,
+  });
   expect(workspace.artifacts).toHaveLength(1);
   const download = await page.request.get(
-    `/api/v1/artifacts/${workspace.artifacts[0].id}/download`,
+    `/api/v1/artifacts/${workspace.artifacts[0]?.id}/download`,
   );
   expect(await download.text()).toContain(TOTAL);
   expect(workspace.run.budget.spent_micro_usd).toBeGreaterThan(0);
   expect(workspace.outstanding.uncertain_calls).toBe(0);
-  expect(workspace.objective).toContain("slice-complete");
-  expect(workspace.plan.version).toBe(1);
+  expect(workspace.objective).toContain(WorkerScenario.complete);
+  expect(workspace.plan?.version).toBe(1);
   expect(workspace.usage.model_calls).toBeGreaterThan(5);
   await page.reload();
   await expect(status(page)).toHaveAttribute("data-run-status", "succeeded");
@@ -141,17 +125,14 @@ test("a goal is admitted, planned, executed, restarted and inspected, ending in 
   await expect(
     page.locator("[data-sequence]").filter({ hasText: "report.md published" }),
   ).toHaveCount(1);
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa"])
-    .analyze();
-  expect(results.violations.map((violation) => violation.id)).toEqual([]);
+  await expectNoA11yViolations(page);
 });
 
 test("a missing required artifact fails the run, whatever the model said", async ({
   page,
 }) => {
-  await signIn(page);
-  const id = await admit(page, "slice-no-artifact");
+  await signInWithKey(page);
+  const id = await admit(page, WorkerScenario.noArtifact);
   await page.goto(`/runs/${id}`);
   await expect(status(page)).toHaveAttribute("data-run-status", "failed", {
     timeout: 40_000,
@@ -167,8 +148,8 @@ test("a missing required artifact fails the run, whatever the model said", async
 test("a failed deterministic check fails the run, and the artifact is still inspectable", async ({
   page,
 }) => {
-  await signIn(page);
-  const id = await admit(page, "slice-wrong-total");
+  await signInWithKey(page);
+  const id = await admit(page, WorkerScenario.wrongTotal);
   await page.goto(`/runs/${id}`);
   await expect(status(page)).toHaveAttribute("data-run-status", "failed", {
     timeout: 40_000,
@@ -182,8 +163,8 @@ test("a failed deterministic check fails the run, and the artifact is still insp
 });
 
 test("an answer alone can't succeed", async ({ page }) => {
-  await signIn(page);
-  const id = await admit(page, "slice-only-claims");
+  await signInWithKey(page);
+  const id = await admit(page, WorkerScenario.onlyClaims);
   await page.goto(`/runs/${id}`);
   await expect(status(page)).toHaveAttribute("data-run-status", "failed", {
     timeout: 40_000,
@@ -192,7 +173,3 @@ test("an answer alone can't succeed", async ({ page }) => {
     "plan missing",
   );
 });
-
-async function version(page: Page, id: string): Promise<number> {
-  return (await (await page.request.get(`/api/v1/runs/${id}`)).json()).version;
-}

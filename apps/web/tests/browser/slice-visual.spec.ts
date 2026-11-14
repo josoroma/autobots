@@ -1,22 +1,33 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 
-import AxeBuilder from "@axe-core/playwright";
 import {
-  expect,
-  test,
-  type Browser,
-  type BrowserContext,
-  type Page,
-  type Request,
+  parseApprovalList,
+  parseExecutionBinding,
+  parseExpertView,
+  parseRunList,
+  parseSessionView,
+  parseWorkflowList,
+  parseWorkflowView,
+} from "@autobots/api-client";
+import type {
+  BrowserContext,
+  BrowserContextOptions,
+  Page,
+  Request,
 } from "@playwright/test";
+
+import { scanA11y } from "./support/a11y.ts";
+import { getJson, send } from "./support/api.ts";
+import { signIn, users } from "./support/auth.ts";
+import { inToOut, twoCountsRun } from "./support/builders.ts";
+import { optional } from "./support/env.ts";
+import { expect, test } from "./support/fixtures.ts";
+import { ensureProviderKey } from "./support/keys.ts";
+import { admitRun } from "./support/runs.ts";
 
 // US-11.11: every named surface in both themes, on the final screens. Its name puts it with the slice
 // suites, so the scripted worker can finish a run. WCAG 2.1 AA is the pass line, by Decision 0010.
-const OUT = process.env.AUTOBOTS_TEST_VISUAL_DIR ?? "test-results/visual";
-const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
-const EMAIL_D = process.env.AUTOBOTS_TEST_NO_KEY_EMAIL ?? "";
-const PASSWORD_D = process.env.AUTOBOTS_TEST_NO_KEY_PASSWORD ?? "";
+const OUT = optional("AUTOBOTS_TEST_VISUAL_DIR", "test-results/visual");
 const THEMES = ["dark", "light"] as const;
 type Theme = (typeof THEMES)[number];
 const TEXT_MINIMUM = 4.5;
@@ -210,30 +221,11 @@ window.__contrast = (() => {
 })();
 `;
 
-async function signIn(
-  page: Page,
-  email: string,
-  password: string,
-): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
-}
-
-async function write(page: Page, key: string): Promise<Record<string, string>> {
-  const token = await (await page.request.get("/api/csrf")).json();
-  return {
-    [token.header]: token.token,
-    Origin: new URL(page.url()).origin,
-    "Content-Type": "application/json",
-    "Idempotency-Key": key,
-  };
-}
-
-async function themed(browser: Browser, theme: Theme): Promise<BrowserContext> {
-  const context = await browser.newContext({
+async function themed(
+  openContext: (options?: BrowserContextOptions) => Promise<BrowserContext>,
+  theme: Theme,
+): Promise<BrowserContext> {
+  const context = await openContext({
     viewport: { width: 1280, height: 800 },
   });
   await context.addInitScript((value) => {
@@ -244,84 +236,56 @@ async function themed(browser: Browser, theme: Theme): Promise<BrowserContext> {
 
 // What the surfaces need, made once through the app's own routes.
 async function arrange(page: Page): Promise<Record<string, string>> {
-  await page.goto("/settings/models");
-  const source = page.locator('[data-field="source"]');
-  await expect(source).toBeVisible();
-  if ((await source.textContent())?.trim() === "None") {
-    await page
-      .getByLabel(/API key|Replace key/)
-      .fill("sk-or-valid-arranged-first");
-    await page.getByRole("button", { name: "Save & validate" }).click();
-    await expect(page.locator('[data-field="auth"]')).toHaveText(
-      "The key authenticated.",
-    );
-  }
+  await ensureProviderKey(page);
   await page.goto("/");
   const stamp = Date.now();
-  const run = await (
-    await page.request.post("/api/v1/runs", {
-      headers: await write(page, `visual-run-${stamp}`),
-      data: {
-        goal_text: "slice-visual: report the total of the two counts",
-        limit_micro_usd: 1000000,
-        acceptance_criteria: ["The report states the correct total"],
-        required_artifacts: [{ name: "report.md", must_contain: ["Total: 5"] }],
-        input_documents: [
-          { path: "inputs/data.md", content: "apples: 2\npears: 3\n" },
-        ],
-      },
-    })
-  ).json();
-  await page.goto(`/runs/${run.run_id}`);
+  // A goal with no scenario word, so the scripted worker finishes it plainly.
+  const run = await admitRun(page, twoCountsRun("slice-visual"), {
+    key: `visual-run-${stamp}`,
+  });
+  await page.goto(`/runs/${run}`);
   await expect(page.locator("[data-run-status]")).toHaveAttribute(
     "data-run-status",
     "succeeded",
     { timeout: 60_000 },
   );
-  const expert = await (
-    await page.request.post("/api/v1/experts", {
-      headers: await write(page, `visual-expert-${stamp}`),
-      data: { name: `Visual ${stamp}`, config: { tools: ["calculate"] } },
-    })
-  ).json();
-  const session = await (
-    await page.request.post("/api/v1/sessions", {
-      headers: await write(page, `visual-session-${stamp}`),
-      data: { kind: "direct", experts: [{ expert_id: expert.id }] },
-    })
-  ).json();
-  const workflow = await (
-    await page.request.post("/api/v1/workflows", {
-      headers: await write(page, `visual-workflow-${stamp}`),
-      data: { name: `Visual ${stamp}` },
-    })
-  ).json();
-  const graph = {
-    nodes: [
-      { id: "in", block: "input", version: 1, config: { type: "string" } },
-      { id: "out", block: "output", version: 1, config: {} },
-    ],
-    links: [
-      {
-        source: "in",
-        source_port: "value",
-        target: "out",
-        target_port: "value",
-      },
-    ],
-  };
-  await page.request.post(`/api/v1/workflows/${workflow.id}/versions`, {
-    headers: await write(page, `visual-version-${stamp}`),
-    data: { expected_version: 0, graph },
+  const expert = await send(page, {
+    path: "/api/v1/experts",
+    key: `visual-expert-${stamp}`,
+    data: { name: `Visual ${stamp}`, config: { tools: ["calculate"] } },
+    status: 201,
+    parse: parseExpertView,
   });
-  const execution = await (
-    await page.request.post(`/api/v1/workflows/${workflow.id}/executions`, {
-      headers: await write(page, `visual-execution-${stamp}`),
-      data: { version: 1, inputs: { in: "x" } },
-    })
-  ).json();
+  const session = await send(page, {
+    path: "/api/v1/sessions",
+    key: `visual-session-${stamp}`,
+    data: { kind: "direct", experts: [{ expert_id: expert.id }] },
+    status: 201,
+    parse: parseSessionView,
+  });
+  const workflow = await send(page, {
+    path: "/api/v1/workflows",
+    key: `visual-workflow-${stamp}`,
+    data: { name: `Visual ${stamp}` },
+    status: 201,
+    parse: parseWorkflowView,
+  });
+  await send(page, {
+    path: `/api/v1/workflows/${workflow.id}/versions`,
+    key: `visual-version-${stamp}`,
+    data: { expected_version: 0, graph: inToOut() },
+    status: 201,
+    parse: parseWorkflowView,
+  });
+  const execution = await send(page, {
+    path: `/api/v1/workflows/${workflow.id}/executions`,
+    key: `visual-execution-${stamp}`,
+    data: { version: 1, inputs: { in: "x" } },
+    status: 201,
+    parse: parseExecutionBinding,
+  });
   return {
-    run: run.run_id,
+    run,
     expert: expert.id,
     session: session.id,
     workflow: workflow.id,
@@ -686,9 +650,7 @@ async function measure(
   )) as string[];
   const screenshot = `${surface.name}-${theme}.png`;
   await page.screenshot({ path: `${OUT}/${screenshot}`, fullPage: true });
-  const axe = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-    .analyze();
+  const violations = await scanA11y(page);
   const stops: Stop[] = [];
   for (let index = 0; index < TAB_STOPS; index += 1) {
     await page.keyboard.press("Tab");
@@ -747,7 +709,7 @@ async function measure(
     focus_stops: stops,
     focus_failures: stops.filter((item) => item.ratio < NON_TEXT_MINIMUM),
     hover,
-    axe_violations: axe.violations.map((violation) => ({
+    axe_violations: violations.map((violation) => ({
       id: violation.id,
       nodes: violation.nodes.length,
       summary: violation.nodes[0]?.failureSummary?.slice(0, 200) ?? "",
@@ -760,28 +722,28 @@ async function measure(
 }
 
 test("every named surface is captured in both themes, with measured contrast and axe", async ({
-  browser,
+  openContext,
 }) => {
   test.setTimeout(600_000);
   mkdirSync(OUT, { recursive: true });
-  const owner = await browser.newContext();
+  const owner = await openContext();
   const ownerPage = await owner.newPage();
-  await signIn(ownerPage, EMAIL_A, PASSWORD_A);
+  await signIn(ownerPage, users.owner);
   const ids = await arrange(ownerPage);
   await owner.close();
 
   const results: Measured[] = [];
   for (const theme of THEMES) {
     const contexts = {
-      "signed-out": await themed(browser, theme),
-      owner: await themed(browser, theme),
-      "no-key": await themed(browser, theme),
+      "signed-out": await themed(openContext, theme),
+      owner: await themed(openContext, theme),
+      "no-key": await themed(openContext, theme),
     };
     const ownerSetup = await contexts.owner.newPage();
-    await signIn(ownerSetup, EMAIL_A, PASSWORD_A);
+    await signIn(ownerSetup, users.owner);
     await ownerSetup.close();
     const keySetup = await contexts["no-key"].newPage();
-    await signIn(keySetup, EMAIL_D, PASSWORD_D);
+    await signIn(keySetup, users.noKey);
     await keySetup.close();
     for (const surface of surfaces(ids)) {
       const page = await contexts[surface.context].newPage();
@@ -861,7 +823,7 @@ test("every named surface is captured in both themes, with measured contrast and
 test("the walk's checks fail when they should, on a page broken on purpose", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "New goal" })).toBeVisible();
   await expect(page.getByLabel("Model for this run")).toBeVisible();
@@ -920,7 +882,7 @@ test("the walk's checks fail when they should, on a page broken on purpose", asy
 test("keyboard use reaches every control on a form, with focus visible, and starts nothing by itself", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "New goal" })).toBeVisible();
   await expect(page.getByLabel("Model for this run")).toBeVisible();
@@ -949,7 +911,7 @@ test("keyboard use reaches every control on a form, with focus visible, and star
 test("at 200% and at 400% zoom nothing is lost to sideways scrolling", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   const widths = { "200%": 640, "400%": 320 };
   const results: Record<string, Record<string, number>> = {};
   for (const [zoom, width] of Object.entries(widths)) {
@@ -986,7 +948,7 @@ test("at 200% and at 400% zoom nothing is lost to sideways scrolling", async ({
 
 test("with reduced motion, nothing animates", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   for (const path of ["/", "/runs", "/settings", "/operations"]) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
@@ -1006,13 +968,22 @@ test("with reduced motion, nothing animates", async ({ page }) => {
 test("changing appearance sends no model or task request, and changes no run or approval", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   const state = async () => ({
-    runs: (await (await page.request.get("/api/v1/runs")).json()).runs,
-    approvals: (await (await page.request.get("/api/v1/approvals")).json())
-      .approvals,
-    workflows: (await (await page.request.get("/api/v1/workflows")).json())
-      .workflows,
+    runs: (await getJson(page, { path: "/api/v1/runs", parse: parseRunList }))
+      .runs,
+    approvals: (
+      await getJson(page, {
+        path: "/api/v1/approvals",
+        parse: parseApprovalList,
+      })
+    ).approvals,
+    workflows: (
+      await getJson(page, {
+        path: "/api/v1/workflows",
+        parse: parseWorkflowList,
+      })
+    ).workflows,
   });
   await page.goto("/settings");
   await expect(page.getByLabel("Dark")).toBeVisible();
@@ -1047,12 +1018,6 @@ test("changing appearance sends no model or task request, and changes no run or 
   await page.waitForTimeout(500);
   expect(requests).toEqual([]);
   expect(await state()).toEqual(before);
-  expect(
-    before.runs.some((run: { status: string }) => run.status === "running"),
-  ).toBe(true);
-  expect(
-    before.approvals.some(
-      (item: { status: string }) => item.status === "pending",
-    ),
-  ).toBe(true);
+  expect(before.runs.some((run) => run.status === "running")).toBe(true);
+  expect(before.approvals.some((item) => item.status === "pending")).toBe(true);
 });

@@ -1,23 +1,22 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
-import { execFileSync } from "node:child_process";
+import type { Page } from "@playwright/test";
+
+import { expectNoA11yViolations, WCAG_22_AA } from "./support/a11y.ts";
+import { signIn, users } from "./support/auth.ts";
+import { arranged } from "./support/env.ts";
+import { objectOf, runDbHelper } from "./support/db-helpers.ts";
+import { expect, test } from "./support/fixtures.ts";
+import { readRun } from "./support/runs.ts";
 
 // US-15.17, PRD-Studio RN-04: the side panel on Runs. tests/db/task_timing_check.py arranges a running
 // run with one done, one current and one to-do task and three metered calls, and a cancelled run.
-const EMAIL = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
-const RUN = process.env.AUTOBOTS_TEST_PANEL_RUN ?? "";
-const TERMINAL = process.env.AUTOBOTS_TEST_PANEL_TERMINAL ?? "";
+const panelRun = arranged({
+  id: "AUTOBOTS_TEST_PANEL_RUN",
+  terminal: "AUTOBOTS_TEST_PANEL_TERMINAL",
+  generation: "AUTOBOTS_TEST_PANEL_GENERATION",
+  workspace: "AUTOBOTS_TEST_PANEL_WORKSPACE",
+});
 
 test.describe.configure({ mode: "serial" });
-
-async function signIn(page: Page): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(EMAIL);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
-}
 
 // Finds the run by its goal with the list's own filter, then selects its row's Details.
 async function openPanel(
@@ -36,34 +35,21 @@ async function openPanel(
 }
 
 // The current worker moves the run's version through two canonical transitions, leaving it running.
-function moveVersion(): { from: number; to: number; status: string } {
-  const printed = execFileSync(
-    process.env.AUTOBOTS_TEST_PYTHON ?? "",
-    [
-      process.env.AUTOBOTS_TEST_PANEL_HELPER ?? "",
-      RUN,
-      process.env.AUTOBOTS_TEST_PANEL_GENERATION ?? "",
-      process.env.AUTOBOTS_TEST_PANEL_WORKSPACE ?? "",
-    ],
-    {
-      env: {
-        ...process.env,
-        AUTOBOTS_DATABASE_URL: process.env.AUTOBOTS_TEST_RUNTIME_URL ?? "",
-        PYTHONPATH: process.env.AUTOBOTS_TEST_PYTHONPATH ?? "",
-      },
-      encoding: "utf8",
-    },
+function moveVersion(): Promise<{ from: number; to: number; status: string }> {
+  return runDbHelper(
+    "task_timing_live.py",
+    [panelRun.id, panelRun.generation, panelRun.workspace],
+    objectOf({ from: "number", to: "number", status: "string" }),
   );
-  return JSON.parse(printed.trim().split("\n").at(-1) ?? "{}");
 }
 
 test("The panel shows the run's state, plan, task tools and times, spend, tokens and metered calls", async ({
   page,
 }) => {
-  expect(RUN, "the task timing check arranges the panel run").not.toBe("");
-  await signIn(page);
-  await openPanel(page, RUN, "Summarize the quarter figures");
-  const panel = page.locator(`section[data-panel="${RUN}"]`);
+  const run = panelRun.id;
+  await signIn(page, users.owner);
+  await openPanel(page, run, "Summarize the quarter figures");
+  const panel = page.locator(`section[data-panel="${run}"]`);
   await expect(panel.locator('[data-field="state"]')).toHaveText("Running");
   await expect(
     panel.getByRole("heading", { name: "Summarize the quarter figures" }),
@@ -113,27 +99,24 @@ test("The panel shows the run's state, plan, task tools and times, spend, tokens
   );
   await expect(panel.getByRole("link", { name: "Open run" })).toHaveAttribute(
     "href",
-    `/runs/${RUN}`,
+    `/runs/${run}`,
   );
   await expect(
-    page.locator(`li[data-run="${RUN}"] [data-field="details"]`),
+    page.locator(`li[data-run="${run}"] [data-field="details"]`),
   ).toHaveAttribute("aria-expanded", "true");
 
-  const scan = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-    .analyze();
-  expect(scan.violations).toEqual([]);
+  await expectNoA11yViolations(page, { extraTags: WCAG_22_AA });
 });
 
 test("A stale Pause is refused with a reload message, a fresh one pauses, and a finished run offers no controls", async ({
   page,
 }) => {
-  expect(RUN, "the task timing check arranges the panel run").not.toBe("");
-  await signIn(page);
-  await openPanel(page, RUN, "Summarize the quarter figures");
-  const panel = page.locator(`section[data-panel="${RUN}"]`);
+  const run = panelRun.id;
+  await signIn(page, users.owner);
+  await openPanel(page, run, "Summarize the quarter figures");
+  const panel = page.locator(`section[data-panel="${run}"]`);
   const loaded = Number(await panel.getAttribute("data-version"));
-  const moved = moveVersion();
+  const moved = await moveVersion();
   expect(moved.from).toBe(loaded);
   expect(moved.to).toBeGreaterThan(loaded);
   expect(moved.status).toBe("running");
@@ -143,8 +126,7 @@ test("A stale Pause is refused with a reload message, a fresh one pauses, and a 
   await expect(refusal).toContainText(
     "This run changed after the panel loaded, so nothing was done.",
   );
-  const unchanged = await page.request.get(`/api/v1/runs/${RUN}`);
-  expect((await unchanged.json()).status).toBe("running");
+  expect((await readRun(page, run)).status).toBe("running");
 
   await panel.getByRole("button", { name: "Reload the panel" }).click();
   await expect(panel).toHaveAttribute("data-version", String(moved.to));
@@ -152,16 +134,15 @@ test("A stale Pause is refused with a reload message, a fresh one pauses, and a 
   await panel.getByRole("button", { name: "Pause" }).click();
   await expect(panel.locator('[data-field="state"]')).toHaveText("Paused");
   await expect(panel.getByRole("button", { name: "Resume" })).toBeVisible();
-  const paused = await page.request.get(`/api/v1/runs/${RUN}`);
-  const body = await paused.json();
+  const body = await readRun(page, run);
   expect(body.status).toBe("paused");
   expect(body.version).toBe(moved.to + 1);
   await expect(
-    page.locator(`li[data-run="${RUN}"] [data-field="state"]`),
+    page.locator(`li[data-run="${run}"] [data-field="state"]`),
   ).toHaveText("Paused");
 
-  await openPanel(page, TERMINAL, "An ended run for the panel");
-  const ended = page.locator(`section[data-panel="${TERMINAL}"]`);
+  await openPanel(page, panelRun.terminal, "An ended run for the panel");
+  const ended = page.locator(`section[data-panel="${panelRun.terminal}"]`);
   await expect(ended.locator('[data-field="state"]')).toHaveText("Cancelled");
   await expect(ended.getByRole("link", { name: "Open run" })).toBeVisible();
   for (const name of ["Pause", "Resume", "Cancel run"])

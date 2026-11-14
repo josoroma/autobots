@@ -1,17 +1,27 @@
-import { execFileSync } from "node:child_process";
+import { parseEventPage, parseToolCatalog } from "@autobots/api-client";
+import type { Page, Route } from "@playwright/test";
 
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expectNoA11yViolations } from "./support/a11y.ts";
+import { getJson } from "./support/api.ts";
+import { signIn, users } from "./support/auth.ts";
+import { arrayOf, objectOf, runDbHelper } from "./support/db-helpers.ts";
+import { arranged } from "./support/env.ts";
+import { expect, test } from "./support/fixtures.ts";
+import { disconnectProviderKey, ensureProviderKey } from "./support/keys.ts";
+import { expectNoPrivateValues } from "./support/leaks.ts";
+import { admitRun, readRun, runCommand } from "./support/runs.ts";
 
-const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
-const EMAIL_B = process.env.AUTOBOTS_TEST_OWNER_B_EMAIL ?? "";
-const PASSWORD_B = process.env.AUTOBOTS_TEST_OWNER_B_PASSWORD ?? "";
-const LOOP_RUN = process.env.AUTOBOTS_TEST_LOOP_RUN ?? "";
-const GAP_RUN = process.env.AUTOBOTS_TEST_ARTIFACT_RUN ?? "";
+const runs = arranged({
+  loop: "AUTOBOTS_TEST_LOOP_RUN",
+  gap: "AUTOBOTS_TEST_ARTIFACT_RUN",
+});
 // US-14.4, arranged by tests/db/tool_use_view_check.py.
-const TOOL_RUN = process.env.AUTOBOTS_TEST_TOOL_RUN ?? "";
-const TOOL_EXECUTION = process.env.AUTOBOTS_TEST_TOOL_EXECUTION ?? "";
+const tools = arranged({
+  run: "AUTOBOTS_TEST_TOOL_RUN",
+  execution: "AUTOBOTS_TEST_TOOL_EXECUTION",
+  generation: "AUTOBOTS_TEST_TOOL_GENERATION",
+  workspace: "AUTOBOTS_TEST_TOOL_WORKSPACE",
+});
 const RUN_NOT_FOUND =
   "That run is not available. Sign in with access to it, or check the link.";
 const OUTAGE = {
@@ -22,64 +32,14 @@ const OUTAGE = {
   },
 };
 
-async function signIn(
-  page: Page,
-  email: string,
-  password: string,
-): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
-}
-
-async function headers(
-  page: Page,
-  key: string,
-): Promise<Record<string, string>> {
-  const token = await (await page.request.get("/api/csrf")).json();
-  return {
-    [token.header]: token.token,
-    Origin: new URL(page.url()).origin,
-    "Content-Type": "application/json",
-    "Idempotency-Key": key,
-  };
-}
-
-async function admitted(page: Page, label: string): Promise<string> {
-  await page.goto("/settings/models");
-  const source = page.locator('[data-field="source"]');
-  await expect(source).toBeVisible();
-  if ((await source.textContent())?.trim() === "None") {
-    await page
-      .getByLabel(/API key|Replace key/)
-      .fill("sk-or-valid-arranged-first");
-    await page.getByRole("button", { name: "Save & validate" }).click();
-    await expect(page.locator('[data-field="auth"]')).toHaveText(
-      "The key authenticated.",
-    );
-  }
+/** Admits a plain run from Home. Admission needs a key, which ensureProviderKey arranges first. */
+async function admitPlain(page: Page, label: string): Promise<string> {
   await page.goto("/");
-  const reply = await page.request.post("/api/v1/runs", {
-    headers: await headers(page, `workspace-${label}`),
-    data: { goal_text: `Goal ${label}`, limit_micro_usd: 1000 },
-  });
-  expect(reply.status()).toBe(202);
-  return (await reply.json()).run_id;
-}
-
-async function command(
-  page: Page,
-  id: string,
-  name: string,
-  version: number,
-  key: string,
-) {
-  return page.request.post(`/api/v1/runs/${id}/${name}`, {
-    headers: await headers(page, key),
-    data: { expected_version: version },
-  });
+  return admitRun(
+    page,
+    { goal_text: `Goal ${label}`, limit_micro_usd: 1000 },
+    { key: `workspace-${label}` },
+  );
 }
 
 /** The paths under one run that the page itself asks for, in order. */
@@ -97,18 +57,12 @@ function snapshotOf(runId: string): (url: URL) => boolean {
   return (url) => url.pathname === `/api/v1/runs/${runId}/workspace`;
 }
 
-async function disconnectKey(page: Page): Promise<void> {
-  await page.goto("/settings/models");
-  await expect(page.locator('[data-field="auth"]')).toBeVisible();
-  await page.getByRole("button", { name: "Disconnect" }).click();
-  await expect(page.locator('[data-field="source"]')).toHaveText("None");
-}
-
 test("events arrive live and survive a dropped connection without duplicates", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  const id = await admitted(page, "live");
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
+  const id = await admitPlain(page, "live");
   await page.goto(`/runs/${id}`);
   await expect(page.locator("[data-run-status]")).toHaveAttribute(
     "data-run-status",
@@ -119,7 +73,16 @@ test("events arrive live and survive a dropped connection without duplicates", a
     "live",
   );
 
-  expect((await command(page, id, "pause", 1, "l1")).status()).toBe(200);
+  expect(
+    (
+      await runCommand(page, {
+        run: id,
+        command: "pause",
+        expectedVersion: 1,
+        key: "l1",
+      })
+    ).status(),
+  ).toBe(200);
   await expect(page.locator("[data-run-status]")).toHaveAttribute(
     "data-run-status",
     "paused",
@@ -136,8 +99,26 @@ test("events arrive live and survive a dropped connection without duplicates", a
     { timeout: 10_000 },
   );
   // These go through Node, not the page, so they happen while it is disconnected.
-  expect((await command(page, id, "resume", 2, "l2")).status()).toBe(200);
-  expect((await command(page, id, "pause", 3, "l3")).status()).toBe(200);
+  expect(
+    (
+      await runCommand(page, {
+        run: id,
+        command: "resume",
+        expectedVersion: 2,
+        key: "l2",
+      })
+    ).status(),
+  ).toBe(200);
+  expect(
+    (
+      await runCommand(page, {
+        run: id,
+        command: "pause",
+        expectedVersion: 3,
+        key: "l3",
+      })
+    ).status(),
+  ).toBe(200);
   await expect(page.locator("[data-run-status]")).toHaveAttribute(
     "data-run-status",
     "paused",
@@ -160,12 +141,11 @@ test("events arrive live and survive a dropped connection without duplicates", a
     );
   expect(sequences).toEqual(["1", "2", "3", "4"]);
 
-  const later = await (
-    await page.request.get(`/api/v1/runs/${id}/events?after=3`)
-  ).json();
-  expect(
-    later.events.map((event: { sequence: number }) => event.sequence),
-  ).toEqual([4]);
+  const later = await getJson(page, {
+    path: `/api/v1/runs/${id}/events?after=3`,
+    parse: parseEventPage,
+  });
+  expect(later.events.map((event) => event.sequence)).toEqual([4]);
   await page.reload();
   await expect(page.locator("[data-sequence]")).toHaveCount(4);
   await expect(page.locator("[data-run-status]")).toHaveAttribute(
@@ -175,12 +155,13 @@ test("events arrive live and survive a dropped connection without duplicates", a
 });
 
 test("closing the page does not change the run, and the end of a run ends the stream", async ({
-  browser,
+  openContext,
 }) => {
-  const context = await browser.newContext();
+  const context = await openContext();
   const page = await context.newPage();
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  const id = await admitted(page, "closing");
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
+  const id = await admitPlain(page, "closing");
   const viewer = await context.newPage();
   await viewer.goto(`/runs/${id}`);
   await expect(viewer.locator("[data-connection]")).toHaveAttribute(
@@ -188,7 +169,7 @@ test("closing the page does not change the run, and the end of a run ends the st
     "live",
   );
   await viewer.close();
-  const summary = await (await page.request.get(`/api/v1/runs/${id}`)).json();
+  const summary = await readRun(page, id);
   expect(summary.status).toBe("queued");
   expect(summary.version).toBe(1);
   const again = await context.newPage();
@@ -197,7 +178,16 @@ test("closing the page does not change the run, and the end of a run ends the st
     "data-connection",
     "live",
   );
-  expect((await command(page, id, "cancel", 1, "c1")).status()).toBe(200);
+  expect(
+    (
+      await runCommand(page, {
+        run: id,
+        command: "cancel",
+        expectedVersion: 1,
+        key: "c1",
+      })
+    ).status(),
+  ).toBe(200);
   await expect(again.locator("[data-run-status]")).toHaveAttribute(
     "data-run-status",
     "cancelled",
@@ -207,14 +197,13 @@ test("closing the page does not change the run, and the end of a run ends the st
     "ended",
     { timeout: 10_000 },
   );
-  await context.close();
 });
 
 test("a plan, its evidence, a reason and artifacts show, sanitized, in both themes", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  await page.goto(`/runs/${LOOP_RUN}`);
+  await signIn(page, users.owner);
+  await page.goto(`/runs/${runs.loop}`);
   await expect(page.locator("[data-run-status]")).toHaveAttribute(
     "data-run-status",
     "failed",
@@ -235,22 +224,16 @@ test("a plan, its evidence, a reason and artifacts show, sanitized, in both them
     { timeout: 15_000 },
   );
 
-  const html = await page.content();
-  for (const leak of [
-    "sk-or-leaked",
-    "PROTECTED-REASONING",
-    "checkpoint",
-    "object_path",
-    "policy_snapshot",
-  ]) {
-    expect(html).not.toContain(leak);
-  }
+  expectNoPrivateValues(await page.content(), {
+    label: "the run page",
+    extra: ["checkpoint", "object_path", "policy_snapshot"],
+  });
   const replay = await (
-    await page.request.get(`/api/v1/runs/${LOOP_RUN}/events?after=0`)
+    await page.request.get(`/api/v1/runs/${runs.loop}/events?after=0`)
   ).text();
   expect(replay).not.toContain("PROTECTED-REASONING");
   const workspace = await (
-    await page.request.get(`/api/v1/runs/${LOOP_RUN}/workspace`)
+    await page.request.get(`/api/v1/runs/${runs.loop}/workspace`)
   ).text();
   expect(workspace).not.toContain("sk-or-leaked");
   expect(workspace).not.toContain("lease");
@@ -262,10 +245,7 @@ test("a plan, its evidence, a reason and artifacts show, sanitized, in both them
     );
     await page.reload();
     await expect(page.locator("[data-run-status]")).toBeVisible();
-    const results = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-      .analyze();
-    expect(results.violations.map((violation) => violation.id)).toEqual([]);
+    await expectNoA11yViolations(page);
   }
   await page.keyboard.press("Tab");
   await expect(
@@ -276,12 +256,13 @@ test("a plan, its evidence, a reason and artifacts show, sanitized, in both them
 test("retained events that can't fill the range say so, and the status comes from the snapshot", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  const page1 = await (
-    await page.request.get(`/api/v1/runs/${GAP_RUN}/events?after=0`)
-  ).json();
+  await signIn(page, users.owner);
+  const page1 = await getJson(page, {
+    path: `/api/v1/runs/${runs.gap}/events?after=0`,
+    parse: parseEventPage,
+  });
   expect(page1.gap).toBe(true);
-  await page.goto(`/runs/${GAP_RUN}`);
+  await page.goto(`/runs/${runs.gap}`);
   await expect(page.locator("[data-gap]")).toBeVisible();
   await expect(page.locator("[data-run-status]")).toBeVisible();
   await expect(page.locator('[data-sequence="1"]')).toHaveCount(0);
@@ -289,9 +270,9 @@ test("retained events that can't fill the range say so, and the status comes fro
 });
 
 test("another workspace gets a clear refusal", async ({ page }) => {
-  await signIn(page, EMAIL_B, PASSWORD_B);
-  const asked = runRequests(page, LOOP_RUN);
-  await page.goto(`/runs/${LOOP_RUN}`);
+  await signIn(page, users.ownerB);
+  const asked = runRequests(page, runs.loop);
+  await page.goto(`/runs/${runs.loop}`);
   const state = page.locator('[data-state="unavailable"]');
   await expect(state).toBeVisible();
   // R-28: a missing run says so once. Nothing reads it again, and no stream opens.
@@ -300,19 +281,19 @@ test("another workspace gets a clear refusal", async ({ page }) => {
   await expect(state.getByRole("button", { name: "Retry" })).toHaveCount(0);
   // Longer than the first two attempts would take, had it kept trying.
   await page.waitForTimeout(3_500);
-  expect(asked).toEqual([`/api/v1/runs/${LOOP_RUN}/workspace`]);
+  expect(asked).toEqual([`/api/v1/runs/${runs.loop}/workspace`]);
   expect(
     (
-      await page.request.get(`/api/v1/runs/${LOOP_RUN}/events?after=0`)
+      await page.request.get(`/api/v1/runs/${runs.loop}/events?after=0`)
     ).status(),
   ).toBe(404);
   expect(
     (
-      await page.request.get(`/api/v1/runs/${LOOP_RUN}/events/stream?after=0`)
+      await page.request.get(`/api/v1/runs/${runs.loop}/events/stream?after=0`)
     ).status(),
   ).toBe(404);
   expect(
-    (await page.request.get(`/api/v1/runs/${LOOP_RUN}/workspace`)).status(),
+    (await page.request.get(`/api/v1/runs/${runs.loop}/workspace`)).status(),
   ).toBe(404);
 });
 
@@ -321,14 +302,14 @@ test("another workspace gets a clear refusal", async ({ page }) => {
 test("a refusal, a malformed id and a drifted reply each stop the run page", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  const asked = runRequests(page, LOOP_RUN);
+  await signIn(page, users.owner);
+  const asked = runRequests(page, runs.loop);
   const logged: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") logged.push(message.text());
   });
   let arranged: Parameters<Route["fulfill"]>[0] = OUTAGE;
-  await page.route(snapshotOf(LOOP_RUN), (route) => route.fulfill(arranged));
+  await page.route(snapshotOf(runs.loop), (route) => route.fulfill(arranged));
   const state = page.locator('[data-state="unavailable"]');
   for (const [reply, reason, words] of [
     [
@@ -352,21 +333,21 @@ test("a refusal, a malformed id and a drifted reply each stop the run page", asy
   ] as const) {
     arranged = reply;
     asked.length = 0;
-    await page.goto(`/runs/${LOOP_RUN}`);
+    await page.goto(`/runs/${runs.loop}`);
     await expect(state).toHaveAttribute("data-reason", reason);
     await expect(state.getByRole("alert")).toHaveText(words);
     await expect(state.getByRole("button", { name: "Retry" })).toHaveCount(0);
     await expect(page.locator('[data-field="retry-in"]')).toHaveCount(0);
     // Longer than the first two attempts would take, had it kept trying.
     await page.waitForTimeout(3_500);
-    expect(asked).toEqual([`/api/v1/runs/${LOOP_RUN}/workspace`]);
+    expect(asked).toEqual([`/api/v1/runs/${runs.loop}/workspace`]);
   }
   expect(
     logged.some((line) =>
       line.includes("This page and the local service disagree."),
     ),
   ).toBe(true);
-  await page.unroute(snapshotOf(LOOP_RUN));
+  await page.unroute(snapshotOf(runs.loop));
 
   // The API's own reply to an id that isn't a UUID, unarranged.
   await page.goto("/runs/not-a-run");
@@ -378,16 +359,16 @@ test("a refusal, a malformed id and a drifted reply each stop the run page", asy
 test("an outage backs off with a visible Retry, and the run shows when it recovers", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   const times: number[] = [];
   let failing = 2;
-  await page.route(snapshotOf(LOOP_RUN), (route) => {
+  await page.route(snapshotOf(runs.loop), (route) => {
     times.push(Date.now());
     if (failing === 0) return route.continue();
     failing -= 1;
     return route.fulfill(OUTAGE);
   });
-  await page.goto(`/runs/${LOOP_RUN}`);
+  await page.goto(`/runs/${runs.loop}`);
   const state = page.locator('[data-state="unavailable"]');
   const note = page.locator('[data-field="retry-in"]');
   const status = page.locator("[data-run-status]");
@@ -424,7 +405,7 @@ test("an outage backs off with a visible Retry, and the run shows when it recove
     "ended",
     { timeout: 15_000 },
   );
-  await page.unroute(snapshotOf(LOOP_RUN));
+  await page.unroute(snapshotOf(runs.loop));
 });
 
 // R-28: snapshot reads run one at a time, and a reply older than the snapshot shown is discarded.
@@ -434,8 +415,9 @@ test("an outage backs off with a visible Retry, and the run shows when it recove
 test("an older snapshot reply that arrives late never replaces a newer one", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  const id = await admitted(page, "order");
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
+  const id = await admitPlain(page, "order");
   await page.goto(`/runs/${id}`);
   const status = page.locator("[data-run-status]");
   await expect(status).toHaveAttribute("data-run-status", "queued");
@@ -471,8 +453,26 @@ test("an older snapshot reply that arrives late never replaces a newer one", asy
     });
     served = true;
   });
-  expect((await command(page, id, "pause", 1, "o1")).status()).toBe(200);
-  expect((await command(page, id, "resume", 2, "o2")).status()).toBe(200);
+  expect(
+    (
+      await runCommand(page, {
+        run: id,
+        command: "pause",
+        expectedVersion: 1,
+        key: "o1",
+      })
+    ).status(),
+  ).toBe(200);
+  expect(
+    (
+      await runCommand(page, {
+        run: id,
+        command: "resume",
+        expectedVersion: 2,
+        key: "o2",
+      })
+    ).status(),
+  ).toBe(200);
   await expect.poll(() => served, { timeout: 10_000 }).toBe(true);
   // The read queued behind the held one starts only once the page has dealt with its reply.
   await expect.poll(() => reads, { timeout: 10_000 }).toBeGreaterThanOrEqual(2);
@@ -493,10 +493,11 @@ test("a signed-out stream is refused, and Run links to the new run", async ({
   request,
 }) => {
   expect(
-    (await request.get(`/api/v1/runs/${LOOP_RUN}/events/stream`)).status(),
+    (await request.get(`/api/v1/runs/${runs.loop}/events/stream`)).status(),
   ).toBe(401);
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  await admitted(page, "link");
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
+  await admitPlain(page, "link");
   await page.getByRole("textbox", { name: "Goal" }).fill("Open what I started");
   await page.getByRole("button", { name: "Run", exact: true }).click();
   await page.getByRole("link", { name: "Open this run" }).click();
@@ -505,22 +506,14 @@ test("a signed-out stream is refused, and Run links to the new run", async ({
     page.getByRole("region", { name: "Goal" }).getByRole("paragraph"),
   ).toHaveText("Open what I started");
   // The settings spec, which runs after this one, expects no key.
-  await disconnectKey(page);
+  await disconnectProviderKey(page);
 });
-
-async function noViolations(page: Page): Promise<void> {
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-    .analyze();
-  expect(results.violations.map((violation) => violation.id)).toEqual([]);
-}
 
 test("US-14.4: tool uses show live, once each and in order, and again after a reload", async ({
   page,
 }) => {
-  expect(TOOL_RUN).not.toBe("");
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  await page.goto(`/runs/${TOOL_RUN}`);
+  await signIn(page, users.owner);
+  await page.goto(`/runs/${tools.run}`);
   const section = page.getByRole("region", { name: "Tools used" });
   const rows = section.locator("[data-tool-use]");
   await expect(rows).toHaveCount(2);
@@ -551,26 +544,12 @@ test("US-14.4: tool uses show live, once each and in order, and again after a re
   );
 
   // A worker's call while the page watches, through the same gateway.
-  const made = execFileSync(
-    process.env.AUTOBOTS_TEST_PYTHON ?? "",
-    [
-      process.env.AUTOBOTS_TEST_TOOL_HELPER ?? "",
-      TOOL_RUN,
-      process.env.AUTOBOTS_TEST_TOOL_GENERATION ?? "",
-      process.env.AUTOBOTS_TEST_TOOL_WORKSPACE ?? "",
-    ],
-    {
-      env: {
-        ...process.env,
-        AUTOBOTS_DATABASE_URL: process.env.AUTOBOTS_TEST_RUNTIME_URL ?? "",
-        PYTHONPATH: process.env.AUTOBOTS_TEST_PYTHONPATH ?? "",
-      },
-      encoding: "utf8",
-    },
+  const made = await runDbHelper(
+    "tool_use_live.py",
+    [tools.run, tools.generation, tools.workspace],
+    objectOf({ outcome: "string" }),
   );
-  expect(JSON.parse(made.trim().split("\n").at(-1) ?? "{}").outcome).toBe(
-    "succeeded",
-  );
+  expect(made.outcome).toBe("succeeded");
   await expect(rows).toHaveCount(3, { timeout: 15_000 });
   const third = rows.nth(2);
   await expect(third).toHaveAttribute("data-tool-id", "save_artifact");
@@ -588,7 +567,7 @@ test("US-14.4: tool uses show live, once each and in order, and again after a re
     page.locator('[data-field="tool-announcement"]'),
   ).toHaveAttribute("aria-live", "polite");
   expect(await page.content()).not.toContain("written live");
-  await noViolations(page);
+  await expectNoA11yViolations(page);
 
   await page.reload();
   await expect(rows).toHaveCount(3);
@@ -605,9 +584,8 @@ test("US-14.4: tool uses show live, once each and in order, and again after a re
 test("US-14.4: the workflow monitor shows tool uses under the node that made them", async ({
   page,
 }) => {
-  expect(TOOL_EXECUTION).not.toBe("");
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  await page.goto(`/workflow-executions/${TOOL_EXECUTION}`);
+  await signIn(page, users.owner);
+  await page.goto(`/workflow-executions/${tools.execution}`);
   const read = page.locator('[data-node-tools="read"]');
   await expect(read.getByRole("heading", { name: "Node read" })).toBeVisible();
   await expect(read.locator('[data-tool-id="read_run_file"]')).toHaveCount(1);
@@ -616,7 +594,7 @@ test("US-14.4: the workflow monitor shows tool uses under the node that made the
   await expect(save.locator('[data-tool-id="save_artifact"]')).toHaveCount(1);
   await expect(save.locator('[data-tool-id="read_run_file"]')).toHaveCount(0);
   await expect(page.locator('[data-node-tools="in"]')).toHaveCount(0);
-  await noViolations(page);
+  await expectNoA11yViolations(page);
 
   // R-27: tool uses that can't be read say so, and Retry reads them again.
   const toolUses = (url: URL) => url.pathname.endsWith("/tool-uses");
@@ -642,33 +620,25 @@ test("US-14.4: the workflow monitor shows tool uses under the node that made the
   await expect(read.locator("[data-tool-use]")).toHaveCount(1);
 });
 
+/** The run's input files, as tests/db/run_files_probe.py reads them from the database. */
 function probe(
   runId: string,
-): { path: string; media_type: string; bytes: number }[] {
-  const script = (process.env.AUTOBOTS_TEST_TOOL_HELPER ?? "").replace(
-    "tool_use_live.py",
+): Promise<{ path: string; media_type: string; bytes: number }[]> {
+  return runDbHelper(
     "run_files_probe.py",
+    [runId],
+    arrayOf(
+      objectOf({ path: "string", media_type: "string", bytes: "number" }),
+    ),
   );
-  const printed = execFileSync(
-    process.env.AUTOBOTS_TEST_PYTHON ?? "",
-    [script, runId],
-    {
-      env: {
-        ...process.env,
-        AUTOBOTS_DATABASE_URL: process.env.AUTOBOTS_TEST_RUNTIME_URL ?? "",
-        PYTHONPATH: process.env.AUTOBOTS_TEST_PYTHONPATH ?? "",
-      },
-      encoding: "utf8",
-    },
-  );
-  return JSON.parse(printed.trim().split("\n").at(-1) ?? "[]");
 }
 
 test("US-14.9: up to five text files attach to a goal as run inputs, and the rest are refused", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  await admitted(page, `attach-${Date.now()}`);
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
+  await admitPlain(page, `attach-${Date.now()}`);
   await page.goto("/");
   const input = page.getByLabel("Attach files");
   const text = (name: string, mimeType: string, body: string) => ({
@@ -708,10 +678,7 @@ test("US-14.9: up to five text files attach to a goal as run inputs, and the res
     "report.pdf: only plain text, markdown, JSON or CSV can be attached.",
   );
   await expect(attached).toHaveCount(4);
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-    .analyze();
-  expect(results.violations.map((violation) => violation.id)).toEqual([]);
+  await expectNoA11yViolations(page);
 
   await page
     .getByRole("textbox", { name: "Goal" })
@@ -720,7 +687,7 @@ test("US-14.9: up to five text files attach to a goal as run inputs, and the res
   await page.getByRole("link", { name: "Open this run" }).click();
   await expect(page).toHaveURL(/\/runs\/[0-9a-f-]{36}/);
   const runId = page.url().split("/").at(-1) ?? "";
-  expect(probe(runId)).toEqual([
+  expect(await probe(runId)).toEqual([
     { path: "inputs/data.json", media_type: "application/json", bytes: 8 },
     { path: "inputs/notes.txt", media_type: "text/plain", bytes: 11 },
     { path: "inputs/plan.md", media_type: "text/markdown", bytes: 6 },
@@ -728,10 +695,13 @@ test("US-14.9: up to five text files attach to a goal as run inputs, and the res
   ]);
 
   // Attaching isn't a tool: the catalog's Files group is unchanged by it.
-  const catalog = await (await page.request.get("/api/v1/tools")).json();
+  const catalog = await getJson(page, {
+    path: "/api/v1/tools",
+    parse: parseToolCatalog,
+  });
   const files = catalog.tools
-    .filter((tool: { group: string }) => tool.group === "files")
-    .map((tool: { tool_id: string }) => tool.tool_id)
+    .filter((tool) => tool.group === "files")
+    .map((tool) => tool.tool_id)
     .sort();
   expect(files).toEqual([
     "publish_artifact",

@@ -1,17 +1,14 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
-const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
+import { signIn, users } from "./support/auth.ts";
+import { expect, test } from "./support/fixtures.ts";
+
 const TERRA = "openrouter_terra";
 const DEEPSEEK = "openrouter_deepseek_flash";
 
 // Run by scripts/qualify_identity.py, after the settings suite left workspace A a valid key.
 async function openSettings(page: Page): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(EMAIL_A);
-  await page.getByLabel("Password").fill(PASSWORD_A);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
+  await signIn(page, users.owner);
   await page.goto("/settings/models");
   await expect(page.locator('[data-field="auth"]')).toHaveText(
     "The key authenticated.",

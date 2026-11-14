@@ -1,96 +1,65 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import {
+  parseModelPolicyState,
+  parseRunWorkspace,
+  type ModelPolicyState,
+} from "@autobots/api-client";
+import type { Page } from "@playwright/test";
+
+import { expectNoA11yViolations } from "./support/a11y.ts";
+import { getJson, send } from "./support/api.ts";
+import { signIn, users } from "./support/auth.ts";
+import { WorkerScenario } from "./support/builders.ts";
+import { expect, test } from "./support/fixtures.ts";
+import { ensureProviderKey } from "./support/keys.ts";
+import { admitRun, cancelUnlessTerminal } from "./support/runs.ts";
 
 // The model policy on Settings. Its name runs it with the slice suites, after settings.spec's versions.
-const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
 const TERRA = "openrouter_terra";
 const DEEPSEEK = "openrouter_deepseek_flash";
 const POLICY = "/api/settings/model-policy";
 
-async function signIn(page: Page): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(EMAIL_A);
-  await page.getByLabel("Password").fill(PASSWORD_A);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
-}
-
-async function write(
-  page: Page,
-  key?: string,
-): Promise<Record<string, string>> {
-  const token = await (await page.request.get("/api/csrf")).json();
-  return {
-    [token.header]: token.token,
-    Origin: new URL(page.url()).origin,
-    "Content-Type": "application/json",
-    ...(key === undefined ? {} : { "Idempotency-Key": key }),
-  };
-}
-
-async function ensureKey(page: Page): Promise<void> {
-  await page.goto("/settings/models");
-  const source = page.locator('[data-field="source"]');
-  await expect(source).toBeVisible();
-  if ((await source.textContent())?.trim() === "None") {
-    await page
-      .getByLabel(/API key|Replace key/)
-      .fill("sk-or-valid-arranged-first");
-    await page.getByRole("button", { name: "Save & validate" }).click();
-    await expect(page.locator('[data-field="auth"]')).toHaveText(
-      "The key authenticated.",
-    );
-  }
-}
-
-async function storedPolicy(page: Page): Promise<{
-  version: number;
-  default_profile: string;
-  role_overrides: Record<string, string>;
-}> {
-  return (await page.request.get(POLICY)).json();
+function storedPolicy(page: Page): Promise<ModelPolicyState> {
+  return getJson(page, { path: POLICY, parse: parseModelPolicyState });
 }
 
 // The worker's scripted route is Terra, so later suites start from the original policy.
 async function restore(page: Page): Promise<void> {
   const current = await storedPolicy(page);
-  const reply = await page.request.put(POLICY, {
-    headers: await write(page),
+  await send(page, {
+    method: "PUT",
+    path: POLICY,
+    key: null,
     data: {
       expected_version: current.version,
       default_profile: TERRA,
       role_overrides: {},
     },
+    status: 200,
+    parse: parseModelPolicyState,
   });
-  expect(reply.status()).toBe(200);
 }
 
-async function admit(page: Page, goal: string): Promise<string> {
-  const reply = await page.request.post("/api/v1/runs", {
-    headers: await write(page, `${goal}-${Date.now()}`),
-    data: { goal_text: `slice-only-claims ${goal}`, limit_micro_usd: 1000 },
-  });
-  expect(reply.status()).toBe(202);
-  return (await reply.json()).run_id;
+/** Admits a run the scripted worker fails at once, as it only claims to be done. */
+function admit(page: Page, label: string): Promise<string> {
+  return admitRun(
+    page,
+    {
+      goal_text: `${WorkerScenario.onlyClaims} ${label}`,
+      limit_micro_usd: 1000,
+    },
+    { key: `${label}-${Date.now()}` },
+  );
 }
 
-async function frozenExecutor(page: Page, id: string): Promise<string> {
-  const view = await (
-    await page.request.get(`/api/v1/runs/${id}/workspace`)
-  ).json();
-  return view.role_map.find(
-    (binding: { role: string }) => binding.role === "executor",
-  ).profile;
-}
-
-async function cancel(page: Page, id: string): Promise<void> {
-  const summary = await (await page.request.get(`/api/v1/runs/${id}`)).json();
-  if (["succeeded", "failed", "cancelled"].includes(summary.status)) return;
-  await page.request.post(`/api/v1/runs/${id}/cancel`, {
-    headers: await write(page, `cancel-${id}`),
-    data: { expected_version: summary.version },
+async function frozenExecutor(
+  page: Page,
+  id: string,
+): Promise<string | undefined> {
+  const view = await getJson(page, {
+    path: `/api/v1/runs/${id}/workspace`,
+    parse: parseRunWorkspace,
   });
+  return view.role_map.find((binding) => binding.role === "executor")?.profile;
 }
 
 const select = (page: Page, role: string) =>
@@ -100,8 +69,8 @@ test("an owner saves a default of what is offered, and DeepSeek is listed but no
   page,
 }) => {
   test.setTimeout(90_000);
-  await signIn(page);
-  await ensureKey(page);
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
   await restore(page);
   await page.goto("/");
   const before = await admit(page, "before-the-change");
@@ -136,22 +105,19 @@ test("an owner saves a default of what is offered, and DeepSeek is listed but no
   const after = await admit(page, "after-the-change");
   expect(await frozenExecutor(page, after)).toBe(TERRA);
   expect(await frozenExecutor(page, before)).toBe(TERRA);
-  await cancel(page, after);
-  await cancel(page, before);
+  await cancelUnlessTerminal(page, after);
+  await cancelUnlessTerminal(page, before);
 
   await page.goto("/settings/models");
   await expect(page.getByLabel("Workspace default")).toHaveValue(TERRA);
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa"])
-    .analyze();
-  expect(results.violations).toEqual([]);
+  await expectNoA11yViolations(page);
   await restore(page);
 });
 
 test("the screen says only the executor dispatches, and a same-binding override reads as the same", async ({
   page,
 }) => {
-  await signIn(page);
+  await signIn(page, users.owner);
   await restore(page);
   await page.goto("/settings/models");
   const effect = page.locator('[data-field="role-effect"]');
@@ -176,22 +142,19 @@ test("the screen says only the executor dispatches, and a same-binding override 
 
 test("a stale save is refused with a reload message, and the stored policy is unchanged", async ({
   page,
-  browser,
+  signedInPage,
 }) => {
-  await signIn(page);
+  await signIn(page, users.owner);
   await restore(page);
   await page.goto("/settings/models");
   await expect(page.getByLabel("Workspace default")).toHaveValue(TERRA);
 
   // Someone else saves after this screen loaded.
-  const context = await browser.newContext();
-  const other = await context.newPage();
-  await signIn(other);
+  const other = await signedInPage(users.owner);
   await other.goto("/settings/models");
   await select(other, "coder").selectOption(TERRA);
   await other.getByRole("button", { name: "Save policy" }).click();
   await expect(other.locator("[data-policy-message]")).toContainText("Saved.");
-  await context.close();
   const stored = await storedPolicy(page);
   expect(stored.role_overrides).toEqual({ coder: TERRA });
 

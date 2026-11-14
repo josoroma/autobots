@@ -1,27 +1,12 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
-
-const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
-const EMAIL_C = process.env.AUTOBOTS_TEST_MEMBER_EMAIL ?? "";
-const PASSWORD_C = process.env.AUTOBOTS_TEST_MEMBER_PASSWORD ?? "";
-
-async function signIn(
-  page: Page,
-  email: string,
-  password: string,
-): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
-}
+import { expectNoA11yViolations } from "./support/a11y.ts";
+import { signIn, users } from "./support/auth.ts";
+import { expect, test } from "./support/fixtures.ts";
+import { expectNoPrivateValues } from "./support/leaks.ts";
 
 test("the owner sees conditions, and no address or secret", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/operations");
   await expect(page.getByRole("heading", { name: "Operations" })).toBeVisible();
   await expect(page.getByText("Ready. New work can start.")).toBeVisible();
@@ -30,20 +15,18 @@ test("the owner sees conditions, and no address or secret", async ({
   await expect(page.getByText(/No worker is running/)).toBeVisible();
   await expect(page.getByText(/Remote tracing: off/)).toBeVisible();
   await expect(page.getByText(/Last backup: none found/)).toBeVisible();
-  const text = (await page.locator("main").innerText()).toLowerCase();
-  for (const leak of ["127.0.0.1", "postgres", "sk-or-", "eyj"]) {
-    expect(text).not.toContain(leak);
-  }
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa"])
-    .analyze();
-  expect(results.violations).toEqual([]);
+  expectNoPrivateValues(await page.locator("main").innerText(), {
+    label: "Operations",
+    extra: ["postgres"],
+    ignoreCase: true,
+  });
+  await expectNoA11yViolations(page);
 });
 
 test("retention saves, and a key window shorter than content is refused", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/operations");
   await page.getByLabel(/Run content/).fill("30");
   await page.getByLabel(/Retry keys/).fill("7");
@@ -65,7 +48,7 @@ test("retention saves, and a key window shorter than content is refused", async 
 test("a malformed or out-of-range retention window is refused on the page, and nothing is sent", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/operations");
   const writes: string[] = [];
   page.on("request", (request) => {
@@ -93,7 +76,7 @@ test("a malformed or out-of-range retention window is refused on the page, and n
 });
 
 test("a member is refused", async ({ page }) => {
-  await signIn(page, EMAIL_C, PASSWORD_C);
+  await signIn(page, users.member);
   await page.goto("/operations");
   await expect(
     page.getByText("Only the workspace owner can see Operations."),

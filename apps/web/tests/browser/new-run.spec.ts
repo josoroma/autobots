@@ -1,18 +1,11 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+import { expectNoA11yViolations, WCAG_22_AA } from "./support/a11y.ts";
+import { signIn, users } from "./support/auth.ts";
+import { expect, test } from "./support/fixtures.ts";
 
 // US-15.23, PRD-Studio SH-02 and Decision 0022 D3 and D16.
-const EMAIL = process.env.AUTOBOTS_TEST_OPS_EMAIL ?? "";
-const PASSWORD = process.env.AUTOBOTS_TEST_OPS_PASSWORD ?? "";
 const MODIFIER = process.platform === "darwin" ? "Meta" : "Control";
-
-async function signIn(page: Page): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(EMAIL);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
-}
 
 function watchPosts(page: Page): string[] {
   const posts: string[] = [];
@@ -29,7 +22,7 @@ const goal = (page: Page) =>
 test("New run follows the skip link with its ⇧⌘O hint, and opens Home's composer with focus in the goal", async ({
   page,
 }) => {
-  await signIn(page);
+  await signIn(page, users.ops);
   await page.goto("/runs");
   const posts = watchPosts(page);
   await page.keyboard.press("Tab");
@@ -51,14 +44,11 @@ test("New run follows the skip link with its ⇧⌘O hint, and opens Home's comp
   await button.click();
   await expect(goal(page)).toBeFocused();
   expect(posts).toEqual([]);
-  const scan = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-    .analyze();
-  expect(scan.violations).toEqual([]);
+  await expectNoA11yViolations(page, { extraTags: WCAG_22_AA });
 });
 
 test("⇧⌘O opens Home's composer from another screen", async ({ page }) => {
-  await signIn(page);
+  await signIn(page, users.ops);
   await page.goto("/workflows");
   const posts = watchPosts(page);
   await page.locator("body").click({ position: { x: 5, y: 5 } });
@@ -74,7 +64,7 @@ test("⇧⌘O opens Home's composer from another screen", async ({ page }) => {
 test("⇧⌘O in a text field does nothing, and the field keeps its content and focus", async ({
   page,
 }) => {
-  await signIn(page);
+  await signIn(page, users.ops);
   await page.goto("/runs");
   const filter = page.getByRole("searchbox", {
     name: "Filter by goal or Expert",

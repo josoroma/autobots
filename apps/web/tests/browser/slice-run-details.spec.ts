@@ -1,45 +1,32 @@
-import { expect, test, type Page } from "@playwright/test";
+import {
+  parseExpertView,
+  parseModelPolicyState,
+  parseRunList,
+  parseSessionView,
+  parseWorkflowView,
+} from "@autobots/api-client";
+import type { Page } from "@playwright/test";
+
+import { expectRefusal, getJson, send, writeHeaders } from "./support/api.ts";
+import { signIn, users } from "./support/auth.ts";
+import { inToOut, twoCountsRun, WorkerScenario } from "./support/builders.ts";
+import { expect, test } from "./support/fixtures.ts";
+import { ensureProviderKey } from "./support/keys.ts";
+import { expectNoPrivateValues } from "./support/leaks.ts";
+import { admitRun, cancelUnlessTerminal, readRun } from "./support/runs.ts";
 
 // What a run discloses, freezes and reports. Its name puts it with the slice suites.
-const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
 const TERRA = "openrouter_terra";
 const DEEPSEEK = "openrouter_deepseek_flash";
 const TERRA_CANONICAL = "openai/gpt-6.1-terra-20261026";
 const DATA =
   "selected instructions, conversation and context excerpts, retrieved material, tool outputs and required protocol metadata";
 
-async function signIn(page: Page): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(EMAIL_A);
-  await page.getByLabel("Password").fill(PASSWORD_A);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
-}
-
-async function write(page: Page, key: string): Promise<Record<string, string>> {
-  const token = await (await page.request.get("/api/csrf")).json();
-  return {
-    [token.header]: token.token,
-    Origin: new URL(page.url()).origin,
-    "Content-Type": "application/json",
-    "Idempotency-Key": key,
-  };
-}
-
-async function ensureKey(page: Page): Promise<void> {
-  await page.goto("/settings/models");
-  const source = page.locator('[data-field="source"]');
-  await expect(source).toBeVisible();
-  if ((await source.textContent())?.trim() === "None") {
-    await page
-      .getByLabel(/API key|Replace key/)
-      .fill("sk-or-valid-arranged-first");
-    await page.getByRole("button", { name: "Save & validate" }).click();
-    await expect(page.locator('[data-field="auth"]')).toHaveText(
-      "The key authenticated.",
-    );
-  }
+function policy(page: Page) {
+  return getJson(page, {
+    path: "/api/settings/model-policy",
+    parse: parseModelPolicyState,
+  });
 }
 
 async function expectDisclosure(page: Page, model: string): Promise<void> {
@@ -65,8 +52,8 @@ async function expectDisclosure(page: Page, model: string): Promise<void> {
 test("each screen that creates a run says what it uses, sends and spends, and sends nothing first", async ({
   page,
 }) => {
-  await signIn(page);
-  await ensureKey(page);
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
   const created: string[] = [];
   page.on("request", (request) => {
     const url = request.url();
@@ -82,47 +69,36 @@ test("each screen that creates a run says what it uses, sends and spends, and se
   await expectDisclosure(page, TERRA_CANONICAL);
 
   // An Expert's session.
-  const expert = await (
-    await page.request.post("/api/v1/experts", {
-      headers: await write(page, `disclose-expert-${Date.now()}`),
-      data: { name: `Disclosing ${Date.now()}`, config: {} },
-    })
-  ).json();
-  const session = await (
-    await page.request.post("/api/v1/sessions", {
-      headers: await write(page, `disclose-session-${Date.now()}`),
-      data: { kind: "direct", experts: [{ expert_id: expert.id }] },
-    })
-  ).json();
+  const expert = await send(page, {
+    path: "/api/v1/experts",
+    key: `disclose-expert-${Date.now()}`,
+    data: { name: `Disclosing ${Date.now()}`, config: {} },
+    status: 201,
+    parse: parseExpertView,
+  });
+  const session = await send(page, {
+    path: "/api/v1/sessions",
+    key: `disclose-session-${Date.now()}`,
+    data: { kind: "direct", experts: [{ expert_id: expert.id }] },
+    status: 201,
+    parse: parseSessionView,
+  });
   await page.goto(`/sessions/${session.id}`);
   await expectDisclosure(page, TERRA_CANONICAL);
 
   // A workflow's run.
-  const workflow = await (
-    await page.request.post("/api/v1/workflows", {
-      headers: await write(page, `disclose-workflow-${Date.now()}`),
-      data: { name: `Disclosing ${Date.now()}` },
-    })
-  ).json();
-  const graph = {
-    nodes: [
-      { id: "in", block: "input", version: 1, config: { type: "string" } },
-      { id: "out", block: "output", version: 1, config: {} },
-    ],
-    links: [
-      {
-        source: "in",
-        source_port: "value",
-        target: "out",
-        target_port: "value",
-      },
-    ],
-  };
+  const workflow = await send(page, {
+    path: "/api/v1/workflows",
+    key: `disclose-workflow-${Date.now()}`,
+    data: { name: `Disclosing ${Date.now()}` },
+    status: 201,
+    parse: parseWorkflowView,
+  });
   const published = await page.request.post(
     `/api/v1/workflows/${workflow.id}/versions`,
     {
-      headers: await write(page, `disclose-version-${Date.now()}`),
-      data: { expected_version: 0, graph },
+      headers: await writeHeaders(page, `disclose-version-${Date.now()}`),
+      data: { expected_version: 0, graph: inToOut() },
     },
   );
   expect(published.status()).toBeLessThan(300);
@@ -137,11 +113,9 @@ test("each screen that creates a run says what it uses, sends and spends, and se
 test("a person picks the other model for one run: it freezes, the default stays, and the workspace says what dispatches", async ({
   page,
 }) => {
-  await signIn(page);
-  await ensureKey(page);
-  const before = await (
-    await page.request.get("/api/settings/model-policy")
-  ).json();
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
+  const before = await policy(page);
   expect(before.default_profile).toBe(TERRA);
   await page.goto("/");
   await expect(
@@ -153,7 +127,7 @@ test("a person picks the other model for one run: it freezes, the default stays,
   await expectDisclosure(page, TERRA_CANONICAL);
   await page
     .getByRole("textbox", { name: "Goal" })
-    .fill("slice-only-claims one run");
+    .fill(`${WorkerScenario.onlyClaims} one run`);
   await page.getByRole("button", { name: "Run", exact: true }).click();
   const link = page
     .locator('[data-outcome="queued"]')
@@ -168,43 +142,24 @@ test("a person picks the other model for one run: it freezes, the default stays,
   await expect(map).toContainText(
     "Only the executor's binding dispatches in this release",
   );
-  const after = await (
-    await page.request.get("/api/settings/model-policy")
-  ).json();
+  const after = await policy(page);
   expect(after.default_profile).toBe(TERRA);
   expect(after.version).toBe(before.version);
-  const id = page.url().split("/").pop() ?? "";
-  const summary = await (await page.request.get(`/api/v1/runs/${id}`)).json();
-  if (!["succeeded", "failed", "cancelled"].includes(summary.status)) {
-    await page.request.post(`/api/v1/runs/${id}/cancel`, {
-      headers: await write(page, `cancel-${id}`),
-      data: { expected_version: summary.version },
-    });
-  }
+  await cancelUnlessTerminal(page, page.url().split("/").pop() ?? "");
 });
 
 test("the workspace shows budgets, and the inspector shows reported and estimated costs apart, errors and evidence", async ({
   page,
 }) => {
   test.setTimeout(120_000);
-  await signIn(page);
-  await ensureKey(page);
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
   await page.goto("/");
-  const reply = await page.request.post("/api/v1/runs", {
-    headers: await write(page, `slice-failed-call-${Date.now()}`),
-    data: {
-      goal_text:
-        "slice-failed-call slice-reasoned: report the total of the two counts",
-      limit_micro_usd: 1000000,
-      acceptance_criteria: ["The report states the correct total"],
-      required_artifacts: [{ name: "report.md", must_contain: ["Total: 5"] }],
-      input_documents: [
-        { path: "inputs/data.md", content: "apples: 2\npears: 3\n" },
-      ],
-    },
-  });
-  expect(reply.status()).toBe(202);
-  const id = (await reply.json()).run_id;
+  const id = await admitRun(
+    page,
+    twoCountsRun(`${WorkerScenario.failedCall} ${WorkerScenario.reasoned}`),
+    { key: `slice-failed-call-${Date.now()}` },
+  );
   await page.goto(`/runs/${id}`);
   await expect(page.locator("[data-run-status]")).toHaveAttribute(
     "data-run-status",
@@ -239,21 +194,21 @@ test("the workspace shows budgets, and the inspector shows reported and estimate
   const body = await (
     await page.request.get(`/api/v1/runs/${id}/inspector`)
   ).text();
-  const text = await page.locator("main").innerText();
-  for (const leak of ["PROTECTED-REASONING", "reasoning_details", "sk-or-"]) {
-    expect(body).not.toContain(leak);
-    expect(text).not.toContain(leak);
-  }
+  expectNoPrivateValues(body, { label: "the inspector's reply" });
+  expectNoPrivateValues(await page.locator("main").innerText(), {
+    label: "the inspector",
+  });
 });
 
 test("an unapproved model is refused, no run starts, and the draft is kept", async ({
   page,
 }) => {
-  await signIn(page);
-  await ensureKey(page);
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
   await page.goto("/");
   const listed = async () =>
-    (await (await page.request.get("/api/v1/runs")).json()).runs.length;
+    (await getJson(page, { path: "/api/v1/runs", parse: parseRunList })).runs
+      .length;
   const before = await listed();
   const draft = "A draft that must survive";
   await page.getByRole("textbox", { name: "Goal" }).fill(draft);
@@ -273,7 +228,7 @@ test("an unapproved model is refused, no run starts, and the draft is kept", asy
   await expect(page.getByRole("textbox", { name: "Goal" })).toHaveValue(draft);
   expect(await listed()).toBe(before);
   const direct = await page.request.post("/api/v1/runs", {
-    headers: await write(page, `refused-${Date.now()}`),
+    headers: await writeHeaders(page, `refused-${Date.now()}`),
     data: { goal_text: "No", run_profile: "openrouter_astra" },
   });
   expect(direct.status()).toBe(422);
@@ -284,42 +239,38 @@ test("an unapproved model is refused, no run starts, and the draft is kept", asy
 test("reusing a key with a model chosen is a conflict, not a replay of the first", async ({
   page,
 }) => {
-  await signIn(page);
-  await ensureKey(page);
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
   await page.goto("/");
   const key = `same-key-${Date.now()}`;
-  const first = await page.request.post("/api/v1/runs", {
-    headers: await write(page, key),
-    data: { goal_text: "slice-only-claims keyed" },
-  });
-  expect(first.status()).toBe(202);
+  const goal = `${WorkerScenario.onlyClaims} keyed`;
+  await admitRun(page, { goal_text: goal }, { key });
   const other = await page.request.post("/api/v1/runs", {
-    headers: await write(page, key),
-    data: { goal_text: "slice-only-claims keyed", run_profile: TERRA },
+    headers: await writeHeaders(page, key),
+    data: { goal_text: goal, run_profile: TERRA },
   });
-  expect(other.status()).toBe(409);
-  expect((await other.json()).code).toBe("idempotency_conflict");
+  await expectRefusal(other, { status: 409, code: "idempotency_conflict" });
 });
 
 test("continuing a finished run asks for a new run naming it, with the disclosure, and it stays as it was", async ({
   page,
 }) => {
   test.setTimeout(90_000);
-  await signIn(page);
-  await ensureKey(page);
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
   await page.goto("/");
-  const reply = await page.request.post("/api/v1/runs", {
-    headers: await write(page, `continue-${Date.now()}`),
-    data: { goal_text: "slice-only-claims to continue" },
-  });
-  const id = (await reply.json()).run_id;
+  const id = await admitRun(
+    page,
+    { goal_text: `${WorkerScenario.onlyClaims} to continue` },
+    { key: `continue-${Date.now()}` },
+  );
   await page.goto(`/runs/${id}`);
   await expect(page.locator("[data-run-status]")).toHaveAttribute(
     "data-run-status",
     "failed",
     { timeout: 60_000 },
   );
-  const before = await (await page.request.get(`/api/v1/runs/${id}`)).json();
+  const before = await readRun(page, id);
   await page.getByRole("button", { name: "Continue in a new run" }).click();
   await expect(page.locator("[data-continue-run]")).toContainText(
     "it can repeat what this run did",
@@ -368,12 +319,12 @@ test("continuing a finished run asks for a new run naming it, with the disclosur
   await expect(link).toBeVisible();
   const href = await link.getAttribute("href");
   expect(href).not.toContain(id);
-  const after = await (await page.request.get(`/api/v1/runs/${id}`)).json();
+  const after = await readRun(page, id);
   expect(after.status).toBe("failed");
   expect(after.version).toBe(before.version);
   await page.goto(href ?? "");
   await expect(
-    page.getByText("slice-only-claims to continue").first(),
+    page.getByText(`${WorkerScenario.onlyClaims} to continue`).first(),
   ).toBeVisible();
 });
 
@@ -381,14 +332,15 @@ test("a refusal clears the key to continue with, and a refusal after a lost repl
   page,
 }) => {
   test.setTimeout(90_000);
-  await signIn(page);
-  await ensureKey(page);
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
   await page.goto("/");
-  const reply = await page.request.post("/api/v1/runs", {
-    headers: await write(page, `continue-keys-${Date.now()}`),
-    data: { goal_text: "slice-only-claims keys" },
-  });
-  await page.goto(`/runs/${(await reply.json()).run_id}`);
+  const id = await admitRun(
+    page,
+    { goal_text: `${WorkerScenario.onlyClaims} keys` },
+    { key: `continue-keys-${Date.now()}` },
+  );
+  await page.goto(`/runs/${id}`);
   await expect(page.locator("[data-run-status]")).toHaveAttribute(
     "data-run-status",
     "failed",

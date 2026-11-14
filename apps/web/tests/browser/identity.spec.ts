@@ -1,37 +1,35 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import {
+  parseSessionSummary,
+  parseWorkspaceSummary,
+} from "@autobots/api-client";
 
-const OWNER_EMAIL = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const OWNER_PASSWORD = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
-const WORKSPACE_A = process.env.AUTOBOTS_TEST_WORKSPACE_A ?? "";
-const WORKSPACE_B = process.env.AUTOBOTS_TEST_WORKSPACE_B ?? "";
-const SERVICE_KEY = process.env.AUTOBOTS_TEST_SERVICE_KEY ?? "";
-const MEMBER_EMAIL = process.env.AUTOBOTS_TEST_MEMBER_EMAIL ?? "";
-const MEMBER_PASSWORD = process.env.AUTOBOTS_TEST_MEMBER_PASSWORD ?? "";
+import { expectNoA11yViolations } from "./support/a11y.ts";
+import { getJson } from "./support/api.ts";
+import { submitSignIn, users } from "./support/auth.ts";
+import { arranged, screenshotPath } from "./support/env.ts";
+import { expect, test } from "./support/fixtures.ts";
+import { captureBodies } from "./support/leaks.ts";
+
+// Each test signs in through the form itself and asserts what follows, as this suite covers the form.
+const stack = arranged({
+  workspaceA: "AUTOBOTS_TEST_WORKSPACE_A",
+  workspaceB: "AUTOBOTS_TEST_WORKSPACE_B",
+  serviceKey: "AUTOBOTS_TEST_SERVICE_KEY",
+});
 const SIGN_IN_UNAVAILABLE =
   "Signing in is unavailable right now. Check that the local services are running, then try again.";
-
-async function signIn(
-  page: Page,
-  email: string,
-  password: string,
-): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-}
 
 test("the owner signs in through the form, and the API verifies identity and membership", async ({
   page,
   context,
 }) => {
-  const bodies: string[] = [];
-  page.on("response", async (response) => {
-    if (response.request().resourceType() !== "fetch")
-      bodies.push(await response.text().catch(() => ""));
-  });
-  await signIn(page, OWNER_EMAIL, OWNER_PASSWORD);
+  const owner = users.owner;
+  // Pages and their scripts, styles and fonts, whose bodies are each read before the check below.
+  const bodies = captureBodies(
+    page,
+    (response) => response.request().resourceType() !== "fetch",
+  );
+  await submitSignIn(page, owner);
   await expect(
     page.getByText("Signed in, with access to 1 workspace."),
   ).toBeVisible();
@@ -46,19 +44,28 @@ test("the owner signs in through the form, and the API verifies identity and mem
   expect(
     await page.evaluate(() => JSON.stringify({ ...localStorage })),
   ).not.toContain("access_token");
-  const own = await page.request.get(`/api/v1/workspaces/${WORKSPACE_A}`);
-  expect(own.status()).toBe(200);
-  expect((await own.json()).id).toBe(WORKSPACE_A);
-  const me = await (await page.request.get("/api/v1/session")).json();
-  expect(me.workspace_ids).toEqual([WORKSPACE_A]);
-  const other = await page.request.get(`/api/v1/workspaces/${WORKSPACE_B}`);
+  const own = await getJson(page, {
+    path: `/api/v1/workspaces/${stack.workspaceA}`,
+    parse: parseWorkspaceSummary,
+  });
+  expect(own.id).toBe(stack.workspaceA);
+  const me = await getJson(page, {
+    path: "/api/v1/session",
+    parse: parseSessionSummary,
+  });
+  expect(me.workspace_ids).toEqual([stack.workspaceA]);
+  const other = await page.request.get(
+    `/api/v1/workspaces/${stack.workspaceB}`,
+  );
   expect(other.status()).toBe(403);
-  for (const body of bodies) {
-    expect(body).not.toContain(SERVICE_KEY);
-    expect(body).not.toContain(OWNER_PASSWORD);
+  const read = await bodies();
+  expect(read.length, "the sign-in page's bodies were read").toBeGreaterThan(0);
+  for (const reply of read) {
+    expect(reply.body, reply.url).not.toContain(stack.serviceKey);
+    expect(reply.body, reply.url).not.toContain(owner.password);
   }
   await page.screenshot({
-    path: `${process.env.AUTOBOTS_WEB_SCREENSHOTS}/signed-in.png`,
+    path: screenshotPath("signed-in.png"),
     fullPage: true,
   });
 });
@@ -67,7 +74,10 @@ test("a wrong password shows a safe error, and no session", async ({
   page,
   context,
 }) => {
-  await signIn(page, OWNER_EMAIL, "not-the-password");
+  await submitSignIn(page, {
+    email: users.owner.email,
+    password: "not-the-password",
+  });
   await expect(
     page.getByText("That email and password did not work."),
   ).toBeVisible();
@@ -75,23 +85,23 @@ test("a wrong password shows a safe error, and no session", async ({
     (await context.cookies()).some((item) => item.name === "autobots.session"),
   ).toBe(false);
   expect(
-    (await page.request.get(`/api/v1/workspaces/${WORKSPACE_A}`)).status(),
+    (await page.request.get(`/api/v1/workspaces/${stack.workspaceA}`)).status(),
   ).toBe(401);
   await page.screenshot({
-    path: `${process.env.AUTOBOTS_WEB_SCREENSHOTS}/sign-in-failed.png`,
+    path: screenshotPath("sign-in-failed.png"),
     fullPage: true,
   });
 });
 
 test("signing out ends access", async ({ page }) => {
-  await signIn(page, OWNER_EMAIL, OWNER_PASSWORD);
+  await submitSignIn(page, users.owner);
   await expect(
     page.getByText("Signed in, with access to 1 workspace."),
   ).toBeVisible();
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page.getByText("You are not signed in.")).toBeVisible();
   expect(
-    (await page.request.get(`/api/v1/workspaces/${WORKSPACE_A}`)).status(),
+    (await page.request.get(`/api/v1/workspaces/${stack.workspaceA}`)).status(),
   ).toBe(401);
 });
 
@@ -124,8 +134,8 @@ test("a sign-in that fails for any other reason says so, not that the password w
     );
   });
   await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(OWNER_EMAIL);
-  await page.getByLabel("Password").fill(OWNER_PASSWORD);
+  await page.getByLabel("Email").fill(users.owner.email);
+  await page.getByLabel("Password").fill(users.owner.password);
   // Each case changes the sentence, so a stale one can't satisfy the next.
   for (const [arranged, sentence] of [
     ["outage", SIGN_IN_UNAVAILABLE],
@@ -150,7 +160,7 @@ test("a sign-in that fails for any other reason says so, not that the password w
 test("a sign-out that fails says so, and the person stays signed in", async ({
   page,
 }) => {
-  await signIn(page, OWNER_EMAIL, OWNER_PASSWORD);
+  await submitSignIn(page, users.owner);
   await expect(
     page.getByText("Signed in, with access to 1 workspace."),
   ).toBeVisible();
@@ -179,7 +189,7 @@ test("a sign-out that fails says so, and the person stays signed in", async ({
 
 test("signing in needs the origin and CSRF checks", async ({ request }) => {
   const reply = await request.post("/api/session", {
-    data: { email: OWNER_EMAIL, password: OWNER_PASSWORD },
+    data: users.owner,
   });
   expect(reply.status()).toBe(403);
 });
@@ -188,21 +198,25 @@ test("signing in needs the origin and CSRF checks", async ({ request }) => {
 test("the account footer, the Account page and the display name", async ({
   page,
 }) => {
-  await signIn(page, MEMBER_EMAIL, MEMBER_PASSWORD);
+  const member = users.member;
+  await submitSignIn(page, member);
   await expect(
     page.getByText(/Signed in, with access to 2 workspaces/),
   ).toBeVisible();
-  const local = MEMBER_EMAIL.split("@")[0] ?? "";
-  const me = await (await page.request.get("/api/v1/session")).json();
+  const local = member.email.split("@")[0] ?? "";
+  const me = await getJson(page, {
+    path: "/api/v1/session",
+    parse: parseSessionSummary,
+  });
   expect(me.display_name).toBe(local);
   expect(me.display_name_saved).toBe(false);
-  expect(me.email).toBe(MEMBER_EMAIL);
+  expect(me.email).toBe(member.email);
   expect(me.workspaces).toHaveLength(2);
-  expect(
-    me.workspaces.map((item: { role: string }) => item.role).sort(),
-  ).toEqual(["member", "owner"]);
-  for (const item of me.workspaces as { name: string }[])
-    expect(item.name.length).toBeGreaterThan(0);
+  expect(me.workspaces.map((item) => item.role).sort()).toEqual([
+    "member",
+    "owner",
+  ]);
+  for (const item of me.workspaces) expect(item.name.length).toBeGreaterThan(0);
 
   const footer = page.locator("[data-account]");
   await expect(footer.locator('[data-field="display-name"]')).toHaveText(local);
@@ -210,7 +224,8 @@ test("the account footer, the Account page and the display name", async ({
   await expect(footer.locator('[data-field="role"]')).toHaveText(
     "No workspace",
   );
-  const chosen = me.workspaces[0] as { name: string; role: string };
+  const chosen = me.workspaces[0];
+  if (chosen === undefined) throw new Error("The session lists no workspace.");
   await Promise.all([
     page.waitForEvent("load"),
     page.getByLabel("Choose a workspace").selectOption({ label: chosen.name }),
@@ -230,16 +245,13 @@ test("the account footer, the Account page and the display name", async ({
   ).toBeVisible();
   const field = page.getByLabel("Display name");
   await expect(field).toBeEditable();
-  await expect(page.locator('[data-field="email"]')).toHaveText(MEMBER_EMAIL);
+  await expect(page.locator('[data-field="email"]')).toHaveText(member.email);
   await expect(page.locator("main")).toContainText("Owner");
   await expect(page.locator("main")).toContainText("Member");
   await expect(
     page.locator("main").getByRole("button", { name: "Sign out" }),
   ).toBeVisible();
-  const axe = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-    .analyze();
-  expect(axe.violations.map((item) => item.id)).toEqual([]);
+  await expectNoA11yViolations(page);
 
   await field.fill("Cy Member");
   await page.getByRole("button", { name: "Save name" }).click();
@@ -254,7 +266,10 @@ test("the account footer, the Account page and the display name", async ({
       "needs 1 to 60 characters",
     );
   }
-  const after = await (await page.request.get("/api/v1/session")).json();
+  const after = await getJson(page, {
+    path: "/api/v1/session",
+    parse: parseSessionSummary,
+  });
   expect(after.display_name).toBe("Cy Member");
   expect(after.display_name_saved).toBe(true);
   await page.reload();

@@ -1,55 +1,49 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import {
+  parseErrorResponse,
+  parseExpertView,
+  parseRunList,
+  parseSessionView,
+  parseToolCatalog,
+  parseToolGrants,
+} from "@autobots/api-client";
+import type { Page } from "@playwright/test";
 
-const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
-const EMAIL_B = process.env.AUTOBOTS_TEST_OWNER_B_EMAIL ?? "";
-const PASSWORD_B = process.env.AUTOBOTS_TEST_OWNER_B_PASSWORD ?? "";
-const EMAIL_C = process.env.AUTOBOTS_TEST_MEMBER_EMAIL ?? "";
-const PASSWORD_C = process.env.AUTOBOTS_TEST_MEMBER_PASSWORD ?? "";
+import { expectNoA11yViolations } from "./support/a11y.ts";
+import { expectRefusal, getJson, send, writeHeaders } from "./support/api.ts";
+import { signIn, users } from "./support/auth.ts";
+import { arranged, need } from "./support/env.ts";
+import { expect, test } from "./support/fixtures.ts";
+import { disconnectProviderKey, ensureProviderKey } from "./support/keys.ts";
 
-async function signIn(
+function createExpert(
   page: Page,
-  email: string,
-  password: string,
-): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
+  { key, name, config }: { key?: string; name: string; config: object },
+) {
+  return send(page, {
+    path: "/api/v1/experts",
+    ...(key === undefined ? {} : { key }),
+    data: { name, config },
+    status: 201,
+    parse: parseExpertView,
+  });
 }
 
-async function saveKey(page: Page): Promise<void> {
-  await page.goto("/settings/models");
-  const source = page.locator('[data-field="source"]');
-  await expect(source).toBeVisible();
-  if ((await source.textContent())?.trim() === "None") {
-    await page
-      .getByLabel(/API key|Replace key/)
-      .fill("sk-or-valid-arranged-first");
-    await page.getByRole("button", { name: "Save & validate" }).click();
-    await expect(page.locator('[data-field="auth"]')).toHaveText(
-      "The key authenticated.",
-    );
-  }
+function readExpert(page: Page, id: string) {
+  return getJson(page, {
+    path: `/api/v1/experts/${id}`,
+    parse: parseExpertView,
+  });
 }
 
-async function write(page: Page, key: string): Promise<Record<string, string>> {
-  const token = await (await page.request.get("/api/csrf")).json();
-  return {
-    [token.header]: token.token,
-    Origin: new URL(page.url()).origin,
-    "Content-Type": "application/json",
-    "Idempotency-Key": key,
-  };
+function runList(page: Page) {
+  return getJson(page, { path: "/api/v1/runs", parse: parseRunList });
 }
 
 test("an owner saves revisions in the editor, and a session shows what it really grants", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  await saveKey(page);
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
   await page.goto("/experts");
   await page.getByLabel("Name").fill("Writer");
   await page.getByRole("button", { name: "Create" }).click();
@@ -73,10 +67,7 @@ test("an owner saves revisions in the editor, and a session shows what it really
   );
   await expect(page.locator('[data-version="1"]')).toContainText("no tools");
   await expect(page.locator('[data-version="2"]')).toContainText("calculate");
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa"])
-    .analyze();
-  expect(results.violations.map((violation) => violation.id)).toEqual([]);
+  await expectNoA11yViolations(page);
 
   await page.getByRole("button", { name: "Start a session" }).click();
   await expect(page).toHaveURL(/\/sessions\//);
@@ -104,52 +95,47 @@ test("an owner saves revisions in the editor, and a session shows what it really
 test("a stale revision conflicts, and earlier versions never change", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/");
-  const created = await page.request.post("/api/v1/experts", {
-    headers: await write(page, "e1"),
-    data: { name: "Reviser", config: { tools: ["calculate"] } },
+  // The same key replays the first creation.
+  const expert = await createExpert(page, {
+    key: "e1",
+    name: "Reviser",
+    config: { tools: ["calculate"] },
   });
-  expect(created.status()).toBe(201);
-  const expert = await created.json();
   const again = await page.request.post("/api/v1/experts", {
-    headers: await write(page, "e1"),
+    headers: await writeHeaders(page, "e1"),
     data: { name: "Reviser", config: { tools: ["calculate"] } },
   });
-  expect((await again.json()).id).toBe(expert.id);
+  expect(parseExpertView(await again.json()).id).toBe(expert.id);
   const taken = await page.request.post("/api/v1/experts", {
-    headers: await write(page, "e2"),
+    headers: await writeHeaders(page, "e2"),
     data: { name: "Reviser", config: {} },
   });
   expect(taken.status()).toBe(409);
-  const saved = await page.request.post(
-    `/api/v1/experts/${expert.id}/versions`,
-    {
-      headers: await write(page, "e3"),
-      data: { expected_version: 1, config: { tools: [] } },
-    },
-  );
-  expect((await saved.json()).latest_version).toBe(2);
-  const stale = await page.request.post(
-    `/api/v1/experts/${expert.id}/versions`,
-    {
-      headers: await write(page, "e4"),
-      data: { expected_version: 1, config: { tools: ["calculate"] } },
-    },
-  );
-  expect(stale.status()).toBe(409);
-  expect((await stale.json()).code).toBe("expert_version_conflict");
-  const read = await (
-    await page.request.get(`/api/v1/experts/${expert.id}`)
-  ).json();
-  expect(read.versions[0].config.tools).toEqual(["calculate"]);
-  expect(read.versions[1].config.tools).toEqual([]);
+  const versions = `/api/v1/experts/${expert.id}/versions`;
+  const saved = await send(page, {
+    path: versions,
+    key: "e3",
+    data: { expected_version: 1, config: { tools: [] } },
+    status: 201,
+    parse: parseExpertView,
+  });
+  expect(saved.latest_version).toBe(2);
+  const stale = await page.request.post(versions, {
+    headers: await writeHeaders(page, "e4"),
+    data: { expected_version: 1, config: { tools: ["calculate"] } },
+  });
+  await expectRefusal(stale, { status: 409, code: "expert_version_conflict" });
+  const read = await readExpert(page, expert.id);
+  expect(read.versions[0]?.config.tools).toEqual(["calculate"]);
+  expect(read.versions[1]?.config.tools).toEqual([]);
 });
 
 test("a revision can't name a shell, an unknown tool, an unapproved model or an unknown role", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/");
   const cases: [Record<string, unknown>, string | null][] = [
     [{ tools: ["execute"] }, "expert_tool_not_available"],
@@ -163,29 +149,24 @@ test("a revision can't name a shell, an unknown tool, an unapproved model or an 
   ];
   for (const [index, [config, code]] of cases.entries()) {
     const reply = await page.request.post("/api/v1/experts", {
-      headers: await write(page, `bad-${index}`),
+      headers: await writeHeaders(page, `bad-${index}`),
       data: { name: `Bad ${index}`, config },
     });
-    expect(reply.status()).toBe(422);
-    if (code !== null) expect((await reply.json()).code).toBe(code);
+    await expectRefusal(reply, {
+      status: 422,
+      ...(code === null ? {} : { code }),
+    });
   }
 });
 
 test("a coordinator routes only among its list, and adds nothing", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  await saveKey(page);
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
   await page.goto("/");
   const make = async (name: string, config: Record<string, unknown>) =>
-    (
-      await (
-        await page.request.post("/api/v1/experts", {
-          headers: await write(page, `route-${name}`),
-          data: { name, config },
-        })
-      ).json()
-    ).id as string;
+    (await createExpert(page, { key: `route-${name}`, name, config })).id;
   const reader = await make("Reader", { tools: ["read_run_file"] });
   const calculator = await make("Calculator", { tools: ["calculate"] });
   const outside = await make("Outside", { tools: ["save_artifact"] });
@@ -207,16 +188,17 @@ test("a coordinator routes only among its list, and adds nothing", async ({
   const session = page.url().split("/").at(-1);
 
   const refused = await page.request.post("/api/v1/runs", {
-    headers: await write(page, "route-outside"),
+    headers: await writeHeaders(page, "route-outside"),
     data: { goal_text: "x", session_id: session, expert_id: outside },
   });
-  expect(refused.status()).toBe(409);
-  expect((await refused.json()).code).toBe("route_not_granted");
+  await expectRefusal(refused, { status: 409, code: "route_not_granted" });
   const unrouted = await page.request.post("/api/v1/runs", {
-    headers: await write(page, "route-none"),
+    headers: await writeHeaders(page, "route-none"),
     data: { goal_text: "x", session_id: session },
   });
-  expect((await unrouted.json()).code).toBe("route_needs_expert");
+  expect(parseErrorResponse(await unrouted.json()).code).toBe(
+    "route_needs_expert",
+  );
 
   await page.getByLabel(/Calculator, version 1/).check();
   await page.getByLabel("Goal").fill("Add it up");
@@ -232,33 +214,29 @@ test("a coordinator routes only among its list, and adds nothing", async ({
 });
 
 test("a member can't save, and another workspace sees nothing", async ({
-  browser,
+  asOwner: owner,
+  signedInPage,
 }) => {
-  const owner = await (await browser.newContext()).newPage();
-  await signIn(owner, EMAIL_A, PASSWORD_A);
   await owner.goto("/");
-  const expert = await (
-    await owner.request.post("/api/v1/experts", {
-      headers: await write(owner, "visibility"),
-      data: { name: "Visible", config: {} },
-    })
-  ).json();
-  const other = await (await browser.newContext()).newPage();
-  await signIn(other, EMAIL_B, PASSWORD_B);
+  const expert = await createExpert(owner, {
+    key: "visibility",
+    name: "Visible",
+    config: {},
+  });
+  const other = await signedInPage(users.ownerB);
   expect(
     (await other.request.get(`/api/v1/experts/${expert.id}`)).status(),
   ).toBe(404);
   const foreign = await other.request.post("/api/v1/sessions", {
-    headers: await write(other, "foreign"),
+    headers: await writeHeaders(other, "foreign"),
     data: { kind: "direct", experts: [{ expert_id: expert.id }] },
   });
   expect(foreign.status()).toBe(404);
   await other.goto(`/experts/${expert.id}`);
   await expect(other.locator('[data-state="unavailable"]')).toBeVisible();
-  const member = await (await browser.newContext()).newPage();
-  await signIn(member, EMAIL_C, PASSWORD_C);
+  const member = await signedInPage(users.member);
   const denied = await member.request.post("/api/v1/experts", {
-    headers: await write(member, "member"),
+    headers: await writeHeaders(member, "member"),
     data: { name: "Nope", config: {} },
   });
   expect(denied.status()).toBe(403);
@@ -266,93 +244,78 @@ test("a member can't save, and another workspace sees nothing", async ({
 
 test.afterAll(async ({ browser }) => {
   // The settings spec, which runs after this one, expects no key.
-  const page = await (await browser.newContext()).newPage();
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  await page.goto("/settings/models");
-  await expect(page.locator('[data-field="auth"]')).toBeVisible();
-  await page.getByRole("button", { name: "Disconnect" }).click();
-  await expect(page.locator('[data-field="source"]')).toHaveText("None");
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+    await signIn(page, users.owner);
+    await disconnectProviderKey(page);
+  } finally {
+    await context.close();
+  }
 });
 
 test("a member can't pin an earlier Expert version through a session, and an owner can", async ({
-  browser,
+  asOwner: owner,
+  signedInPage,
 }) => {
-  const owner = await (await browser.newContext()).newPage();
-  await signIn(owner, EMAIL_A, PASSWORD_A);
   const stamp = Date.now();
-  const expert = await (
-    await owner.request.post("/api/v1/experts", {
-      headers: await write(owner, `pin-expert-${stamp}`),
-      data: { name: `Pinned ${stamp}`, config: {} },
-    })
-  ).json();
-  const member = await (await browser.newContext()).newPage();
-  await signIn(member, EMAIL_C, PASSWORD_C);
-  const workspace = process.env.AUTOBOTS_TEST_WORKSPACE_A ?? "";
+  const expert = await createExpert(owner, {
+    key: `pin-expert-${stamp}`,
+    name: `Pinned ${stamp}`,
+    config: {},
+  });
+  const member = await signedInPage(users.member);
+  const workspace = need("AUTOBOTS_TEST_WORKSPACE_A");
   const refused = await member.request.post("/api/v1/sessions", {
     headers: {
-      ...(await write(member, `pin-member-${stamp}`)),
+      ...(await writeHeaders(member, `pin-member-${stamp}`)),
       "X-Autobots-Workspace": workspace,
     },
     data: { kind: "direct", experts: [{ expert_id: expert.id, version: 1 }] },
   });
-  expect(refused.status()).toBe(403);
-  expect((await refused.json()).code).toBe("owner_required");
+  await expectRefusal(refused, { status: 403, code: "owner_required" });
   const unpinned = await member.request.post("/api/v1/sessions", {
     headers: {
-      ...(await write(member, `pin-latest-${stamp}`)),
+      ...(await writeHeaders(member, `pin-latest-${stamp}`)),
       "X-Autobots-Workspace": workspace,
     },
     data: { kind: "direct", experts: [{ expert_id: expert.id }] },
   });
   expect(unpinned.status()).toBe(201);
   const pinned = await owner.request.post("/api/v1/sessions", {
-    headers: await write(owner, `pin-owner-${stamp}`),
+    headers: await writeHeaders(owner, `pin-owner-${stamp}`),
     data: { kind: "direct", experts: [{ expert_id: expert.id, version: 1 }] },
   });
   expect(pinned.status()).toBe(201);
 });
 
 test("saving a revision keeps what the form doesn't edit", async ({ page }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/experts");
-  const token = await (await page.request.get("/api/csrf")).json();
   const stamp = Date.now();
-  const headers = (key: string) => ({
-    [token.header]: token.token,
-    Origin: new URL(page.url()).origin,
-    "Content-Type": "application/json",
-    "Idempotency-Key": `${key}-${stamp}`,
+  const expert = await createExpert(page, {
+    key: `keeps-${stamp}`,
+    name: `Keeps ${stamp}`,
+    config: {
+      skills: ["a-skill"],
+      role_bindings: { coder: "openrouter_terra" },
+    },
   });
-  const expert = await (
-    await page.request.post("/api/v1/experts", {
-      headers: headers("keeps"),
-      data: {
-        name: `Keeps ${stamp}`,
-        config: {
-          skills: ["a-skill"],
-          role_bindings: { coder: "openrouter_terra" },
-        },
-      },
-    })
-  ).json();
   await page.goto(`/experts/${expert.id}`);
   await page.getByLabel("Purpose").fill("Changed here");
   await page.getByRole("button", { name: "Save revision" }).click();
   await expect(page.getByText(/Saved as version 2/)).toBeVisible();
-  const saved = await (
-    await page.request.get(`/api/v1/experts/${expert.id}`)
-  ).json();
-  const latest = saved.versions.at(-1).config;
-  expect(latest.purpose).toBe("Changed here");
-  expect(latest.skills).toEqual(["a-skill"]);
-  expect(latest.role_bindings).toEqual({ coder: "openrouter_terra" });
+  const saved = await readExpert(page, expert.id);
+  const latest = saved.versions.at(-1)?.config;
+  expect(latest?.purpose).toBe("Changed here");
+  expect(latest?.skills).toEqual(["a-skill"]);
+  expect(latest?.role_bindings).toEqual({ coder: "openrouter_terra" });
 });
 
 test("US-14.2: a group grant is previewed, saved as explicit tools, and an unavailable tool is refused", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/experts");
   await page.getByLabel("Name").fill("Grouped");
   await page.getByRole("button", { name: "Create" }).click();
@@ -385,16 +348,13 @@ test("US-14.2: a group grant is previewed, saved as explicit tools, and an unava
   );
   await expect(version).toContainText("(groups: files)");
   await expect(page.locator('[data-version="1"]')).toContainText("no tools");
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa"])
-    .analyze();
-  expect(results.violations.map((violation) => violation.id)).toEqual([]);
+  await expectNoA11yViolations(page);
 
   // The stored version names the tools, so it doesn't follow the group later.
   const url = new URL(page.url());
   const id = url.pathname.split("/").at(-1) ?? "";
-  const stored = await (await page.request.get(`/api/v1/experts/${id}`)).json();
-  expect(stored.versions[1].config.tools).toEqual([
+  const stored = await readExpert(page, id);
+  expect(stored.versions[1]?.config.tools).toEqual([
     "calculate",
     "publish_artifact",
     "read_csv",
@@ -402,7 +362,7 @@ test("US-14.2: a group grant is previewed, saved as explicit tools, and an unava
     "save_artifact",
     "store_remote_file",
   ]);
-  expect(stored.versions[1].config.tool_groups).toEqual(["files"]);
+  expect(stored.versions[1]?.config.tool_groups).toEqual(["files"]);
 
   for (const [config, code] of [
     [{ tools: ["create_github_issue"] }, "expert_tool_unavailable"],
@@ -410,11 +370,10 @@ test("US-14.2: a group grant is previewed, saved as explicit tools, and an unava
     [{ tool_groups: ["planning"] }, "expert_tool_group_empty"],
   ] as const) {
     const refused = await page.request.post(`/api/v1/experts/${id}/versions`, {
-      headers: await write(page, crypto.randomUUID()),
+      headers: await writeHeaders(page),
       data: { expected_version: 2, config },
     });
-    expect(refused.status()).toBe(422);
-    expect((await refused.json()).code).toBe(code);
+    await expectRefusal(refused, { status: 422, code });
   }
 });
 
@@ -423,18 +382,19 @@ test("US-14.5: a missing key refuses only a run or version that grants its tool"
 }) => {
   // Arranged by tests/db/provider_key_check.py: Experts saved while the GitHub variables were set.
   // This suite's API has none of them.
-  const keyedSession = process.env.AUTOBOTS_TEST_KEYED_SESSION ?? "";
-  const keyedExpert = process.env.AUTOBOTS_TEST_KEYED_EXPERT ?? "";
-  const plainSession = process.env.AUTOBOTS_TEST_PLAIN_SESSION ?? "";
-  const plainExpert = process.env.AUTOBOTS_TEST_PLAIN_EXPERT ?? "";
-  expect(keyedSession).not.toBe("");
-  await signIn(page, EMAIL_A, PASSWORD_A);
-  await saveKey(page);
+  const { keyedSession, keyedExpert, plainSession, plainExpert } = arranged({
+    keyedSession: "AUTOBOTS_TEST_KEYED_SESSION",
+    keyedExpert: "AUTOBOTS_TEST_KEYED_EXPERT",
+    plainSession: "AUTOBOTS_TEST_PLAIN_SESSION",
+    plainExpert: "AUTOBOTS_TEST_PLAIN_EXPERT",
+  });
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
   await page.goto("/");
-  const before = await (await page.request.get("/api/v1/runs")).json();
+  const before = await runList(page);
 
   const refused = await page.request.post("/api/v1/runs", {
-    headers: await write(page, crypto.randomUUID()),
+    headers: await writeHeaders(page),
     data: {
       goal_text: "File the issue",
       session_id: keyedSession,
@@ -442,13 +402,12 @@ test("US-14.5: a missing key refuses only a run or version that grants its tool"
       limit_micro_usd: 1000,
     },
   });
-  expect(refused.status()).toBe(409);
-  expect((await refused.json()).code).toBe("tool_unavailable");
-  const after = await (await page.request.get("/api/v1/runs")).json();
+  await expectRefusal(refused, { status: 409, code: "tool_unavailable" });
+  const after = await runList(page);
   expect(after.runs.length).toBe(before.runs.length);
 
   const admitted = await page.request.post("/api/v1/runs", {
-    headers: await write(page, crypto.randomUUID()),
+    headers: await writeHeaders(page),
     data: {
       goal_text: "Add it up",
       session_id: plainSession,
@@ -462,19 +421,18 @@ test("US-14.5: a missing key refuses only a run or version that grants its tool"
   const kept = await page.request.post(
     `/api/v1/experts/${keyedExpert}/versions`,
     {
-      headers: await write(page, crypto.randomUUID()),
+      headers: await writeHeaders(page),
       data: {
         expected_version: 1,
         config: { tools: ["calculate", "create_github_issue"] },
       },
     },
   );
-  expect(kept.status()).toBe(422);
-  expect((await kept.json()).code).toBe("expert_tool_unavailable");
+  await expectRefusal(kept, { status: 422, code: "expert_tool_unavailable" });
   const dropped = await page.request.post(
     `/api/v1/experts/${keyedExpert}/versions`,
     {
-      headers: await write(page, crypto.randomUUID()),
+      headers: await writeHeaders(page),
       data: { expected_version: 1, config: { tools: ["calculate"] } },
     },
   );
@@ -483,13 +441,11 @@ test("US-14.5: a missing key refuses only a run or version that grants its tool"
   // This suite's API has no provider key but the Jina one arranged in its configuration root's .env
   // (US-14.17), so exactly the keyed tools with no key source read key_missing, and every tool
   // needing no key is unaffected.
-  const catalog = await (await page.request.get("/api/v1/tools")).json();
-  type Tool = {
-    tool_id: string;
-    availability: string;
-    key_requirement: { credential: string; source: string | null } | null;
-  };
-  const tools = catalog.tools as Tool[];
+  const catalog = await getJson(page, {
+    path: "/api/v1/tools",
+    parse: parseToolCatalog,
+  });
+  const tools = catalog.tools;
   const missing = tools
     .filter((tool) => tool.availability === "key_missing")
     .map((tool) => tool.tool_id)
@@ -516,9 +472,6 @@ test("US-14.5: a missing key refuses only a run or version that grants its tool"
 });
 
 // US-15.6: Experts arranged by SQL (four, with US-15.7's older-version grant) in their own workspace (scripts/qualify_identity.py).
-const EXPERTS_EMAIL = process.env.AUTOBOTS_TEST_EXPERTS_EMAIL ?? "";
-const EXPERTS_PASSWORD = process.env.AUTOBOTS_TEST_EXPERTS_PASSWORD ?? "";
-
 function cardOf(page: Page, name: string) {
   return page
     .locator("li")
@@ -528,7 +481,7 @@ function cardOf(page: Page, name: string) {
 test("Expert cards show their facts, filters and the approval note", async ({
   page,
 }) => {
-  await signIn(page, EXPERTS_EMAIL, EXPERTS_PASSWORD);
+  await signIn(page, users.experts);
   await page.goto("/experts");
   const filter = (id: string) => page.locator(`[data-filter="${id}"]`);
   await expect(filter("all")).toHaveText("All 4");
@@ -553,10 +506,7 @@ test("Expert cards show their facts, filters and the approval note", async ({
   await expect(
     cardOf(page, "Brief writer").locator('[data-field="approval"]'),
   ).toHaveCount(0);
-  const axe = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-    .analyze();
-  expect(axe.violations.map((item) => item.id)).toEqual([]);
+  await expectNoA11yViolations(page);
 
   const names = async () =>
     (await page.locator("main li a[href^='/experts/']").allTextContents()).map(
@@ -578,8 +528,8 @@ test("Expert cards show their facts, filters and the approval note", async ({
 test("Start run opens run creation with the disclosure, and sends nothing", async ({
   page,
 }) => {
-  await signIn(page, EXPERTS_EMAIL, EXPERTS_PASSWORD);
-  const before = (await (await page.request.get("/api/v1/runs")).json()).total;
+  await signIn(page, users.experts);
+  const before = (await runList(page)).total;
   await page.goto("/experts");
   await cardOf(page, "Brief writer")
     .getByRole("button", { name: "Start run with Brief writer" })
@@ -588,13 +538,13 @@ test("Start run opens run creation with the disclosure, and sends nothing", asyn
   await expect(page.locator('[data-field="disclosure"]')).toContainText(
     "Nothing is sent until you press Run",
   );
-  const after = (await (await page.request.get("/api/v1/runs")).json()).total;
+  const after = (await runList(page)).total;
   expect(after).toBe(before);
 });
 
 // US-15.7: who a tool is granted to, from the latest Expert versions and published workflows.
 test("a tool's detail lists who it's granted to now", async ({ page }) => {
-  await signIn(page, EXPERTS_EMAIL, EXPERTS_PASSWORD);
+  await signIn(page, users.experts);
   await page.goto("/tools?tool=read_csv");
   const panel = page.locator('[data-panel="read_csv"]');
   const granted = panel.locator('[data-field="granted-to"]');
@@ -608,19 +558,16 @@ test("a tool's detail lists who it's granted to now", async ({ page }) => {
     granted.getByRole("link", { name: "Workflow Nightly triage, version 1" }),
   ).toBeVisible();
   await expect(granted).not.toContainText("Old granter");
-  const grants = await (
-    await page.request.get("/api/v1/tools/read_csv/grants")
-  ).json();
-  expect(
-    grants.experts.map((item: { name: string }) => item.name).sort(),
-  ).toEqual(["Issue triager", "Market watcher"]);
-  expect(grants.workflows.map((item: { name: string }) => item.name)).toEqual([
-    "Nightly triage",
+  const grants = await getJson(page, {
+    path: "/api/v1/tools/read_csv/grants",
+    parse: parseToolGrants,
+  });
+  expect(grants.experts.map((item) => item.name).sort()).toEqual([
+    "Issue triager",
+    "Market watcher",
   ]);
-  const axe = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-    .analyze();
-  expect(axe.violations.map((item) => item.id)).toEqual([]);
+  expect(grants.workflows.map((item) => item.name)).toEqual(["Nightly triage"]);
+  await expectNoA11yViolations(page);
 });
 
 // R-18 step 1, Decision 0027 D2: the route answers the admission for the API, so this starts no
@@ -628,20 +575,24 @@ test("a tool's detail lists who it's granted to now", async ({ page }) => {
 test("a double click on Run in a session sends one admission", async ({
   page,
 }) => {
-  await signIn(page, EMAIL_A, PASSWORD_A);
+  await signIn(page, users.owner);
   await page.goto("/");
-  const created = await page.request.post("/api/v1/experts", {
-    headers: await write(page, `double-${Date.now()}`),
-    data: { name: `Pressed twice ${Date.now()}`, config: {} },
-  });
-  expect(created.status()).toBe(201);
-  const expert = (await created.json()).id;
-  const opened = await page.request.post("/api/v1/sessions", {
-    headers: await write(page, `double-session-${Date.now()}`),
-    data: { kind: "direct", experts: [{ expert_id: expert }] },
-  });
-  expect(opened.ok()).toBe(true);
-  const session = (await opened.json()).id;
+  const expert = (
+    await createExpert(page, {
+      key: `double-${Date.now()}`,
+      name: `Pressed twice ${Date.now()}`,
+      config: {},
+    })
+  ).id;
+  const session = (
+    await send(page, {
+      path: "/api/v1/sessions",
+      key: `double-session-${Date.now()}`,
+      data: { kind: "direct", experts: [{ expert_id: expert }] },
+      status: 201,
+      parse: parseSessionView,
+    })
+  ).id;
 
   let posts = 0;
   await page.route("**/api/v1/runs", async (route) => {

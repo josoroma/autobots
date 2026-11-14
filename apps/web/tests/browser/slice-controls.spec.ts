@@ -1,65 +1,32 @@
-import { expect, test, type Page } from "@playwright/test";
+import {
+  parseReconciliationResult,
+  parseRunWorkspace,
+} from "@autobots/api-client";
+import type { Page } from "@playwright/test";
+
+import { expectRefusal, getJson, send, writeHeaders } from "./support/api.ts";
+import { signIn, users } from "./support/auth.ts";
+import { twoCountsRun, WorkerScenario } from "./support/builders.ts";
+import { need } from "./support/env.ts";
+import { expect, test } from "./support/fixtures.ts";
+import { ensureProviderKey } from "./support/keys.ts";
+import { admitRun, readRun, runCommand } from "./support/runs.ts";
 
 // A run's controls, with the scripted worker running. Its name puts it with the slice suites.
-const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
-const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
-const EMAIL_C = process.env.AUTOBOTS_TEST_MEMBER_EMAIL ?? "";
-const PASSWORD_C = process.env.AUTOBOTS_TEST_MEMBER_PASSWORD ?? "";
-const WORKSPACE_A = process.env.AUTOBOTS_TEST_WORKSPACE_A ?? "";
 
-async function signIn(
-  page: Page,
-  email: string = EMAIL_A,
-  password: string = PASSWORD_A,
-): Promise<void> {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(/Signed in, with access to/)).toBeVisible();
-}
-
-async function write(page: Page, key: string): Promise<Record<string, string>> {
-  const token = await (await page.request.get("/api/csrf")).json();
-  return {
-    [token.header]: token.token,
-    Origin: new URL(page.url()).origin,
-    "Content-Type": "application/json",
-    "Idempotency-Key": key,
-  };
-}
-
-async function ensureKey(page: Page): Promise<void> {
-  await page.goto("/settings/models");
-  const source = page.locator('[data-field="source"]');
-  await expect(source).toBeVisible();
-  if ((await source.textContent())?.trim() === "None") {
-    await page
-      .getByLabel(/API key|Replace key/)
-      .fill("sk-or-valid-arranged-first");
-    await page.getByRole("button", { name: "Save & validate" }).click();
-    await expect(page.locator('[data-field="auth"]')).toHaveText(
-      "The key authenticated.",
-    );
-  }
-}
-
-async function admit(page: Page, goal: string): Promise<string> {
+/** Admits the two-counts run for `scenario` from Home. */
+async function admit(page: Page, scenario: string): Promise<string> {
   await page.goto("/");
-  const reply = await page.request.post("/api/v1/runs", {
-    headers: await write(page, `${goal}-${Date.now()}`),
-    data: {
-      goal_text: `${goal}: report the total of the two counts`,
-      limit_micro_usd: 1000000,
-      acceptance_criteria: ["The report states the correct total"],
-      required_artifacts: [{ name: "report.md", must_contain: ["Total: 5"] }],
-      input_documents: [
-        { path: "inputs/data.md", content: "apples: 2\npears: 3\n" },
-      ],
-    },
+  return admitRun(page, twoCountsRun(scenario), {
+    key: `${scenario}-${Date.now()}`,
   });
-  expect(reply.status()).toBe(202);
-  return (await reply.json()).run_id;
+}
+
+function workspace(page: Page, id: string) {
+  return getJson(page, {
+    path: `/api/v1/runs/${id}/workspace`,
+    parse: parseRunWorkspace,
+  });
 }
 
 const status = (page: Page) => page.locator("[data-run-status]");
@@ -67,7 +34,7 @@ const button = (page: Page, name: string) =>
   page.getByRole("button", { name, exact: true });
 
 async function apiStatus(page: Page, id: string): Promise<string> {
-  return (await (await page.request.get(`/api/v1/runs/${id}`)).json()).status;
+  return (await readRun(page, id)).status;
 }
 
 // The page's text state, and the one the API reports, agree.
@@ -94,9 +61,9 @@ test("a person pauses, resumes and cancels a running run from its page, and the 
   page,
 }) => {
   test.setTimeout(120_000);
-  await signIn(page);
-  await ensureKey(page);
-  const id = await admit(page, "slice-slow");
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
+  const id = await admit(page, WorkerScenario.slow);
   await page.goto(`/runs/${id}`);
   await expectState(page, id, "running", "Running.");
 
@@ -122,9 +89,9 @@ test("after a lost Pause, Resume sends nothing, and Cancel still stops the run",
   page,
 }) => {
   test.setTimeout(120_000);
-  await signIn(page);
-  await ensureKey(page);
-  const id = await admit(page, "slice-slow");
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
+  const id = await admit(page, WorkerScenario.slow);
   await page.goto(`/runs/${id}`);
   await expectState(page, id, "running", "Running.");
   // Decision 0027 D2: the Pause reaches the API and applies, but its reply is lost. Pause and Resume
@@ -172,10 +139,11 @@ test("a finished run offers no control, whichever way it ended", async ({
   page,
 }) => {
   test.setTimeout(120_000);
-  await signIn(page);
-  await ensureKey(page);
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
+  // A goal with no scenario word runs plainly to success.
   const succeeded = await admit(page, "slice-finishes");
-  const failed = await admit(page, "slice-only-claims");
+  const failed = await admit(page, WorkerScenario.onlyClaims);
   const expected = { [succeeded]: "succeeded", [failed]: "failed" };
   for (const [id, state] of Object.entries(expected)) {
     await page.goto(`/runs/${id}`);
@@ -184,13 +152,11 @@ test("a finished run offers no control, whichever way it ended", async ({
     });
     await expectNoControls(page);
     await expect(page.locator("[data-run-controls]")).toHaveCount(0);
-    const reopened = await page.request.post(`/api/v1/runs/${id}/resume`, {
-      headers: await write(page, `reopen-${id}`),
-      data: {
-        expected_version: (
-          await (await page.request.get(`/api/v1/runs/${id}`)).json()
-        ).version,
-      },
+    const reopened = await runCommand(page, {
+      run: id,
+      command: "resume",
+      expectedVersion: (await readRun(page, id)).version,
+      key: `reopen-${id}`,
     });
     expect(reopened.status()).toBe(409);
   }
@@ -198,12 +164,12 @@ test("a finished run offers no control, whichever way it ended", async ({
 
 test("resume is refused with its reason until an uncertain call is reconciled, and then accepted", async ({
   page,
-  browser,
+  signedInPage,
 }) => {
   test.setTimeout(160_000);
-  await signIn(page);
-  await ensureKey(page);
-  const id = await admit(page, "slice-uncertain");
+  await signIn(page, users.owner);
+  await ensureProviderKey(page);
+  const id = await admit(page, WorkerScenario.uncertain);
   await page.goto(`/runs/${id}`);
   // The scripted worker dies inside a model call, and recovery stops at the unknown.
   await expect(status(page)).toHaveAttribute("data-run-status", "paused", {
@@ -213,9 +179,7 @@ test("resume is refused with its reason until an uncertain call is reconciled, a
     "uncertain model call",
   );
 
-  const before = await (
-    await page.request.get(`/api/v1/runs/${id}/workspace`)
-  ).json();
+  const before = await workspace(page, id);
   expect(before.outstanding.uncertain_calls).toBe(1);
 
   await button(page, "Resume").click();
@@ -224,28 +188,22 @@ test("resume is refused with its reason until an uncertain call is reconciled, a
   );
   await page.waitForTimeout(3000);
   await expectState(page, id, "paused", "Paused.");
-  const refused = await (
-    await page.request.get(`/api/v1/runs/${id}/workspace`)
-  ).json();
+  const refused = await workspace(page, id);
   expect(refused.usage.model_calls).toBe(before.usage.model_calls);
 
   // Someone who isn't the owner is refused, by the route and on the screen.
-  const memberContext = await browser.newContext();
-  const member = await memberContext.newPage();
-  await signIn(member, EMAIL_C, PASSWORD_C);
+  const member = await signedInPage(users.member);
   const denied = await member.request.post(
     `/api/v1/runs/${id}/model-calls/reconcile`,
     {
       headers: {
-        ...(await write(member, "member-reconcile")),
-        "X-Autobots-Workspace": WORKSPACE_A,
+        ...(await writeHeaders(member, "member-reconcile")),
+        "X-Autobots-Workspace": need("AUTOBOTS_TEST_WORKSPACE_A"),
       },
       data: { charged_micro_usd: 1 },
     },
   );
-  expect(denied.status()).toBe(403);
-  expect((await denied.json()).code).toBe("owner_required");
-  await memberContext.close();
+  await expectRefusal(denied, { status: 403, code: "owner_required" });
 
   await page.route("**/model-calls/reconcile", (route) =>
     route.fulfill({
@@ -303,9 +261,7 @@ test("resume is refused with its reason until an uncertain call is reconciled, a
   await page.unroute(snapshot);
   await page.reload();
   await expect(page.locator("[data-reconcile]")).toHaveCount(0);
-  const after = await (
-    await page.request.get(`/api/v1/runs/${id}/workspace`)
-  ).json();
+  const after = await workspace(page, id);
   expect(after.outstanding.uncertain_calls).toBe(0);
   expect(
     after.run.budget.spent_micro_usd - before.run.budget.spent_micro_usd,
@@ -329,12 +285,12 @@ test("resume is refused with its reason until an uncertain call is reconciled, a
 
   // E-6: a stale tab is told nothing was recorded.
   await page.goto(`/runs/${id}`);
-  const stale = await page.request.post(
-    `/api/v1/runs/${id}/model-calls/reconcile`,
-    {
-      headers: await write(page, `stale-${id}`),
-      data: { charged_micro_usd: 5 },
-    },
-  );
-  expect((await stale.json()).reconciled_calls).toBe(0);
+  const stale = await send(page, {
+    path: `/api/v1/runs/${id}/model-calls/reconcile`,
+    key: `stale-${id}`,
+    data: { charged_micro_usd: 5 },
+    status: 200,
+    parse: parseReconciliationResult,
+  });
+  expect(stale.reconciled_calls).toBe(0);
 });
