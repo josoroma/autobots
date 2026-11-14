@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from langchain_core.messages import AIMessage, BaseMessage
 
-from autobots.adapters.loop_middleware import AdmittedModel, UnadmittedModelCall
+from autobots.adapters.loop_middleware import AdmittedModel, UnadmittedModelCall, admitted_scope
 from autobots.application.browsing_loop import (
     ACTION_TOOLS,
     Link,
@@ -207,15 +207,10 @@ class Middleware:
         self.complete = complete
 
     async def admitted(self, request: Any, handler: Callable[[Any], Any], route: Any) -> Any:
-        from autobots.adapters import loop_middleware
-
         self.routes.append(route)
         self.requests.append(request)
-        token = loop_middleware._ADMITTED.set(True)
-        try:
+        with admitted_scope():
             return await handler(request), self.complete
-        finally:
-            loop_middleware._ADMITTED.reset(token)
 
 
 def test_a_step_goes_through_admission_on_the_given_route_with_tools_required() -> None:

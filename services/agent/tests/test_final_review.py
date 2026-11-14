@@ -1,7 +1,6 @@
 """What US-11.12's independent review found, held in place. Fakes only, and no model call."""
 
 import asyncio
-import inspect
 import io
 import json
 import logging
@@ -18,7 +17,6 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel
 
 from autobots.adapters.loop_middleware import (
-    LoopMiddleware,
     ModelRoute,
     past_known_price,
     request_bytes,
@@ -35,11 +33,11 @@ from autobots.application.operations import (
 from autobots.application.tool_gateway import ToolFailed
 from autobots.application.worker_inference import AttemptModel, CatalogCache, InferenceSource
 from autobots.contracts.run_commands import RunRequest
-from autobots.domain.models import PROFILES, ModelProfileId, ModelRole, resolve_role_policy
+from autobots.domain.models import ModelRole, resolve_role_policy
 from autobots.domain.tools import DELEGATION_TOOL
-from autobots.operations import worker as worker_module
 from autobots.operations.logs import JsonFormatter, configure_logging
 from autobots.operations.worker import inference_step
+from fake_openrouter import catalog_payload, provider_context
 
 ROUTE = ModelRoute("executor", "openrouter_terra", "fixture/model", 34_560, 1_000_000)
 
@@ -76,21 +74,10 @@ def test_the_size_counts_the_system_prompt_and_tool_schemas() -> None:
 
 
 def test_a_price_above_the_reservation_is_refused_before_sending() -> None:
-    profile = PROFILES[ModelProfileId.TERRA]
-
     async def catalog() -> dict[str, Any]:
-        return {
-            "data": [
-                {
-                    "id": profile.wire_id,
-                    "canonical_slug": profile.canonical_id,
-                    "supported_parameters": ["max_tokens", "tools", "tool_choice"],
-                    "pricing": {"prompt": "0.001", "completion": "0.001"},
-                }
-            ]
-        }
+        return catalog_payload(pricing={"prompt": "0.001", "completion": "0.001"})
 
-    source = InferenceSource("postgresql://never", None, CatalogCache(catalog))  # type: ignore[arg-type]
+    source = InferenceSource("postgresql://never", provider_context(), CatalogCache(catalog))
     policy = resolve_role_policy()
     assert ModelRole.EXECUTOR in policy.bindings
     with pytest.raises(ProviderFailure) as refused:
@@ -263,13 +250,6 @@ def test_a_rate_above_the_assumed_size_is_kept_as_where_refusals_start() -> None
     assert not past_known_price(ROUTE, 10_000_000)
 
 
-def test_the_wiring_a_unit_test_cant_reach_is_in_place() -> None:
-    """Text only: these three call sites otherwise run only with a real worker."""
-    assert "inference_step(config, source, store, stop)" in inspect.getsource(worker_module)
-    assert "reserved_micro_usd=worst_case" in inspect.getsource(InferenceSource.bind)
-    assert "worst_case, rate, tier)" in inspect.getsource(InferenceSource.bind)
-
-
 def test_a_request_counts_its_real_bytes() -> None:
     text = "\u6f22" * 1_000
     request = SimpleNamespace(messages=[HumanMessage(text)], system_message=None, tools=[])
@@ -283,11 +263,9 @@ def test_a_lone_surrogate_is_refused_before_any_reservation() -> None:
         system_message=None,
         tools=[],
     )
+    # The middleware stops on it before reserving (tests/test_loop_middleware.py).
     with pytest.raises(UnicodeEncodeError):
         request_bytes(request)
-    # The call site turns that into a stop, ahead of building the reservation.
-    source = inspect.getsource(LoopMiddleware._admitted_call)
-    assert source.index("request_unencodable") < source.index("AdmissionRequest(")
 
 
 def test_a_tools_real_bytes_count_too() -> None:

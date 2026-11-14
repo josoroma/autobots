@@ -198,22 +198,3 @@ def test_the_sdks_own_summarizer_is_replaced_in_the_stack(
     )
     named = [item for item in captured["middleware"] if item.name == "SummarizationMiddleware"]
     assert [type(item) for item in named] == [SummarizationOff]
-
-
-def test_running_out_of_budget_while_compacting_stops_cleanly() -> None:
-    from autobots.adapters.loop_middleware import LoopMiddleware, LoopStopped
-    from autobots.application.run_usage import LimitReached
-
-    middleware = LoopMiddleware.__new__(LoopMiddleware)
-
-    async def fine() -> float:
-        return 1.0
-
-    async def out(*_: Any) -> Any:
-        raise LimitReached("budget_exceeded")
-
-    middleware._guard = fine  # type: ignore[method-assign]
-    middleware._compacted = out  # type: ignore[method-assign, assignment]
-    with pytest.raises(LoopStopped) as stopped:
-        asyncio.run(middleware.awrap_model_call(object(), out))
-    assert str(stopped.value.code) == "budget_exceeded_limit"

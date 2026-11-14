@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 from uuid import UUID
 
 from pydantic import SecretStr
@@ -79,26 +79,26 @@ class ProviderContext:
     fetch_catalog: CatalogFetcher
 
 
-class ProviderSettings:
-    """One workspace's provider settings, over one runtime-role connection."""
+class SettingsRows(Protocol):
+    """A workspace's provider settings row: its version, authentication state and last check."""
 
-    def __init__(self, connection: Any, context: ProviderContext) -> None:
+    async def read(
+        self, workspace_id: UUID, *, lock: bool = False
+    ) -> tuple[int, str, datetime | None]: ...
+
+    async def record(self, workspace_id: UUID, status: str) -> None: ...
+
+
+class StoredSettingsRows:
+    """`app_private.provider_settings`, over one runtime-role connection."""
+
+    def __init__(self, connection: Any) -> None:
         self._connection = connection
-        self._context = context
-        self._store = ProviderCredentialStore(connection, context.master_key_file)
 
-    def _environment_candidate(self) -> EnvironmentCandidate | None:
-        return resolve_environment_key(
-            self._context.process_environment, self._context.config_root, self._context.mode
-        )
-
-    async def _effective_environment(self, workspace_id: UUID) -> EnvironmentCandidate | None:
-        candidate = self._environment_candidate()
-        if candidate is not None and await self._store.installation_key_allowed(workspace_id):
-            return candidate
-        return None
-
-    async def _settings_row(self, workspace_id: UUID, lock: bool = False) -> tuple[int, str, Any]:
+    async def read(
+        self, workspace_id: UUID, *, lock: bool = False
+    ) -> tuple[int, str, datetime | None]:
+        """Creates the row on first read, so every workspace has a version to compare against."""
         await self._connection.execute(
             "insert into app_private.provider_settings (workspace_id) values (%s) "
             "on conflict (workspace_id) do nothing",
@@ -113,13 +113,47 @@ class ProviderSettings:
         row = await cursor.fetchone()
         return row[0], row[1], row[2]
 
-    async def _record(self, workspace_id: UUID, status: str) -> None:
+    async def record(self, workspace_id: UUID, status: str) -> None:
         await self._connection.execute(
             "update app_private.provider_settings set version = version + 1, auth_status = %s, "
             "validated_at = case when %s = 'configured' then now() else validated_at end "
             "where workspace_id = %s",
             (status, status, workspace_id),
         )
+
+
+class ProviderSettings:
+    """One workspace's provider settings, over one runtime-role connection."""
+
+    def __init__(
+        self,
+        connection: Any,
+        context: ProviderContext,
+        *,
+        store: ProviderCredentialStore | None = None,
+        rows: SettingsRows | None = None,
+    ) -> None:
+        self._connection = connection
+        self._context = context
+        # Production passes neither, so keys and the settings row come from this connection.
+        # Tests pass in-memory ones to reach the gates without a database (PTST-01).
+        self._store = (
+            store
+            if store is not None
+            else ProviderCredentialStore(connection, context.master_key_file)
+        )
+        self._rows: SettingsRows = rows if rows is not None else StoredSettingsRows(connection)
+
+    def _environment_candidate(self) -> EnvironmentCandidate | None:
+        return resolve_environment_key(
+            self._context.process_environment, self._context.config_root, self._context.mode
+        )
+
+    async def _effective_environment(self, workspace_id: UUID) -> EnvironmentCandidate | None:
+        candidate = self._environment_candidate()
+        if candidate is not None and await self._store.installation_key_allowed(workspace_id):
+            return candidate
+        return None
 
     async def catalog_status(self) -> str:
         try:
@@ -132,7 +166,7 @@ class ProviderSettings:
 
     async def auth_status(self, workspace_id: UUID) -> str:
         """The stored authentication state only, as `status` reports it, with no catalog fetch."""
-        _version, auth_status, _validated_at = await self._settings_row(workspace_id)
+        _version, auth_status, _validated_at = await self._rows.read(workspace_id)
         if await self._effective_environment(workspace_id) is not None:
             return auth_status
         try:
@@ -144,7 +178,7 @@ class ProviderSettings:
         return auth_status
 
     async def status(self, workspace_id: UUID) -> ProviderStatus:
-        version, auth_status, validated_at = await self._settings_row(workspace_id)
+        version, auth_status, validated_at = await self._rows.read(workspace_id)
         source = "none"
         credential_id = None
         credential_version = None
@@ -182,7 +216,7 @@ class ProviderSettings:
         """Validate first. Only a valid key commits, so a bad draft leaves the prior key alone."""
         if await self._effective_environment(workspace_id) is not None:
             raise EnvironmentManaged("the environment supplies this key; change it there")
-        current, _, _ = await self._settings_row(workspace_id)
+        current, _, _ = await self._rows.read(workspace_id)
         self._check_version(current, expected)
         if not looks_usable(draft):
             raise InvalidKey("that key was not accepted")
@@ -192,22 +226,22 @@ class ProviderSettings:
         if result is KeyCheck.UNREACHABLE:
             raise ValidationUnavailable("the key could not be checked right now")
         async with self._connection.transaction():
-            current, _, _ = await self._settings_row(workspace_id, lock=True)
+            current, _, _ = await self._rows.read(workspace_id, lock=True)
             self._check_version(current, expected)
             await self._store.save(workspace_id, draft)
-            await self._record(workspace_id, "configured")
+            await self._rows.record(workspace_id, "configured")
 
     async def disconnect(self, workspace_id: UUID, expected: int) -> None:
         """Removes the app credential only. An environment key is neither deleted nor overridden."""
         async with self._connection.transaction():
-            current, _, _ = await self._settings_row(workspace_id, lock=True)
+            current, _, _ = await self._rows.read(workspace_id, lock=True)
             self._check_version(current, expected)
             await self._connection.execute(
                 "update app_private.provider_credentials set status = 'deleted' "
                 "where workspace_id = %s and provider = 'openrouter' and status = 'active'",
                 (workspace_id,),
             )
-            await self._record(workspace_id, "missing")
+            await self._rows.record(workspace_id, "missing")
 
     async def revalidate(self, workspace_id: UUID) -> None:
         """Checks the effective key's metadata. A failure never falls through to another source."""
@@ -225,13 +259,13 @@ class ProviderSettings:
             KeyCheck.REJECTED: "invalid",
             KeyCheck.UNREACHABLE: "unavailable",
         }[result]
-        await self._settings_row(workspace_id)
-        await self._record(workspace_id, status)
+        await self._rows.read(workspace_id)
+        await self._rows.record(workspace_id, status)
 
     async def run_intent(self, workspace_id: UUID) -> str:
         """Every model call's gate. Saved drafts and page loads never reach past this into a run."""
         environment = await self._effective_environment(workspace_id)
-        _, stored_status, _ = await self._settings_row(workspace_id)
+        _, stored_status, _ = await self._rows.read(workspace_id)
         if environment is not None:
             if not looks_usable(environment.value) or stored_status == "invalid":
                 return "credential_invalid"
@@ -268,8 +302,8 @@ class ProviderSettings:
             except (CredentialMissing, CredentialStorageUnavailable, CredentialDecryptionError):
                 return
         if current == used:
-            await self._settings_row(workspace_id)
-            await self._record(workspace_id, "invalid")
+            await self._rows.read(workspace_id)
+            await self._rows.record(workspace_id, "invalid")
 
     async def models(self) -> ModelList:
         payload = await self._context.fetch_catalog()

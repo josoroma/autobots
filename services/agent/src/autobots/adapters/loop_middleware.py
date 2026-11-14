@@ -3,15 +3,14 @@
 import asyncio
 import json
 import logging
-import math
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterator
+from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-import httpx
 from langchain.agents.middleware.types import AgentMiddleware
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import (
@@ -29,7 +28,13 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.utils.function_calling import convert_to_openai_tool
 from pydantic import ConfigDict
 
-from autobots.adapters.models.catalog import RESERVED_PROMPT_TOKENS, micro_usd
+from autobots.adapters.model_replies import (
+    charged,
+    failure_without_status,
+    finished,
+    retry_after,
+)
+from autobots.adapters.models.catalog import RESERVED_PROMPT_TOKENS
 from autobots.adapters.result_stream import current_tap
 from autobots.application.compaction import (
     CompactionPolicy,
@@ -69,7 +74,6 @@ from autobots.operations.logs import log_event
 logger = logging.getLogger("autobots.worker")
 
 CHECK_SECONDS = 1.0
-INCOMPLETE_FINISHES = frozenset({"length", "error", "content_filter"})
 MAX_FACT_CHARS = 100
 MAX_FACT_NAMES = 20
 
@@ -90,6 +94,32 @@ _ADMITTED: ContextVar[bool] = ContextVar("autobots_model_call_admitted", default
 _INVOCATION: ContextVar[UUID | None] = ContextVar("autobots_model_invocation", default=None)
 _MIDDLEWARE: ContextVar["LoopMiddleware | None"] = ContextVar("autobots_loop", default=None)
 REPAIR_NOTE = "Your last reply was cut off, so none of it was used. Reply again, more briefly."
+# Before each dispatch: raises `LoopStopped` to refuse it, and otherwise returns the run's seconds
+# left. `LoopMiddleware`'s default reads ownership, run status and active time from the database.
+Guard = Callable[[], Awaitable[float]]
+# The settlement `tests/test_reported_charges.py` pins under this name (R-22).
+_charged = charged
+
+
+@contextmanager
+def admitted_scope() -> Iterator[None]:
+    """Model calls inside it are admitted, so `AdmittedModel` answers them. The middleware opens one
+    around each dispatch it admitted, and nothing else in production does."""
+    token = _ADMITTED.set(True)
+    try:
+        yield
+    finally:
+        _ADMITTED.reset(token)
+
+
+@contextmanager
+def active_middleware(middleware: "LoopMiddleware") -> Iterator[None]:
+    """`current_middleware` returns this loop inside it, as it does during the loop's tool calls."""
+    token = _MIDDLEWARE.set(middleware)
+    try:
+        yield
+    finally:
+        _MIDDLEWARE.reset(token)
 
 
 def current_middleware() -> "LoopMiddleware | None":
@@ -259,25 +289,6 @@ def past_known_price(route: ModelRoute, prompt_bytes: int) -> bool:
     return route.tier_from_tokens is not None and prompt_bytes >= route.tier_from_tokens
 
 
-def _retry_after(error: Exception) -> float | None:
-    # The SDK's errors carry `headers`. Other clients' errors carry them on `response`.
-    headers = (
-        getattr(error, "headers", None)
-        or getattr(getattr(error, "response", None), "headers", None)
-        or {}
-    )
-    try:
-        seconds = float(str(headers.get("retry-after")))
-    except ValueError:
-        return None
-    return seconds if math.isfinite(seconds) and seconds >= 0 else None
-
-
-def _charged(message: AIMessage) -> int | None:
-    """Rounded up, as the paid trials round the same reply. Unreadable is unreported (PADP-12)."""
-    return micro_usd(message.response_metadata.get("cost"))
-
-
 def _count(value: Any) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
@@ -298,18 +309,6 @@ def reply_facts(message: AIMessage) -> ReplyFacts:
         ],
         invalid_tool_calls=len(message.invalid_tool_calls),
     )
-
-
-def _finished(message: AIMessage) -> bool:
-    """A reply cut off or stopped by the provider is never run, whatever it appears to hold."""
-    return message.response_metadata.get("finish_reason") not in INCOMPLETE_FINISHES
-
-
-def _failure_without_status(error: Exception) -> FailureClass:
-    """A connection that never opened carried nothing. Anything else may have been accepted."""
-    if isinstance(error, httpx.ConnectError | httpx.ConnectTimeout):
-        return FailureClass.NETWORK_BEFORE_ACCEPTANCE
-    return FailureClass.UNCERTAIN_ACCEPTANCE
 
 
 def _type_name(error: BaseException) -> str:
@@ -360,6 +359,8 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
         goal: GoalSpec | None = None,
         compaction: CompactionPolicy | None = None,
         summary_route: ModelRoute | None = None,
+        guard: Guard | None = None,
+        admission: Callable[[], ModelAdmission] | None = None,
     ) -> None:
         super().__init__()
         self._connection = connection
@@ -374,8 +375,14 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
         self._summary_route = summary_route
         self._lock = asyncio.Lock()
         self._inner_stop: str | None = None
+        # Production passes neither, so every dispatch checks the database and settles in the
+        # ledger. Tests pass in-memory ones to reach these paths without a database (PTST-01).
+        self._guard: Guard = guard or self._owned_with_time_left
+        self._admission: Callable[[], ModelAdmission] = admission or (
+            lambda: ModelAdmission(connection)
+        )
 
-    async def _guard(self) -> float:
+    async def _owned_with_time_left(self) -> float:
         """Before each new dispatch: still the owner, still running, and time left."""
         refusal = await ownership_refusal(self._connection, self._scope)
         if refusal is not None:
@@ -513,39 +520,38 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             except LimitReached as reached:
                 limit.append(reached)
                 raise ProviderFailure(FailureClass.OTHER) from None
-            token = _ADMITTED.set(True)
-            invocation = _INVOCATION.set(ticket.invocation_id)
-            try:
-                response = await self._bounded(handler, request, stopped)
-            except ProviderFailure as provider_failure:
-                if provider_failure.failure in UNCERTAIN:
-                    _log_uncertain(
-                        ticket.invocation_id,
-                        run_id,
-                        provider_failure.failure,
-                        provider_failure,
-                        provider_failure.reason,
+            with admitted_scope():
+                invocation = _INVOCATION.set(ticket.invocation_id)
+                try:
+                    response = await self._bounded(handler, request, stopped)
+                except ProviderFailure as provider_failure:
+                    if provider_failure.failure in UNCERTAIN:
+                        _log_uncertain(
+                            ticket.invocation_id,
+                            run_id,
+                            provider_failure.failure,
+                            provider_failure,
+                            provider_failure.reason,
+                        )
+                    raise
+                except Exception as error:  # noqa: BLE001 - any failure of a model call becomes a classified ProviderFailure
+                    status = getattr(error, "status_code", None)
+                    failure = (
+                        classify_status(status)
+                        if isinstance(status, int)
+                        else failure_without_status(error)
                     )
-                raise
-            except Exception as error:  # noqa: BLE001 - any failure of a model call becomes a classified ProviderFailure
-                status = getattr(error, "status_code", None)
-                failure = (
-                    classify_status(status)
-                    if isinstance(status, int)
-                    else _failure_without_status(error)
-                )
-                if failure in UNCERTAIN:
-                    _log_uncertain(ticket.invocation_id, run_id, failure, error, None)
-                raise ProviderFailure(failure, retry_after=_retry_after(error)) from None
-            finally:
-                _INVOCATION.reset(invocation)
-                _ADMITTED.reset(token)
+                    if failure in UNCERTAIN:
+                        _log_uncertain(ticket.invocation_id, run_id, failure, error, None)
+                    raise ProviderFailure(failure, retry_after=retry_after(error)) from None
+                finally:
+                    _INVOCATION.reset(invocation)
             message = response.result[-1]
             replies.append(response)
             return ModelOutput(
                 text=str(message.content),
-                complete=_finished(message),
-                charged_micro_usd=_charged(message),
+                complete=finished(message),
+                charged_micro_usd=charged(message),
             )
 
         cursor = await self._connection.execute(
@@ -572,10 +578,9 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
         policy = RetryPolicy(
             deadline=datetime.now(UTC) + timedelta(seconds=remaining), sleep=self._sleep
         )
+        ledger = self._admission()
         try:
-            output = await call_with_policy(
-                ModelAdmission(self._connection), admission_request, dispatch, policy
-            )
+            output = await call_with_policy(ledger, admission_request, dispatch, policy)
         except ProviderFailure as failure:
             if stopped:
                 raise LoopStopped(stopped[0]) from None
@@ -584,14 +589,12 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             raise LoopStopped(failure.failure.value) from None
         except ValueError:
             # Recovery classified this call while it was out. Its charge is late evidence.
-            charged = _charged(replies[-1].result[-1]) if replies else None
-            if charged is not None and last_ticket:
-                await ModelAdmission(self._connection).reconcile(
-                    last_ticket[-1].invocation_id, charged, source="provider"
-                )
+            late = charged(replies[-1].result[-1]) if replies else None
+            if late is not None and last_ticket:
+                await ledger.reconcile(last_ticket[-1].invocation_id, late, source="provider")
             raise LoopStopped("lease_lost") from None
         # Settled by now, so this can't change what the call cost or whether it counted.
-        await ModelAdmission(self._connection).record_reply(
+        await ledger.record_reply(
             last_ticket[-1].invocation_id, reply_facts(replies[-1].result[-1])
         )
         return replies[-1], output.complete
@@ -658,11 +661,8 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             except LimitReached as reached:
                 raise LoopStopped(reached.code) from None
             self._inner_stop = None
-            token = _MIDDLEWARE.set(self)
-            try:
+            with active_middleware(self):
                 reply = await handler(request)
-            finally:
-                _MIDDLEWARE.reset(token)
             if self._inner_stop is not None:
                 raise LoopStopped(self._inner_stop)
             code = json.loads(reply.content).get("code")

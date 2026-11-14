@@ -15,6 +15,7 @@ from autobots.api.app import create_app
 from autobots.api.settings import Settings
 from autobots.application.operations import Condition
 from autobots.application.provider_settings import ProviderSettings
+from fake_openrouter import provider_context
 
 INTERNAL = "fixture-internal"
 SECRET = "fixture-jwt-secret-with-enough-length"
@@ -81,11 +82,10 @@ def arranged(
     monkeypatch.setattr(operation_routes, "database_conditions", conditions)
     monkeypatch.setattr(operation_routes, "worker_condition", worker_state)
     monkeypatch.setattr(ProviderSettings, "auth_status", auth_status)
-    monkeypatch.setattr(ProviderSettings, "__init__", lambda *_args: None)
     app = create_app(SETTINGS, membership=Membership())
     client = TestClient(app, raise_server_exceptions=False)
     app.state.pool = Pool()
-    app.state.provider_context = object()
+    app.state.provider_context = provider_context()
     return client
 
 

@@ -1,47 +1,30 @@
 """The worker's route and attempt client, through the real adapter and SDK over a fake transport."""
 
 import asyncio
-import json
-import logging
-from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
-import httpx
 import openrouter
 import psycopg
 import pytest
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
 from pydantic import SecretStr
 
+from autobots.adapters import model_replies
 from autobots.adapters.loop_middleware import (
-    MAX_FACT_CHARS,
-    MAX_FACT_NAMES,
     AdmittedModel,
-    LoopMiddleware,
-    LoopStopped,
-    _charged,
-    _failure_without_status,
-    _finished,
-    _retry_after,
-    reply_facts,
-    uncertain_call_fields,
+    admitted_scope,
 )
 from autobots.adapters.models.catalog import (
-    RESERVED_PROMPT_TOKENS,
     CatalogEntry,
     CatalogSnapshot,
     ModelUnavailable,
     parse_catalog,
-    parse_pricing,
 )
-from autobots.adapters.models.factory import chat_model, default_sdk_client
 from autobots.application.credentials.crypto import CredentialDecryptionError
-from autobots.application.credentials.precedence import EnvironmentCandidate
 from autobots.application.credentials.store import (
     CredentialBlocked,
     CredentialMissing,
@@ -49,21 +32,13 @@ from autobots.application.credentials.store import (
     CredentialStorageUnavailable,
 )
 from autobots.application.goal_loop import UNBOUND, LoopConfig
-from autobots.application.model_admission import (
-    BudgetExceeded,
-    NoInferenceSlot,
-    Pricing,
-    worst_case_cost,
-)
 from autobots.application.model_attempts import (
     UNCERTAIN,
     FailureClass,
     ProviderFailure,
-    classify_status,
 )
 from autobots.application.provider_settings import (
     CredentialRefused,
-    ProviderContext,
     ProviderSettings,
 )
 from autobots.application.worker_inference import (
@@ -78,76 +53,26 @@ from autobots.application.worker_inference import (
 from autobots.application.worker_leases import Lease
 from autobots.domain.models import (
     MAX_OUTPUT_TOKENS,
-    PROFILES,
-    ModelProfileId,
     ModelRole,
     UnknownModelProfile,
 )
-from autobots.operations import worker
-from autobots.operations.fake_stream import completion_to_sse
-from autobots.operations.logs import JsonFormatter, redact
-from fake_openrouter import ARRANGED_KEY, DEEPSEEK_WIRE_ID, TERRA_WIRE_ID
+from fake_openrouter import (
+    ARRANGED_KEY,
+    DEEPSEEK,
+    DEEPSEEK_WIRE_ID,
+    PRICE,
+    TERRA,
+    TERRA_WIRE_ID,
+    RecordingOpenRouter,
+    attempt_model,
+    catalog_payload,
+    invoke,
+    provider_context,
+    snapshot,
+    source_with,
+)
 
 NOW = datetime.now(UTC)
-DEEPSEEK = PROFILES[ModelProfileId.DEEPSEEK_FLASH]
-TERRA = PROFILES[ModelProfileId.TERRA]
-PRICE = {"prompt": "0.000001", "completion": "0.000002"}
-
-
-def catalog_payload(*drop: str, pricing: Any = PRICE) -> dict[str, Any]:
-    supported = ["max_tokens", "tools", "tool_choice"]
-    return {
-        "data": [
-            {
-                "id": profile.wire_id,
-                "canonical_slug": profile.canonical_id,
-                "supported_parameters": [name for name in supported if name not in drop],
-                "pricing": pricing,
-            }
-            for profile in (DEEPSEEK, TERRA)
-        ]
-    }
-
-
-def snapshot(deepseek_or_terra: str = DEEPSEEK.id.value) -> dict[str, Any]:
-    return {"version": 1, "bindings": {"executor": deepseek_or_terra, "summarizer": DEEPSEEK.id}}
-
-
-def fresh_catalog(**kwargs: Any) -> CatalogSnapshot:
-    return parse_catalog(catalog_payload(**kwargs), retrieved_at=NOW, revision="fixture")
-
-
-# Pricing
-
-
-def test_a_catalog_price_is_scaled_to_micro_usd_per_million_tokens() -> None:
-    assert parse_pricing({"pricing": PRICE}) == Pricing(1_000_000, 2_000_000)
-
-
-def test_the_highest_listed_rate_counts_including_overrides_and_cache_writes() -> None:
-    pricing = {
-        "prompt": "0.00001",
-        "completion": "0.00005",
-        "input_cache_write": "0.0000125",
-        "internal_reasoning": "0.00006",
-        "request": "0.001",
-        "overrides": [{"prompt": "0.00002", "completion": "0.0001", "min_prompt_tokens": 5}],
-    }
-    assert parse_pricing({"pricing": pricing}) == Pricing(20_000_000, 100_000_000, 1000)
-
-
-@pytest.mark.parametrize(
-    "pricing",
-    [None, {}, {"prompt": "0.1"}, {"prompt": "free", "completion": "0.1"}, {"prompt": "NaN"}],
-)
-def test_a_missing_or_unreadable_price_is_no_price(pricing: Any) -> None:
-    assert parse_pricing({"pricing": pricing}) is None
-
-
-def test_a_variable_price_has_no_bound_so_a_reservation_refuses_it() -> None:
-    pricing = parse_pricing({"pricing": {"prompt": "-1", "completion": "-1"}})
-    with pytest.raises(Exception, match="price is not known"):
-        worst_case_cost(pricing, 1, 1)
 
 
 # The frozen route
@@ -239,103 +164,15 @@ def test_no_catalog_at_all_is_unavailable() -> None:
         asyncio.run(CatalogCache(fetch).current())
 
 
+def test_a_malformed_catalog_is_a_failed_refresh_not_a_crash() -> None:
+    async def fetch() -> dict[str, Any]:
+        return {"data": ["not an entry"]}
+
+    with pytest.raises(ModelUnavailable):
+        asyncio.run(CatalogCache(fetch).current())
+
+
 # Attempts, through the real adapter and SDK
-
-
-class Fake:
-    """Answers chat completions over a mock transport, and records what really went out."""
-
-    def __init__(self, status: int = 200, cost: float | None = 0.00025) -> None:
-        self.status = status
-        self.cost = cost
-        self.bodies: list[dict[str, Any]] = []
-        self.keys: list[str] = []
-        self.clients = 0
-
-    def handle(self, request: httpx.Request) -> httpx.Response:
-        self.bodies.append(json.loads(request.content))
-        self.keys.append(request.headers.get("authorization", ""))
-        if self.status != 200:
-            error = {"code": self.status, "message": "arranged"}
-            return httpx.Response(self.status, json={"error": error})
-        usage: dict[str, Any] = {"prompt_tokens": 5, "completion_tokens": 7, "total_tokens": 12}
-        if self.cost is not None:
-            usage["cost"] = self.cost
-        message = {
-            "role": "assistant",
-            "content": None,
-            "tool_calls": [
-                {
-                    "id": "call-1",
-                    "type": "function",
-                    "function": {"name": "lookup", "arguments": json.dumps({"text": "a"})},
-                }
-            ],
-        }
-        choice = {"index": 0, "finish_reason": "tool_calls", "message": message}
-        completion = {
-            "id": "fake",
-            "object": "chat.completion",
-            "created": 1,
-            "model": self.bodies[-1]["model"],
-            "system_fingerprint": "fake",
-            "choices": [choice],
-            "usage": usage,
-        }
-        if self.bodies[-1].get("stream"):
-            # Every worker call streams (Decision 0022's streaming decision).
-            return httpx.Response(
-                200,
-                content=completion_to_sse(completion),
-                headers={"content-type": "text/event-stream"},
-            )
-        return httpx.Response(200, json=completion)
-
-    def client(self, key: str) -> openrouter.OpenRouter:
-        self.clients += 1
-        return default_sdk_client(
-            key, async_http=httpx.AsyncClient(transport=httpx.MockTransport(self.handle))
-        )
-
-
-def _context(fetch: Any) -> ProviderContext:
-    async def validate(_: Any) -> Any:
-        raise AssertionError("a model attempt never validates a key")
-
-    return ProviderContext("/nonexistent", "test", Path("/nonexistent"), {}, validate, fetch)
-
-
-class ScriptedKeys:
-    """`open_attempt` with keys from a list instead of a database. The disposable check has that."""
-
-    def __init__(
-        self, client_factory: Callable[[str], Any], keys: list[Any], rejected: list[Any]
-    ) -> None:
-        async def fetch() -> dict[str, Any]:
-            return catalog_payload()
-
-        self.catalog = CatalogCache(fetch)
-        self.client_factory = client_factory
-        self.keys = keys
-        self.rejected = rejected
-
-    async def open_attempt(self, workspace_id: Any, policy: Any, **_kwargs: Any) -> Any:
-        try:
-            attempt, _ = prepared(policy, await self.catalog.current(), _kwargs.get("role", ROLE))
-        except ModelUnavailable:
-            raise ProviderFailure(FailureClass.MODEL_UNAVAILABLE) from None
-        key = self.keys.pop(0)
-        if isinstance(key, Exception):
-            raise key
-        model = chat_model(attempt, SecretStr(key), client_factory=self.client_factory)
-        return model, CredentialReference("app", None, 1)
-
-    async def reject_key(self, workspace_id: Any, used: CredentialReference) -> None:
-        self.rejected.append(used)
-
-
-def source_with(fake: Fake, keys: list[Any], rejected: list[Any] | None = None) -> Any:
-    return ScriptedKeys(fake.client, keys, rejected if rejected is not None else [])
 
 
 @tool
@@ -344,16 +181,8 @@ def lookup(text: str) -> str:
     return text
 
 
-def attempt_model(source: Any, profile: str = DEEPSEEK.id.value) -> AttemptModel:
-    return AttemptModel(source, uuid4(), frozen_policy(snapshot(profile)))
-
-
-def invoke(model: Any) -> Any:
-    return asyncio.run(model.ainvoke([HumanMessage("hello")]))
-
-
 def test_a_request_carries_the_routes_identity_limits_and_routing_flags() -> None:
-    fake = Fake()
+    fake = RecordingOpenRouter()
     invoke(attempt_model(source_with(fake, [ARRANGED_KEY])).bind_tools([lookup]))
     body = fake.bodies[0]
     assert body["model"] == DEEPSEEK_WIRE_ID
@@ -365,15 +194,15 @@ def test_a_request_carries_the_routes_identity_limits_and_routing_flags() -> Non
 
 
 def test_the_wire_id_follows_the_runs_binding() -> None:
-    fake = Fake()
+    fake = RecordingOpenRouter()
     invoke(attempt_model(source_with(fake, [ARRANGED_KEY]), TERRA.id.value))
     assert fake.bodies[0]["model"] == TERRA_WIRE_ID
 
 
 def test_the_reply_gives_the_loop_what_it_settles_on() -> None:
-    fake = Fake(cost=0.00025)
+    fake = RecordingOpenRouter(cost=0.00025)
     message = invoke(attempt_model(source_with(fake, [ARRANGED_KEY])).bind_tools([lookup]))
-    assert _charged(message) == 250
+    assert model_replies.charged(message) == 250
     assert message.response_metadata["finish_reason"] == "tool_calls"
     assert [(call["name"], call["args"]) for call in message.tool_calls] == [
         ("lookup", {"text": "a"})
@@ -381,7 +210,7 @@ def test_the_reply_gives_the_loop_what_it_settles_on() -> None:
 
 
 def test_each_attempt_opens_its_own_client_so_a_rotation_reaches_the_next_call() -> None:
-    fake = Fake()
+    fake = RecordingOpenRouter()
     model = attempt_model(source_with(fake, ["arranged-first-key", "arranged-next-key"]))
     invoke(model)
     invoke(model)
@@ -390,7 +219,7 @@ def test_each_attempt_opens_its_own_client_so_a_rotation_reaches_the_next_call()
 
 
 def test_a_missing_key_stops_the_attempt_before_anything_is_sent() -> None:
-    fake = Fake()
+    fake = RecordingOpenRouter()
     missing = ProviderFailure(FailureClass.CREDENTIALS_REQUIRED)
     with pytest.raises(ProviderFailure) as caught:
         invoke(attempt_model(source_with(fake, [missing])))
@@ -399,16 +228,18 @@ def test_a_missing_key_stops_the_attempt_before_anything_is_sent() -> None:
 
 
 def test_a_stale_catalog_stops_the_attempt_before_any_key_is_read() -> None:
-    fake = Fake()
-    source = source_with(fake, [ARRANGED_KEY])
-    source.catalog._snapshot = parse_catalog(
-        catalog_payload(), retrieved_at=NOW - timedelta(minutes=6), revision="old"
-    )
+    fake = RecordingOpenRouter()
+    answers: list[dict[str, Any] | None] = [catalog_payload(), None]
 
-    async def nothing() -> None:
-        return None
+    async def fetch() -> dict[str, Any] | None:
+        return answers.pop(0)
 
-    source.catalog._fetch = nothing
+    # Read six minutes ago. The refresh due now fails, which leaves only that copy to age out.
+    moments = [datetime.now(UTC) - timedelta(minutes=6)]
+    catalog = CatalogCache(fetch, lambda: moments[-1])
+    asyncio.run(catalog.current())
+    moments.append(datetime.now(UTC))
+    source = source_with(fake, [ARRANGED_KEY], catalog=catalog)
     with pytest.raises(ProviderFailure) as caught:
         invoke(attempt_model(source))
     assert caught.value.failure is FailureClass.MODEL_UNAVAILABLE
@@ -417,7 +248,7 @@ def test_a_stale_catalog_stops_the_attempt_before_any_key_is_read() -> None:
 
 
 def test_a_401_marks_the_key_rejected_and_is_still_raised_with_its_status() -> None:
-    fake = Fake(status=401)
+    fake = RecordingOpenRouter(status=401)
     rejected: list[Any] = []
     with pytest.raises(openrouter.errors.OpenRouterError) as caught:
         invoke(attempt_model(source_with(fake, [ARRANGED_KEY], rejected)))
@@ -428,7 +259,7 @@ def test_a_401_marks_the_key_rejected_and_is_still_raised_with_its_status() -> N
 
 @pytest.mark.parametrize("status", [402, 429, 500])
 def test_other_statuses_leave_the_key_alone(status: int) -> None:
-    fake = Fake(status=status)
+    fake = RecordingOpenRouter(status=status)
     rejected: list[Any] = []
     with pytest.raises(openrouter.errors.OpenRouterError):
         invoke(attempt_model(source_with(fake, [ARRANGED_KEY], rejected)))
@@ -436,7 +267,7 @@ def test_other_statuses_leave_the_key_alone(status: int) -> None:
 
 
 def test_no_key_or_client_survives_on_the_model_the_graph_holds() -> None:
-    fake = Fake()
+    fake = RecordingOpenRouter()
     model = attempt_model(source_with(fake, [ARRANGED_KEY])).bind_tools([lookup])
     invoke(model)
     assert ARRANGED_KEY not in repr(vars(model))
@@ -462,17 +293,20 @@ class Rows:
         return (self.value,)
 
 
-def real_source() -> InferenceSource:
+def real_source(pricing: object = PRICE) -> InferenceSource:
     async def fetch() -> dict[str, Any]:
-        return catalog_payload()
+        return catalog_payload(pricing=pricing)
 
-    return InferenceSource("postgresql://unused", _context(fetch), CatalogCache(fetch))
+    return InferenceSource("postgresql://unused", provider_context(fetch), CatalogCache(fetch))
 
 
 def bind_with(
-    value: Any, refusal: tuple[str | None, int], monkeypatch: pytest.MonkeyPatch
+    value: Any,
+    refusal: tuple[str | None, int],
+    monkeypatch: pytest.MonkeyPatch,
+    pricing: object = PRICE,
 ) -> tuple[Any, LoopConfig]:
-    source = real_source()
+    source = real_source(pricing)
 
     async def arranged(*_: Any) -> tuple[str | None, int]:
         return refusal
@@ -505,330 +339,32 @@ def test_an_unbound_snapshot_leaves_the_route_unbound(monkeypatch: pytest.Monkey
     assert config.route == UNBOUND
 
 
-def test_the_worst_case_is_an_upper_bound_at_the_stated_limits() -> None:
-    entry = fresh_catalog().entries[0]
-    assert entry.pricing is not None
-    worst = worst_case_cost(entry.pricing, RESERVED_PROMPT_TOKENS, MAX_OUTPUT_TOKENS)
-    assert worst == RESERVED_PROMPT_TOKENS * 1 + MAX_OUTPUT_TOKENS * 2
-
-
-def test_the_real_catalog_prices_both_profiles_within_a_runs_default_cap() -> None:
-    """Terra's cache-write rate is its highest input rate. Its long-prompt override starts far above
-    what's reserved for, so it doesn't count, and a request that could reach it isn't sent."""
-    path = Path(__file__).parents[3] / "research/openrouter-model-catalog-2026-11-05.json"
-    matches = {item["id"]: item for item in json.loads(path.read_text())["matches"]}
-    prices = {wire: parse_pricing(matches[wire]) for wire in (DEEPSEEK_WIRE_ID, TERRA_WIRE_ID)}
-    assert prices[DEEPSEEK_WIRE_ID] == Pricing(300_000, 1_200_000)
-    assert prices[TERRA_WIRE_ID] == Pricing(1_250_000, 5_000_000, tier_from_tokens=272_000)
-    worst = {
-        wire: worst_case_cost(price, RESERVED_PROMPT_TOKENS, MAX_OUTPUT_TOKENS)
-        for wire, price in prices.items()
-    }
-    assert worst == {DEEPSEEK_WIRE_ID: 10_215, TERRA_WIRE_ID: 42_560}
-
-
-def test_an_override_this_app_can_reach_still_counts() -> None:
-    near = {"min_prompt_tokens": RESERVED_PROMPT_TOKENS, "prompt": "0.5", "completion": "0.5"}
-    far = {"min_prompt_tokens": RESERVED_PROMPT_TOKENS + 1, "prompt": "9", "completion": "9"}
-    pricing = {"prompt": "0.1", "completion": "0.1", "overrides": [near, far]}
-    assert parse_pricing({"pricing": pricing}) == Pricing(
-        500_000_000_000, 500_000_000_000, tier_from_tokens=RESERVED_PROMPT_TOKENS + 1
-    )
-
-
-def test_a_per_request_price_counts_wherever_it_is_listed() -> None:
-    pricing = {"prompt": "0", "completion": "0", "overrides": [{"request": "0.002"}]}
-    assert parse_pricing({"pricing": pricing}) == Pricing(0, 0, 2000)
-
-
-@pytest.mark.parametrize(
-    "pricing",
-    [
-        {"prompt": "0.1", "completion": "0.1", "overrides": [{"prompt": "-1"}]},
-        {"prompt": "0.1", "completion": "0.1", "request": "-1"},
-    ],
-)
-def test_a_variable_rate_is_not_hidden_by_a_fixed_one(pricing: dict[str, Any]) -> None:
-    with pytest.raises(Exception, match="price is not known"):
-        worst_case_cost(parse_pricing({"pricing": pricing}), 1, 1)
-
-
-# What a provider's replies mean for the ledger, through the real SDK
-
-
-def model_over(handle: Any) -> AttemptModel:
-    fake = Fake()
-    fake.handle = handle  # type: ignore[method-assign]
-    return attempt_model(source_with(fake, [ARRANGED_KEY]))
-
-
-def test_a_success_the_sdk_cant_parse_keeps_its_reservation() -> None:
-    """A reply arrived, so it may have been charged. A 200 is not a refusal."""
-
-    def handle(_: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"error": {"code": 500, "message": "arranged"}})
-
-    with pytest.raises(openrouter.errors.ResponseValidationError) as caught:
-        invoke(model_over(handle))
-    assert classify_status(caught.value.status_code) is FailureClass.UNCERTAIN_ACCEPTANCE
-
-
-def _logged(error: BaseException) -> str:
-    record = logging.LogRecord("autobots.worker", logging.WARNING, "", 0, "e", (), None)
-    record.fields = uncertain_call_fields(error)
-    return JsonFormatter().format(record)
-
-
-def test_an_uncertain_calls_log_names_types_and_status_and_no_reply_text() -> None:
-    """The reply's text really is in the exception, so its absence from the log means something."""
-    text = "arranged-reply-text-7f3a"
-
-    def handle(_: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"error": {"code": 500, "message": text}})
-
-    with pytest.raises(openrouter.errors.ResponseValidationError) as caught:
-        invoke(model_over(handle))
-    # In what the exception holds, its body. Its `str()` embeds a shortened validation error.
-    assert text in repr(caught.value)
-    assert redact(text) == text
-    line = json.loads(_logged(caught.value))
-    assert line["status"] == 200
-    assert line["error_type"].endswith(".ResponseValidationError")
-    assert line["cause_type"].endswith("ValidationError")
-    assert text not in json.dumps(line)
-
-
-def test_an_exceptions_cause_is_named_and_neither_message_is_kept() -> None:
-    sentinel = "arranged-sentinel-91c2"
-    try:
-        try:
-            raise ValueError(sentinel)
-        except ValueError as cause:
-            raise RuntimeError(sentinel) from cause
-    except RuntimeError as error:
-        assert sentinel in str(error) and sentinel in str(error.__cause__)
-        assert redact(sentinel) == sentinel
-        written = _logged(error)
-    line = json.loads(written)
-    assert line["error_type"] == "builtins.RuntimeError"
-    assert line["cause_type"] == "builtins.ValueError"
-    assert "status" not in line
-    assert sentinel not in written
-
-
-def test_an_exception_raised_while_handling_another_names_that_one() -> None:
-    try:
-        try:
-            raise ValueError("arranged")
-        except ValueError:
-            raise RuntimeError("arranged")  # noqa: B904
-    except RuntimeError as error:
-        assert uncertain_call_fields(error)["cause_type"] == "builtins.ValueError"
-
-
-def test_a_cause_set_outside_any_handler_is_named() -> None:
-    # `__context__` is empty here, so reading only that would lose the cause.
-    error = RuntimeError("arranged")
-    error.__cause__ = ValueError("arranged")
-    assert error.__context__ is None
-    assert uncertain_call_fields(error)["cause_type"] == "builtins.ValueError"
-
-
-def test_a_status_that_is_no_number_isnt_reported_as_one() -> None:
-    class Odd(Exception):
-        status_code = "504"
-
-    assert uncertain_call_fields(Odd("arranged")).get("status") is None
-
-
-def test_a_partial_streams_output_stays_out_of_its_fields() -> None:
-    sentinel = "arranged-partial-44d1"
-    fields = uncertain_call_fields(
-        ProviderFailure(FailureClass.PARTIAL_STREAM, accumulated_output=sentinel)
-    )
-    assert fields == {"error_type": "autobots.application.model_attempts.ProviderFailure"}
-
-
-def test_retry_after_is_read_from_a_real_sdk_error() -> None:
-    def handle(_: httpx.Request) -> httpx.Response:
-        error = {"error": {"code": 429, "message": "arranged"}}
-        return httpx.Response(429, json=error, headers={"Retry-After": "60"})
-
-    with pytest.raises(openrouter.errors.OpenRouterError) as caught:
-        invoke(model_over(handle))
-    assert _retry_after(caught.value) == 60.0
-
-
-def test_an_unusable_retry_after_is_ignored() -> None:
-    def handle(_: httpx.Request) -> httpx.Response:
-        error = {"error": {"code": 429, "message": "arranged"}}
-        return httpx.Response(429, json=error, headers={"Retry-After": "soon"})
-
-    with pytest.raises(openrouter.errors.OpenRouterError) as caught:
-        invoke(model_over(handle))
-    assert _retry_after(caught.value) is None
-
-
-@pytest.mark.parametrize(
-    ("error", "expected"),
-    [
-        (httpx.ConnectError("arranged"), FailureClass.NETWORK_BEFORE_ACCEPTANCE),
-        (httpx.ConnectTimeout("arranged"), FailureClass.NETWORK_BEFORE_ACCEPTANCE),
-        (httpx.ReadTimeout("arranged"), FailureClass.UNCERTAIN_ACCEPTANCE),
-        (httpx.RemoteProtocolError("arranged"), FailureClass.UNCERTAIN_ACCEPTANCE),
-        (RuntimeError("arranged"), FailureClass.UNCERTAIN_ACCEPTANCE),
-    ],
-)
-def test_only_a_connection_that_never_opened_counts_as_unsent(
-    error: Exception, expected: FailureClass
+def test_binding_reserves_the_worst_case_and_routes_by_the_rate_and_tier(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    assert _failure_without_status(error) is expected
+    """Each attempt passes its reservation on, so a fresh price is compared with it, and the route
+    keeps the input rate and the tier where a longer request is refused (PTST-08)."""
+    seen: list[int | None] = []
 
+    async def recording(
+        _source: InferenceSource,
+        _workspace: UUID,
+        _policy: Any,
+        reserved_micro_usd: int | None = None,
+        role: ModelRole = ROLE,
+    ) -> Any:
+        seen.append(reserved_micro_usd)
+        raise ProviderFailure(FailureClass.OTHER)
 
-@pytest.mark.parametrize(
-    ("finish", "finished"),
-    [
-        ("stop", True),
-        ("tool_calls", True),
-        ("length", False),
-        ("error", False),
-        ("content_filter", False),
-    ],
-)
-def test_only_a_reply_the_model_finished_can_run(finish: str, finished: bool) -> None:
-    assert _finished(AIMessage(content="", response_metadata={"finish_reason": finish})) is finished
-
-
-def test_reply_facts_hold_no_content_and_stay_bounded() -> None:
-    calls = [
-        {"name": "x" * 500, "args": {"content": "the report's text"}, "id": str(number)}
-        for number in range(30)
-    ]
-    message = AIMessage(
-        content="the report's text",
-        tool_calls=calls,
-        invalid_tool_calls=[{"name": "save_artifact", "args": '{"pa', "id": "cut", "error": "bad"}],
-        response_metadata={"finish_reason": "length"},
-        usage_metadata={
-            "input_tokens": 9,
-            "output_tokens": 512,
-            "total_tokens": 521,
-            "output_token_details": {"reasoning": 400},
-        },
-    )
-    facts = reply_facts(message)
-    assert (
-        facts.finish_reason,
-        facts.input_tokens,
-        facts.output_tokens,
-        facts.reasoning_tokens,
-    ) == ("length", 9, 512, 400)
-    assert facts.invalid_tool_calls == 1
-    assert len(facts.tool_names) == MAX_FACT_NAMES and {len(name) for name in facts.tool_names} == {
-        MAX_FACT_CHARS
-    }
-    assert "report" not in repr(facts)
-    # A reply with nothing to report is still a record, not a failure.
-    empty = reply_facts(AIMessage(content=""))
-    assert (
-        empty.finish_reason,
-        empty.output_tokens,
-        empty.tool_names,
-        empty.invalid_tool_calls,
-    ) == (None, None, (), 0)
-
-
-def test_a_refused_summary_stops_the_loop_with_its_reason() -> None:
-    """A budget that runs out during compaction pauses the run like one at any other call."""
-
-    class Refusing(LoopMiddleware):
-        def __init__(self) -> None:
-            self._summary_route = UNBOUND
-
-        async def _guard(self) -> float:
-            return 1.0
-
-        async def _admitted_call(self, *_: Any, **__: Any) -> Any:
-            raise BudgetExceeded("arranged")
-
-    class Request:
-        def override(self, **_: Any) -> "Request":
-            return self
-
-    async def go() -> None:
-        await Refusing()._summarize(Request(), None, [HumanMessage("old")], None, 0, 1)
-
-    with pytest.raises(LoopStopped) as caught:
-        asyncio.run(go())
-    assert caught.value.code == "budget_exceeded"
-
-
-def test_a_busy_slot_during_a_summary_is_waited_out_like_any_other_call() -> None:
-    answers: list[Any] = [NoInferenceSlot("arranged"), NoInferenceSlot("arranged"), ("reply", True)]
-    waits: list[float] = []
-
-    class Busy(LoopMiddleware):
-        def __init__(self) -> None:
-            self._slot_wait_seconds = 30.0
-
-        async def _guard(self) -> float:
-            return 1.0
-
-        async def _sleep(self, seconds: float) -> None:
-            waits.append(seconds)
-
-        async def _admitted_call(self, *_: Any, **__: Any) -> Any:
-            answer = answers.pop(0)
-            if isinstance(answer, Exception):
-                raise answer
-            return answer
-
-    assert asyncio.run(Busy()._with_slot(None, None)) == ("reply", True)
-    assert waits == [1.0, 1.0]
-
-
-@pytest.mark.parametrize(
-    ("finish", "repairs"), [("length", 1), ("error", 0), ("content_filter", 0)]
-)
-def test_only_a_cut_off_reply_is_worth_a_repair(finish: str, repairs: int) -> None:
-    done: list[str] = []
-    message = AIMessage(content="", response_metadata={"finish_reason": finish})
-
-    class Reply:
-        def __init__(self) -> None:
-            self.result = [message]
-
-    class Request:
-        def __init__(self) -> None:
-            self.messages: list[Any] = []
-
-        def override(self, **_: Any) -> "Request":
-            return self
-
-    async def handler(_: Any) -> Any:
-        raise AssertionError("the stand-in never calls the model")
-
-    class Stopping(LoopMiddleware):
-        def __init__(self) -> None:
-            pass
-
-        async def _guard(self) -> float:
-            return 1.0
-
-        async def _compacted(self, request: Any, _: Any) -> Any:
-            return request
-
-        async def _with_slot(self, *_: Any, **__: Any) -> Any:
-            return Reply(), False
-
-        async def _repair(self, code: str) -> None:
-            done.append(code)
-            raise LoopStopped(code)
-
-    with pytest.raises(LoopStopped) as caught:
-        asyncio.run(Stopping().awrap_model_call(Request(), handler))
-    assert caught.value.code == "incomplete_output"
-    assert len(done) == repairs
+    tiered = {**PRICE, "overrides": [{"min_prompt_tokens": 272_000, "prompt": "0.01"}]}
+    factory, config = bind_with(snapshot(), (None, 777), monkeypatch, pricing=tiered)
+    route = config.route
+    assert (route.worst_case_micro_usd, route.input_per_million_micro_usd) == (777, 1_000_000)
+    assert route.tier_from_tokens == 272_000
+    monkeypatch.setattr(InferenceSource, "open_attempt", recording)
+    with pytest.raises(ProviderFailure):
+        asyncio.run(factory().ainvoke([HumanMessage("hello")]))
+    assert seen == [777]
 
 
 # Inside a real attempt, with the database replaced
@@ -857,7 +393,7 @@ class Current:
 
 
 def real_attempt(
-    monkeypatch: pytest.MonkeyPatch, outcome: Any, fake: Fake | None = None
+    monkeypatch: pytest.MonkeyPatch, outcome: Any, fake: RecordingOpenRouter | None = None
 ) -> tuple[Any, CredentialReference]:
     async def credential(*_: Any) -> Any:
         if isinstance(outcome, Exception):
@@ -866,7 +402,7 @@ def real_attempt(
 
     monkeypatch.setattr("psycopg.AsyncConnection.connect", connected)
     monkeypatch.setattr(ProviderSettings, "credential_for_attempt", credential)
-    source = replace(real_source(), client_factory=(fake or Fake()).client)
+    source = replace(real_source(), client_factory=(fake or RecordingOpenRouter()).client)
     return asyncio.run(source.open_attempt(uuid4(), frozen_policy(snapshot())))
 
 
@@ -897,7 +433,7 @@ def test_every_credential_failure_is_classed_as_never_sent(
 def test_a_real_attempt_returns_the_client_and_what_it_used(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake = Fake()
+    fake = RecordingOpenRouter()
     client, used = real_attempt(monkeypatch, Current(3), fake)
     assert fake.clients == 1
     assert used == CredentialReference("app", None, 3)
@@ -909,84 +445,10 @@ def test_a_price_gone_mid_job_stops_the_next_attempt_before_any_key_is_read() ->
     async def fetch() -> dict[str, Any]:
         return catalog_payload(pricing=None)
 
-    source = InferenceSource("postgresql://unused", _context(fetch), CatalogCache(fetch))
+    source = InferenceSource("postgresql://unused", provider_context(fetch), CatalogCache(fetch))
     with pytest.raises(ProviderFailure) as caught:
         asyncio.run(source.open_attempt(uuid4(), frozen_policy(snapshot())))
     assert caught.value.failure is FailureClass.COST_UNAVAILABLE
-
-
-# Marking a key rejected
-
-
-class Settings(ProviderSettings):
-    """The real gate over a stored status and an arranged key, with no database."""
-
-    def __init__(self, active: Any, stored: str = "configured") -> None:
-        self.active = active
-        self.stored = stored
-        self.recorded: list[str] = []
-        self._store = self  # type: ignore[assignment]
-
-    async def _effective_environment(self, _: Any) -> Any:
-        return None
-
-    async def _settings_row(self, *_: Any, **__: Any) -> tuple[int, str, Any]:
-        return 1, self.stored, None
-
-    async def route_qualifications(self) -> list[Any]:
-        return []
-
-    async def _record(self, _: Any, status: str) -> None:
-        self.recorded.append(status)
-
-    async def load_active(self, _: Any) -> Any:
-        if isinstance(self.active, Exception):
-            raise self.active
-        return self.active
-
-
-def test_a_401_marks_the_key_that_received_it_while_it_is_current() -> None:
-    settings = Settings(Current(2))
-    asyncio.run(settings.mark_invalid(uuid4(), CredentialReference("app", None, 2)))
-    assert settings.recorded == ["invalid"]
-
-
-def test_a_401_for_a_key_replaced_mid_call_leaves_its_successor_alone() -> None:
-    settings = Settings(Current(3))
-    asyncio.run(settings.mark_invalid(uuid4(), CredentialReference("app", None, 2)))
-    assert settings.recorded == []
-
-
-def test_a_key_that_wont_decrypt_reads_as_unavailable_not_an_error() -> None:
-    settings = Settings(CredentialDecryptionError())
-    assert asyncio.run(settings.run_intent(uuid4())) == "credential_unavailable"
-
-
-def test_a_damaged_key_still_gives_the_version_needed_to_replace_it() -> None:
-    async def nothing() -> None:
-        return None
-
-    settings = Settings(CredentialDecryptionError())
-    settings._context = _context(nothing)
-    status = asyncio.run(settings.status(uuid4()))
-    assert (status.auth_status, status.settings_version) == ("unavailable", 1)
-
-
-def test_rechecking_a_damaged_key_says_storage_not_an_error() -> None:
-    settings = Settings(CredentialDecryptionError())
-    with pytest.raises(CredentialStorageUnavailable):
-        asyncio.run(settings.revalidate(uuid4()))
-
-
-def test_a_stored_failed_check_blocks_an_environment_key_too() -> None:
-    class FromEnvironment(Settings):
-        async def _effective_environment(self, _: Any) -> Any:
-            return EnvironmentCandidate("process_environment", ARRANGED_KEY)
-
-    settings = FromEnvironment(None, stored="unavailable")
-    assert asyncio.run(settings.run_intent(uuid4())) == "credential_unavailable"
-    settings.stored = "configured"
-    assert asyncio.run(settings.run_intent(uuid4())) == "ready"
 
 
 # The worker's refusal, for what a job's configuration can raise
@@ -1008,89 +470,18 @@ def test_an_unreadable_configuration_refuses_a_job_rather_than_looping(
     assert config.refusal == "credential_unavailable"
 
 
-def test_a_malformed_catalog_is_a_failed_refresh_not_a_crash() -> None:
-    async def fetch() -> dict[str, Any]:
-        return {"data": ["not an entry"]}
-
-    with pytest.raises(ModelUnavailable):
-        asyncio.run(CatalogCache(fetch).current())
-
-
-# The entry point
-
-
-def test_the_switch_needs_its_configuration_rather_than_starting_half_ready(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.delenv("AUTOBOTS_CONFIG_ROOT", raising=False)
-    with pytest.raises(SystemExit, match="AUTOBOTS_CONFIG_ROOT"):
-        worker.inference_from_environment("postgresql://unused", object(), None, None)
-    monkeypatch.setenv("AUTOBOTS_CONFIG_ROOT", "/nonexistent")
-    with pytest.raises(SystemExit, match="service key"):
-        worker.inference_from_environment("postgresql://unused", None, None, None)
-
-
-def test_a_failing_first_step_does_not_starve_the_second() -> None:
-    async def broken(_: Any) -> bool:
-        raise RuntimeError("arranged")
-
-    async def working(_: Any) -> bool:
-        return True
-
-    async def go() -> bool:
-        return await worker.both(broken, working)(None)
-
-    assert asyncio.run(go()) is True
-
-
-def test_losing_the_database_still_reaches_the_serve_loop() -> None:
-    async def lost(_: Any) -> bool:
-        raise psycopg.OperationalError("arranged")
-
-    async def working(_: Any) -> bool:
-        raise AssertionError("no second step on a lost connection")
-
-    async def go() -> bool:
-        return await worker.both(lost, working)(None)
-
-    with pytest.raises(psycopg.OperationalError):
-        asyncio.run(go())
-
-
-def test_a_relative_configuration_root_refuses_to_start(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("AUTOBOTS_CONFIG_ROOT", "relative/path")
-    with pytest.raises(SystemExit, match="absolute"):
-        worker.inference_from_environment("postgresql://unused", object(), None, None)
-
-
-def test_both_steps_run_and_either_one_counts_as_work() -> None:
-    calls: list[str] = []
-
-    def step(name: str, worked: bool) -> Any:
-        async def inner(_: Any) -> bool:
-            calls.append(name)
-            return worked
-
-        return inner
-
-    async def run_both(first: bool, second: bool) -> bool:
-        return await worker.both(step("first", first), step("second", second))(None)
-
-    assert asyncio.run(run_both(False, True)) is True
-    assert calls == ["first", "second"]
-    assert asyncio.run(run_both(True, False)) is True
-    assert asyncio.run(run_both(False, False)) is False
+# Browsing's researcher route
 
 
 def _role_route(value: Any, *drop: str) -> Any:
     async def fetch() -> dict[str, Any]:
         return catalog_payload(*drop)
 
-    source = InferenceSource("postgresql://unused", _context(fetch), CatalogCache(fetch))
+    source = InferenceSource("postgresql://unused", provider_context(fetch), CatalogCache(fetch))
     return asyncio.run(source.role_route(Rows(value), lease(), ModelRole.RESEARCHER))
 
 
-def test_browsing_binds_the_runs_frozen_researcher_route() -> None:
+def test_browsing_binds_the_runs_frozen_researcher_route(monkeypatch: pytest.MonkeyPatch) -> None:
     frozen = {
         **snapshot(DEEPSEEK.id.value),
         "bindings": {"executor": DEEPSEEK.id.value, "researcher": TERRA.id.value},
@@ -1101,7 +492,24 @@ def test_browsing_binds_the_runs_frozen_researcher_route() -> None:
         TERRA.id.value,
         TERRA_WIRE_ID,
     )
-    assert route.worst_case_micro_usd > 0 and model._role is ModelRole.RESEARCHER
+    assert route.worst_case_micro_usd > 0
+    opened: list[tuple[ModelRole, int | None]] = []
+
+    async def recording(
+        _source: InferenceSource,
+        _workspace: UUID,
+        _policy: Any,
+        reserved_micro_usd: int | None = None,
+        role: ModelRole = ROLE,
+    ) -> Any:
+        opened.append((role, reserved_micro_usd))
+        raise ProviderFailure(FailureClass.OTHER)
+
+    # Its attempts open on the researcher role, reserving what the route says.
+    monkeypatch.setattr(InferenceSource, "open_attempt", recording)
+    with pytest.raises(ProviderFailure):
+        asyncio.run(model.ainvoke([HumanMessage("read")]))
+    assert opened == [(ModelRole.RESEARCHER, route.worst_case_micro_usd)]
 
 
 def test_a_researcher_route_without_tools_is_refused_before_anything_is_sent() -> None:
@@ -1119,10 +527,9 @@ def test_a_run_without_a_researcher_binding_has_no_browsing_route() -> None:
 def test_a_browsing_step_reaches_the_transport_on_the_researcher_route_with_tools_required() -> (
     None
 ):
-    from autobots.adapters import loop_middleware
     from autobots.application.browsing_loop import ACTION_TOOLS, admitted_steps
 
-    fake = Fake()
+    fake = RecordingOpenRouter()
     policy = frozen_policy(
         {"version": 1, "bindings": {"executor": DEEPSEEK.id.value, "researcher": TERRA.id.value}}
     )
@@ -1132,11 +539,8 @@ def test_a_browsing_step_reaches_the_transport_on_the_researcher_route_with_tool
 
     class Admits:
         async def admitted(self, request: Any, handler: Any, route: Any) -> Any:
-            token = loop_middleware._ADMITTED.set(True)
-            try:
+            with admitted_scope():
                 return await handler(request), True
-            finally:
-                loop_middleware._ADMITTED.reset(token)
 
     step = admitted_steps(Admits(), model, "route")  # type: ignore[arg-type]
     asyncio.run(step([HumanMessage("read")]))

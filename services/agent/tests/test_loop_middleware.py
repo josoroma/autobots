@@ -1,0 +1,423 @@
+"""`LoopMiddleware` through its public methods. Its guard and admission ledger are in-memory
+stand-ins passed through its seams, and every other step is its own (PTST-01). The disposable
+checks drive it over real rows (tests/db/goal_loop_check.py, memory_check.py and
+admission_check.py)."""
+
+import asyncio
+import json
+import logging
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from datetime import datetime
+from uuid import UUID, uuid4
+
+import httpx
+import openrouter
+import pytest
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+
+from autobots.adapters.loop_middleware import (
+    MAX_FACT_CHARS,
+    MAX_FACT_NAMES,
+    REPAIR_NOTE,
+    LoopMiddleware,
+    LoopStopped,
+    ModelRoute,
+    reply_facts,
+    uncertain_call_fields,
+)
+from autobots.application.compaction import CompactionPolicy
+from autobots.application.model_admission import (
+    AdmissionRefused,
+    AdmissionRequest,
+    BudgetExceeded,
+    ModelAdmission,
+    NoInferenceSlot,
+    ReplyFacts,
+    Ticket,
+)
+from autobots.application.model_attempts import FailureClass, ProviderFailure, classify_status
+from autobots.application.run_usage import COUNTER_SQL, RootLimits
+from autobots.application.tool_gateway import ToolScope
+from autobots.contracts.plans import GoalSpec
+from autobots.operations.logs import JsonFormatter, redact
+from fake_openrouter import DEEPSEEK, TERRA, invoke, model_over
+
+SCOPE = ToolScope(uuid4(), uuid4(), 1, {})
+ROUTE = ModelRoute("executor", TERRA.id.value, TERRA.wire_id, 1_000)
+SUMMARY_ROUTE = ModelRoute("summarizer", DEEPSEEK.id.value, DEEPSEEK.wire_id, 500)
+GOAL = GoalSpec(
+    objective="Write the report",
+    original_request="Write the report",
+    criteria={"c1": "the report exists"},
+    allowed_tools={},
+    allowed_paths=[],
+)
+# Three 150-character turns pass it, and the last one stays in view beside the summary.
+TIGHT = CompactionPolicy(context_chars=200, keep_recent=1)
+
+
+class Usage:
+    """One run's `app_private.run_usage` row, as `consume` and the middleware read it, and the
+    summaries stored. Nothing else is stored: no earlier summary, open wait or pending approval, and
+    no run or lease, so the default guard finds no run."""
+
+    def __init__(self) -> None:
+        self.used = dict.fromkeys(COUNTER_SQL, 0)
+        self.consumed: list[str] = []
+        self.summaries: list[str] = []
+        self._row: tuple[object, ...] | None = None
+
+    async def execute(self, statement: str, values: Sequence[object] = ()) -> "Usage":
+        self._row = None
+        for counter, sql in COUNTER_SQL.items():
+            if statement == sql:
+                self.consumed.append(counter)
+                limit = values[1]
+                assert isinstance(limit, int)
+                if self.used[counter] < limit:
+                    self.used[counter] += 1
+                    self._row = (self.used[counter],)
+                return self
+        if statement.startswith("select model_calls from app_private.run_usage"):
+            self._row = (self.used["model_calls"],)
+        elif statement.startswith("insert into app_private.run_summaries"):
+            self.summaries.append(str(values[3]))
+        return self
+
+    async def fetchone(self) -> tuple[object, ...] | None:
+        return self._row
+
+    async def fetchall(self) -> list[tuple[object, ...]]:
+        return []
+
+
+class Ledger(ModelAdmission):
+    """Admission in memory. `admit` records each request, then raises the arranged refusals in
+    order, as the real ledger refuses a busy slot or a spent budget, and then reserves."""
+
+    def __init__(self, *refusals: AdmissionRefused) -> None:
+        super().__init__(connection=None)
+        self.refusals = list(refusals)
+        self.asked: list[AdmissionRequest] = []
+        self.events: list[tuple[str, object]] = []
+
+    def admitted_roles(self) -> list[object]:
+        return [detail for event, detail in self.events if event == "admitted"]
+
+    async def admit(self, request: AdmissionRequest, *, at: datetime | None = None) -> Ticket:
+        self.asked.append(request)
+        if self.refusals:
+            raise self.refusals.pop(0)
+        self.events.append(("admitted", request.role))
+        return Ticket(uuid4(), request.worst_case_micro_usd, False, 1, 1)
+
+    async def mark_dispatched(self, invocation_id: UUID) -> None:
+        self.events.append(("dispatched", None))
+
+    async def settle(
+        self, invocation_id: UUID, charged_micro_usd: int, *, upstream_provider: str | None = None
+    ) -> None:
+        self.events.append(("settled", charged_micro_usd))
+
+    async def fail_before_acceptance(self, invocation_id: UUID, failure_class: str) -> None:
+        self.events.append(("failed", failure_class))
+
+    async def mark_uncertain(
+        self, invocation_id: UUID, failure_class: str, accumulated_output: str = ""
+    ) -> None:
+        self.events.append(("uncertain", failure_class))
+
+    async def reconcile(
+        self, invocation_id: UUID, charged_micro_usd: int, source: str = "owner"
+    ) -> None:
+        self.events.append(("reconciled", charged_micro_usd))
+
+    async def record_reply(self, invocation_id: UUID, facts: ReplyFacts) -> None:
+        self.events.append(("reply", facts.finish_reason))
+
+
+@dataclass(frozen=True)
+class Request:
+    """The parts of the SDK's model request the middleware reads and overrides."""
+
+    messages: list[BaseMessage]
+    tools: list[object] = field(default_factory=list)
+    system_message: SystemMessage | None = None
+
+    def override(
+        self, *, messages: list[BaseMessage] | None = None, tools: list[object] | None = None
+    ) -> "Request":
+        return Request(
+            self.messages if messages is None else messages,
+            self.tools if tools is None else tools,
+            self.system_message,
+        )
+
+
+@dataclass(frozen=True)
+class Response:
+    result: list[AIMessage]
+
+
+class Model:
+    """The SDK's model handler: each request gets the next reply, and is recorded."""
+
+    def __init__(self, *replies: AIMessage) -> None:
+        self.replies = list(replies)
+        self.requests: list[Request] = []
+
+    async def __call__(self, request: Request) -> Response:
+        self.requests.append(request)
+        return Response([self.replies.pop(0)])
+
+
+def reply(text: str = "done", finish: str = "stop") -> AIMessage:
+    return AIMessage(content=text, response_metadata={"finish_reason": finish, "cost": 0.0001})
+
+
+def history() -> Request:
+    """More than TIGHT holds, so the first two turns are summarized before the call."""
+    return Request([HumanMessage("a" * 150), AIMessage("b" * 150), HumanMessage("c" * 150)])
+
+
+def loop(
+    usage: Usage,
+    ledger: Ledger,
+    waits: list[float] | None = None,
+    *,
+    limits: RootLimits | None = None,
+    goal: GoalSpec | None = None,
+) -> LoopMiddleware:
+    """The real middleware over `usage`, with `ledger` admitting and a guard that always passes."""
+
+    async def owned() -> float:
+        return 60.0
+
+    async def sleep(seconds: float) -> None:
+        if waits is not None:
+            waits.append(seconds)
+
+    return LoopMiddleware(
+        usage,
+        SCOPE,
+        limits or RootLimits(),
+        ROUTE,
+        sleep=sleep,
+        goal=goal,
+        compaction=TIGHT,
+        summary_route=SUMMARY_ROUTE,
+        guard=owned,
+        admission=lambda: ledger,
+    )
+
+
+def test_a_refused_summary_stops_the_loop_with_its_reason() -> None:
+    """A budget that runs out during compaction pauses the run like one at any other call."""
+    usage, ledger, model = Usage(), Ledger(BudgetExceeded("arranged")), Model()
+    with pytest.raises(LoopStopped) as caught:
+        asyncio.run(loop(usage, ledger, goal=GOAL).awrap_model_call(history(), model))
+    assert caught.value.code == "budget_exceeded"
+    assert [asked.role for asked in ledger.asked] == ["summarizer"]
+    assert model.requests == [] and usage.summaries == []
+
+
+def test_a_busy_slot_during_a_summary_is_waited_out_like_any_other_call() -> None:
+    usage, waits = Usage(), list[float]()
+    ledger = Ledger(NoInferenceSlot("arranged"), NoInferenceSlot("arranged"))
+    model = Model(reply("ARRANGED-SUMMARY"), reply("the answer"))
+    middleware = loop(usage, ledger, waits, goal=GOAL)
+    response = asyncio.run(middleware.awrap_model_call(history(), model))
+    assert waits == [1.0, 1.0]
+    assert [asked.role for asked in ledger.asked] == ["summarizer"] * 3 + ["executor"]
+    assert usage.summaries == ["ARRANGED-SUMMARY"]
+    assert response.result[-1].content == "the answer"
+    # The answer is asked with the summary in place of the two turns it covers.
+    sent = model.requests[1].messages
+    assert len(sent) == 3 and "ARRANGED-SUMMARY" in str(sent[1].content)
+
+
+@pytest.mark.parametrize(
+    ("finish", "repairs"), [("length", 1), ("error", 0), ("content_filter", 0)]
+)
+def test_only_a_cut_off_reply_is_worth_a_repair(finish: str, repairs: int) -> None:
+    usage, model = Usage(), Model(reply("", finish))
+    middleware = loop(usage, Ledger(), limits=RootLimits(repairs=0))
+    with pytest.raises(LoopStopped) as caught:
+        asyncio.run(middleware.awrap_model_call(Request([HumanMessage("hello")]), model))
+    assert caught.value.code == "incomplete_output"
+    assert usage.consumed.count("repairs") == repairs
+
+
+def test_a_cut_off_reply_is_asked_once_more_briefly() -> None:
+    usage, ledger = Usage(), Ledger()
+    model = Model(reply("", "length"), reply("short"))
+    response = asyncio.run(
+        loop(usage, ledger).awrap_model_call(Request([HumanMessage("hello")]), model)
+    )
+    assert response.result[-1].content == "short"
+    assert model.requests[1].messages[-1].content == REPAIR_NOTE
+    assert usage.used["repairs"] == 1
+    assert ledger.admitted_roles() == ["executor", "executor"]
+
+
+def test_running_out_of_model_calls_while_compacting_stops_cleanly() -> None:
+    """The summary's call counts against the run's limit. Past it, nothing is sent, and its
+    reservation closes as never accepted."""
+    usage, ledger, model = Usage(), Ledger(), Model()
+    middleware = loop(usage, ledger, limits=RootLimits(model_calls=0), goal=GOAL)
+    with pytest.raises(LoopStopped) as caught:
+        asyncio.run(middleware.awrap_model_call(history(), model))
+    assert caught.value.code == "model_calls_limit"
+    assert model.requests == []
+    assert ledger.events[-1] == ("failed", "other")
+
+
+def test_an_unencodable_request_stops_before_anything_is_reserved() -> None:
+    """A lone surrogate is no text a provider can read."""
+    usage, ledger, model = Usage(), Ledger(), Model()
+    request = Request([HumanMessage(b"before \\ud83d after".decode("unicode_escape"))])
+    with pytest.raises(LoopStopped) as caught:
+        asyncio.run(loop(usage, ledger).admitted(request, model, ROUTE))
+    assert caught.value.code == "request_unencodable"
+    assert ledger.asked == [] and model.requests == []
+
+
+def test_without_a_guard_each_dispatch_reads_the_runs_ownership() -> None:
+    """The default guard is the database's: a run it doesn't hold stops before any admission."""
+    ledger = Ledger()
+    middleware = LoopMiddleware(Usage(), SCOPE, RootLimits(), ROUTE, admission=lambda: ledger)
+    with pytest.raises(LoopStopped) as caught:
+        asyncio.run(middleware.admitted(Request([HumanMessage("hello")]), Model(), ROUTE))
+    assert caught.value.code == "run_not_found"
+    assert ledger.asked == []
+
+
+# What a reply or a failed call leaves in the ledger and the log, split from
+# test_worker_inference.py by module (PTST-04)
+
+
+def test_a_success_the_sdk_cant_parse_keeps_its_reservation() -> None:
+    """A reply arrived, so it may have been charged. A 200 is not a refusal."""
+
+    def handle(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"error": {"code": 500, "message": "arranged"}})
+
+    with pytest.raises(openrouter.errors.ResponseValidationError) as caught:
+        invoke(model_over(handle))
+    assert classify_status(caught.value.status_code) is FailureClass.UNCERTAIN_ACCEPTANCE
+
+
+def _logged(error: BaseException) -> str:
+    record = logging.LogRecord("autobots.worker", logging.WARNING, "", 0, "e", (), None)
+    record.fields = uncertain_call_fields(error)
+    return JsonFormatter().format(record)
+
+
+def test_an_uncertain_calls_log_names_types_and_status_and_no_reply_text() -> None:
+    """The reply's text really is in the exception, so its absence from the log means something."""
+    text = "arranged-reply-text-7f3a"
+
+    def handle(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"error": {"code": 500, "message": text}})
+
+    with pytest.raises(openrouter.errors.ResponseValidationError) as caught:
+        invoke(model_over(handle))
+    # In what the exception holds, its body. Its `str()` embeds a shortened validation error.
+    assert text in repr(caught.value)
+    assert redact(text) == text
+    line = json.loads(_logged(caught.value))
+    assert line["status"] == 200
+    assert line["error_type"].endswith(".ResponseValidationError")
+    assert line["cause_type"].endswith("ValidationError")
+    assert text not in json.dumps(line)
+
+
+def test_an_exceptions_cause_is_named_and_neither_message_is_kept() -> None:
+    sentinel = "arranged-sentinel-91c2"
+    try:
+        try:
+            raise ValueError(sentinel)
+        except ValueError as cause:
+            raise RuntimeError(sentinel) from cause
+    except RuntimeError as error:
+        assert sentinel in str(error) and sentinel in str(error.__cause__)
+        assert redact(sentinel) == sentinel
+        written = _logged(error)
+    line = json.loads(written)
+    assert line["error_type"] == "builtins.RuntimeError"
+    assert line["cause_type"] == "builtins.ValueError"
+    assert "status" not in line
+    assert sentinel not in written
+
+
+def test_an_exception_raised_while_handling_another_names_that_one() -> None:
+    try:
+        try:
+            raise ValueError("arranged")
+        except ValueError:
+            raise RuntimeError("arranged")  # noqa: B904
+    except RuntimeError as error:
+        assert uncertain_call_fields(error)["cause_type"] == "builtins.ValueError"
+
+
+def test_a_cause_set_outside_any_handler_is_named() -> None:
+    # `__context__` is empty here, so reading only that would lose the cause.
+    error = RuntimeError("arranged")
+    error.__cause__ = ValueError("arranged")
+    assert error.__context__ is None
+    assert uncertain_call_fields(error)["cause_type"] == "builtins.ValueError"
+
+
+def test_a_status_that_is_no_number_isnt_reported_as_one() -> None:
+    class Odd(Exception):
+        status_code = "504"
+
+    assert uncertain_call_fields(Odd("arranged")).get("status") is None
+
+
+def test_a_partial_streams_output_stays_out_of_its_fields() -> None:
+    sentinel = "arranged-partial-44d1"
+    fields = uncertain_call_fields(
+        ProviderFailure(FailureClass.PARTIAL_STREAM, accumulated_output=sentinel)
+    )
+    assert fields == {"error_type": "autobots.application.model_attempts.ProviderFailure"}
+
+
+def test_reply_facts_hold_no_content_and_stay_bounded() -> None:
+    calls = [
+        {"name": "x" * 500, "args": {"content": "the report's text"}, "id": str(number)}
+        for number in range(30)
+    ]
+    message = AIMessage(
+        content="the report's text",
+        tool_calls=calls,
+        invalid_tool_calls=[{"name": "save_artifact", "args": '{"pa', "id": "cut", "error": "bad"}],
+        response_metadata={"finish_reason": "length"},
+        usage_metadata={
+            "input_tokens": 9,
+            "output_tokens": 512,
+            "total_tokens": 521,
+            "output_token_details": {"reasoning": 400},
+        },
+    )
+    facts = reply_facts(message)
+    assert (
+        facts.finish_reason,
+        facts.input_tokens,
+        facts.output_tokens,
+        facts.reasoning_tokens,
+    ) == ("length", 9, 512, 400)
+    assert facts.invalid_tool_calls == 1
+    assert len(facts.tool_names) == MAX_FACT_NAMES and {len(name) for name in facts.tool_names} == {
+        MAX_FACT_CHARS
+    }
+    assert "report" not in repr(facts)
+    # A reply with nothing to report is still a record, not a failure.
+    empty = reply_facts(AIMessage(content=""))
+    assert (
+        empty.finish_reason,
+        empty.output_tokens,
+        empty.tool_names,
+        empty.invalid_tool_calls,
+    ) == (None, None, (), 0)
