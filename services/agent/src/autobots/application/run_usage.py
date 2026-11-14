@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import Any, Literal
 from uuid import UUID
 
+from autobots.domain.stops import StopCode
+
 Counter = Literal["model_calls", "tool_dispatches", "repairs", "plan_revisions", "children"]
 COUNTER_SQL: dict[Counter, str] = {
     "model_calls": "update app_private.run_usage set model_calls = model_calls + 1 "
@@ -33,10 +35,20 @@ class RootLimits:
     active_seconds: float = 900.0
 
 
+# Each counter's stop code, named in the stop table so a search finds it (PRUN-02, R-29).
+LIMIT_CODES: dict[Counter, StopCode] = {
+    "model_calls": StopCode.MODEL_CALLS_LIMIT,
+    "tool_dispatches": StopCode.TOOL_DISPATCHES_LIMIT,
+    "repairs": StopCode.REPAIRS_LIMIT,
+    "plan_revisions": StopCode.PLAN_REVISIONS_LIMIT,
+    "children": StopCode.CHILDREN_LIMIT,
+}
+
+
 class LimitReached(Exception):
-    def __init__(self, counter: str) -> None:
+    def __init__(self, counter: Counter) -> None:
         super().__init__(counter)
-        self.code = f"{counter}_limit"
+        self.code = LIMIT_CODES[counter]
 
 
 async def ensure_usage(connection: Any, run_id: UUID) -> None:

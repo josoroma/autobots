@@ -84,37 +84,19 @@ from autobots.application.worker_leases import (
     revive_lease,
 )
 from autobots.contracts.plans import GoalSpec
-from autobots.domain.execution import INCOMPATIBLE, incompatibility
+from autobots.domain.execution import incompatibility
 from autobots.domain.runs import Actor, CommandRefused, RunCommand, RunStatus
+from autobots.domain.stops import (
+    COMMANDS,
+    UNMAPPED,
+    Disposition,
+    PassOutcome,
+    StopCode,
+    disposition_of,
+)
 from autobots.domain.tools import DELEGATION_TOOL
 from autobots.operations.logs import Repeated, forbid_remote_tracing, log_event
 
-# Waiting can resolve these: a person adds budget or a key, or reconciles an uncertain call.
-PAUSE_FOR = frozenset(
-    {
-        "budget_exceeded",
-        "no_inference_slot",
-        "cost_unavailable",
-        "credentials_required",
-        "credential_unavailable",
-        "model_unavailable",
-        "network_before_acceptance",
-        "invalid_credential",
-        "insufficient_credits",
-        "partial_stream",
-        "uncertain_acceptance",
-        "uncertain_model_call",
-        "assignment_paused",
-        "assignment_lost",
-        "assignment_busy",
-        "parent_not_running",
-        "outcome_unknown",
-        INCOMPATIBLE,
-        # A worker on another model, say after a release, leaves the saved run for the right one.
-        "route_not_bound",
-    }
-)
-NOT_OURS = frozenset({"lease_lost", "run_not_running", "run_not_found", "approval_pending"})
 SYSTEM_PROMPT = (
     "Work only on the stated goal. First call propose_plan, covering every criterion by its ID. "
     "Use only the tools offered. Call complete_task with real evidence as tasks finish. "
@@ -150,7 +132,7 @@ JobBinder = Callable[[Any, Lease, LoopConfig], Awaitable[tuple[Callable[[], Any]
 class LoopResult:
     """What really happened, whatever the model said at the end."""
 
-    outcome: str
+    outcome: PassOutcome
     code: str | None
     run_status: str | None
     plan_version: int | None
@@ -322,18 +304,20 @@ async def run_goal(
                 connection, config.object_store, lease.workspace_id, lease.run_id, scope
             )
         except LeaseLost:
-            return await _result(connection, lease, goal, "lost", "lease_lost", None)
+            return await _result(
+                connection, lease, goal, PassOutcome.LOST, StopCode.LEASE_LOST, None
+            )
     status = await _run_status(connection, lease)
     if status == RunStatus.CANCELLING.value:
-        return await _finish(connection, lease, goal, "run_not_running")
+        return await _finish(connection, lease, goal, StopCode.RUN_NOT_RUNNING)
     if await _obligation_holds(connection, lease):
         return await _result(
-            connection, lease, goal, "waiting", None, await _run_status(connection, lease)
+            connection, lease, goal, PassOutcome.WAITING, None, await _run_status(connection, lease)
         )
     if (await outstanding(connection, lease.run_id)).uncertain_calls:
-        return await _finish(connection, lease, goal, "uncertain_model_call")
+        return await _finish(connection, lease, goal, StopCode.UNCERTAIN_MODEL_CALL)
     if not await _route_is_bound(connection, lease, config):
-        return await _finish(connection, lease, goal, "route_not_bound")
+        return await _finish(connection, lease, goal, StopCode.ROUTE_NOT_BOUND)
     if config.refusal is not None:
         return await _finish(connection, lease, goal, config.refusal)
     await begin_segment(connection, lease.run_id)
@@ -368,13 +352,13 @@ async def run_goal(
     except LoopStopped as stopped:
         code = stopped.code
     except GraphRecursionError:
-        code = "step_limit"
+        code = StopCode.STEP_LIMIT
     except UnadmittedModelCall:
-        code = "unadmitted_model_call"
+        code = StopCode.UNADMITTED_MODEL_CALL
     except Exception as error:
         if not is_stale_owner(error):
             raise
-        code = "lease_lost"
+        code = StopCode.LEASE_LOST
     finally:
         await stop_task(beating)
         await end_segment(connection, lease.run_id)
@@ -426,7 +410,7 @@ async def _drive(
         # Before any model or checkpoint is touched. A migration never swaps these for it.
         goal = await load_goal(connection, lease.run_id)
         await classify_interrupted(connection, lease.run_id, lease.generation)
-        return await _finish(connection, lease, goal, INCOMPATIBLE)
+        return await _finish(connection, lease, goal, StopCode.INCOMPATIBLE_VERSION)
     cursor = await connection.execute(
         "select 1 from public.workflow_executions where run_id = %s", (lease.run_id,)
     )
@@ -437,7 +421,7 @@ async def _drive(
         return await run_workflow(connection, database_url, lease, model_factory(), config)
     if lease.run_status != RunStatus.VERIFYING.value:
         result = await run_goal(connection, database_url, lease, model_factory(), config)
-        if result.outcome != "candidate":
+        if result.outcome != PassOutcome.CANDIDATE:
             return result
     return await _settle_candidate(connection, database_url, lease, config)
 
@@ -451,10 +435,10 @@ async def _settle_candidate(
     try:
         report = await verify_candidate(connection, config.object_store, lease, goal)
     except LeaseLost:
-        return await _result(connection, lease, goal, "lost", "lease_lost", None)
+        return await _result(connection, lease, goal, PassOutcome.LOST, StopCode.LEASE_LOST, None)
     finally:
         await stop_task(beating)
-    code = None if report.passed else "criteria_unmet"
+    code = None if report.passed else StopCode.CRITERIA_UNMET
     cursor = await connection.execute(
         "select version from public.runs where id = %s", (lease.run_id,)
     )
@@ -482,10 +466,10 @@ async def _settle_candidate(
             )
     except CommandRefused:
         # A cancel arrived first. It wins, and this worker settles it.
-        return await _finish(connection, lease, goal, "run_not_running")
+        return await _finish(connection, lease, goal, StopCode.RUN_NOT_RUNNING)
     except (LeaseLost, VersionConflict):
-        return await _result(connection, lease, goal, "lost", "lease_lost", None)
-    outcome = "succeeded" if report.passed else "stopped"
+        return await _result(connection, lease, goal, PassOutcome.LOST, StopCode.LEASE_LOST, None)
+    outcome = PassOutcome.SUCCEEDED if report.passed else PassOutcome.STOPPED
     return await _result(connection, lease, goal, outcome, code, result.status)
 
 
@@ -604,7 +588,7 @@ async def _result(
     connection: Any,
     lease: Lease,
     goal: GoalSpec,
-    outcome: str,
+    outcome: PassOutcome,
     code: str | None,
     status: str | None,
 ) -> LoopResult:
@@ -664,7 +648,10 @@ async def _settle_children(connection: Any, lease: Lease) -> datetime | None:
             settled = None
             if child_lease is not None:
                 settled = await _finish(
-                    connection, child_lease, await load_goal(connection, child), "run_not_running"
+                    connection,
+                    child_lease,
+                    await load_goal(connection, child),
+                    StopCode.RUN_NOT_RUNNING,
                 )
             if settled is None or settled.run_status not in terminal:
                 # Still owned, or it has children of its own to wait for.
@@ -695,19 +682,41 @@ async def _holds_lease(connection: Any, lease: Lease) -> bool:
     return await cursor.fetchone() is not None
 
 
+def _disposition(lease: Lease, code: str | None) -> Disposition:
+    """The table's disposition. A code missing from it suspends the run, so it stays resumable, and
+    the warning names the code so that it can join the table (Decision 0028 E3, SP-010)."""
+    disposition = disposition_of(code)
+    if disposition is None:
+        log_event(
+            logger, "worker.stop_code_unmapped", logging.WARNING, run=str(lease.run_id), code=code
+        )
+        return UNMAPPED
+    return disposition
+
+
 async def _finish(
     connection: Any, lease: Lease, goal: GoalSpec, stop_code: str | None
 ) -> LoopResult:
     view = await plan_view(connection, lease.run_id, goal)
     code = stop_code
     # Whatever stopped this pass, a run being cancelled finishes that. Anything else is refused.
-    if code != "lease_lost" and await _run_status(connection, lease) == RunStatus.CANCELLING.value:
+    if (
+        code != StopCode.LEASE_LOST
+        and await _run_status(connection, lease) == RunStatus.CANCELLING.value
+    ):
         # Settling classifies what's in flight, so a worker that lost the run must not start it.
-        code = "run_not_running" if await _holds_lease(connection, lease) else "lease_lost"
+        code = (
+            StopCode.RUN_NOT_RUNNING
+            if await _holds_lease(connection, lease)
+            else StopCode.LEASE_LOST
+        )
     if code is None and not view.finished:
-        code = "plan_missing" if view.version is None else "plan_incomplete"
+        code = StopCode.PLAN_MISSING if view.version is None else StopCode.PLAN_INCOMPLETE
     command: RunCommand | None
-    if code == "run_not_running" and await _run_status(connection, lease) == "cancelling":
+    if (
+        code == StopCode.RUN_NOT_RUNNING
+        and await _run_status(connection, lease) == RunStatus.CANCELLING.value
+    ):
         # This worker still owns it, and it is the one who settles the cancellation.
         retry_at = await _settle_children(connection, lease)
         if retry_at is not None:
@@ -718,19 +727,29 @@ async def _finish(
                 (retry_at, lease.run_id, lease.generation),
             )
             return await _result(
-                connection, lease, goal, "waiting", "children_settling", RunStatus.CANCELLING.value
+                connection,
+                lease,
+                goal,
+                PassOutcome.WAITING,
+                StopCode.CHILDREN_SETTLING,
+                RunStatus.CANCELLING.value,
             )
         await classify_interrupted(connection, lease.run_id, lease.generation + 1)
         left = await outstanding(connection, lease.run_id)
         code = (
-            "cancelled_with_unknown_outcomes"
+            StopCode.CANCELLED_WITH_UNKNOWN_OUTCOMES
             if left.uncertain_calls or left.unknown_effects
-            else "cancelled"
+            else StopCode.CANCELLED
         )
         command = RunCommand.FINISH_CANCEL
-    elif code in NOT_OURS:
-        command = None
-        if code == "run_not_running" and await _run_status(connection, lease) == "paused":
+    else:
+        disposition = _disposition(lease, code)
+        command = COMMANDS.get(disposition)
+        if (
+            disposition is Disposition.RELEASE
+            and code == StopCode.RUN_NOT_RUNNING
+            and await _run_status(connection, lease) == RunStatus.PAUSED.value
+        ):
             # Stopped at a safe boundary. The run waits for a resume with nobody holding it.
             await connection.execute(
                 "update app_private.run_jobs set status = 'done', lease_owner = null, "
@@ -738,12 +757,6 @@ async def _finish(
                 "and status = 'claimed'",
                 (lease.run_id, lease.generation),
             )
-    elif code is None:
-        command = RunCommand.VERIFY
-    elif code in PAUSE_FOR:
-        command = RunCommand.SUSPEND
-    else:
-        command = RunCommand.FAIL
     status = None
     if command is not None:
         cursor = await connection.execute(
@@ -770,14 +783,14 @@ async def _finish(
                 )
             status = result.status
         except (LeaseLost, VersionConflict, CommandRefused):
-            code = "lease_lost"
+            code = StopCode.LEASE_LOST
     outcome = (
-        "candidate"
+        PassOutcome.CANDIDATE
         if code is None
-        else "waiting"
-        if code == "approval_pending"
-        else "lost"
-        if code in NOT_OURS
-        else "stopped"
+        else PassOutcome.WAITING
+        if code == StopCode.APPROVAL_PENDING
+        else PassOutcome.LOST
+        if disposition_of(code) is Disposition.RELEASE
+        else PassOutcome.STOPPED
     )
     return await _result(connection, lease, goal, outcome, code, status)

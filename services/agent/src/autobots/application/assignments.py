@@ -21,6 +21,7 @@ from autobots.application.tool_gateway import (
 from autobots.application.worker_leases import Lease, claim_run
 from autobots.contracts.assignments import AssignmentResult, AssignSpecialist
 from autobots.domain.runs import Actor, RunCommand, RunStatus
+from autobots.domain.stops import GatewayCode, PassOutcome, StopCode
 from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import DELEGATION_TOOL, PLAN_TOOLS, OperationClass
 
@@ -55,13 +56,13 @@ def narrowed_tools(
     if requested is not None:
         named = [tool for tool in requested if tool != DELEGATION_TOOL]
         if any(tool not in available for tool in named):
-            raise ToolFailed("scope_expansion_denied")
+            raise ToolFailed(GatewayCode.SCOPE_EXPANSION_DENIED)
         available = {tool: available[tool] for tool in named}
     # N-4: a narrowed request that doesn't name delegation doesn't get it.
     wants_delegation = requested is None or DELEGATION_TOOL in requested
     can_delegate = DELEGATION_TOOL in parent and depth < levels
     if requested is not None and DELEGATION_TOOL in requested and not can_delegate:
-        raise ToolFailed("scope_expansion_denied")
+        raise ToolFailed(GatewayCode.SCOPE_EXPANSION_DENIED)
     if can_delegate and wants_delegation:
         available[DELEGATION_TOOL] = parent[DELEGATION_TOOL]
     return {**PLAN_TOOLS, **available}
@@ -86,15 +87,15 @@ async def _create(
     session_id, snapshot, limit, parent_depth = await cursor.fetchone()
     depth = parent_depth + 1
     if depth > limits.child_levels:
-        raise ToolFailed("assignment_depth_limit")
+        raise ToolFailed(GatewayCode.ASSIGNMENT_DEPTH_LIMIT)
     if session_id is None:
-        raise ToolFailed("route_not_granted")
+        raise ToolFailed(GatewayCode.ROUTE_NOT_GRANTED)
     try:
         binding = await resolve_binding(
             connection, scope.workspace_id, session_id, expert_id=UUID(arguments.expert_id)
         )
     except (ExpertRefused, ValueError):
-        raise ToolFailed("route_not_granted") from None
+        raise ToolFailed(GatewayCode.ROUTE_NOT_GRANTED) from None
     goal = await load_goal(connection, scope.run_id)
     tools = narrowed_tools(
         goal.allowed_tools, binding.tools, arguments.tools, depth, limits.child_levels
@@ -106,7 +107,7 @@ async def _create(
             "select status from public.runs where id = %s for share", (scope.run_id,)
         )
         if (await cursor.fetchone())[0] != RunStatus.RUNNING.value:
-            raise ToolFailed("parent_not_running")
+            raise ToolFailed(GatewayCode.PARENT_NOT_RUNNING)
         cursor = await connection.execute(
             "select count(*) filter (where status = 'open'), count(*) "
             "from app_private.assignments where root_run_id = %s",
@@ -114,11 +115,11 @@ async def _create(
         )
         open_count, total = await cursor.fetchone()
         if open_count >= limits.outstanding_assignments:
-            raise ToolFailed("outstanding_assignments_limit")
+            raise ToolFailed(GatewayCode.OUTSTANDING_ASSIGNMENTS_LIMIT)
         try:
             await consume(connection, root, "children", limits.children)
-        except LimitReached as reached:
-            raise ToolFailed(reached.code) from None
+        except LimitReached:
+            raise ToolFailed(GatewayCode.CHILDREN_LIMIT) from None
         namespace = f"outputs/child-{total + 1}"
         paths = (*[path for path in goal.allowed_paths if path == "inputs"], namespace)
         admitted = await admit_run(
@@ -171,7 +172,7 @@ async def _claim_child(connection: Any, child: UUID, delegation: Delegation) -> 
         if lease is not None:
             return lease
         await delegation.sleep(0.2)
-    raise ToolFailed("assignment_busy")
+    raise ToolFailed(GatewayCode.ASSIGNMENT_BUSY)
 
 
 def assign_tool(delegation: Delegation) -> ToolDefinition:  # noqa: C901 - baseline 2026-11-14, shrink only (STD-06)
@@ -199,11 +200,11 @@ def assign_tool(delegation: Delegation) -> ToolDefinition:  # noqa: C901 - basel
         lease = await _claim_child(connection, child, delegation)
         result = await delegation.drive(connection, lease)
         if result.run_status == RunStatus.PAUSED.value:
-            raise ToolFailed("assignment_paused")
-        if result.outcome == "lost" or result.code == "children_settling":
-            raise ToolFailed("assignment_lost")
-        if result.outcome == "waiting":
-            raise ToolFailed("assignment_paused")
+            raise ToolFailed(GatewayCode.ASSIGNMENT_PAUSED)
+        if result.outcome == PassOutcome.LOST or result.code == StopCode.CHILDREN_SETTLING:
+            raise ToolFailed(GatewayCode.ASSIGNMENT_LOST)
+        if result.outcome == PassOutcome.WAITING:
+            raise ToolFailed(GatewayCode.ASSIGNMENT_PAUSED)
         return await _close(
             connection,
             assignment_id,
@@ -222,7 +223,7 @@ def assign_tool(delegation: Delegation) -> ToolDefinition:  # noqa: C901 - basel
             RunStatus.WAITING_INPUT.value,
             RunStatus.WAITING_APPROVAL.value,
         }:
-            raise ToolFailed("assignment_paused")
+            raise ToolFailed(GatewayCode.ASSIGNMENT_PAUSED)
 
     async def _finished_child(
         connection: Any, child: UUID
@@ -236,9 +237,11 @@ def assign_tool(delegation: Delegation) -> ToolDefinition:  # noqa: C901 - basel
         if status not in TERMINAL_STATUSES:
             return None
         view = await plan_view(connection, child, await load_goal(connection, child))
-        if status == RunStatus.CANCELLED.value and not str(code).startswith("cancelled"):
-            code = "cancelled"
-        outcome = "succeeded" if status == RunStatus.SUCCEEDED.value else "stopped"
+        if status == RunStatus.CANCELLED.value and not str(code).startswith(StopCode.CANCELLED):
+            code = StopCode.CANCELLED
+        outcome = (
+            PassOutcome.SUCCEEDED if status == RunStatus.SUCCEEDED.value else PassOutcome.STOPPED
+        )
         return outcome, code, status, list(view.completed), list(view.remaining)
 
     async def _close(
@@ -283,7 +286,7 @@ def assign_tool(delegation: Delegation) -> ToolDefinition:  # noqa: C901 - basel
         if status != RunStatus.PAUSED.value:
             return
         if (await outstanding(connection, child)).uncertain_calls:
-            raise ToolFailed("assignment_paused")
+            raise ToolFailed(GatewayCode.ASSIGNMENT_PAUSED)
         await apply_command(
             connection,
             workspace_id=context.scope.workspace_id,

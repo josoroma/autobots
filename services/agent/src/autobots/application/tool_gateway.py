@@ -24,6 +24,7 @@ from autobots.application.runs import LeaseLost
 # The gateway's own fenced writes use it, and so do the writers that import it from this module.
 from autobots.application.worker_leases import hold_lease as hold_lease
 from autobots.domain.runs import RunStatus
+from autobots.domain.stops import GatewayCode
 from autobots.domain.tool_catalog import CostClass, KeyRequirement, ToolGroup, ToolProvider
 from autobots.domain.tools import EFFECTFUL, OperationClass, ToolOutcome, path_granted
 
@@ -147,7 +148,8 @@ class ToolDefinition:
 @dataclass(frozen=True)
 class ToolResult:
     outcome: ToolOutcome
-    code: str | None = None
+    # A tool keeps any code of its own beside the gateway's (PTOL-09).
+    code: GatewayCode | str | None = None
     output: dict[str, Any] | None = None
     operation_id: str | None = None
     replayed: bool = False
@@ -263,7 +265,7 @@ async def _has_approval(connection: Any, operation_id: str) -> bool:
     return await cursor.fetchone() is not None
 
 
-def _denied(code: str) -> ToolResult:
+def _denied(code: GatewayCode | str) -> ToolResult:
     return ToolResult(ToolOutcome.DENIED, code)
 
 
@@ -300,7 +302,7 @@ async def _expert_behind(connection: Any, scope: ToolScope) -> bool:
     return bool(row and row[0])
 
 
-async def ownership_refusal(connection: Any, scope: ToolScope) -> str | None:
+async def ownership_refusal(connection: Any, scope: ToolScope) -> GatewayCode | None:
     """Run status and ownership, read fresh by database time."""
     cursor = await connection.execute(
         "select r.status, j.status, j.generation, j.lease_expires_at > clock_timestamp() "
@@ -310,12 +312,12 @@ async def ownership_refusal(connection: Any, scope: ToolScope) -> str | None:
     )
     row = await cursor.fetchone()
     if row is None:
-        return "run_not_found"
+        return GatewayCode.RUN_NOT_FOUND
     run_status, job_status, generation, live = row
     if job_status != "claimed" or generation != scope.generation or not live:
-        return "lease_lost"
+        return GatewayCode.LEASE_LOST
     if run_status != RunStatus.RUNNING.value:
-        return "run_not_running"
+        return GatewayCode.RUN_NOT_RUNNING
     return None
 
 
@@ -349,7 +351,7 @@ class ToolGateway:
         result = await self._dispatch(connection, scope, name, arguments, use)
         if use is not None:
             # A call now waiting for a person released the lease in its own approval gate.
-            waiting = result.code == "approval_pending"
+            waiting = result.code == GatewayCode.APPROVAL_PENDING
             await complete_use(
                 connection, scope, self.registry, use, name, result, fenced=not waiting
             )
@@ -361,27 +363,27 @@ class ToolGateway:
         """Refused before any effect: ungranted, unqualified, invalid, out of scope or unowned."""
         version = scope.tools.get(name)
         if version is None:
-            return _denied("tool_not_granted")
+            return _denied(GatewayCode.TOOL_NOT_GRANTED)
         tool = self.registry.get(name, version)
         if tool is None:
-            return _denied("tool_not_registered")
+            return _denied(GatewayCode.TOOL_NOT_REGISTERED)
         if (
             tool.operation_class is OperationClass.ARBITRARY_EXECUTION
             and not tool.executor_qualified()
         ):
             # Checked again here, as a qualification can be withdrawn while a worker runs.
-            return _denied("capability_disabled")
+            return _denied(GatewayCode.CAPABILITY_DISABLED)
         try:
             parsed = tool.input_model.model_validate(arguments)
         except ValidationError:
-            return _denied("invalid_arguments")
+            return _denied(GatewayCode.INVALID_ARGUMENTS)
         if not all(path_granted(path, scope.paths) for path in tool.resources(parsed)):
-            return _denied("resource_not_granted")
+            return _denied(GatewayCode.RESOURCE_NOT_GRANTED)
         refusal = await ownership_refusal(connection, scope)
         if refusal is not None:
             return _denied(refusal)
         if tool.expert_only and not await _expert_behind(connection, scope):
-            return _denied("expert_grant_required")
+            return _denied(GatewayCode.EXPERT_GRANT_REQUIRED)
         if (
             tool.approval_required
             or tool.operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE
@@ -395,7 +397,7 @@ class ToolGateway:
                     target = await tool.target_resolver(parsed, reviewing)
                 except ToolFailed as error:
                     # Nothing to approve: the destination isn't configured for this workspace.
-                    return _denied(str(error) or "connector_not_configured")
+                    return _denied(str(error) or GatewayCode.CONNECTOR_NOT_CONFIGURED)
             if tool.review_detail is not None and not await _has_approval(
                 connection, _operation_id(scope, tool, parsed)
             ):
@@ -404,13 +406,13 @@ class ToolGateway:
                         tool.review_detail(parsed, reviewing), tool.timeout_seconds
                     )
                 except ToolFailed as error:
-                    return _denied(str(error) or "review_unavailable")
+                    return _denied(str(error) or GatewayCode.REVIEW_UNAVAILABLE)
                 except Exception as error:  # noqa: BLE001 - a review that can't be built denies the call, so nothing runs
                     # A denial keeps no receipt, so the log line is all that's kept.
                     _log_failure(
                         "tool.operation.review_failed", tool, reviewing.operation_id, error
                     )
-                    return _denied("review_unavailable")
+                    return _denied(GatewayCode.REVIEW_UNAVAILABLE)
             code = await approval_gate(
                 connection,
                 workspace_id=scope.workspace_id,
@@ -435,14 +437,14 @@ class ToolGateway:
             if tool.target_resolver is not None and not await _target_unchanged(
                 connection, _operation_id(scope, tool, parsed), target
             ):
-                return _denied("approval_target_changed")
+                return _denied(GatewayCode.APPROVAL_TARGET_CHANGED)
         if tool.cost_class is CostClass.METERED_PROVIDER:
             # Decision 0017 Q4: counted per root run tree, before any request leaves. After
             # approval, so a call waiting for a person isn't counted twice.
             from autobots.application.tool_uses import admit_metered
 
             if use is None or not await admit_metered(connection, scope, use):
-                return _denied("tool_budget_exceeded")
+                return _denied(GatewayCode.TOOL_BUDGET_EXCEEDED)
         if tool.operation_class in EFFECTFUL:
             return await self._effect(connection, scope, tool, parsed)
         return await self._read(connection, scope, tool, parsed)
@@ -456,17 +458,17 @@ class ToolGateway:
             try:
                 output = await asyncio.wait_for(tool.handler(parsed, context), tool.timeout_seconds)
             except TimeoutError:
-                code = "tool_timeout"
+                code = GatewayCode.TOOL_TIMEOUT
             except ToolFailed as error:
-                return ToolResult(ToolOutcome.FAILED, str(error) or "tool_failed")
+                return ToolResult(ToolOutcome.FAILED, str(error) or GatewayCode.TOOL_FAILED)
             except Exception as error:  # noqa: BLE001 - any tool failure is recorded as tool_failed
                 # A read keeps no receipt, so the log line is all that's kept.
                 _log_failure("tool.operation.failed", tool, None, error)
-                code = "tool_failed"
+                code = GatewayCode.TOOL_FAILED
             else:
                 visible, too_large = _visible(tool, output)
                 if too_large:
-                    return ToolResult(ToolOutcome.FAILED, "output_too_large")
+                    return ToolResult(ToolOutcome.FAILED, GatewayCode.OUTPUT_TOO_LARGE)
                 return ToolResult(ToolOutcome.SUCCEEDED, output=visible)
             if attempt < tool.retries:
                 refusal = await ownership_refusal(connection, scope)
@@ -524,11 +526,11 @@ class ToolGateway:
                     replayed = await self._replay(context, tool, parsed, operation_id)
                     if replayed is not None:
                         return replayed
-                    return _denied("lease_lost")
+                    return _denied(GatewayCode.LEASE_LOST)
         except LeaseLost:
-            return _denied("lease_lost")
+            return _denied(GatewayCode.LEASE_LOST)
         except NotRunning:
-            return _denied("run_not_running")
+            return _denied(GatewayCode.RUN_NOT_RUNNING)
         return await self._attempt(context, tool, parsed, operation_id)
 
     async def _replay(
@@ -569,7 +571,10 @@ class ToolGateway:
             return None
         await _record(context, operation_id, "unknown", None, failure_detail=detail)
         return ToolResult(
-            ToolOutcome.UNKNOWN, "outcome_unknown", operation_id=operation_id, replayed=True
+            ToolOutcome.UNKNOWN,
+            GatewayCode.OUTCOME_UNKNOWN,
+            operation_id=operation_id,
+            replayed=True,
         )
 
     async def _attempt(
@@ -578,7 +583,7 @@ class ToolGateway:
         try:
             output = await asyncio.wait_for(tool.handler(parsed, context), tool.timeout_seconds)
         except ToolFailed as error:
-            code = str(error) or "tool_failed"
+            code = str(error) or GatewayCode.TOOL_FAILED
             await _record(context, operation_id, "failed", None, code, error.detail)
             return ToolResult(ToolOutcome.FAILED, code, operation_id=operation_id)
         except LeaseLost:
@@ -589,11 +594,15 @@ class ToolGateway:
         except Exception as error:  # noqa: BLE001 - an unexpected failure leaves the outcome unknown for reconciliation
             _log_failure("tool.operation.unknown", tool, operation_id, error)
             await _record(context, operation_id, "unknown", None, failure_detail=_diagnosis(error))
-            return ToolResult(ToolOutcome.UNKNOWN, "outcome_unknown", operation_id=operation_id)
+            return ToolResult(
+                ToolOutcome.UNKNOWN, GatewayCode.OUTCOME_UNKNOWN, operation_id=operation_id
+            )
         visible, too_large = _visible(tool, output)
         if too_large:
             await _record(context, operation_id, "unknown", None, failure_detail="output_too_large")
-            return ToolResult(ToolOutcome.UNKNOWN, "output_too_large", operation_id=operation_id)
+            return ToolResult(
+                ToolOutcome.UNKNOWN, GatewayCode.OUTPUT_TOO_LARGE, operation_id=operation_id
+            )
         # The effect happened, so it is recorded whoever owns the run now.
         await _record(context, operation_id, "succeeded", visible)
         refusal = await ownership_refusal(context.connection, context.scope)

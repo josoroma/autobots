@@ -9,9 +9,10 @@ from uuid import uuid4
 import pytest
 
 from autobots.application.run_projection import public_text
-from autobots.application.tool_gateway import ToolScope, _operation_id
+from autobots.application.tool_gateway import ToolResult, ToolScope, _operation_id
 from autobots.application.workflow_runner import _run_block, _Stop, _tool
 from autobots.contracts.assignments import AssignSpecialist
+from autobots.domain.tools import ToolOutcome
 from autobots.domain.workflow_execution import BlockFailed, GraphShape, Step, unsettled_nodes
 from autobots.domain.workflows import (
     MAX_FOREACH_ITEMS,
@@ -306,18 +307,44 @@ def test_a_join_cannot_mix_a_foreach_with_an_outside_source() -> None:
 
 
 def test_a_stopped_agent_node_runs_again_instead_of_failing() -> None:
-    class Stopped:
-        def __init__(self, code: str) -> None:
-            self.code = code
+    """A code that would release or suspend the run stops the node, which runs again on resume.
+    parent_not_running is what a pause inside an assignment's creation returns (PPRD-03), and
+    tests/db/blocker_check.py reproduces that race. A code that fails the run fails the node."""
 
-        async def execute(self, *_: Any) -> Any:
-            return SimpleNamespace(code=self.code, outcome=SimpleNamespace(value="failed"))
+    class Returning:
+        def __init__(self, result: ToolResult) -> None:
+            self.result = result
 
-    for code in ("assignment_lost", "assignment_busy", "run_not_running", "run_not_found"):
-        with pytest.raises(_Stop):
-            asyncio.run(_tool(Stopped(code), None, None, "t", {}))  # type: ignore[arg-type]
-    with pytest.raises(BlockFailed):
-        asyncio.run(_tool(Stopped("tool_failed"), None, None, "t", {}))  # type: ignore[arg-type]
+        async def execute(self, *_: Any) -> ToolResult:
+            return self.result
+
+    def run(outcome: ToolOutcome, code: str | None, output: dict[str, Any] | None = None) -> Any:
+        gateway = Returning(ToolResult(outcome, code, output))
+        return asyncio.run(_tool(gateway, None, None, "t", {}))  # type: ignore[arg-type]
+
+    stops = (
+        "approval_pending",
+        "outcome_unknown",
+        "assignment_paused",
+        "assignment_lost",
+        "assignment_busy",
+        "parent_not_running",
+        "lease_lost",
+        "run_not_running",
+        "run_not_found",
+    )
+    for code in stops:
+        with pytest.raises(_Stop) as stopped:
+            run(ToolOutcome.FAILED, code)
+        assert stopped.value.code == code
+    for code in ("tool_failed", "output_too_large", "plan_revisions_limit", "children_limit"):
+        with pytest.raises(BlockFailed) as failed:
+            run(ToolOutcome.FAILED, code)
+        assert failed.value.code == code
+    with pytest.raises(BlockFailed) as failed:
+        run(ToolOutcome.UNKNOWN, None)
+    assert failed.value.code == "tool_failed"
+    assert run(ToolOutcome.SUCCEEDED, None, {"value": 1}) == {"value": 1}
 
 
 def _chain(first: dict[str, Any], *rest: tuple[dict[str, Any], str, str]) -> dict[str, Any]:
@@ -364,11 +391,7 @@ def test_equal_foreach_items_are_separate_operations() -> None:
     class Recording:
         async def execute(self, _: Any, scope: Any, name: str, arguments: Any) -> Any:
             seen.append(scope.instance)
-            return SimpleNamespace(
-                code=None,
-                outcome=SimpleNamespace(value="succeeded"),
-                output={"outcome": "succeeded"},
-            )
+            return ToolResult(ToolOutcome.SUCCEEDED, output={"outcome": "succeeded"})
 
     scope = ToolScope(workspace_id=uuid4(), run_id=uuid4(), generation=1, tools={})
     agent = node("a", "agent", expert_id=str(uuid4()))

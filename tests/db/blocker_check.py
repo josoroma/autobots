@@ -9,6 +9,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.application import assignments
 from autobots.application.approvals import (
     ARGUMENT_LIMIT,
     ApprovalRefused,
@@ -17,6 +18,7 @@ from autobots.application.approvals import (
     list_approvals,
 )
 from autobots.application.compaction import CompactionPolicy, offload_large
+from autobots.application.experts import create_expert
 from autobots.application.goal_loop import LoopConfig, _finish, process_next
 from autobots.application.memory import READ_OFFLOAD
 from autobots.application.plans import load_goal
@@ -31,11 +33,15 @@ from autobots.application.tool_gateway import (
     _record,
 )
 from autobots.application.worker_leases import claim_next
-from autobots.application.workflow_runner import _Stop, _tool
+from autobots.application.workflow_runner import _Stop, _tool, run_workflow
+from autobots.application.workflows import create_execution, create_workflow, publish_version
+from autobots.contracts.experts import ExpertConfig
+from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import Actor, RunCommand
-from autobots.domain.tools import LOOP_TOOL_GRANTS, OperationClass
-from goal_loop_script import ROUTE
+from autobots.domain.tools import DELEGATION_TOOL, LOOP_TOOL_GRANTS, OperationClass
+from checklib import Cases, Db
+from goal_loop_script import ROUTE, Script, say
 from langchain_core.messages import ToolMessage
 from pydantic import BaseModel
 
@@ -55,6 +61,76 @@ class Note(BaseModel):
 
 class Sent(BaseModel):
     delivered: bool
+
+
+async def pause_inside_assignment(db: Db) -> None:
+    """B6 inside an agent step (PPRD-03, R-29). A person's pause lands after the tool gateway admitted
+    the assignment and before the assignment's leased read of its run, which then refuses with
+    parent_not_running. The step must stop without failing, so the run resumes it rather than ending
+    workflow_node_failed, a failure no one can resume (SP-010). The run has no money, so its child
+    stops at admission with no model call."""
+    cases = db.cases
+    expert = await create_expert(db.connection, workspace_id=db.workspace, actor_id=db.actor, idempotency_key='blocker-race-helper',
+                                 name='Blocker race helper', config=ExpertConfig(tools=['calculate']))
+    graph = {
+        'nodes': [{'id': 'in', 'block': 'input', 'version': 1, 'config': {'type': 'string'}},
+                  {'id': 'ask', 'block': 'agent', 'version': 1, 'config': {'expert_id': str(expert.id)}},
+                  {'id': 'out', 'block': 'output', 'version': 1, 'config': {}}],
+        'links': [{'source': 'in', 'source_port': 'value', 'target': 'ask', 'target_port': 'goal'},
+                  {'source': 'ask', 'source_port': 'result', 'target': 'out', 'target_port': 'value'}],
+    }
+    flow = await create_workflow(db.connection, workspace_id=db.workspace, actor_id=db.actor, idempotency_key='blocker-race',
+                                 name='Blocker pause inside an assignment')
+    await publish_version(db.connection, workspace_id=db.workspace, actor_id=db.actor, workflow_id=flow.id, idempotency_key='blocker-race-p',
+                          expected_version=0, graph=WorkflowGraph.model_validate(graph), source='user')
+    execution = await create_execution(db.connection, workspace_id=db.workspace, actor_id=db.actor, workflow_id=flow.id,
+                                       idempotency_key='blocker-race-e', version=1, inputs={'in': 'Work it out'})
+    run = execution.run_id
+    await db.connection.execute('update public.runs set limit_micro_usd = 0 where id = %s', (run,))
+    config = LoopConfig(route=ROUTE, sleep=lambda _: asyncio.sleep(0))
+    receipt_sql = 'select status, failure_code from app_private.tool_receipts where run_id = %s and tool_id = %s'
+
+    async def ask() -> tuple[Any, ...] | None:
+        found = await (await db.connection.execute(
+            "select status, error_code from public.workflow_node_instances where execution_id = %s and instance_key = 'ask'",
+            (execution.id,))).fetchone()
+        return None if found is None else tuple(found)
+
+    async def standing() -> tuple[str, int]:
+        return (await db.value('select status from public.runs where id = %s', run),
+                await db.value('select count(*) from app_private.assignments where parent_run_id = %s', run))
+
+    real_binding = assignments.resolve_binding
+    seen: list[tuple[str, str]] = []
+
+    async def pause_then_bind(*args: Any, **kwargs: Any) -> Any:
+        # Read before the assignment's leased transaction opens, so the pause can't wait on its lock.
+        if not seen:
+            seen.append((await db.value('select status from public.runs where id = %s', run), (await db.row(receipt_sql, run, DELEGATION_TOOL))[0]))
+            await db.command(run, RunCommand.PAUSE, Actor.USER)
+        return await real_binding(*args, **kwargs)
+
+    lease = await db.claim(run, worker_id='b6-assignment')
+    assignments.resolve_binding = pause_then_bind
+    try:
+        await run_workflow(db.connection, URL, lease, Script(items=[]), config)
+    finally:
+        assignments.resolve_binding = real_binding
+    cases.check('arranged: the pause lands after the gateway admitted the assignment, before its leased read',
+                "once, on a running run whose receipt is started", seen, lambda found: found == [('running', 'started')])
+    status, children = await standing()
+    cases.check('a pause inside an assignment stops the agent step without failing it',
+                'ask has no instance, run paused, receipt failed with parent_not_running, no child',
+                (await ask(), status, await db.row(receipt_sql, run, DELEGATION_TOOL), children),
+                lambda found: found == (None, 'paused', ('failed', 'parent_not_running'), 0))
+    await db.command(run, RunCommand.RESUME, Actor.USER)
+    lease = await db.claim(run, worker_id='b6-assignment-resume')
+    model = Script(items=[say('never asked')])
+    await run_workflow(db.connection, URL, lease, model, config)
+    status, children = await standing()
+    cases.check('resumed, the step runs its assignment again and the run stays resumable',
+                'ask has no instance, one child, run paused, no model call',
+                (await ask(), children, status, len(model.seen)), lambda found: found == (None, 1, 'paused', 0))
 
 
 async def main() -> None:
@@ -209,6 +285,12 @@ async def main() -> None:
         lease = await claim_next(db, worker_id='b6-resume')
         output = await _tool(gateway, db, scope_of(lease, {'upload': 1}), 'upload', {'text': 'bytes'})
         check('on resume the node gets its result without uploading again', 'delivered, one upload', (output, len(uploads)), output == {'delivered': True} and len(uploads) == 1)
+
+        # B6 inside an agent step, through checklib (R-38): its cases join this check's line.
+        race = Cases()
+        with race.scenario('a pause inside an assignment'):
+            await pause_inside_assignment(Db(db, race, WORKSPACE, ACTOR))
+        cases.extend(race.records)
 
         # B8: a cancel settles even when the release can't run this work, with what it left classified.
         run = await admit()

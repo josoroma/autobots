@@ -16,30 +16,15 @@ from autobots.contracts.plans import (
     PlanTask,
     TaskCompleted,
 )
+from autobots.domain.stops import GatewayCode
 from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import OperationClass
 
-# What the model can fix. Each one spends the root's single repair.
-PLAN_REJECTIONS = frozenset(
-    {
-        "plan_duplicate_task",
-        "plan_unknown_dependency",
-        "plan_cycle",
-        "plan_out_of_scope",
-        "plan_uncovered_criteria",
-        "plan_drops_completed",
-        "plan_changes_completed",
-        "plan_reason_required",
-        "plan_missing",
-        "task_unknown",
-        "task_dependencies_open",
-        "evidence_invalid",
-    }
-)
-
 
 class PlanRejected(Exception):
-    def __init__(self, code: str, detail: str | None = None) -> None:
+    """What the model can fix. Each code spends the root's single repair (domain/stops.py)."""
+
+    def __init__(self, code: GatewayCode, detail: str | None = None) -> None:
         super().__init__(code)
         self.code = code
         self.detail = detail
@@ -67,31 +52,31 @@ def validate_proposal(
     """A plan can't widen scope, drop a criterion or rewrite what's already done."""
     names = [task.id for task in proposal.tasks]
     if len(names) != len(set(names)):
-        raise PlanRejected("plan_duplicate_task")
+        raise PlanRejected(GatewayCode.PLAN_DUPLICATE_TASK)
     if any(need not in names for task in proposal.tasks for need in task.depends_on):
-        raise PlanRejected("plan_unknown_dependency")
+        raise PlanRejected(GatewayCode.PLAN_UNKNOWN_DEPENDENCY)
     if _has_cycle(proposal.tasks):
-        raise PlanRejected("plan_cycle")
+        raise PlanRejected(GatewayCode.PLAN_CYCLE)
     for task in proposal.tasks:
         if any(criterion not in goal.criteria for criterion in task.criteria):
-            raise PlanRejected("plan_out_of_scope", "criterion")
+            raise PlanRejected(GatewayCode.PLAN_OUT_OF_SCOPE, "criterion")
         if any(tool not in goal.allowed_tools for tool in task.tools):
-            raise PlanRejected("plan_out_of_scope", "tool")
+            raise PlanRejected(GatewayCode.PLAN_OUT_OF_SCOPE, "tool")
     covered = {criterion for task in proposal.tasks for criterion in task.criteria}
     if covered != set(goal.criteria):
-        raise PlanRejected("plan_uncovered_criteria")
+        raise PlanRejected(GatewayCode.PLAN_UNCOVERED_CRITERIA)
     if previous is None:
         return
     if not (proposal.revision_reason or "").strip():
-        raise PlanRejected("plan_reason_required")
+        raise PlanRejected(GatewayCode.PLAN_REASON_REQUIRED)
     proposed = {task.id: task for task in proposal.tasks}
     for task in previous:
         if task.id not in completed:
             continue
         if task.id not in proposed:
-            raise PlanRejected("plan_drops_completed")
+            raise PlanRejected(GatewayCode.PLAN_DROPS_COMPLETED)
         if proposed[task.id] != task:
-            raise PlanRejected("plan_changes_completed")
+            raise PlanRejected(GatewayCode.PLAN_CHANGES_COMPLETED)
 
 
 async def load_goal(connection: Any, run_id: UUID) -> GoalSpec:
@@ -205,8 +190,8 @@ def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
                         arguments.revision_reason,
                     ),
                 )
-        except LimitReached as reached:
-            raise ToolFailed(reached.code) from None
+        except LimitReached:
+            raise ToolFailed(GatewayCode.PLAN_REVISIONS_LIMIT) from None
         return PlanCommitted(version=version, tasks=[task.id for task in arguments.tasks])
 
     async def proposed_already(
@@ -222,18 +207,18 @@ def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
         run_id = context.scope.run_id
         plan = await latest_plan(context.connection, run_id)
         if plan is None:
-            raise ToolFailed("plan_missing")
+            raise ToolFailed(GatewayCode.PLAN_MISSING)
         tasks = {task.id: task for task in plan[1]}
         task = tasks.get(arguments.task_id)
         if task is None:
-            raise ToolFailed("task_unknown")
+            raise ToolFailed(GatewayCode.TASK_UNKNOWN)
         done = await completed_tasks(context.connection, run_id)
         if not set(task.depends_on) <= done:
-            raise ToolFailed("task_dependencies_open")
+            raise ToolFailed(GatewayCode.TASK_DEPENDENCIES_OPEN)
         for item in arguments.evidence:
             if not await _evidence_exists(context.connection, run_id, item.kind, item.reference):
                 detail = f"{item.kind}:{reference_shape(item.reference)}"
-                raise ToolFailed("evidence_invalid", detail=detail)
+                raise ToolFailed(GatewayCode.EVIDENCE_INVALID, detail=detail)
         async with context.connection.transaction():
             await hold_lease(context.connection, context.scope)
             await context.connection.execute(

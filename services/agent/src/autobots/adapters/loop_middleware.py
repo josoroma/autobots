@@ -64,11 +64,11 @@ from autobots.application.model_attempts import (
     call_with_policy,
     classify_status,
 )
-from autobots.application.plans import PLAN_REJECTIONS
 from autobots.application.run_usage import LimitReached, RootLimits, active_seconds_used, consume
 from autobots.application.tool_gateway import ToolScope, ownership_refusal
 from autobots.contracts.plans import GoalSpec
 from autobots.domain.runs import INTERRUPTING
+from autobots.domain.stops import REPAIRABLE, STOPPING, StopCode, repair_limit
 from autobots.operations.logs import log_event
 
 logger = logging.getLogger("autobots.worker")
@@ -77,19 +77,6 @@ CHECK_SECONDS = 1.0
 MAX_FACT_CHARS = 100
 MAX_FACT_NAMES = 20
 
-REPAIRABLE = PLAN_REJECTIONS | {"invalid_arguments", "route_not_granted", "scope_expansion_denied"}
-STOPPING = frozenset(
-    {
-        "plan_revisions_limit",
-        "assignment_paused",
-        "assignment_lost",
-        "assignment_busy",
-        "approval_pending",
-        "outcome_unknown",
-        # N-15: its result is unknown, so nothing should build on it.
-        "output_too_large",
-    }
-)
 _ADMITTED: ContextVar[bool] = ContextVar("autobots_model_call_admitted", default=False)
 _INVOCATION: ContextVar[UUID | None] = ContextVar("autobots_model_invocation", default=None)
 _MIDDLEWARE: ContextVar["LoopMiddleware | None"] = ContextVar("autobots_loop", default=None)
@@ -396,12 +383,12 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
                 (self._scope.parent_run_id,),
             )
             if (await cursor.fetchone())[0]:
-                raise LoopStopped("parent_not_running")
+                raise LoopStopped(StopCode.PARENT_NOT_RUNNING)
         remaining = self._limits.active_seconds - await active_seconds_used(
             self._connection, self._scope.budget_run_id
         )
         if remaining <= 0:
-            raise LoopStopped("active_time_limit")
+            raise LoopStopped(StopCode.ACTIVE_TIME_LIMIT)
         return remaining
 
     async def _bounded(self, handler: Any, request: Any, stopped: list[str]) -> Any:
@@ -427,7 +414,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
                 )
                 row = await cursor.fetchone()
                 if row is not None and row[0] in INTERRUPTING:
-                    stopped.append("run_not_running")
+                    stopped.append(StopCode.RUN_NOT_RUNNING)
                     raise ProviderFailure(
                         FailureClass.UNCERTAIN_ACCEPTANCE, reason="run_interrupted"
                     )
@@ -475,14 +462,14 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
         """Under the run's frozen summarizer role, through admission like any other call."""
         route = self._summary_route
         if route is None:
-            raise LoopStopped("route_not_bound")
+            raise LoopStopped(StopCode.ROUTE_NOT_BOUND)
         earlier = view[covered:cut]
         asked = request.override(
             messages=[HumanMessage(summary_request(earlier, previous))], tools=[]
         )
         response, complete = await self._with_slot(asked, handler, route)
         if not complete:
-            raise LoopStopped("compaction_failed")
+            raise LoopStopped(StopCode.COMPACTION_FAILED)
         text = str(response.result[-1].content)
         return await store_summary(
             self._connection,
@@ -562,7 +549,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             prompt_bytes = request_bytes(request)
         except UnicodeEncodeError:
             # A lone surrogate is no text a provider can read, so nothing is reserved or sent.
-            raise LoopStopped("request_unencodable") from None
+            raise LoopStopped(StopCode.REQUEST_UNENCODABLE) from None
         if past_known_price(chosen, prompt_bytes):
             raise LoopStopped(FailureClass.COST_UNAVAILABLE.value)
         admission_request = AdmissionRequest(
@@ -592,7 +579,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             late = charged(replies[-1].result[-1]) if replies else None
             if late is not None and last_ticket:
                 await ledger.reconcile(last_ticket[-1].invocation_id, late, source="provider")
-            raise LoopStopped("lease_lost") from None
+            raise LoopStopped(StopCode.LEASE_LOST) from None
         # Settled by now, so this can't change what the call cost or whether it counted.
         await ledger.record_reply(
             last_ticket[-1].invocation_id, reply_facts(replies[-1].result[-1])
@@ -666,9 +653,9 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             if self._inner_stop is not None:
                 raise LoopStopped(self._inner_stop)
             code = json.loads(reply.content).get("code")
-            if code in STOPPING or code in {"lease_lost", "run_not_running"}:
+            if code in STOPPING:
                 raise LoopStopped(code)
             if code in REPAIRABLE:
-                await self._repair(f"repair_limit:{code}")
+                await self._repair(repair_limit(code))
             message: ToolMessage = reply
             return message
