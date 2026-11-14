@@ -51,6 +51,8 @@ export async function AccountFooter() {
           Your session could not be checked. Check that the local services are
           running, then reload.
         </p>
+        {/* Signing out needs only the sign-in service, not the API (PRD-Studio SH-05). */}
+        <SignOutButton className="w-full justify-start" />
       </div>
     );
   }

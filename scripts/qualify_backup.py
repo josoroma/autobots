@@ -33,7 +33,7 @@ from disposable_db import (
 )
 from harness_lib import fingerprint, project_root
 from local_backup import restored_values
-from qualification.children import last_json, parse_report, run_child_check
+from qualification.children import last_json, launch, parse_report, run_child_check
 from qualification.records import write_report
 from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner, http, password_token
 from qualify_operations import (
@@ -130,8 +130,7 @@ def qualify(root: Path) -> int:
         exited(worker, 30)
         pending = ops.admit(workspace_a)
         master_key.parent.mkdir(parents=True, mode=0o700)
-        seeded = subprocess.run([str(root / PYTHON), str(root / 'tests/db/restore_check.py'), 'seed', workspace_a, str(master_key), FAKE_CREDENTIAL], env=ops.env,
-                                capture_output=True, text=True, timeout=60, check=False)
+        seeded = launch([str(root / PYTHON), str(root / 'tests/db/restore_check.py'), 'seed', workspace_a, str(master_key), FAKE_CREDENTIAL], env=ops.env, timeout=60, label='the credential seed')
         cases.arrange('a fake credential sealed with the provider key', seeded)
         cases.check('the source holds real content (arranged credential)', 'finished, paused, queued, a sealed fake key', f'{finished}, {paused}, seed exit {seeded.returncode}', finished and paused and seeded.returncode == 0)
         env_file.write_text(env_text(stack) + f'AUTOBOTS_MIGRATOR_PASSWORD={stack.migrator_password}\nAUTOBOTS_RUNTIME_PASSWORD={stack.runtime_password}\n')
@@ -270,8 +269,8 @@ def qualify(root: Path) -> int:
         # Released by a person: the restored checkpoint really can continue, with the scripted model.
         released = restored_stack.sql('delete from app_private.installation_holds;')
         reconciled, _reply = api_call(api_port, restored_ops.internal, token_a, 'POST', f'/v1/runs/{interrupted}/model-calls/reconcile', json.dumps({'charged_micro_usd': 100}).encode(), {'Idempotency-Key': secrets.token_hex(8)})
-        cancel = subprocess.run([str(root / PYTHON), str(root / 'tests/db/operations_check.py'), 'cancel', workspace_a, pending], env=restored_ops.env, capture_output=True, text=True, timeout=60, check=False)
-        resume = subprocess.run([str(root / PYTHON), str(root / 'tests/db/operations_check.py'), 'resume', workspace_a, interrupted], env=restored_ops.env, capture_output=True, text=True, timeout=60, check=False)
+        cancel = launch([str(root / PYTHON), str(root / 'tests/db/operations_check.py'), 'cancel', workspace_a, pending], env=restored_ops.env, timeout=60, label='the restored cancel')
+        resume = launch([str(root / PYTHON), str(root / 'tests/db/operations_check.py'), 'resume', workspace_a, interrupted], env=restored_ops.env, timeout=60, label='the restored resume')
         marker.unlink(missing_ok=True)
         worker = restored_ops.fixture_worker('restored-resume-worker', 0, 30, marker, 'resume')
         resumed = wait(lambda: restored_ops.sql(f"select status from public.runs where id = '{interrupted}';") == 'succeeded', 60)

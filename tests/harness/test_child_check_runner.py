@@ -125,6 +125,11 @@ class ChildOutcomes(Quiet):
                 self.assertEqual(self.outcomes(cases), [('the fake check printed its cases', 'failed')])
                 self.assertEqual(cases.records[0]['observed'], observed)
 
+    def test_an_empty_report_fails_one_case_instead_of_passing(self) -> None:
+        cases, _ = self.run_child(self.root.child('empty_check.py', 'import json\nprint(json.dumps({"cases": []}))\n'))
+        self.assertEqual(self.outcomes(cases), [('the fake check printed its cases', 'failed')])
+        self.assertEqual(cases.records[0]['observed'], 'an empty list')
+
     def test_a_malformed_case_fails_one_case(self) -> None:
         for name, case in (('truthy_check.py', {'id': 'x', 'expected': 'y', 'observed': 'z', 'passed': 'yes'}),
                            ('short_check.py', {'id': 'x', 'expected': 'y', 'passed': True}),

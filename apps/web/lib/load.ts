@@ -177,7 +177,7 @@ export async function loadJson<T>(
 
 /**
  * What the browser console records for a mismatch: the schema and the field's path, never a value
- * from the reply (XTYP-14). Null for any other outcome.
+ * from the reply (XTYP-14); a path can include a key of a map-typed field. Null for any other outcome.
  */
 export function mismatchRecord(failure: LoadFailure): {
   event: "web.contract_mismatch";

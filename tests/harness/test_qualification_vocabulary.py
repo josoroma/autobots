@@ -152,5 +152,16 @@ class SharedRunner(unittest.TestCase):
         self.assertEqual((result.returncode, result.stdout.splitlines()[-1]), (0, 'failed 1'), result.stderr)
 
 
+
+class Verdicts(unittest.TestCase):
+    def test_a_qualifier_case_refuses_a_predicate_that_would_always_pass(self) -> None:
+        cases = records.Cases()
+        with contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaises(TypeError):
+                cases.check('a predicate', 'false', 'x', lambda _seen: False)
+            cases.check('a verdict', 'false', 'x', False)
+        self.assertEqual([(record['id'], record['status']) for record in cases.records], [('a verdict', 'failed')])
+
+
 if __name__ == '__main__':
     unittest.main()

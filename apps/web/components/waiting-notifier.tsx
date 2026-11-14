@@ -88,6 +88,8 @@ export function WaitingNotifier() {
         if (allowed()) next.fresh.forEach(announce);
         seen = next.seen;
       }
+      // Signed out: whoever signs in next starts fresh, so their waiting runs are only noted (SE-05).
+      if (read.result === "signed_out") seen = null;
       failures = read.result === "failed" ? failures + 1 : 0;
       timer = setTimeout(
         () => void poll(mine),

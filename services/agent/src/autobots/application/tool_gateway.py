@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import BaseModel, ValidationError
 
 from autobots.application.approvals import (
+    LEASE_LOST,
     approval_gate,
     approved_request,
     receipt_may_have_sent,
@@ -530,9 +531,10 @@ class ToolGateway:
             await _record(context, operation_id, "failed", None, code, error.detail)
             return ToolResult(ToolOutcome.FAILED, code, operation_id=operation_id)
         except LeaseLost:
-            # The write's transaction refused it, so nothing happened.
-            await _record(context, operation_id, "failed", None)
-            return ToolResult(ToolOutcome.DENIED, "lease_lost", operation_id=operation_id)
+            # The write's transaction refused it, so nothing happened. The code tells the approval
+            # gate that this attempt didn't use a person's decision.
+            await _record(context, operation_id, "failed", None, LEASE_LOST)
+            return ToolResult(ToolOutcome.DENIED, LEASE_LOST, operation_id=operation_id)
         except Exception:  # noqa: BLE001 - an unexpected failure leaves the outcome unknown for reconciliation
             await _record(context, operation_id, "unknown", None)
             return ToolResult(ToolOutcome.UNKNOWN, "outcome_unknown", operation_id=operation_id)

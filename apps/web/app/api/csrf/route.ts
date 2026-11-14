@@ -2,7 +2,10 @@ import { randomBytes } from "node:crypto";
 
 import { NextResponse, type NextRequest } from "next/server";
 
+import { failed } from "@/lib/bff";
+import { cookieOptions } from "@/lib/bff-policy";
 import { CSRF_COOKIE, CSRF_HEADER } from "@/lib/request-guard";
+import { serverConfig } from "@/lib/server-config";
 
 // What this route mints: 32 random bytes, base64url.
 const TOKEN = /^[A-Za-z0-9_-]{43}$/;
@@ -16,13 +19,15 @@ export function GET(request: NextRequest): NextResponse {
     existing !== undefined && TOKEN.test(existing)
       ? existing
       : randomBytes(32).toString("base64url");
+  let origin: string;
+  try {
+    origin = serverConfig().allowedOrigin;
+  } catch (error) {
+    return failed("GET /api/csrf", error);
+  }
   const response = NextResponse.json({ header: CSRF_HEADER, token });
-  response.cookies.set(CSRF_COOKIE, token, {
-    sameSite: "strict",
-    path: "/",
-    httpOnly: false,
-    secure: false,
-  });
+  // Secure on an https origin, as the session and workspace cookies are (WSHL-05).
+  response.cookies.set(CSRF_COOKIE, token, cookieOptions(origin, false));
   response.headers.set("Cache-Control", "no-store");
   return response;
 }

@@ -79,7 +79,10 @@ class Cases:
         return 'passed' if all(record['status'] == 'passed' for record in self.records) else 'failed'
 
     def check(self, case_id: str, expected: str, observed: object, passed: object) -> None:
-        """Record a case. Any observed value is shown as text, and `passed` is read for its truth."""
+        """Record a case. Any observed value is shown as text, and `passed` is read for its truth. A
+        callable is refused: checklib's check takes a predicate, and here one would always be true."""
+        if callable(passed):
+            raise TypeError(f'{case_id}: pass a verdict, not a predicate')
         text = str(observed)
         print(f"{'PASS' if passed else 'FAIL'}: {case_id}: {text[:PRINTED_LIMIT]}")
         self.records.append({'id': case_id, 'class': self.verification_class, 'model_transport': self.model_transport,

@@ -283,6 +283,14 @@ async def main(cases: Cases) -> None:
                    await row("select count(*) filter (where payload ->> 'type' = 'approval.requested'), count(*), max(sequence), "
                              '(select event_sequence from public.runs where id = %s) from public.run_events where run_id = %s', run, run)),
                   lambda seen: seen[0][1:] == (True,) and seen[1][0] == requested and seen[1][1] == seen[1][2] == seen[1][3])
+            # The attempt the lease refused wrote nothing, so the person's decision still stands for the
+            # worker that owns the run now, which finds the base still moved and asks again.
+            if newer:
+                retried = await gateway.execute(db, ToolScope(WORKSPACE, run, newer[0], granted), TOOL_ID, proposal('Stale owner'))
+                check("the run's new owner can use the decision the refused attempt left, and finds the base moved",
+                      'base_moved, request pending again (not approval_consumed)',
+                      (retried.code, (await row(DECISION, run) or ('',))[0]),
+                      lambda seen: seen == ('base_moved', 'pending'))
             # The worker that claimed it lets go, so no later check can take this run.
             await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null "
                              'where run_id = %s', (run,))

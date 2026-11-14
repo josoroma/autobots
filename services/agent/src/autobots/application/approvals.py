@@ -24,6 +24,8 @@ from autobots.application.worker_leases import LeaseHolder, hold_lease
 from autobots.domain.runs import RunCommand, RunStatus
 
 DEFAULT_TTL_SECONDS = 86_400
+# The failure code of an attempt the lease refused before it wrote anything.
+LEASE_LOST = "lease_lost"
 
 
 # What a reviewer can be shown whole. Anything longer can be rejected, not approved.
@@ -213,7 +215,7 @@ async def approval_gate(  # noqa: PLR0911, PLR0913 - baseline 2026-11-14, shrink
             if stored_scope != current_scope_hash:
                 return "approval_scope_changed"
             cursor = await connection.execute(
-                "select status, reconciled_at from app_private.tool_receipts "
+                "select status, reconciled_at, failure_code from app_private.tool_receipts "
                 "where operation_id = %s",
                 (operation_id,),
             )
@@ -222,8 +224,10 @@ async def approval_gate(  # noqa: PLR0911, PLR0913 - baseline 2026-11-14, shrink
                 # It was already sent, or may have been. Its receipt answers that, whatever the
                 # date, and refusing here would report an effect that happened as not happening.
                 return None
-            if receipt is not None and receipt[1] is None:
-                # A failure nobody ruled on used this decision. A ruling grants one more try.
+            if receipt is not None and receipt[1] is None and receipt[2] != LEASE_LOST:
+                # A failure nobody ruled on used this decision. A ruling grants one more try. An
+                # attempt whose lease was lost wrote nothing and wasn't the run's current owner's,
+                # so the decision still stands for that owner.
                 return "approval_consumed"
             if expired:
                 # Nothing was sent, so this is only stale. A person can look at it again.

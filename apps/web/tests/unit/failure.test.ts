@@ -77,12 +77,19 @@ test("only Auth's own refusal of the credentials is a wrong password", () => {
     ),
     SIGN_IN_FAILED,
   );
+  assert.deepEqual(
+    signInRefusal(new AuthApiError("Invalid email", 422, "validation_failed")),
+    SIGN_IN_FAILED,
+  );
   assert.equal(SIGN_IN_FAILED.status, 401);
   for (const error of [
     new AuthRetryableFetchError("fetch failed", 0),
     new AuthRetryableFetchError("Bad Gateway", 502),
     new AuthApiError("Internal error", 500, "unexpected_failure"),
     new AuthApiError("Too many requests", 429, "over_request_rate_limit"),
+    // The gateway in front of Auth refusing a wrong anon key is no wrong password.
+    new AuthApiError("Invalid API key", 401, "no_authorization"),
+    new AuthApiError("Forbidden", 403, "forbidden"),
     new AuthUnknownError("not JSON", null),
     new Error("unexpected"),
   ]) {
@@ -182,13 +189,15 @@ test("the log record never carries a message, query, token or value", () => {
     "query-secret",
     "envelope-secret",
     "header-secret",
-    "AUTOBOTS_INTERNAL_TOKEN",
     "thrown-secret",
     "name-secret",
   ]) {
     assert.equal(text.includes(secret), false, secret);
   }
   assert.equal(records[2]?.error, "ConfigurationError");
+  // A missing variable is named, so an operator can set it; its value is never read here (WSHL-20).
+  assert.deepEqual(records[2]?.variables, ["AUTOBOTS_INTERNAL_TOKEN"]);
+  assert.equal(records[0]?.variables, undefined);
   assert.equal(records[3]?.error, "string");
   assert.equal(records[4]?.error, "Error");
   for (const record of records) {
@@ -205,6 +214,7 @@ test("the log record never carries a message, query, token or value", () => {
             "path",
             "status",
             "timeout",
+            "variables",
           ].includes(key),
       ),
       [],

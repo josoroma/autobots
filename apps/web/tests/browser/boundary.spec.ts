@@ -195,6 +195,10 @@ test("a session the API cannot read shows the account as unavailable, not Sign i
   await expect(page.locator('[data-session="unavailable"]')).toBeVisible();
   await expect(page.getByRole("link", { name: "Sign in" })).toHaveCount(0);
   await expect(page.getByText("You are not signed in.")).toHaveCount(0);
+  // Signing out needs only the sign-in service, so it stays offered (PRD-Studio SH-05).
+  await expect(
+    page.getByRole("button", { name: "Sign out" }).first(),
+  ).toBeVisible();
   expect(await page.locator("body").innerText()).not.toContain("ECONNREFUSED");
   await page.screenshot({
     path: `${process.env.AUTOBOTS_WEB_SCREENSHOTS ?? "test-results/screenshots"}/session-unavailable.png`,

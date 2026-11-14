@@ -35,7 +35,7 @@ from disposable_db import (
     tool_env,
 )
 from harness_lib import fingerprint, project_root
-from qualification.children import run_child_check
+from qualification.children import launch, run_child_check
 from qualification.records import write_report
 from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner, password_token
 from qualify_operations import MODEL_TRANSPORT, Checks, Ops, api_call, conditions, exited, wait
@@ -101,7 +101,7 @@ def qualify(root: Path) -> int:
         token = password_token(base, stack.values['ANON_KEY'], email, password)[1]
 
         def prior_admit() -> str:
-            result = subprocess.run([str(root / PYTHON), str(prior / 'tests/db/operations_check.py'), 'admit', workspace], env={**ops.env, **prior_env}, capture_output=True, text=True, timeout=60, check=False)
+            result = launch([str(root / PYTHON), str(prior / 'tests/db/operations_check.py'), 'admit', workspace], env={**ops.env, **prior_env}, timeout=60, label='the prior admission')
             lines = result.stdout.strip().splitlines()
             if result.returncode or not lines:
                 raise Unavailable(f'the prior release did not admit: exit {result.returncode}: {result.stderr.strip()[-300:]}')
@@ -138,7 +138,7 @@ with psycopg.connect(os.environ['AUTOBOTS_DATABASE_URL']) as db:
     rows = db.execute({BINDINGS!r}, ({prior_runs!r},)).fetchall()
 print(hashlib.sha256(json.dumps(rows, default=str, sort_keys=True).encode()).hexdigest())
 """
-        hashed = subprocess.run([str(root / PYTHON), '-c', binding_probe], env=ops.env, capture_output=True, text=True, timeout=30, check=False)
+        hashed = launch([str(root / PYTHON), '-c', binding_probe], env=ops.env, timeout=30, label='the binding probe')
         if hashed.returncode:
             raise Unavailable(f'the bindings could not be read: {hashed.stderr[-200:]}')
         before_hash = hashed.stdout.strip()
@@ -202,7 +202,7 @@ print(hashlib.sha256(json.dumps(rows, default=str, sort_keys=True).encode()).hex
 
         # A prior checkpoint continuing on this release's code, after a person settled the uncertain call.
         reconciled, _ = api_call(api_port, ops.internal, token, 'POST', f'/v1/runs/{interrupted}/model-calls/reconcile', json.dumps({'charged_micro_usd': 100}).encode(), {'Idempotency-Key': secrets.token_hex(8)})
-        resume = subprocess.run([str(root / PYTHON), str(root / 'tests/db/operations_check.py'), 'resume', workspace, interrupted], env=ops.env, capture_output=True, text=True, timeout=60, check=False)
+        resume = launch([str(root / PYTHON), str(root / 'tests/db/operations_check.py'), 'resume', workspace, interrupted], env=ops.env, timeout=60, label='the upgraded resume')
         marker.unlink(missing_ok=True)
         worker = ops.fixture_worker('upgraded-resume', 0, 30, marker, 'resume', 'openrouter_deepseek_flash')
         resumed = wait(lambda: ops.sql(f"select status from public.runs where id = '{interrupted}';") == 'succeeded', 60)

@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Records a contract mismatch in the browser console once per field, with the schema and the
- * field's path, never a value from the reply (XTYP-14, XERR-03).
+ * field's path, never a value from the reply (XTYP-14, XERR-03). A path can include a map's key.
  */
 export function useMismatchLog(state: ResourceState<unknown>): void {
   const record = state.kind === "out_of_date" ? mismatchRecord(state) : null;

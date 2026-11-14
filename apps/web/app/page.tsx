@@ -59,15 +59,16 @@ function AccountState({ read }: { read: MemberRead<SessionSummary> }) {
 }
 
 function AccountAction({ read }: { read: MemberRead<SessionSummary> }) {
-  if (read.kind === "ok") return <SignOutButton />;
-  return read.kind === "signed_out" ? (
+  // Signing out needs only the sign-in service, so it's offered while the API is unavailable too.
+  if (read.kind !== "signed_out") return <SignOutButton />;
+  return (
     <Link
       href="/sign-in"
       className={buttonVariants({ variant: "outline", size: "sm" })}
     >
       Sign in
     </Link>
-  ) : null;
+  );
 }
 
 export default async function HomePage() {

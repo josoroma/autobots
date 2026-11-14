@@ -35,7 +35,7 @@ from disposable_db import (
     tool_env,
 )
 from harness_lib import fingerprint, project_root
-from qualification.children import run_child_check, service_env
+from qualification.children import launch, run_child_check, service_env
 from qualification.records import Cases, write_report
 from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner, http, password_token
 from supabase_stack import generated_values, require_images, require_rendered
@@ -90,8 +90,7 @@ class Ops:
         return result.stdout.strip().splitlines()[0] if result.returncode == 0 and result.stdout.strip() else ''
 
     def admit(self, workspace: str) -> str:
-        result = subprocess.run([str(self.root / PYTHON), str(self.root / 'tests/db/operations_check.py'), 'admit', workspace], env=self.env,
-                                capture_output=True, text=True, timeout=60, check=False)
+        result = launch([str(self.root / PYTHON), str(self.root / 'tests/db/operations_check.py'), 'admit', workspace], env=self.env, timeout=60, label='the fixture admission')
         lines = result.stdout.strip().splitlines()
         if result.returncode or not lines:
             raise Unavailable(f'the fixture job was not admitted: exit {result.returncode}: {result.stderr.strip()[-300:]}')
@@ -323,7 +322,7 @@ def qualify(root: Path) -> int:
         code, reply = api_call(api_port, ops.internal, token_a, 'POST', f'/v1/runs/{cut}/model-calls/reconcile', json.dumps({'charged_micro_usd': 100}).encode(), {'Idempotency-Key': secrets.token_hex(8)})
         cases.check('the owner reconciles it through the API', '200, one call', f'{code} {reply[:60]}', code == 200 and '"reconciled_calls":1' in reply)
         # Arranged: the route also requires a usable key, and none exists here, so this is the command it calls.
-        resumed = subprocess.run([str(root / PYTHON), str(root / 'tests/db/operations_check.py'), 'resume', workspace_a, cut], env=ops.env, capture_output=True, text=True, timeout=60, check=False)
+        resumed = launch([str(root / PYTHON), str(root / 'tests/db/operations_check.py'), 'resume', workspace_a, cut], env=ops.env, timeout=60, label='the arranged resume')
         finished = wait(lambda: ops.sql(f"select status from public.runs where id = '{cut}';") == 'succeeded', 60)
         resuming.send_signal(signal.SIGTERM)
         exit_code = exited(resuming, 30)

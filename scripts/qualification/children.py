@@ -14,7 +14,7 @@ import contextlib
 import json
 import os
 import subprocess
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -120,8 +120,8 @@ def parse_report(stdout: str) -> tuple[ChildReport, dict[str, object]] | None:
 def record_child(cases: Cases, label: str, returncode: int | None, stdout: str, stderr: str,
                  problem: str | None = None) -> ChildRun:
     """Add a child's cases. A child that did not exit 0 fails one case, `<label> ran`; one that exited 0
-    with no report fails one case, `<label> printed its cases` (XDUP-14). A report's cases are kept either
-    way (TDBC-04)."""
+    with no report, or with an empty one, fails one case, `<label> printed its cases` (XDUP-14). A report's
+    cases are kept either way (TDBC-04)."""
     parsed = parse_report(stdout)
     if returncode != 0:
         reason = problem or f'exit {returncode}'
@@ -133,6 +133,9 @@ def record_child(cases: Cases, label: str, returncode: int | None, stdout: str, 
     if parsed is None:
         return ChildRun(label, returncode, stdout, stderr, None)
     report, fields = parsed
+    if not report['cases']:
+        # A report with nothing in it proves nothing, so it can't pass.
+        cases.check(f'{label} printed its cases', 'at least one case', 'an empty list', False)
     for case in report['cases']:
         cases.check(case['id'], case['expected'], case['observed'], case['passed'])
     return ChildRun(label, returncode, stdout, stderr, report, fields)
@@ -211,6 +214,19 @@ def run_child(cases: Cases, root: Path, child: Child, values: Mapping[str, str],
     return run_child_check(cases, root, child.script, *(argument.format_map(values) for argument in child.args), label=child.label,
                            env=env, timeout=child.timeout, err_dir=err_dir, cwd=root if child.from_root else None,
                            err_name=child.err_name)
+
+
+def launch(argv: Sequence[str], *, label: str, env: Mapping[str, str], timeout: float,
+           cwd: Path | str | None = None) -> subprocess.CompletedProcess[str]:
+    """Run a helper a qualifier needs and judges itself. One that can't start or runs past `timeout`
+    raises Unavailable, so the qualifier ends with exit 2 rather than a traceback (SCRP-01, DH-09.2)."""
+    try:
+        return subprocess.run(list(argv), env=dict(env), capture_output=True, text=True, errors='replace', timeout=timeout,
+                              check=False, cwd=cwd)
+    except subprocess.TimeoutExpired:
+        raise Unavailable(f'{label} timed out after {timeout} seconds') from None
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        raise Unavailable(f'{label} could not start: {type(error).__name__}') from error
 
 
 def run_arrangement(cases: Cases, root: Path, script: str, *args: str, label: str, env: Mapping[str, str], timeout: float,

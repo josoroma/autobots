@@ -82,13 +82,18 @@ export function failureRefusal(
   return timedOut(error) ? API_TIMEOUT : API_UNAVAILABLE;
 }
 
+// Auth's answers about the email and password themselves. A 401 or 403 comes from the gateway in
+// front of Auth, such as a wrong anon key, and is no fault of the person's.
+const CREDENTIAL_STATUSES: ReadonlySet<number> = new Set([400, 422]);
+
 /**
- * Sign-in's answer to an Auth error. Only Auth's own 4xx refusal is about the credentials, and it
- * never says which field failed. A rate limit, a 5xx or no reply is an outage (WSHL-07).
+ * Sign-in's answer to an Auth error. Only Auth's 400 and 422 refusals are about the credentials, and
+ * they never say which field failed. A 401 or 403 from the gateway, a rate limit, a 5xx or no reply
+ * is an outage (WSHL-07).
  */
 export function signInRefusal(error: unknown): Refusal {
   const status = isAuthError(error) ? error.status : undefined;
-  return status !== undefined && status >= 400 && status < 500 && status !== 429
+  return status !== undefined && CREDENTIAL_STATUSES.has(status)
     ? SIGN_IN_FAILED
     : AUTH_UNAVAILABLE;
 }
@@ -110,6 +115,8 @@ export interface FailureRecord {
   path?: string;
   status?: number;
   timeout: boolean;
+  /** For a `ConfigurationError`: the names of the missing variables, never their values (WSHL-20). */
+  variables?: string[];
 }
 
 const CLASS_NAME = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
@@ -127,9 +134,10 @@ function statusOf(error: unknown): number | undefined {
 }
 
 /**
- * The operation, the error class, a `ContractError`'s schema path, the HTTP or Auth status and
- * whether a timeout fired. Never a message, body, header, token or query string, which can carry a
- * credential or a person's content (PRD-Development-Harness DH-06).
+ * The operation, the error class, a `ContractError`'s schema path, the HTTP or Auth status, whether
+ * a timeout fired and, for missing configuration, the variables' names. Never a message, body,
+ * header, token, query string or value, which can carry a credential or a person's content
+ * (PRD-Development-Harness DH-06). A schema path can include a key of a map-typed field.
  */
 export function failureRecord(
   operation: string,
@@ -149,5 +157,8 @@ export function failureRecord(
       : {}),
     ...(status === undefined ? {} : { status }),
     timeout: timedOut(error),
+    ...(error instanceof ConfigurationError
+      ? { variables: [...error.variables] }
+      : {}),
   };
 }

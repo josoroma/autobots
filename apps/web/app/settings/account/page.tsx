@@ -18,10 +18,14 @@ export default async function AccountPage() {
     <div className="max-w-3xl space-y-6">
       <PageHeader title="Account" />
       {read.kind === "unavailable" ? (
-        <p data-session="unavailable" className="text-sm">
-          Your account could not be loaded. Check that the local services are
-          running, then reload.
-        </p>
+        <div className="space-y-3">
+          <p data-session="unavailable" className="text-sm">
+            Your account could not be loaded. Check that the local services are
+            running, then reload.
+          </p>
+          {/* Signing out needs only the sign-in service (PRD-Studio SH-05). */}
+          <SignOutButton />
+        </div>
       ) : session === null ? (
         <p className="text-sm">
           <Link href="/sign-in" className="font-medium underline">
