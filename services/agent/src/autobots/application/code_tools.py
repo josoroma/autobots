@@ -6,15 +6,13 @@ new versions with an operation ID, like `save_artifact`. A patch is exact string
 absent `old_string`, or one found more than once without `replace_all`, writes nothing.
 """
 
-import asyncio
-import fnmatch
-import re
 from collections.abc import Mapping
 
+from autobots.application import code_search
+from autobots.application.bounded import BoundExceeded, run_in_child
 from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed
 from autobots.application.tools import write_run_file
 from autobots.contracts.code_tools import (
-    MATCH_CHARACTERS,
     CodeFileWritten,
     NumberedLine,
     PatchCodeFileInput,
@@ -22,80 +20,34 @@ from autobots.contracts.code_tools import (
     ReadCodeFileOutput,
     SearchFilesInput,
     SearchFilesOutput,
-    SearchMatch,
     WriteCodeFileInput,
 )
 from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import OperationClass, path_granted
 
 LINE_CHARACTERS = 2000
-
-
-def _cut(text: str, limit: int = MATCH_CHARACTERS) -> str:
-    return text if len(text) <= limit else text[:limit]
+# Under the tool's 10 s gateway timeout, so the child is stopped before the gateway gives up.
+SEARCH_SECONDS = 8.0
 
 
 def search(files: Mapping[str, str], arguments: SearchFilesInput) -> SearchFilesOutput:
-    """The whole search, given each file's latest content. Pure, so it is tested without a run."""
+    """The search in this process, unbounded. Pure, so it is tested without a run."""
     try:
-        pattern = re.compile(arguments.pattern)
-    except re.error:
+        return code_search.search(files, arguments)
+    except code_search.InvalidPattern:
         raise ToolFailed("invalid_pattern") from None
-    chosen = sorted(
-        path
-        for path in files
-        if path.startswith(arguments.path)
-        and (
-            arguments.file_glob is None
-            or fnmatch.fnmatchcase(path.rsplit("/", 1)[-1], arguments.file_glob)
-            or fnmatch.fnmatchcase(path, arguments.file_glob)
-        )
-    )
-    if arguments.target == "files":
-        named = [path for path in chosen if pattern.search(path)]
-        page = named[arguments.offset : arguments.offset + arguments.limit]
-        return SearchFilesOutput(
-            matches=[],
-            files=[] if arguments.output_mode == "count" else page,
-            total_count=len(named),
-            truncated=arguments.offset + arguments.limit < len(named),
-        )
-    found: list[SearchMatch] = []
-    hit_files: list[str] = []
-    for path in chosen:
-        lines = files[path].splitlines()
-        hits = [index for index, line in enumerate(lines) if pattern.search(line)]
-        if hits:
-            hit_files.append(path)
-        for index in hits:
-            found.append(
-                SearchMatch(
-                    path=path,
-                    line_number=index + 1,
-                    content=_cut(lines[index]),
-                    before=[
-                        _cut(line) for line in lines[max(index - arguments.context, 0) : index]
-                    ],
-                    after=[_cut(line) for line in lines[index + 1 : index + 1 + arguments.context]],
-                )
-            )
-    total = len(hit_files) if arguments.output_mode == "files_only" else len(found)
-    end = arguments.offset + arguments.limit
-    if arguments.output_mode == "count":
-        return SearchFilesOutput(matches=[], files=[], total_count=len(found), truncated=False)
-    if arguments.output_mode == "files_only":
-        return SearchFilesOutput(
-            matches=[],
-            files=hit_files[arguments.offset : end],
-            total_count=total,
-            truncated=end < total,
-        )
-    return SearchFilesOutput(
-        matches=found[arguments.offset : end],
-        files=[],
-        total_count=total,
-        truncated=end < total,
-    )
+
+
+async def bounded_search(
+    files: Mapping[str, str], arguments: SearchFilesInput, seconds: float = SEARCH_SECONDS
+) -> SearchFilesOutput:
+    """The search in a child process that is stopped after `seconds` (R-20)."""
+    try:
+        return await run_in_child(code_search.search, dict(files), arguments, seconds=seconds)
+    except code_search.InvalidPattern:
+        raise ToolFailed("invalid_pattern") from None
+    except BoundExceeded:
+        raise ToolFailed("search_timeout") from None
 
 
 async def _latest_files(context: ToolContext) -> dict[str, str]:
@@ -113,8 +65,9 @@ async def _latest_files(context: ToolContext) -> dict[str, str]:
 
 async def _search(arguments: SearchFilesInput, context: ToolContext) -> SearchFilesOutput:
     files = await _latest_files(context)
-    # In a thread, so the gateway's timeout bounds a slow pattern instead of the event loop.
-    return await asyncio.to_thread(search, files, arguments)
+    # A pattern holds the interpreter lock while it matches, so a thread can't be stopped and the
+    # event loop would stall with it. A child process is stopped on time (R-20, PTOL-01).
+    return await bounded_search(files, arguments)
 
 
 async def _latest(context: ToolContext, path: str) -> tuple[int, str]:
@@ -137,7 +90,7 @@ async def _read(arguments: ReadCodeFileInput, context: ToolContext) -> ReadCodeF
         path=arguments.path,
         version=version,
         lines=[
-            NumberedLine(number=index + 1, text=_cut(lines[index], LINE_CHARACTERS))
+            NumberedLine(number=index + 1, text=code_search.cut(lines[index], LINE_CHARACTERS))
             for index in range(arguments.offset, min(end, len(lines)))
         ],
         total_lines=len(lines),

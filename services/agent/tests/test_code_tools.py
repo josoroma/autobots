@@ -65,3 +65,68 @@ def test_names_never_match_the_sdks_file_tools() -> None:
 def test_ceilings_are_in_the_schema(arguments: dict[str, object]) -> None:
     with pytest.raises(ValueError):
         SearchFilesInput.model_validate(arguments)
+
+
+# R-20, PTOL-01: a pattern that backtracks without end holds the interpreter lock, so a thread
+# can't be stopped. The bounded search runs in a child process, which is stopped on time, and the
+# event loop keeps going.
+def test_a_runaway_pattern_ends_on_time_and_the_event_loop_keeps_running() -> None:
+    import asyncio
+    import time
+
+    from autobots.application.code_tools import bounded_search
+
+    files = {"inputs/slow.txt": "a" * 40 + "b"}
+    arguments = SearchFilesInput.model_validate({"pattern": "(a+)+$", "path": "inputs/"})
+
+    async def run() -> tuple[float, int, str]:
+        ticks = 0
+        stop = asyncio.Event()
+
+        async def ticker() -> None:
+            nonlocal ticks
+            while not stop.is_set():
+                ticks += 1
+                await asyncio.sleep(0.01)
+
+        task = asyncio.create_task(ticker())
+        began = time.monotonic()
+        try:
+            await bounded_search(files, arguments, seconds=1.0)
+            code = "finished"
+        except ToolFailed as failed:
+            code = str(failed)
+        elapsed = time.monotonic() - began
+        stop.set()
+        await task
+        return elapsed, ticks, code
+
+    elapsed, ticks, code = asyncio.run(run())
+    assert code == "search_timeout"
+    assert elapsed < 5.0
+    # About 100 ticks a second while the child works, so the loop was never stalled.
+    assert ticks > elapsed * 50
+
+
+def test_a_bounded_search_gives_the_same_answer_as_the_plain_one() -> None:
+    import asyncio
+    import time
+
+    from autobots.application.code_tools import bounded_search
+
+    arguments = SearchFilesInput.model_validate(
+        {"pattern": "def ", "path": "inputs/", "context": 1}
+    )
+    began = time.monotonic()
+    bounded = asyncio.run(bounded_search(FILES, arguments, seconds=8.0))
+    spent = time.monotonic() - began
+    assert bounded == search(FILES, arguments)
+    # A process start per search: measured here, and well within the tool's 10 s timeout.
+    assert spent < 5.0
+    with pytest.raises(ToolFailed) as failed:
+        asyncio.run(
+            bounded_search(
+                FILES, SearchFilesInput.model_validate({"pattern": "(", "path": ""}), seconds=8.0
+            )
+        )
+    assert str(failed.value) == "invalid_pattern"
