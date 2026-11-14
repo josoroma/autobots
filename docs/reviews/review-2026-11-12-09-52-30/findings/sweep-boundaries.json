@@ -1,0 +1,967 @@
+{
+  "schema": "autobots.code-review/v1",
+  "area": "sweep-boundaries",
+  "title": "Lens: module boundaries and dependency direction",
+  "kind": "lens",
+  "timestamp": "2026-11-12-09-52-30",
+  "revision": "156534da0bd5b19417f05d313077d767804b175b",
+  "summary": "Dependencies run in the intended direction at the core but not above it. domain/ (11 modules) imports only the standard library. 25 of the 27 contracts modules import only pydantic, contracts and domain. The two exceptions are contracts/export.py, which imports api.app (the service's one upward import), and contracts/adapters.py, which imports persistence. Above that line, application/ and adapters/ import each other (21 and 26 statements) and application/ imports operations/ 6 times. The worker imports the API entry point to get its configuration. 7 of the 29 function-level imports (in 17 functions) exist only to break five module cycles, and no check reports those cycles. application/goal_loop.py is the hub. It builds the tool registry from 11 adapter imports, wires Deep Agents, and shares private lifecycle helpers with workflow_runner and 10 test files. Because the catalog and four API routers depend on it, building the API or the OpenAPI document imports 110 autobots modules, plus deepagents, langchain and langgraph. Business rules also cross layers: the GitHub adapters run approval and receipt SQL through ToolContext's raw connection, the API routes read the workspace model policy six times and write it with their own version check, and the web re-implements the run command guards. The web boundary itself holds: no client module imports a server-only module, pages are thin, and responses are parsed with generated parsers. However, 28 request bodies and 78 API paths are hand-written, and 74 of the 78 generated operations go unused. The layout has drifted from DH-03 (no workers/ or graphs/, operations/ and persistence/ undocumented, no scripts/db/). Five rule path globs match no file, and their harness test checks paths that don't exist. Nothing enforces layer direction.",
+  "scores": [
+    {
+      "dimension": "standards",
+      "score": 3,
+      "why": "DH-06 separation holds for domain by convention only: no lint rule or test checks import direction, and five rule globs fail DH-03's 'test representative paths'."
+    },
+    {
+      "dimension": "modules",
+      "score": 3,
+      "why": "domain and contracts are clean leaves (two contracts files aside), but application and adapters depend on each other, goal_loop is a hub, and five cycles sit behind function-level imports."
+    },
+    {
+      "dimension": "size",
+      "score": 3,
+      "why": "The modules with the most cross-layer edges are also among the largest (goal_loop: 782 lines, 17 application and 11 adapter imports); the area reviews cover per-file size."
+    },
+    {
+      "dimension": "functions",
+      "score": 3,
+      "why": "Route handlers such as post_run run whole use cases, and lifecycle functions are named private while other modules depend on them."
+    },
+    {
+      "dimension": "structure",
+      "score": 3,
+      "why": "CODEBASE.md documents the real layout, but it differs from DH-03 in five places and the rule globs follow DH-03's paths."
+    },
+    {
+      "dimension": "approach",
+      "score": 3,
+      "why": "The pure app factory and single BFF are sound; registry, executor and model wiring happen inside application, and configuration is read at call sites."
+    },
+    {
+      "dimension": "comments",
+      "score": 4,
+      "why": "Every module has a docstring, and 87 of 139 cite a decision, PRD or story ID; of the 7 function-level imports that break a cycle, only goal_loop.py:433 says why, and tools.py:1 is stale."
+    },
+    {
+      "dimension": "types",
+      "score": 3,
+      "why": "Generated parsers check responses, but request bodies use no generated types, the pool is Any in 10 copies, and SQL rows are positional tuples."
+    },
+    {
+      "dimension": "errors",
+      "score": 3,
+      "why": "Typed refusal codes cross layers cleanly, but HTTP mapping is spread over per-router as_api_error functions, two of them with the same name."
+    },
+    {
+      "dimension": "tests",
+      "score": 3,
+      "why": "Parity tests pin the parallel tool tables, but 34 test imports of private names couple tests to internals, and nothing tests layering."
+    },
+    {
+      "dimension": "maintainability",
+      "score": 3,
+      "why": "Most changes stay in one area. Adding a tool, changing the run lifecycle or changing a request contract touches several layers with no checks to guide the edit."
+    }
+  ],
+  "strengths": [
+    {
+      "title": "Pure domain layer",
+      "evidence": "All 11 modules in services/agent/src/autobots/domain import only the standard library and each other (AST scan: 0 framework imports and 0 imports from other layers). domain/runs.py:22-128 holds the canonical transition table and domain/execution.py:14-49 holds the execution contract."
+    },
+    {
+      "title": "Contracts are nearly a leaf, with strict configs",
+      "evidence": "25 of 27 contract modules import only pydantic, contracts and domain. contracts/primitives.py:9-10 STRICT_CONTRACT refuses unknown fields, and request models such as RunRequest (contracts/run_commands.py:16) forbid extras."
+    },
+    {
+      "title": "One OpenRouter factory",
+      "evidence": "ChatOpenRouter and openrouter.OpenRouter are constructed only in services/agent/src/autobots/adapters/models/factory.py (lines 95-110 and 124). Every other model path goes through that factory, as DH-06 requires."
+    },
+    {
+      "title": "Pure app factory, lifespan-owned resources, one API composition root",
+      "evidence": "api/app.py:41-92 builds the app without opening anything and opens and closes the pool in lifespan. api/main.py:37-51 is the only place that wires the environment, membership and storage for the API process."
+    },
+    {
+      "title": "Explicit web server/client boundary",
+      "evidence": "apps/web/lib/bff.ts, session.ts, server-config.ts, service-status.ts and workspace-choice.ts each start with import \"server-only\", and none of the 39 \"use client\" modules imports them. lib/ imports no component, app/ has no client module, the largest page is 127 lines (app/page.tsx), and process.env is read only in lib/server-config.ts:11-21."
+    },
+    {
+      "title": "Single BFF choke point for API traffic",
+      "evidence": "Every route handler that reaches the API (5 of the 8) forwards through apps/web/lib/bff.ts forward (71-126) or streamFrom (132-175). These apply the Host/Origin/CSRF guard, session, internal token, workspace header, body limits and no-store in one place. The session, workspace and csrf handlers stay local and assemble the guard themselves (XDUP-12 in the duplication lens)."
+    },
+    {
+      "title": "Responses parsed with generated parsers",
+      "evidence": "25 web files import 32 distinct generated parse* functions (45 imports), for example apps/web/components/run-controls.tsx:3-6 and the parseRunSummary call at :66-68."
+    },
+    {
+      "title": "Parallel tables pinned by tests",
+      "evidence": "services/agent/tests/test_execution_contract.py:23-29 keeps domain TOOL_VERSIONS equal to the registry. test_tool_catalog.py:23-31 keeps the catalog equal to the registry, and test_tool_guides.py:25-28 keeps the guides complete. domain/execution.py:14 names its test."
+    }
+  ],
+  "findings": [
+    {
+      "id": "XMOD-01",
+      "title": "goal_loop builds the tool registry, so application imports adapters and the API imports the agent runtime",
+      "dimension": "modules",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/application/goal_loop.py",
+          "line": 19,
+          "endLine": 41,
+          "note": "11 adapter import statements, mostly tool constants"
+        },
+        {
+          "file": "services/agent/src/autobots/application/goal_loop.py",
+          "line": 162,
+          "endLine": 197,
+          "note": "loop_registry: the whole tool list"
+        },
+        {
+          "file": "services/agent/src/autobots/application/tool_catalog.py",
+          "line": 61,
+          "endLine": 79,
+          "note": "catalog built through loop_registry with a _never Delegation and object_store=object()"
+        },
+        {
+          "file": "services/agent/src/autobots/application/tool_catalog.py",
+          "line": 12,
+          "endLine": 13,
+          "note": "imports assignments (for Delegation) and goal_loop"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 14,
+          "note": "API imports goal_loop for execution_block"
+        },
+        {
+          "file": "services/agent/src/autobots/api/tool_routes.py",
+          "line": 13,
+          "note": "API imports tool_catalog and through it goal_loop (application/search.py:10 does the same for search_routes)"
+        },
+        {
+          "file": "services/agent/src/autobots/application/routines.py",
+          "line": 369,
+          "note": "lazy import that breaks routines -> tool_catalog -> goal_loop -> cronjob_tool -> routines"
+        },
+        {
+          "file": "services/agent/src/autobots/application/experts.py",
+          "line": 37,
+          "note": "lazy import that breaks experts -> tool_catalog -> assignments -> experts (again at :65)"
+        }
+      ],
+      "occurrences": 21,
+      "evidence": "An AST count over services/agent/src/autobots, including function-level imports, finds 21 imports from application/ into adapters/; 11 of them are in goal_loop.py:19-41. tool_catalog derives the catalog by calling loop_registry with stand-in arguments:\n```\ndelegation = Delegation(drive=_never, limits=RootLimits(), lease_seconds=0.0)\nreturn loop_registry(RootLimits(), object_store=object(), delegation=delegation,\n                     extra=(APPROVAL_GATE, *browsing))\n```\nrun_routes.py:14 imports goal_loop, and tool_routes.py:13 and search.py:10 import tool_catalog. As a result, the static import-time closure of autobots.api.app is 110 modules, including deepagents, langchain, langgraph and every tool adapter; contracts/export.py has the same closure. Three of the five hidden cycles pass through this registry wiring (routines.py:369, experts.py:37 and :65, cronjob_tool.py:40). A third builder, application/tools.py:284-288 default_registry, is used only by tests.",
+      "impact": "Adding or changing a tool means editing the run loop module. A broken import in any tool adapter breaks API startup and OpenAPI generation. application cannot be imported or tested without the adapters and the Deep Agents stack. The stand-in arguments are an unwritten second contract with loop_registry's conditional registration.",
+      "recommendation": "Build the registry at the edge and pass it in. Put the full tool list in one composition module that may import application tool modules (for example adapters/tool_registry.py). Have api/main.py and operations/worker.py build it once, pass it to goal_loop through LoopConfig and to tool_catalog as a parameter, and give experts and routines an availability callable, as routines already receives credential_check. Move execution_block next to the execution contract (application/runs.py or recovery.py) so the API stops importing goal_loop. Point test_execution_contract.py at the registry the worker uses.",
+      "sketch": "adapters/tool_registry.py: build_registry(limits, *, object_store, delegation, browsing, extra) -> ToolRegistry; the only module that imports every ToolDefinition (10 application and 7 adapter modules)\napplication/goal_loop.py: run_goal and build_stage take config.registry_factory; no adapter tool imports\napplication/tool_catalog.py: all_descriptors(registry, environ) and tool_catalog(registry, ...); no goal_loop or assignments import and no stand-ins\napplication/runs.py: execution_block(connection, run_id)\napi/main.py and operations/worker.py: build the factory once (app.state.tool_registry, LoopConfig)\napplication/experts.py and routines.py: receive require_available as a parameter; lazy imports removed",
+      "effort": "L",
+      "risk": "medium",
+      "ruleCheck": "python-worker rule: one LangGraph lifecycle still owns execution. domain/execution.py TOOL_VERSIONS and its parity test (services/agent/tests/test_execution_contract.py:23-29) keep comparing against the registry the worker runs. No lease, fence or approval behavior changes.",
+      "verdict": "confirmed",
+      "verifierNote": "Re-ran an AST import scan: 21 application-to-adapters statements, 11 in goal_loop.py:19-41. The module-level closure of autobots.api.app is 110 autobots modules (120 counting package __init__ files) and reaches deepagents, langchain and langgraph; at import time four routers (run, tool, search, workflow) reach goal_loop. default_registry (tools.py:284-288) is used only by tests/db and services/agent/tests."
+    },
+    {
+      "id": "XMOD-02",
+      "title": "External tool adapters run approval and receipt SQL through ToolContext's raw connection",
+      "dimension": "modules",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/application/tool_gateway.py",
+          "line": 55,
+          "endLine": 59,
+          "note": "ToolContext gives every tool connection: Any"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_pulls.py",
+          "line": 134,
+          "endLine": 154,
+          "note": "return_to_review settles the receipt, resets the approval to pending and appends approval.requested"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_pulls.py",
+          "line": 122,
+          "endLine": 132,
+          "note": "approved_detail reads approval_requests"
+        },
+        {
+          "file": "services/agent/src/autobots/application/approvals.py",
+          "line": 182,
+          "endLine": 200,
+          "note": "the application's own reset to pending, using ttl_seconds and _enter_wait"
+        },
+        {
+          "file": "services/agent/src/autobots/application/approvals.py",
+          "line": 25,
+          "note": "DEFAULT_TTL_SECONDS = 86_400, copied into the adapter as interval '1 day'"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_issues.py",
+          "line": 101,
+          "endLine": 109,
+          "note": "approved_repository reads approval_requests"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/remote_files.py",
+          "line": 55,
+          "endLine": 61,
+          "note": "reads app_private.run_files"
+        }
+      ],
+      "occurrences": 5,
+      "evidence": "github_pulls.py:137-145:\n```\nawait context.connection.execute(\n    \"update app_private.tool_receipts set reconciled_at = now() where operation_id = %s\", ...)\ncursor = await context.connection.execute(\n    \"update public.approval_requests set status = 'pending', decided_by = null, \"\n    \"decided_at = null, review_detail = %s, expires_at = clock_timestamp() + interval '1 day' \" ...\n```\nThe same approved-to-pending transition exists in approvals.py:182-200, which uses make_interval(secs => %s) from DEFAULT_TTL_SECONDS and calls _enter_wait. approval_requests.status is written at four application sites (approvals.py:185, 208, 299 and runs.py:451) and at this one adapter site. Adapters issue 5 statements against approval, receipt and run-file tables, in 3 modules.",
+      "impact": "The approval state machine, which the rules say must bind the actual effect, now has a second implementation inside an HTTP client module. A change to approval expiry, events or waiting in approvals.py won't reach the pull-request path. Because the tool port hands out raw SQL access, every new connector can repeat the pattern.",
+      "recommendation": "Keep Decision 0022 D15's behavior but move its implementation. Add approvals.approved_call() and approvals.return_to_review() (one transaction, DEFAULT_TTL_SECONDS, the same event). Have the gateway load the approved call into ToolContext for approved dispatches, and give remote_files a tools.stored_file() helper next to write_run_file. Then narrow ToolContext so external adapters get capabilities instead of a connection. Run tests/db/pull_request_check.py and approval_check.py before and after.",
+      "sketch": "application/approvals.py: approved_call(connection, operation_id) -> ApprovedCall | None; return_to_review(connection, operation_id, detail) -> None, which settles the receipt, sets pending with DEFAULT_TTL_SECONDS and appends approval.requested\napplication/tool_gateway.py: ToolContext.approval: ApprovedCall | None, loaded before an approved dispatch\napplication/tools.py: stored_file(connection, operation_id) beside write_run_file\nadapters/github_pulls.py, github_issues.py and remote_files.py: use context.approval and these helpers; no SQL strings",
+      "effort": "M",
+      "risk": "high",
+      "ruleCheck": "Preserves the python-worker rule 'approvals bind the actual normalized effect' and Decision 0022 D15 (base_moved sends the request back to a person with the new diff). The transition moves into application/approvals.py and nothing is relaxed.",
+      "verdict": "confirmed",
+      "verifierNote": "Re-read all cited SQL: github_pulls.py:137-147 settles the receipt and resets the approval with a literal '1 day'; approvals.py:184-199 uses ttl_seconds and _enter_wait; approval status is written at approvals.py:185, 208, 299, runs.py:451 and github_pulls.py:142. The 5 adapter statements are github_issues.py:102, github_pulls.py:123, 137 and 141, and remote_files.py:58. XDUP-02 reports the same copy from the duplication side."
+    },
+    {
+      "id": "XMOD-03",
+      "title": "Web request bodies and paths are hand-written, so the generated contract checks only responses",
+      "dimension": "types",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 288,
+          "endLine": 300,
+          "note": "run admission body built as an untyped object literal"
+        },
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 62,
+          "endLine": 83,
+          "note": "hand-built base path and command body"
+        },
+        {
+          "file": "apps/web/lib/service-status.ts",
+          "line": 3,
+          "endLine": 10,
+          "note": "the only consumer of generated operations (4 of 78), server-side"
+        },
+        {
+          "file": "packages/api-client/src/runtime.ts",
+          "line": 157,
+          "endLine": 172,
+          "note": "requestJson throws without the ErrorResponse body that screens display"
+        },
+        {
+          "file": "services/agent/src/autobots/contracts/run_commands.py",
+          "line": 13,
+          "endLine": 16,
+          "note": "RunRequest forbids extra fields"
+        },
+        {
+          "file": "services/agent/src/autobots/api/errors.py",
+          "line": 29,
+          "endLine": 32,
+          "note": "validation failures become a generic invalid_request"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 331,
+          "endLine": 333,
+          "note": "any 422 becomes a model-or-request refusal (session-panel.tsx:76-77 does the same)"
+        }
+      ],
+      "occurrences": 28,
+      "evidence": "goal-composer.tsx:288-298:\n```\nconst reply = await csrfFetch(\"/api/v1/runs\", {\n  method: \"POST\",\n  headers: { \"Content-Type\": \"application/json\", \"Idempotency-Key\": crypto.randomUUID() },\n  body: JSON.stringify({ goal_text: draft, budget_micro_usd: budget,\n    ...(sessionId === null ? {} : { session_id: sessionId }), ...\n```\nA grep of apps/web/components finds 28 `body: JSON.stringify(` request bodies in 18 files and 78 hand-written '/api/...' path literals in 31 files. There are 0 references to a generated request type (RunRequest, ExpertCreate, ApprovalDecision, ModelPolicyUpdate, ...) and 0 uses of `satisfies`. The generated client has 78 typed operations, for example generated.ts:9418 admitRun(options, body: RunRequest), and 4 are used, all server-side.",
+      "impact": "Renaming or retyping a request field in Pydantic regenerates the TypeScript types but breaks no compile. The API then rejects the body (extra='forbid') with a generic 422 invalid_request (errors.py:29-32), and the screens misreport it: the composer turns any 422 into 'That model or request isn't approved' (goal-composer.tsx:331-333 and 636) and the session panel into 'That request isn't approved' (session-panel.tsx:76-77), which points the person at their model choice rather than at a contract mismatch. Path and method changes are just as invisible to tsc. Drift at the browser-to-API boundary is caught only if a browser test covers that form.",
+      "recommendation": "Route browser calls through the generated operations. Use a client-safe options object with baseUrl '/api' and a fetch adapter over csrfFetch, add a runtime error type that carries the parsed ErrorResponse so screens keep their refusal messages, and teach the generator to emit declared header parameters such as Idempotency-Key. Migrate one screen at a time; until a screen moves, type its bodies with `satisfies` and the generated request type.",
+      "sketch": "packages/api-client/src/runtime.ts: class ApiRefusal(status, body: ErrorResponse); requestJson throws it and accepts per-call headers\nscripts/generate_contracts.py: emit declared header parameters (Idempotency-Key) in each operation\napps/web/lib/api.ts: browserApi: ClientOptions = { baseUrl: \"/api\", fetch: adapter that uses csrfFetch for writes }\ncomponents: await admitRun(browserApi, body), with body typed as RunRequest; catch ApiRefusal for the refusal text\nInterim: JSON.stringify({ ... } satisfies RunRequest)",
+      "effort": "L",
+      "risk": "medium",
+      "ruleCheck": "contracts rule: Pydantic/OpenAPI owns the definitions and generated TypeScript consumes them. generated.ts is regenerated by scripts/generate_contracts.py and never hand-edited; runtime.ts is hand-written. nextjs rule: response parsing, CSRF and same-origin BFF routing through lib/bff.ts all stay.",
+      "verdict": "revised",
+      "verifierNote": "Counts reproduced with git grep: 28 bodies in 18 component files, 78 '/api/' literals in 31 files, no generated request type and no `satisfies`; 4 of the 78 generated operations are used, all in lib/service-status.ts. Impact corrected: a drifted body is not shown as 'The request is not valid.' but as 'That model or request isn't approved', because both run screens map every 422 to an approval refusal."
+    },
+    {
+      "id": "XMOD-04",
+      "title": "Five rule path globs match no tracked file, and the harness test checks paths that don't exist",
+      "dimension": "standards",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": ".claude/rules/database.md",
+          "line": 5,
+          "note": "services/agent/src/autobots/adapters/persistence/**/* matches 0 files"
+        },
+        {
+          "file": ".claude/rules/model-gateway.md",
+          "line": 5,
+          "note": "services/agent/src/autobots/graphs/**/* matches 0"
+        },
+        {
+          "file": ".claude/rules/model-gateway.md",
+          "line": 7,
+          "note": "apps/web/src/app/api/settings/**/* matches 0"
+        },
+        {
+          "file": ".claude/rules/infrastructure.md",
+          "line": 7,
+          "note": "scripts/operations/**/* matches 0"
+        },
+        {
+          "file": ".claude/rules/infrastructure.md",
+          "line": 4,
+          "note": "**/Dockerfile* matches 0 (forward-looking)"
+        },
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 52,
+          "endLine": 71,
+          "note": "RULE_PATHS lists DH-03's planned paths such as adapters/persistence/runs.py, graphs/run.py, scripts/operations/backup.sh"
+        },
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 620,
+          "endLine": 633,
+          "note": "asserts that globs match those representative paths, never real files"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 53,
+          "endLine": 61,
+          "note": "imports and applies the model-attempt retry policy; no model-gateway glob covers adapters/ outside models/"
+        }
+      ],
+      "occurrences": 5,
+      "evidence": "Each `paths` glob was matched against `git ls-files`: database.md adapters/persistence/** matches 0 files, model-gateway.md graphs/** and apps/web/src/app/api/settings/** match 0, and infrastructure.md scripts/operations/** and **/Dockerfile* match 0. The SQL the database rule governs lives in application/ (340 `.execute(` calls in 36 modules), api/ (17 in 5) and adapters/ (13 in 8). Model calls outside adapters/models happen in adapters/loop_middleware.py and in the paid operations/route_qualification.py, reasoning_trial.py and browse_trial.py, and the Python provider routes are in api/settings_routes.py. scripts/supabase_stack.py and scripts/app_db.py match no infrastructure or database glob. The test passes because RULE_PATHS lists DH-03's planned paths.",
+      "impact": "The database rule does not load when application or API SQL is edited, or when scripts/app_db.py changes. The model-gateway rule (no fallback, fake transports by default, live qualification as a bounded task) does not load for the loop middleware or the paid trials. AGENTS.md and python-worker.md still load there, so the core OpenRouter-only and fake-transport boundaries stay in view, but the path-specific rule text does not. The harness test reads DH-03's planned paths as representatives by design (its comment at test_assistant_assets.py:52-53 says it shows only the matcher's reading), so nothing checks that a glob matches a real file.",
+      "recommendation": "Point the globs at the code that exists. Make the harness test require every glob to match at least one tracked file, except an explicit allowlist of forward-looking globs such as **/Dockerfile*, and use real files as representative paths. Update the matching 'Relevant paths' lines in .claude/skills/autobots-model-gateway/SKILL.md:8 and .claude/skills/autobots-docker-local/SKILL.md:8, which repeat the dead globs, in the same change.",
+      "sketch": "database.md paths: supabase/**/*; packages/db-types/**/*; services/agent/src/autobots/application/**/*; services/agent/src/autobots/api/**/*; services/agent/src/autobots/persistence/**/*; scripts/app_db.py; scripts/disposable_db.py\nmodel-gateway.md paths: adapters/models/**/*; application/**/*; adapters/loop_middleware.py; operations/route_qualification.py; operations/reasoning_trial.py; operations/browse_trial.py; api/settings_routes.py; apps/web/app/api/settings/**/* (drop graphs/** and apps/web/src/**)\ninfrastructure.md: replace scripts/operations/**/* with scripts/supabase_stack.py, scripts/qualify_operations.py, scripts/qualify_backup.py, scripts/qualify_upgrade.py\ntests/harness/test_assistant_assets.py: real representative paths, plus 'every glob matches >= 1 git ls-files path unless in FORWARD_LOOKING'\n.claude/skills/autobots-model-gateway/SKILL.md and autobots-docker-local/SKILL.md: Relevant paths follow the rule globs",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-03: 'Use supported paths frontmatter for scoping and test representative paths'. Only `paths` values change (RULE_KEYS stays {'paths'}), and the test becomes stricter. No rule text or check is weakened.",
+      "verdict": "revised",
+      "verifierNote": "Matched every glob with the test's own glob_matches against git ls-files: exactly these five match 0 files. Severity lowered from high to medium: AGENTS.md (always loaded) and python-worker.md (services/agent/**) still carry the core model and database boundaries, so the gap is path-specific guidance rather than an unguarded change, and the test documents that it checks only the matcher's reading. Added the two skills that repeat the globs."
+    },
+    {
+      "id": "XMOD-05",
+      "title": "API routes read and write the workspace model policy and run admission orchestration themselves",
+      "dimension": "modules",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 120,
+          "endLine": 127,
+          "note": "policy read in preview_run (again at 201-208 in post_run)"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 177,
+          "endLine": 277,
+          "note": "post_run sequences budget, key readiness, Expert binding, tool availability, policy and offered-profile checks before admit_run"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 329,
+          "endLine": 344,
+          "note": "versioned upsert with for update and stale_version, inside the route"
+        },
+        {
+          "file": "services/agent/src/autobots/api/improvement_routes.py",
+          "line": 99,
+          "endLine": 112
+        },
+        {
+          "file": "services/agent/src/autobots/application/routines.py",
+          "line": 352,
+          "endLine": 362
+        },
+        {
+          "file": "services/agent/src/autobots/application/workflow_overview.py",
+          "line": 119,
+          "endLine": 136
+        },
+        {
+          "file": "services/agent/src/autobots/application/workflows.py",
+          "line": 364
+        }
+      ],
+      "occurrences": 11,
+      "evidence": "app_private.model_policies is read in 9 places. Six are in three API route modules (run_routes.py:123, 204; settings_routes.py:295, 364, 395; improvement_routes.py:102) and three are in application (workflow_overview.py:120, routines.py:355, workflows.py:364). Each read is followed by the same `resolve_role_policy(workspace_default=row[0] if row else None, workspace_role_overrides=row[1] if row else None, ...)`. The policy is written only at settings_routes.py:339 and :373, inside the route with its own optimistic version check. api/ issues 17 SQL statements in 5 modules.",
+      "impact": "The rule for which profiles a run gets is assembled at seven call sites across two layers. A policy change, such as a new override source or a Decision 0019-style default, has to be repeated by hand, and the versioned write can only be tested through HTTP.",
+      "recommendation": "Add an application model-policy service and an admission use case. Routes then only parse the request, call the service and map refusals to ApiError.",
+      "sketch": "application/model_policy.py: read_policy(connection, workspace_id) -> WorkspacePolicy; effective_policy(policy, run_overrides, run_profile) -> RolePolicy; update_policy(connection, workspace_id, expected_version, default, overrides), which raises StaleVersion\napplication/admission.py: admit_request(connection, request, user, settings, environ) -> AdmitResult covering budget, binding, availability, offered profiles and admit_run\napi/run_routes.py, settings_routes.py, improvement_routes.py: call these and map refusals",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06 'avoid duplicated business rules'. HTTP admission stays separate from durable execution. The optimistic version check and require_offered (Decisions 0013 and 0019) move unchanged.",
+      "verdict": "confirmed",
+      "verifierNote": "Re-read the nine reads and the two versioned writes (settings_routes.py:339 and :373; the select for update at :331 belongs to the first write). post_run at 177-277 sequences the checks as stated, and api/ has 17 `.execute(` calls in 5 modules. XDUP-08 covers the same reads from the duplication side."
+    },
+    {
+      "id": "XMOD-06",
+      "title": "The web re-implements run command guards that the domain owns",
+      "dimension": "modules",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 16,
+          "endLine": 36,
+          "note": "TERMINAL, PAUSABLE and commandsFor"
+        },
+        {
+          "file": "apps/web/components/workflow-monitor.tsx",
+          "line": 13,
+          "note": "its own TERMINAL set, used at :61 to stop polling"
+        },
+        {
+          "file": "services/agent/src/autobots/domain/runs.py",
+          "line": 22,
+          "note": "canonical TERMINAL"
+        },
+        {
+          "file": "services/agent/src/autobots/domain/runs.py",
+          "line": 97,
+          "endLine": 128,
+          "note": "COMMAND_SOURCES and next_status"
+        },
+        {
+          "file": "services/agent/src/autobots/contracts/run_workspace.py",
+          "line": 166,
+          "endLine": 167,
+          "note": "can_continue: a guard the server already projects"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "run-controls.tsx:16-36, abridged:\n```\nconst TERMINAL = new Set([\"succeeded\", \"failed\", \"cancelled\"]);\nconst PAUSABLE = new Set([\"queued\", \"running\", \"waiting_input\", \"waiting_approval\", \"verifying\"]);\nexport function commandsFor(status: string): Command[] {\n  if (TERMINAL.has(status) || status === \"cancelling\") return [];\n  if (status === \"paused\") return [\"resume\", \"cancel\"];\n```\nworkflow-monitor.tsx:13 defines another TERMINAL. Both sets are typed as plain strings rather than the generated RunStatus union (generated.ts:8691). The run workspace view already projects one guard, can_continue.",
+      "impact": "When the domain table changes (a new state, or pause allowed from another state), the UI offers stale actions or hides valid ones. The server still refuses, so users see 'That is not allowed' instead of the correct control.",
+      "recommendation": "Project the allowed user commands from domain.next_status into the run summary or workspace view, as can_continue already is, then regenerate the client and render from that field. Type any remaining UI-only status maps with the generated RunStatus union.",
+      "sketch": "contracts/run_workspace.py (or runs.py): available_commands: list[Literal['pause','resume','cancel']], computed from domain.runs.next_status for Actor.USER\napplication/run_projection.py: fills the field\ncomponents/run-controls.tsx: renders view.available_commands; TERMINAL and PAUSABLE removed\ncomponents/workflow-monitor.tsx: stops on a server terminal flag or a Set<RunStatus>",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "autobots-nextjs skill: 'do not duplicate Python business-state enums'. DH-06: 'do not invent a second state enum for the UI'. contracts rule: canonical guards are shared. The new field is a contract change, so the client is regenerated, never hand-edited.",
+      "verdict": "confirmed",
+      "verifierNote": "The UI's PAUSABLE equals the domain's pause sources today (every state whose NORMAL_EXITS include PAUSED, domain/runs.py:24-42), so this is drift risk rather than a current bug. No web module imports the generated RunStatus, and commandsFor is also used by run-panel.tsx:130, so the projected field has to reach the run summary as well as the workspace view."
+    },
+    {
+      "id": "XMOD-07",
+      "title": "Run lifecycle helpers are private to goal_loop but used by workflow_runner and ten test files",
+      "dimension": "modules",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/application/workflow_runner.py",
+          "line": 16,
+          "endLine": 24,
+          "note": "imports _finish, _keep_lease, _result, _run_status"
+        },
+        {
+          "file": "services/agent/src/autobots/application/workflow_runner.py",
+          "line": 298,
+          "endLine": 301,
+          "note": "drive_child lazily imports _drive"
+        },
+        {
+          "file": "services/agent/src/autobots/application/goal_loop.py",
+          "line": 417,
+          "endLine": 438,
+          "note": "_drive reaches run_workflow through a lazy import"
+        },
+        {
+          "file": "tests/db/review_check.py",
+          "line": 21,
+          "note": "_drive, _settle_children"
+        },
+        {
+          "file": "tests/db/wake_check.py",
+          "line": 16,
+          "note": "_keep_lease, with noqa PLC2701"
+        },
+        {
+          "file": "tests/db/assignment_check.py",
+          "line": 21,
+          "note": "_finish"
+        },
+        {
+          "file": "services/agent/tests/test_plans.py",
+          "line": 7,
+          "note": "_opening"
+        }
+      ],
+      "occurrences": 40,
+      "evidence": "An AST count of `from autobots... import _name` finds 40 imports of private names. 6 are in src: 5 in workflow_runner from goal_loop and 1 in reasoning_trial. The other 34 are in 19 test files and come from 9 modules (goal_loop 11, workflow_runner 6, tool_gateway 5, loop_middleware 5, others 7).\n```\nfrom autobots.application.goal_loop import (\n    LoopConfig, LoopResult, _finish, _keep_lease, _result, _run_status, loop_registry,\n)\n```\ngoal_loop.py:433 notes that the runner 'builds on this module's lifecycle', and the two modules import each other.",
+      "impact": "Two runners share the lease heartbeat and the terminal write, but the names suggest they are local to goal_loop. A 'private' edit in goal_loop can break workflow runs and db-profile checks, and tests/db is outside mypy. The mutual import is a permanent cycle.",
+      "recommendation": "Give the run lifecycle a public module and a dispatcher, and let the runners receive drive through Delegation instead of importing each other. Tests import the new public names. For the other modules, either promote a helper on purpose or test through the public function.",
+      "sketch": "application/run_lifecycle.py: keep_lease(), finish(), run_status(), result() for the lease heartbeat and terminal writes\napplication/run_dispatch.py: drive(connection, database_url, lease, model_factory, config) checks execution_block, then picks workflow, goal or verification, and passes itself as Delegation.drive\napplication/goal_loop.py: run_goal(), build_stage(), prompts\napplication/workflow_runner.py: run_workflow(), importing run_lifecycle only",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "python-worker rule: the lease and fencing code moves verbatim. Run tests/db wake_check, review_check and assignment_check (db profile) before and after.",
+      "verdict": "confirmed",
+      "verifierNote": "An AST scan of tracked Python reproduced every count: 40 private-name imports, 6 in src, 34 in 19 test files from 9 modules, and 10 test files importing goal_loop privates. mypy's files list in services/agent/pyproject.toml is src and tests, so tests/db at the repository root is not type-checked."
+    },
+    {
+      "id": "XMOD-08",
+      "title": "Process configuration is read at call sites in four layers, and the worker imports the API entry point to get it",
+      "dimension": "approach",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/settings.py",
+          "line": 1,
+          "endLine": 28,
+          "note": "'read once ... by the entry point', but it covers 4 variables"
+        },
+        {
+          "file": "services/agent/src/autobots/api/main.py",
+          "line": 17,
+          "endLine": 34,
+          "note": "DEFAULT_KEY_FILE and provider_context_from_environment"
+        },
+        {
+          "file": "services/agent/src/autobots/application/tool_keys.py",
+          "line": 29,
+          "note": "DEFAULT_KEY_FILE defined again, with its override at 77-78"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/worker.py",
+          "line": 29,
+          "note": "worker imports api.main"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/worker.py",
+          "line": 178,
+          "endLine": 186,
+          "note": "disk readiness read from the environment"
+        },
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 86,
+          "endLine": 97,
+          "note": "the same readiness inputs read separately"
+        },
+        {
+          "file": "services/agent/src/autobots/application/experts.py",
+          "line": 32,
+          "note": "environ defaults to os.environ (also :58); :55 passes os.environ"
+        },
+        {
+          "file": "apps/web/lib/server-config.ts",
+          "line": 11,
+          "endLine": 21,
+          "note": "the web's single config reader, for contrast"
+        }
+      ],
+      "occurrences": 26,
+      "evidence": "Per grep, os.environ appears in 26 modules, and 19 distinct AUTOBOTS_* variables are read in 10 modules across api, application, adapters and operations. DEFAULT_KEY_FILE and its override are defined twice (api/main.py:17-26 and application/tool_keys.py:29, 77-78). The disk readiness rule reads AUTOBOTS_MIN_FREE_BYTES and AUTOBOTS_CONFIG_ROOT separately in the API (operation_routes.py:87, 95) and in the worker (worker.py:184-185), although the worker's comment says a routine 'waits on the same readiness a person would'. The worker takes its provider context from api/main.py, so it imports every api module (all 20, plus the package), every router included. key_sources(..., os.environ) is called in 6 places.",
+      "impact": "No single place lists what a process needs, and defaults can diverge between API and worker. Application functions that default to `environ = os.environ` silently read the real environment in tests unless every caller passes one.",
+      "recommendation": "Add a leaf config module that each entry point loads, and pass the config (or the environ Mapping) down. Share one installation_conditions() between operation_routes and the worker, define the master-key default once, and move provider_context_from_environment out of api/main.py.",
+      "sketch": "autobots/config.py (leaf): ProcessConfig.from_environ(environ) with database_url, config_root, min_free_bytes, backup_dir, supabase_url, service_key, master_key_file, stream_seconds and worker settings; provider_context(config, environ)\napi/main.py, operations/worker.py, bootstrap_owner.py, concept_seed.py: load it once\napplication/operations.py: installation_conditions(config, pool, store), used by operation_routes and worker.unattended_refusal\napplication/*: environ parameters with no os.environ default",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "model-gateway rule 'Late-resolve credential references per attempt': pass the live environ Mapping, not a startup snapshot, so .env files and process keys are still read per attempt. forbid_remote_tracing stays the first call in every entry point.",
+      "verdict": "revised",
+      "verifierNote": "Counts reproduced: os.environ in 26 modules, 19 AUTOBOTS_* names in 10 modules, key_sources(..., os.environ) at 6 sites. Corrected the experts.py line (expand_groups is at :32, not :30) and the worker's reach: its import closure holds all 21 api modules including the package, not 20 of 21."
+    },
+    {
+      "id": "XMOD-09",
+      "title": "Nothing enforces layer direction, and function-level imports hide five cycles",
+      "dimension": "standards",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/pyproject.toml",
+          "line": 47,
+          "note": "ruff selects no tidy-imports or import-outside-top-level rule"
+        },
+        {
+          "file": "services/agent/src/autobots/application/cronjob_tool.py",
+          "line": 38,
+          "endLine": 42,
+          "note": "cronjob_tool -> operations.worker -> goal_loop -> cronjob_tool"
+        },
+        {
+          "file": "services/agent/src/autobots/application/experts.py",
+          "line": 37,
+          "note": "experts -> tool_catalog -> assignments -> experts (again at :65)"
+        },
+        {
+          "file": "services/agent/src/autobots/application/routines.py",
+          "line": 369,
+          "note": "routines -> tool_catalog -> goal_loop -> cronjob_tool -> routines"
+        },
+        {
+          "file": "services/agent/src/autobots/application/tool_gateway.py",
+          "line": 310,
+          "note": "tool_gateway <-> tool_uses (again at :402)"
+        },
+        {
+          "file": "services/agent/src/autobots/application/goal_loop.py",
+          "line": 433,
+          "endLine": 434,
+          "note": "the only function-level import that says why"
+        }
+      ],
+      "occurrences": 7,
+      "evidence": "An AST scan finds 0 cycles among module-level imports, but 29 function-level import statements of autobots modules, in 17 functions across 13 files. 7 of the statements break real cycles: cronjob_tool/worker/goal_loop, experts/tool_catalog/assignments (twice), routines/tool_catalog/goal_loop/cronjob_tool, goal_loop/workflow_runner and tool_gateway/tool_uses (twice). Only goal_loop.py:433 explains its import. Package edges outside the intended direction: application -> adapters 21, application -> operations 6, adapters -> operations 2, operations -> api 1, contracts -> api 1, contracts -> persistence 1. No test or lint rule checks any of them; pyproject.toml:47 selects E, F, W, I, B, UP, ASYNC and RUF, and the exploratory ALL run counts 31 PLC0415 hits.",
+      "impact": "New upward imports and cycles land without notice. Reviewers have to rediscover the intended direction every time, and a function-level import reads like a performance choice when it hides a cycle.",
+      "recommendation": "Add a pytest that builds the layer graph with ast, function-level imports included, and checks it against an allowed matrix with today's exceptions as a shrinking baseline. It should also fail on new module cycles. Require a one-line reason on each remaining function-level import. The test needs no new dependency and runs in the fast profile.",
+      "sketch": "services/agent/tests/test_layering.py: ALLOWED = {domain: {}, contracts: {domain}, persistence: {domain, contracts}, application: {domain, contracts, persistence}, adapters: {domain, contracts, persistence, application}, api: {+adapters}, operations: {all}}; BASELINE = {(file, target), ...}; assert edges - ALLOWED <= BASELINE; assert no new strongly connected component",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "AGENTS.md: checks don't install anything. An ast test uses only the prepared environment, and the fast profile already runs services/agent tests.",
+      "verdict": "revised",
+      "verifierNote": "Reproduced with an AST scan and strongly connected components: no module-level cycle; with function-level imports, five cycles closed by exactly 7 statements. The review's '17 function-level imports' counted functions, not statements (browse_trial.py:148-158 alone holds 11), so the evidence now gives both and occurrences counts the 7 cycle-hiding imports. All six package-edge counts and the 31 PLC0415 hits match."
+    },
+    {
+      "id": "XMOD-11",
+      "title": "API routers get shared dependencies from settings_routes, and each copies the pool accessor",
+      "dimension": "modules",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 52,
+          "endLine": 88,
+          "note": "current_workspace, require_owner and provider_settings live in the settings feature module"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 10,
+          "endLine": 12,
+          "note": "imports operation_routes and settings_routes"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 66,
+          "endLine": 70,
+          "note": "one of 10 identical _pool copies"
+        },
+        {
+          "file": "services/agent/src/autobots/api/workflow_routes.py",
+          "line": 9,
+          "endLine": 12,
+          "note": "imports operation_routes, run_routes and settings_routes"
+        },
+        {
+          "file": "services/agent/src/autobots/api/approval_routes.py",
+          "line": 38,
+          "endLine": 42
+        },
+        {
+          "file": "services/agent/src/autobots/api/app.py",
+          "line": 30,
+          "endLine": 32,
+          "note": "the Pool protocol has only open and close, so routes type the pool as Any"
+        }
+      ],
+      "occurrences": 12,
+      "evidence": "Per grep of `from autobots.api.settings_routes`, 12 of the 14 router modules import current_workspace, require_owner or provider_settings from settings_routes.py. run_routes and workflow_routes also import operation_routes.require_ready, and workflow_routes imports run_routes.budget_error. The same accessor is defined 10 times (approval, artifact, event, expert, improvement, memory, operation, run, routine and workflow routes):\n```\ndef _pool(request: Request) -> Any:\n    pool = request.app.state.pool\n    if pool is None:\n        raise ApiError(503, \"service_unavailable\", \"The database is unavailable.\")\n    return pool\n```",
+      "impact": "Workspace authorization, the most security-relevant dependency, lives in the 417-line provider-settings module, so a settings change ripples into every router's imports. Routers depend on each other instead of being siblings, and the pool is typed Any wherever it is used.",
+      "recommendation": "Create api/dependencies.py holding current_workspace, require_owner, require_ready, provider_settings and a typed database dependency (a Protocol with connection()). Each *_routes module then imports only dependencies, errors and security. Move budget_error to errors.py.",
+      "sketch": "api/dependencies.py: current_workspace, require_owner, require_ready, provider_settings, database() -> ConnectionPool (a Protocol with connection())\napi/errors.py: budget_error and the other shared mappers\n*_routes.py: import dependencies only; no _pool copies and no router-to-router imports",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Per-operation session and workspace checks stay, since every route still depends on current_workspace, and require_internal stays on every router.",
+      "verdict": "confirmed",
+      "verifierNote": "12 routers import from settings_routes (approval, artifact, event, expert, improvement, memory, operation, routine, run, search, tool, workflow); _pool is defined in exactly the 10 listed modules; settings_routes.py is 417 lines and app.py:30-32 declares only open and close. XDUP-20 reports the copied aliases from the duplication side."
+    },
+    {
+      "id": "XMOD-13",
+      "title": "The service layout and DH-03 disagree in five places",
+      "dimension": "structure",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "PRD-Development-Harness.md",
+          "line": 60,
+          "note": "src/autobots/{api,domain,application,adapters,workers,graphs,contracts}/"
+        },
+        {
+          "file": "PRD-Development-Harness.md",
+          "line": 54,
+          "note": "scripts/db/"
+        },
+        {
+          "file": "PRD-Development-Harness.md",
+          "line": 63,
+          "note": "packages/db-types/ described as a boundary"
+        },
+        {
+          "file": "CODEBASE.md",
+          "line": 25,
+          "note": "documents the seven packages that actually exist"
+        },
+        {
+          "file": "services/agent/src/autobots/application/goal_loop.py",
+          "line": 208,
+          "endLine": 246,
+          "note": "the Deep Agents wiring DH-03 places in graphs/"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/worker.py",
+          "line": 1,
+          "note": "the worker DH-03 places in workers/"
+        },
+        {
+          "file": "scripts/persistent_install.py",
+          "line": 395,
+          "note": "the persistent install launches autobots.operations.worker"
+        }
+      ],
+      "occurrences": 5,
+      "evidence": "DH-03 lists api, domain, application, adapters, workers, graphs and contracts. The code has api, domain, application, adapters, contracts, operations and persistence. (1) workers/ is absent: the process is operations/worker.py, and its logic is in application/worker_inference.py and worker_leases.py. (2) graphs/ is absent: build_stage and create_deep_agent are in goal_loop.py:208-246, and the middleware and checkpointer are in adapters/ (loop_middleware, tool_middleware, checkpoints, result_stream). (3) operations/ and (4) persistence/ are not in DH-03. (5) scripts/db/ is absent: app_db.py and disposable_db.py sit in a flat scripts/ with 26 other scripts. DH-03 also omits tests/db, tests/web, tests/faults, tests/qualification and tests/toolchain, and nothing imports packages/db-types.",
+      "impact": "Rules, skills and reviewers that follow DH-03 look for directories that don't exist (see XMOD-04), and new code has no agreed home for graph wiring or worker composition.",
+      "recommendation": "For workers/, operations/, scripts/db/ and the test directories, change the document. operations/worker.py is launched by Makefile:166, the persistent install and four other scripts; app_db is named in 117 tracked files (24 outside docs/ and openspec/) and disposable_db in 47 (21). Describe db-types as an exposure and drift artifact. For graphs/, change the code: when goal_loop is split, put build_stage and the agent middleware there, which also gives the model-gateway rule a real target. Decide persistence/ together with XMOD-10.",
+      "sketch": "DH-03 amendment (user decision): src/autobots/{api,domain,application,adapters,contracts,graphs,operations,persistence}/, where operations = process entry points, operator commands and paid qualification; scripts/ stays flat, with app_db.py and disposable_db.py as the target-checked database operations; tests/{harness,db,web,faults,qualification,toolchain}/\nCode: graphs/stage.py (build_stage, SummarizationOff), graphs/middleware.py (from adapters/loop_middleware.py and tool_middleware.py), graphs/checkpoints.py",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-03 is an approved PRD, so amending it is the user's decision, recorded under docs/engineering/decisions/; no decision in 0001-0026 governs the package layout. Moves must keep `python -m` entry paths or ship shims, and must not change what checkpoints serialize.",
+      "verdict": "revised",
+      "verifierNote": "DH-03's list (PRD-Development-Harness.md:54-63) checked against CODEBASE.md:25 and the tree; a grep of docs/engineering/decisions finds no decision on the layout. The script reference counts (91 and 39) could not be reproduced and are replaced with git grep -l counts; .claude/skills/autobots-model-gateway/SKILL.md:8 also names graphs/**."
+    },
+    {
+      "id": "XMOD-10",
+      "title": "contracts imports api and persistence, and persistence/ holds one row type that its only caller bypasses",
+      "dimension": "modules",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/contracts/export.py",
+          "line": 9,
+          "note": "from autobots.api.app import create_app: the service's only upward import"
+        },
+        {
+          "file": "services/agent/src/autobots/contracts/adapters.py",
+          "line": 3,
+          "endLine": 5,
+          "note": "row-to-domain-to-DTO mapper importing persistence.rows"
+        },
+        {
+          "file": "services/agent/src/autobots/persistence/rows.py",
+          "line": 8,
+          "endLine": 20,
+          "note": "the whole persistence layer: one TypedDict"
+        },
+        {
+          "file": "services/agent/src/autobots/application/run_projection.py",
+          "line": 119,
+          "endLine": 120,
+          "note": "rebuilds RunRow from a tuple under a type: ignore"
+        },
+        {
+          "file": "scripts/generate_contracts.py",
+          "line": 98,
+          "note": "runs python -m autobots.contracts.export"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "Only 2 of the 27 contract modules import outside pydantic, contracts and domain: export.py:9 and adapters.py:5. persistence/ is a single 12-field TypedDict, and its only production use rebuilds it from a tuple and silences the type:\n```\nreturn run_summary_from_domain(run_from_row(dict(zip(_NAMES, row[:-1], strict=True))))  # type: ignore[arg-type]\n```\nEverywhere else rows are read by position: 269 accesses of the form `row[N]` (grep for `*row[0-9]`) in application, api and adapters, with more under other names such as found[0]. packages/db-types generates row types only for TypeScript, and no package consumes it. contracts/adapters.py also shares its name with the adapters/ layer.",
+      "impact": "No contract module imports export.py, so loading a DTO never loads the API. The cost is that contracts/ cannot be described or checked as 'imports only domain' without an exception, and the OpenAPI entry point sits where readers look for DTOs. The persistence package suggests typed rows while SQL results stay untyped tuples, and its one type is silenced at its only use.",
+      "recommendation": "Move export.py to api/openapi_export.py, updating scripts/generate_contracts.py:98 and services/agent/tests/test_contracts.py:13; the drift check proves the artifact is unchanged. Move the mapper out of contracts and give it a name other than 'adapters'. Then decide what persistence/ is for: either the home of row mappers for the busiest tables, with the database rule glob pointing at it, or removed.",
+      "sketch": "api/openapi_export.py: openapi_document(), main() (python -m autobots.api.openapi_export)\npersistence/runs.py: RunRow, run_from_row(), run_summary_from_domain()\ncontracts/: imports only pydantic, contracts.* and domain.*, enforced by the layering test",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "contracts rule: generation stays offline (create_app opens nothing), and generated artifacts are regenerated and compared, never hand-edited.",
+      "verdict": "revised",
+      "verifierNote": "Both imports, the type: ignore at run_projection.py:120 and the only two references to the export module (generate_contracts.py:98, test_contracts.py:13) confirmed. Severity lowered from medium to low and impact corrected: export.py is a `python -m` entry that no contract module imports, so the upward edge never loads at DTO import time. Positional access recounted as 269 `row[N]`, not 'at least 286'."
+    },
+    {
+      "id": "XMOD-12",
+      "title": "operations/ mixes the worker, shared logging, seeding, paid trials and a test double, and inner layers import it",
+      "dimension": "structure",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/operations/logs.py",
+          "line": 1,
+          "note": "structured logging and the tracing guard, a leaf concern"
+        },
+        {
+          "file": "services/agent/src/autobots/application/goal_loop.py",
+          "line": 89,
+          "note": "application imports operations.logs (also operations.py:23, retention.py:11, routines.py:35, worker_inference.py:61)"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 66,
+          "note": "adapters import operations.logs (also result_stream.py:21)"
+        },
+        {
+          "file": "services/agent/src/autobots/application/cronjob_tool.py",
+          "line": 38,
+          "endLine": 42,
+          "note": "application lazily imports operations.worker"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/fake_stream.py",
+          "line": 1,
+          "endLine": 3,
+          "note": "fake-transport helper used only by tests and qualifiers"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/route_qualification.py",
+          "line": 1,
+          "endLine": 3,
+          "note": "'Paid qualification of one OpenRouter route'"
+        },
+        {
+          "file": "Makefile",
+          "line": 166,
+          "note": "launches python -m autobots.operations.worker"
+        }
+      ],
+      "occurrences": 8,
+      "evidence": "The 8 modules are: the worker process (worker.py); operator commands (bootstrap_owner.py, concept_seed.py); logging and the tracing guard (logs.py); paid live trials (route_qualification.py, reasoning_trial.py, browse_trial.py); and a streaming fake used only by tests and qualifiers (fake_stream.py). Inner layers import operations 8 times: 7 imports of logs from application and adapters, plus the lazy import of operations.worker at cronjob_tool.py:40, which closes the cycle cronjob_tool -> worker -> goal_loop -> cronjob_tool.",
+      "impact": "Logging is a leaf concern, but here it ties application and adapters to the package that also holds the process entry and paid code, so the rule 'operations sits at the edge' can't be checked. Test support also ships inside the production package without being marked as such.",
+      "recommendation": "Move logs.py to a leaf module and fake_stream.py to a testing module. Moving logs.py also touches six code references outside the package (scripts/qualify_operations.py, services/agent/tests/test_final_review.py, test_operations.py and test_worker_inference.py, tests/db/operations_worker.py and tests/db/verification_check.py) and the operations runbook, so update them in the same change or keep a re-export in operations/logs.py for a while. Inject the credential check into cronjob_tool when the registry is built, so application never imports operations. Leave the command modules where they are: Makefile:166, scripts/persistent_install.py:395 and :629, and four other scripts launch the worker, and route_qualification is a documented command.",
+      "sketch": "autobots/logs.py: redact, JsonFormatter, configure_logging, log_event, forbid_remote_tracing, remote_tracing_disabled (stdlib only)\nautobots/testing/fake_stream.py: stream_chunks for fake transports\noperations/: worker, bootstrap_owner, concept_seed, route_qualification, reasoning_trial, browse_trial (entry points only)\napplication/cronjob_tool.py: cronjob_tool(credential_check), built by the registry composer with the worker's check",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "Paid trials stay explicit and unchanged. forbid_remote_tracing keeps its behavior and call sites, so there is still no hosted tracing. Entry module paths stay stable for the persistent install.",
+      "verdict": "revised",
+      "verifierNote": "Confirmed the 8 inner-layer imports (7 of operations.logs, 1 lazy import of operations.worker) and that fake_stream is used only by services/agent/tests/test_worker_inference.py and tests/db/product_inference_worker.py. Severity lowered from medium to low: logs.py is stdlib-only, so the edge is conceptual; the cronjob_tool -> worker cycle is the substantive part and is planned under XMOD-01 and XMOD-09. Added the external references a move must update."
+    },
+    {
+      "id": "XMOD-15",
+      "title": "contracts/tools.py is a hub for unrelated modules, and the contract model configs are copied",
+      "dimension": "structure",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/contracts/tools.py",
+          "line": 12,
+          "note": "TOOL_CONTRACT, imported by 10 other contract modules"
+        },
+        {
+          "file": "services/agent/src/autobots/contracts/tools.py",
+          "line": 16,
+          "endLine": 262,
+          "note": "built-in and GitHub tool argument models"
+        },
+        {
+          "file": "services/agent/src/autobots/contracts/tools.py",
+          "line": 290,
+          "endLine": 387,
+          "note": "catalog HTTP DTOs, followed by more tool models at 388-455"
+        },
+        {
+          "file": "services/agent/src/autobots/contracts/approvals.py",
+          "line": 9,
+          "note": "VIEW redefined here and in 8 other modules"
+        },
+        {
+          "file": "services/agent/src/autobots/contracts/primitives.py",
+          "line": 9,
+          "endLine": 10,
+          "note": "STRICT_CONTRACT lives here"
+        }
+      ],
+      "occurrences": 11,
+      "evidence": "contracts/tools.py (474 lines) interleaves 31 TOOL_CONTRACT models for model-facing tool arguments with 8 STRICT_CONTRACT catalog DTOs served over HTTP. Meanwhile the web, market, code, cronjob and browsing tool schemas each have their own module. 10 contract modules import contracts.tools only for TOOL_CONTRACT, and `VIEW = ConfigDict(extra=\"forbid\", frozen=True)` is defined identically in 9 modules (approvals, experts, improvements, memory, operations, routines, run_workspace, search, workflows).",
+      "impact": "An edit to the HTTP catalog view lands in a file of GitHub argument schemas. The two audiences, OpenAPI consumers and model tool calls versioned by TOOL_VERSIONS, can't be told apart by file location.",
+      "recommendation": "Put the three shared configs in contracts/primitives.py. Split contracts/tools.py into a tool_catalog module for the HTTP DTOs and per-family tool schema modules, matching web_tools.py and market_tools.py.",
+      "sketch": "contracts/primitives.py: STRICT_CONTRACT, VIEW, TOOL_CONTRACT\ncontracts/tool_catalog.py: FieldDescriptor ... ToolCatalog, ToolVersions, GrantedTo, ToolGrants\ncontracts/builtin_tools.py and contracts/github_tools.py: tool input and output models",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "contracts rule (generator ownership): contracts/generated/ must stay byte-identical, which scripts/generate_contracts.py's drift check proves. Model names and schemas don't change.",
+      "verdict": "confirmed",
+      "verifierNote": "Counted model_config lines in contracts/tools.py: 31 TOOL_CONTRACT and 8 STRICT_CONTRACT models, plus GrantedTo and ToolGrants with an inline config; 10 modules import TOOL_CONTRACT from it and VIEW is defined identically in the 9 named modules."
+    },
+    {
+      "id": "XMOD-16",
+      "title": "Three BFF routes duplicate paths the /api/v1 catch-all already forwards",
+      "dimension": "structure",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/app/api/settings/[...path]/route.ts",
+          "line": 7,
+          "endLine": 16,
+          "note": "forwards /api/settings/* to /v1/settings/*, without the query string"
+        },
+        {
+          "file": "apps/web/app/api/v1/[...path]/route.ts",
+          "line": 7,
+          "endLine": 17,
+          "note": "forwards every /api/v1/* path, settings included, with its query"
+        },
+        {
+          "file": "apps/web/app/api/models/route.ts",
+          "line": 5,
+          "endLine": 7
+        },
+        {
+          "file": "apps/web/app/api/runs/intent/route.ts",
+          "line": 5,
+          "endLine": 7,
+          "note": "no component calls it; only a browser test does"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 136,
+          "endLine": 137,
+          "note": "uses the older namespace"
+        },
+        {
+          "file": ".claude/rules/model-gateway.md",
+          "line": 6,
+          "note": "scopes the older settings route"
+        }
+      ],
+      "occurrences": 15,
+      "evidence": "The settings, models and runs/intent routes were added in US-3.2, after the catch-all, which has forwarded every /v1 path since US-2.5 (git log --diff-filter=A); US-5.3 later moved it onto lib/bff.ts. Components use the older paths 15 times in 5 files (model-policy-panel 4, provider-settings-panel 5, keys-and-vars-panel 3, run-disclosure 2, goal-composer 1). /api/runs/intent has no component caller (apps/web/tests/browser/saved-choice.spec.ts:56 uses it). The settings catch-all also drops the query string, which the v1 catch-all forwards.",
+      "impact": "The browser uses two URL schemes for one API, and three extra route files have to stay in step with lib/bff.ts.",
+      "recommendation": "Use /api/v1 everywhere, delete the three routes, and update the model-gateway rule glob and the browser test in the same change.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "nextjs rule: every operation still goes through lib/bff.ts forward, so auth and CSRF checks are unchanged. The model-gateway rule's web glob moves to the remaining settings code.",
+      "verdict": "revised",
+      "verifierNote": "The duplicate forwarding and the 15 uses in 5 components are confirmed. The history claim was wrong: the catch-all came first (US-2.5) and the three routes were added in US-3.2; corrected. Noted that the settings route drops query strings, so moving to /api/v1 also removes that difference."
+    },
+    {
+      "id": "XMOD-17",
+      "title": "Two CredentialCheck aliases with different signatures name the same concept",
+      "dimension": "naming",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/application/cronjob_tool.py",
+          "line": 35,
+          "note": "Callable[[Any, UUID], Awaitable[str]]"
+        },
+        {
+          "file": "services/agent/src/autobots/application/routines.py",
+          "line": 38,
+          "note": "Callable[[UUID], Awaitable[str]]"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/worker.py",
+          "line": 190,
+          "note": "first shape, spelled inline (again at :230)"
+        },
+        {
+          "file": "services/agent/src/autobots/application/cronjob_tool.py",
+          "line": 143,
+          "note": "ready closure converting one shape to the other (worker.py:203 does the same)"
+        }
+      ],
+      "occurrences": 4,
+      "evidence": "The two aliases share a name but take different arguments, and both the worker and cronjob_tool write a local closure to convert between them.",
+      "impact": "A function's parameter name doesn't tell the reader which check it expects. mypy catches mismatches, but each new caller writes another conversion closure.",
+      "recommendation": "Give the two shapes different names and define them once beside run_intent in application/provider_settings.py (for example WorkspaceReadiness for Callable[[UUID], Awaitable[str]] and ConnectionReadiness for Callable[[Any, UUID], Awaitable[str]]), and use the named alias in worker.py instead of the inline Callable. Keep the small closures that bind a connection: they are the honest conversion between the two.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "none",
+      "verdict": "revised",
+      "verifierNote": "Aliases at cronjob_tool.py:35 and routines.py:38, inline shapes at worker.py:190 and :230, and closures at cronjob_tool.py:143 and worker.py:203 confirmed. Recommendation narrowed to naming, since a single Protocol would still need the connection-binding closures."
+    }
+  ],
+  "rejected": [
+    {
+      "id": "XMOD-14",
+      "title": "Tool implementations are spread over 17 modules in two layers, named four different ways",
+      "reason": "Mostly taste, and subsumed by XMOD-01. The counts hold (31 ToolDefinition constructions in 17 modules), but the split follows a rule: external-provider clients sit in adapters/, database-backed and feature tools beside their feature in application/. XMOD-01's registry module becomes the single index of tools, and the proposed package move is churn with checkpoint-path risk that the finding itself defers. The stale docstring at application/tools.py:1 ('Nothing else exists' above five tools) is a single-file comment issue for the py-tools area."
+    }
+  ],
+  "notCovered": "This lens covers patterns across the 545 in-scope files. I opened the code behind every cited pattern but did not read every file in full; the area reviews cover single files. Large modules I read only in part include goal_loop, workflow_runner, tool_catalog, tool_gateway, approvals, run_routes, settings_routes, operations/worker, loop_middleware, the GitHub adapters, goal-composer and run-controls. The Python import analysis is static (ast): it counts module-level and function-level imports, does not run the code, and would miss importlib or other dynamic imports. The 110-module closure counts module-level imports only. The TypeScript analysis covers apps/web app, components and lib with grep; package internals and test files were not graphed. I counted dependencies inside tests/ and scripts/ (sys.path inserts, private-name imports) but did not map them module by module. I did not check whether any LangGraph checkpoint stores classes by import path, so the module moves proposed here carry that open question. The project's PreToolUse hook refused one read-only grep because its pattern named the provider master key file; I reran it on the constant name DEFAULT_KEY_FILE. Per the ground rules, I did not rerun verification profiles or any runtime check, and the only file written is scratch output in .checks/reviews/review-2026-11-12-09-52-30/sweep-boundaries/py_edges.tsv."
+}

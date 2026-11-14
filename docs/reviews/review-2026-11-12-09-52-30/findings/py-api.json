@@ -1,0 +1,1238 @@
+{
+  "schema": "autobots.code-review/v1",
+  "area": "py-api",
+  "title": "Python: HTTP API",
+  "kind": "area",
+  "timestamp": "2026-11-12-09-52-30",
+  "revision": "156534da0bd5b19417f05d313077d767804b175b",
+  "summary": "The HTTP layer has 21 files, 3,206 lines and 80 routes in 14 routers, and its skeleton is sound. create_app stays pure for offline OpenAPI generation: it opens nothing, test_app_factory proves this with sockets blocked, and contracts/export.py builds the schema from it. The pool lives in the lifespan. Authentication fails closed. One error envelope never echoes input. Every schema route has a stable operation_id and a response model, and an AST test bans background work in requests. Where an application service exists (workflows, routines, Experts), handlers are thin. The friction sits where no such service exists. run_routes.py and settings_routes.py hold 11 of the 13 SQL statements found in route modules, including the versioned model-policy writes and the model-call reconciliation transaction. post_run (101 lines, complexity 12) assembles the gate for paid work inline. Shared plumbing is copied or in the wrong place: 10 copies of _pool, and the auth dependencies that 73 routes use live in settings_routes, with four ways of resolving the workspace. Error translation is spread over 54 per-module mappings keyed on code strings. app.state and the database handles are untyped (Any). Handlers read os.environ on every request, and five handlers hold two of the pool's five connections at once. The published OpenAPI documents a 422 body the server never sends and no ErrorResponse at all. In-process tests are strong at the boundary but reach only 8 of the 80 operations.",
+  "scores": [
+    {
+      "dimension": "standards",
+      "score": 3,
+      "why": "Passes the project's ruff and mypy strict, and every schema route has an operation_id and a response model. However, DH-06's rule that domain decisions stay independent of HTTP is broken in the run and settings routes, and nothing enforces against 7 suppressions, 16 Any signatures or 78 redundant response_model arguments."
+    },
+    {
+      "dimension": "modules",
+      "score": 3,
+      "why": "One router per feature, composed by a pure factory. But 15 imports between route modules make settings_routes the hub for the authorization of 73 routes, and a Postgres adapter sits inside api/."
+    },
+    {
+      "dimension": "size",
+      "score": 3,
+      "why": "Most modules are small, but four files exceed 300 lines (486, 417, 380 and 331), post_run (101 lines) and get_local_status (83) dominate, and 17 functions (16 handlers and the _command helper) take six or more parameters."
+    },
+    {
+      "dimension": "functions",
+      "score": 3,
+      "why": "Most handlers make one application call and map one refusal. post_run, preview_run, post_reconcile, check_run_intent and get_local_status mix validation, SQL, rules and DTO assembly."
+    },
+    {
+      "dimension": "structure",
+      "score": 3,
+      "why": "The layout follows DH-03's api package, but routes.py and settings_routes.py no longer say what they own, and shared request plumbing has no module of its own."
+    },
+    {
+      "dimension": "approach",
+      "score": 3,
+      "why": "Idiomatic FastAPI: Annotated dependencies, a lifespan-owned pool, exception handlers and SSE authorized before the first byte. It is undercut by SQL in handlers, an untyped app.state, environment reads per request and split connection ownership."
+    },
+    {
+      "dimension": "comments",
+      "score": 4,
+      "why": "Every module docstring states its invariant, and comments explain why with story and decision IDs. Two docstrings are stale, and 24% of public functions have docstrings."
+    },
+    {
+      "dimension": "types",
+      "score": 3,
+      "why": "Pydantic contracts and bounded parameters at the edge. But pools and connections are Any, handlers map dict rows, 7 suppressions sit at DTO construction, and the OpenAPI misdescribes every error body."
+    },
+    {
+      "dimension": "errors",
+      "score": 3,
+      "why": "One safe envelope that never echoes input or leaks detail. But mapping is spread over 54 per-module translations keyed on code strings, with inconsistent wording."
+    },
+    {
+      "dimension": "tests",
+      "score": 3,
+      "why": "Strong boundary tests: forged tokens, host, factory purity with sockets blocked, the background-work ban. But only 8 of 80 operations run in-process, and several refusal branches have no test anywhere."
+    },
+    {
+      "dimension": "maintainability",
+      "score": 3,
+      "why": "Safe and well explained, but the route layer has absorbed use-case logic and duplicated plumbing, so admission and settings changes are slower and riskier than they need to be."
+    }
+  ],
+  "strengths": [
+    {
+      "title": "A pure factory with lifespan-owned resources, proven offline",
+      "evidence": "services/agent/src/autobots/api/app.py:41-92 builds the app without I/O and opens the pool only in the lifespan (49-62). contracts/export.py:22-30 generates OpenAPI from create_app(). services/agent/tests/test_app_factory.py:10-102 blocks sockets and pins the set of paths, and test_api.py:156-180 shows the pool opens and closes with the lifespan."
+    },
+    {
+      "title": "One safe error envelope with fixed text",
+      "evidence": "services/agent/src/autobots/api/errors.py:19-40 returns ErrorResponse with server-chosen messages, never echoes rejected input (line 31) and exposes nothing on unexpected errors (test_api.py:124-129, 137-154). settings_routes.py:91-92 documents why the messages are fixed."
+    },
+    {
+      "title": "Authentication fails closed at the edge",
+      "evidence": "security.py:20-30 makes deny-all the default membership. Lines 38-45 compare the internal token in constant time, and lines 48-67 accept only HS256 with exp, sub and aud required. settings.py:12 makes empty secrets fail closed. test_api.py:54-92 covers wrong-secret, wrong-audience, expired, none-algorithm and no-expiry tokens."
+    },
+    {
+      "title": "Requests never own long-running work, and a test enforces it",
+      "evidence": "routes.py:1 and run_routes.py:1 state the rule. test_api.py:201-210 parses every api module and rejects BackgroundTasks, create_task, run_in_executor and threads."
+    },
+    {
+      "title": "Thin handlers where an application service exists",
+      "evidence": "workflow_routes.py:223-299, routine_routes.py:54-131 and expert_routes.py:95-101 each make one dependency-checked call and one refusal mapping, and the application owns the SQL. This is the target shape for the run and settings routes."
+    },
+    {
+      "title": "A stable, explicit contract surface",
+      "evidence": "All 78 schema routes declare an operation_id and a response model (for example run_routes.py:170-176). The 18 create-and-command mutations, admission among them, require a bounded Idempotency-Key header (run_routes.py:63), settings writes carry an expected version instead, and admission answers 202 as Option B asks."
+    },
+    {
+      "title": "Streams authorize before the first byte and re-validate live frames",
+      "evidence": "event_routes.py:226-241 refuses with a status, not an empty stream. _live_frame (145-170) re-validates NOTIFY payloads as the typed ResultTextDelta and never moves the replay cursor, and _frames closes the listener in finally (173-182)."
+    },
+    {
+      "title": "Docstrings and comments state invariants and cite sources",
+      "evidence": "Module docstrings such as event_routes.py:1, artifact_routes.py:1 and operation_routes.py:1, and comments such as run_routes.py:215, run_routes.py:249 and approval_routes.py:85, explain why, with story and decision IDs."
+    }
+  ],
+  "findings": [
+    {
+      "id": "PAPI-01",
+      "title": "Route handlers own SQL, transactions and use-case rules",
+      "dimension": "approach",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 305,
+          "endLine": 345,
+          "note": "put_model_policy: version check, row lock and upsert in the handler"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 348,
+          "endLine": 379,
+          "note": "reset_model_policy_overrides repeats lock, check and upsert"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 433,
+          "endLine": 474,
+          "note": "post_reconcile: receipt lookup, FOR UPDATE select and reconcile in one handler transaction"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 120,
+          "endLine": 144,
+          "note": "preview_run queries model_policies and expert_versions directly"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 291,
+          "endLine": 296,
+          "note": "_require_run existence query in the route module"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 377,
+          "endLine": 392,
+          "note": "post_resume orders the recovery preconditions in the handler"
+        },
+        {
+          "file": "services/agent/src/autobots/api/event_routes.py",
+          "line": 197,
+          "endLine": 199,
+          "note": "run status query inside the stream loop"
+        },
+        {
+          "file": "services/agent/src/autobots/api/improvement_routes.py",
+          "line": 99,
+          "endLine": 114,
+          "note": "policy read, resolve and offered check in post_replay"
+        }
+      ],
+      "occurrences": 13,
+      "evidence": "Counted with grep: route modules hold 13 SQL statements and 3 transactions. That excludes the LISTEN at event_routes.py:139 and the adapter membership.py. They split as run_routes.py 5, settings_routes.py 6, improvement_routes.py 1 and event_routes.py 1. The whole versioned model-policy write path is in handlers:\n  async with pool.connection() as connection, connection.transaction():\n      cursor = await connection.execute(\"select version from app_private.model_policies where workspace_id = %s for update\", ...)\n      if current != body.expected_version:\n          raise ApiError(409, \"stale_version\", ...)\n      await connection.execute(\"insert into app_private.model_policies ... on conflict (workspace_id) do update ...\")",
+      "impact": "The model-policy table is read or written from 9 places in api/ and 3 in application/, so a column or rule change means editing HTTP code. No other entry point (worker, cronjob tool, script) can reuse the versioned write or the idempotent reconciliation without going through HTTP. These statements run only through HTTP, in browser specs and qualification scripts. They never run in the fast profile, because the tests/db checks call application functions directly.",
+      "recommendation": "Move each statement into the application module that owns the table, and leave handlers to parse, authorize, call one function and map refusals. The model-policy read, save and reset, with the expected-version check and the row lock, go to a new application/model_policy.py that raises a typed stale-version refusal. The reconciliation flow (receipt, FOR UPDATE, reconcile, store_receipt) goes to application/reconciliation.py. The run existence and status reads go to application/runs.py and run_projection.py, and the preview's Expert lookup goes to application/experts.py. Add in-process tests for the moved functions before moving them, and keep the db and operations profiles as the proof.",
+      "sketch": "application/model_policy.py: read_policy(conn, ws) -> StoredPolicy; save_policy(conn, ws, expected_version, default, overrides) -> StoredPolicy; reset_overrides(conn, ws, expected_version) -> StoredPolicy; workspace_role_policy(conn, ws, *, run_overrides=None, run_profile=None) -> RolePolicy\napplication/reconciliation.py: reconcile_oldest_uncertain_call(conn, *, workspace_id, actor_id, run_id, idempotency_key, charged_micro_usd) -> int\napplication/runs.py: require_run(conn, ws, run_id) (raises RunNotFound); run_projection.run_status(conn, run_id) -> RunStatus | None\napplication/experts.py: latest_config(conn, ws, expert_id) -> ExpertConfig\napi/settings_routes.put_model_policy: validate body -> save_policy -> _policy_state (about 12 lines)",
+      "effort": "M",
+      "risk": "high",
+      "ruleCheck": "DH-06 'Keep domain decisions independent of HTTP' and the Python rule's layer separation. The optimistic version check, the FOR UPDATE lock and the operation receipt move unchanged, so no guardrail is weakened. SQL stays the schema owner, and no migration is involved.",
+      "verdict": "confirmed",
+      "verifierNote": "13 statements and 3 transactions recounted with grep (run_routes 5, settings_routes 6, improvement_routes 1, event_routes 1); model_policies appears 9 times in api/ and 3 in application/."
+    },
+    {
+      "id": "PAPI-02",
+      "title": "post_run packs nine admission concerns into one 101-line handler",
+      "dimension": "functions",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 177,
+          "endLine": 277,
+          "note": "101 lines, C901 12, 6 parameters, no docstring"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 185,
+          "endLine": 197,
+          "note": "request-shape and budget-versus-limit rules on their own connection"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 198,
+          "endLine": 200,
+          "note": "key readiness gate"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 209,
+          "endLine": 239,
+          "note": "owner-only version pin, binding resolution, tool availability from os.environ"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 240,
+          "endLine": 251,
+          "note": "policy resolution and offered check, 422 versus 409"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 252,
+          "endLine": 277,
+          "note": "admission, conflict mapping, type-ignored DTO"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "The checks run in this order:\n1. Session and Expert shape (185-186).\n2. Budget xor limit, plus the daily cap on its own connection (187-197).\n3. Key readiness (198-200).\n4. Workspace policy read with raw SQL (201-208).\n5. Owner-only version pin through request.app.state.membership (211-216).\n6. Expert binding, with ExpertRefused mapped by code suffix (217-227).\n7. Tool availability against os.environ (228-239).\n8. Offered profiles (240-251).\n9. Admission and conflict mapping (252-270).\nFinally it builds RunAccepted with a type: ignore (275).",
+      "impact": "This is the gate for paid work and an authorization point, yet no in-process test reaches POST /v1/runs, and the session_required branch appears in no test anywhere. Every new admission rule lands mid-function, and which refusal wins depends on implicit ordering.",
+      "recommendation": "Extract an admission use case in the application layer. It takes a plain input dataclass and returns the admission result or raises a typed refusal. The handler only gathers dependencies (role, provider settings, environment), calls it and maps refusals. Before moving any code, test the use case branch by branch with fakes in the fast profile.",
+      "sketch": "application/run_admission.py\n  @dataclass(frozen=True) AdmissionInput(goal_text, limit, budget, session_id, expert_id, expert_version, run_profile, criteria, artifacts, documents, continues_run_id)\n  async def admit_from_request(conn, gate, *, workspace_id, user_id, role, key, data) -> AdmissionResult\n    _choose_limit(data, remaining) -> int            # budget xor limit, require_budget\n    _expert_binding(conn, workspace_id, data, role)  # owner-only pin, resolve_binding, require_available\n    _policy(conn, workspace_id, binding, data)       # workspace_role_policy + require_offered\n  raises AdmissionRefused(code, kind)\napi/run_routes.post_run (about 20 lines): role = await membership.role_in(...); result = await admit_from_request(...); return RunAccepted(...)",
+      "effort": "M",
+      "risk": "high",
+      "ruleCheck": "DH-06 'Keep HTTP admission separate from durable execution': admission stays in the request and still only records intent. The Decision 0011 owner-only pin and the PK-02 tool refusal move with their comments, and server idempotency stays the duplicate-submit mechanism.",
+      "verdict": "confirmed",
+      "verifierNote": "101 lines, C901 12, six parameters and the nine-step order confirmed, and session_required appears in no test; plan it with PAPI-01 and PAPI-04, which share the admission gate."
+    },
+    {
+      "id": "PAPI-03",
+      "title": "The OpenAPI document misdescribes every error response",
+      "dimension": "types",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/errors.py",
+          "line": 29,
+          "endLine": 32,
+          "note": "every validation failure returns ErrorResponse {code, message}"
+        },
+        {
+          "file": "services/agent/src/autobots/api/app.py",
+          "line": 78,
+          "endLine": 91,
+          "note": "routers included with no responses= declaration"
+        },
+        {
+          "file": "services/agent/src/autobots/api/security.py",
+          "line": 44,
+          "endLine": 45,
+          "note": "401 on every route, undeclared"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 170,
+          "endLine": 176,
+          "note": "admitRun declares only 202 yet raises 403, 404, 409, 422 and 503"
+        },
+        {
+          "file": "services/agent/src/autobots/contracts/export.py",
+          "line": 22,
+          "endLine": 30,
+          "note": "ErrorResponse added as a loose component that no operation references"
+        }
+      ],
+      "occurrences": 78,
+      "evidence": "Read from contracts/generated/openapi.json with a python3.12 -I script: all 78 operations document 422 as #/components/schemas/HTTPValidationError ({detail: [...]}), and none references ErrorResponse. Yet errors.py:29-32 answers every validation failure with ErrorResponse, and handlers raise ApiError with 401, 403, 404, 409 and 503, which no operation declares. The generated client exports parseHTTPValidationError for a body the server never sends, and its generated parseErrorResponse is unused by the web.",
+      "impact": "Option B SP-009 makes the generated OpenAPI the public schema source, but error bodies are outside it. The BFF and the screens therefore parse code by hand, and a renamed field or error shape would never show up as contract drift. The published 422 shape is wrong for all 78 operations.",
+      "recommendation": "Declare the real error envelope once. Pass a shared ERROR_RESPONSES mapping (401, 403, 404, 409, 422 and 503 to ErrorResponse) to include_router in create_app. Declaring 422 also stops FastAPI from emitting its default validation schema. Then regenerate contracts/generated and the TypeScript client with the generator and let consumers use the generated parser. Runtime behavior does not change. Narrowing per-route error codes can come later.",
+      "sketch": "# api/errors.py\nERROR_RESPONSES = {status: {\"model\": ErrorResponse, \"description\": text} for status, text in ((401, \"Not authorized\"), (403, \"Forbidden\"), (404, \"Not available\"), (409, \"Conflict\"), (422, \"Invalid request\"), (503, \"Unavailable\"))}\n# api/app.py\nfor item in ROUTERS: app.include_router(item, responses=ERROR_RESPONSES)\n# regenerate contracts/generated/openapi.json and packages/api-client/src/generated.ts with the generator",
+      "effort": "S",
+      "risk": "high",
+      "ruleCheck": "contracts.md and DH-06: Pydantic/OpenAPI owns the public API and generated TypeScript consumes it. The generated files are regenerated, never hand-edited. Codes and messages stay the fixed server text that errors.py requires.",
+      "verdict": "confirmed",
+      "verifierNote": "Generated openapi.json read: 78 operations all document 422 as HTTPValidationError and none references ErrorResponse; parseErrorResponse and parseHTTPValidationError are unused outside generated.ts."
+    },
+    {
+      "id": "PAPI-04",
+      "title": "The gate for model-backed work is rebuilt in five handlers",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 198,
+          "endLine": 200,
+          "note": "key gate, first wording"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 374,
+          "endLine": 376,
+          "note": "same gate on resume"
+        },
+        {
+          "file": "services/agent/src/autobots/api/improvement_routes.py",
+          "line": 96,
+          "endLine": 114,
+          "note": "gate, policy select, resolve, offered check, second wording"
+        },
+        {
+          "file": "services/agent/src/autobots/api/workflow_routes.py",
+          "line": 352,
+          "endLine": 365,
+          "note": "budget check and gate, third wording"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 389,
+          "endLine": 407,
+          "note": "gate, policy select, resolve and offered check, returned as a code"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 201,
+          "endLine": 208,
+          "note": "policy select in admission"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 121,
+          "endLine": 127,
+          "note": "policy select in preview"
+        },
+        {
+          "file": "services/agent/src/autobots/api/workflow_routes.py",
+          "line": 10,
+          "endLine": 10,
+          "note": "imports budget_error from run_routes"
+        }
+      ],
+      "occurrences": 13,
+      "evidence": "Counted with grep, 13 sites in four groups:\n- 4 handlers call settings.run_intent(...) and then raise ApiError(409, code, ...) when the code is not ready, using 3 different messages.\n- 4 handlers select default_profile and role_overrides from app_private.model_policies, then call resolve_role_policy(workspace_default=row[0] if row else None, ...). application/ has 3 more copies of this read.\n- 3 handlers call require_offered(policy.bindings.values()).\n- 2 handlers call require_budget against remaining_daily_micro_usd, sharing budget_error across route modules.",
+      "impact": "Whether paid work may start is one product rule, but each entry point applies its own subset of the checks, with its own status and wording. Resume skips the offered check, and workflows check the key only when a step needs a model. A change to readiness or to the offered profiles must be repeated consistently in five handlers and three application modules.",
+      "recommendation": "Name the gate in the application layer, with one function per deliberate variant, and call it from the handlers: workspace_role_policy, require_model_ready, an offered-policy check and chosen_limit. Make the deliberate differences explicit parameters, not missing lines. Move budget_error to the shared error module.",
+      "sketch": "application/model_gate.py: require_model_ready(settings, ws) -> None (raises GateRefused(code)); workspace_role_policy(conn, ws, *, run_overrides=None, run_profile=None, require_offered=True) -> RolePolicy; chosen_limit(conn, ws, budget) -> int (raises BudgetRefused)",
+      "effort": "M",
+      "risk": "high",
+      "ruleCheck": "DH-06 'Avoid ... duplicated business rules'. The worker still re-checks key readiness before dispatch (run_routes.py:373), and refusal codes stay the same, so the browser specs that assert them keep passing.",
+      "verdict": "confirmed",
+      "verifierNote": "Four raise sites with three messages, four policy selects (plus three in application/), three require_offered calls and two budget checks recounted: 13 sites."
+    },
+    {
+      "id": "PAPI-05",
+      "title": "Error translation is per module and keyed on code strings",
+      "dimension": "errors",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/errors.py",
+          "line": 24,
+          "endLine": 40,
+          "note": "only the generic handlers are central"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 73,
+          "endLine": 90,
+          "note": "as_api_error returns an ApiError or re-raises (line 90)"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 91,
+          "endLine": 117,
+          "note": "a second as_api_error, plus a HANDLED tuple so callers avoid its re-raise"
+        },
+        {
+          "file": "services/agent/src/autobots/api/workflow_routes.py",
+          "line": 82,
+          "endLine": 96,
+          "note": "seven returns chained on code strings; getattr for a typed field"
+        },
+        {
+          "file": "services/agent/src/autobots/api/improvement_routes.py",
+          "line": 42,
+          "endLine": 44,
+          "note": "404 when the code ends with not_found"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 226,
+          "endLine": 226,
+          "note": "same suffix rule inline"
+        },
+        {
+          "file": "services/agent/src/autobots/api/memory_routes.py",
+          "line": 58,
+          "endLine": 59,
+          "note": "any MemoryRefused becomes the Expert-not-found message"
+        },
+        {
+          "file": "services/agent/src/autobots/api/approval_routes.py",
+          "line": 156,
+          "endLine": 159,
+          "note": "a third wording for IdempotencyConflict"
+        }
+      ],
+      "occurrences": 54,
+      "evidence": "Counted with grep: 54 `raise ... from None` translations across 10 route modules. IdempotencyConflict is mapped in 6 places with 3 wordings. Four places choose 404 over 409 with error.code.endswith(\"not_found\"), and four more compare codes for equality. Two functions named as_api_error are typed -> ApiError but end with `raise error`, so their callers narrow their except clauses to avoid that path.",
+      "impact": "Adding a refusal code means finding the right local mapper. A not-found code that does not end in not_found silently becomes 409, and a new MemoryRefused code would be reported as a missing Expert. The same conflict reads differently depending on the route, and none of these mappers has a test.",
+      "recommendation": "Make errors.py the one place that turns refusals into responses. Register a handler per refusal type, backed by a table from code to status and fixed message, with route-specific wording only where it is deliberate. Give refusals a typed category (not_found, conflict, invalid, unavailable) instead of inferring it from a code suffix. Handlers then let refusals propagate, which removes most try/except blocks. Cover the table with one parametrized test.",
+      "sketch": "# application/refusals.py (no HTTP)\nclass Refusal(Exception): code: str; kind: Literal[\"not_found\", \"conflict\", \"invalid\", \"unavailable\"]\n# api/errors.py\nSTATUS = {\"not_found\": 404, \"conflict\": 409, \"invalid\": 422, \"unavailable\": 503}\nMESSAGES: Mapping[str, str] = {\"idempotency_conflict\": \"This key was already used with different content.\", ...}\napp.add_exception_handler(Refusal, refusal_response)",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06 'centralize error handling ... expose safe typed errors' and Option B's 'stable safe error codes'. Codes and statuses stay as they are, and messages stay fixed server text, so nothing submitted is echoed.",
+      "verdict": "confirmed",
+      "verifierNote": "54 'from None' raises in 10 modules, six IdempotencyConflict mappings with three wordings and four endswith('not_found') checks recounted."
+    },
+    {
+      "id": "PAPI-06",
+      "title": "Shared request dependencies live in feature route modules",
+      "dimension": "modules",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 52,
+          "endLine": 85,
+          "note": "current_workspace, require_owner and provider_settings, imported by 12 route modules"
+        },
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 100,
+          "endLine": 103,
+          "note": "require_ready, imported by the run and workflow routes"
+        },
+        {
+          "file": "services/agent/src/autobots/api/workflow_routes.py",
+          "line": 9,
+          "endLine": 12,
+          "note": "imports from three other route modules"
+        },
+        {
+          "file": "services/agent/src/autobots/api/security.py",
+          "line": 87,
+          "endLine": 95,
+          "note": "second workspace check, by path parameter and is_member"
+        },
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 288,
+          "endLine": 293,
+          "note": "third: the header or the first workspace"
+        },
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 133,
+          "endLine": 135,
+          "note": "calls the dependency by hand and repeats the owner check"
+        },
+        {
+          "file": "services/agent/src/autobots/api/expert_routes.py",
+          "line": 138,
+          "endLine": 143,
+          "note": "owner check inline, also run_routes.py:211-216"
+        },
+        {
+          "file": "services/agent/src/autobots/api/membership.py",
+          "line": 7,
+          "endLine": 47,
+          "note": "Postgres adapter inside the HTTP package"
+        }
+      ],
+      "occurrences": 15,
+      "evidence": "Counted with grep, there are 15 imports between route modules:\n- 12 modules take their workspace, owner or provider dependencies from settings_routes.\n- 2 take require_ready from operation_routes.\n- 1 takes budget_error from run_routes.\nWorkspace resolution exists in four forms:\n- require_workspace_member (security.py:87)\n- current_workspace (settings_routes.py:52)\n- get_readiness's first-workspace rule (operation_routes.py:288-293)\n- a manual call to the dependency in get_local_status (operation_routes.py:133)\nWalking the factory's routes shows 73 of 80 routes depend on current_workspace.",
+      "impact": "The authorization gate for 73 routes sits in a 417-line settings module. Splitting settings or operations therefore touches every router's imports, and readers must look for workspace rules in four places. The three inline owner checks can drift from require_owner's role test and wording.",
+      "recommendation": "Create api/dependencies.py for request plumbing: the database pool, current_workspace, require_owner, a named readiness-workspace variant, an optional owner workspace for Operations, provider settings and require_ready. Import it from every router, so route modules import only dependencies and application code. Keep the readiness rule deliberately different, but named and colocated. Move PostgresMembership to adapters/ behind the MembershipStore protocol.",
+      "sketch": "api/dependencies.py: db_pool, current_workspace, readiness_workspace (SH-04), require_owner, optional_owner_workspace, provider_settings, keys_and_vars_settings, require_ready; aliases MemberWorkspace, OwnerWorkspace, CurrentUser, IdempotencyKey, Db\nadapters/membership.py: PostgresMembership(pool_provider)",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "DH-03 places adapters under src/autobots/adapters, and DH-06 asks for explicit ownership and narrow interfaces. This is a move with no semantic change: header verification, owner checks and the SH-04/HM-05 readiness rule stay as written. Add the current_workspace tests first.",
+      "verdict": "confirmed",
+      "verifierNote": "15 imports between route modules recounted; a dependency walk of the pure factory confirms 73 of 80 routes depend on current_workspace."
+    },
+    {
+      "id": "PAPI-07",
+      "title": "Request plumbing is copied into each route module",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 66,
+          "endLine": 70,
+          "note": "_pool, one of 10 identical copies"
+        },
+        {
+          "file": "services/agent/src/autobots/api/event_routes.py",
+          "line": 48,
+          "endLine": 52,
+          "note": "copy"
+        },
+        {
+          "file": "services/agent/src/autobots/api/workflow_routes.py",
+          "line": 68,
+          "endLine": 72,
+          "note": "copy"
+        },
+        {
+          "file": "services/agent/src/autobots/api/routes.py",
+          "line": 97,
+          "endLine": 99,
+          "note": "inline 503 check"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 290,
+          "endLine": 292,
+          "note": "model-policy route says provider settings are unavailable"
+        },
+        {
+          "file": "services/agent/src/autobots/api/search_routes.py",
+          "line": 30,
+          "endLine": 32,
+          "note": "inline 503 check"
+        },
+        {
+          "file": "services/agent/src/autobots/api/improvement_routes.py",
+          "line": 93,
+          "endLine": 93,
+          "note": "Idempotency-Key header spelled inline; 5 modules define the same Key alias"
+        },
+        {
+          "file": "services/agent/src/autobots/api/tool_routes.py",
+          "line": 28,
+          "endLine": 28,
+          "note": "Member alias; artifact, event and run routes call the same dependency Workspace"
+        }
+      ],
+      "occurrences": 24,
+      "evidence": "Counted with grep:\n- _pool(request) is defined identically in 10 modules.\n- 8 more inline `if pool is None: raise ApiError(503, ...)` checks use 3 different messages.\n- The Idempotency-Key header alias is defined in 5 modules and spelled out once more.\n- 17 module-level aliases in 9 modules redefine Workspace, Member, Owner or User.",
+      "impact": "Changing the unavailable-database response or the idempotency header bounds means editing up to 18 sites. The copies already disagree: model-policy routes report that provider settings are unavailable.",
+      "recommendation": "Export one pool dependency and the shared aliases from api/dependencies.py, delete the local copies, and use one message per condition.",
+      "sketch": "Db = Annotated[Pool, Depends(db_pool)]; IdempotencyKey = Annotated[str, Header(alias=\"Idempotency-Key\", min_length=1, max_length=200)]; MemberWorkspace, OwnerWorkspace, CurrentUser",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "none",
+      "verdict": "revised",
+      "verifierNote": "10 _pool copies, 8 inline 503 checks with 3 messages and 6 Idempotency-Key spellings confirmed; the dependency aliases recount to 17, not 22. Shares api/dependencies.py with PAPI-06."
+    },
+    {
+      "id": "PAPI-08",
+      "title": "app.state is an untyped bag, and the pool and connections are Any",
+      "dimension": "types",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/app.py",
+          "line": 30,
+          "endLine": 32,
+          "note": "the Pool protocol declares open and close, not connection()"
+        },
+        {
+          "file": "services/agent/src/autobots/api/app.py",
+          "line": 72,
+          "endLine": 75,
+          "note": "the factory declares four state attributes"
+        },
+        {
+          "file": "services/agent/src/autobots/api/main.py",
+          "line": 42,
+          "endLine": 50,
+          "note": "entry point replaces membership and adds stream_seconds, object_store and provider_context after the factory"
+        },
+        {
+          "file": "services/agent/src/autobots/api/membership.py",
+          "line": 10,
+          "endLine": 10,
+          "note": "PostgresMembership(state: Any)"
+        },
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 77,
+          "endLine": 83,
+          "note": "probe_times created on app.state by a request"
+        },
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 162,
+          "endLine": 162,
+          "note": "nested getattr for the catalog fetcher"
+        },
+        {
+          "file": "services/agent/src/autobots/api/artifact_routes.py",
+          "line": 40,
+          "endLine": 40,
+          "note": "getattr fallback for object_store"
+        },
+        {
+          "file": "services/agent/src/autobots/api/event_routes.py",
+          "line": 173,
+          "endLine": 187,
+          "note": "pool: Any and listener: Any through the stream helpers"
+        }
+      ],
+      "occurrences": 45,
+      "evidence": "15 files make 38 direct request.app.state.* accesses, 24 of them for the pool. Another 7 accesses use getattr fallbacks, 5 of them for attributes the factory never declares (stream_seconds, probe_times and object_store three times). ruff ANN401 reports 16 Any signatures in api/, including all 10 `_pool -> Any` copies.",
+      "impact": "mypy strict cannot check any handler call on the pool, the connections or the membership store, so a renamed method or a missing attribute surfaces as a runtime 500. The getattr fallbacks make 'not configured' and 'misspelled' look the same. Production wiring is split between create_app and main.py, so tests build a different object graph from the one uvicorn runs.",
+      "recommendation": "Declare process resources once in an AppResources dataclass. The factory builds it from explicit parameters, stores it once on app.state, and handlers read it through one typed dependency; the lifespan still opens and closes the pool. Give the Pool protocol a typed connection(), and give the membership adapter a pool provider instead of the whole state.",
+      "sketch": "@dataclass class AppResources: settings: Settings; membership: MembershipStore; provider_context: ProviderContext | None = None; object_store: ObjectStore | None = None; stream_seconds: float = 60.0; probe_times: ProbeTimes = field(default_factory=ProbeTimes); pool: Pool | None = None  # set by lifespan\ndef create_app(resources: AppResources | None = None, *, pool_factory=default_pool) -> FastAPI\ndef app_resources(request: Request) -> AppResources\nclass Pool(Protocol): async def open/close; def connection(self) -> AbstractAsyncContextManager[Connection]",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "The Python rule says schema generation is offline and resources belong in the lifespan. The factory still opens nothing, as test_app_factory.py keeps proving, and the object store and catalog fetchers already open their clients per call.",
+      "verdict": "revised",
+      "verifierNote": "38 direct accesses in 15 files and 16 ANN401 hits confirmed; of the 7 getattr fallbacks, 5 read attributes the factory never declares, since settings and provider_context are declared."
+    },
+    {
+      "id": "PAPI-09",
+      "title": "Seven type-check suppressions where application results return plain str",
+      "dimension": "types",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 275,
+          "endLine": 275,
+          "note": "status=result.status  # type: ignore[arg-type]"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 328,
+          "endLine": 328,
+          "note": "same"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 415,
+          "endLine": 415,
+          "note": "code=code  # type: ignore[arg-type]"
+        },
+        {
+          "file": "services/agent/src/autobots/api/search_routes.py",
+          "line": 41,
+          "endLine": 41,
+          "note": "kind=hit.kind  # type: ignore[arg-type]"
+        },
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 172,
+          "endLine": 172,
+          "note": "OperationCondition(...)  # type: ignore[arg-type]"
+        },
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 180,
+          "endLine": 180,
+          "note": "openrouter=openrouter  # type: ignore[arg-type]"
+        },
+        {
+          "file": "services/agent/src/autobots/api/routes.py",
+          "line": 61,
+          "endLine": 61,
+          "note": "cast(Literal[\"owner\", \"member\"], role)"
+        }
+      ],
+      "occurrences": 7,
+      "evidence": "The contract fields are typed RunStatus, Literal unions and SearchKind. The values come from application types declared str:\n- AdmissionResult.status (application/runs.py:70)\n- Condition.state (application/operations.py:81), whose comment lists the three allowed values\n- Hit.kind (application/search.py:17)\n- ProviderSettings.run_intent -> str (application/provider_settings.py:231)\n- the role tuple from workspaces_with_roles (application/profiles.py:54)",
+      "impact": "mypy strict cannot catch a new or misspelled status, condition state, search kind or intent code. Pydantic rejects the value while building the response, and the user gets a 500. The suppressions are undocumented first-party exceptions.",
+      "recommendation": "Type the application results with the domain enum or shared Literal aliases: RunStatus, a condition-state alias, the search kinds, an intent-code alias and a workspace-role alias. Alternatively, convert explicitly at the application edge. Then remove the ignores and the cast. Strict mode's warn_unused_ignores will flag any that remain, which acts as the ratchet.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06 asks for explicit enums or unions and for narrow, documented typing exceptions. Domain enums and DTOs stay separate types; only the application results gain precise annotations.",
+      "verdict": "confirmed",
+      "verifierNote": "Six type: ignore[arg-type] and one cast confirmed against the str-typed application results they adapt."
+    },
+    {
+      "id": "PAPI-10",
+      "title": "Handlers read configuration from os.environ on every request",
+      "dimension": "approach",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 86,
+          "endLine": 87,
+          "note": "data root from AUTOBOTS_CONFIG_ROOT"
+        },
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 95,
+          "endLine": 95,
+          "note": "int(os.environ.get(\"AUTOBOTS_MIN_FREE_BYTES\", ...)) per request"
+        },
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 177,
+          "endLine": 182,
+          "note": "AUTOBOTS_BACKUP_DIR read twice"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 231,
+          "endLine": 231,
+          "note": "tool key sources from the live environment"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 180,
+          "endLine": 180,
+          "note": "ToolKeySettings receives os.environ"
+        },
+        {
+          "file": "services/agent/src/autobots/api/tool_routes.py",
+          "line": 31,
+          "endLine": 37,
+          "note": "os.environ used as the key map, or returned when the pool is missing"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings.py",
+          "line": 1,
+          "endLine": 1,
+          "note": "'read once from the environment by the entry point'"
+        },
+        {
+          "file": "services/agent/src/autobots/api/main.py",
+          "line": 31,
+          "endLine": 31,
+          "note": "a startup snapshot, process_environment, already exists"
+        }
+      ],
+      "occurrences": 9,
+      "evidence": "Counted with grep, request paths read os.environ 9 times across 5 route modules: operation_routes.py:87, 95, 178 and 182; run_routes.py:231; search_routes.py:34; settings_routes.py:180; tool_routes.py:35 and 37. This count excludes the live tracing check at operation_routes.py:170, which may read the live environment on purpose.",
+      "impact": "A malformed AUTOBOTS_MIN_FREE_BYTES raises ValueError inside require_ready. Every guarded admission (runs, workflow executions, retention apply) and the local-status page then fail with 500, instead of the process failing at start. Tests have to monkeypatch the process environment. And the process environment has two sources, live os.environ and ProviderContext's snapshot, which can diverge.",
+      "recommendation": "Parse data_root, min_free_bytes and backup_dir once in load_settings. Expose a snapshot of the process environment through the resources object, and pass it to key_sources and ToolKeySettings. If the tracing check reads the live environment on purpose, keep it live and say so in a comment.",
+      "sketch": "@dataclass(frozen=True) class Settings: ...; data_root: Path; min_free_bytes: int; backup_dir: str; process_environment: Mapping[str, str]",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Decisions 0024 K1 and 0025 V3 fix the key order: Settings, then the process environment, then the .env files. The order stays; only how the process environment reaches the handlers changes.",
+      "verdict": "confirmed",
+      "verifierNote": "Nine request-path os.environ reads in five modules confirmed; int() of AUTOBOTS_MIN_FREE_BYTES runs inside require_ready on every guarded admission."
+    },
+    {
+      "id": "PAPI-11",
+      "title": "Connection ownership is split between dependencies, handlers and streams",
+      "dimension": "approach",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 79,
+          "endLine": 85,
+          "note": "provider_settings holds a pooled connection for the whole request"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 198,
+          "endLine": 201,
+          "note": "post_run opens a second connection while holding it"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 374,
+          "endLine": 377,
+          "note": "post_resume, then _command opens another (309)"
+        },
+        {
+          "file": "services/agent/src/autobots/api/improvement_routes.py",
+          "line": 96,
+          "endLine": 99,
+          "note": "post_replay"
+        },
+        {
+          "file": "services/agent/src/autobots/api/workflow_routes.py",
+          "line": 351,
+          "endLine": 363,
+          "note": "post_execution"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 389,
+          "endLine": 411,
+          "note": "check_run_intent, twice"
+        },
+        {
+          "file": "services/agent/src/autobots/api/app.py",
+          "line": 35,
+          "endLine": 38,
+          "note": "pool max_size=5"
+        },
+        {
+          "file": "services/agent/src/autobots/api/event_routes.py",
+          "line": 130,
+          "endLine": 142,
+          "note": "one unpooled LISTEN connection per open stream"
+        }
+      ],
+      "occurrences": 6,
+      "evidence": "  async def provider_settings(request: Request) -> AsyncIterator[ProviderSettings]:\n      ...\n      async with pool.connection() as connection:\n          yield ProviderSettings(connection, context)\nFive handlers that take this dependency also call _pool(request).connection() or pool.connection(), so each holds two of the pool's five connections. get_readiness already builds ProviderSettings on its own single connection (operation_routes.py:306-313).",
+      "impact": "Five concurrent requests to these handlers can each hold one connection and wait for a second until psycopg_pool's default 30-second timeout expires. They then fail with 500, and every other request stalls meanwhile. This comes from reading the code; it was not observed. Streams add one direct database connection each, outside the pool and with no cap.",
+      "recommendation": "Give each request a single owner for its connection. The simplest fix is to construct ProviderSettings on the connection the handler opens, as get_readiness does. The alternative is one per-request connection dependency shared by the settings object and the handler; it changes how statements group into transactions, so write tests first. For streams, cap concurrent listeners in the resources object, or move LISTEN to one lifespan-owned connection that fans out to a queue per stream.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: own pools in process lifecycles and bound concurrency. The pool stays lifespan-owned, and no readiness or key check is removed.",
+      "verdict": "confirmed",
+      "verifierNote": "Five handlers hold the provider_settings connection while opening a second one, against a pool of five; inferred from code, not observed."
+    },
+    {
+      "id": "PAPI-12",
+      "title": "run_routes.py and settings_routes.py each bundle several features",
+      "dimension": "size",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 1,
+          "endLine": 486,
+          "note": "486 lines: preview, admission, reads, commands, reconciliation, labels and messages"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 93,
+          "endLine": 108,
+          "note": "budget messages and profile labels"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 396,
+          "endLine": 474,
+          "note": "two reconciliation routes"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 1,
+          "endLine": 1,
+          "note": "docstring says 'The exact MP-05 routes'"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 52,
+          "endLine": 117,
+          "note": "shared dependencies and error mapping"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 174,
+          "endLine": 257,
+          "note": "keys and vars (PK-07)"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 267,
+          "endLine": 379,
+          "note": "model policy with SQL (MD-02, MD-03)"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 382,
+          "endLine": 417,
+          "note": "run intent"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "Both files exceed 300 lines (486 and 417). Together they hold 21 of the 80 routes, 11 of the 13 SQL statements in route modules, 8 of the 17 PLR0913 hits, the only C901 hit and 3 of the 6 type ignores in api/.",
+      "impact": "Changes to unrelated features (keys and vars versus model policy, admission versus reconciliation) collide in the same file, and the settings module's own docstring no longer describes it.",
+      "recommendation": "Split by feature once the shared dependencies have moved out. Keep every path and operation_id, so the generated contract stays byte-identical, and prove it with the contract drift check.",
+      "sketch": "api/run_routes.py (preview, admit, get); api/run_command_routes.py (input, pause, resume, cancel + _command); api/run_reconcile_routes.py (effect evidence, model-call reconcile); api/provider_routes.py (OpenRouter credential, validate, models); api/keys_and_vars_routes.py; api/model_policy_routes.py (get, put, reset, run intent); api/dependencies.py (shared); budget and profile text from the domain",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "Option B keeps the exact provider routes, and a file split changes no path or operation_id. DH-06 asks for small, cohesive modules.",
+      "verdict": "confirmed",
+      "verifierNote": "21 routes, 11 SQL statements, 8 PLR0913 hits, the only C901 and 3 of 6 ignores confirmed; workflow_routes.py (380) and operation_routes.py (331) also pass 300 lines but are single-feature."
+    },
+    {
+      "id": "PAPI-13",
+      "title": "get_local_status computes, authorizes, queries and maps in 83 lines",
+      "dimension": "size",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 117,
+          "endLine": 199,
+          "note": "83 lines"
+        },
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 124,
+          "endLine": 124,
+          "note": "'database up' read from conditions[0] and conditions[1]"
+        },
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 133,
+          "endLine": 135,
+          "note": "manual current_workspace call and inline owner check"
+        },
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 136,
+          "endLine": 153,
+          "note": "eight reads in one block"
+        },
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 166,
+          "endLine": 199,
+          "note": "response assembly"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "  conditions = await _installation_conditions(request)\n  database_up = conditions[0].state == \"ok\" and conditions[1].state == \"ok\"\n  ...\n  if database_up:\n      workspace_id = await current_workspace(request, user_id, x_autobots_workspace)\n      if await request.app.state.membership.role_in(user_id, workspace_id) != \"owner\":",
+      "impact": "What 'database up' means depends on the order of a list built elsewhere, the owner rule is re-implemented outside require_owner, and the D5 values cannot be tested without running the whole route.",
+      "recommendation": "Split the route into three parts: a dependency that yields the owner's workspace, or None when the database is down; one application read that returns the workspace values as a dataclass; and a pure mapper to LocalStatus. Return named conditions instead of a positional list.",
+      "sketch": "api/dependencies.optional_owner_workspace(...) -> UUID | None\napplication/operations.read_workspace_operations(conn, ws) -> WorkspaceOperations(counts, policy, delayed, qualifications, workers, migrations, storage_used)\nInstallationConditions(NamedTuple): database, schema, hold, adapter, storage, disk\n_local_status(conditions, ops | None, catalog, disk, probes) -> LocalStatus  # pure\nget_local_status: about 15 lines",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "The module's own rule stays: it answers with the database down (operation_routes.py:1). Decision 0022 D5's value set is unchanged.",
+      "verdict": "revised",
+      "verifierNote": "The handler spans 83 lines (117-199) and makes eight reads in its block, not seven; positional conditions[0] and [1] and the inline owner check confirmed."
+    },
+    {
+      "id": "PAPI-15",
+      "title": "In-process tests reach 8 of 80 operations",
+      "dimension": "tests",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/tests/test_api.py",
+          "line": 17,
+          "endLine": 51,
+          "note": "settings, membership fake, token and client helpers local to this file"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 63,
+          "endLine": 64,
+          "note": "workspace_required: no test anywhere"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 185,
+          "endLine": 186,
+          "note": "session_required: no test anywhere"
+        },
+        {
+          "file": "services/agent/src/autobots/api/tool_routes.py",
+          "line": 76,
+          "endLine": 76,
+          "note": "tool_version_not_found: no test anywhere"
+        },
+        {
+          "file": "services/agent/src/autobots/api/artifact_routes.py",
+          "line": 41,
+          "endLine": 42,
+          "note": "storage_unavailable: no test anywhere"
+        },
+        {
+          "file": "services/agent/tests/test_readiness.py",
+          "line": 19,
+          "endLine": 57,
+          "note": "the same fixtures copied again"
+        }
+      ],
+      "occurrences": 6,
+      "evidence": "The in-process suites call 8 operations: GET /v1/health, /v1/session, /v1/profile, PUT /v1/profile, /v1/workspaces/{id}, /v1/readiness, /v1/retention and /v1/operations/local-status. Grep finds workspace_required, session_required, tool_version_not_found, storage_unavailable and routine_name_taken in no file under services/agent/tests, tests, apps/web/tests or scripts. current_workspace, which 73 routes depend on, has no in-process test of its header-mismatch or ambiguous-workspace branches.",
+      "impact": "Status mapping, the owner-only pins and the workspace gate are verified only through browser specs in the db profile, or not at all. The refactors proposed above therefore have no fast safety net.",
+      "recommendation": "Add an api_client fixture to conftest, with settings, a fake membership, a fake pool and a token helper. Use it for a table test of current_workspace's three branches, parametrized tests of every refusal-to-status mapping, and post_run branch tests against a fake admission use case once that is extracted. Keep the db-profile checks for SQL behavior.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-06: tests use injected fakes, no real time and no paid calls. These tests run in the fast profile with sockets blocked by conftest, so they add no database or model use.",
+      "verdict": "confirmed",
+      "verifierNote": "In-process suites call exactly 8 operations, and the five codes appear in no test, web or script file."
+    },
+    {
+      "id": "PAPI-14",
+      "title": "get_approvals maps untyped rows field by field in the handler",
+      "dimension": "types",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/approval_routes.py",
+          "line": 61,
+          "endLine": 115,
+          "note": "54-line handler"
+        },
+        {
+          "file": "services/agent/src/autobots/api/approval_routes.py",
+          "line": 78,
+          "endLine": 111,
+          "note": "30 row[...] lookups on dict[str, Any]"
+        },
+        {
+          "file": "services/agent/src/autobots/api/approval_routes.py",
+          "line": 86,
+          "endLine": 89,
+          "note": "exceeds_review_limit evaluated twice per row"
+        },
+        {
+          "file": "services/agent/src/autobots/api/approval_routes.py",
+          "line": 91,
+          "endLine": 91,
+          "note": "timestamps formatted to strings in the route"
+        },
+        {
+          "file": "services/agent/src/autobots/api/approval_routes.py",
+          "line": 45,
+          "endLine": 58,
+          "note": "_requester reads nested dict keys"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "application.approvals.list_approvals returns list[dict[str, Any]]. The handler builds each ApprovalView with 30 row[...] lookups, works out truncation twice and calls .isoformat() on two timestamp columns.",
+      "impact": "A renamed key in the row dict surfaces only as a runtime KeyError, the truncation choice (exceeds_review_limit, computed twice) lives in the HTTP layer, and no test asserts arguments_truncated.",
+      "recommendation": "Return a typed row (a frozen dataclass) from list_approvals and move the row-to-view mapping into one function that computes truncation once. Keep the row type and the DTO type distinct.",
+      "sketch": "application/approvals.py: @dataclass(frozen=True) ApprovalRow(...); list_approvals(...) -> list[ApprovalRow]\napi/approval_routes.py: def _view(row: ApprovalRow, viewer: UUID) -> ApprovalView",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Option B SP-009: adapters make conversion explicit rather than treating a database row as an API response. The typed row and the DTO remain separate types.",
+      "verdict": "revised",
+      "verifierNote": "30 row lookups and the double exceeds_review_limit call confirmed; a typed row can't make mypy check SQL column names and ApprovalView validates at runtime, so severity lowered to low."
+    },
+    {
+      "id": "PAPI-16",
+      "title": "The session token is decoded twice with separate settings",
+      "dimension": "duplication",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/security.py",
+          "line": 58,
+          "endLine": 64,
+          "note": "current_user: HS256, audience, required claims"
+        },
+        {
+          "file": "services/agent/src/autobots/api/security.py",
+          "line": 76,
+          "endLine": 82,
+          "note": "session_email decodes again without the required-claims option"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "session_email repeats `jwt.decode(token, settings.jwt_secret.get_secret_value(), algorithms=[\"HS256\"], audience=\"authenticated\")` after current_user has already verified the same token with `options={\"require\": [\"exp\", \"sub\", \"aud\"]}`.",
+      "impact": "Any future verification change, such as an issuer, leeway or a second algorithm, must be made in both places. Today the second decode is safe only because it depends on current_user.",
+      "recommendation": "Decode once in a verified_claims dependency, which FastAPI caches per request, and derive current_user and session_email from it.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "The verification options stay the same, and the bad-token tests in test_api.py:69-92 stay as the guard.",
+      "verdict": "confirmed",
+      "verifierNote": "Two jwt.decode calls with different options confirmed; session_email is safe today only through its current_user dependency."
+    },
+    {
+      "id": "PAPI-17",
+      "title": "Two docstrings describe an earlier state of the code",
+      "dimension": "comments",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 1,
+          "endLine": 1,
+          "note": "'The exact MP-05 routes', yet the module also holds PK-07, MD-02/03, run intent and shared dependencies"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 388,
+          "endLine": 388,
+          "note": "'run admission is a later story', yet run_routes.post_run admits runs"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "settings_routes.py:1 reads \"The exact MP-05 routes, behind the BFF.\" settings_routes.py:388 reads \"It admits nothing: run admission is a later story.\"",
+      "impact": "Readers trust module docstrings here because most are accurate, and these two send them to the wrong place for admission and for what the module owns.",
+      "recommendation": "Update both when the module is split, keeping the story and decision references.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Ground rule: stories and decisions stay cited; only the stale statements change.",
+      "verdict": "confirmed",
+      "verifierNote": "Both statements confirmed stale: the module also holds PK-07, MD-02/03 and shared dependencies, and run_routes.post_run admits runs."
+    },
+    {
+      "id": "PAPI-18",
+      "title": "check_run_intent keeps branches its own dependency makes unreachable",
+      "dimension": "functions",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 79,
+          "endLine": 83,
+          "note": "provider_settings already raises 503 when the pool is missing"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 390,
+          "endLine": 391,
+          "note": "pool re-read and tested again"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 408,
+          "endLine": 411,
+          "note": "budget stays None only if the pool disappears mid-request"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "The handler takes `settings: Settings`, whose dependency refuses when request.app.state.pool is None. It then re-reads the pool and guards on `pool is not None` twice.",
+      "impact": "The budget=None case of RunIntentCheck looks reachable during a database outage but is not, which misleads anyone reasoning about the composer's states.",
+      "recommendation": "Drop the second checks and use the connection the settings object already holds (see the connection-ownership finding), or make the dependency optional if a no-database answer is wanted.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "none",
+      "verdict": "confirmed",
+      "verifierNote": "provider_settings refuses when the pool is missing, so check_run_intent's two pool checks and budget=None are unreachable short of shutdown mid-request."
+    },
+    {
+      "id": "PAPI-19",
+      "title": "Every route states its response type twice, and FastAPI rules are not enforced",
+      "dimension": "standards",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/pyproject.toml",
+          "line": 47,
+          "endLine": 47,
+          "note": "ruff selects no FAST, C90, PLR09 or ANN401 rules"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 280,
+          "endLine": 283,
+          "note": "response_model=RunSummary and -> RunSummary"
+        },
+        {
+          "file": "services/agent/src/autobots/api/workflow_routes.py",
+          "line": 146,
+          "endLine": 147,
+          "note": "same pattern"
+        }
+      ],
+      "occurrences": 78,
+      "evidence": "The exploratory `ruff --select ALL`, run on api/ only, reports FAST001 on 78 routes whose response_model repeats the return annotation. It also reports 17 PLR0913, 16 ANN401 and 1 C901 hits, none of which the project's selection at pyproject.toml:47 enforces.",
+      "impact": "FastAPI serializes with response_model while mypy checks the annotation, so editing one without the other makes them disagree silently.",
+      "recommendation": "Make the return annotation the single source, which is FastAPI's default. Enable ruff's FAST rules for services/agent, and adopt argument and complexity thresholds with a baseline once the dependency aliases have cut handler parameter counts.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: Ruff is the lint gate, check and format are separate gates, and safe autofix stays an explicit operation.",
+      "verdict": "confirmed",
+      "verifierNote": "ruff --select ALL on api/ reports 78 FAST001, 17 PLR0913, 16 ANN401 and 1 C901, and pyproject.toml:47 selects none of them."
+    },
+    {
+      "id": "PAPI-20",
+      "title": "One dependency goes by several names, and two different things are called Settings",
+      "dimension": "naming",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 88,
+          "endLine": 88,
+          "note": "Settings alias names ProviderSettings"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings.py",
+          "line": 11,
+          "endLine": 11,
+          "note": "Settings is also the process configuration class"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 181,
+          "endLine": 181,
+          "note": "parameter settings is ProviderSettings here"
+        },
+        {
+          "file": "services/agent/src/autobots/api/security.py",
+          "line": 39,
+          "endLine": 39,
+          "note": "and the process Settings here"
+        },
+        {
+          "file": "services/agent/src/autobots/api/event_routes.py",
+          "line": 40,
+          "endLine": 40,
+          "note": "Workspace = current_workspace"
+        },
+        {
+          "file": "services/agent/src/autobots/api/workflow_routes.py",
+          "line": 63,
+          "endLine": 63,
+          "note": "Member = the same dependency"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 73,
+          "endLine": 73,
+          "note": "public as_api_error; four modules use _error for the same role"
+        }
+      ],
+      "occurrences": 14,
+      "evidence": "Counted with grep:\n- 3 modules alias current_workspace as Workspace and 4 as Member.\n- 2 error mappers are public as_api_error, and 4 are private _error.\n- 1 alias reuses the name Settings for ProviderSettings.\nHandlers also name the same values workspace or workspace_id, and user or user_id.",
+      "impact": "settings.run_intent(...) and settings.jwt_secret appear in the same package with different types under one name, which slows reading and invites wrong imports.",
+      "recommendation": "Rename the alias to something like ProviderSettingsDep, and standardize on MemberWorkspace, OwnerWorkspace, CurrentUser, workspace_id and user_id when the aliases move to api/dependencies.py.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "none",
+      "verdict": "confirmed",
+      "verifierNote": "3 Workspace and 4 Member aliases, 2 as_api_error and 4 _error mappers, and the Settings alias for ProviderSettings confirmed."
+    },
+    {
+      "id": "PAPI-21",
+      "title": "Domain facts are restated as literals in run_routes.py",
+      "dimension": "duplication",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 93,
+          "endLine": 97,
+          "note": "budget messages spell out US$0.25, US$5.00 and the step"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 104,
+          "endLine": 108,
+          "note": "profile display labels"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 160,
+          "endLine": 160,
+          "note": "PROFILE_LABELS[profile] lookup"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "BUDGET_MESSAGES restates BUDGET_MIN_MICRO_USD, BUDGET_MAX_MICRO_USD and BUDGET_STEP_MICRO_USD (domain/budgets.py:5-7) as text. PROFILE_LABELS covers exactly the three ModelProfileId members, and the web repeats the same labels in three components (apps/web/components/run-list.tsx:76, experts-panel.tsx:296, expert-editor.tsx:23).",
+      "impact": "If a fourth profile joins the domain, as Sol did under Decision 0019, preview_run raises KeyError and returns 500 until someone finds this table. A changed budget range would leave the refusal text wrong.",
+      "recommendation": "Give ModelProfile a label in domain/models.py and format the budget messages from the domain constants. The web can then show the label that the preview already returns.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Decision 0022 D11's budget range and the set of profiles are unchanged; only the source of their text moves.",
+      "verdict": "revised",
+      "verifierNote": "Both tables and the KeyError path confirmed; the domain constants are named BUDGET_MIN_MICRO_USD, BUDGET_MAX_MICRO_USD and BUDGET_STEP_MICRO_USD, now quoted correctly."
+    }
+  ],
+  "rejected": [],
+  "notCovered": "This review is static. I ran no tests, mypy or uvicorn, so the pool-exhaustion scenario and the per-request ValueError from AUTOBOTS_MIN_FREE_BYTES are inferred from the code, not observed. To count route dependencies (73 of 80 depend on current_workspace), I imported create_app with services/agent/.venv/bin/python -I. That is project code run by the venv interpreter rather than a script that only reads files; the factory opens nothing, as test_app_factory proves. I inspected contracts/generated/openapi.json and packages/api-client/src/generated.ts read-only, with python3.12 -I and grep. The application modules the routes call were read only around the cited lines: runs, provider_settings, operations, approvals, reconciliation, model_admission, artifacts, search, experts, workflows and domain/models. Their own quality is not judged here. test_readiness.py and test_operation_values.py were read in part. I searched the browser specs, tests/db checks and qualification scripts for error codes but did not read them. metrics.md and PRD-Development-Harness.md (DH-03 to DH-06) were read in the relevant sections only. The PRD sources the code cites (MP-05, PK-07, MD-02/03, SH-04, HM-05) were not opened; their IDs come from the code's own comments."
+}

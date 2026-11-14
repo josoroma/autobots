@@ -1,0 +1,1324 @@
+{
+  "schema": "autobots.code-review/v1",
+  "area": "web-run",
+  "title": "Web: run screens",
+  "kind": "area",
+  "timestamp": "2026-11-12-09-52-30",
+  "revision": "156534da0bd5b19417f05d313077d767804b175b",
+  "summary": "The run screens handle the hard behavior with care. The workspace loads a snapshot, replays the events after a cursor, then opens the event stream from that cursor and deduplicates by sequence. Writes use server idempotency keys and version guards. Empty states are deliberate, colors come only from semantic tokens, accessible names are in place, and Playwright covers reconnects, duplicates, gaps, a cut stream and refusals. The cost sits in one place. RunWorkspaceView is a single function of 677 lines with complexity 39. It does the data loading (snapshot, event-page replay, a second refresh path driven by a counter, and the result download), runs the EventSource with its reconnect timer, deduplicates through a Map, merges live text, derives view state during render and draws about fifteen regions. 17 commits for 16 stories have edited it. Error handling is the weakest dimension. The workspace treats every failed read as temporary: it keeps polling a denied or missing run every second, and it never leaves 'Loading' on 403, 422, 5xx or a contract error. Three components also report a lost write reply as a failure and send any retry with a new idempotency key, so an owner can record one provider charge twice. Smaller costs recur across the area: status words and tones, money and time formats, the summarizer rule and the command senders are each written more than once; contract unions are widened to string; error and admission replies are cast although generated parsers exist; run-list and run-panel import each other; and pure logic sits in .tsx files that the node:test runner cannot load. The refactor can be done in steps. First move pure lib/runs modules out with unit tests. Then add load and stream hooks with an explicit state machine that keeps snapshots in cursor order. Then split the screens into section components. This is a static review. It is not runtime evidence.",
+  "scores": [
+    {
+      "dimension": "standards",
+      "score": 3,
+      "why": "Strict TypeScript flags and the project lint pass, and the pages are thin Server Components, but 10 type assertions at trust boundaries, no denied state, a client-only inspector and a fresh idempotency key per press fall short of DH-06."
+    },
+    {
+      "dimension": "modules",
+      "score": 3,
+      "why": "Pages compose views and views compose children clearly, but run-list and run-panel import each other and other screens import vocabulary, hooks and constants from screen modules."
+    },
+    {
+      "dimension": "size",
+      "score": 2,
+      "why": "9 of the 13 files have functions over 60 lines. RunWorkspaceView (677 lines, complexity 39) is the largest function in the app, and 17 commits have edited it."
+    },
+    {
+      "dimension": "functions",
+      "score": 2,
+      "why": "The small pure helpers are good (withDelta, wallTime, brief), but each main component mixes fetching, state machines, product rules and markup, and multi-step flows are tracked with boolean flags."
+    },
+    {
+      "dimension": "structure",
+      "score": 3,
+      "why": "Files are where you would expect them, but the 10 run components sit flat among the 43 files in apps/web/components, and there is no lib/runs or feature folder to receive extracted code."
+    },
+    {
+      "dimension": "approach",
+      "score": 3,
+      "why": "The replay-then-stream design with server idempotency and version guards is sound. It is weakened by an unordered refetch on every event, no request aborts, counters used as effect triggers and client-side fetching for a static inspector."
+    },
+    {
+      "dimension": "comments",
+      "score": 4,
+      "why": "Comments explain why and cite decisions and stories throughout. A few mechanics, such as blanking the events before parsing a page and draining response bodies, have no stated reason."
+    },
+    {
+      "dimension": "types",
+      "score": 3,
+      "why": "Generated parsers validate every successful read, but error replies, the admission reply and the stream's cursor frame are cast, and contract unions are widened to string."
+    },
+    {
+      "dimension": "errors",
+      "score": 2,
+      "why": "The run page retries forever on 401, 403, 404 and 422 and hangs on contract errors, and lost write replies are reported as failures. ContinueRun shows the right pattern."
+    },
+    {
+      "dimension": "tests",
+      "score": 3,
+      "why": "Playwright covers reconnect, deduplication, gaps, stream cuts, controls and refusals, but none of the pure stream, merge or rule logic has a unit test."
+    },
+    {
+      "dimension": "maintainability",
+      "score": 3,
+      "why": "Well commented and covered by browser tests, but the workspace hotspot, duplicated vocabulary and formatting, and inconsistent error states make every run story costly."
+    }
+  ],
+  "strengths": [
+    {
+      "title": "Snapshot, replay, then stream, with cursor-based reconnects and deduplication by sequence",
+      "evidence": "apps/web/components/run-workspace.tsx:242-272 loads the snapshot, replays every page after the cursor and only then opens the EventSource from that cursor. Lines 175-181 deduplicate by sequence. Lines 235-239 close the browser's own retry, because it 'would resume from a stale URL'. apps/web/tests/browser/run-workspace.spec.ts:83-151 and 252-265, and stream-result.spec.ts:101-122, exercise dropped connections, duplicates, gaps and a cut result stream in a real browser."
+    },
+    {
+      "title": "Generated runtime parsers on every successful read",
+      "evidence": "Each successful read is parsed: parseRunWorkspace (run-workspace.tsx:194, run-panel.tsx:68), parseRunList (run-list.tsx:193), parseRunInspector (run-inspector.tsx:32), parseToolUseList after the body is typed unknown (tool-uses.tsx:127-133), parseModelList and parseModelPolicyState (run-disclosure.tsx:58-59), and parseRunEvent for each event (run-workspace.tsx:146). They check JSON against the generated schemas (packages/api-client/src/runtime.ts:142-149)."
+    },
+    {
+      "title": "ContinueRun treats an unknown outcome as unknown",
+      "evidence": "apps/web/components/continue-run.tsx:20-21 keeps the Idempotency-Key in a ref until the outcome is known, and line 39 reuses it. Lines 47-51 treat a lost reply or any 5xx as 'may have started'. Lines 68-69 reset the key only after a refusal that followed no unknown attempt. This is the pattern WRUN-03 asks the other writers to adopt."
+    },
+    {
+      "title": "A reusable, abortable hook for paginated reads",
+      "evidence": "useToolUses (apps/web/components/tool-uses.tsx:102-147) aborts a superseded read with an AbortController and says why (line 111), loops over cursor pages, and is reused by the workflow monitor (apps/web/components/workflow-monitor.tsx:7)."
+    },
+    {
+      "title": "Deliberate empty, loading and failure states",
+      "evidence": "RunList separates loading, unavailable, an empty workspace (with a link to Home) and no filter matches (run-list.tsx:282-314). RunInspectorView separates loading, unavailable and error (run-inspector.tsx:54-63) and gives each section its own empty sentence. ToolsUsed separates failed, loading and empty (tool-uses.tsx:262-274). The workspace states an empty plan, no artifacts and no role map in words (run-workspace.tsx:531, 643, 734-736)."
+    },
+    {
+      "title": "Accessible states and semantic tokens throughout",
+      "evidence": "There are no color literals in scope, and every state color sits beside words: StateLine (run-list.tsx:136-143), and the header badge is aria-hidden because the status sentence says the same (run-workspace.tsx:364-371). Tool outcomes are announced through a polite live region (tool-uses.tsx:257-261), and the tool table has a caption and scoped headers (159-199). The filter buttons use aria-pressed (run-list.tsx:239), and Details sets aria-expanded and aria-controls (366-369)."
+    },
+    {
+      "title": "Comments explain why and trace to decisions and stories",
+      "evidence": "Examples: run-workspace.tsx:117-118 (US-15.24, SE-03), 125-126 (how live pieces join the text), 143 (Decision 0017 Q13) and 236; run-disclosure.tsx:53 (why bodies are drained), 86 (the server rule it mirrors) and 99-102; run-panel.tsx:83 (why the loaded version is sent); run-controls.tsx:17 (SP-010)."
+    },
+    {
+      "title": "Key types derived from generated DTOs, and thin Server Component pages",
+      "evidence": "run-panel.tsx:15 derives Task from RunWorkspace, and lines 22-26 key MARKER_TEXT by Task['marker'], so a new marker value fails the type check. The pages await Next 16's async params and set metadata (apps/web/app/runs/[id]/page.tsx:7-13). The list page wraps its useSearchParams consumer in Suspense (apps/web/app/runs/page.tsx:10-17)."
+    }
+  ],
+  "findings": [
+    {
+      "id": "WRUN-01",
+      "title": "RunWorkspaceView is a 677-line, complexity-39 component that every run story edits",
+      "dimension": "size",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 152,
+          "endLine": 844,
+          "note": "RunWorkspaceView: 8 useState hooks, 3 effects and all rendering"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 168,
+          "endLine": 280,
+          "note": "Stream effect: snapshot load, replay loop, EventSource listeners, reconnect timer and deduplication"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 283,
+          "endLine": 331,
+          "note": "Derives the published result, downloads it, and runs a second snapshot fetch path"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 356,
+          "endLine": 843,
+          "note": "Render tree: header, 12 Section blocks, unknown outcomes, tools and parent link"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 36,
+          "endLine": 150,
+          "note": "Module-level status maps and pure helpers (describe, withDelta, known)"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 744,
+          "endLine": 748,
+          "note": "Product rule computed inline in JSX"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 795,
+          "endLine": 826,
+          "note": "Money arithmetic and outstanding totals computed inline in JSX"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "ESLint, with the review's extra rules, measures RunWorkspaceView at 677 lines with complexity 39 (metrics.md section 7), the largest and most complex function in apps/web. The one function has six jobs. (1) Data loading: refresh() reads /workspace (183-196), a loop replays /events pages (243-272), a counter triggers a second refresh (316-331), and an effect downloads the newest published artifact (294-314). (2) Event stream and reconnects: an EventSource with run, live, cursor, gap and end listeners, a fixed 1 s retry and a closed flag (198-240, 274-279). (3) Deduplication: a Map keyed by sequence plus a 'sequence <= cursor' guard (175-181, 208). (4) Live text: merged through withDelta (213-220). (5) Derived view state, computed during render: the newest published artifact, the sorted timeline, the tool-event count, the summarizer rule, outstanding totals and dollar conversions (283-293, 356-357, 430-433, 576-578, 744-748, 795-826). (6) Rendering about fifteen regions. git log shows 17 commits touching the file, for 16 stories from US-4.6 to US-15.24.",
+      "impact": "Every run-facing story edits this one function, so diffs mix stream behavior with markup and reviewers must read both. The reconnect and deduplication state machine cannot be tested without a browser. Each live text delta (setLive, line 219) re-renders every region and sorts or filters the event map three times.",
+      "recommendation": "Split it in behavior-preserving steps, keeping every data-* hook and sentence that the Playwright specs read. (1) Move the pure helpers and view-model derivations to lib/runs/*.ts, with node:test coverage (WRUN-15). (2) Extract useRunWorkspace, which holds the load state machine (WRUN-02) and the ordered refresh (WRUN-04), and useRunEvents, which does replay, EventSource, backoff, deduplication and live text. (3) Extract one component per region. RunWorkspaceView should end as composition under 60 lines. Run the db profile's browser suites after each step.",
+      "sketch": "lib/runs/run-events.ts        pure: describeEvent (exhaustive switch), mergeEvents, withDelta, parseCursorFrame,\n                              splitEventPage (Decision 0017 Q13 per event), latestPublished, toolEventCount\nlib/runs/workspace-view.ts    pure: toWorkspaceView(snapshot) -> { statusSentence, label, tone, stopReason, openCalls,\n                              outstanding, summarizerDiffers, budgetLines, roleRows }\ncomponents/runs/workspace/use-run-workspace.ts   load state machine + coalesced refresh() that keeps cursor order\ncomponents/runs/workspace/use-run-events.ts      replay pages, EventSource, backoff, dedup -> { events, connection, gap, live }\ncomponents/runs/workspace/use-published-result.ts  downloads the newest text artifact, aborts superseded reads\ncomponents/runs/workspace/*.tsx  RunHeader, StatusSection (status, connection, ContinueRun, RunControls), VerificationSection,\n  ResultSection (stored | live), GoalSection, PlanSection, UnknownOutcomesSection, AssignmentsSection, ArtifactsSection,\n  TimelineSection, ExpertSection, ModelsSection, BudgetsSection, UsageSection\nRunWorkspaceView: const load = useRunWorkspace(runId); const stream = useRunEvents(runId, load.refresh); return layout",
+      "effort": "L",
+      "risk": "medium",
+      "ruleCheck": "DH-06 asks for small cohesive modules and invariants explained in code. .claude/rules/nextjs.md requires reconnect and deduplication handling and explicit states, which the hooks keep. The split moves only browser code, so business transitions stay on the server. Decision 0021 R1 froze data-* hooks and wording only for its own change, but the specs still read them, so they are preserved.",
+      "verdict": "confirmed",
+      "verifierNote": "Re-read every cited range: eight useState hooks, three effects and the six jobs sit where stated. eslint.json gives 677 lines and complexity 39, with the stream effect alone at 104 lines, and git log --follow lists 17 commits: 16 story deliveries and the Studio redesign."
+    },
+    {
+      "id": "WRUN-02",
+      "title": "The run page treats every failed read as temporary: denied runs are polled every second, and 403, 422, 5xx or contract errors never leave Loading",
+      "dimension": "errors",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 183,
+          "endLine": 196,
+          "note": "refresh(): on 401 or 404 it sets unavailable but still returns false; any other status just returns false; the body is never read; the parse is unguarded"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 243,
+          "endLine": 249,
+          "note": "start(): every false result schedules another attempt"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 198,
+          "endLine": 201,
+          "note": "retry(): a fixed 1 s delay, no cap and no final state"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 344,
+          "endLine": 354,
+          "note": "Shows 'Reconnecting. Showing the last known state.' when no state exists"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 259,
+          "endLine": 261,
+          "note": "Replay parse is unguarded, so a throw silently ends both the loop and the stream"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 52,
+          "endLine": 66,
+          "note": "Run reads can return 403 'forbidden' or 'workspace_required' ('Choose a workspace.')"
+        },
+        {
+          "file": "services/agent/src/autobots/api/errors.py",
+          "line": 29,
+          "endLine": 32,
+          "note": "A malformed run id such as /runs/abc fails the UUID path parameter and returns 422"
+        },
+        {
+          "file": "apps/web/components/run-inspector.tsx",
+          "line": 36,
+          "endLine": 40,
+          "note": "The inspector tells a 403 or 422 to 'check that the local API is running'"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "if (reply?.ok !== true) {\n  if (reply?.status === 404 || reply?.status === 401) {\n    setUnavailable(true);\n  }\n  return false; // start() then calls retry(): another attempt after RECONNECT_MS\n}\nsetSnapshot(parseRunWorkspace(await reply.json()));\n\nOn 401 or 404 the page says the run is not available, but it keeps requesting /workspace every second while it stays open. On 403 (current_workspace's 'Choose a workspace.'), 422 (a malformed id) or any 5xx, unavailable stays false: the page shows 'Loading this run.', then 'Reconnecting. Showing the last known state.' indefinitely. A ContractError or invalid JSON at line 194 or 259-260 rejects start(), and 'void start()' discards the rejection. Nothing retries, no stream opens, and the page stays on Loading, or stops updating silently if the snapshot had already loaded. Refusal bodies are never read, although run-disclosure.tsx:53 says an unread refusal holds its connection open.",
+      "impact": "A mistyped link, a session with several workspaces and no choice made, or contract drift between the API and the client leaves the user on an endless loading message that is also misleading, while the page sends a request every second. Drift shows up only as an unhandled rejection in the console. DH-06's denied, unavailable and retryable states are not told apart.",
+      "recommendation": "Give useRunWorkspace an explicit load state machine. 401 is signed_out. 403 is denied, showing the ErrorResponse message. 404 and 422 are not_found, with no retry and no stream. 5xx and network failures are retryable, with capped exponential backoff and a visible Retry button. A ContractError or invalid JSON is invalid: stop, say that the page and the API disagree, and log the ContractError path. Drain or cancel every non-ok body. Show the reconnecting sentence only when a snapshot is on screen. Add Playwright cases for 403, 422 and a malformed body using page.route, and give RunInspectorView and RunList the same classification.",
+      "sketch": "type WorkspaceLoad =\n  | { kind: 'loading' } | { kind: 'ready'; snapshot: RunWorkspace; reconnecting: boolean }\n  | { kind: 'signed_out' } | { kind: 'denied'; message: string } | { kind: 'not_found' }\n  | { kind: 'retrying'; attempt: number } | { kind: 'invalid'; path: string };\nlib/api/read-json.ts   readJson(url, parse, signal): Promise<ReadResult<T>>\n                       // classifies 401/403/404/422/5xx, drains bodies, parses ErrorResponse, catches ContractError\nuse-run-workspace.ts   backoff 1 s, 2 s, 4 s ... 30 s; stops on signed_out | denied | not_found | invalid\nRunWorkspaceView       switch (load.kind) -> RunLoading | RunDenied | RunNotFound | RunInvalid | workspace",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: 'Represent loading, empty, denied, unavailable and retryable states deliberately' and 'explicit response parsing at untrusted boundaries'. nextjs.md: 'explicit error/empty/loading states'. Reads stay idempotent, and no server guard changes.",
+      "verdict": "confirmed",
+      "verifierNote": "Traced refresh(), start() and retry(): a 401 or 404 shows the unavailable text while the effect keeps requesting /workspace every second, and every other failure keeps data-state=\"loading\" with the reconnecting sentence. The 403 and 422 shapes match settings_routes.py:52-66 and errors.py:29-32. The cross-workspace spec (run-workspace.spec.ts:267-284) asserts only the text, so nothing catches the polling."
+    },
+    {
+      "id": "WRUN-03",
+      "title": "A lost write reply is reported as a failure, and the retry is sent with a new idempotency key",
+      "dimension": "errors",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 106,
+          "endLine": 130,
+          "note": "Charge reconcile: new key on every submit; a lost reply becomes a refusal; the amount stays in the field for another submit"
+        },
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 38,
+          "endLine": 43,
+          "note": "refusalOf(null) gives 'That could not be done. Nothing changed.'"
+        },
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 73,
+          "endLine": 88,
+          "note": "Pause, resume and cancel: new key, same message"
+        },
+        {
+          "file": "apps/web/components/run-panel.tsx",
+          "line": 84,
+          "endLine": 109,
+          "note": "Panel commands: new key, same default message"
+        },
+        {
+          "file": "apps/web/components/unknown-effects.tsx",
+          "line": 34,
+          "endLine": 61,
+          "note": "Effect reconcile: new key; a null reply shows 'That couldn't be recorded.'"
+        },
+        {
+          "file": "apps/web/components/unknown-effects.tsx",
+          "line": 91,
+          "endLine": 118,
+          "note": "Buttons stay enabled while a request is in flight"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 446,
+          "endLine": 470,
+          "note": "The server deduplicates by an Idempotency-Key receipt and charges the oldest open call"
+        },
+        {
+          "file": "apps/web/components/continue-run.tsx",
+          "line": 20,
+          "endLine": 51,
+          "note": "The right pattern: the key is kept until the outcome is known, and a 5xx counts as unknown"
+        }
+      ],
+      "occurrences": 4,
+      "evidence": "const reply = await csrfFetch(`${base}/model-calls/reconcile`, {\n  method: \"POST\",\n  headers: { \"Content-Type\": \"application/json\", \"Idempotency-Key\": crypto.randomUUID() },\n  body: JSON.stringify({ charged_micro_usd: Math.round(dollars * MICRO_USD) }),\n}).catch(() => null);\n// condensed. On failure: setRefusal(await refusalOf(reply)), and refusalOf(null) says 'Nothing changed.'\n\nWhen the browser loses the reply (null), the owner sees 'That could not be done. Nothing changed.' When the BFF times out after 30 s, it returns 503 'The local API is unavailable.' even though the API may already have committed. Neither message says the charge may have been recorded, and the amount stays in the field. post_reconcile stores a receipt per key and applies the charge to the oldest uncertain call, so a resubmission under a new key is a new request. If two or more calls are open, the same charge is recorded against a second call. Pause, resume, cancel (in both run-controls and run-panel) and effect reconciliation show the same unproven failure. In UnknownEffects a double press sends two reconciliations, and the second one's refusal ('This was already resolved.') replaces the success note.",
+      "impact": "An owner who follows the screen's advice can enter one provider charge twice into the run's ledger. The UI defeats the server's idempotency receipts, which exist to prevent exactly this. The defect needs a lost reply, a retry and more than one open uncertain call, but the message invites the retry.",
+      "recommendation": "Use ContinueRun's pattern everywhere, through one helper. Keep the key, and the exact body it was first sent with, until a definite 2xx or 4xx arrives. The server fingerprints the body with the key and refuses a reused key with different content, so RunControls must resend the version it read for the first press, and the charge field and the effect evidence stay locked meanwhile. Treat a null reply or a 5xx as unknown, and say 'This may have been recorded. Pressing again won't record it twice.' Disable every action button while a request is pending. Show refusals with role='alert' and the destructive icon, as RunControls does. Add a Playwright case that lets the request reach the API, aborts the reply (route.fetch, then route.abort), retries, and checks that exactly one charge was recorded.",
+      "sketch": "lib/runs/post-idempotent.ts\n  type PostOutcome<T> = { kind: 'ok'; body: T } | { kind: 'refused'; code: string; message: string } | { kind: 'unknown' };\n  postIdempotent<T>(url, body, key, parse): Promise<PostOutcome<T>>  // network or 5xx -> unknown; 4xx -> parseErrorResponse\ncomponents/runs/use-idempotent-action.ts\n  const pending = useRef<{ key: string; body: unknown } | null>(null);\n  send = (body) => { pending.current ??= { key: crypto.randomUUID(), body };   // a retry resends the first body\n                     return postIdempotent(url, pending.current.body, pending.current.key, parse); }\n  on ok or refused: pending.current = null; on unknown: keep both, lock the inputs, show the 'may have been recorded' note",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: 'Disable duplicate submits with server idempotency as the correctness mechanism'. The change uses the server's existing receipts and expected-version guard as designed and weakens no guard. AGENTS.md's receipt requirements are not touched.",
+      "verdict": "revised",
+      "verifierNote": "Four fresh-key sites confirmed (run-controls.tsx:81 and 110, run-panel.tsx:91, unknown-effects.tsx:46). A second effect is possible only for the charge: pause, resume and cancel carry expected_version, and an effect must still be unknown (reconciliation.py:88-91), so there the harm is the unproven 'Nothing changed'. Revised the recommendation and sketch: the receipt fingerprints include the body (application/runs.py:408-410, run_routes.py:450), so a retry must resend the first body, including the version RunControls read for the first press."
+    },
+    {
+      "id": "WRUN-06",
+      "title": "Write replies and stream frames are cast instead of parsed, although generated parsers exist",
+      "dimension": "types",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "apps/web/components/continue-run.tsx",
+          "line": 53,
+          "endLine": 56,
+          "note": "The admission reply is cast; parseRunAccepted is generated (generated.ts:8534)"
+        },
+        {
+          "file": "apps/web/components/continue-run.tsx",
+          "line": 65,
+          "endLine": 67,
+          "note": "Error body cast"
+        },
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 39,
+          "endLine": 41,
+          "note": "Error body cast"
+        },
+        {
+          "file": "apps/web/components/run-panel.tsx",
+          "line": 101,
+          "endLine": 104,
+          "note": "Error body cast"
+        },
+        {
+          "file": "apps/web/components/unknown-effects.tsx",
+          "line": 57,
+          "endLine": 59,
+          "note": "Error body cast; parseErrorResponse is generated (generated.ts:7698)"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 221,
+          "endLine": 226,
+          "note": "The stream's cursor frame is cast, and a NaN would persist"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 259,
+          "endLine": 267,
+          "note": "The event page is cast to { events?: unknown[] }, and the envelope is parsed with its events blanked"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 143,
+          "endLine": 150,
+          "note": "known() drops any event that fails validation, not only event types the page doesn't know"
+        }
+      ],
+      "occurrences": 10,
+      "evidence": "cursor = Math.max(\n  cursor,\n  (JSON.parse(message.data as string) as { cursor: number }).cursor,\n);\n\nIf a cursor frame carries no number, cursor becomes NaN, and Math.max keeps it NaN. From then on every replay and reconnect asks for after=NaN, which the API's Cursor parameter (an int with ge=0, event_routes.py:41) rejects, so the page loops. An admission reply without run_id produces a link to /runs/undefined (continue-run.tsx:62, 108-110). Nothing in apps/web uses parseErrorResponse or parseRunAccepted. The stream route is include_in_schema=False (event_routes.py:226), so its frames have no generated parser. ESLint counts 10 type assertions in this area, and grep finds 20 casts of the form `json().catch(() => null)) as` across apps/web. Three of the ten are `message.data as string` on EventSource data, which is always a string; the seven that can hide drift are the cursor frame, the event page, the admission reply and four error bodies.",
+      "impact": "A contract mismatch shows up as a wrong link, a reconnect loop that never ends, or a missing timeline row, instead of a visible, logged error.",
+      "recommendation": "Parse the admission reply with parseRunAccepted. Add readErrorResponse(reply): Promise<ErrorResponse | null>, which wraps parseErrorResponse in try/catch. Add a pure parseCursorFrame(data): number | null that accepts only safe non-negative integers, and a pure splitEventPage(raw: unknown) that requires an events array and returns the known events plus a count of skipped ones. In known(), skip only payload types outside the generated union, and log a known type that fails validation with its ContractError path.",
+      "sketch": "export function parseCursorFrame(data: string): number | null {\n  let value: unknown;\n  try { value = JSON.parse(data); } catch { return null; }\n  if (typeof value !== 'object' || value === null || !('cursor' in value)) return null;\n  const cursor = value.cursor;\n  return typeof cursor === 'number' && Number.isSafeInteger(cursor) && cursor >= 0 ? cursor : null;\n}",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: 'No blanket type assertions to conceal contract mismatches' and 'explicit response parsing at untrusted boundaries'. contracts.md: TypeScript types do not validate JSON. Decision 0017 Q13 still holds, because unknown event types are still ignored. Generated files are consumed, not edited.",
+      "verdict": "revised",
+      "verifierNote": "Raised from medium to high: the rubric rates hidden contract drift at a trust boundary high, the stream's frames have no schema the drift check could compare (event_routes.py:226), and WCMP-02 rates the same admission-reply cast high. All casts and the NaN path were confirmed; the evidence now says which of the ten assertions can hide drift."
+    },
+    {
+      "id": "WRUN-04",
+      "title": "Every stored event refetches the whole snapshot, and an older reply can overwrite a newer one",
+      "dimension": "approach",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 206,
+          "endLine": 211,
+          "note": "Each run frame adds the event and starts a full /workspace fetch"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 227,
+          "endLine": 230,
+          "note": "Each gap frame does the same"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 194,
+          "note": "Replies are applied in the order they arrive, without a check"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 316,
+          "endLine": 331,
+          "note": "A second refresh path, driven by a counter and not coordinated with the first"
+        },
+        {
+          "file": "packages/api-client/src/generated.ts",
+          "line": 8729,
+          "note": "RunWorkspace.cursor exists but is never read"
+        },
+        {
+          "file": "services/agent/src/autobots/application/run_projection.py",
+          "line": 373,
+          "note": "cursor is the run's event_sequence at read time (the column is selected at line 84)"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 575,
+          "endLine": 579,
+          "note": "The tool-event count is ToolsUsed's reload trigger"
+        },
+        {
+          "file": "apps/web/components/tool-uses.tsx",
+          "line": 110,
+          "endLine": 140,
+          "note": "Each change of that count reloads every tool-use page from after=0"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "Stored events come in bursts (tool.use.started, tool.use.completed, run.status_changed) as consecutive run frames. Each frame starts its own GET, and each reply calls setSnapshot unconditionally. The DTO's cursor, which the projection fills from runs.event_sequence, could order the replies, but the client never reads it. read_workspace makes at least 14 database calls per refresh. ToolsUsed reloads every page whenever the tool-event count changes, and setLive re-renders the whole workspace for each live delta.",
+      "impact": "If an earlier reply resolves last, the page shows older state. After a run's final events nothing comes later to correct it, so the header and controls can show a non-terminal status after the timeline says 'Run moved from verifying to succeeded'. Long runs also make reads proportional to their event count.",
+      "recommendation": "In useRunWorkspace, allow one request in flight and at most one queued refresh. Apply a reply only when its snapshot.cursor is at least the shown cursor; an equal cursor is harmless. Send the after-action refresh through the same function. Have ToolsUsed refetch only from its first unfinished use and merge the rows by id, since the list pages by id and a started use changes when it completes; when every loaded use is finished, fetch after the last id. Let ResultSection own the live text so a delta re-renders one region, and memoize the values derived from events.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: 'Browser state is a view of durable state'. Ordering snapshots by the server's event_sequence keeps it a faithful view. The reconnect and deduplication behavior required by nextjs.md is unchanged.",
+      "verdict": "revised",
+      "verifierNote": "refresh() applies every reply unconditionally (194); RunWorkspace.cursor (generated.ts:8729) comes from runs.event_sequence (run_projection.py:84 and 373), and nothing in apps/web reads it. Revised one step: the tool-use list pages by id (tool_uses.py:277-278), so fetching only after the last loaded id, as first proposed, would miss a started use that later completes. The race is reasoned from the code, not reproduced."
+    },
+    {
+      "id": "WRUN-05",
+      "title": "Eight more run components exceed 60 lines by combining fetching, state and the whole render tree",
+      "dimension": "size",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 160,
+          "endLine": 425,
+          "note": "RunList: 260 lines; the row arrow at 332 is 65; the file is 399 non-blank lines"
+        },
+        {
+          "file": "apps/web/components/run-inspector.tsx",
+          "line": 18,
+          "endLine": 282,
+          "note": "RunInspectorView: 263; the model-call row arrow at 93 is 84"
+        },
+        {
+          "file": "apps/web/components/run-panel.tsx",
+          "line": 47,
+          "endLine": 283,
+          "note": "RunPanel: 228, complexity 14"
+        },
+        {
+          "file": "apps/web/components/run-disclosure.tsx",
+          "line": 22,
+          "endLine": 256,
+          "note": "RunDisclosure: 220, complexity 25"
+        },
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 45,
+          "endLine": 219,
+          "note": "RunControls: 170; the run commands and the charge form share refusal, note and busy"
+        },
+        {
+          "file": "apps/web/components/continue-run.tsx",
+          "line": 12,
+          "endLine": 127,
+          "note": "ContinueRun: 108, with seven separate useState flags"
+        },
+        {
+          "file": "apps/web/components/unknown-effects.tsx",
+          "line": 22,
+          "endLine": 130,
+          "note": "UnknownEffects: 107"
+        },
+        {
+          "file": "apps/web/components/tool-uses.tsx",
+          "line": 149,
+          "endLine": 237,
+          "note": "ToolUseTable: 89"
+        }
+      ],
+      "occurrences": 8,
+      "evidence": "ESLint counts these lengths without blank and comment lines (metrics.md section 7). RunControls keeps refusal, note, busy and charge (58-61) for two unrelated flows, so a charge-form refusal and a pause refusal share one alert (195-207). ContinueRun tracks open, profile, started, problem, pending, lost and already as separate flags (13-19); pending stays true after a success (52-63). RunDisclosure derives bindings with a nested ternary (73-84) and chooses between its notices with a chain of ternaries (127-163). RunInspectorView repeats `reported_micro_usd === null ? 'none' : dollars(...)` three times within one row (151-167).",
+      "impact": "A change to one flow re-renders and re-tests its neighbors, and the rules sit in JSX ternaries that no unit test can reach.",
+      "recommendation": "Split each component the next time it is touched, starting with RunList, RunDisclosure and RunControls. Keep the data-* hooks and the wording.",
+      "sketch": "RunList         useRunList(filters) { list, state, loadMore } + RunFilters + RunRow + RunListState\nRunInspector    ModelCallRow (chargeText(call) once) + ToolAttemptList + EvidenceList + CheckpointList\nRunPanel        useRunWorkspace(runId) (shared with WRUN-02) + PanelPlan + PanelFacts + RunCommandButtons\nRunDisclosure   resolveDisclosure({ models, policy, chosen, roleOverrides, usesModel }) in lib/runs (pure)\n                + ModelChoice + DisclosureNotice + RoleList\nRunControls     RunCommandButtons + ChargeReconcileForm (its own refusal, note and busy)\nContinueRun     useReducer over closed | choosing | pending | unknown | started { runId, replayed }\nUnknownEffects  EffectRow + useIdempotentAction (WRUN-03); ToolUseTable -> ToolUseRow + a COLUMNS array",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-06 asks for small cohesive modules and Client Components only where there is interaction. The specs read the data-* hooks and wording, and both stay.",
+      "verdict": "confirmed",
+      "verifierNote": "Lengths and complexities match eslint.json; the shared alert (run-controls.tsx:195-207), the seven ContinueRun flags, the nested ternaries and the repeated charge expression are at the cited lines."
+    },
+    {
+      "id": "WRUN-07",
+      "title": "Contract unions are widened to string, so a new status or outcome passes the type check and renders blank",
+      "dimension": "types",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 36,
+          "endLine": 72,
+          "note": "STATUS_TEXT, STATUS_LABEL and STATUS_TONE are keyed by string"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 83,
+          "endLine": 88,
+          "note": "ROLE_SOURCE is keyed by string; BindingSource is generated (generated.ts:7533)"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 16,
+          "endLine": 48,
+          "note": "STATUS_TEXT and tone(status: string); StateLine also takes a string (127)"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 75,
+          "endLine": 79,
+          "note": "PROFILE_NAMES is keyed by string; ModelProfileId is generated (generated.ts:8144)"
+        },
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 16,
+          "endLine": 36,
+          "note": "TERMINAL and PAUSABLE are Set<string>; commandsFor takes status: string, as does the prop at line 53"
+        },
+        {
+          "file": "apps/web/components/tool-uses.tsx",
+          "line": 22,
+          "endLine": 33,
+          "note": "OUTCOMES and OutcomeIcon take string"
+        },
+        {
+          "file": "apps/web/components/unknown-effects.tsx",
+          "line": 9,
+          "endLine": 13,
+          "note": "A hand-written Operation type duplicates the generated UnknownEffect; outcome is a string at line 37"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 89,
+          "endLine": 115,
+          "note": "describe(): an if-chain whose last branch labels any unmatched payload with a name field 'Artifact ... is missing'; tsc already rejects a new type without one"
+        }
+      ],
+      "occurrences": 17,
+      "evidence": "Seven lookup maps, the TERMINAL and PAUSABLE sets and six parameters use string where a generated union exists (RunStatus is at generated.ts:8691). There is also one hand-written DTO type and one non-exhaustive dispatch. With noUncheckedIndexedAccess, each lookup returns string | undefined. A status added to the Python enum therefore type-checks, then renders an empty status sentence (392) and no header badge (363), and commandsFor offers Cancel because the new status is in neither TERMINAL nor PAUSABLE. run-panel.tsx:22 already shows the safer form, Record<Task['marker'], string>. A related cause belongs to another area: the generator maps ExpertBinding.role_bindings, declared in Pydantic as dict[str, str], to Record<string, unknown> (scripts/generate_contracts.py:46-47). That is why run-disclosure.tsx:34 and 78 and run-workspace.tsx:723-727 handle unknown values.",
+      "impact": "After the client is regenerated, tsc still passes while the UI silently mishandles the new value, so reviewers must find every map by hand.",
+      "recommendation": "Key the maps by the generated unions: Record<RunStatus, string>, Record<BindingSource, string>, Record<NonNullable<ToolUseView['outcome']>, string> and Record<ModelProfileId, string>. Type the parameters with the same unions. Use UnknownEffect and EffectEvidence['outcome'] in UnknownEffects. Turn describe() into a switch on payload.type that ends in assertNever(payload). Keep a runtime fallback for values the client doesn't know, as Decision 0017 Q13 requires. Report the role_bindings mapping to the contracts owner.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: use generated API types. contracts.md: generated TypeScript consumes the API definitions. The UI view maps stay separate from the DTOs and are only keyed by DTO unions, so no types are merged.",
+      "verdict": "revised",
+      "verifierNote": "Recounted: seven maps, the TERMINAL and PAUSABLE sets, six parameters, the hand-written Operation type and describe() make 17, not 15. describe() is narrower than first stated: tsc already rejects a new payload type without a name field at line 114, and parseRunEvent drops unknown types at runtime, so only a new type with a name field would be mislabeled."
+    },
+    {
+      "id": "WRUN-08",
+      "title": "Run status words and tones are defined twice, and STATUS_TEXT names two different things",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 16,
+          "endLine": 27,
+          "note": "Exported STATUS_TEXT: short labels"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 48,
+          "endLine": 60,
+          "note": "STATUS_LABEL repeats the same ten labels, under a comment saying they must match the list"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 35,
+          "endLine": 47,
+          "note": "Here STATUS_TEXT means full sentences"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 29,
+          "endLine": 64,
+          "note": "tone(), STATE_TEXT and STATE_DOT"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 61,
+          "endLine": 72,
+          "note": "STATUS_TONE: a second table from status to tone"
+        },
+        {
+          "file": "apps/web/components/home-activity.tsx",
+          "line": 13,
+          "note": "Imports STATUS_TEXT from the run list screen"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 17,
+          "note": "Imports STATUS_TEXT from the run list screen"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "run-workspace.tsx:48 says the header uses 'the header's short state words, as the run list says them', but copies the words instead of importing them. The two tone tables already disagree in their categories: the list gives queued, paused, cancelling and cancelled one neutral dot, while the header uses muted for queued, cancelling and cancelled, and outline for paused.",
+      "impact": "Adding or renaming a state means editing two label tables and two tone tables, and nothing fails if one is missed. A reader cannot tell which STATUS_TEXT a file means.",
+      "recommendation": "Create lib/runs/run-status.ts: pure, keyed by RunStatus, holding RUN_STATUS_LABEL, RUN_STATUS_SENTENCE and runTone(status). Create components/runs/run-status.tsx with StateLine and a RunStatusBadge that maps the tone to dot classes or Badge variants. Import these in run-list, run-workspace, run-panel, home-activity and workflows-panel. Keep the words, which the specs assert.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Decision 0021 R3-R4 requires state words beside every tone, and they stay. DH-06 says not to invent a second state enum for the UI; the new module is keyed by the generated RunStatus.",
+      "verdict": "confirmed",
+      "verifierNote": "Both label tables, both tone tables and the comment at run-workspace.tsx:48 confirmed. The tone categories differ only for paused, which the list leaves neutral and the header marks outline."
+    },
+    {
+      "id": "WRUN-09",
+      "title": "Run screens import shared pieces from each other, including a run-list and run-panel cycle",
+      "dimension": "modules",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 8,
+          "note": "Imports RunPanel"
+        },
+        {
+          "file": "apps/web/components/run-panel.tsx",
+          "line": 8,
+          "endLine": 9,
+          "note": "Imports commandsFor from run-controls and StateLine from run-list, which closes the cycle"
+        },
+        {
+          "file": "apps/web/components/home-activity.tsx",
+          "line": 13,
+          "note": "Imports STATUS_TEXT from a screen"
+        },
+        {
+          "file": "apps/web/components/workflow-monitor.tsx",
+          "line": 7,
+          "note": "Imports ToolUseTable and useToolUses from the workspace's tools section"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 18,
+          "endLine": 20,
+          "note": "Imports DEFAULT_BUDGET_MICRO_USD from run-disclosure"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 29,
+          "note": "Imports focusGoal and NEW_RUN_PARAM from new-run"
+        },
+        {
+          "file": "apps/web/components/new-run.tsx",
+          "line": 11,
+          "endLine": 15,
+          "note": "focusGoal finds the composer through the literal id 'goal'"
+        },
+        {
+          "file": "apps/web/components/run-panel.tsx",
+          "line": 34,
+          "note": "wallTime is exported but used only in this file"
+        }
+      ],
+      "occurrences": 7,
+      "evidence": "There is one import cycle and six imports between screens. All 43 component files sit flat in apps/web/components. Shared run vocabulary (STATUS_TEXT, StateLine), the command rule (commandsFor), a data hook (useToolUses), a budget default and a DOM id all live inside screen modules, so other screens depend on whole screens.",
+      "impact": "Dependencies run sideways between screens. The cycle makes module evaluation order matter if either file gains top-level effects. The pieces extracted in WRUN-01 and WRUN-05 have no home. The 'goal' id contract breaks silently if the composer renames its input.",
+      "recommendation": "Add lib/runs/ for pure logic and components/runs/ for shared run widgets. Screens import from those folders, never from each other. Move DEFAULT_BUDGET_MICRO_USD to lib/runs/budget.ts. Export a GOAL_INPUT_ID constant that both the composer input and focusGoal use. Move wallTime, with a test, to lib/runs/format.ts.",
+      "sketch": "apps/web/lib/runs/          run-status.ts  run-events.ts  workspace-view.ts  commands.ts  format.ts  budget.ts   (pure)\napps/web/components/runs/   run-status.tsx  run-command-buttons.tsx  section.tsx  tool-uses/ (hook + table)\napps/web/components/runs/workspace/   RunWorkspaceView, its sections and hooks\napps/web/components/runs/list/        RunList, RunRow, RunFilters, RunPanel",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-03 prescribes only apps/web/ and no internal layout, so these folders are a proposal. DH-06 asks for explicit ownership, narrow interfaces and small cohesive modules.",
+      "verdict": "confirmed",
+      "verifierNote": "grep confirms the cycle (run-list.tsx:8 and run-panel.tsx:9) and the six cross-screen imports; wallTime has no caller outside run-panel.tsx."
+    },
+    {
+      "id": "WRUN-10",
+      "title": "Money and time formatting is reimplemented per file, with diverging rules",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 87,
+          "endLine": 89,
+          "note": "dollars(): US$ with two decimals"
+        },
+        {
+          "file": "apps/web/components/run-panel.tsx",
+          "line": 30,
+          "endLine": 32,
+          "note": "An identical dollars()"
+        },
+        {
+          "file": "apps/web/components/run-inspector.tsx",
+          "line": 10,
+          "endLine": 12,
+          "note": "The same name with exact precision, which slice-run-details.spec.ts:222-230 pins"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 795,
+          "endLine": 822,
+          "note": "Budgets mixes two-decimal and exact values; Usage repeats the same three figures with '$'"
+        },
+        {
+          "file": "apps/web/components/run-disclosure.tsx",
+          "line": 19,
+          "endLine": 20,
+          "note": "A second MICRO_USD (and toFixed(2) at line 97)"
+        },
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 94,
+          "endLine": 113,
+          "note": "Charge parsing: Number() accepts '0x10' and '1e3', and extra decimals are rounded silently (MICRO_USD at line 30)"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 93,
+          "endLine": 94,
+          "note": "The RN-03 'estimated' rule, repeated at run-panel.tsx:131-134"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 393,
+          "note": "Start time via toISOString; run-panel.tsx:163 shows the raw string and tool-uses.tsx:70 a locale time"
+        }
+      ],
+      "occurrences": 10,
+      "evidence": "Spend limit: US$\n{(snapshot.run.budget.limit_micro_usd / 1_000_000).toFixed(2)}.\nReported so far: US$\n{snapshot.run.budget.spent_micro_usd / 1_000_000}. Held as an\n...\n{snapshot.usage.repairs} repairs. Spent $\n\nThere are 10 conversions from micro-USD for display across 5 files in this area. A grep for 'function dollars', '1_000_000' and 'MICRO_USD' finds 6 dollars() functions in apps/web: 3 here, plus workflows-panel.tsx:50, goal-composer.tsx:74 and home-activity.tsx:34. It also finds two MICRO_USD constants.",
+      "impact": "The same amount can read US$0.30 in the list, US$0.3 under Budgets and $0.3 under Usage. Changing the currency or precision rule means editing many files, and the ledger input accepts text no reader would call dollars.",
+      "recommendation": "Put the app-wide helpers in lib/format.ts, the module WCMP-12 proposes for the same copies on Home and in the composer: formatUsd(micro, { precision: 'cents' | 'exact' }) and formatTimestamp. Put the run-specific ones in lib/runs/format.ts, pure and unit-tested: parseUsdToMicro(text), which uses a strict decimal pattern of up to six places and returns micro-USD or a reason; spendSummary({ charged, reserved, unreported, limit }) for RN-03; and wallTime. Pin the current outputs first (run-panel.spec.ts:105-107, slice-run-details.spec.ts:217-230), then replace the copies. Ask product whether Usage should repeat the Budgets figures.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06 asks for exact integer monetary units. Amounts stay integer micro-USD until display, and parsing stays exact on integers.",
+      "verdict": "revised",
+      "verifierNote": "Recounted 10 display conversions in five files, six dollars() copies in apps/web and two MICRO_USD constants; Number('0x10') and Number('1e3') both parse. Revised only where the helpers live, so the app-wide formatter is the one WCMP-12 proposes."
+    },
+    {
+      "id": "WRUN-11",
+      "title": "The summarizer-differs rule is written three times, and the copies disagree",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 744,
+          "endLine": 757,
+          "note": "The run's frozen role map"
+        },
+        {
+          "file": "apps/web/components/run-disclosure.tsx",
+          "line": 216,
+          "endLine": 229,
+          "note": "The disclosure shown before a run starts"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 75,
+          "endLine": 79,
+          "note": "Settings: the roles that differ from the executor"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 104,
+          "endLine": 111,
+          "note": "Settings: the summarizer note"
+        },
+        {
+          "file": "apps/web/components/run-disclosure.tsx",
+          "line": 17,
+          "note": "EXECUTOR is named here, while run-workspace uses string literals"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "// run-workspace.tsx:744-748 and run-disclosure.tsx:216-217 (condensed)\nfind((binding) => binding.role === \"summarizer\")?.profile !== executor?.profile // no summarizer: 'differs'\n// model-policy-panel.tsx:76-79 and 108 (condensed)\ndiffering.some((binding) => binding.role === SUMMARIZER) // no summarizer: 'same'\n\nAll three state the same product fact, that a differing summarizer pauses with route_not_bound when compaction is needed, each in its own words.",
+      "impact": "When the routing rule changes, for example when the summarizer starts to dispatch, three screens must change together. They already give different answers for a role map that has no summarizer binding.",
+      "recommendation": "Add pure summarizerDiffers(bindings) and differingRoles(bindings) functions to lib/runs/model-roles.ts. Cover them with node:test cases, including the missing-binding case, and decide that case's answer explicitly. Use them in all three components.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: avoid duplicated business rules. The screens still only disclose the rule, and routing stays on the server.",
+      "verdict": "confirmed",
+      "verifierNote": "Compared the three checks: with no summarizer binding, the workspace and the disclosure say it differs and the model policy panel does not."
+    },
+    {
+      "id": "WRUN-12",
+      "title": "The UI re-derives SP-010's command table, and two components each have their own copy of the command code",
+      "dimension": "approach",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 14,
+          "endLine": 36,
+          "note": "TERMINAL, PAUSABLE and commandsFor, all over status strings"
+        },
+        {
+          "file": "services/agent/src/autobots/domain/runs.py",
+          "line": 22,
+          "endLine": 42,
+          "note": "The canonical transition table"
+        },
+        {
+          "file": "services/agent/src/autobots/domain/runs.py",
+          "line": 96,
+          "endLine": 130,
+          "note": "COMMAND_SOURCES and next_status"
+        },
+        {
+          "file": "services/agent/src/autobots/contracts/run_workspace.py",
+          "line": 166,
+          "endLine": 167,
+          "note": "can_continue: a server-derived affordance already in the DTO"
+        },
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 65,
+          "endLine": 88,
+          "note": "Sends the current version, read before each press"
+        },
+        {
+          "file": "apps/web/components/run-panel.tsx",
+          "line": 83,
+          "endLine": 110,
+          "note": "Sends the loaded version (RN-04's guard)"
+        },
+        {
+          "file": "apps/web/components/run-panel.tsx",
+          "line": 14,
+          "endLine": 21,
+          "note": "The Command type and LABELS again (run-controls.tsx:14, 25-29)"
+        },
+        {
+          "file": "apps/web/components/run-panel.tsx",
+          "line": 246,
+          "endLine": 260,
+          "note": "The button row again (run-controls.tsx:138-152)"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "Today commandsFor matches runs.py: pause from queued, running, waiting_* and verifying; resume from paused; nothing from cancelling or a terminal state. Nothing ties the two together. Both senders build the same POST, with Content-Type, Idempotency-Key and expected_version, and the same buttons. They differ only in which version they send, a product choice recorded in two comments (run-controls.tsx:65 and run-panel.tsx:83).",
+      "impact": "A change to SP-010 needs a matching UI edit that no check catches, and the version policy is easy to copy into the wrong screen.",
+      "recommendation": "Now: type commandsFor with RunStatus and an exhaustive switch. Move it, the labels and the button row into lib/runs/commands.ts and components/runs/run-command-buttons.tsx, with a sendRunCommand(runId, command, expectedVersion, key) function so each caller passes the version it means; WRUN-03 supplies the key handling. Later, as its own story: add the user's allowed commands to RunWorkspace, computed by next_status (Pydantic first, then regenerate the client), and delete commandsFor, as can_continue already does for continuation.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "The ground rule keeps business transitions out of Next.js, and this moves that knowledge from the UI to the server. RN-04's expected-version guard and the workspace's current-version choice both survive, as explicit arguments. The generated client is regenerated, never edited.",
+      "verdict": "confirmed",
+      "verifierNote": "commandsFor agrees with can_transition and next_status today (domain/runs.py:22-128); the two senders differ only in the version they send, as their comments say."
+    },
+    {
+      "id": "WRUN-13",
+      "title": "Several handlers catch only network errors, so a bad body leaves buttons disabled or a list stuck",
+      "dimension": "errors",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 66,
+          "endLine": 71,
+          "note": "currentVersion parses without a guard"
+        },
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 73,
+          "endLine": 88,
+          "note": "If it throws, setBusy(false) is skipped and every button stays disabled"
+        },
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 117,
+          "endLine": 118,
+          "note": "parseReconciliationResult is unguarded, and onChanged is skipped"
+        },
+        {
+          "file": "apps/web/components/tool-uses.tsx",
+          "line": 127,
+          "endLine": 133,
+          "note": "parseToolUseList is unguarded, so 'Loading tool uses.' can stay forever"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 210,
+          "endLine": 221,
+          "note": "loadMore: no catch, a silent non-ok, and a stale list merged after the filters change"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 294,
+          "endLine": 314,
+          "note": "A failed result download is swallowed, and the live note keeps promising the stored result"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 316,
+          "endLine": 331,
+          "note": "A failed after-action refresh is swallowed"
+        }
+      ],
+      "occurrences": 6,
+      "evidence": "setBusy(true);\n...\nconst reply = await csrfFetch(`${base}/${command}`, {\n  ...\n  body: JSON.stringify({ expected_version: await currentVersion() }), // may throw before the request\n}).catch(() => null);\nsetBusy(false);",
+      "impact": "A proxy error page, invalid JSON or contract drift becomes an unhandled rejection with no message. Pause, Resume and Cancel stay disabled until a reload, the tools table never resolves, Load more does nothing visible, and a page loaded for the old filters can replace the new list.",
+      "recommendation": "Wrap handler bodies in try/finally so busy flags always reset, and turn a ContractError or SyntaxError into the existing refusal or failed state. Use the shared readJson (WRUN-02) for GETs. In loadMore, use a functional setList that checks the cursor it started from, abort the request when the filters change, and show a short failure note.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: centralize error handling and expose safe typed errors. nextjs.md: explicit error, empty and loading states.",
+      "verdict": "confirmed",
+      "verifierNote": "currentVersion() is awaited while csrfFetch's arguments are built, outside its .catch, so a throw skips setBusy(false). RunList's first load does catch a parse error (run-list.tsx:200-202), but loadMore has no catch; the other paths behave as stated."
+    },
+    {
+      "id": "WRUN-14",
+      "title": "The run inspector is a Client Component only so that it can fetch in an effect",
+      "dimension": "standards",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/run-inspector.tsx",
+          "line": 1,
+          "note": "'use client'"
+        },
+        {
+          "file": "apps/web/components/run-inspector.tsx",
+          "line": 18,
+          "endLine": 48,
+          "note": "useState and useEffect exist only to fetch; there are no handlers, inputs or live updates"
+        },
+        {
+          "file": "apps/web/app/runs/[id]/inspector/page.tsx",
+          "line": 7,
+          "endLine": 13,
+          "note": "The server page only passes the id"
+        },
+        {
+          "file": "apps/web/lib/service-status.ts",
+          "line": 33,
+          "endLine": 39,
+          "note": "An existing server-only member client that sends the chosen workspace"
+        },
+        {
+          "file": "packages/api-client/src/runtime.ts",
+          "line": 168,
+          "endLine": 170,
+          "note": "requestJson keeps the status only inside its error message"
+        },
+        {
+          "file": "packages/api-client/src/generated.ts",
+          "line": 9450,
+          "endLine": 9452,
+          "note": "getRunInspector"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "RunInspectorView renders static facts and a single Link. Its only client state is the fetch result and a hand-written status mapping (36-40), so its first paint is always 'Loading this run.'",
+      "impact": "The inspector's render code ships to the browser, the page needs an extra client round trip and flashes a loading state, and 404 or 403 get ad hoc text instead of notFound() and the app's error boundaries. DH-06 asks for Server Components unless there is interaction.",
+      "recommendation": "Render the inspector on the server. Read the API on each request with a server-only member client (cache: 'no-store', a token per request, and the chosen workspace header, as lib/service-status.ts does), and parse the reply with parseRunInspector. Call notFound() on 404 and show a denied message on 401 or 403. Because requestJson reports the status only inside its message, use fetch with the generated parser, or add a status-aware helper to the hand-written runtime.ts. Keep the data-* hooks. Later, consider rendering the workspace's first snapshot the same way, leaving only the stream client-side.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: 'Prefer Server Components; use Client Components for actual interaction', 'Authenticate and authorize each BFF mutation/read independently' and 'Prevent workspace data from leaking through shared caches, serialized props'. A no-store read with per-request authentication satisfies these. generated.ts is not edited.",
+      "verdict": "confirmed",
+      "verifierNote": "RunInspectorView holds only the fetch result and its status, with no handlers, inputs or live updates. memberClient (service-status.ts:33-39) is module-private today, so the server read needs it exported or a sibling helper beside it."
+    },
+    {
+      "id": "WRUN-15",
+      "title": "The stream, merge and rule logic has no unit tests, and living in .tsx files keeps it out of the unit runner",
+      "dimension": "tests",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 127,
+          "endLine": 141,
+          "note": "withDelta"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 89,
+          "endLine": 115,
+          "note": "describe (and known at 143-150)"
+        },
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 32,
+          "endLine": 36,
+          "note": "commandsFor"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 148,
+          "endLine": 158,
+          "note": "stateLine (and tone at 33-48)"
+        },
+        {
+          "file": "apps/web/components/run-disclosure.tsx",
+          "line": 69,
+          "endLine": 95,
+          "note": "Binding resolution, refused, fromExpert and showModel"
+        },
+        {
+          "file": "apps/web/components/tool-uses.tsx",
+          "line": 78,
+          "endLine": 99,
+          "note": "brief, result and outcome"
+        },
+        {
+          "file": "scripts/verify.py",
+          "line": 161,
+          "endLine": 162,
+          "note": "web_unit_tests runs a fixed list of two files with node --test"
+        },
+        {
+          "file": "apps/web/tests/browser/run-workspace.spec.ts",
+          "line": 83,
+          "endLine": 151,
+          "note": "Browser coverage of reconnects and deduplication, in the db profile only"
+        }
+      ],
+      "occurrences": 6,
+      "evidence": "apps/web/tests/unit holds three test files, none for the run screens. Node's type stripping, in the pinned Node 22.23.2, loads .ts but not .tsx and does not resolve the @/ alias, so helpers inside components are out of reach; lib/schema-value.ts shows a shape the runner can load. A value import from @autobots/api-client does load, because the workspace link resolves to packages/api-client/src. withDelta has an edge no test pins: a piece that overlaps the current text is appended whole. For example, 'Hello' followed by the piece 'lo world' at offset 3 becomes 'Hellolo world', marked as joined. Nothing establishes whether the server can send overlapping pieces.",
+      "impact": "Refactoring for WRUN-01 and WRUN-05 depends on slow browser runs against disposable databases, and subtle ordering or merge rules can regress with no fast failing test.",
+      "recommendation": "Move the pure logic into lib/runs/*.ts files that use relative .ts imports and no @/ alias or JSX; they may import the generated parsers and types from @autobots/api-client. Add node:test files for withDelta (continuing, duplicate, gap, overlap and new-segment pieces), describeEvent for every payload type, splitEventPage and parseCursorFrame, commandsFor against a fixture of runs.py's table, exhaustive status labels and tones, resolveDisclosure, summarizerDiffers, formatUsd and parseUsdToMicro. Add the files to web_unit_tests, or have it discover tests/unit/*.test.ts.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-06 names Vitest and React Testing Library for pure and client behavior. The project's runner today is node:test; this keeps that runner and installs nothing. Changing verify.py's list is a harness edit that needs its own work item.",
+      "verdict": "revised",
+      "verifierNote": "Ran one import of @autobots/api-client from apps/web under the pinned Node 22.23.2 (the version scripts/toolchain.py selects): it loaded and parsed a status, so only .tsx and the @/ alias keep helpers out of the runner, and the recommendation no longer limits pure modules to type-only imports. The withDelta overlap case was traced by hand."
+    },
+    {
+      "id": "WRUN-16",
+      "title": "Effects ignore late replies instead of aborting their requests",
+      "dimension": "approach",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 183,
+          "endLine": 186,
+          "note": "The stream's refresh and replay fetches (also 251-253) pass no signal"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 294,
+          "endLine": 314,
+          "note": "Result download"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 316,
+          "endLine": 331,
+          "note": "After-action refresh"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 186,
+          "endLine": 208,
+          "note": "List load (150 ms debounce)"
+        },
+        {
+          "file": "apps/web/components/run-panel.tsx",
+          "line": 62,
+          "endLine": 81,
+          "note": "Panel load"
+        },
+        {
+          "file": "apps/web/components/run-inspector.tsx",
+          "line": 24,
+          "endLine": 48,
+          "note": "Inspector load"
+        },
+        {
+          "file": "apps/web/components/run-disclosure.tsx",
+          "line": 44,
+          "endLine": 67,
+          "note": "Model and policy reads"
+        },
+        {
+          "file": "apps/web/components/tool-uses.tsx",
+          "line": 110,
+          "endLine": 145,
+          "note": "The one effect here that aborts"
+        }
+      ],
+      "occurrences": 7,
+      "evidence": "Cleanup sets active = false (or closed = true). The reply is then ignored, but the request runs to completion, and refusal bodies on these paths are drained only after it finishes. Only tool-uses.tsx in this area uses an AbortController, and in the whole of apps/web only it and tool-catalog.tsx do. tool-uses.tsx:111-112 explains the right behavior: 'A newer read replaces this one, so this one is aborted rather than left open.'",
+      "impact": "Fast typing in the filter, switching panels and navigating away all leave requests in flight. Combined with WRUN-02's retry loop, the waste adds up.",
+      "recommendation": "Pass an AbortController signal to every effect fetch through the shared readJson helper, abort in the cleanup, and ignore AbortError.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "none",
+      "verdict": "confirmed",
+      "verifierNote": "grep finds an AbortController only in tool-uses.tsx and tool-catalog.tsx; the seven listed effects only flip a flag on cleanup."
+    },
+    {
+      "id": "WRUN-17",
+      "title": "Section shells and page headers are built by hand in each screen",
+      "dimension": "duplication",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 846,
+          "endLine": 864,
+          "note": "A private Section component"
+        },
+        {
+          "file": "apps/web/components/run-inspector.tsx",
+          "line": 284,
+          "endLine": 309,
+          "note": "A second private Section, with an optional note and the same Decision 0021 comment"
+        },
+        {
+          "file": "apps/web/components/tool-uses.tsx",
+          "line": 250,
+          "endLine": 256,
+          "note": "An inline copy of the same section markup"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 582,
+          "endLine": 595,
+          "note": "A bordered attention card; it shares only the heading style"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 360,
+          "endLine": 383,
+          "note": "A header that reimplements PageHeader's layout and title classes"
+        },
+        {
+          "file": "apps/web/components/run-inspector.tsx",
+          "line": 70,
+          "endLine": 83,
+          "note": "A header that repeats PageHeader's title class"
+        },
+        {
+          "file": "apps/web/components/ui/page-header.tsx",
+          "line": 6,
+          "endLine": 44,
+          "note": "PageHeader already accepts a ReactNode title, a description and actions"
+        }
+      ],
+      "occurrences": 5,
+      "evidence": "Three section copies repeat 'space-y-3 border-t pt-6' and an h2 with 'text-sm font-semibold' (run-workspace.tsx:857, run-inspector.tsx:297, tool-uses.tsx:252). The workspace header repeats PageHeader's 'flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between' and 'text-[32px] leading-tight', and the inspector header repeats the title class. The unknown-outcomes card is a bordered attention panel that shares only the heading style.",
+      "impact": "Decision 0021's hairline section and title style are maintained in five places, and a spacing or heading change will miss some copies.",
+      "recommendation": "Add components/ui/section.tsx, taking an id, a title and an optional note, and use it for the three hairline sections; leave the attention card's frame as it is. Render both headers with PageHeader, passing a ReactNode title for the badge, actions for 'Inspect this run', and the inspector's goal and back link as its description.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Decision 0021's hairline sections and single header style, and DS-03's consistency, are kept.",
+      "verdict": "revised",
+      "verifierNote": "Recounted with grep: three hairline shells and two hand-built headers, so 5 rather than 6. The inspector header does not repeat PageHeader's flex layout, and the attention card is not a hairline section, so both claims and the recommendation were narrowed."
+    },
+    {
+      "id": "WRUN-18",
+      "title": "Magic values, and different names for the same concepts",
+      "dimension": "naming",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 362,
+          "note": "text-[32px]; this file has 15 arbitrary pixel sizes"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 132,
+          "note": "text-[13px]; this file has 7"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 203,
+          "note": "An unnamed 150 ms debounce"
+        },
+        {
+          "file": "apps/web/components/tool-uses.tsx",
+          "line": 119,
+          "note": "limit=200 written inline"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 745,
+          "endLine": 747,
+          "note": "Literal 'summarizer' and 'executor'; run-disclosure.tsx:17 names EXECUTOR"
+        },
+        {
+          "file": "apps/web/components/run-panel.tsx",
+          "line": 54,
+          "note": "Calls the RunWorkspace DTO view; run-workspace.tsx:153 calls it snapshot"
+        },
+        {
+          "file": "apps/web/components/run-inspector.tsx",
+          "line": 20,
+          "note": "Calls a load failure state; run-panel.tsx:55 calls it failed and run-workspace.tsx:158 unavailable"
+        },
+        {
+          "file": "apps/web/components/continue-run.tsx",
+          "line": 16,
+          "note": "Calls a refused write problem; unknown-effects.tsx:32 calls it message and run-controls.tsx:58 refusal"
+        }
+      ],
+      "occurrences": 38,
+      "evidence": "There are 38 arbitrary pixel font sizes in 8 files of this area, using 8 distinct values: 19 x 13px, 6 x 12.5px, 5 x 15px, 2 x 32px, 2 x 17px, 2 x 13.5px, 1 x 12px and 1 x 11px. apps/web has 212 in total. The @theme block in globals.css defines colors, fonts and radii, but no font sizes.",
+      "impact": "Typography drifts from screen to screen, although DS-03 asks for consistent typography. Readers must translate between names in files that hold the same data.",
+      "recommendation": "Add a named type scale, font sizes only, to the @theme block in globals.css, and use it here. Name FILTER_DEBOUNCE_MS and TOOL_USE_PAGE_SIZE. Reuse the EXECUTOR and SUMMARIZER constants. Settle on one vocabulary: snapshot, load state, refusal.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Only font-size tokens are added: the DS-01 palette is untouched and, per Decision 0021 R4, no colors are added. slice-visual.spec.ts measures contrast, focus and zoom and saves screenshots, but compares them with no baseline, so check those screenshots by eye after the change.",
+      "verdict": "revised",
+      "verifierNote": "Recounted 38 pixel sizes in 8 files with the stated distribution, and 212 in apps/web; the @theme block has no font-size tokens. Corrected the rule check: slice-visual.spec.ts:686-687 saves screenshots without comparing them, so it would not catch size drift."
+    },
+    {
+      "id": "WRUN-19",
+      "title": "Paths are built by hand, with a mix of <a> and Link and inconsistent encoding",
+      "dimension": "approach",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 609,
+          "endLine": 614,
+          "note": "<a href> for the parent run, a full page load"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 627,
+          "endLine": 630,
+          "note": "<a href> for child runs"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 375,
+          "endLine": 381,
+          "note": "Link with an unencoded runId"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 344,
+          "note": "Link with an unencoded id"
+        },
+        {
+          "file": "apps/web/components/run-panel.tsx",
+          "line": 241,
+          "note": "Link with an encoded id"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 297,
+          "note": "The download path is encoded here, but not at 659 or run-inspector.tsx:238"
+        },
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 62,
+          "note": "One of seven places that build /api/v1/runs/{id} (also run-workspace 173 and 320, run-panel 58, tool-uses 119, unknown-effects 41 and run-inspector 26)"
+        }
+      ],
+      "occurrences": 7,
+      "evidence": "Seven places build the run API path, three build the artifact download path, and two internal links use <a> while their neighbors use Link.",
+      "impact": "A route change means edits in many files. Navigating to a parent or child run reloads the whole app shell instead of using the client router.",
+      "recommendation": "Add lib/routes.ts with runPath, runInspectorPath, artifactDownloadPath and apiRunPath(id, ...segments), each encoding its parts. Use next/link for in-app routes, and keep <a> only for downloads.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "none",
+      "verdict": "confirmed",
+      "verifierNote": "Counted seven builders of the run API path and three download paths. Run ids are UUIDs, so the missing encoding is a consistency issue, not a live bug."
+    },
+    {
+      "id": "WRUN-20",
+      "title": "Some non-obvious mechanics give no reason, and one comment documents a copy",
+      "dimension": "comments",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 259,
+          "endLine": 260,
+          "note": "The page envelope is parsed with its events blanked, with no explanation"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 196,
+          "note": "A body is drained without comment (also run-panel.tsx:71 and run-inspector.tsx:35)"
+        },
+        {
+          "file": "apps/web/components/run-disclosure.tsx",
+          "line": 53,
+          "note": "The only stated reason for draining bodies"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 188,
+          "endLine": 193,
+          "note": "This refusal path does not drain"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 160,
+          "note": "The refreshes counter is an effect trigger (bumped at 434 and 599), unexplained"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 48,
+          "note": "The comment says the labels match the run list instead of importing them"
+        }
+      ],
+      "occurrences": 4,
+      "evidence": "Body draining appears three times without comment and is explained once, in another file, so a reader cannot tell whether run-workspace's undrained refusal is a bug. The `{ ...raw, events: [] }` parse applies Decision 0017 Q13 one event at a time, but nothing at the call says so.",
+      "impact": "Readers have to reverse-engineer the intent, and may 'simplify' away required mechanics or copy the omissions.",
+      "recommendation": "Move these mechanics into named helpers whose doc comments carry the reason: readJson drains bodies, and splitEventPage applies Q13 per event. Replace the counter with a direct refresh() call. Delete the copied labels and their comment (WRUN-08).",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: explain non-obvious invariants in code, and avoid comments that restate syntax. Decision and story citations stay.",
+      "verdict": "confirmed",
+      "verifierNote": "Draining without comment at run-list.tsx:196, run-panel.tsx:71 and run-inspector.tsx:35; in this area only run-disclosure.tsx:53 gives the reason, and the workspace's refresh() leaves its refusal unread."
+    }
+  ],
+  "rejected": [],
+  "notCovered": "This was a static review. No browser, server or verify profile was run. The snapshot race (WRUN-04), the lost-reply double charge (WRUN-03) and the endless retry loop (WRUN-02) are reasoned from the code and the server routes, not reproduced. The claim that an unread refusal holds a connection open comes from the project's own comment (run-disclosure.tsx:53), not from a measurement. ESLint was not rerun; size, complexity and assertion counts come from this run's .checks/reviews/review-2026-11-12-09-52-30/eslint.json. Files from other areas were read only in the excerpts cited: PRD-Development-Harness.md DH-03 to DH-06, metrics.md, generated.ts, run_projection.py, run_routes.py, event_routes.py, settings_routes.py, security.py, errors.py, domain/runs.py, contracts/run_workspace.py, lib/bff.ts, model-policy-panel.tsx, globals.css, scripts/verify.py, scripts/generate_contracts.py and the browser specs. The /api/v1 BFF route handlers that serve these screens belong to web-shell and were not reviewed. No command was refused."
+}

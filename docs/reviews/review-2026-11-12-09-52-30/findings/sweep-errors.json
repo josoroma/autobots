@@ -1,0 +1,965 @@
+{
+ "schema": "autobots.code-review/v1",
+ "area": "sweep-errors",
+ "title": "Lens: errors, logging and view states",
+ "kind": "lens",
+ "timestamp": "2026-11-12-09-52-30",
+ "revision": "156534da0bd5b19417f05d313077d767804b175b",
+ "summary": "Errors in Autobots are safe but rarely diagnosable, and often misclassified. The API edge is strong: one {code, message} envelope with fixed messages, validation input never echoed, `raise ... from None` throughout, and a redacting local JSON logger behind every service log line. No `except` clause catches a cancellation, though one cleanup path's `suppress(BaseException)` can absorb one. The model-call path is the pattern to copy, with a FailureClass taxonomy, an explicit uncertain set, and logs that carry qualified error and cause types. Elsewhere, failures lose either their cause or their class:\n- Every process boundary logs only the exception's class name, with no location, step or run.\n- The tool gateway turns any unexpected tool exception into tool_failed or outcome_unknown, with no log line and, for effects, an empty failure_detail.\n- A database outage during a request becomes a 500 instead of a retryable 503.\n- On most screens, a contract mismatch, a denial and an outage reach the user as the same 'unavailable' message. This runs through hand-written loaders in 24 component files and 19 hand-cast error bodies, and 8 load failures tell a signed-in user to sign in whatever the cause.\n- Refusals use four code conventions across 61 exception classes. Eleven route modules map them to HTTP, partly by string suffix.\n- The codes cross the contract as plain strings, and one client key already matches nothing the service emits.\n\nMost fixes centralize one thing: an error_fields helper, an OutcomeUnknown type with receipt detail, one Refusal base with a status table, and one typed loader with explicit view states.",
+ "scores": [
+  {
+   "dimension": "standards",
+   "score": 3,
+   "why": "DH-06's safety clauses are met (no leaks, redaction, cancellation not caught by any except clause). Its clauses on cause preservation, centralized handling and deliberate view states are not, and no lint rule guards blind or silent handlers."
+  },
+  {
+   "dimension": "modules",
+   "score": 3,
+   "why": "There is one response envelope and one logger, but refusal-to-status mapping lives in 11 route modules, and the web has no shared error or load-state module."
+  },
+  {
+   "dimension": "functions",
+   "score": 3,
+   "why": "Error mappers are small but blur roles: as_api_error ends in `raise error`, and settings mirrors it with a HANDLED tuple by hand. Screen loaders fetch, parse, classify and set state inline, and two screens write theirs twice."
+  },
+  {
+   "dimension": "approach",
+   "score": 3,
+   "why": "The model-call and worker paths classify failures deliberately, and so do workflow-monitor.tsx and continue-run.tsx. The tool gateway, the BFF and most screens collapse failure classes into one."
+  },
+  {
+   "dimension": "comments",
+   "score": 4,
+   "why": "About 10 of the 27 broad handlers that BLE001 reports carry a reason comment (retention.py:82, operations.py:154, dispatch.py:19), and most others log a named event. The silent ones carry none: the four in the tool gateway, experts.py:72 and tool_uses.py:103."
+  },
+  {
+   "dimension": "types",
+   "score": 2,
+   "why": "61 exception classes use four code conventions and share no base. Error and stop codes are plain strings in the contract. The web hand-casts 19 error bodies, and ContractError doubles as an HTTP error."
+  },
+  {
+   "dimension": "errors",
+   "score": 3,
+   "why": "Errors are safe and almost always cancellation-correct. But causes are dropped at every boundary, unknown tool outcomes cannot be diagnosed, and outages, denials and contract drift are misreported to users."
+  },
+  {
+   "dimension": "tests",
+   "score": 3,
+   "why": "Tests pin that nothing leaks (test_api.py:137, test_operations.py:64), and tests/db asserts refusal codes by name. Nothing asserts that a cause is logged, that a tool defect is recorded, or that a screen tells denied from unavailable."
+  },
+  {
+   "dimension": "maintainability",
+   "score": 3,
+   "why": "The foundations are sound. A few central changes would remove most of the friction: a cause-fields helper, an outcome-unknown type, a refusal base and a shared loader."
+  }
+ ],
+ "strengths": [
+  {
+   "title": "One safe error envelope at the API edge",
+   "evidence": "services/agent/src/autobots/api/errors.py:19-40 answers every failure with ErrorResponse {code, message} and fixed text, never echoes rejected input, and hides 500 details. Routes consistently raise `ApiError(...) from None` (e.g. api/approval_routes.py:153-158). services/agent/tests/test_api.py:124-153 pins both the no-echo and no-leak properties."
+  },
+  {
+   "title": "A redacting, local-only JSON logger behind every service log line",
+   "evidence": "services/agent/src/autobots/operations/logs.py:12-90 redacts secret shapes, shortens identifiers, drops uvicorn access lines and quiets httpx URLs. All 25 log_event calls go through it, and no service path prints, only CLI entry points. Pinned by services/agent/tests/test_operations.py:38-79."
+  },
+  {
+   "title": "A real failure taxonomy for model calls",
+   "evidence": "services/agent/src/autobots/application/model_attempts.py:17-73 defines FailureClass, classify_status (MP-08's table) and the UNCERTAIN set. services/agent/src/autobots/adapters/loop_middleware.py:308-346 logs uncertain calls with the module-qualified error type, the cause type and the status, and never a message. This is the model for the tool path and for logging generally."
+  },
+  {
+   "title": "Worker process boundaries that fail soft and reconnect",
+   "evidence": "services/agent/src/autobots/operations/worker.py:74-169 runs on autocommit connections and re-raises psycopg.OperationalError to the reconnect loop. Drain has a deadline, and the cancelled heartbeat is awaited (worker.py:158-160). Per-item isolation names the item: application/routines.py:478-488."
+  },
+  {
+   "title": "No except clause catches a cancellation",
+   "evidence": "No `except CancelledError` exists in services/agent/src, and every `except Exception` leaves cancellation alone. The three `except BaseException` handlers settle the qualification ledger and re-raise (operations/route_qualification.py:277-284, 302-306, 394-400). The one context manager that can absorb a cancellation is `suppress(BaseException)` at application/browsing_tool.py:142 (XERR-13)."
+  },
+  {
+   "title": "Unknown is a first-class state",
+   "evidence": "application/operations.py:153-160 returns *_unknown conditions when the database can't answer instead of guessing. apps/web/components/readiness.tsx:17-29 renders unknown distinctly. Tool receipts separate 'failed for certain' from 'unknown' (application/tool_gateway.py:24-33)."
+  },
+  {
+   "title": "Deliberate connection states on the run page, and a loader worth promoting",
+   "evidence": "apps/web/components/run-workspace.tsx:168-279 models loading, reconnecting with cursor replay, live, ended and gap, and deduplicates by sequence. apps/web/components/tool-catalog.tsx:156-181 has a typed useLoaded union with an AbortController, the best basis for a shared loader. Two more screens already classify failures: workflow-monitor.tsx:44-48 reconnects on 5xx and network errors, and continue-run.tsx:47-51 treats a 5xx after a write as an unknown outcome."
+  },
+  {
+   "title": "Many handlers explain why",
+   "evidence": "About 10 of the 27 broad handlers that BLE001 reports carry a reason comment: application/retention.py:82, adapters/result_stream.py:242, application/operations.py:154, application/goal_loop.py:536, application/routines.py:481, operations/route_qualification.py:527, operations/reasoning_trial.py:259 and .claude/hooks/dispatch.py:19 and 235. The BaseException handler at route_qualification.py:282 does too."
+  }
+ ],
+ "findings": [
+  {
+   "id": "XERR-01",
+   "title": "Private logs keep only the exception's class name, so no failure can be located without reproducing it",
+   "dimension": "errors",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/operations/logs.py",
+     "line": 64,
+     "endLine": 66,
+     "note": "JsonFormatter keeps the exc_info class name and drops the traceback and cause chain"
+    },
+    {
+     "file": "services/agent/src/autobots/api/errors.py",
+     "line": 38,
+     "endLine": 40,
+     "note": "The 500 handler logs nothing. Starlette re-raises after it, and uvicorn's 'Exception in ASGI application' line, reduced to the class name with no route, is the only trace."
+    },
+    {
+     "file": "services/agent/src/autobots/operations/worker.py",
+     "line": 143,
+     "endLine": 149,
+     "note": "worker.step_failed at ERROR names no step, run or location (again at 276-277)"
+    },
+    {
+     "file": "services/agent/src/autobots/application/routines.py",
+     "line": 480,
+     "endLine": 488,
+     "note": "Per-routine isolation logs the routine id and the class name only"
+    },
+    {
+     "file": "services/agent/src/autobots/application/retention.py",
+     "line": 171,
+     "endLine": 172,
+     "note": "Per-workspace isolation logs the class name without the workspace"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+     "line": 319,
+     "endLine": 328,
+     "note": "The only helper that adds a qualified type and the cause's type, used for model calls only"
+    },
+    {
+     "file": ".claude/hooks/dispatch.py",
+     "line": 235,
+     "endLine": 237,
+     "note": "One fixed sentence for every failure, so a defect reads like bad input"
+    },
+    {
+     "file": "services/agent/tests/test_operations.py",
+     "line": 64,
+     "endLine": 79,
+     "note": "Pins the no-message half (error == 'RuntimeError'). Nothing pins the cause half."
+    }
+   ],
+   "occurrences": 16,
+   "evidence": "# operations/logs.py:64-66\nif record.exc_info and record.exc_info[0] is not None:\n    entry[\"error\"] = record.exc_info[0].__name__\n# api/errors.py:38-40\n@app.exception_handler(Exception)\nasync def unexpected(_request: Request, _error: Exception) -> JSONResponse:\n    return _response(500, \"internal_error\", \"Something went wrong.\")\nCount: 13 log_event calls pass error=type(error).__name__ (rg over services/agent/src: 5 in worker.py, 3 in operations.py, and one each in result_stream.py, goal_loop.py, worker_inference.py, routines.py and retention.py), plus the formatter, the 500 handler and the hook.",
+   "impact": "DH-06 requires keeping causes in private logs, and PRD 12.2 keeps restricted raw diagnostic traces apart from public activity. Today an ERROR from the unattended worker reads {\"event\":\"worker.step_failed\",\"error\":\"KeyError\"}, with no file, line, step or run. An unexpected API failure reads {\"event\":\"Exception in ASGI application\",\"error\":\"KeyError\"}, with no route. Every diagnosis needs a reproduction, which slows fixes and makes it hard to confirm a regression is gone. The secrecy rationale covers messages, not frame locations or cause types, which carry no input.",
+   "recommendation": "Keep the no-message rule and add message-free cause data in one place. Add error_fields(error) to operations/logs.py, returning:\n- the module-qualified type;\n- the types in the cause chain (bounded);\n- the last few traceback frames as package-relative path:line:function, never locals or messages.\n\nUse it in JsonFormatter for exc_info, replace the 13 error=type(error).__name__ arguments with **error_fields(error), and rebuild uncertain_call_fields on it. In api/errors.py, log api.unhandled at ERROR with the method and route template before returning 500. Let the hook print the exception type, which carries no input. Extend test_operations.py to require frames and forbid planted secrets, and add an API test that a 500 writes one api.unhandled line.",
+   "sketch": "operations/logs.py\n  def error_fields(error: BaseException, frames: int = 6) -> dict[str, Any]\n      # error_type 'builtins.KeyError', causes ['psycopg.OperationalError'],\n      # frames ['autobots/application/goal_loop.py:357:run_goal', ...]; no messages, no locals\n  JsonFormatter.format: if record.exc_info: entry.update(error_fields(record.exc_info[1]))\napi/errors.py\n  unexpected(request, error): log_event(logger, 'api.unhandled', logging.ERROR,\n      method=request.method, route=<route template>, **error_fields(error))\nworker.py, goal_loop.py, routines.py, retention.py, operations.py, result_stream.py, worker_inference.py\n  log_event(..., **error_fields(error))   # replaces error=type(error).__name__\nadapters/loop_middleware.py\n  uncertain_call_fields(error) = error_fields(error) | {'status': ...}",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "DH-06 (preserve causes in private logs) and PRD-LangChain-Deep-Agents 12.2 (restricted, redacted diagnostic traces). The recommendation keeps logs.py's no-message rule and its local stderr sink, adds no hosted tracing, and keeps the leak assertions in test_operations.py.",
+   "verdict": "confirmed",
+   "verifierNote": "Every site re-read; rg finds exactly 13 class-name-only log calls, and the installed Starlette 1.10.0 re-raises after the 500 handler (middleware/errors.py:183-186), so uvicorn's reduced line is the only trace."
+  },
+  {
+   "id": "XERR-02",
+   "title": "The tool gateway turns any unexpected tool exception into a bare code, with no log line and no receipt detail",
+   "dimension": "errors",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/tool_gateway.py",
+     "line": 542,
+     "endLine": 544,
+     "note": "An effect that raised is recorded as unknown, with failure_code and failure_detail left null"
+    },
+    {
+     "file": "services/agent/src/autobots/application/tool_gateway.py",
+     "line": 422,
+     "endLine": 423,
+     "note": "A read that raised becomes tool_failed and is retried, with nothing kept"
+    },
+    {
+     "file": "services/agent/src/autobots/application/tool_gateway.py",
+     "line": 514,
+     "endLine": 515,
+     "note": "A readback that raised falls through to unknown"
+    },
+    {
+     "file": "services/agent/src/autobots/application/tool_gateway.py",
+     "line": 372,
+     "endLine": 373,
+     "note": "A review detail that raised becomes review_unavailable"
+    },
+    {
+     "file": "supabase/migrations/20261105000030_tool_failure_diagnostics.sql",
+     "line": 1,
+     "endLine": 6,
+     "note": "These columns were added so a stopped run can be diagnosed: a code and a category"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/github_issues.py",
+     "line": 55,
+     "endLine": 56,
+     "note": "UnclearReply, the adapters' deliberate 'can't tell' signal, lands in the same except Exception as a defect"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/github_pulls.py",
+     "line": 48,
+     "endLine": 49,
+     "note": "A second class with the same name and purpose"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+     "line": 530,
+     "endLine": 539,
+     "note": "The model-call path logs worker.call_uncertain with error and cause types for the same 'may have happened' state"
+    }
+   ],
+   "occurrences": 4,
+   "evidence": "# application/tool_gateway.py:542-544 (_attempt)\n        except Exception:\n            await _record(context, operation_id, \"unknown\", None)\n            return ToolResult(ToolOutcome.UNKNOWN, \"outcome_unknown\", operation_id=operation_id)\n# tool_gateway.py:422-423 (_read)\n            except Exception:\n                code = \"tool_failed\"\ntool_gateway.py has no logger. Only plans.py ever supplies ToolFailed(detail=...), and nothing in services/agent/src or apps/web reads failure_detail.",
+   "impact": "An unknown effect is the state a person must reconcile against the destination's own records, and the receipt is the evidence they rule on. Today an unclear GitHub reply, a timeout and a KeyError from a changed provider payload all record the same unknown/outcome_unknown. The read path turns a parser defect into a retried tool_failed. External API drift at this trust boundary therefore shows up only as unexplained unknown effects. The failure_detail column, built for diagnosis, stays empty in exactly the case that needs it.",
+   "recommendation": "Keep every outcome and retry decision as it is, and record why it happened.\n1. Add OutcomeUnknown(Exception) with a detail category to tool_gateway.py, for adapters that can't tell whether an effect happened. Define one UnclearReply as its subclass and use it in both GitHub adapters.\n2. Effects keep a receipt, so in _attempt and _replay set failure_detail to the OutcomeUnknown category, or to `defect:<qualified type>` for anything else.\n3. Reads and review denials keep no receipt (_denied records nothing), so _read and the review branch get the log line only.\n4. Log tool.operation.unknown (or .failed) with tool id, version, operation id and error_fields.\n5. Add gateway tests with a handler that raises KeyError and one that raises UnclearReply, asserting the receipt detail and the log line.",
+   "sketch": "application/tool_gateway.py\n  class OutcomeUnknown(Exception): detail: str      # the tool can't tell; the outcome stays unknown\n  def _diagnosis(error) -> str: OutcomeUnknown -> error.detail; else 'defect:' + qualified type\n  _attempt / _replay: except Exception as error:\n      await _record(context, op, 'unknown', None, 'outcome_unknown', _diagnosis(error))\n      log_event(logger, 'tool.operation.unknown', logging.WARNING, tool=..., operation=..., **error_fields(error))\n  _read / review branch: the same log line; no receipt exists, outcome codes unchanged\nadapters/github_issues.py, github_pulls.py\n  UnclearReply(OutcomeUnknown), defined once and imported by both",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "python-worker rule: reconcile unknown outcomes before retry, and replay is not exactly-once execution. Outcome classes, retries and receipt statuses stay as they are. Only the existing nullable failure_detail column (added by migration 20261105000030, which is not edited) gets filled, with a category and never model text, as its comment requires.",
+   "verdict": "revised",
+   "verifierNote": "All four handlers, the null detail and the two UnclearReply classes confirmed. Revised: only effects have receipts (_denied at tool_gateway.py:242-243 records nothing, and _read keeps none), so reads and review denials get a log line, not a detail."
+  },
+  {
+   "id": "XERR-03",
+   "title": "The web reports a contract mismatch as an outage, or hangs on it, and nothing records which field failed",
+   "dimension": "types",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "packages/api-client/src/runtime.ts",
+     "line": 22,
+     "endLine": 30,
+     "note": "ContractError carries the failing path"
+    },
+    {
+     "file": "packages/api-client/src/runtime.ts",
+     "line": 168,
+     "endLine": 170,
+     "note": "requestJson throws the same ContractError for an HTTP status, so drift and refusal look alike"
+    },
+    {
+     "file": "apps/web/components/tool-catalog.tsx",
+     "line": 156,
+     "endLine": 181,
+     "note": "useLoaded: a parse failure becomes 'unavailable', shown as 'Check that the local service is running.'"
+    },
+    {
+     "file": "apps/web/components/run-list.tsx",
+     "line": 189,
+     "endLine": 202,
+     "note": "A parse failure becomes 'Runs are unavailable. Sign in, and check that the local API is running.'"
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 183,
+     "endLine": 196,
+     "note": "refresh parses with no catch"
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 274,
+     "note": "void start(): a throw leaves 'Loading this run.' forever, with no retry"
+    },
+    {
+     "file": "apps/web/components/waiting-notifier.tsx",
+     "line": 46,
+     "endLine": 48,
+     "note": "A parse throw inside void poll() skips the reschedule at line 71, so notifications stop until reload or a setting change"
+    },
+    {
+     "file": "apps/web/lib/service-status.ts",
+     "line": 42,
+     "endLine": 49,
+     "note": "Server-side calls swallow ContractError into 'unavailable' or null, with no server log"
+    }
+   ],
+   "occurrences": 60,
+   "evidence": "// components/tool-catalog.tsx:163-174 (abridged)\nfetch(path, { cache: \"no-store\", signal: controller.signal })\n  .then(async (reply) => {\n    if (!reply.ok) { setState({ kind: \"unavailable\" }); return; }\n    setState({ kind: \"ready\", value: parse(await reply.json()) });\n  })\n  .catch(() => { if (active) setState({ kind: \"unavailable\" }); });\nCount: generated parsers are used at 60 sites in 25 component files, counted outside import statements; 44 of them are the literal parse*(await reply.json()) form, in 20 files. ContractError is referenced 0 times and console.* is called 0 times in app, components and lib.",
+   "impact": "The generated parsers exist so that drift fails loudly at the boundary; the contracts rule says TypeScript types do not validate JSON. Every screen catches that failure with the same handler as a network error and tells the user to sign in or start the API. After a partial upgrade, a renamed field looks like an outage, the run page can stay on 'Loading this run.' with no retry, and the waiting notifier stops until the page reloads or the setting changes. Meanwhile the browser console and the server logs stay empty.",
+   "recommendation": "Separate the failure kinds at the client boundary, and report the one only developers can fix.\n1. In runtime.ts, add an HttpError (status, code) for non-ok replies, so ContractError means drift only. packages/api-client/tests/contract.test.ts:33-36 pins ContractError for a failed status today and changes with it.\n2. Add apps/web/lib/load.ts (loadJson) and move useLoaded from tool-catalog.tsx into lib. Return a union with a contractMismatch kind, which calls console.error with ContractError.path (no values) and shows 'This page and the local service disagree. Reload after updating.'\n3. Wrap the run page's start and refresh and the notifier's poll so a throw sets that state instead of rejecting.\n4. In service-status.ts, log the mismatch on the server.",
+   "sketch": "packages/api-client/src/runtime.ts\n  export class HttpError extends Error { status: number; code?: string }   // requestJson throws this when !ok\napps/web/lib/load.ts\n  type LoadResult<T> = {kind:'ready', value:T} | {kind:'signedOut'} | {kind:'denied'} | {kind:'notFound'}\n                     | {kind:'unavailable', retry:true} | {kind:'contractMismatch', path:string}\n  async function loadJson<T>(path, parse, init?): Promise<LoadResult<T>>\napps/web/lib/use-loaded.ts      // moved from tool-catalog.tsx, built on loadJson, returns {state, reload}\napps/web/components/ui/load-state.tsx  // one renderer for every non-ready kind",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "contracts rule (TypeScript types do not validate JSON) and nextjs rule (runtime parsing at untrusted boundaries). The generated parsers and generated.ts stay untouched; runtime.ts is the hand-written runtime that generated.ts imports (packages/api-client/README.md says so). No business state moves into Next.js.",
+   "verdict": "revised",
+   "verifierNote": "The hangs are traced from the code (unhandled rejections from void start() and void poll()), not observed. Revised: counts redone with an import-stripping scan, and the contract test that pins ContractError for a failed status is named as part of the change."
+  },
+  {
+   "id": "XERR-04",
+   "title": "Screens collapse every load failure into one message, so denied, unavailable and retryable are not represented",
+   "dimension": "errors",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "apps/web/components/run-list.tsx",
+     "line": 283,
+     "endLine": 299,
+     "note": "One failed boolean covers every cause"
+    },
+    {
+     "file": "apps/web/components/experts-panel.tsx",
+     "line": 160,
+     "endLine": 164,
+     "note": "'Sign in, then try again.' for any failure, with no retry control"
+    },
+    {
+     "file": "apps/web/components/approvals-panel.tsx",
+     "line": 136,
+     "endLine": 187,
+     "note": "The loader is written twice, and setCounts runs twice in a row at 170-171"
+    },
+    {
+     "file": "apps/web/components/operations-panel.tsx",
+     "line": 165,
+     "endLine": 206,
+     "note": "The only screen that names 403; its loader is also written twice"
+    },
+    {
+     "file": "apps/web/components/operations-panel.tsx",
+     "line": 208,
+     "endLine": 222,
+     "note": "save has no rejection handler and shows one validation sentence for 403 and 503 alike"
+    },
+    {
+     "file": "apps/web/components/tool-catalog.tsx",
+     "line": 587,
+     "endLine": 593,
+     "note": "ToolDetail says 'isn't in the catalog' for any failure, including an outage"
+    },
+    {
+     "file": "apps/web/components/run-list.tsx",
+     "line": 210,
+     "endLine": 220,
+     "note": "loadMore uses try/finally with no catch, so it fails silently or rejects unhandled"
+    },
+    {
+     "file": "apps/web/components/workflow-monitor.tsx",
+     "line": 44,
+     "endLine": 48,
+     "note": "The read pattern to copy: 5xx and network errors reconnect, any other refusal is unavailable"
+    }
+   ],
+   "occurrences": 24,
+   "evidence": "// components/experts-panel.tsx:37-45 (abridged)\nfetch(\"/api/v1/experts\", { cache: \"no-store\" })\n  .then(async (reply) => {\n    if (reply.ok) setExperts(parseExpertList(await reply.json()).experts);\n    else setFailed(true);\n  })\n  .catch(() => { if (active) setFailed(true); });\n// failed renders 'Experts could not be loaded. Sign in, then try again.'\nCounts: 24 component files load in a mount effect (30 effects, by a brace-matching scan of useEffect bodies that fetch or call a loader); only tool-catalog.tsx shares one hook between its reads. 4 branch on 401, 403 or 404, 2 treat 5xx deliberately (workflow-monitor.tsx:44 reconnects, continue-run.tsx:48 reports an unknown outcome), and none branches on 409. 8 load-failure messages advise signing in whatever the cause. data-state markers appear in 11 of 50 component files.",
+   "impact": "DH-06 asks for loading, empty, denied, unavailable and retryable states represented deliberately. A signed-in user facing a stopped API is told to sign in. A non-owner and an outage look the same on most screens: only Operations names 403, and only the workflow monitor separates 5xx from other refusals. 'Try again' is text without a control, so recovery means a full reload. Each new screen copies a loader and invents its wording, and the copies already drift: approvals and operations write their loader twice, approvals sets its counts twice in a row, and ToolDetail calls an outage 'not in the catalog'.",
+   "recommendation": "Build on the loader proposed in XERR-03.\n- Use one status-to-kind table for reads: 401 signed out, 403 denied, 404 not found, 409 conflict, 5xx or network unavailable with retry, parse failure contract mismatch. workflow-monitor.tsx:44-48 already does the 5xx part.\n- Add one LoadState component with fixed wording per kind, data-state markers, and a Retry button that re-runs the loader.\n- Migrate screens as they are touched, starting with approvals and operations, whose loaders are written twice.\n- Keep empty states in each screen, since their wording is domain-specific.\n- Give secondary actions (run-list loadMore, operations save) the same refusal reader, so they never fail silently or with an unrelated message. For writes, keep continue-run.tsx:47-51's rule that a 5xx proves no more than a lost reply.",
+   "sketch": "apps/web/lib/use-loaded.ts\n  useLoaded(path, parse) -> { state: LoadResult<T>, reload(): void }\napps/web/components/ui/load-state.tsx\n  <LoadState state={state} noun='Experts' onRetry={reload} />   // role=status|alert, data-state, Retry\nscreens keep only their ready branch and their own empty text",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "DH-06 Next.js (represent loading, empty, denied, unavailable and retryable states deliberately) and the nextjs rule (explicit error, empty and loading states). Retry re-reads durable state and schedules nothing in the browser.",
+   "verdict": "revised",
+   "verifierNote": "The duplicated approvals and operations loaders, the double setCounts and the eight sign-in messages confirmed. Revised: two screens do branch on 5xx (workflow-monitor.tsx:44, continue-run.tsx:48), so 'none on 503' was wrong; loader counts restated from a fresh scan."
+  },
+  {
+   "id": "XERR-05",
+   "title": "The BFF and its session helpers report an Auth outage as a wrong password, a stopped API as signed out, and a timeout as unavailable, with no server trace",
+   "dimension": "errors",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "apps/web/app/api/session/route.ts",
+     "line": 51,
+     "endLine": 55,
+     "note": "Any Auth error, including AuthRetryableFetchError when Auth is down, becomes 401 'That email and password did not work.'"
+    },
+    {
+     "file": "apps/web/lib/service-status.ts",
+     "line": 52,
+     "endLine": 61,
+     "note": "fetchSession returns null both when signed out and when the API is unreachable"
+    },
+    {
+     "file": "apps/web/app/api/workspace/route.ts",
+     "line": 40,
+     "endLine": 43,
+     "note": "That null becomes 401 'Sign in first.'"
+    },
+    {
+     "file": "apps/web/lib/bff.ts",
+     "line": 98,
+     "endLine": 104,
+     "note": "Every forwarded request, mutations included, aborts at 30 s"
+    },
+    {
+     "file": "apps/web/lib/bff.ts",
+     "line": 119,
+     "endLine": 125,
+     "note": "A refused connection, a timeout and an abort all become 503 'unavailable', with no log"
+    },
+    {
+     "file": "apps/web/lib/bff.ts",
+     "line": 168,
+     "endLine": 174,
+     "note": "The same for streams"
+    },
+    {
+     "file": "apps/web/app/api/workspace/route.ts",
+     "line": 8,
+     "endLine": 13,
+     "note": "One of three local copies of the {code, message} constructor (also bff.ts:21, session/route.ts:25)"
+    }
+   ],
+   "occurrences": 4,
+   "evidence": "// app/api/session/route.ts:51-55\nconst { error } = await client.auth.signInWithPassword({ email, password });\nif (error !== null) {\n  return NextResponse.json(REFUSED, { status: 401 }); // 'That email and password did not work.'\n}\n// lib/bff.ts:119-124: refused, timed out (30 s) and aborted alike\n} catch {\n  return safeError(503, \"service_unavailable\", \"The local API is unavailable.\");\nIn the installed @supabase/auth-js 2.119.0, a failed fetch becomes AuthRetryableFetchError (status 0, or 5xx; lib/fetch.js) and signInWithPassword returns it as `error`. fetchSession has four callers: two pages, account-footer.tsx and the workspace route.",
+   "impact": "The BFF decides every screen's failure class, because only it sees transport errors. An Auth outage tells the user their password is wrong. fetchSession's null answers 'Sign in first.' when the API is down during workspace choice. A forwarded POST that hits the 30-second abort may still be applied by the API, yet it reads as 'unavailable' rather than 'unknown, retry with the same key'. None of these leaves a server-side line.",
+   "recommendation": "Classify at the BFF and keep the classes stable:\n- A refused connection stays 503 service_unavailable, which boundary.spec.ts:165-174 pins.\n- An abort after the request was sent becomes 504 upstream_timeout, retryable with the same Idempotency-Key. continue-run.tsx:48 already treats any 5xx after a write as an unknown outcome, so it keeps working.\n- An Auth fetch failure (isAuthRetryableFetchError, which supabase-js re-exports) becomes 503 auth_unavailable.\n- fetchSession returns {kind: signedOut | unavailable | ready}, so the workspace route can answer 503.\n\nWrite one server-side line per classified failure with the route template (never the path, which can hold a run ID; logs.py:81 drops access lines for that reason), the status and the error type only. This keeps bff.ts's promise that bodies are never read or logged. Share one safeError (with no-store) from lib/bff.ts in the session and workspace routes.",
+   "sketch": "lib/bff.ts\n  export function safeError(status, code, message)       // shared, no-store\n  function transportFailure(error, sent: boolean): 'api_unreachable' | 'upstream_timeout'\nlib/service-status.ts\n  fetchSession(): Promise<{kind:'signedOut'} | {kind:'unavailable'} | {kind:'ready', session}>\napp/api/session/route.ts\n  isAuthRetryableFetchError(error) ? 503 auth_unavailable : 401 sign_in_failed",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "nextjs rule (verify the session per BFF operation; server keys never reach responses) and DH-06 (safe typed errors). Bodies stay unread and unlogged, logged routes are templates, and the existing 503 service_unavailable for a refused connection is kept.",
+   "verdict": "revised",
+   "verifierNote": "Auth behavior confirmed in the installed auth-js 2.119.0 (lib/fetch.js and GoTrueClient.signInWithPassword). Revised: the server line logs a route template rather than the path, and effort rises to M for four fetchSession callers plus boundary tests."
+  },
+  {
+   "id": "XERR-06",
+   "title": "A database outage during a request becomes a 500 internal_error, after up to 30 seconds, instead of a retryable 503",
+   "dimension": "errors",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/api/app.py",
+     "line": 35,
+     "endLine": 38,
+     "note": "No timeout is set, so psycopg_pool's 30 s default applies"
+    },
+    {
+     "file": "services/agent/src/autobots/api/run_routes.py",
+     "line": 66,
+     "endLine": 70,
+     "note": "_pool answers 503 only when no pool was configured (13 route modules repeat this)"
+    },
+    {
+     "file": "services/agent/src/autobots/api/errors.py",
+     "line": 38,
+     "endLine": 40,
+     "note": "PoolTimeout and OperationalError fall to the generic 500 handler"
+    },
+    {
+     "file": "services/agent/src/autobots/operations/worker.py",
+     "line": 141,
+     "endLine": 157,
+     "note": "The worker treats OperationalError as 'database lost, reconnect'"
+    },
+    {
+     "file": "apps/web/lib/bff.ts",
+     "line": 102,
+     "note": "The BFF also aborts at 30 s, so the status depends on which timer fires first"
+    },
+    {
+     "file": "apps/web/tests/browser/boundary.spec.ts",
+     "line": 165,
+     "endLine": 174,
+     "note": "The browser suite already expects 503 service_unavailable when the API is down"
+    }
+   ],
+   "occurrences": 1,
+   "evidence": "# api/app.py:35-38 (no timeout: psycopg_pool's default is 30 s)\n    return AsyncConnectionPool(\n        url, open=False, min_size=1, max_size=5, check=AsyncConnectionPool.check_connection\n    )\n# api/run_routes.py:68-69: 503 only when no pool is configured\n    if pool is None:\n        raise ApiError(503, \"service_unavailable\", \"The database is unavailable.\")\nNo handler exists for psycopg.OperationalError. In the installed psycopg_pool 3.3.3, PoolTimeout subclasses it (errors.py:16) and the pool timeout defaults to 30.0 (pool_async.py:63).",
+   "impact": "One condition gets three answers:\n- 503 'The database is unavailable.' when the pool was never configured;\n- 500 'Something went wrong.' when the database stops while the API runs;\n- the BFF's 503 when its own 30-second timer fires first.\n\nA 500 reads as a defect rather than a retryable outage, so the UI can't offer a retry. The API also disagrees with the worker about the same failure.",
+   "recommendation": "Register one handler for psycopg.OperationalError in api/errors.py. It answers 503 with the code the no-pool path already uses, service_unavailable, and a fixed retryable message such as 'The database is unavailable. Try again.' The class also covers PoolTimeout and transaction conflicts such as SerializationFailure, DeadlockDetected, QueryCanceled and LockNotAvailable, all retryable, so the wording must not claim an outage for certain. The handler logs api.database_unavailable with error_fields. Give the pool an explicit timeout shorter than the BFF's abort (for example 10 s), and name both constants together. Replace the 13 copies of the no-pool check with one dependency in api/. Pin today's statuses first, then add an API test with a fake pool whose connection() raises PoolTimeout.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "medium",
+   "ruleCheck": "DH-06 Python (bound timeouts) and the python-worker rule (resources belong in lifespan). The lifespan still owns the pool; only its timeout and the error mapping change. The response envelope and the service_unavailable code are unchanged, so boundary.spec.ts:165-174 stays valid.",
+   "verdict": "revised",
+   "verifierNote": "The 30 s default and the PoolTimeout hierarchy confirmed in the installed psycopg_pool. Revised: reuse service_unavailable instead of a new code, word the message for retry because OperationalError also covers transaction conflicts, and raise risk to medium since statuses change for a whole exception family."
+  },
+  {
+   "id": "XERR-07",
+   "title": "Exception classes use four code conventions with no shared base, and 11 route modules map refusals to HTTP, partly by string suffix",
+   "dimension": "modules",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/approvals.py",
+     "line": 36,
+     "endLine": 39,
+     "note": "The code is set in __init__ (18 classes)"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 23,
+     "endLine": 30,
+     "note": "The code is a class attribute (20 classes)"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/runs.py",
+     "line": 76,
+     "endLine": 77,
+     "note": "CommandRefused has no code; run_routes.py:86-88 invents 'transition_refused'"
+    },
+    {
+     "file": "services/agent/src/autobots/application/tool_gateway.py",
+     "line": 24,
+     "endLine": 33,
+     "note": "ToolFailed carries its code as the message, read back with str(error)"
+    },
+    {
+     "file": "services/agent/src/autobots/api/run_routes.py",
+     "line": 73,
+     "endLine": 90,
+     "note": "as_api_error ends in `raise error`"
+    },
+    {
+     "file": "services/agent/src/autobots/api/settings_routes.py",
+     "line": 91,
+     "endLine": 117,
+     "note": "A HANDLED tuple must match as_api_error by hand"
+    },
+    {
+     "file": "services/agent/src/autobots/api/expert_routes.py",
+     "line": 48,
+     "endLine": 55,
+     "note": "ExpertRefused is mapped by code sets (else 422) here, but by suffix (else 409) at run_routes.py:225-227"
+    },
+    {
+     "file": "services/agent/src/autobots/api/improvement_routes.py",
+     "line": 42,
+     "endLine": 44,
+     "note": "The status comes from endswith('not_found')"
+    }
+   ],
+   "occurrences": 61,
+   "evidence": "# api/improvement_routes.py:42-44\ndef _error(error: ImprovementRefused) -> ApiError:\n    status_code = 404 if error.code.endswith(\"not_found\") else 409\n    return ApiError(status_code, error.code, \"That can't be done to this proposal.\")\n# api/approval_routes.py:153-155\n        except ApprovalRefused as error:\n            status_code = 404 if error.code == \"approval_not_found\" else 409\nCount (AST over services/agent/src): 61 exception classes. 20 set the code as a class attribute, 18 in __init__, and 23 have none, including ToolFailed, whose message is its code. 11 route modules catch and map refusals; endswith('not_found') decides the status in 4 of them (routine, improvement, workflow and run routes). The idempotency message is repeated 4 times.",
+   "impact": "DH-06 asks for centralized error handling. The response envelope is central, but each router rebuilds which status and message a refusal gets. Adding a code means finding every mapper that might see it. ExpertRefused follows two different rules in two modules. The 409-versus-422 rule for ProfileNotOffered is written down only at run_routes.py:249. With no shared base, routes need multi-class except clauses, and memory_routes.py:58-59 maps every MemoryRefused to 404, which is right today only because MemoryRefused has one code (memory.py:49).",
+   "recommendation": "Give the refusal classes one shape without tying the domain to HTTP. This covers the classes whose code reaches a response, not signals such as NotDelivered, ProviderFailure or UnclearReply.\n1. Add a Refusal base in domain with a code and a RefusalKind (not_found, conflict, invalid, forbidden, unavailable). Make the existing refusal classes subclass it, keeping their names and codes, and give ToolFailed and CommandRefused real codes.\n2. In api/errors.py, register one handler for Refusal that maps kind to status and code to a fixed message from one table, with a default per kind.\n3. Routes then stop catching, except where the status depends on the request (the named-profile rule), which sets kind at the raise.\n\nFirst pin today's statuses with a table-driven test over every code.",
+   "sketch": "domain/errors.py\n  class RefusalKind(StrEnum): NOT_FOUND, CONFLICT, INVALID, FORBIDDEN, UNAVAILABLE\n  class Refusal(Exception): code: str; kind: RefusalKind\napplication/*: ApprovalRefused(Refusal), IdempotencyConflict(Refusal), ...   # names and codes unchanged\napi/errors.py\n  STATUS = {NOT_FOUND: 404, CONFLICT: 409, INVALID: 422, FORBIDDEN: 403, UNAVAILABLE: 503}\n  MESSAGES = {'idempotency_conflict': 'This key was already used with different content.', ...}\n  @app.exception_handler(Refusal) -> _response(STATUS[kind], code, MESSAGES.get(code, DEFAULT[kind]))\napi/*_routes.py: drop _error, as_api_error, HANDLED and the inline mappings",
+   "effort": "L",
+   "risk": "medium",
+   "ruleCheck": "DH-06 (centralize error handling; keep domain decisions independent of HTTP). The kind enum carries no status, and the status table lives in api/. Domain, DTO and UI types stay separate, and the ErrorResponse contract is unchanged.",
+   "verdict": "revised",
+   "verifierNote": "An AST scan reproduces the 61 classes and their conventions, and rg the four suffix rules. Revised: not all 61 are refusals, so the base covers only codes that reach a response, and the memory mapping is latent rather than wrong today."
+  },
+  {
+   "id": "XERR-08",
+   "title": "Error and stop codes are plain strings in the contract, so client code maps drift without a type error",
+   "dimension": "types",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/contracts/runs.py",
+     "line": 150,
+     "endLine": 154,
+     "note": "ErrorResponse.code: str, with no enumeration"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/run_workspace.py",
+     "line": 157,
+     "note": "stop_reason: str | None"
+    },
+    {
+     "file": "apps/web/components/run-list.tsx",
+     "line": 80,
+     "endLine": 83,
+     "note": "STOP_TEXT keys budget_exhausted, which nothing emits"
+    },
+    {
+     "file": "services/agent/src/autobots/application/model_admission.py",
+     "line": 21,
+     "endLine": 24,
+     "note": "The service's code is budget_exceeded"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 92,
+     "endLine": 95,
+     "note": "budget_exceeded pauses the run rather than failing it"
+    },
+    {
+     "file": "apps/web/components/approvals-panel.tsx",
+     "line": 24,
+     "endLine": 33,
+     "note": "A client map keyed by codes the contract does not name"
+    },
+    {
+     "file": "apps/web/components/unknown-effects.tsx",
+     "line": 15,
+     "endLine": 20,
+     "note": "Another map, whose owner_required wording overrides the server's"
+    }
+   ],
+   "occurrences": 1,
+   "evidence": "# contracts/runs.py:150-154\nclass ErrorResponse(BaseModel):\n    code: str = Field(min_length=1, max_length=100)\n// apps/web/components/run-list.tsx:80-83\nconst STOP_TEXT: Record<string, string> = {\n  tool_budget_exceeded: \"tool budget\",\n  budget_exhausted: \"budget\",   // the service writes budget_exceeded\n};\nrg finds budget_exhausted only in run-list.tsx. The fallback at run-list.tsx:151 then shows the raw code with spaces, budget exceeded.",
+   "impact": "Codes are the real interface between Python and the screens, which switch on them, yet the generated client types them as string. A renamed or removed code still compiles and quietly falls back to generic text. A rough cross-check of the 108 snake_case map keys and comparands in apps/web found four that the service and SQL never use; three are goal-composer.tsx's own outcome names, so budget_exhausted is the one server code nothing emits. The contracts rule asks for defined behavior for unknown enum values; with plain strings there is nothing to check.",
+   "recommendation": "Publish the known codes from Pydantic as their own enum schemas (for example RefusalCode and StopReason), so the generator exports them as TypeScript unions. ErrorResponse.code and stop_reason stay open strings on the wire, so an unknown code still parses and shows the server's message. Type client maps as `Partial<Record<RefusalCode, string>>`, so removing a code fails tsc. Fix the budget_exhausted key now.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "contracts rule (Pydantic/OpenAPI owns public definitions, generated TypeScript consumes them, and unknown enum values need defined behavior). Generated files are regenerated, never edited, and the wire format stays compatible.",
+   "verdict": "revised",
+   "verifierNote": "The contract fields and the dead key confirmed. Revised: the reviewer's count of 88 literals could not be reproduced; a broader recount gives 108 with the same single dead server code, and the evidence now says how the fallback renders it."
+  },
+  {
+   "id": "XERR-09",
+   "title": "Nineteen hand-cast error bodies instead of the generated parseErrorResponse, with two competing policies for error wording",
+   "dimension": "duplication",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "apps/web/components/run-controls.tsx",
+     "line": 38,
+     "endLine": 43,
+     "note": "Shows the server's message"
+    },
+    {
+     "file": "apps/web/components/unknown-effects.tsx",
+     "line": 57,
+     "endLine": 60,
+     "note": "Ignores the server's message and maps the code to its own wording"
+    },
+    {
+     "file": "apps/web/components/approvals-panel.tsx",
+     "line": 216,
+     "endLine": 221,
+     "note": "Another client map"
+    },
+    {
+     "file": "apps/web/components/model-policy-panel.tsx",
+     "line": 179,
+     "note": "A cast plus a code check"
+    },
+    {
+     "file": "apps/web/components/workflow-editor.tsx",
+     "line": 220,
+     "note": "One of four casts in this file"
+    },
+    {
+     "file": "apps/web/components/account-form.tsx",
+     "line": 33,
+     "endLine": 40,
+     "note": "A cast plus an inline code check"
+    },
+    {
+     "file": "apps/web/components/session-panel.tsx",
+     "line": 68,
+     "note": "The same cast"
+    },
+    {
+     "file": "packages/api-client/src/generated.ts",
+     "line": 7698,
+     "note": "parseErrorResponse exists and is used 0 times in apps/web"
+    }
+   ],
+   "occurrences": 19,
+   "evidence": "// components/run-controls.tsx:38-43\nconst failure = (await reply?.json().catch(() => null)) as {\n  message?: string;\n} | null;\nreturn failure?.message ?? \"That could not be done. Nothing changed.\";\n// components/unknown-effects.tsx:57-60: the same cast, then\nsetMessage(REFUSALS[failure?.code ?? \"\"] ?? \"That couldn't be recorded.\");\nCount: 20 casts in 15 files match `json().catch(() => null)) as {` (rg); 19 read error bodies, and continue-run.tsx:53 reads a success body.",
+   "impact": "Every mutation re-implements reading the error envelope with a type assertion, which DH-06 asks to avoid. Each picks its own wording policy: some screens show the server's fixed message, others replace it by code, and nothing says which a new screen should do. Changing the envelope or adding a code touches 15 files, and none of them validates what it read.",
+   "recommendation": "Add one readRefusal(reply, wording?) to apps/web/lib. It parses with the generated parseErrorResponse; a parse failure or a null reply yields a generic refusal. Write down one policy: the server's fixed message by default, and a per-screen override by code where the screen's wording is better, such as the action-specific owner_required sentences. Replace the 19 casts as screens are touched, together with the typed codes from XERR-08.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "nextjs rule (generated API types plus runtime parsing at untrusted boundaries) and DH-06 (no blanket type assertions). It uses the generated parser as it is.",
+   "verdict": "revised",
+   "verifierNote": "All cited casts re-read. Revised: one of the 20 matches is a success body, so 19 error bodies; the claim that owner_required reads four ways was dropped, since those sentences name each action on purpose."
+  },
+  {
+   "id": "XERR-10",
+   "title": "A run whose processing raises leaves no durable reason, and nothing bounds how often it is reclaimed",
+   "dimension": "errors",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/worker_leases.py",
+     "line": 89,
+     "endLine": 96,
+     "note": "attempts goes up on every claim; nothing in src reads it"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 373,
+     "endLine": 376,
+     "note": "An unexpected exception re-raises out of run_goal, correctly, but no stop reason is written"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 343,
+     "endLine": 357,
+     "note": "The work before the first model call: building the stage and reading graph state"
+    },
+    {
+     "file": "services/agent/src/autobots/operations/worker.py",
+     "line": 139,
+     "endLine": 150,
+     "note": "serve logs worker.step_failed with the class name and moves on; the job stays claimed until its lease expires"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+     "line": 393,
+     "endLine": 397,
+     "note": "The active-time limit is checked only before a model call"
+    },
+    {
+     "file": "supabase/migrations/20261105000007_run_admission.sql",
+     "line": 14,
+     "note": "The attempts column"
+    }
+   ],
+   "occurrences": 1,
+   "evidence": "# application/worker_leases.py:90-93, on every claim\n\"update app_private.run_jobs set status = 'claimed', generation = generation + 1, \"\n\"attempts = attempts + 1, lease_owner = %s, \"\n# rg over services/agent/src: attempts is written here and read nowhere.\n# application/goal_loop.py:373-375\n    except Exception as error:\n        if not is_stale_owner(error):\n            raise\nLease.attempts (worker_leases.py:56, 104) is returned and read nowhere, and process_next and _drive (goal_loop.py:383-441) put no handler around run_goal.",
+   "impact": "As written, a run that raises before its first model call (loading the goal, building the stage, reading graph state) re-raises out of run_goal. The worker logs only worker.step_failed with a class name, and the job stays claimed until its lease expires and is claimed again. The active-time limit and the budgets are only checked at model calls, so this path never reaches them. The user sees a run that stays running with no stop reason; the operator sees one unlocalized ERROR per pass.",
+   "recommendation": "Record each failed attempt durably before moving on, in private state: a forward migration adding, for example, last_failure_type and failed_attempts to app_private.run_jobs, written with the qualified exception type and never its message. A public run event, if one is added, carries only the attempt number, since public projections are sanitized. Then decide, as a durable-worker change recorded in a decision, a bound on consecutive failed attempts. Reaching it moves the run to a visible paused or failed state through the canonical transition table. Add a db check with a fake that raises before the first model call, and assert the recorded reason and the bound.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "high",
+   "ruleCheck": "Option B contract (workers claim with attempts and fencing; canonical transitions) and the python-worker rule (canonical transitions, sanitized public projections; test restart). Migrations only move forward. No decision in docs/engineering/decisions sets a bound, so the review proposes one for a decision instead of picking a number.",
+   "verdict": "revised",
+   "verifierNote": "The claim query, the unread counter, the re-raise and the missing handler in process_next confirmed; the reclaim loop is traced from the code, not reproduced. Revised: the failure type goes to private state through a forward migration, not into a public run event."
+  },
+  {
+   "id": "XERR-11",
+   "title": "Failures the code deliberately tolerates leave no trace, and contextlib.suppress hides them from the blind-except count",
+   "dimension": "errors",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/browsing_tool.py",
+     "line": 99,
+     "endLine": 101,
+     "note": "The BX-04 sweep of sessions left by crashed workers fails silently"
+    },
+    {
+     "file": "services/agent/src/autobots/api/event_routes.py",
+     "line": 137,
+     "endLine": 141,
+     "note": "Live text silently falls back to polling"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/result_stream.py",
+     "line": 241,
+     "endLine": 246,
+     "note": "The producer side logs result_text.unavailable for the same failure"
+    },
+    {
+     "file": "services/agent/src/autobots/application/retention.py",
+     "line": 79,
+     "endLine": 84,
+     "note": "Object removal failures are counted, but their cause is never recorded"
+    },
+    {
+     "file": "services/agent/src/autobots/api/operation_routes.py",
+     "line": 106,
+     "endLine": 114,
+     "note": "An unreadable restore record is skipped with no count and no log"
+    }
+   ],
+   "occurrences": 4,
+   "evidence": "# application/browsing_tool.py:100-101 (comment at 99 cites BX-04)\n    with contextlib.suppress(Exception):\n        await runtime.executor.sweep(lease_alive(context.connection))\n# api/event_routes.py:137-141 (abridged)\n    try:\n        connection = await psycopg.AsyncConnection.connect(url, autocommit=True)\n    except psycopg.Error:\n        return None\nThe live-text producer logs its side of the same failure (result_stream.py:241-246); the consumer logs nothing.",
+   "impact": "Each tolerance is a product choice, and the comments say why, but an operator can't see it happening:\n- browser sessions left behind by crashed workers;\n- a run page that never goes live;\n- artifact bytes that never leave Storage;\n- restore records that drop out of the history.\n\nruff's BLE001 does not flag contextlib.suppress(Exception), so these escape the only metric that counts blind handlers.",
+   "recommendation": "Keep each tolerance and add a trace: one WARNING log_event per degradation with error_fields, rate-limited where it can repeat (goal_loop.py:537-538 shows the pattern). For restore history, log the number of skipped records; showing that count in LocalStatus would be a separate contract change, regenerated rather than hand-edited. Replace contextlib.suppress(Exception) with an explicit except that logs, so a lint rule or a grep can see it.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06 (no swallowed exceptions). BX-04 cleanup, live text and object removal stay best-effort as designed; only a trace is added, and any new response field goes through the generated contract.",
+   "verdict": "revised",
+   "verifierNote": "All five sites re-read, and the excerpt trimmed to eight lines. Revised: a skipped count in the response is a public contract change, so the first step is a log line."
+  },
+  {
+   "id": "XERR-12",
+   "title": "Log events follow no shared convention: field names, levels, rate limits and context keys differ for the same condition",
+   "dimension": "standards",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/operations/logs.py",
+     "line": 89,
+     "endLine": 90,
+     "note": "log_event accepts free-form fields and defaults to INFO"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+     "line": 319,
+     "endLine": 328,
+     "note": "error_type (qualified) and cause_type, where every other call uses error"
+    },
+    {
+     "file": "services/agent/src/autobots/operations/worker.py",
+     "line": 89,
+     "endLine": 91,
+     "note": "Heartbeat connection lost: a WARNING on every failure, every 2 s"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 535,
+     "endLine": 545,
+     "note": "Lease keeper connection lost: INFO, on the first and every 30th failure"
+    },
+    {
+     "file": "services/agent/src/autobots/application/retention.py",
+     "line": 171,
+     "endLine": 172,
+     "note": "Per-item isolation without the item (no workspace)"
+    },
+    {
+     "file": "services/agent/src/autobots/application/routines.py",
+     "line": 480,
+     "endLine": 488,
+     "note": "The same isolation at ERROR, with the routine id"
+    },
+    {
+     "file": "services/agent/src/autobots/api/app.py",
+     "line": 64,
+     "endLine": 92,
+     "note": "No module in api/ logs at all"
+    }
+   ],
+   "occurrences": 25,
+   "evidence": "# operations/worker.py:89-90\n        except Exception as error:\n            log_event(logger, \"worker.heartbeat_lost\", logging.WARNING, error=type(error).__name__)\n# application/goal_loop.py:537-542 (abridged), the same condition\n            if failures == 1 or failures % 30 == 0:\n                log_event(logger, \"worker.keeper_reconnecting\", error=type(error).__name__, failures=failures)\nCount: 25 log_event calls in 10 modules, with 24 distinct event names. 13 use error=, one helper uses error_type, and 0 modules in api/ log (api/main.py only configures logging).",
+   "impact": "PRD 12.2 asks for records keyed by workspace and run, with categories such as run.*, model.* and tool.operation.*. Today:\n- the same condition, a background loop losing its connection, is a WARNING every 2 s in one module and an INFO every 30th failure in another;\n- the two per-item isolation loops differ in level and in whether they name the item;\n- a search for failures must know both error and error_type;\n- the API emits no events, so nothing ties a 4xx or 5xx to a log line;\n- no event uses the PRD's categories.",
+   "recommendation": "Write the conventions beside log_event and let the helper carry them:\n- event names from a registered table, using PRD 12.2's categories;\n- standard context keys (workspace, run, operation);\n- **error_fields(error) for causes;\n- levels by audience: ERROR needs a person, WARNING is degraded and retrying, INFO is lifecycle;\n- one rate-limit helper for reconnect loops.\n\nAdd a test that scans log_event call sites and fails on an unregistered name.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "PRD-LangChain-Deep-Agents 12.2 (records keyed by workspace and run; explicit event categories) and LM-07 (local, redacted logs). No external sink is added.",
+   "verdict": "confirmed",
+   "verifierNote": "rg finds 25 calls in 10 modules and 24 event names, none in a PRD 12.2 category; the heartbeat and keeper loops log as described."
+  },
+  {
+   "id": "XERR-13",
+   "title": "One cleanup path can discard the caller's cancellation, and task cleanup idioms differ across modules",
+   "dimension": "errors",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/browsing_tool.py",
+     "line": 141,
+     "endLine": 143,
+     "note": "watcher.cancel(), then await watcher inside suppress(BaseException)"
+    },
+    {
+     "file": "services/agent/src/autobots/operations/worker.py",
+     "line": 117,
+     "endLine": 119,
+     "note": "The drain cut cancels the step and waits for it, so a swallowed cancel lets the step run on"
+    },
+    {
+     "file": "services/agent/src/autobots/operations/worker.py",
+     "line": 158,
+     "endLine": 160,
+     "note": "The safe idiom: cancel, then gather with return_exceptions"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 377,
+     "endLine": 378,
+     "note": "beating.cancel(), not awaited"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 454,
+     "endLine": 455,
+     "note": "The same"
+    },
+    {
+     "file": "services/agent/src/autobots/application/workflow_runner.py",
+     "line": 318,
+     "endLine": 319,
+     "note": "The same"
+    },
+    {
+     "file": "services/agent/src/autobots/operations/reasoning_trial.py",
+     "line": 184,
+     "endLine": 189,
+     "note": "Settles the ledger on Exception"
+    },
+    {
+     "file": "services/agent/src/autobots/operations/route_qualification.py",
+     "line": 277,
+     "endLine": 284,
+     "note": "Settles the same ledger on BaseException"
+    }
+   ],
+   "occurrences": 5,
+   "evidence": "# application/browsing_tool.py:141-143\n        watcher.cancel()\n        with contextlib.suppress(BaseException):\n            await watcher\n# operations/worker.py:159-160\n        beat.cancel()\n        await asyncio.gather(beat, return_exceptions=True)\nrg: 0 `except CancelledError` in src; all 3 `except BaseException` handlers re-raise; suppress(BaseException) appears once.",
+   "impact": "DH-06 says to propagate cancellation after cleanup. suppress(BaseException) also discards a cancel aimed at the tool's own task if it arrives while the watcher is awaited. The window is narrow, but in it a worker's drain cut (worker.py:117-119 cancels the step and waits for it without a bound) may fail to stop a browsing step, and the gateway's own wait_for timeout can be lost too, so the tool returns after its deadline. The keeper tasks are cancelled but not awaited, so each module reasons separately about a heartbeat still in flight; fencing makes that harmless today. The trial ledger settles on BaseException in one module and on Exception in its sibling, for the same reserve-then-settle step.",
+   "recommendation": "Add one stop_task(task) helper: cancel, then await asyncio.wait({task}), which neither raises the child's exception nor hides the caller's cancellation, and mark the child's exception retrieved. Use it in browsing_tool, goal_loop (two places), workflow_runner and worker. Settle the trial ledger on BaseException in reasoning_trial.py, or reuse route_qualification's _call. Add a test that cancels a browse step while its finally block runs and asserts that CancelledError propagates.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "medium",
+   "ruleCheck": "DH-06 Python and the python-worker rule (propagate cancellation after cleanup; bounded async work). Drain, lease and fencing behavior are otherwise unchanged.",
+   "verdict": "revised",
+   "verifierNote": "Reasoned from asyncio's Task.cancel: a cancel that lands while the task awaits the already cancelled watcher surfaces as that watcher's CancelledError, which suppress(BaseException) absorbs; not reproduced. Revised: the title said no broad handler swallows cancellation, which this one can."
+  },
+  {
+   "id": "XERR-14",
+   "title": "No lint gate covers blind or silent handlers, and the only BLE001 markers suppress a rule nothing runs",
+   "dimension": "standards",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/pyproject.toml",
+     "line": 46,
+     "endLine": 47,
+     "note": "The selection has no BLE, S110/S112 or TRY rules"
+    },
+    {
+     "file": "tests/db/restore_check.py",
+     "line": 71,
+     "note": "One of 8 `noqa: BLE001` markers in tests/db, for a rule that is never selected"
+    },
+    {
+     "file": "services/agent/src/autobots/application/tool_gateway.py",
+     "line": 542,
+     "note": "An unannotated blind handler that passes the gate"
+    },
+    {
+     "file": "services/agent/src/autobots/application/browsing_tool.py",
+     "line": 100,
+     "note": "suppress(Exception), invisible even to BLE001"
+    }
+   ],
+   "occurrences": 27,
+   "evidence": "# services/agent/pyproject.toml:46-47\n[tool.ruff.lint]\nselect = [\"E\", \"F\", \"W\", \"I\", \"B\", \"UP\", \"ASYNC\", \"RUF\"]\n# tests/db/restore_check.py:71\n            except Exception as error:  # noqa: BLE001 - only the type is reported, never a message.\nruff --select BLE001 (rerun, isolated): 22 hits in services/agent/src, 3 in scripts and 2 in .claude/hooks, none with a noqa. The 8 markers in tests/db sit in 7 files. S110 and S112 report 0 everywhere.",
+   "impact": "DH-06's 'no swallowed exceptions' has no enforcement. A new except Exception needs no justification: about 10 of the 27 current ones carry a reason comment, and no tool asks for one. The 8 markers in tests/db document an intent the configuration never carries out. contextlib.suppress(Exception) escapes even BLE001, which is how the silent sweep in browsing_tool.py escaped the metric.",
+   "recommendation": "Ratchet:\n1. Enable BLE001, S110 and S112 in services/agent's ruff selection. S110 and S112 report 0 today.\n2. Give each of the 22 justified boundaries a noqa with its reason; about half already have a comment to reuse.\n3. Fail on new ones.\n4. Add a small check to the fast profile that flags suppress(Exception) and suppress(BaseException) in services/agent/src.\n\nApply the same selection to scripts and .claude/hooks once they get a repository-level ruff configuration.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "Makes DH-06's 'no swallowed exceptions' enforceable. The ratchet adds a check and weakens none, and the justified process boundaries keep working with per-line reasons.",
+   "verdict": "revised",
+   "verifierNote": "Counts reproduce with ruff 0.17.3. Revised: the impact said the 22 src handlers carry no justification, but about 10 of the 27 have a reason comment; what none has is a lint annotation. S110 and S112 were checked and start at 0."
+  },
+  {
+   "id": "XERR-15",
+   "title": "Broad catches where a precise type exists turn defects into user refusals, and one qualifier saves exception text",
+   "dimension": "errors",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/experts.py",
+     "line": 69,
+     "endLine": 73,
+     "note": "except Exception around approved_role, so any defect becomes 422 expert_role_unknown"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/models.py",
+     "line": 116,
+     "endLine": 120,
+     "note": "approved_role raises only UnknownModelProfile"
+    },
+    {
+     "file": "services/agent/src/autobots/application/tool_uses.py",
+     "line": 100,
+     "endLine": 104,
+     "note": "except Exception around the same validation that tool_gateway.py:338-341 catches as ValidationError"
+    },
+    {
+     "file": "scripts/qualify_github_connector.py",
+     "line": 96,
+     "endLine": 103,
+     "note": "Line 100 saves str(error) in the live report; line 102 says only the type may be saved"
+    }
+   ],
+   "occurrences": 3,
+   "evidence": "# application/experts.py:69-73\n    try:\n        for role in config.role_bindings:\n            approved_role(role)\n    except Exception:\n        raise ExpertRefused(\"expert_role_unknown\") from None\n# scripts/qualify_github_connector.py:100 passes the exception object as the observed value:\n#   check(..., error, str(error) == 'github_refused_401')\ncheck() stores str(observed) in the report it saves (qualify_github_connector.py:56), and _write_redacted only refuses a report that contains the token.",
+   "impact": "A defect inside the guarded call is reported as the user's mistake (422 expert_role_unknown) or silently dropped (tool_uses.py records no public input). Tests that expect the refusal keep passing while the defect hides. The connector qualifier may save provider text in a live report, against the rule its own comment states two lines later.",
+   "recommendation": "Catch UnknownModelProfile in experts.py, and ValidationError in tool_uses.py, as tool_gateway.py already does for the same parse. In the qualifier, record type(error).__name__ unless the error is a ToolFailed, whose message is a code.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06 (no swallowed exceptions) and AGENTS.md completion evidence (no secrets or user content saved as proof).",
+   "verdict": "confirmed",
+   "verifierNote": "approved_role raises only UnknownModelProfile, and check() saves str(observed), so line 100 can save exception text; all three sites re-read."
+  }
+ ],
+ "rejected": [],
+ "notCovered": "This was a static, read-only sweep. Nothing was run beyond ruff, rg, grep, sed and AST scans.\n\nCoverage of the 545 in-scope files:\n- 34 were read in full.\n- About 60 more were read around every broad handler, error mapper, log call, and web load or failure path.\n- The rest were covered only by the scans named in each finding.\n\nNot reviewed:\n- error handling inside SQL functions (plpgsql raise and exception blocks in supabase/migrations);\n- Makefile and shell error handling;\n- each tests/db script's exit-code semantics beyond its broad handlers;\n- runtime behavior of Server Components when they throw (no error.tsx or loading.tsx exists, so Next.js defaults apply; not exercised).\n\nThe run-reclaim finding and the cancellation window in browsing_tool.py come from reading the code, not from a reproduction.\n\nNo command was refused. Two commands failed on zsh's `===` expansion and on a bracketed glob, and were rerun with quoting. Nothing was written under .checks/reviews/review-2026-11-12-09-52-30/sweep-errors/ beyond creating the directory.\n\nOverlaps with other lenses: the loader, hand-cast-body and lint-gate findings touch the web-architecture, types, duplication and tooling lenses. They are framed here by their error consequences."
+}

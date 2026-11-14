@@ -1,0 +1,1178 @@
+{
+ "schema": "autobots.code-review/v1",
+ "area": "py-domain",
+ "title": "Python: domain, contracts and persistence",
+ "kind": "area",
+ "timestamp": "2026-11-12-09-52-30",
+ "revision": "156534da0bd5b19417f05d313077d767804b175b",
+ "summary": "The domain package is pure and is the strongest code in this area. Its 11 modules import only the standard library and autobots.domain, and they hold the canonical run state machine, role-policy resolution, budgets, routine timing and workflow validation as small, tested functions. contracts/ has a good boundary toolkit: STRICT_CONTRACT, MicroUsd bounded by MAX_SAFE_INTEGER, UtcTimestamp, schema_version on 48 of 51 route responses, and cross-language fixtures. The main risks are at the seams between layers. Request and tool contracts double as the stored JSON format for Experts, routines, goals and plans (16 read sites, all refusing unknown fields, and only WorkflowGraph carries a version), so tightening a contract can make saved records unreadable. The routine configuration has two definitions whose trigger, budget and timezone rules differ (cronjob tool versus Routines API). A tool input accepts naive datetimes that the GitHub adapter cannot compare, so a date-only `since` makes the read fail with a generic tool_failed after a retry. Typing is uneven. At least 23 response fields are typed looser than vocabularies that SQL or sibling contracts already declare. Strictness is chosen per model and is off in 22 of 30 request bodies, so MicroUsd's strict-money promise does not hold where requests arrive. Nine domain enums are re-declared by hand as Literals in 10 places, with no parity check. The workflow domain runs on Mapping[str, Any]. Typed persistence rows exist for one entity (RunRow), while roughly 353 positional row reads elsewhere build DTOs by hand. Size is mostly healthy. Complexity concentrates in validate_graph (C901 21) and next_steps (14), and two contract modules pass 300 lines. pyproject.toml enforces no complexity rule, nothing checks layer purity, and pydantic is not a declared dependency.",
+ "scores": [
+  {
+   "dimension": "standards",
+   "score": 3,
+   "why": "Ruff, format and strict mypy pass and versions are pinned, but no complexity rule is selected, pydantic is undeclared, layering is unchecked, and strictness is set per model rather than per field as DH-06 asks."
+  },
+  {
+   "dimension": "modules",
+   "score": 3,
+   "why": "domain is a pure leaf and contracts otherwise depend only on domain and persistence, but export.py imports the API app, tools.py serves three audiences, and contracts double as storage formats."
+  },
+  {
+   "dimension": "size",
+   "score": 4,
+   "why": "40 of 42 files are under 300 lines and most functions are short. Complexity concentrates in validate_graph (21), next_steps (14) and two helpers."
+  },
+  {
+   "dimension": "functions",
+   "score": 4,
+   "why": "Domain functions are small and pure with explicit inputs. The exceptions are a few phase-heavy validators and a six-parameter helper."
+  },
+  {
+   "dimension": "structure",
+   "score": 3,
+   "why": "The domain and contracts layout is clear, but persistence/ holds one TypedDict, the OpenAPI exporter sits in contracts/, and run screens and tool families are split unevenly."
+  },
+  {
+   "dimension": "approach",
+   "score": 3,
+   "why": "The state machine, policy resolution and allowlist DTO mapping are exemplary, but stored JSON reuses request contracts, positional rows dominate, and the routine config has two definitions."
+  },
+  {
+   "dimension": "comments",
+   "score": 4,
+   "why": "Comments explain why and cite decisions and stories. A few docstrings leak Pydantic configuration notes into OpenAPI or describe history."
+  },
+  {
+   "dimension": "types",
+   "score": 3,
+   "why": "StrEnums, shared primitives and strict mypy are strong, but at least 23 loose response fields, per-model strictness, untyped workflow graphs and a naive-datetime tool input weaken the boundaries."
+  },
+  {
+   "dimension": "errors",
+   "score": 3,
+   "why": "Typed refusal codes exist, but in four shapes, with 13 copies of one constructor and each route mapping each exception by hand."
+  },
+  {
+   "dimension": "tests",
+   "score": 3,
+   "why": "Domain logic is well tested (state machine, workflows, budgets, execution table), but shared fixtures cover 4 of 170 schemas, and the since defect and transform parity are untested."
+  },
+  {
+   "dimension": "maintainability",
+   "score": 3,
+   "why": "The core is solid and readable, but storage formats, duplicated vocabularies and loose DTO types make contract changes riskier than they look."
+  }
+ ],
+ "strengths": [
+  {
+   "title": "The domain stays pure",
+   "evidence": "All 11 domain modules import only the standard library and autobots.domain, and services/agent/src/autobots/persistence/rows.py imports only the standard library (grep of every import line). services/agent/src/autobots/domain/__init__.py:1 states the rule. Even key availability takes the environment as a parameter (services/agent/src/autobots/domain/tool_catalog.py:105-112)."
+  },
+  {
+   "title": "The run lifecycle is a reviewed table",
+   "evidence": "services/agent/src/autobots/domain/runs.py:22-128 encodes TERMINAL, NORMAL_EXITS, COMMANDS (actor and target) and COMMAND_SOURCES as data, and next_status refuses with CommandRefused. services/agent/tests/test_contracts.py:103-160 tests wrong actor, terminal states, idempotent cancel and the SP-010 exits."
+  },
+  {
+   "title": "Boundary primitives that state their reasons",
+   "evidence": "services/agent/src/autobots/contracts/primitives.py:9-32 defines STRICT_CONTRACT, MicroUsd bounded by MAX_SAFE_INTEGER (with the JavaScript rationale) and UtcTimestamp (AfterValidator plus a JSON Schema pattern). The 29 cases in contracts/fixtures/boundary-cases.json are read by both services/agent/tests/test_contracts.py:30 and the TypeScript client tests (packages/api-client/tests/contract.test.ts:8)."
+  },
+  {
+   "title": "Allowlist mapping keeps new fields private",
+   "evidence": "services/agent/src/autobots/contracts/adapters.py:26-42 names every public field, so a new domain field stays private by default. run_from_row raises on an unknown stored status instead of passing it to a client (adapters.py:9), which services/agent/tests/test_contracts.py:86 tests."
+  },
+  {
+   "title": "Versioned envelopes and explicit compatibility tables",
+   "evidence": "48 of 51 route response models carry schema_version: Literal[1]. RunEvent is a typed envelope (services/agent/src/autobots/contracts/runs.py:127-147). IR normalization keeps version 1 hashes stable (services/agent/src/autobots/domain/workflows.py:15-18, 199-211). The execution table lists explicitly compatible tool changes (services/agent/src/autobots/domain/execution.py:10-76) and is kept equal to the registry by services/agent/tests/test_execution_contract.py:23-29."
+  },
+  {
+   "title": "Cross-field invariants live in the schema",
+   "evidence": "services/agent/src/autobots/contracts/cronjob.py:74-81: each action takes only its own fields. services/agent/src/autobots/contracts/tools.py:228-234: 1 MiB in total and unique paths. services/agent/src/autobots/contracts/browsing.py:38-49: the start URL must be inside allowed_domains. services/agent/src/autobots/contracts/operations.py:42-50: receipt retention outlives run retention."
+  },
+  {
+   "title": "Money is exact integers end to end",
+   "evidence": "No contract or domain type uses a float for money. services/agent/src/autobots/domain/budgets.py:34-51 checks range, step and daily cap with typed codes, and the role policy refuses unknown profiles instead of mapping them to a default (services/agent/src/autobots/domain/models.py:109-120)."
+  },
+  {
+   "title": "Comments explain why and cite their source",
+   "evidence": "services/agent/src/autobots/domain/routines.py:43-47 (daylight-saving semantics), services/agent/src/autobots/domain/models.py:69-72 (why offering is checked where new work starts), services/agent/src/autobots/contracts/approvals.py:70-73 (fields empty on older requests), and services/agent/src/autobots/domain/execution.py:1-5 (raising a version is a review decision)."
+  }
+ ],
+ "findings": [
+  {
+   "id": "PDOM-01",
+   "title": "Stored JSON records are read back with the request contracts, so a contract edit is an unversioned storage-format change",
+   "dimension": "approach",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/contracts/experts.py",
+     "line": 14,
+     "note": "ExpertConfig: request body (extra=forbid, max_length bounds) and the stored config format"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/routines.py",
+     "line": 21,
+     "note": "RoutineConfig: request body and the stored routine_versions.config"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/plans.py",
+     "line": 40,
+     "note": "GoalSpec: TOOL_CONTRACT model stored in app_private.goal_specs"
+    },
+    {
+     "file": "services/agent/src/autobots/application/experts.py",
+     "line": 82,
+     "note": "stored config read with ExpertConfig (also :213, :319)"
+    },
+    {
+     "file": "services/agent/src/autobots/application/routines.py",
+     "line": 98,
+     "note": "stored config read with RoutineConfig (also :284, :434)"
+    },
+    {
+     "file": "services/agent/src/autobots/application/plans.py",
+     "line": 104,
+     "endLine": 116,
+     "note": "GoalSpec and PlanTask validate stored jsonb"
+    },
+    {
+     "file": "services/agent/tests/test_execution_contract.py",
+     "line": 75,
+     "note": "older-record tests exist for snapshots and execution contracts, not for these records"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/execution.py",
+     "line": 62,
+     "endLine": 76,
+     "note": "the one stored record that is read tolerantly and explicitly"
+    }
+   ],
+   "occurrences": 16,
+   "evidence": "16 read sites validate stored jsonb, or stored lines, with request or tool contract models. Counted by grep for `<Model>.model_validate(` over stored values in application/ and api/: ExpertConfig 5 (api/run_routes.py:141, application/experts.py:82, :213, :319, application/workflow_overview.py:81), RoutineConfig 3, WorkflowGraph 2, and GoalSpec, PlanTask, AssignmentResult, ApprovalScope, ApprovalReviewDetail and RestoreRecord once each. Every one refuses unknown fields (VIEW or TOOL_CONTRACT), and most carry request bounds, for example `tools: list[str] = Field(default_factory=list, max_length=20)`. Only WorkflowGraph has a version (ir_version). Older-record tests exist only for role-policy snapshots and execution contracts (services/agent/tests/test_model_policy.py:478, services/agent/tests/test_execution_contract.py:36 and :75); none holds an earlier stored shape of these 16 records.",
+   "impact": "Removing or renaming a field, or tightening a bound, in ExpertConfig, RoutineConfig, GoalSpec or PlanTask makes saved versions fail validation on read: Expert pages, routine occurrences and running goals would error. Nothing flags this, because the drift check compares OpenAPI, not stored data. It also blocks the contract tightening that other findings here recommend (PDOM-02, PDOM-04, PDOM-05).",
+   "recommendation": "Give stored documents their own record types: read them leniently, give them a version, and map them explicitly to and from the DTOs. Keep request DTOs strict. Start with ExpertConfig and RoutineConfig, which have the most read sites. Add one test per record type checking that every stored shape still reads, with fixtures captured from the current release. domain/execution.py:62-76 shows the tolerant read style to follow.",
+   "sketch": "persistence/records.py\n  class StoredRecord(BaseModel): model_config = ConfigDict(frozen=True, extra=\"ignore\"); record_version: int = 1\n  class ExpertConfigRecord(StoredRecord): purpose, instructions, tools, tool_groups, skills, role_bindings  # no request bounds\n  class RoutineConfigRecord / GoalSpecRecord / PlanTaskRecord(StoredRecord)\n  def read_expert_config(raw: Mapping[str, object]) -> ExpertConfigRecord   # upgrades older record_version\napplication/<aggregate>.py: to_record(dto) on write, to_view(record) on read\nservices/agent/tests/fixtures/stored/<record>/v1.json + test_every_stored_shape_reads",
+   "effort": "L",
+   "risk": "high",
+   "ruleCheck": "DH-06 'Distinguish domain entities, persistence rows, public DTOs...' and 'Define compatibility/migration behavior for renamed/removed fields', and contracts.md 'Define compatibility and upgrade behavior'. This separates types and merges none (ground rule 2). If existing rows need normalizing, that is a new forward migration, never an edit to an applied one.",
+   "verdict": "revised",
+   "verifierNote": "All 16 call sites re-opened and recounted. Corrected 'every one carries request bounds' (ApprovalScope and AssignmentResult have none) and noted the execution-contract compatibility tests, which don't cover these records."
+  },
+  {
+   "id": "PDOM-02",
+   "title": "The routine configuration has two definitions whose trigger, budget and timezone rules differ",
+   "dimension": "types",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/contracts/routines.py",
+     "line": 25,
+     "note": "Routines API: trigger: dict[str, Any]"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/cronjob.py",
+     "line": 27,
+     "note": "cronjob tool: typed schedule, HH:MM pattern"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/routines.py",
+     "line": 33,
+     "note": "API path validates the daily time with time.fromisoformat"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/routines.py",
+     "line": 30,
+     "note": "limit ge=0, no upper bound, plain int"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/cronjob.py",
+     "line": 51,
+     "note": "limit capped at 1_000_000"
+    },
+    {
+     "file": "services/agent/src/autobots/application/cronjob_tool.py",
+     "line": 45,
+     "endLine": 60,
+     "note": "converts the typed schedule back into the untyped dict"
+    },
+    {
+     "file": "services/agent/src/autobots/application/routines.py",
+     "line": 73,
+     "note": "Routines API validation entry"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/routines.py",
+     "line": 8,
+     "note": "DEFAULT_TIMEZONE is unused; both contracts repeat the literal"
+    }
+   ],
+   "occurrences": 2,
+   "evidence": "RoutineConfig (Routines API) types `trigger: dict[str, Any]`, `timezone: str = \"America/Costa_Rica\"` and `limit_micro_usd: int = Field(default=1_000_000, ge=0)`, and domain.routines.validate_trigger checks the trigger. CronjobTask (cronjob tool) types the schedule (`time` pattern `^([01][0-9]|2[0-3]):[0-5][0-9]$`), bounds the timezone to 1-64 characters and caps the limit at 1_000_000. Re-run in memory: validate_trigger accepts \"0730\", \"07\", \"07:30:45\", \"T07:30\" and \"07:30+05:00\", which the tool refuses, and it accepts extra keys. occurrences() schedules \"07:30+05:00\" at 13:30 UTC, the same instant as \"07:30\", so the offset is silently ignored (datetime.combine replaces it with the routine's zone). RoutineConfig accepts limit_micro_usd=2**60. The generated client publishes `trigger: Record<string, unknown>` (packages/api-client/src/generated.ts:8460). DEFAULT_TIMEZONE has no reader.",
+   "impact": "Decision 0026 C5 promises the tool 'the same rules as the Routines API', including that 'the budget is capped and the trigger and timezone are checked'. Today the API is laxer: it can store triggers and budgets the tool would refuse, and the web client gets no type for the trigger. Every routine rule has to be changed in two places.",
+   "recommendation": "Make the typed schedule the single trigger definition. Move CronjobSchedule into contracts/routines.py without renaming it, so the cronjob v1 input schema stays byte-identical, and use it for RoutineConfig.trigger, dumping with exclude_none so stored triggers keep today's shape. Share one IANA timezone alias with a known-zone check, and use DEFAULT_TIMEZONE. Type the API's limit as MicroUsd now. Whether the API should also take the tool's US$1 cap is for the owner to decide: today the API accepts more, and admission caps each run at the workspace's run limit (US$5 by default since migration 20261108000044). In the domain, parse the stored mapping once into typed triggers so occurrences() takes a typed value. Existing stored triggers that the stricter type refuses must still read, so land this after PDOM-01 (lenient stored records) or add a forward data migration.",
+   "sketch": "contracts/routines.py\n  class CronjobSchedule(BaseModel)   # moved unchanged from contracts/cronjob.py, so the cronjob v1 schema doesn't move\n  IanaTimezone = Annotated[str, Field(min_length=1, max_length=64), AfterValidator(known_zone)]\n  class RoutineConfig: trigger: CronjobSchedule; timezone: IanaTimezone = DEFAULT_TIMEZONE; limit_micro_usd: MicroUsd\ncontracts/cronjob.py: CronjobTask.schedule: CronjobSchedule (imported); timezone: IanaTimezone\ndomain/routines.py\n  @dataclass(frozen=True) class IntervalTrigger: minutes: int\n  @dataclass(frozen=True) class DailyTrigger: at: time\n  def parse_trigger(raw: Mapping[str, object]) -> IntervalTrigger | DailyTrigger   # raises TriggerInvalid(code)\n  def occurrences(trigger, zone: ZoneInfo, after, until) -> list[datetime]",
+   "effort": "M",
+   "risk": "high",
+   "ruleCheck": "Decision 0026 C5 ('Same rules as the Routines API') and DH-06 'explicit enums/unions'. The generated client is regenerated, never edited. Stored rows change only through a forward migration. A shared budget cap for the API is an owner decision, not part of this refactor.",
+   "verdict": "revised",
+   "verifierNote": "Re-ran the trigger and limit checks in memory and confirmed every claim. Revised the recommendation so the moved class keeps its name (a rename would change the cronjob schema) and so the API's cap is left to the owner, because admission already honors limits up to the workspace run limit."
+  },
+  {
+   "id": "PDOM-03",
+   "title": "Tool inputs accept naive `since` datetimes, which the GitHub adapter cannot compare",
+   "dimension": "types",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/contracts/tools.py",
+     "line": 86,
+     "note": "GithubListPullRequestsInput.since: datetime | None (naive allowed)"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/tools.py",
+     "line": 115,
+     "note": "same type on the workflow-runs input, used only through .date(), so it works naive"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/github_reads.py",
+     "line": 47,
+     "endLine": 50,
+     "note": "_after: aware >= naive raises TypeError"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/github_reads.py",
+     "line": 98,
+     "note": "comparison applied to every listed pull request"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/github_reads.py",
+     "line": 209,
+     "endLine": 211,
+     "note": "the GitHub reads are READ_ONLY with one retry"
+    },
+    {
+     "file": "services/agent/src/autobots/application/tool_gateway.py",
+     "line": 410,
+     "endLine": 431,
+     "note": "_read: an unexpected exception becomes FAILED tool_failed after the retries"
+    }
+   ],
+   "occurrences": 2,
+   "evidence": "`since: datetime | None = None` sits under TOOL_CONTRACT, which is not strict. In memory, GithubListPullRequestsInput.model_validate({\"since\": \"2026-11-01\"}) and \"2026-11-01T00:00:00\" both give tzinfo=None, and _after(\"2026-11-05T00:00:00Z\", since) then raises `TypeError: can't compare offset-naive and offset-aware datetimes`. The GitHub read tools are READ_ONLY with retries=1, so the gateway's _read path catches the TypeError as a generic exception, repeats the GitHub call once and returns ToolOutcome.FAILED with code tool_failed. Reads keep no receipt. The published schema says only `format: date-time`. No test passes `since` (none in services/agent/tests or tests/db).",
+   "impact": "A natural date-only filter from the model costs a second GitHub request and ends in a generic tool_failed the model can't repair, instead of a filtered list or an invalid_arguments refusal. The timezone rule belongs in the contract, not in each adapter.",
+   "recommendation": "Add a UTC input primitive next to UtcTimestamp that treats a naive value as UTC, or refuses it if a repairable validation error is preferred; pick one and state it in the field description. Use it for both `since` fields, and add github_reads tests for date-only, naive and offset inputs. An AfterValidator leaves the JSON Schema unchanged, so no tool version change should follow; a reviewer should confirm that against domain/execution.py.",
+   "sketch": "contracts/primitives.py\n  def _assume_utc(value: datetime) -> datetime:\n      return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)\n  UtcInput = Annotated[datetime, AfterValidator(_assume_utc)]\ncontracts/tools.py\n  since: UtcInput | None = Field(default=None, description=\"ISO 8601. Without an offset, UTC.\")\nservices/agent/tests/test_github_reads.py: since=\"2026-11-01\" filters by updated_at; \"+02:00\" compares as an instant",
+   "effort": "S",
+   "risk": "medium",
+   "ruleCheck": "DH-06 'Use timezone-aware UTC dates' and 'Validate data at trust boundaries'. The schema is unchanged, so the tool-version table in domain/execution.py should not move. Nothing here weakens the URL guard or approvals.",
+   "verdict": "revised",
+   "verifierNote": "Reproduced the TypeError in memory, but the cited gateway lines (542-544) belong to the effect path. These tools are READ_ONLY, so _read turns the error into FAILED tool_failed after one retry, with no receipt. Evidence corrected, and severity lowered to medium because the read fails closed and the fix is small."
+  },
+  {
+   "id": "PDOM-04",
+   "title": "At least 23 response fields are typed looser than vocabularies that already exist",
+   "dimension": "types",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/contracts/approvals.py",
+     "line": 68,
+     "note": "status: str; SQL allows pending, approved, rejected, expired, withdrawn"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/routines.py",
+     "line": 58,
+     "note": "occurrence_time: str; status: str at :60 (SQL: admitted, missed, skipped_overlap, blocked)"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/run_workspace.py",
+     "line": 267,
+     "note": "ToolAttemptView.status: str (SQL: started, succeeded, failed, unknown)"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/workflows.py",
+     "line": 233,
+     "note": "ExecutionView.run_status: str although RunStatus exists"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/operations.py",
+     "line": 71,
+     "note": "plain datetime accepts naive values (also :81)"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/settings.py",
+     "line": 46,
+     "note": "plain datetime (also :119)"
+    },
+    {
+     "file": "services/agent/src/autobots/application/routines.py",
+     "line": 107,
+     "note": "caller formats the timestamp by hand, without UTC conversion"
+    },
+    {
+     "file": "apps/web/components/workflow-monitor.tsx",
+     "line": 13,
+     "note": "web re-declares the run terminal set over run_status: string"
+    }
+   ],
+   "occurrences": 23,
+   "evidence": "14 status, kind or source fields are `str` although an SQL check constraint or a sibling contract fixes their values: ApprovalView.status, ApprovalResult.status, OccurrenceView.status (DelayedOccurrence already uses a Literal for it), ModelCallView.status, ToolAttemptView.status, InstanceView.status, WorkflowExecutionSummary.status, ExecutionView.run_status, ReplayRunView.status, CandidateView.kind and KnowledgeHead.kind (Literal[\"memory\",\"skill\"] exists), CandidateView.status (supabase/migrations/20261105000022_improvements.sql:12), EvidenceView.kind and WorkflowVersionView.source. 9 timestamps are `str` (approvals.py:69, :81; routines.py:58; workflows.py:98, :126) or plain `datetime` (operations.py:71, :81; settings.py:46, :119), while 13 fields use UtcTimestamp. Counted by reading every contract module and checking each field against the migrations' check constraints. Callers format timestamps differently: routines.py:107 `item[0].isoformat()`, workflow_overview.py:45 `.astimezone(UTC).isoformat()`.",
+   "impact": "The generated client types these as `string`, so the web re-declares vocabularies by hand (workflow-monitor.tsx:13 `new Set([\"succeeded\", \"failed\", \"cancelled\"])`), and a new or misspelled value passes both sides unnoticed. Each caller decides the timestamp format.",
+   "recommendation": "Type each field with the vocabulary that exists: RunStatus for run statuses, the Literal the sibling contract already uses, and new Literal aliases for the SQL-backed sets. Use UtcTimestamp for all 9 timestamps so callers pass datetimes. Keep `str` only where history can hold retired values, such as FrozenBinding.profile and ToolUseView.provider, and say so in a comment. Follow adapters.py: an unknown stored value raises instead of reaching a client. Then regenerate the client and remove the web's hand-made sets.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "high",
+   "ruleCheck": "contracts.md: canonical states are shared, and unknown enum values need defined behavior. contracts/adapters.py:9 already fails closed on an unknown run status. The TypeScript client is regenerated, never hand-edited.",
+   "verdict": "revised",
+   "verifierNote": "Rechecked every listed field against the migrations' check constraints and sibling Literals. Added CandidateView.status, which has an SQL check constraint, so the total is 23, not 22."
+  },
+  {
+   "id": "PDOM-05",
+   "title": "Strictness is chosen per model and is off in 22 of 30 request bodies, so MicroUsd accepts strings and floats where requests arrive",
+   "dimension": "types",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/contracts/primitives.py",
+     "line": 17,
+     "note": "'Floats and strings are refused by strict validation'"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/run_commands.py",
+     "line": 16,
+     "note": "RunRequest is lax, inline config"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/run_commands.py",
+     "line": 24,
+     "note": "MicroUsd inside a lax model accepts \"5000000\" and 5000000.0"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/routines.py",
+     "line": 30,
+     "note": "money as plain int, accepts 2**60"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/routines.py",
+     "line": 52,
+     "note": "RoutineEnabled.enabled accepts \"no\" and \"off\""
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/improvements.py",
+     "line": 133,
+     "note": "ReplayRequest accepts \"250000\""
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/approvals.py",
+     "line": 9,
+     "note": "VIEW config, one of 9 module copies plus 9 inline"
+    },
+    {
+     "file": "services/agent/src/autobots/application/routines.py",
+     "line": 383,
+     "note": "the routine's limit becomes the run's limit, which RunSummary later refuses above MAX_SAFE_INTEGER"
+    }
+   ],
+   "occurrences": 22,
+   "evidence": "Only 8 of the 30 request-body models use STRICT_CONTRACT; the count comes from the OpenAPI requestBody refs and each model's model_config. Observed in memory: RunRequest accepts limit_micro_usd \"5000000\" and 5000000.0, ReplayRequest accepts \"250000\", RoutineEnabled accepts enabled=\"no\" or \"off\", and RoutineConfig accepts limit_micro_usd=2**60, above MAX_SAFE_INTEGER. That last one passes because 18 money fields are plain `int`; only 6 use MicroUsd. application/routines.py:383 hands that limit to admit_run, and the admitted run's RunSummary then fails strict validation (BudgetCounters refuses it, checked in memory), so that run's summary and workspace views would error. The shared fixtures refuse 'bad money: a numeric string' for RunSummary only. The configuration is also copied: `VIEW = ConfigDict(extra=\"forbid\", frozen=True)` is defined in 9 modules and inlined 9 more times, and TOOL_CONTRACT lives in the 474-line contracts/tools.py (line 12), which 10 contract modules import for it.",
+   "impact": "The money rule the primitive documents holds only for responses, the opposite of where it matters. An amount above 2^53 can be stored, later lose precision in the browser, and break the views of the run it funds. Each new module re-declares its config, so the three conventions drift apart.",
+   "recommendation": "Put strictness on the primitives rather than the models: MicroUsd = Annotated[int, Strict(), Field(ge=0, le=MAX_SAFE_INTEGER)], plus strict bool and count aliases. Lax models still parse UUID, enum and datetime strings. Use MicroUsd for all 18 money fields. Define STRICT_CONTRACT, TOOL_CONTRACT and one lax config once in primitives.py, and name the lax one for what it is rather than VIEW, since request bodies use it too. Add money and boolean cases for RunRequest to the shared fixtures.",
+   "sketch": "contracts/primitives.py\n  STRICT_CONTRACT, LAX_CONTRACT = ConfigDict(extra=\"forbid\", frozen=True), TOOL_CONTRACT = LAX + allow_inf_nan=False\n  MicroUsd = Annotated[int, Strict(), Field(ge=0, le=MAX_SAFE_INTEGER)]\n  Flag = StrictBool; Count = Annotated[int, Strict(), Field(ge=0)]",
+   "effort": "M",
+   "risk": "high",
+   "ruleCheck": "DH-06 'choose explicit coercion/strictness per field' and 'exact decimal or integer monetary units'; primitives.py:12 states the JavaScript bound. Strict() leaves the JSON Schema unchanged. Adding the MAX_SAFE_INTEGER bound to money fields changes OpenAPI, so the client is regenerated.",
+   "verdict": "revised",
+   "verifierNote": "Recounted 30 request-body models (8 strict), 18 plain-int and 6 MicroUsd money fields, and 9 VIEW copies plus 9 inline configs, and reproduced the coercions in memory. Added the run-summary failure a 2**60 routine limit causes, and raised the change risk to high because the fix changes what public request bodies accept."
+  },
+  {
+   "id": "PDOM-06",
+   "title": "Contract Literals re-declare nine domain enums by hand in 10 places, with no parity check",
+   "dimension": "duplication",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/contracts/tools.py",
+     "line": 263,
+     "endLine": 287,
+     "note": "ToolGroupName, ToolProviderName, OperationClassName, AvailabilityName, GrantSiteName"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/tools.py",
+     "line": 342,
+     "note": "side_effects and cost_class (:344) inline Literals"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/runs.py",
+     "line": 108,
+     "note": "ToolUseCompleted.outcome repeats ToolOutcome (also ToolUseView.outcome at :175)"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/tool_catalog.py",
+     "line": 15,
+     "endLine": 92,
+     "note": "the StrEnums they mirror"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/experts.py",
+     "line": 24,
+     "note": "max_length=12 sized to US-14.2's 12 groups; 13 since US-14.19"
+    },
+    {
+     "file": "services/agent/src/autobots/application/tool_catalog.py",
+     "line": 217,
+     "note": "cast(list[GrantSiteName], ...)"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/tool_catalog.py",
+     "line": 115,
+     "endLine": 126,
+     "note": "grant_sites returns list[str] from enum .value"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/run_workspace.py",
+     "line": 142,
+     "endLine": 144,
+     "note": "FrozenBinding.source repeats BindingSource, which contracts/models.py:25 uses directly"
+    }
+   ],
+   "occurrences": 10,
+   "evidence": "Five aliases and two inline Literals in contracts/tools.py mirror OperationClass and the catalog StrEnums (ToolGroup, ToolProvider, ToolAvailability, GrantSite, SideEffect, CostClass). FrozenBinding.source repeats BindingSource, and ToolUseCompleted.outcome and ToolUseView.outcome repeat domain.tools.ToolOutcome. That is nine enums in 10 places. No test compares a Literal with its enum; test_tool_catalog.py catches only a value that a registered tool actually uses, because ToolDescriptor is strict. A magic size has already gone stale: ExpertConfig.tool_groups got `max_length=12` in commit d96d488 (US-14.2), when ToolGroupName had 12 members, and kept it when ff158fb (US-14.19) added `automation`. It doesn't bind today only because planning and delegation have no Expert-grantable tools, so an Expert can name at most 11 groups. The catalog mapping needs a cast because grant_sites returns strings.",
+   "impact": "Adding a group, provider, grant site or binding source means editing two declarations plus magic numbers. A missed Literal shows up as a validation error when the catalog or a run view is built, and only if something exercises that value, not as a type error.",
+   "recommendation": "Use the domain StrEnums in the contracts, as RunStatus, ModelProfileId and BindingSource already are elsewhere. If inline enums are preferred in OpenAPI, keep the Literals and add a parity test for each pair (`set(get_args(ToolGroupName)) == set(ToolGroup)`). Replace `max_length=12` with `len(ToolGroup)`, and have grant_sites return list[GrantSite] so the cast goes away.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "DH-06 'Avoid ... duplicated business rules' and the shared canonical vocabularies in contracts.md. Switching to enums renames generated schema types, so the client is regenerated, not edited; the parity-test option changes no contract.",
+   "verdict": "revised",
+   "verifierNote": "Confirmed the history with git show. Corrected the count (ToolOutcome is mirrored twice in contracts/runs.py, so nine enums in 10 places, not seven) and noted that the stale max_length doesn't bind today and that catalog tests catch a value a tool actually uses."
+  },
+  {
+   "id": "PDOM-07",
+   "title": "Tool input types under-declare their constraints, so the model never sees them",
+   "dimension": "types",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/contracts/market_tools.py",
+     "line": 11,
+     "note": "Symbol = str; regex hidden in a model validator at :24"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/web_tools.py",
+     "line": 14,
+     "endLine": 15,
+     "note": "Domain = str and HttpsUrl = str constrain nothing"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/web_tools.py",
+     "line": 57,
+     "note": "urls items unbounded; a 100,000-character item passes"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/browsing.py",
+     "line": 42,
+     "note": "DOMAIN_PATTERN checked inside a model validator"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/assignments.py",
+     "line": 11,
+     "note": "UUID as a 36-character string (also improvements.py:17, memory.py:60)"
+    },
+    {
+     "file": "services/agent/src/autobots/application/assignments.py",
+     "line": 94,
+     "endLine": 96,
+     "note": "re-parses the UUID and maps ValueError to a ToolFailed code"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/tools.py",
+     "line": 212,
+     "note": "second copy of the repository path validator (first at :181)"
+    }
+   ],
+   "occurrences": 8,
+   "evidence": "Eight tool-input fields show a bare string in the published schema while their real rule lives in a validator, in the adapter, or nowhere: MarketHistoryInput.symbols (regex in a model validator), TavilySearchInput.include_domains and exclude_domains (Domain = str, checked nowhere), TavilyExtractInput.urls and the Map, Crawl and ExtractWebsite `url` fields (HttpsUrl = str; https is enforced only by the adapter's URL guard), and BrowseGoalInput.allowed_domains (DOMAIN_PATTERN in a model validator). TavilyExtractInput accepted a 100,000-character URL item in memory, although web_tools.py:3 says 'Ceilings are in the schema'. Three ID fields are 36-character strings, while the newer cronjob.py:44 uses Identifier, so application/memory.py:167-169 and application/assignments.py:94-96 parse them again. Constraints are also copied: `path: str = Field(min_length=1, max_length=500, ...)` is written 11 times in three modules (6 plain, 3 with ^outputs/, 2 with the repository pattern), and the GitHub title and body bounds 3 times (tools.py:49-50, :68-69, :223-224).",
+   "impact": "The model and the Tools page see input schemas without their real limits, so a valid call depends on a retry. The same concept is validated at different layers, and changing a limit means finding every copy.",
+   "recommendation": "Declare tool field types once, as Annotated aliases with the constraint in the schema: Symbol, DomainName (move DOMAIN_PATTERN out of browsing.py), HttpsUrl (length plus a ^https:// pattern), RunFilePath, OutputPath, RepoPath (with the climb-out validator), IssueTitle and IssueBody. Use Identifier for IDs. Keep the URL guard and the cross-field validators. Handle any schema change under the tool-version policy in domain/execution.py.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "high",
+   "ruleCheck": "DH-06 'Validate data at trust boundaries'. The adapter's URL guard stays: schema constraints are added alongside it, not instead of it. domain/execution.py's version table and compatible-change list decide whether a tool version moves.",
+   "verdict": "revised",
+   "verifierNote": "Recounted the fields, the 11 path copies and the 3 ID strings, and reproduced the 100,000-character URL. Clarified that the domain lists are checked nowhere, and raised the change risk to high because tool schemas are versioned against saved runs."
+  },
+  {
+   "id": "PDOM-08",
+   "title": "Typed persistence rows exist for one entity; elsewhere DTOs are built from positional tuples",
+   "dimension": "approach",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/persistence/rows.py",
+     "line": 8,
+     "note": "RunRow, the only row type"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/adapters.py",
+     "line": 8,
+     "note": "row to domain to DTO mapping, for runs only"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 120,
+     "note": "the one typed use needs type: ignore[arg-type]"
+    },
+    {
+     "file": "services/agent/src/autobots/application/workflow_overview.py",
+     "line": 42,
+     "note": "charged_micro_usd=int(row[7]); row[0]..row[9] in one function"
+    },
+    {
+     "file": "services/agent/src/autobots/application/routines.py",
+     "line": 107,
+     "note": "item[0]..item[4] mapped inline into OccurrenceView"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/checkpoints.py",
+     "line": 70,
+     "note": "the only psycopg row_factory in the service"
+    }
+   ],
+   "occurrences": 353,
+   "evidence": "persistence/ defines one TypedDict. Its only production use builds it from `dict(zip(_NAMES, row[:-1], strict=True))` and needs a type ignore. Everywhere else, DTOs are constructed inline from positional tuples. grep -rEo '\\b(row|item|found|record)\\[[0-9]+\\]' counts 353 positional reads in 41 modules of application/, api/ and operations/. The count is approximate, since other variable names are missed.",
+   "impact": "Adding or reordering a SELECT column silently shifts every positional read after it, and mypy cannot help because rows are Any. That the one typed path needs a type ignore suggests the pattern was never made easy to follow.",
+   "recommendation": "Use psycopg's class_row (or dict_row with TypedDicts) per query. Keep one typed row type per table or read model, and map rows to DTOs in named functions, as contracts/adapters.py does for runs. Start with modules that index past row[5], and track the remaining positional reads as a ratchet count.",
+   "sketch": "",
+   "effort": "L",
+   "risk": "medium",
+   "ruleCheck": "DH-06 'Distinguish ... persistence rows, public DTOs'. Rows stay distinct from DTOs and are not merged; this only makes the mapping explicit. DH-03 lists no persistence/ package, so where rows live is for the sweep-boundaries lens to settle.",
+   "verdict": "confirmed",
+   "verifierNote": "Re-ran the grep (353 reads in 41 modules) and confirmed RunRow's single, type-ignored use. PRUN-12 reports the same pattern inside the run modules."
+  },
+  {
+   "id": "PDOM-09",
+   "title": "The workflow domain runs on untyped mappings and bare strings",
+   "dimension": "types",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/domain/workflow_execution.py",
+     "line": 12,
+     "note": "TERMINAL instance statuses as strings"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflow_execution.py",
+     "line": 72,
+     "note": "Step.decision: str (run, skipped, blocked)"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflow_execution.py",
+     "line": 78,
+     "note": "GraphShape.nodes: Mapping[str, Mapping[str, Any]]"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflows.py",
+     "line": 105,
+     "note": "block, config, name read by string subscripts"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflows.py",
+     "line": 214,
+     "note": "validate_graph(graph: Mapping[str, Any])"
+    },
+    {
+     "file": "services/agent/src/autobots/application/workflow_runner.py",
+     "line": 261,
+     "endLine": 263,
+     "note": "the runner writes the same status strings"
+    },
+    {
+     "file": "supabase/migrations/20261105000019_workflow_execution.sql",
+     "line": 9,
+     "note": "the only closed list of instance statuses"
+    }
+   ],
+   "occurrences": 29,
+   "evidence": "The two workflow modules use `Any` 29 times in annotations (31 occurrences with the two imports) and 56 string-key subscripts on nodes and links (52 on `node[...]` or `link[...]`, 4 on `nodes[...][\"block\"]`). Block names (\"foreach\", \"join\", \"input\", ...), instance statuses, source states (\"waiting\", \"ready\") and step decisions are string literals compared across both modules and the runner. Counted with grep over domain/workflows.py and domain/workflow_execution.py.",
+   "impact": "A misspelled block name or status takes a wrong branch silently instead of failing a type check, and adding a block means touching string comparisons in both modules and the runner. domain/runs.py, where RunStatus makes the same kind of logic checkable, is the contrast.",
+   "recommendation": "Parse the canonical graph once into frozen domain types (Node, Link, Graph), with Block and InstanceStatus StrEnums and a Decision Literal. Keep ir_normalized, canonical and graph_hash working on the normalized dict, so stored hashes do not change. validate_graph and next_steps then read attributes.",
+   "sketch": "domain/workflows.py\n  class Block(StrEnum): INPUT, OUTPUT, TRANSFORM, CONDITION, FOREACH, JOIN, READ, ARTIFACT, APPROVAL, AGENT\n  @dataclass(frozen=True) class Node: id; block: Block; version: int; config: Mapping[str, object]; label: str | None\n  @dataclass(frozen=True) class Link: source; source_port; target; target_port\n  def parse_graph(normalized: Mapping[str, object]) -> Graph   # hashing stays on the normalized dict\ndomain/workflow_execution.py: class InstanceStatus(StrEnum); Decision = Literal[\"run\", \"skipped\", \"blocked\"]",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "DH-06 'explicit enums/unions'. graph_hash stability and IR versioning must hold. The domain types stay separate from the WorkflowGraph DTO and are mapped explicitly, not merged.",
+   "verdict": "revised",
+   "verifierNote": "Recounted with grep: 29 Any annotations rather than 31 (two were imports) and 56 subscripts rather than 55. The finding stands."
+  },
+  {
+   "id": "PDOM-10",
+   "title": "Workflow validation and scheduling concentrate the area's complexity",
+   "dimension": "size",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/domain/workflows.py",
+     "line": 214,
+     "endLine": 289,
+     "note": "validate_graph: 76 lines, C901 21, 20 branches"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflows.py",
+     "line": 104,
+     "endLine": 125,
+     "note": "_config_errors: C901 11, 9 returns"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflows.py",
+     "line": 145,
+     "endLine": 196,
+     "note": "_iteration_errors: C901 11"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflows.py",
+     "line": 76,
+     "endLine": 93,
+     "note": "_resolved_type: 6 positional parameters"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflow_execution.py",
+     "line": 199,
+     "endLine": 234,
+     "note": "next_steps: C901 14, 13 branches"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflow_execution.py",
+     "line": 227,
+     "note": "item count repeated from _decide_join at :185"
+    },
+    {
+     "file": "services/agent/tests/test_workflows.py",
+     "line": 152,
+     "note": "first of nine exact error-list assertions"
+    }
+   ],
+   "occurrences": 5,
+   "evidence": "Measured by ruff with max-complexity 10 (metrics.md), confirmed by reading. validate_graph runs seven phases inline: version, labels, node index, block specs and config, links, arity and presence, then cycle and iteration. _config_errors is an if-chain over block names. next_steps handles joins, top-level nodes and foreach bodies in one loop, and repeats `sum(1 for (key, port, _) in emissions if key == foreach and port == \"item\")`.",
+   "impact": "Every new block or rule lands in the longest function in the domain. Nine assertions in test_workflows.py compare exact error-code lists (one of them parametrized), so the phase order is observable behavior and has to survive any change.",
+   "recommendation": "Split validate_graph by phase, keeping the early returns and the error order. Drive per-block config checks from a table keyed by block. Pass a parameter object to _resolved_type. Split next_steps by node kind, with a shared _item_count.",
+   "sketch": "def validate_graph(graph):\n    if refused := _version_error(graph): return [refused]\n    nodes, index_errors = _index_nodes(graph)\n    specs, spec_errors = _resolve_specs(nodes)          # _CONFIG_CHECKS[block](node) -> GraphError | None\n    if errors := _label_errors(graph) + index_errors + spec_errors: return errors\n    wiring = _check_links(graph, TypeContext(nodes, specs, feeds))   # errors, linked, successors\n    if errors := wiring.errors + _arity_errors(wiring.linked, specs) + _presence_errors(nodes): return errors\n    return [GraphError(\"cycle_not_supported\")] if _has_cycle(...) else _iteration_errors(nodes, wiring.successors)\ndef next_steps(shape, statuses, emissions): flat map over shape.order of _join_steps / _top_level_steps / _foreach_body_steps",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "DH-06 'small cohesive modules'. No complexity rule is configured yet (PDOM-15). Error order is asserted by tests and must not change.",
+   "verdict": "revised",
+   "verifierNote": "Line ranges and complexity figures match metrics.md. The test count is nine exact-list assertions, not eight; nothing else changed."
+  },
+  {
+   "id": "PDOM-12",
+   "title": "Transform and predicate vocabularies are declared three times, with nothing tying them together",
+   "dimension": "duplication",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/domain/workflows.py",
+     "line": 19,
+     "note": "TRANSFORMS decides what validates"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflows.py",
+     "line": 20,
+     "note": "PREDICATES"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflows.py",
+     "line": 65,
+     "endLine": 71,
+     "note": "TRANSFORM_OUTPUTS decides output types"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflow_execution.py",
+     "line": 23,
+     "endLine": 39,
+     "note": "run_transform if-chain over the same names"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflow_execution.py",
+     "line": 48,
+     "endLine": 62,
+     "note": "run_predicate if-chain"
+    },
+    {
+     "file": "services/agent/tests/test_workflow_execution.py",
+     "line": 181,
+     "note": "parametrized over 4 of 6 transforms"
+    }
+   ],
+   "occurrences": 5,
+   "evidence": "Three declarations hold one vocabulary across two modules. Tests run upper, lower, length and sum directly (test_workflow_execution.py:181-186). identity runs only inside the golden-graph helper, to_string never executes in a test, and of the five predicates only greater_than does. No test checks that every validated name executes.",
+   "impact": "Adding a name to TRANSFORMS without an execution branch lets a graph publish and then fail at run time with transform_operation_unknown. The reverse leaves dead branches.",
+   "recommendation": "Keep one table per vocabulary in the domain: TRANSFORMS: Mapping[str, Transform(output_type, apply)] and PREDICATES: Mapping[str, Callable[[Any, Any], bool]]. Validation reads the keys, _resolved_type reads output_type, and execution dispatches through the table. One parametrized test covers every key.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06 'Avoid ... duplicated business rules'.",
+   "verdict": "revised",
+   "verifierNote": "Confirmed the three declarations. Corrected the coverage claim: identity is exercised through the golden-graph helper, so only to_string and four of the five predicates never execute in a test."
+  },
+  {
+   "id": "PDOM-13",
+   "title": "Coded refusals take four shapes, and the same constructor is written 13 times",
+   "dimension": "errors",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/domain/budgets.py",
+     "line": 11,
+     "note": "__init__(self, code) sets self.code"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflow_execution.py",
+     "line": 15,
+     "note": "the same constructor again"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/routines.py",
+     "line": 13,
+     "note": "TriggerInvalid: the code is the message"
+    },
+    {
+     "file": "services/agent/src/autobots/application/routines.py",
+     "line": 75,
+     "note": "RoutineRefused(str(invalid))"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/models.py",
+     "line": 83,
+     "note": "ProfileNotOffered: code on the class, a sentence in the message"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/models.py",
+     "line": 116,
+     "endLine": 120,
+     "note": "UnknownModelProfile, which has no code, is also raised for an unknown role"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/runs.py",
+     "line": 76,
+     "note": "CommandRefused: free text only"
+    },
+    {
+     "file": "services/agent/src/autobots/api/run_routes.py",
+     "line": 86,
+     "endLine": 89,
+     "note": "the API substitutes the constant transition_refused"
+    }
+   ],
+   "occurrences": 13,
+   "evidence": "grep 'def __init__(self, code: str' finds 13 classes in domain/, application/ and adapters/ that each set self.code by hand, with no shared base. Domain refusals carry their code as an instance attribute, as the message, as a class attribute, or not at all. api/settings_routes.py:323 maps UnknownModelProfile to unknown_model.",
+   "impact": "Each route maps each exception by hand, and that is where codes and messages drift. A new refusal has no obvious shape to follow.",
+   "recommendation": "Add domain/errors.py with `class Refused(Exception)` that holds a code and an optional internal detail. Make the domain refusals subclass it, and let application refusals reuse it, so the API can map the base class once. Keep every existing code and HTTP status.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "DH-06 'centralize error handling ... expose safe typed errors'. Codes and statuses stay identical. The route-side mapping belongs to the api area.",
+   "verdict": "confirmed",
+   "verifierNote": "Re-ran the grep (13 classes with the same constructor) and opened each cited refusal shape and both route mappings."
+  },
+  {
+   "id": "PDOM-14",
+   "title": "Layer purity is declared but not enforced, and contracts/export.py already depends on the API",
+   "dimension": "standards",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/domain/__init__.py",
+     "line": 1,
+     "note": "'No framework, persistence or public DTO imports'"
+    },
+    {
+     "file": "services/agent/src/autobots/persistence/__init__.py",
+     "line": 1,
+     "note": "rule stated, not checked"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/export.py",
+     "line": 9,
+     "note": "contracts imports autobots.api.app.create_app"
+    },
+    {
+     "file": "scripts/generate_contracts.py",
+     "line": 98,
+     "note": "runs -m autobots.contracts.export"
+    },
+    {
+     "file": "services/agent/tests/test_model_policy.py",
+     "line": 355,
+     "endLine": 374,
+     "note": "an existing AST import check to reuse"
+    }
+   ],
+   "occurrences": 1,
+   "evidence": "The domain complies today: every import is from the standard library or autobots.domain. Nothing checks it, though. export.py makes the contracts package, otherwise a leaf over domain and persistence, depend on the whole app factory. Only scripts/generate_contracts.py:98 and services/agent/tests/test_contracts.py:13 reference the module. The repository already uses an AST walk to keep OpenRouter imports inside factory.py.",
+   "impact": "One convenience import, such as a Pydantic model or a psycopg type in domain/, would pass review unnoticed. The inverted export module invites import cycles as the API grows.",
+   "recommendation": "Move export.py into the API package (for example autobots.api.openapi_export) and update the script and test that call it. Then reuse the AST-walk pattern for a layering test: domain imports only the standard library and autobots.domain, persistence only the standard library, and contracts only the standard library, pydantic, autobots.contracts, autobots.domain and autobots.persistence.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06 'Keep domain decisions independent of HTTP, Supabase clients and LangGraph internals'. Generation stays offline (contracts.md), still built from the pure app factory, just from the API package.",
+   "verdict": "confirmed",
+   "verifierNote": "Confirmed the import at export.py:9 and that only two files reference the module, so the move is small."
+  },
+  {
+   "id": "PDOM-15",
+   "title": "pyproject.toml enforces no size or complexity rule and leaves pydantic undeclared",
+   "dimension": "standards",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/pyproject.toml",
+     "line": 47,
+     "note": "select = E, F, W, I, B, UP, ASYNC, RUF"
+    },
+    {
+     "file": "services/agent/pyproject.toml",
+     "line": 6,
+     "endLine": 21,
+     "note": "dependencies without pydantic"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflows.py",
+     "line": 214,
+     "note": "C901 21 passes the project check"
+    }
+   ],
+   "occurrences": 2,
+   "evidence": "The project ruff check exits 0, while ruff with C901 at 10 and the PLR size rules finds 9 violations in this area (metrics.md: 4 C901, 1 PLR0911, 2 PLR0912, 1 PLR0913, 1 PLR0917). 42 source modules import pydantic, and the contracts are built on it, but uv.lock resolves pydantic 2.12.5 only transitively, through fastapi, langchain-core, langgraph, openrouter and other packages.",
+   "impact": "Complexity can only grow, and a lock refresh can move the contract engine without any visible pyproject change. DH-06 names Pydantic in the dependency set to qualify.",
+   "recommendation": "Pin pydantic directly, and add the complexity rules with a baseline that ratchets down: `\"pydantic==2.12.5\"` in dependencies; select += [\"C90\", \"PLR0911\", \"PLR0912\", \"PLR0913\", \"PLR0915\"]; [tool.ruff.lint.mccabe] max-complexity = 10; per-file-ignores listing today's offenders, each removed as its refactor lands.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06 'Use Ruff for lint/format' and 'Qualify the combined LangGraph/Deep Agents/OpenRouter/Pydantic dependency set'. Updating the lock is an explicit dependency operation, never part of a check.",
+   "verdict": "confirmed",
+   "verifierNote": "Checked pyproject.toml, the packages in uv.lock that depend on pydantic, the 42 importing modules and the 9 in-area violations listed in metrics.md."
+  },
+  {
+   "id": "PDOM-16",
+   "title": "Cross-language contract fixtures cover 4 of 170 schemas and only one request body",
+   "dimension": "tests",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "contracts/fixtures/boundary-cases.json",
+     "line": 1,
+     "note": "29 cases: RunSummary 19, RunEvent 4, WorkflowGraph 4, ErrorResponse 2"
+    },
+    {
+     "file": "services/agent/tests/test_contracts.py",
+     "line": 30,
+     "endLine": 35,
+     "note": "the four models the fixtures exercise"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/run_commands.py",
+     "line": 13,
+     "note": "RunRequest accepts the 'numeric string' money case that RunSummary refuses"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/operations.py",
+     "line": 34,
+     "note": "RetentionSettings returned without schema_version"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/tools.py",
+     "line": 377,
+     "note": "ToolVersions and ToolDescriptor returned without schema_version"
+    }
+   ],
+   "occurrences": 29,
+   "evidence": "The OpenAPI document has 170 schemas and 30 request-body models. WorkflowGraph is the only request body with shared cases, so 29 are uncovered. The money, timestamp, unknown-enum and private-field cases exist for RunSummary and RunEvent only. 3 of 51 route response models lack schema_version (RetentionSettings, ToolDescriptor, ToolVersions), and no test notices.",
+   "impact": "Cross-language validation parity is proven for the responses, where coercion matters least. Request bodies, where it matters most, have no shared cases on either side.",
+   "recommendation": "Extend the fixtures to request bodies first: RunRequest, RoutineCreate, ModelPolicyUpdate, ExecutionCreate and ApprovalDecision, with money, boolean, timestamp and unknown-enum cases. Add a contract test that every route response model carries schema_version.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "contracts.md: 'Shared validation fixtures cover both languages, unknown enums and private-field leakage'.",
+   "verdict": "confirmed",
+   "verifierNote": "Recomputed from contracts/generated/openapi.json (170 schemas, 30 request-body models, 51 response models) and from the fixture file (29 cases over four models)."
+  },
+  {
+   "id": "PDOM-11",
+   "title": "contracts/tools.py mixes three audiences in 474 lines; run_workspace.py holds three screens",
+   "dimension": "size",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/contracts/tools.py",
+     "line": 16,
+     "endLine": 260,
+     "note": "model-facing tool I/O: calculate, run file v1, GitHub issue v1/v2, GitHub reads and pull request, save artifact"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/tools.py",
+     "line": 262,
+     "endLine": 382,
+     "note": "web-facing catalog API"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/tools.py",
+     "line": 384,
+     "endLine": 454,
+     "note": "more tool I/O: run file v2, CSV, remote file"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/tools.py",
+     "line": 456,
+     "endLine": 474,
+     "note": "grants API"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/run_workspace.py",
+     "line": 15,
+     "endLine": 171,
+     "note": "run workspace view"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/run_workspace.py",
+     "line": 173,
+     "endLine": 225,
+     "note": "run list"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/run_workspace.py",
+     "line": 227,
+     "endLine": 305,
+     "note": "run inspector"
+    }
+   ],
+   "occurrences": 2,
+   "evidence": "tools.py also exports TOOL_CONTRACT and MAX_FILE_CHARACTERS, which 10 contract modules import. Other tool families already have their own modules (web_tools, market_tools, code_tools, browsing, cronjob). run_workspace.py is declarative and cohesive around runs, but it holds three independent responses for three routes.",
+   "impact": "A catalog change and a GitHub tool change edit the same file, and a new tool model has no obvious home. The run screens evolve independently but share one module.",
+   "recommendation": "Split tools.py by audience and tool family; the run_workspace.py split is optional. Class names stay the same, so OpenAPI schema names and the generated client do not change; the drift check should show no difference.",
+   "sketch": "contracts/primitives.py     TOOL_CONTRACT, MAX_FILE_CHARACTERS (moved)\ncontracts/tool_catalog.py   vocabularies, FieldDescriptor ... ToolVersions, GrantedTo, ToolGrants\ncontracts/github_tools.py   CreateGithubIssue v1/v2, Github* inputs and outputs, MAX_PULL_REQUEST_BYTES\ncontracts/file_tools.py     ReadRunFile v1/v2, ReadCsv, CsvColumn, SaveArtifact, StoreRemoteFile, TextMediaType\ncontracts/tools.py          Calculate only\ncontracts/run_list.py       RunListGroup, RunListItem, RunGroupCounts, RunList   (optional)\ncontracts/run_inspector.py  ModelCallView, ToolAttemptView, CheckpointView, EvidenceView, RunInspector   (optional)",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "DH-06 'small cohesive modules'. Schema names are class names, so the generated artifacts should not change; any change is regenerated, never edited.",
+   "verdict": "revised",
+   "verifierNote": "Line ranges and importers confirmed. Lowered to low: the module is declarative, nothing breaks, and the friction is only where new tool models go; run_workspace.py's three screens are cohesive, so its split is marked optional."
+  },
+  {
+   "id": "PDOM-17",
+   "title": "Kahn's topological sort is written three times and the foreach region walk twice",
+   "dimension": "duplication",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/domain/workflows.py",
+     "line": 128,
+     "endLine": 142,
+     "note": "_has_cycle"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflows.py",
+     "line": 292,
+     "endLine": 311,
+     "note": "step_order"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflow_execution.py",
+     "line": 84,
+     "endLine": 101,
+     "note": "shape_of order"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflows.py",
+     "line": 153,
+     "endLine": 179,
+     "note": "foreach region walk during validation"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflow_execution.py",
+     "line": 102,
+     "endLine": 112,
+     "note": "foreach owner walk during execution"
+    }
+   ],
+   "occurrences": 5,
+   "evidence": "Each sort builds in-degree counts and drains a deque. The copies differ slightly: set versus list successors, and different handling of leftover nodes. Both region walks follow a foreach's successors until a join.",
+   "impact": "A fix to ordering, or to what counts as inside a foreach, must be repeated in each copy, and the small differences are undocumented.",
+   "recommendation": "Write one topological_order(names, edges) -> (ordered, unordered) helper for all three uses, and share the common part of the region walk. Add a comment wherever validation and execution intentionally differ.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "medium",
+   "ruleCheck": "DH-06 'Avoid ... duplicated business rules'.",
+   "verdict": "confirmed",
+   "verifierNote": "Opened all five walks; the differences in successor types and leftover handling are as stated."
+  },
+  {
+   "id": "PDOM-18",
+   "title": "Colliding and misleading names in contracts and domain",
+   "dimension": "naming",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/contracts/search.py",
+     "line": 11,
+     "note": "SearchResult (API)"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/web_tools.py",
+     "line": 40,
+     "note": "SearchResult (tool)"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/search.py",
+     "line": 23,
+     "note": "SearchResults (API)"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/memory.py",
+     "line": 28,
+     "note": "SearchResults (tool)"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/runs.py",
+     "line": 22,
+     "note": "TERMINAL: set of RunStatus"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflow_execution.py",
+     "line": 12,
+     "note": "TERMINAL: set of instance-status strings"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/primitives.py",
+     "line": 19,
+     "note": "Sequence shadows collections.abc.Sequence"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/models.py",
+     "line": 116,
+     "note": "UnknownModelProfile raised for an unknown role"
+    }
+   ],
+   "occurrences": 6,
+   "evidence": "Two pairs of public classes share names across modules, two domain constants named TERMINAL hold different element types, the event sequence primitive is called Sequence, and contracts/adapters.py (row-to-DTO mappers) shares its name with the autobots.adapters package of external clients.",
+   "impact": "Readers and autocomplete pick the wrong import. If both SearchResults classes reached the OpenAPI document, FastAPI would rename them and change the generated client types.",
+   "recommendation": "Rename the tool-side models (WebSearchHit, MemorySearchResults), the workflow constant (INSTANCE_TERMINAL), the primitive (EventSequence) and the mapper module (contracts/mapping.py), and raise a separate UnknownModelRole for roles. None of the renamed tool models appears in the OpenAPI document today.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "none",
+   "verdict": "confirmed",
+   "verifierNote": "Confirmed each collision and that OpenAPI holds only the API-side SearchResult and SearchResults today."
+  },
+  {
+   "id": "PDOM-19",
+   "title": "Some docstrings publish implementation notes as API documentation or describe history",
+   "dimension": "comments",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/contracts/artifacts.py",
+     "line": 30,
+     "note": "'Not strict, since it is built from database values.'"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/run_commands.py",
+     "line": 14,
+     "note": "also :42; published as the OpenAPI description"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/settings.py",
+     "line": 124,
+     "note": "also experts.py:15"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/runs.py",
+     "line": 1,
+     "note": "'The initial public slice.'"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/service.py",
+     "line": 1,
+     "note": "'Contracts for the first routes.'"
+    },
+    {
+     "file": "services/agent/pyproject.toml",
+     "line": 4,
+     "note": "'minimal non-feature scaffold.'"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/tools.py",
+     "line": 26,
+     "note": "describes propose_improvement but sits above PROVIDER_TOOLS"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflow_execution.py",
+     "line": 84,
+     "note": "shape_of and GraphShape.owner undocumented"
+    }
+   ],
+   "occurrences": 10,
+   "evidence": "Pydantic publishes class docstrings as schema descriptions. contracts/generated/openapi.json carries 'Not strict...' as the description of ArtifactSummary, RunAccepted, RunRequest, ExpertConfig and ModelPolicyUpdate. Three docstrings describe the module's history rather than its contents. git blame shows the comment at domain/tools.py:26 dates from 2026-11-05, and PROVIDER_TOOLS was inserted under it on 2026-11-07. shape_of computes run order and foreach ownership with no docstring.",
+   "impact": "API consumers read Pydantic configuration notes as API documentation, and readers have to reverse-engineer what `owner` means.",
+   "recommendation": "Move strictness notes into `#` comments beside model_config, and keep consumer-facing facts in docstrings. Rewrite the three history docstrings to say what each module holds. Move the orphaned comment down to EXPERT_TOOLS' propose_improvement entry (line 40), and document shape_of's outputs.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06 'Explain nonobvious invariants in code; avoid comments that restate syntax'. Decision and story citations stay (ground rule 2).",
+   "verdict": "confirmed",
+   "verifierNote": "Confirmed the five published 'Not strict' descriptions in openapi.json and the blame dates for domain/tools.py:26-28."
+  },
+  {
+   "id": "PDOM-20",
+   "title": "Grant allowlists and transition tables are mutable dicts; only models.py freezes its tables",
+   "dimension": "approach",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/domain/tools.py",
+     "line": 16,
+     "endLine": 63,
+     "note": "PLAN, GENERAL, PROVIDER, EXPERT and LOOP grant maps, untyped dicts"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/runs.py",
+     "line": 24,
+     "note": "NORMAL_EXITS dict"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/runs.py",
+     "line": 81,
+     "note": "COMMANDS and COMMAND_SOURCES dicts"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/tool_guides.py",
+     "line": 16,
+     "note": "TOOL_GUIDES dict"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflows.py",
+     "line": 31,
+     "note": "BLOCKS typed Mapping, built as dict"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/execution.py",
+     "line": 15,
+     "note": "TOOL_VERSIONS typed Mapping, built as dict"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/models.py",
+     "line": 39,
+     "note": "the contrast: MappingProxyType"
+    }
+   ],
+   "occurrences": 14,
+   "evidence": "14 module-level dict tables in domain/ are mutable (5 grant maps, 3 run tables, TOOL_GUIDES, BLOCKS, TRANSFORM_OUTPUTS, TOOL_VERSIONS, GROUP_TITLES and SIDE_EFFECTS). models.py wraps PROFILES, NOT_OFFERED_MESSAGES and the RolePolicy maps in MappingProxyType (5 uses). grep finds no code that mutates the others today.",
+   "impact": "The grant sets decide what a run may call. One accidental `EXPERT_TOOLS[name] = 1` in any importer would widen grants process-wide without a type error.",
+   "recommendation": "Annotate these tables as Final Mapping types and wrap them in MappingProxyType, as models.py does. The tests that monkeypatch TOOL_GUIDES replace the attribute, so they keep working.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "none. This matches domain/models.py's own immutability choice.",
+   "verdict": "confirmed",
+   "verifierNote": "Counted 14 module-level dict tables and found no mutation in src or tests; the TOOL_GUIDES test replaces the attribute, as stated."
+  }
+ ],
+ "rejected": [],
+ "notCovered": "The review is static reading plus read-only checks: python3.12 -I -B snippets that validated contract models in memory against the service's installed pydantic and wrote no files, and ruff in check mode with --no-cache. mypy, pytest and scripts/verify.py were not run, per the ground rules. Files in application/, api/ and adapters/ were read only at the call sites cited as evidence; their own quality belongs to other areas. docs/engineering/option-b-contract.md was not compared field by field with domain/runs.py. On the TypeScript side, only the generated client's trigger type and apps/web/components/workflow-monitor.tsx were checked. The counts of positional row reads (353) and stored-record read sites (16) come from grep patterns and may miss differently named variables. metrics.md and PRD-Development-Harness.md were read only in their relevant sections (DH-03, DH-06, and the Python measurements)."
+}

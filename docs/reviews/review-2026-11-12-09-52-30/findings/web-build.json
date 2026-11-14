@@ -1,0 +1,1216 @@
+{
+  "schema": "autobots.code-review/v1",
+  "area": "web-build",
+  "title": "Web: workflows and Experts",
+  "kind": "area",
+  "timestamp": "2026-11-12-09-52-30",
+  "revision": "156534da0bd5b19417f05d313077d767804b175b",
+  "summary": "The web-build area has five thin App Router pages and five client components (2,713 lines). They cover the workflow list, editor and execution monitor, and the Experts list and editor. Most boundaries are right. The pages are small Server Components that await params and mount one client island. Every successful reply except the three session starts is parsed with the generated api-client parsers, and saves and publishes carry expected versions. The monitor only reads and keeps the last known state through disconnects. The screens also take real care over accessibility and carry why-comments tied to WF-, EX- and Decision IDs. The cost is in how the client components are built. WorkflowEditor (617 lines, 11 state hooks, eight handlers), ExpertEditor (393), WorkflowsPanel (341) and ExpertsPanel (255) each write their own reads, writes, refusal parsing and messages, with no shared read or submit hook. That is where the defects are. Nine create, publish and run calls make a new Idempotency-Key on every click and never disable their buttons, so a double-click on Run this version starts two executions even though the server stores idempotency receipts. Ten reply bodies are cast with type assertions although parseErrorResponse and parseSessionView exist. Six secondary reads fail silently: into Loading text that never clears, into a missing Budget field or Blocks card, or, on the Experts page, into a Read only classification. Rules the server owns are copied into the browser and have started to drift: the offered model profiles, the WF-06 IR version, run-state tones and the terminal set, and budget choices. The editors also have no dirty state, and the workflow editor's two publish buttons publish from different sources. The most valuable changes are these. Add a useResource and useSubmit pair in lib/, starting from the useLoaded hook the tool catalog already has. Split WorkflowEditor around a draft hook, with the IR helpers in a unit-tested lib module. Create one shared module each for model-profile labels, run-state presentation, and money and time formatting.",
+  "scores": [
+    {
+      "dimension": "standards",
+      "score": 3,
+      "why": "Strict TypeScript and the project lint pass, and the pages are thin Server Components. But DH-06's duplicate-submit, explicit-state and no-assertion rules are missed (9 unguarded keyed writes, 15 assertions, 6 silent reads), and DS-03's radius rule at two sites."
+    },
+    {
+      "dimension": "modules",
+      "score": 3,
+      "why": "Rules the server owns (offered profiles, WF-06 IR version, run-state tones, budget choices) are copied into components. Shared vocabularies are imported from other screens' component files (run-list, tool-catalog)."
+    },
+    {
+      "dimension": "size",
+      "score": 2,
+      "why": "Four functions are over 250 lines (WorkflowEditor 617, ExpertEditor 393, WorkflowsPanel 341, ExpertsPanel 255), three files are over 450 lines, and ExpertCard has complexity 27."
+    },
+    {
+      "dimension": "functions",
+      "score": 3,
+      "why": "Pure helpers are small and well named (withLabel, tidy, expansion, spend). Handlers mix request building, transport, parsing and five-level message ternaries (save has complexity 19)."
+    },
+    {
+      "dimension": "structure",
+      "score": 3,
+      "why": "App Router pages are thin and uniform. Each component file bundles several components, formatting helpers and constants (some declared after use), which keeps pure logic out of reach of the unit harness."
+    },
+    {
+      "dimension": "approach",
+      "score": 2,
+      "why": "There is no shared read or submit hook. 8 hand-written read effects and 12 writes (9 keyed, 3 unkeyed) each re-implement state, idempotency and messages. Per-click keys defeat server dedupe. The monitor polls every second and reloads all tool uses on each poll."
+    },
+    {
+      "dimension": "comments",
+      "score": 4,
+      "why": "Comments mostly explain why and cite WF-, EX-, TC- and Decision IDs. One is misplaced, and the body-drain idiom is not explained here."
+    },
+    {
+      "dimension": "types",
+      "score": 3,
+      "why": "Successful replies are parsed with generated parsers, except the three session starts, and tsconfig is strict. But error and session bodies, role bindings and a URL parameter are cast (15 assertions), and the IR uses local DraftGraph types."
+    },
+    {
+      "dimension": "errors",
+      "score": 2,
+      "why": "Refusal codes get clear text. But failed secondary reads look like loading, network and auth failures read as shape errors, contract errors read as reconnecting, and sibling actions map the same code differently."
+    },
+    {
+      "dimension": "tests",
+      "score": 3,
+      "why": "Browser specs cover the main flows, refusals, conflicts, label IR versions and monitor reconnect. Nothing covers repeated submits or failed secondary reads, and no pure helper has a unit test."
+    },
+    {
+      "dimension": "maintainability",
+      "score": 3,
+      "why": "The code is readable, commented and browser-tested. But four oversized components and per-screen copies of fetch, submit, format and rule logic make every change wide and let the copies drift."
+    }
+  ],
+  "strengths": [
+    {
+      "title": "Successful replies are parsed with the generated contract",
+      "evidence": "These sites pass reply JSON through parse* functions from @autobots/api-client before it reaches state: expert-editor.tsx:83, 102, 160; experts-panel.tsx:40, 50, 116; workflow-editor.tsx:130, 148, 165, 187, 212, 252, 341, 388; workflow-monitor.tsx:52; workflows-panel.tsx:104, 138, 478, 496. Drift on a success path fails at the boundary. The three session starts are the exception (WBLD-03)."
+    },
+    {
+      "title": "Thin Server Component pages with one client island",
+      "evidence": "apps/web/app/experts/[id]/page.tsx:8-20, apps/web/app/workflows/[id]/page.tsx:8-20 and apps/web/app/workflow-executions/[id]/page.tsx:8-20 await params, export route metadata and mount one component. apps/web/app/workflows/page.tsx:16-24 wraps the panel that uses useSearchParams in Suspense, with an accessible role=status fallback."
+    },
+    {
+      "title": "Linkable list state in the URL",
+      "evidence": "workflows-panel.tsx:86-89 and 116-124 keep tab, search, selection and version in search params. The tab links use aria-current and scroll={false} (185-189), and key={chosen.id} (380-388) resets the preview when the selection changes, so the view survives reload and Back."
+    },
+    {
+      "title": "Optimistic concurrency with plain-language conflicts",
+      "evidence": "Saves and publishes send expected_version (expert-editor.tsx:143; workflow-editor.tsx:206, 301), and conflicts become clear text (expert-editor.tsx:177-178; workflow-editor.tsx:265-266). experts.spec.ts:104 and workflows.spec.ts:217 exercise this."
+    },
+    {
+      "title": "Accessibility designed in from the start",
+      "evidence": "workflows-panel.tsx:455-467 moves focus to the preview heading and respects reduced motion when it scrolls. Lines 78-79 keep the table usable at 400% zoom, and 230-235 make the scroll region focusable. expert-editor.tsx:339-343 links each disabled tool to its reason with aria-describedby. experts-panel.tsx:373 and 380 give each button and checkbox the Expert's name. workflow-monitor.tsx:178-191 puts words beside every status dot (Decision 0021)."
+    },
+    {
+      "title": "A read-only monitor that cleans up and survives disconnects",
+      "evidence": "workflow-monitor.tsx:26 documents that reconnecting cannot start or repeat anything. Line 61 stops polling at a terminal state, 67-70 clear the timer on unmount, and 132-134 keep the last known state while reconnecting. slice-workflows.spec.ts:132-158 drives the disconnect."
+    },
+    {
+      "title": "Why-comments with traceable IDs",
+      "evidence": "workflow-editor.tsx:78-79 explains why nulls are removed (the hash stays stable). Line 89 cites WF-06, 138 cites WF-02, and 144 cites WF-05 and D11. expert-editor.tsx:114-115, 145 and 356 explain what the form keeps or drops. experts-panel.tsx:46 cites EX-02 and EX-03, and workflows-panel.tsx:81-82 cites WF-01, WF-03 and WF-04."
+    },
+    {
+      "title": "Stable data attributes as test hooks",
+      "evidence": "data-field, data-state, data-validation and data-message attributes give the Playwright specs selectors that don't depend on wording or styling, for example expert-editor.tsx:387, workflow-editor.tsx:548 and 568, workflow-monitor.tsx:103 and workflows-panel.tsx:284."
+    }
+  ],
+  "findings": [
+    {
+      "id": "WBLD-01",
+      "title": "WorkflowEditor is one 617-line component that owns eight concerns",
+      "dimension": "size",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 106,
+          "endLine": 736,
+          "note": "Component body: 617 lines, complexity 20, 27 statements (ESLint with the review's extra rules)"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 108,
+          "endLine": 118,
+          "note": "11 useState hooks: catalog, graph text, validation, message, version, inputs, description, budgets, budget, and so on"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 120,
+          "endLine": 171,
+          "note": "One effect loads the workflow, the run-preview budget and the block catalog"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 173,
+          "endLine": 396,
+          "note": "Eight async handlers write one shared message slot"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 412,
+          "endLine": 735,
+          "note": "Three cards and the block table, inline"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "The function holds:\n- 11 useState hooks (108-118);\n- one effect that fetches three unrelated resources (120-171);\n- eight async handlers at 173-396: validate, publish, draftRequest, saveDraft, publishDraft, discardDraft, saveDescription and run. Each builds a request, reads the reply and writes the same `message`;\n- about 320 lines of JSX for the graph card, the run card and the block catalog (412-735).\nThe file is 739 lines. ESLint with the review's warn-only rules reports 617 lines, complexity 20 and 27 statements for this one function.",
+      "impact": "Any change to drafts (WF-02), labels (WF-06), budgets (WF-05) or starting an execution edits the same closure, and the concerns leak into each other. For example, saving the description replaces a validation or publish message. No piece can be unit-tested or reused on its own. That is why the editor-state gaps in this review (dirty state, publish sources, duplicate submits) are hard to fix safely here.",
+      "recommendation": "Split along the concerns, with workflows.spec.ts and slice-workflows.spec.ts as the safety net, and add the dirty-state cases first. The pieces:\n- a read hook for the workflow;\n- a draft hook that owns the graph text and every draft action;\n- pure IR helpers in lib/;\n- one component per card.\nKeep WorkflowEditor as a layout container of about 80 lines.",
+      "sketch": "lib/workflow-ir.ts         parseGraphText, withLabel, tidy (pure, node --test)\nlib/use-resource.ts        useResource(url, parse) -> {status, data, retry}\nlib/use-submit.ts          pending flag + an Idempotency-Key kept until the outcome is known\nworkflow-editor/use-graph-draft.ts  useGraphDraft(workflow) -> {text, setText, graph, isDirty, check, validate, saveDraft, publish, publishDraft, discard, message}\nworkflow-editor/index.tsx  WorkflowEditor: reads the workflow, lays out the cards (~80 lines)\n  <WorkflowHeading>   name, version and draft badges\n  <DescriptionField>  textarea, its own save and message\n  <GraphEditor>       textarea, <StepLabels>, <ValidationResult>, <DraftActions>\n  <RunVersionCard>    version, inputs, budget (lib/budget.ts), RunDisclosure, run\n  <BlockCatalogTable> its own read and unavailable state",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06 asks for small cohesive modules and Client Components only for interaction. The split keeps publish, draft and run as API calls that the service owns, and edits no generated file.",
+      "verdict": "confirmed",
+      "verifierNote": "Re-read the whole function: 11 useState hooks at 108-118, one three-read effect at 120-171, eight async handlers at 173-396 and JSX at 412-735; the ESLint figures match eslint.json."
+    },
+    {
+      "id": "WBLD-02",
+      "title": "Create, publish and run calls make a new Idempotency-Key on every click and never disable their buttons",
+      "dimension": "approach",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 369,
+          "endLine": 385,
+          "note": "run() starts an execution with a new key on every call"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 675,
+          "endLine": 678,
+          "note": "Run this version has no pending or disabled state"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 197,
+          "endLine": 210,
+          "note": "publish() uses a new key; so does the draft publish at 245"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 134,
+          "endLine": 158,
+          "note": "save() uses a new key; so does startSession at 187-199"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 434,
+          "endLine": 441,
+          "note": "Save revision and Start a session are never disabled"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 84,
+          "endLine": 95,
+          "note": "startRun(); create() at 104-114 and coordinate() at 131-142 do the same"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 126,
+          "endLine": 136,
+          "note": "create() uses a new key"
+        },
+        {
+          "file": "apps/web/components/continue-run.tsx",
+          "line": 21,
+          "endLine": 39,
+          "note": "The repository's safe pattern: the key stays in a ref until the outcome is known, plus a pending flag"
+        }
+      ],
+      "occurrences": 9,
+      "evidence": "All nine keyed POSTs build the header inside the handler with \"Idempotency-Key\": crypto.randomUUID(). The sites are expert-editor 140 and 193; experts-panel 89, 111 and 136; workflow-editor 203, 245 and 375; and workflows-panel 133. No trigger in these files is disabled while a request runs. The only disabled props check input: name.trim() === \"\", routed.size === 0, workflow.draft === null and budgets.length === 0. A lost reply (.catch(() => null)) is reported as a refusal. continue-run.tsx shows the intended shape: it writes \"Idempotency-Key\": (key.current ??= crypto.randomUUID()), keeps a pending flag, and treats null and 5xx as an unknown outcome.",
+      "impact": "The API dedupes by key, through stored receipts in application/experts.py add_version and IdempotencyConflict in api/workflow_routes.py. A new key per click defeats that.\n- A double-click on Run this version, or a second press after a lost reply, starts two executions, each with its own budget.\n- Start run or Start a session opens two sessions.\n- A repeated Save revision or Publish fails the expected-version check and tells the user someone saved a newer version, after their own click.",
+      "recommendation": "Add one useSubmit hook in lib/, modelled on continue-run.tsx, and use it for the nine keyed calls and the three unkeyed writes (saveDescription, draft PUT and DELETE). The hook provides:\n- a pending state that disables the trigger and changes its label;\n- where the API takes one, a key held in a ref until the outcome is known: cleared on success or a 4xx refusal, kept after a null or 5xx reply, and dropped when the request body changes, because the API refuses a reused key with different content (IdempotencyConflict, api/workflow_routes.py:82-84);\n- a typed outcome.\nAdd a Playwright case that double-clicks Run this version and expects exactly one execution.",
+      "sketch": "// lib/use-submit.ts\ntype Outcome<T> = { kind: 'ok'; value: T } | { kind: 'refused'; refusal: ErrorResponse } | { kind: 'unknown' };\nexport function useSubmit<T>(send: (key: string) => Promise<Response>, parse: (body: unknown) => T) {\n  const key = useRef<string | null>(null);\n  const [pending, setPending] = useState(false);\n  // submit(): key.current ??= crypto.randomUUID(); null or 5xx -> 'unknown', key kept;\n  // ok -> parse, key cleared; 4xx -> readRefusal(reply), key cleared; finally setPending(false)\n  return { pending, submit };\n}\n// <Button disabled={run.pending}>{run.pending ? 'Starting' : 'Run this version'}</Button>",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: 'Disable duplicate submits with server idempotency as the correctness mechanism.' The hook supplies both halves and leaves the server's receipts and version checks as the authority. No guard is weakened.",
+      "verdict": "revised",
+      "verifierNote": "Recounted 9 keyed POSTs with grep and found no trigger disabled while pending; added that a kept key must reset when the body changes, since the server's fingerprint check refuses a reused key with new content."
+    },
+    {
+      "id": "WBLD-03",
+      "title": "Ten reply bodies are cast although generated parsers exist for them",
+      "dimension": "types",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 168,
+          "endLine": 171,
+          "note": "Error body cast"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 201,
+          "note": "Session reply cast to { id: string }"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 97,
+          "note": "Session reply cast; also at 144"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 119,
+          "endLine": 121,
+          "note": "Error body cast"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 220,
+          "endLine": 223,
+          "note": "Error body cast; also at 254, 351 and 392"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 141,
+          "endLine": 143,
+          "note": "Error body cast"
+        },
+        {
+          "file": "packages/api-client/src/generated.ts",
+          "line": 7698,
+          "note": "parseErrorResponse, used 0 times in apps/web"
+        },
+        {
+          "file": "packages/api-client/src/generated.ts",
+          "line": 8840,
+          "note": "parseSessionView, the schema of the 201 reply to POST /v1/sessions"
+        }
+      ],
+      "occurrences": 10,
+      "evidence": "Seven refusal reads use: const failure = (await reply?.json().catch(() => null)) as { code?: string; message?: string } | null;. A grep for 'json().catch(() => null)) as' finds 20 such casts in 15 files across the repository. The three session starts read (await reply.json()) as { id: string } and put id into a URL. Every refusal from the API (api/errors.py) and the BFF (lib/bff.ts safeError) has the shape {code, message}, which parseErrorResponse validates. POST /v1/sessions returns SessionView, which parseSessionView validates. parseErrorResponse is used nowhere in apps/web, while every other successful reply in these files is parsed.",
+      "impact": "DH-06 rules out assertions that hide contract mismatches. If either shape drifts, these paths fail quietly, with generic messages or a push to /sessions/undefined, instead of failing at the boundary like the rest of the screen. The same read-and-cast code is also repeated at each site.",
+      "recommendation": "Add readRefusal(reply) in lib/. It drains the body and returns parseErrorResponse(...) or null. Use parseSessionView for session starts. Then enable @typescript-eslint/consistent-type-assertions (assertionStyle: never) for these files as a ratchet.",
+      "sketch": "// lib/refusal.ts\nexport async function readRefusal(reply: Response | null): Promise<ErrorResponse | null> {\n  if (reply === null) return null;\n  try { return parseErrorResponse(await reply.json()); } catch { return null; }\n}\n// session starts: router.push(`/sessions/${parseSessionView(await reply.json()).id}`)",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: explicit response parsing at untrusted boundaries and no blanket assertions. The fix uses the generated parsers and edits no generated file.",
+      "verdict": "confirmed",
+      "verifierNote": "Recounted 7 refusal casts and 3 session casts in scope; grep finds 20 such casts in 15 files and no parseErrorResponse use in apps/web; every API refusal is built from ErrorResponse (api/errors.py:19-21)."
+    },
+    {
+      "id": "WBLD-04",
+      "title": "Six secondary reads fail silently into Loading text that never clears, or into wrong facts",
+      "dimension": "errors",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 80,
+          "endLine": 85,
+          "note": "Tool catalog read: a non-ok reply is ignored and errors are swallowed"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 273,
+          "endLine": 276,
+          "note": "'Loading the tool catalog.' then stays, and no tools are listed"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 47,
+          "endLine": 53,
+          "note": "Tool catalog read is swallowed"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 59,
+          "endLine": 75,
+          "note": "Without the catalog, every Expert is counted as Read only"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 398,
+          "endLine": 409,
+          "note": "The 'Approval on every…' note disappears with it"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 145,
+          "endLine": 167,
+          "note": "Budget-range and block-catalog reads are swallowed; the Budget field and the Blocks card never appear"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 469,
+          "endLine": 486,
+          "note": "Preview read is swallowed; 'Loading its steps.' stays (552-553)"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 488,
+          "endLine": 503,
+          "note": "Executions read is swallowed; 'Loading.' stays (608-609)"
+        }
+      ],
+      "occurrences": 6,
+      "evidence": "Each secondary read ignores a non-ok reply and swallows errors with `.catch(() => undefined)`, and none has a failed state. The six reads are:\n- the tool catalog in expert-editor.tsx:80-85;\n- the tool catalog in experts-panel.tsx:47-53;\n- the budget range in workflow-editor.tsx:145-161;\n- the block catalog in workflow-editor.tsx:162-167;\n- the preview in workflows-panel.tsx:469-486;\n- the recent executions in workflows-panel.tsx:488-503.\nOn the Experts page, `outside` is computed with `catalog.get(tool)?.operation_class` against a Map that starts empty (59-70). Until the catalog arrives, or if it never does, every Expert counts as Read only, including Experts granted github_open_pull_request, and the approval note is hidden. When the budget read fails, run() also sends no budget (380-382), so the server applies its default limit. Only 2 of the 11 read sites in scope read a refused body (workflows-panel 479 and 497), which is the convention documented in run-disclosure.tsx:53.",
+      "impact": "DH-06 and nextjs.md require deliberate loading, unavailable and retryable states. Here a 500 or a dropped connection looks like a load that never finishes. The Experts page presents a safety-relevant classification as known when it isn't (DS-04, state meaning).",
+      "recommendation": "Promote the useLoaded hook from tool-catalog.tsx:156-181, which already aborts on cleanup, ignores stale replies and returns a typed state, into lib/ as useResource(url, parse). Extend it to return {status: 'loading'|'ready'|'unavailable', data, retry} and to read refused bodies. Render an explicit unavailable line with a Retry control for each secondary read. On the Experts page, treat the classification as unknown until the catalog is ready: disable the two class filters and show 'Checking granted tools'.",
+      "sketch": "// lib/use-resource.ts, promoted from tool-catalog.tsx useLoaded\ntype Resource<T> = { status: 'loading' } | { status: 'ready'; data: T } | { status: 'unavailable'; retry: () => void };\nexport function useResource<T>(url: string | null, parse: (body: unknown) => T): Resource<T>;\n// reads refused bodies, aborts on unmount or URL change, treats ContractError as unavailable\n// ExpertsPanel: const catalog = useResource('/api/v1/tools', parseToolCatalog);\n//   classify only when catalog.status === 'ready'; otherwise the class filters say 'Checking granted tools'",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: 'Represent loading, empty, denied, unavailable and retryable states deliberately'. nextjs.md: 'explicit error/empty/loading states'. DS-04: state meaning.",
+      "verdict": "revised",
+      "verifierNote": "All six reads re-read: the code shapes vary (two drain refused bodies) but none has a failed state; the recommendation now builds on the existing useLoaded hook instead of a second new one, and the omitted-budget consequence was added."
+    },
+    {
+      "id": "WBLD-05",
+      "title": "The editors have no dirty state, and the workflow editor's two publish buttons publish from different sources",
+      "dimension": "approach",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 111,
+          "note": "Editor text, kept apart from the saved WF-02 draft with no comparison between them"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 194,
+          "endLine": 210,
+          "note": "Publish sends the textarea and never checks the JSON first"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 293,
+          "endLine": 312,
+          "note": "Publish draft publishes the saved server draft, whatever the textarea shows"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 437,
+          "endLine": 441,
+          "note": "'Draft saved' shows whenever a server draft exists, even with unsaved edits"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 511,
+          "endLine": 546,
+          "note": "Publish and Publish draft sit side by side, with nothing saying what each publishes"
+        },
+        {
+          "file": "services/agent/src/autobots/application/workflows.py",
+          "line": 220,
+          "endLine": 250,
+          "note": "publish_draft deletes the draft; publish_version (251) leaves it in place"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 434,
+          "endLine": 441,
+          "note": "Save revision is always enabled; Start a session navigates away from unsaved edits"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "The workflow editor holds the IR as one text string (`draft`) next to `workflow.draft` (the saved draft) and the published versions, and never compares them.\n- Publish sends graph: parsed(draft) without the parsed(...) === null check that validate() (176-179) and saveDraft() (273-277) apply. Invalid JSON therefore reaches the API as graph: null and returns the generic 'The request is not valid.'\n- Publish draft sends only expected_version, so it publishes the stored draft while the textarea may show different, unsaved edits.\n- Publishing the textarea leaves an older stored draft in place.\nThe Expert editor has the same gap. Save revision is always enabled, and each save creates a new version (add_version has no no-op check). Start a session goes to a session bound to the saved version while the edits stay unsaved.",
+      "impact": "Users can publish or start work from a different graph or configuration than the one on screen, and the badge says 'Draft saved' when the screen isn't. Every fix today has to reason about three implicit states inside a 617-line component.",
+      "recommendation": "Model the editor state explicitly in the draft hook: `baseline` (the saved draft or the latest version, tidied), `text`, `isDirty = text !== baseline`, and `graph`, parsed once. Then:\n- show 'Unsaved changes' beside the badge;\n- name the two actions by source;\n- disable 'Publish saved draft' while the text is dirty;\n- run the JSON check in one place for every action;\n- warn before leaving the page or starting a session while there are unsaved changes.\nIn the Expert editor, derive isDirty by comparing the draft with draftOf(expert), and disable Save when nothing has changed.",
+      "sketch": "type GraphDraft = {\n  baseline: string;             // tidy(saved draft ?? latest version)\n  text: string;                 // what the textarea shows\n  isDirty: boolean;             // text !== baseline\n  graph: WorkflowGraph | null;  // parsed once per text (useMemo)\n};\n// every action starts with: if (graph === null) return say(INVALID_JSON)\n// 'Publish what is shown' | 'Publish saved draft' (disabled while isDirty); warn before leaving when dirty\n// ExpertEditor: isDirty = !sameDraft(draft, draftOf(expert)); Save disabled when clean",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "Under PRD-Studio WF-02, one saved draft is published under the expected version. The recommendation keeps both publish paths and the server checks, and only makes the browser's view of them explicit (DH-06: browser state is a view of durable state).",
+      "verdict": "confirmed",
+      "verifierNote": "Traced both publish paths against publish_draft and publish_version (application/workflows.py:220-303); invalid JSON in publish() reaches the API as graph: null, and add_version has no no-op check."
+    },
+    {
+      "id": "WBLD-06",
+      "title": "WF-06 IR rules are re-implemented in the browser, and half of the label rule exists only there",
+      "dimension": "modules",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 59,
+          "endLine": 76,
+          "note": "Local DraftNode and DraftGraph types; parsed(text) is asserted as DraftGraph before it is checked"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 78,
+          "endLine": 87,
+          "note": "tidy() strips label: null and ir_version: null, mirroring ir_normalized"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 89,
+          "endLine": 104,
+          "note": "withLabel() bumps the graph to ir_version 2, and deletes it when no label is left"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 479,
+          "endLine": 486,
+          "note": "draftGraph(draft) is parsed twice per render, then asserted non-null with !"
+        },
+        {
+          "file": "services/agent/src/autobots/domain/workflows.py",
+          "line": 199,
+          "endLine": 211,
+          "note": "ir_normalized strips null labels and adds ir_version 2 to a labelled graph, but never returns a label-free graph to version 1"
+        },
+        {
+          "file": "packages/api-client/src/generated.ts",
+          "line": 9167,
+          "note": "Generated WorkflowGraph and WorkflowNode (with label and ir_version), unused here"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "The server already canonicalizes every graph it validates, publishes or previews with ir_normalized (api/workflow_routes.py:136, application/workflows.py:58). It drops null labels and a null ir_version, and stores a labelled graph at version 2. The editor repeats this in tidy and withLabel, and adds one rule the server doesn't have: removing the last label deletes ir_version, so the graph returns to version 1 and its old hash. That half runs only when a label input changes. A user who deletes the labels in the JSON textarea keeps \"ir_version\": 2, and the API stores it. The editor also types the payload with hand-written DraftNode and DraftGraph types instead of the generated WorkflowGraph and WorkflowNode.",
+      "impact": "WF-06's version rule has two owners that disagree on one case, so a graph's hash depends on which control the user edited. Changing the IR, for example to a version 3, means editing a React component as well as the domain. Each keystroke in a label field also re-serializes the whole graph text, which drops the user's own JSON formatting.",
+      "recommendation": "Choose one owner. The preferred option is a story that makes ir_normalized return a label-free graph to version 1. That is a contract and hash decision, so it needs its own work item; after it, the editor only sets or deletes labels. Until then:\n- move parse, tidy and withLabel to lib/workflow-ir.ts, typed with Pick<WorkflowNode, 'id' | 'block' | 'label'> and WorkflowGraph;\n- parse once per render with useMemo;\n- unit-test both directions of the label rule.",
+      "sketch": "// lib/workflow-ir.ts, until the domain owns the whole rule\ntype LabelNode = Pick<WorkflowNode, 'id' | 'block' | 'label'>;\nexport function parseGraphText(text: string): (WorkflowGraph & { nodes: LabelNode[] }) | null;\nexport function withLabel(graph: WorkflowGraph, nodeId: string, label: string): WorkflowGraph;\nexport function tidy(graph: WorkflowGraph): WorkflowGraph;\n// story: domain/workflows.py ir_normalized also returns a label-free graph to version 1;\n// then withLabel only sets or deletes `label`, and tidy goes once views omit nulls",
+      "effort": "M",
+      "risk": "high",
+      "ruleCheck": "DH-06: 'Avoid duplicated business rules'. contracts.md: version the workflow IR. nextjs.md: Next.js owns UI and BFF, not business-state transitions. The recommendation moves ownership toward the domain, edits no generated file, and leaves the hash change to an explicit story. The draft graph is the WorkflowDraftSave payload, so typing it with the generated type uses the DTO without merging it into a view model.",
+      "verdict": "revised",
+      "verifierNote": "ir_normalized (domain/workflows.py:199-211) keeps an explicit ir_version 2 while withLabel deletes it; re-serialization happens on label edits, not on every keystroke, so that sentence and the nextjs.md wording were corrected. Risk stays high only for the domain story; the interim lib move is low risk."
+    },
+    {
+      "id": "WBLD-07",
+      "title": "The Expert editor hard-codes which model profiles are offered, and profile labels exist in three copies",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 21,
+          "endLine": 25,
+          "note": "PROFILES: workspace setting, Terra, Sol"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 116,
+          "endLine": 128,
+          "note": "Kept and dropped bindings are computed against PROFILES"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 415,
+          "endLine": 432,
+          "note": "The 'not offered for new runs until qualified' option and the dropped-binding notice come from PROFILES"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 295,
+          "endLine": 299,
+          "note": "PROFILE_NAMES copy"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 75,
+          "endLine": 79,
+          "note": "PROFILE_NAMES copy"
+        },
+        {
+          "file": "services/agent/src/autobots/domain/models.py",
+          "line": 72,
+          "note": "OFFERED_FOR_NEW_RUNS = {TERRA, SOL}, exposed as ModelAvailability.offered"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 235,
+          "note": "Already builds its choices from offered, read from /api/models"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "PROFILES lists Terra and Sol as the offered choices. Any other saved binding is treated as not offered and removed on save. The server decides the same thing in OFFERED_FOR_NEW_RUNS (domain/models.py:72), which gained Sol on 2026-11-07 under Decision 0019 S2 and S4. It publishes the answer per profile as ModelAvailability.offered through /api/models, which run-disclosure.tsx:47 and model-policy-panel.tsx:136 already read. The labels for ModelProfileId are written out again in experts-panel.tsx and run-list.tsx.",
+      "impact": "The next change to the offered set needs a matching edit in this component, or the editor misleads. A newly offered DeepSeek would still be labelled 'not offered' and silently dropped from other roles on save. A withdrawn profile would still be offered, and the save would only fail late with model_not_offered.",
+      "recommendation": "Read /api/models in the editor, or reuse RunDisclosure's read through a shared hook. Build the executor options as model-policy-panel does: the offered profiles plus the current value, marked not offered. Compute kept and dropped from offered. Put the labels in one lib/model-profiles.ts typed Record<ModelProfileId, string>, so a new generated profile breaks the build until it has a label.",
+      "sketch": "// lib/model-profiles.ts\nexport const PROFILE_NAMES: Record<ModelProfileId, string> = {\n  openrouter_terra: 'Terra', openrouter_sol: 'Sol', openrouter_deepseek_flash: 'DeepSeek Flash',\n};\n// expert-editor: const models = useResource('/api/models', parseModelList);\n// options = offered profiles plus the saved one marked not offered (as model-policy-panel.tsx:235)\n// dropped = other roles whose profile has offered === false",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "model-gateway.md: three approved profiles, with DeepSeek and Sol offered only once qualified; Decision 0019 S2. The server stays the only owner of 'offered', and no fallback or alternative provider is introduced.",
+      "verdict": "confirmed",
+      "verifierNote": "PROFILES at 21-25 and the kept/dropped logic match; OFFERED_FOR_NEW_RUNS is at domain/models.py:72, expert routes call require_offered, and model-policy-panel.tsx:234-235 already builds choices from offered."
+    },
+    {
+      "id": "WBLD-08",
+      "title": "The execution monitor polls every second with no backoff, reloads all tool uses on each poll, and shows contract errors as reconnecting",
+      "dimension": "approach",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/workflow-monitor.tsx",
+          "line": 12,
+          "note": "POLL_MS = 1000, used by the fixed re-poll at 64 with no check of page visibility"
+        },
+        {
+          "file": "apps/web/components/workflow-monitor.tsx",
+          "line": 44,
+          "endLine": 45,
+          "note": "A null or 5xx reply sets 'reconnecting' without reading the body; the next poll is still 1 s later"
+        },
+        {
+          "file": "apps/web/components/workflow-monitor.tsx",
+          "line": 50,
+          "endLine": 56,
+          "note": "A parse failure (ContractError) also shows as 'reconnecting', indefinitely"
+        },
+        {
+          "file": "apps/web/components/workflow-monitor.tsx",
+          "line": 59,
+          "note": "loads is incremented on every successful poll, whether or not anything changed"
+        },
+        {
+          "file": "apps/web/components/workflow-monitor.tsx",
+          "line": 199,
+          "endLine": 203,
+          "note": "version={loads} drives useToolUses"
+        },
+        {
+          "file": "apps/web/components/tool-uses.tsx",
+          "line": 110,
+          "endLine": 145,
+          "note": "Each version change re-reads every tool-use page"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 204,
+          "note": "The run screen follows the same run with an EventSource, a cursor and reconnect"
+        },
+        {
+          "file": "apps/web/tests/browser/slice-workflows.spec.ts",
+          "line": 152,
+          "endLine": 166,
+          "note": "Pins that an unexpected reply reads as reconnecting and that polling recovers to live"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "load() (38-65) polls again every POLL_MS = 1000 until the run reaches a terminal state, with no backoff and no visibility check. A null or 5xx reply sets 'reconnecting' without reading the body. A reply that fails parseExecutionView is also shown as 'reconnecting'. slice-workflows.spec.ts:152-166 pins that on purpose: an HTML reply must read as reconnecting, and polling must then recover to live. Nothing tells a ContractError (valid JSON in the wrong shape) apart from a network blip, though. Every successful poll increments loads, and version={loads} makes useToolUses re-read every tool-use page, 200 at a time. run-workspace.tsx:170-204 follows a run with an EventSource, a cursor and a reconnect delay.",
+      "impact": "While an execution runs, each open monitor, hidden tabs included, sends at least two requests about once a second and downloads the whole tool-use history again, which keeps growing with the run. During an outage it keeps polling every second and leaves refused bodies unread, against the documented drain convention (run-disclosure.tsx:53). After an API or bundle mismatch it shows 'Reconnecting' indefinitely, with nothing that suggests a reload.",
+      "recommendation": "Move polling into a useExecution hook:\n- back off while reconnecting;\n- pause while the page is hidden;\n- read refused bodies;\n- bump the tool-use revision only when the snapshot changed.\nKeep polling after any unexpected reply, as slice-workflows.spec.ts:152-166 requires. A ContractError may add a note that the page may be out of date, with a reload link, while polling continues. Alternatively, refetch on the bound run's event stream, as the run screen does. Split the JSX into per-card components while moving it.",
+      "sketch": "// lib/use-execution.ts\nexport function useExecution(id: string): {\n  view: ExecutionView | null;\n  connection: 'live' | 'reconnecting' | 'unavailable';\n  outdated: boolean; // the last reply failed parseExecutionView; polling continues\n  revision: number;  // bumps only when the snapshot changed; drives useToolUses\n};\n// 1 s while live, doubling to 15 s while reconnecting, paused while document.hidden\n// 5xx -> body read, back off; any bad body keeps polling (slice-workflows.spec.ts:152-166)\n// or refetch on /api/v1/runs/{run_id}/events/stream events, as run-workspace.tsx:204 does\n// WorkflowMonitor -> <BindingCard>, <InstancesTable>, <NodeToolUses revision>, <EmissionsList>",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "nextjs.md: 'handle reconnect/deduplication and explicit error/empty/loading states. Browser disconnect does not cancel a run.' The monitor stays read-only, as its documented invariant at line 26 requires, and the tested keep-polling behaviour is preserved.",
+      "verdict": "revised",
+      "verifierNote": "Polling rate, the loads counter and useToolUses' full re-read are confirmed; treating a bad body as reconnecting is pinned by slice-workflows.spec.ts:152-166, so the recommendation now keeps polling and only adds an out-of-date hint for a ContractError."
+    },
+    {
+      "id": "WBLD-09",
+      "title": "The Experts and Workflows screens copy the same list and detail scaffolding, with two filter mechanisms",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 246,
+          "endLine": 281,
+          "note": "Create section; workflows-panel.tsx:389-424 differs in 4 of 36 lines"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 104,
+          "endLine": 129,
+          "note": "create(); workflows-panel.tsx:126-151 differs in 5 of 26 lines"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 389,
+          "endLine": 424,
+          "note": "The second create section"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 35,
+          "endLine": 45,
+          "note": "List read, with failed and loading text at 160-173; same as workflows-panel.tsx:98-114 and 153-166"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 178,
+          "endLine": 211,
+          "note": "Filter and search kept in component state, with aria-pressed buttons"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 182,
+          "endLine": 221,
+          "note": "Tab and search kept in the URL, with links and aria-current"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 91,
+          "endLine": 112,
+          "note": "Detail read and states (208-221); same as workflow-editor.tsx:120-143 and 398-411"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 187,
+          "endLine": 206,
+          "note": "Session start; copied in experts-panel.tsx:84-102 and 131-149"
+        }
+      ],
+      "occurrences": 15,
+      "evidence": "Running diff on the two create sections shows 4 changed lines of 36. On the two create() handlers it shows 5 of 26: the endpoint, body, parser and messages. The list reads with their failed and loading paragraphs, the empty states and the detail reads all follow one template, and the session start is written three times. That makes 15 places in seven blocks. The two toolbars differ in mechanism. Experts keeps filter and search in component state with aria-pressed buttons. Workflows keeps tab, search and selection in the URL, with links and aria-current.",
+      "impact": "Each fix in this review (the submit guard, unavailable states, refusal parsing) has to be made in up to 15 places. The two lists also behave differently for the same task: Expert filters reset on reload and Back, while workflow tabs survive both.",
+      "recommendation": "Extract the shared pieces: useResource for list and detail reads, a CreateByName component, useStartSession, a ListToolbar backed by the URL, and EmptyState and load-state primitives. Then give the Experts toolbar the same URL behaviour as Workflows.",
+      "sketch": "lib/use-resource.ts             list and detail reads with loading and unavailable states\nlib/use-start-session.ts        useStartSession() -> { pending, start(kind, expertIds) } with parseSessionView\ncomponents/create-by-name.tsx   <CreateByName heading inputId endpoint body={(name) => ...} parse hrefFor refusals />\ncomponents/ui/list-toolbar.tsx  <ListToolbar tabs={[{ id, label, count }]} tabParam='tab' searchParam='q' /> (URL state)\ncomponents/ui/empty-state.tsx   <EmptyState>No Experts yet.</EmptyState>\ncomponents/ui/load-state.tsx    <Loading>, <Unavailable> for list and detail pages",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: small cohesive modules. PRD-Studio EX-02 does not say where the Expert filters live, so moving them into the URL is a visible behaviour change that belongs in its own story rather than in this refactor.",
+      "verdict": "revised",
+      "verifierNote": "Re-ran diff: the create sections differ in 4 of 36 lines and the create handlers in 5 of 26, not 6; the 15 places in seven blocks recount correctly, and the ruleCheck now flags the URL change as a story."
+    },
+    {
+      "id": "WBLD-10",
+      "title": "ExpertEditor is a 393-line component with a save handler of complexity 19",
+      "dimension": "size",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 70,
+          "endLine": 472,
+          "note": "Component: 393 lines, complexity 14"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 59,
+          "endLine": 68,
+          "note": "draftOf has complexity 13 from its default values"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 116,
+          "endLine": 128,
+          "note": "Role-binding reconciliation computed during render"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 130,
+          "endLine": 185,
+          "note": "save(): body merge, transport, cast and a five-level message ternary"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 279,
+          "endLine": 319,
+          "note": "Group grants inline, calling grantable() again for each group"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 326,
+          "endLine": 383,
+          "note": "Tool grants inline, with an onChange that updates two fields"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "ExpertEditor reads the catalog and the Expert, reconciles role bindings during render, and saves with save(). save() merges the body, sends it, casts the reply and maps it through a five-level message ternary, giving complexity 19. The component also starts sessions and renders:\n- group grants;\n- tool grants;\n- the expansion sentence (385-397);\n- the executor select (398-432);\n- the version list (450-469).\nThe file is 475 lines.",
+      "impact": "The grant rules (TC-06 expansion, unavailable tools, group wholeness at 356-361) and the binding rules can only be exercised through the browser. Any change to one fieldset re-renders and re-reasons about the whole form.",
+      "recommendation": "Move the pure grant and draft logic to lib/, keep the container small, and give each fieldset its own component. Map refusals with a lookup table, as the error-mapping finding describes.",
+      "sketch": "lib/expert-grants.ts  grantable, members, expansion, draftOf, revisionBody(expert, draft, offered) (pure, unit-tested)\nexpert-editor.tsx     ExpertEditor: reads, draft and isDirty, save via useSubmit (~90 lines)\n  <PurposeFields>     purpose and instructions with the contract's maxLength\n  <GroupGrants>       whole-group checkboxes (now 279-319)\n  <ToolGrants>        per-tool checkboxes and unavailable reasons (now 326-382)\n  <GrantSummary>      the expansion sentence (now 385-397)\n  <ExecutorSelect>    offered profiles from /api/models and the dropped notice (now 398-432)\n  <VersionHistory>    the versions list (now 450-469)\nSAVE_REFUSALS: Record<string, string> replaces the five-level ternary",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: small cohesive modules. The form's Draft type stays a UI model separate from ExpertConfig, as contracts.md keeps DTO and UI types distinct.",
+      "verdict": "confirmed",
+      "verifierNote": "ESLint figures (393 lines and complexity 14; save 19; draftOf 13) match eslint.json; grantable() runs twice per group at 280-284, and the file is 475 lines."
+    },
+    {
+      "id": "WBLD-11",
+      "title": "workflows-panel.tsx holds two large components (341 and 213 lines) and the list's formatting helpers",
+      "dimension": "size",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 83,
+          "endLine": 427,
+          "note": "WorkflowsPanel: 341 lines, complexity 11"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 269,
+          "endLine": 374,
+          "note": "The row map alone is 106 lines"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 429,
+          "endLine": 649,
+          "note": "WorkflowPreviewPanel: 213 lines, complexity 12, focus handling and two read effects"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 34,
+          "endLine": 74,
+          "note": "relative, dollars, spend, duration and stateText"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "WorkflowsPanel reads URL state, loads the list, builds hrefs, creates workflows, and renders the tabs, search, a seven-column table and the create form. WorkflowPreviewPanel owns focus management and two read effects, and renders the steps and recent executions. The file is 649 lines.",
+      "impact": "The table row, the preview and the formatting helpers can't be changed, reused or tested on their own. The preview's two silent reads are hidden inside a 213-line function.",
+      "recommendation": "Split into a container, a table file and a preview file. Move the helpers to lib/format.ts and share the create form with experts-panel.",
+      "sketch": "workflows-panel.tsx   WorkflowsPanel: URL state, list read, layout (~100 lines)\nworkflow-table.tsx    <WorkflowTable rows selected hrefFor> and <WorkflowRow> (now the 106-line map at 269-374)\nworkflow-preview.tsx  <WorkflowPreviewPanel> -> <VersionSwitch>, <PreviewSteps>, <RecentExecutions>, each with its own read state\ncreate-by-name.tsx    shared with experts-panel\nlib/format.ts         formatMicroUsd, formatRelative, formatDuration (reuse run-panel's wallTime), spendText",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-06: small cohesive modules. A mechanical split covered by workflow-list.spec.ts.",
+      "verdict": "confirmed",
+      "verifierNote": "Function spans and complexities match eslint.json; the row map is 106 lines at 269-374, and the file is 649 lines."
+    },
+    {
+      "id": "WBLD-12",
+      "title": "ExpertCard has complexity 27 and shares a 434-line file with a 255-line panel",
+      "dimension": "size",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 22,
+          "endLine": 284,
+          "note": "ExpertsPanel: 255 lines, with two reads, classification and three writes"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 59,
+          "endLine": 82,
+          "note": "Classification, counts and filtering computed during render"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 286,
+          "endLine": 305,
+          "note": "Module constants placed between the two components"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 317,
+          "endLine": 431,
+          "note": "ExpertCard: 115 lines, complexity 27, from inline ternaries"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "ExpertsPanel holds the experts and catalog reads, the classification, the filtering, and three writes (startRun, create, coordinate) plus the toggle. It renders the toolbar, the grid, the coordinator bar and the create form. ExpertCard gets complexity 27 from inline ternaries for the executor label, the run count, the approval noun and the tool chips.",
+      "impact": "The safety-relevant classification (outside versus read only) is computed inline, where no unit test can reach it. The card's branching makes small wording changes risky.",
+      "recommendation": "Move the card to its own file built from small parts. Make the classification a pure function in lib/ that reports when it is unknown. Reuse the shared create form and the session-start hook.",
+      "sketch": "experts-panel.tsx      ExpertsPanel: reads, toolbar, grid, coordinator bar (~120 lines)\nexpert-card.tsx        <ExpertCard> -> <InitialTile>, <ExecutorLine>, <RunsLine>, <ApprovalNote>, <ToolChips>\nlib/expert-classes.ts  classify(experts, catalog | null) -> { known, items, counts } (pure)\nlib/model-profiles.ts  PROFILE_NAMES shared with run-list\ncreate-by-name.tsx and lib/use-start-session.ts shared with workflows-panel and expert-editor",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: small cohesive modules.",
+      "verdict": "confirmed",
+      "verifierNote": "ExpertCard complexity 27, the 255-line panel and the 434-line file are confirmed; the module constants sit between the components at 286-305."
+    },
+    {
+      "id": "WBLD-13",
+      "title": "The monitor re-implements run-state labels, tones and the terminal set, and other screens import them from component files",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/workflow-monitor.tsx",
+          "line": 13,
+          "note": "TERMINAL, the same set as run-controls.tsx:16"
+        },
+        {
+          "file": "apps/web/components/workflow-monitor.tsx",
+          "line": 103,
+          "endLine": 110,
+          "note": "Run status and stop reason shown as raw enum text"
+        },
+        {
+          "file": "apps/web/components/workflow-monitor.tsx",
+          "line": 235,
+          "endLine": 242,
+          "note": "tone() gives no tone to waiting_input or verifying"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 33,
+          "endLine": 47,
+          "note": "tone() for the same run states: waiting_input gets attention, verifying gets live"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 127,
+          "note": "Exported StateLine, which the monitor doesn't use; STOP_TEXT at 80 is private"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 17,
+          "note": "STATUS_TEXT imported from the run-list component file"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 17,
+          "note": "AVAILABILITY and repair imported from the 853-line tool-catalog.tsx"
+        }
+      ],
+      "occurrences": 5,
+      "evidence": "workflow-monitor.tsx defines its own TERMINAL and its own tone(), both citing Decision 0021 R3–R4. run-list.tsx has a tone() for the same run states that differs: there, waiting_input gets the attention tone and verifying the live tone, while the monitor gives neither a tone. The monitor prints the run status as raw enum text ('waiting approval'). workflows-panel.tsx shows the same status as 'Waiting for approval', through STATUS_TEXT imported from run-list.tsx. run-list.tsx also has STOP_TEXT and an exported StateLine that the monitor doesn't use.",
+      "impact": "The same canonical run state looks different on three screens, and the monitor misses R3's attention tone for requested input. The next change to a state or its wording has to be found in several components. Imports from one component file to another couple screens that otherwise share nothing.",
+      "recommendation": "Move run-state presentation into lib/ plus one small component keyed by the canonical states: labels, stop reasons, tone, the terminal set and StateLine. Use StateLine for the monitor's run line, and keep node-instance states in their own map. Move AVAILABILITY and repair to lib/ as well.",
+      "sketch": "lib/run-states.ts         RUN_STATE_TEXT, STOP_TEXT, runStateTone(), TERMINAL_RUN_STATES, isTerminal()\ncomponents/run-state.tsx  <StateLine status /> moved from run-list.tsx, used by the monitor's run line\nlib/workflow-states.ts    INSTANCE_STATE_TEXT and instanceTone() for node instances\nlib/tool-availability.ts  AVAILABILITY and repair() moved from tool-catalog.tsx",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "AGENTS.md: canonical states from the Option B contract. DH-06: 'do not invent a second state enum for the UI'. Decision 0021 R3–R4. These are presentation maps only; the DTO's run_status: string is unchanged.",
+      "verdict": "revised",
+      "verifierNote": "Both tone() maps and both TERMINAL sets confirmed, and Decision 0021 R3 gives requested input the attention tone the monitor omits; StateLine is at run-list.tsx:127, not 126. The AVAILABILITY move is the same as web-tools-approvals WTAP-07."
+    },
+    {
+      "id": "WBLD-14",
+      "title": "Budget choices and money and time formatting are copied across screens and have diverged",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 150,
+          "endLine": 157,
+          "note": "Budget-step loop, the same as goal-composer.tsx:197-206"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 118,
+          "note": "1_000_000 literal instead of DEFAULT_BUDGET_MICRO_USD (run-disclosure.tsx:20)"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 641,
+          "endLine": 679,
+          "note": "'Nothing left today' next to an enabled Run this version; the budget is omitted at 380-382"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 593,
+          "note": "The composer disables Run when no budget is left (207)"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 34,
+          "endLine": 70,
+          "note": "relative(), dollars(), spend() and duration()"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 310,
+          "endLine": 315,
+          "note": "lastRun(): a second relative-time wording, calling Date.now() during render"
+        },
+        {
+          "file": "apps/web/components/run-panel.tsx",
+          "line": 34,
+          "endLine": 42,
+          "note": "Exported wallTime(), which duration() re-implements without hours"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 658,
+          "note": "Inline US$ formatting, one of 7 copies"
+        }
+      ],
+      "occurrences": 16,
+      "evidence": "The same helpers are written several times across the repository, counted with grep:\n- 2 budget-step loops;\n- 7 copies of `US$${(micro / 1_000_000).toFixed(2)}`;\n- 4 relative-time implementations: experts-panel, workflows-panel, approvals-panel.tsx:88 and home-activity.tsx:24;\n- 2 duration formatters: workflows-panel and run-panel's exported wallTime.\nThat is 16 counting the literal default, 7 of them in scope. With nothing left today, the composer disables Run. The workflow editor keeps Run enabled and sends no budget, so the server applies DEFAULT_LIMIT_MICRO_USD without require_budget (api/workflow_routes.py:350-361). duration() prints 2 hours as '120m 00s', where wallTime prints '2h 00m'.",
+      "impact": "WF-05's 'same budget choices as a goal run' is two copies that already behave differently, and nothing records whether the editor's behaviour is meant for versions without agent steps. The same timestamp reads '5 min ago' on an Expert card and '5 minutes ago' in the workflow list.",
+      "recommendation": "Share lib/budget.ts and lib/format.ts between the screens. Write the rule for starting a run when nothing is left once, and take `now` from one hook instead of calling Date.now() during render.",
+      "sketch": "// lib/budget.ts\nexport function budgetChoices(range: BudgetRange | null): number[];  // guards step > 0\nexport function canStart(range: BudgetRange | null, usesModel: boolean): boolean;  // one written rule for both screens\n// lib/format.ts\nexport function formatMicroUsd(micro: number): string;\nexport function formatRelative(iso: string, now: number): string;\nexport function formatDuration(seconds: number | null): string;  // today run-panel.tsx wallTime",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "PRD-Studio WF-05 and Decision 0022 D11. The server's require_budget remains the authority; the browser only stops duplicating its choices.",
+      "verdict": "confirmed",
+      "verifierNote": "Recounted with grep: 2 budget loops, 7 US$ formatters (5 helpers, workflow-editor.tsx:658 and run-disclosure.tsx:97), 4 relative-time helpers and 2 duration helpers; the execution route skips require_budget when no budget is sent."
+    },
+    {
+      "id": "WBLD-15",
+      "title": "Risky editor logic has no unit tests, and no test covers repeated submits or failed secondary reads",
+      "dimension": "tests",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 51,
+          "endLine": 104,
+          "note": "parsed, draftGraph, tidy and withLabel live in a .tsx client module"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 36,
+          "endLine": 68,
+          "note": "grantable, members, expansion and draftOf"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 36,
+          "endLine": 74,
+          "note": "relative, dollars, spend, duration and stateText"
+        },
+        {
+          "file": "scripts/verify.py",
+          "line": 161,
+          "endLine": 162,
+          "note": "web_unit_tests runs node --test on two lib test files only"
+        },
+        {
+          "file": "apps/web/tests/browser/experts.spec.ts",
+          "line": 528,
+          "note": "Cards and filters are tested only with a loaded catalog"
+        },
+        {
+          "file": "apps/web/tests/browser/slice-workflows.spec.ts",
+          "line": 132,
+          "endLine": 158,
+          "note": "The only failure-injection test in this area (monitor reconnect)"
+        }
+      ],
+      "occurrences": 16,
+      "evidence": "Sixteen top-level helpers in this area live inside 'use client' .tsx modules, counted by reading: 4 in workflow-editor, 4 in expert-editor, 5 in workflows-panel, 2 in experts-panel and 1 in workflow-monitor. All but lastRun, which reads the clock, are pure. The unit runner (node --test, on an explicit file list in scripts/verify.py) can't import those, and apps/web/tests/unit holds only lib tests. experts.spec.ts, workflows.spec.ts and workflow-list.spec.ts contain no page.route calls, so no failed read is ever simulated. No spec double-clicks a submit. The label IR rule is covered only end to end (workflows.spec.ts:177-213).",
+      "impact": "The two highest-risk gaps in this review, duplicate submits and silent read failures, have no regression test. Each change to the IR or grant helpers needs a full browser run to check.",
+      "recommendation": "Move the helpers to lib/*.ts with node --test units, and make web_unit_tests run every tests/unit file. Add Playwright cases for:\n- a double-click on Run this version, which should start one execution;\n- a failed /api/v1/tools, which should show no Read only classification;\n- a failed preview, which should show an unavailable state.",
+      "sketch": "apps/web/lib/workflow-ir.ts   + tests/unit/workflow-ir.test.ts   (a label adds v2, removing the last label returns to v1, tidy keeps the hash)\napps/web/lib/expert-grants.ts + tests/unit/expert-grants.test.ts (named tools first, group tools appended once)\napps/web/lib/format.ts        + tests/unit/format.test.ts        (estimated versus reported, minutes and hours)\nscripts/verify.py web_unit_tests: run tests/unit/*.test.ts, not a fixed list\nPlaywright: double-click Run this version -> one execution; /api/v1/tools 500 -> no Read only count",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-06: unit tests for relevant pure and client behaviour, and Playwright for key flows. The repository runs unit tests with node --test rather than Vitest, and the recommendation keeps that runner.",
+      "verdict": "revised",
+      "verifierNote": "Recounted 16 top-level helpers in five client modules (15 pure; lastRun reads the clock), not 13; the three specs have no page.route or double-click, and web_unit_tests lists two files."
+    },
+    {
+      "id": "WBLD-16",
+      "title": "Refusal codes are mapped with nested ternaries, inconsistently across sibling actions",
+      "dimension": "errors",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 172,
+          "endLine": 184,
+          "note": "Five-level ternary"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 224,
+          "endLine": 228,
+          "note": "publish(): no case for workflow_version_conflict"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 261,
+          "endLine": 269,
+          "note": "refused(): maps workflow_version_conflict for the draft actions"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 186,
+          "endLine": 191,
+          "note": "validate(): any failure reads 'That has the wrong shape for a workflow.'"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 586,
+          "endLine": 590,
+          "note": "Refusals announced with role=status"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 277,
+          "note": "Refusals announced with role=alert, as in workflows-panel.tsx:420"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 246,
+          "endLine": 265,
+          "note": "Purpose and instructions lack the contract's maxLength"
+        }
+      ],
+      "occurrences": 6,
+      "evidence": "expert-editor.tsx:172-184 is a five-level ternary on failure?.code, which accounts for most of save()'s complexity of 19. Five more chains repeat the shape: experts-panel.tsx:122-128, workflows-panel.tsx:144-150 and workflow-editor.tsx:224-228, 262-268 and 354-357. Several handlers disagree:\n- publish() has no case for workflow_version_conflict, which refused() maps, so the same conflict reads differently from the two publish buttons;\n- validate() reports any failure, including a lost reply or a 401, as a shape error;\n- refusals use role=status in the editors and role=alert in the lists.\nThe purpose and instructions fields omit the contract's maxLength of 1000 and 20000, so overlong text ends in the generic invalid_request message.",
+      "impact": "Messages for the same refusal drift between buttons. Transport failures are blamed on the user's input. Assistive technology announces some refusals politely and others assertively.",
+      "recommendation": "Give each screen one Record<code, text> map and a messageFor(refusal, map, fallback) helper built on readRefusal. Tell a lost reply apart from a refusal. Use role=alert for refusals and role=status for confirmations. Set maxLength from ExpertConfig.",
+      "sketch": "const SAVE_REFUSALS: Record<string, string> = {\n  owner_required: 'Only the workspace owner can save a revision.',\n  expert_version_conflict: 'Someone saved a newer version. Reload to see it.',\n};\nconst text = refusal === null ? LOST_REPLY : (SAVE_REFUSALS[refusal.code] ?? refusal.message);\n// refusals: role='alert'; confirmations: role='status'",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: 'centralize error handling… expose safe typed errors'.",
+      "verdict": "confirmed",
+      "verifierNote": "Six ternary chains confirmed; publish() falls back to the API's own message for workflow_version_conflict while refused() has its own text, and the generated ExpertConfig sets maxLength 1000 and 20000."
+    },
+    {
+      "id": "WBLD-17",
+      "title": "Pixel type sizes, a hard-coded radius and repeated heading and avatar class strings bypass the token scale",
+      "dimension": "standards",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 229,
+          "note": "rounded-[10px] initial tile, equal to rounded-lg"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 344,
+          "note": "The same tile copied; also session-panel.tsx:115"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 235,
+          "note": "Serif 22px heading string; 7 copies repo-wide, one already drifted (tool-catalog.tsx:621)"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 426,
+          "note": "The same heading string, again at 598"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 739,
+          "note": "SECTION copies SectionLabel's classes and is declared after use"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 475,
+          "note": "LEGEND: the same classes plus mb-2, declared after use"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 76,
+          "note": "TH with text-[12.5px]; 22 uses of text-[12.5px] in scope"
+        },
+        {
+          "file": "apps/web/app/globals.css",
+          "line": 72,
+          "note": "--radius-lg: var(--radius)"
+        }
+      ],
+      "occurrences": 51,
+      "evidence": "The in-scope files use 47 arbitrary text sizes in 7 distinct values (212 in 39 files repo-wide) and two hard-coded radii, both rounded-[10px] on the initial tile (five repo-wide, with session-panel.tsx:115 and appearance-control.tsx:56 and 78). Three of the 47 sizes belong to copies of the serif display heading string, which has seven copies repo-wide. The initial tile repeats `grid … shrink-0 place-items-center rounded-[10px] border font-serif`, at size-10 in the editor and size-9 on the card. SECTION and LEGEND re-type the classes of SectionLabel (ui/page-header.tsx:47-69), because SectionLabel can't render a label or a legend. The total counts the 47 sizes, the 2 radii and the 2 re-typed constants, counted with grep for text-[Npx] and rounded-[.",
+      "impact": "DS-03 asks for the radius scale mapped to the base token and for consistent typography. Today a type or radius change means editing class strings across files, and copies have already started to drift.",
+      "recommendation": "Name the sizes in use as tokens in globals.css @theme. Add an InitialTile primitive next to IconTile. Add a display variant of CardTitle. Let SectionLabel render a label or a legend.",
+      "sketch": "/* globals.css @theme: named steps for the sizes in use */\n--text-meta: 12.5px; --text-row: 13.5px; --text-title: 15px; --text-display: 22px;\n// components/ui/card.tsx\nexport function InitialTile({ name }: { name: string }) // rounded-lg, replaces three copies\n// components/ui/page-header.tsx: SectionLabel as='label' | 'legend', or export SECTION_LABEL",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "PRD-Design-System.md DS-03: 'Map the radius scale to the canonical base… Keep layout spacing and typography consistent.' The new size tokens add to the Luma tokens without changing them (DS-01).",
+      "verdict": "revised",
+      "verifierNote": "Text-size counts confirmed with grep; hard-coded radii are 2 in scope and 5 repo-wide, not 1 and 3, so the evidence and the total (51) were corrected. --radius is 0.625rem, so rounded-[10px] equals rounded-lg."
+    },
+    {
+      "id": "WBLD-18",
+      "title": "A comment sits above the wrong declarations, and the body drains have no explanation",
+      "dimension": "comments",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 288,
+          "note": "Describes ExpertCard but sits above `type Filter`, 29 lines before the card"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 479,
+          "note": "`else await reply.text();` with no reason given"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 497,
+          "note": "The same drain, also unexplained"
+        },
+        {
+          "file": "apps/web/components/run-disclosure.tsx",
+          "line": 53,
+          "note": "Where the reason is written"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "experts-panel.tsx:288 reads 'One Expert as a card: what its latest version says, from the list already loaded.', but it sits above type Filter, FILTERS, PROFILE_NAMES and APPROVAL_NOUN; ExpertCard starts at 317. workflows-panel.tsx ends two refused reads with `else await reply.text();` and no comment. run-disclosure.tsx:53, model-policy-panel.tsx:142 and home-activity.tsx:73 explain the same line: 'Read, or an unread refusal holds its connection open for as long as the page lives.'",
+      "impact": "A reader can't tell why the drains exist, so they look removable, and the other nine reads in this area skip them. The card comment describes the wrong declarations.",
+      "recommendation": "Move the card comment to line 317. State the drain rule once where it is enforced, in the shared read hook, instead of at each call. Until then, copy the one-line reason to both drains.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: 'Explain nonobvious invariants in code'. The citations of stories and decisions stay.",
+      "verdict": "confirmed",
+      "verifierNote": "The comment at 288 describes ExpertCard (317); the two drains lack the reason that run-disclosure.tsx:53, model-policy-panel.tsx:142 and home-activity.tsx:73 give."
+    },
+    {
+      "id": "WBLD-19",
+      "title": "`draft` names two different things in the workflow editor, and one action has two names",
+      "dimension": "naming",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 111,
+          "note": "`draft`: the textarea text, which publish() sends"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 139,
+          "note": "`loaded.draft`: the saved WF-02 draft that saveDraft, publishDraft and discardDraft act on"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 172,
+          "note": "`shown`: the filtered rows"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 442,
+          "note": "`shown`: the previewed version, in the same file"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 84,
+          "note": "`startRun` posts a session, behind the 'Start run' button (372)"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 187,
+          "note": "The same POST is `startSession`, behind 'Start a session' (440)"
+        }
+      ],
+      "occurrences": 4,
+      "evidence": "In workflow-editor.tsx, the local `draft` holds what the textarea shows, while `workflow.draft` (139, 437, 531) is the stored draft. The handler names (saveDraft, publishDraft, discardDraft) refer to the stored one, and publish() sends the local one. workflows-panel.tsx reuses `shown` for two meanings. The session start has two function names and two button labels. `routed` (experts-panel.tsx:28) holds the coordinator picks.",
+      "impact": "The `draft` collision sits exactly where the two publish paths are easiest to confuse. One action with two function names suggests two different behaviours.",
+      "recommendation": "Rename the text to graphText; keep workflow.draft, which is the contract's name. Rename `shown` to visibleWorkflows and previewVersion, `routed` to coordinatorPicks, and both session handlers to startDirectSession. Keep the two button labels: PRD-Studio EX-01 names the card's 'Start run', which experts.spec.ts:578 checks.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: readable names. EX-01 fixes the card's 'Start run' label, so only identifiers change.",
+      "verdict": "revised",
+      "verifierNote": "Names and sites confirmed; the original advice to use one button label would change EX-01's 'Start run' on the card, so the recommendation now renames identifiers only."
+    },
+    {
+      "id": "WBLD-20",
+      "title": "A URL parameter, role bindings and block versions are narrowed without checks",
+      "dimension": "types",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 87,
+          "note": "params.get('tab') asserted as Tab | null"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 167,
+          "endLine": 171,
+          "note": "An unknown tab falls through to the Drafts rule"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 116,
+          "endLine": 119,
+          "note": "role_bindings cast to Record<string, string>"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 331,
+          "endLine": 332,
+          "note": "The same cast"
+        },
+        {
+          "file": "apps/web/components/workflow-monitor.tsx",
+          "line": 175,
+          "note": "String(view.block_versions[node_id]) renders 'undefined' for a missing node"
+        },
+        {
+          "file": "packages/api-client/src/runtime.ts",
+          "line": 64,
+          "endLine": 79,
+          "note": "checkObject ignores schema-valued additionalProperties"
+        },
+        {
+          "file": "scripts/generate_contracts.py",
+          "line": 46,
+          "endLine": 47,
+          "note": "An object without properties becomes Record<string, unknown>"
+        }
+      ],
+      "occurrences": 4,
+      "evidence": "Four values are narrowed without a check:\n- `const tab = (params.get('tab') as Tab | null) ?? 'all';` accepts any string. inTab then sends an unknown value to the Drafts branch, and no tab has aria-current.\n- Two sites cast role_bindings to Record<string, string>. The generator emits Record<string, unknown> for an object without properties, and runtime.ts never checks map values, so the ModelProfileId values are neither typed nor validated.\n- The monitor stringifies an unknown map lookup, so a missing key prints 'undefined'.",
+      "impact": "Each narrowing hides a shape the code then trusts. A hand-edited URL shows the wrong rows, and a binding that isn't a string would be rendered as text or sent back on save.",
+      "recommendation": "Add isTab() and fall back to 'all'. Read the executor through a typed accessor that calls parseModelProfileId inside try/catch. Render a dash for a missing block version. Fix the root cause in the generator and runtime.ts: emit Record<string, ModelProfileId> and check map values. Never edit generated.ts by hand.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "DH-06: 'No blanket type assertions'. Ground rule: generated files are regenerated, not edited, so the type gap is fixed in scripts/generate_contracts.py and runtime.ts.",
+      "verdict": "revised",
+      "verifierNote": "All four narrowings confirmed, with the generator rule at generate_contracts.py:46-47 and checkObject at runtime.ts:64-79; risk raised to medium because the root-cause fix changes generated types and runtime validation for every client."
+    }
+  ],
+  "rejected": [],
+  "notCovered": "This was a static reading; no browser session was run. The duplicate-submit, silent-failure and polling-load scenarios are traced from the code, not observed. The claim that unread refusals hold connections open is the repository's own documented rationale (run-disclosure.tsx:53), not something measured here.\n\nSeveral sources were read only in part:\n- Browser specs (experts.spec.ts, workflows.spec.ts, workflow-list.spec.ts, slice-workflows.spec.ts): checked by test titles and grep for route injection, ir_version and double clicks.\n- Server files (api/workflow_routes.py, api/errors.py, application/workflows.py, application/experts.py, domain/workflows.py, domain/models.py): read only at the cited lines, to confirm behaviour the web code depends on.\n- Sibling web components (run-list, run-disclosure, continue-run, goal-composer, tool-uses, run-workspace, model-policy-panel, ui/card, ui/page-header), the relevant PRD-Development-Harness.md sections (DH-03, DH-06) and the metrics file: read only in part.\n\nNot checked: whether workflow node progress emits run events, which decides whether the monitor can follow the run event stream as run-workspace.tsx does.\n\nLeft to the web-architecture lens: whether screens should load first-paint data in Server Components or read it in the browser through the BFF, which is a cross-cutting decision.\n\nESLint was not re-run. The in-scope rule hits come from .checks/reviews/review-2026-11-12-09-52-30/eslint.json."
+}

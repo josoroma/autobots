@@ -1,0 +1,1373 @@
+{
+ "schema": "autobots.code-review/v1",
+ "area": "py-run",
+ "title": "Python: run lifecycle and model spend",
+ "kind": "area",
+ "timestamp": "2026-11-12-09-52-30",
+ "revision": "156534da0bd5b19417f05d313077d767804b175b",
+ "summary": "The run lifecycle stands on sound durable mechanics. A pure, unit-tested transition table (domain/runs.py) is enforced by apply_command under job-then-run row locks. Claims and heartbeats use database time and a rising generation, and idempotency receipts are serialized by advisory locks. Completion is decided from recorded evidence, and an integer micro-dollar ledger reserves before dispatch and keeps uncertain attempts open. Comments explain why and cite their decisions. The cost sits in two hubs. goal_loop.py (782 lines) combines tool assembly, prompts, dispatch, lease keeping and settlement, and workflow_runner plus ten test files reach its private names, with function-local imports to dodge a cycle. Its _finish decides the fate of every pass by membership in string sets: it fails any code PAUSE_FOR lacks, and it reads the run status three times. In runs.py, admit_run (15 parameters, with a binding typed Any that four shapes satisfy) and apply_command (11 parameters, positional job tuple) carry admission and transition plumbing. Job-row writes, version reads and system commands issued as Actor.USER are spread over six modules beside the command table. Types stop at the database edge: 73 connection: Any parameters, positional rows, and an untyped policy snapshot read seven ways. State vocabularies are restated as literals, and run_projection.py (664 lines) also hosts a display redaction weaker than the log redaction. I read the metric leads on validate_proposal, verify_candidate and ModelAdmission.admit and judged them acceptable, since they are flat guard sequences or one atomic reservation. Priorities, in order: a typed stop-code table with a pure _finish decision; one shared redaction; parameter objects for admission and worker commands that keep lock order, fencing and receipt fingerprints; and a split of goal_loop along its seams.",
+ "scores": [
+  {
+   "dimension": "standards",
+   "score": 3,
+   "why": "Project ruff and mypy strict pass, but no complexity or positional-argument gate exists, and Any at the database edge stops strict typing from catching errors."
+  },
+  {
+   "dimension": "modules",
+   "score": 2,
+   "why": "Other modules use goal_loop.py's private names through cyclic local imports, run_projection.py hosts redaction that 7 modules use, and the API imports the worker loop."
+  },
+  {
+   "dimension": "size",
+   "score": 2,
+   "why": "Two files exceed 650 lines. admit_run has 124 lines and 15 parameters; plan_tools has 121 lines, apply_command 97, run_goal 90, read_inspector 89 and _finish 86."
+  },
+  {
+   "dimension": "functions",
+   "score": 3,
+   "why": "Many small pure helpers (worst_case_cost, classify_status, validate_proposal, WakeClock), but admit_run, apply_command, run_goal and _finish mix decisions with I/O."
+  },
+  {
+   "dimension": "structure",
+   "score": 3,
+   "why": "The layout follows DH-03, but run and job state are written from four modules beside the command table rather than through it."
+  },
+  {
+   "dimension": "approach",
+   "score": 4,
+   "why": "Database-time leases, database-enforced fencing, receipts and a reserve-first ledger set the example; the gaps are unbounded re-claims, an unawaited keeper task and views without a consistent snapshot."
+  },
+  {
+   "dimension": "comments",
+   "score": 4,
+   "why": "Comments consistently explain why and cite decisions and stories; run_goal and _finish lack contract docstrings, and one module docstring is wrong."
+  },
+  {
+   "dimension": "types",
+   "score": 2,
+   "why": "73 connection: Any parameters, positional rows, an untyped policy snapshot and a binding typed Any that SimpleNamespace satisfies; enums exist but stop at the edges."
+  },
+  {
+   "dimension": "errors",
+   "score": 2,
+   "why": "Stop codes are strings that fail by default, ledger conflicts raise plain ValueError, and a crashing pass is re-claimed forever; cancellation itself propagates correctly."
+  },
+  {
+   "dimension": "tests",
+   "score": 3,
+   "why": "The pure parts have unit tests named for behaviors and tests/db covers behavior broadly, but settlement and transition rules have no unit seam and tests depend on private names."
+  },
+  {
+   "dimension": "maintainability",
+   "score": 3,
+   "why": "Correct where it matters most, but slow to change: hub functions, string vocabularies and untyped rows make each lifecycle edit a multi-file change that only the db profile can prove."
+  }
+ ],
+ "strengths": [
+  {
+   "title": "One canonical transition table, enforced where the change is written",
+   "evidence": "services/agent/src/autobots/domain/runs.py:24-125 defines NORMAL_EXITS, COMMANDS, COMMAND_SOURCES and next_status. apply_command (services/agent/src/autobots/application/runs.py:404-447) evaluates them under the job and run row locks, with the expected version. record_transition (services/agent/src/autobots/application/runs.py:315-325) writes status, version and event together. Unit tests cover them in services/agent/tests/test_contracts.py:103-159."
+  },
+  {
+   "title": "Ownership by database time and a rising generation",
+   "evidence": "services/agent/src/autobots/application/worker_leases.py:76-104 claims with 'for update of j skip locked', increments the generation and sets the expiry from clock_timestamp(). heartbeat (worker_leases.py:142-154) extends only a live lease, and revive_lease (worker_leases.py:123-139) fails once anyone else has claimed the job. services/agent/src/autobots/application/runs.py:381-387 checks ownership under the job row lock in the writing transaction. services/agent/src/autobots/adapters/checkpoints.py:59-75 makes the database refuse stale checkpoint writes."
+  },
+  {
+   "title": "A conservative integer ledger that reserves before dispatch",
+   "evidence": "services/agent/src/autobots/application/model_admission.py:60-70 rounds the worst-case cost up, in micro-dollars. admit (model_admission.py:105-186) serializes each workspace on an advisory lock and checks slots, run and day budgets before inserting the reservation. Only fail_before_acceptance releases money (model_admission.py:242-248); mark_uncertain keeps it (model_admission.py:250-259)."
+  },
+  {
+   "title": "Idempotent commands with serialized receipts",
+   "evidence": "services/agent/src/autobots/application/runs.py:74-133: request_hash normalizes content, and existing_receipt takes a transaction advisory lock on the exact key, so concurrent duplicates wait and replay, while different content raises IdempotencyConflict. Comments explain fingerprint compatibility with older receipts (services/agent/src/autobots/application/runs.py:210-216)."
+  },
+  {
+   "title": "Retry policy and sleep detection as small units with injected time",
+   "evidence": "services/agent/src/autobots/application/model_attempts.py:55-71 classifies HTTP statuses in one table. call_with_policy (model_attempts.py:108-155) bounds retries by count, wait cap and root deadline, never retries an uncertain outcome and never invents a charge. services/agent/tests/test_model_attempts.py:105-216 states each rule as a test named for its behavior. WakeClock (services/agent/src/autobots/application/worker_leases.py:19-47) takes injected clocks and is tested in test_wake_clock.py."
+  },
+  {
+   "title": "Completion decided from records, not from model claims",
+   "evidence": "plan_view (services/agent/src/autobots/application/plans.py:138-151) decides completion from recorded evidence. verify_candidate (services/agent/src/autobots/application/verification.py:35-77) reads artifacts back from storage and writes no verdict. services/agent/src/autobots/application/goal_loop.py:462-481 commits the verdict with the transition, so a worker that lost the run records nothing."
+  },
+  {
+   "title": "Public projection through the contract",
+   "evidence": "project_event (services/agent/src/autobots/application/run_projection.py:93-108) validates each stored payload against the RunEvent contract and drops what doesn't fit while the cursor advances. read_inspector (services/agent/src/autobots/application/run_projection.py:576-664) reads typed columns only, never tool arguments or partial model output."
+  },
+  {
+   "title": "Comments that explain why and cite their source",
+   "evidence": "services/agent/src/autobots/application/goal_loop.py:269-270 (Decision 0023 on citing criteria by ID), services/agent/src/autobots/application/run_usage.py:77-87 (the clock behavior observed in US-12.5), services/agent/src/autobots/application/compaction.py:1-6 (what compaction may never lose), services/agent/src/autobots/application/recovery.py:18-20, services/agent/src/autobots/application/worker_inference.py:1-5."
+  }
+ ],
+ "findings": [
+  {
+   "id": "PRUN-01",
+   "title": "goal_loop.py is a seven-concern hub that other modules use through private names",
+   "dimension": "modules",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 162,
+     "endLine": 197,
+     "note": "loop_registry: tool assembly, also used by tool_catalog.py and workflow_runner.py"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 250,
+     "endLine": 288,
+     "note": "_scope_guidance and _opening: prompt text plus an experts query"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 417,
+     "endLine": 441,
+     "note": "_drive: job dispatch; imports workflow_runner inside the function (line 434) to avoid a cycle"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 491,
+     "endLine": 547,
+     "note": "_keep_lease: lease keeping, imported by workflow_runner.py and tests/db/wake_check.py"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 697,
+     "endLine": 782,
+     "note": "_finish: settlement, called 8 times here and 6 times from workflow_runner.py"
+    },
+    {
+     "file": "services/agent/src/autobots/application/workflow_runner.py",
+     "line": 16,
+     "endLine": 24,
+     "note": "imports _finish, _keep_lease, _result and _run_status; imports _drive inside a function at line 299"
+    },
+    {
+     "file": "services/agent/src/autobots/application/tool_catalog.py",
+     "line": 13,
+     "note": "the tool catalog imports the worker loop for loop_registry"
+    },
+    {
+     "file": "services/agent/src/autobots/api/run_routes.py",
+     "line": 14,
+     "note": "the API imports the worker loop module for the 7-line execution_block query"
+    }
+   ],
+   "occurrences": 1,
+   "evidence": "782 lines and 22 top-level definitions (19 functions, 3 classes): tool registry (162-197), graph construction (208-247), prompts and an experts query (250-288), the pass (291-380), job dispatch (383-441), candidate settlement (444-488), lease keeping (491-547) and run settlement (550-782). Consumers depend on the private half. workflow_runner.py imports four underscore names at module level and _drive inside drive_child, while goal_loop imports run_workflow inside _drive, a cycle that only function-local imports avoid. Besides workflow_runner.py, ten test files import goal_loop's private names: nine tests/db scripts (_finish, _drive, _settle_children, _settle_candidate, _keep_lease, _scope_guidance) and services/agent/tests/test_plans.py (_opening), counted by parsing every import statement.",
+   "impact": "Settlement and the keeper are an undeclared API: reshaping _finish or _keep_lease breaks the workflow runner and ten test files, and import order becomes part of correctness. The API process and the tool catalog load deepagents and langgraph through this module just to call execution_block and loop_registry.",
+   "recommendation": "Split along the existing seams, moving code without changing behavior. Tool assembly, prompts, the lease keeper, settlement and dispatch each get a module with public names. Make job dispatch the only module that imports both the goal loop and the workflow runner, and have it pass its own drive function to both as the child driver, since run_goal and run_workflow drive children through _drive today; then neither imports dispatch back. Keep temporary re-exports in goal_loop.py until tests/db moves to the public names.",
+   "sketch": "application/loop_tools.py     loop_registry, SummarizationOff        <- tool_catalog, workflow_runner, goal_loop\napplication/loop_prompts.py   SYSTEM_PROMPT, opening(goal), scope_guidance(conn, run_id, goal)\napplication/lease_keeper.py   keep_lease(database_url, lease, config): async context manager\napplication/settlement.py     finish_pass (was _finish), loop_result (was _result), run_status,\n                              settle_cancellation (was _settle_children + _cancel_stray_child)\napplication/job_dispatch.py   process_next, drive (was _drive), execution_block\n                              imports goal_loop.run_goal and workflow_runner.run_workflow and passes\n                              `drive` to both as the child driver, so neither imports it back\napplication/goal_loop.py      LoopConfig, LoopResult, run_goal(..., drive_child), build_stage, settle_candidate",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "DH-06 'small cohesive modules' and the DH-03 application/ layout. Code moves only: lease checks, fencing, receipts and transaction boundaries stay in the same functions, and the db profile proves the move.",
+   "verdict": "revised",
+   "verifierNote": "Line ranges, the 22 definitions and every importer confirmed. An import scan finds ten test files using goal_loop's private names, not seven. The sketch now injects the child driver, because run_goal and drive_child call _drive, and a dispatcher that both import would otherwise bring the cycle back."
+  },
+  {
+   "id": "PRUN-02",
+   "title": "Stop codes are bare strings, and any code missing from PAUSE_FOR fails the run permanently",
+   "dimension": "errors",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 92,
+     "endLine": 115,
+     "note": "PAUSE_FOR: 19 codes, 9 of them FailureClass values retyped as literals"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 116,
+     "note": "NOT_OURS: no comment says what it means"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 740,
+     "endLine": 745,
+     "note": "None verifies, PAUSE_FOR suspends, everything else fails"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 773,
+     "endLine": 781,
+     "note": "the pass outcome as a nested string conditional"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+     "line": 77,
+     "endLine": 88,
+     "note": "STOPPING: another code set that feeds _finish"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_usage.py",
+     "line": 36,
+     "endLine": 39,
+     "note": "codes built with an f-string from the counter name, so grep can't find them"
+    },
+    {
+     "file": "services/agent/src/autobots/application/worker_inference.py",
+     "line": 68,
+     "endLine": 72,
+     "note": "credential_invalid becomes invalid_credential before PAUSE_FOR sees it"
+    },
+    {
+     "file": "services/agent/src/autobots/application/assignments.py",
+     "line": 203,
+     "note": "a consumer compares outcome and code with literals"
+    }
+   ],
+   "occurrences": 5,
+   "evidence": "_finish decides a run's fate by set membership:\n    elif code is None:\n        command = RunCommand.VERIFY\n    elif code in PAUSE_FOR:\n        command = RunCommand.SUSPEND\n    else:\n        command = RunCommand.FAIL\nCodes arrive from goal_loop, loop_middleware (19 LoopStopped raises carrying FailureClass values, AdmissionRefused and LimitReached codes), workflow_runner and worker_inference refusals. Five string sets route them: PAUSE_FOR and NOT_OURS here, STOPPING and REPAIRABLE in loop_middleware, and PLAN_REJECTIONS in plans.py. For example, rate_limited or provider_error after retries fails the run, while network_before_acceptance pauses it, and only PAUSE_FOR's membership shows that. No test references PAUSE_FOR or NOT_OURS. LoopResult.outcome is a str with five values, unlike ToolOutcome in domain/tools.py:74.",
+   "impact": "A new or misspelled code silently becomes a terminal FAILED run, which can never resume. Knowing what any code does means reading five sets in three modules.",
+   "recommendation": "Add a StopCode StrEnum and an explicit disposition table that maps every code reaching _finish to its current behavior. Then derive PAUSE_FOR and NOT_OURS from the table, and type LoopResult.outcome. Add a test that every FailureClass value, AdmissionRefused code, LimitReached counter and STOPPING member has a disposition. Whether an unmapped code should suspend instead of fail is a separate decision for the owner.",
+   "sketch": "class Disposition(StrEnum):\n    VERIFY = 'verify'; SUSPEND = 'suspend'; FAIL = 'fail'; RELEASE = 'release'   # RELEASE was NOT_OURS\n\nclass StopCode(StrEnum):\n    BUDGET_EXCEEDED = 'budget_exceeded'; RATE_LIMITED = 'rate_limited'; LEASE_LOST = 'lease_lost'  # ...\n\nDISPOSITION: Final[Mapping[StopCode, Disposition]] = {...}   # every member, reviewed once\n\ndef disposition_of(code: StopCode | None) -> Disposition: ...   # pure; exhaustive unit test\n\nclass PassOutcome(StrEnum):\n    CANDIDATE = 'candidate'; WAITING = 'waiting'; LOST = 'lost'; STOPPED = 'stopped'; SUCCEEDED = 'succeeded'",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "SP-010 (terminal runs cannot resume) and DH-06 'explicit enums/unions'. Mapping each code to its current disposition first changes no behavior. StopCode is a reason code, not a second run-state enum, and stays separate from DTOs.",
+   "verdict": "confirmed",
+   "verifierNote": "Counted 19 PAUSE_FOR codes (nine are FailureClass values), five routing sets and 19 LoopStopped raises in loop_middleware.py; no test names PAUSE_FOR or NOT_OURS."
+  },
+  {
+   "id": "PRUN-03",
+   "title": "_finish mixes the stop decision with cancellation settlement and raw job writes, and reads the status three times",
+   "dimension": "functions",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 697,
+     "endLine": 782,
+     "note": "86 lines, C901 11, no docstring, 14 callers in two modules"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 703,
+     "note": "first status read"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 709,
+     "note": "second read, compared with the literal 'cancelling'"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 713,
+     "endLine": 718,
+     "note": "job requeued with a raw UPDATE"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 722,
+     "note": "classify_interrupted with generation + 1, to include this owner's receipts"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 732,
+     "endLine": 739,
+     "note": "third read, then a raw job release"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 771,
+     "endLine": 772,
+     "note": "CommandRefused recorded as lease_lost"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 773,
+     "endLine": 781,
+     "note": "outcome derived from the final code"
+    }
+   ],
+   "occurrences": 1,
+   "evidence": "    if code != \"lease_lost\" and await _run_status(connection, lease) == RunStatus.CANCELLING.value:\n        code = \"run_not_running\" if await _holds_lease(connection, lease) else \"lease_lost\"\n    if code is None and not view.finished:\n        code = \"plan_missing\" if view.version is None else \"plan_incomplete\"\n    command: RunCommand | None\n    if code == \"run_not_running\" and await _run_status(connection, lease) == \"cancelling\":\nOne function normalizes the code, settles a cancelled tree (children, requeue, classification), releases a paused job, picks the command, commits it with stop_reason in one transaction and maps the outcome.",
+   "impact": "Every goal and workflow pass ends here, yet its decision table can only be exercised through a disposable database. The three status reads can disagree under a concurrent pause or cancel; apply_command re-validates under locks, so the cost is muddled reporting rather than a wrong write. A refused command is reported as a lost lease, so a parent's assignment sees 'lost' for what was a state conflict.",
+   "recommendation": "Read status and ownership once, decide with a pure function, then run the effects. Keep the generation and status='claimed' guards on the job writes, keep classify_interrupted before FINISH_CANCEL, and keep the transition and its stop_reason in one transaction. Give a refused command its own stop code.",
+   "sketch": "@dataclass(frozen=True)\nclass Observed:\n    status: RunStatus; holds_lease: bool; plan: PlanView\n\n@dataclass(frozen=True)\nclass Decision:\n    code: StopCode | None; command: RunCommand | None; outcome: PassOutcome\n    settle_cancel: bool; release_job: bool\n\ndef decide(code: StopCode | None, seen: Observed) -> Decision: ...      # pure, table-tested\n\nasync def finish_pass(conn, lease, goal, code) -> LoopResult:\n    decision = decide(code, await observe(conn, lease, goal))\n    if decision.settle_cancel:\n        decision = await settle_cancellation(conn, lease)      # children, requeue, classify\n    if decision.release_job:\n        await release_job(conn, lease)                         # fenced by generation\n    if decision.command:\n        decision = await commit_stop(conn, lease, decision)    # apply + stop_reason, one transaction\n    return await loop_result(conn, lease, goal, decision)",
+   "effort": "M",
+   "risk": "high",
+   "ruleCheck": "SP-010 cancellation rules and SP-012 fencing: apply_command still re-validates under row locks, job writes keep their generation predicates, and nothing reaches FINISH_CANCEL before outstanding work is classified.",
+   "verdict": "revised",
+   "verifierNote": "Opened every cited line; the reads at 703, 709 and 732 and the CommandRefused-to-lease_lost mapping are as stated. The impact now notes that apply_command's own checks keep the writes safe, so the gain is clarity, testability and honest reporting."
+  },
+  {
+   "id": "PRUN-04",
+   "title": "admit_run takes 15 parameters and a binding typed Any that four different shapes satisfy",
+   "dimension": "functions",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 172,
+     "endLine": 189,
+     "note": "15 parameters, 124 lines"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 185,
+     "note": "binding: Any decides tool grants and instructions"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 195,
+     "endLine": 196,
+     "note": "inherit silently replaces binding"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 136,
+     "endLine": 138,
+     "note": "policy is optional in the signature but required at runtime"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 236,
+     "endLine": 260,
+     "note": "16-column positional insert with eight conditional expressions"
+    },
+    {
+     "file": "services/agent/src/autobots/application/routines.py",
+     "line": 385,
+     "note": "SimpleNamespace binding; also workflows.py:397 and improvements.py:392"
+    },
+    {
+     "file": "services/agent/src/autobots/operations/browse_trial.py",
+     "line": 175,
+     "note": "binding built with type('Binding', (), {...})()"
+    },
+    {
+     "file": "services/agent/src/autobots/application/experts.py",
+     "line": 274,
+     "note": "RunBinding, the typed shape, whose non-optional fields the namespaces can't meet"
+    }
+   ],
+   "occurrences": 6,
+   "evidence": "    binding: Any = None,\n    inherit: Inheritance | None = None,\n    ...\n    if inherit is not None:\n        binding = inherit\nThe six callers pass a RunBinding (api/run_routes.py:264), SimpleNamespace objects (routines, workflows, improvements) whose session or Expert fields are None where RunBinding declares them non-optional, a class built with type() (browse_trial), or an Inheritance through inherit (assignments). The binding fills GoalSpec.allowed_tools and instructions (runs.py:283-284) and part of the idempotency fingerprint (runs.py:209). One function resolves a repeated goal, computes the fingerprint, checks continuation and performs six inserts.",
+   "impact": "Nothing checks at the type level the scope a run is admitted with, mypy strict accepts any object, and policy=None fails only at runtime. Every admission edit is high-stakes, because the receipt fingerprint must stay byte-identical for replays.",
+   "recommendation": "Introduce a frozen RunAdmission request, a typed RunScope with optional session and Expert fields, and an origin union, so that 'a policy unless inherited' is a type rule. Extract the fingerprint, the continuation check and the inserts. Keep request_hash's payload byte-identical, with a golden test against today's hashes, and keep run, job, first event and receipt in one transaction.",
+   "sketch": "@dataclass(frozen=True)\nclass RunScope:                    # replaces RunBinding subsets, SimpleNamespace and type(...)()\n    session_id: UUID | None; expert_id: UUID | None; expert_version: int | None\n    instructions: str; tools: Mapping[str, int]\n\n@dataclass(frozen=True)\nclass Fresh:     policy: RolePolicy; scope: RunScope | None\n@dataclass(frozen=True)\nclass Inherited: inheritance: Inheritance\n\n@dataclass(frozen=True)\nclass RunAdmission:\n    workspace_id: UUID; actor_id: UUID; started_by: UUID | None; idempotency_key: str\n    goal_text: str | None; limit_micro_usd: int; origin: Fresh | Inherited\n    criteria: tuple[str, ...] = (); continues_run_id: UUID | None = None\n    required_artifacts: tuple[RequiredArtifact, ...] = ()\n    input_documents: tuple[InputDocument, ...] = (); run_profile: str | None = None\n\nasync def admit_run(conn, admission: RunAdmission) -> AdmissionResult:\n    goal = await _goal_text(conn, admission)\n    fingerprint = admission_fingerprint(admission, goal)       # same payload as today\n    async with conn.transaction():\n        ...  # replay receipt, _require_continuable, _insert_run_and_job, _insert_inputs,\n             # _insert_goal_spec, append_event, store_receipt",
+   "effort": "M",
+   "risk": "high",
+   "ruleCheck": "SP-012 and SP-014: the admitted run, job, first event and receipt still commit together. Decision 0015's started_by rule is unchanged, and RunAccepted and other DTOs stay separate from the request type.",
+   "verdict": "revised",
+   "verifierNote": "Confirmed the signature, the 16-column insert and all six callers. Corrected two details: the insert has eight conditional expressions, not seven, and the routines namespace sets expert_id and version (it is session_id that is None there)."
+  },
+  {
+   "id": "PRUN-05",
+   "title": "Display redaction keeps its own three-pattern regex, weaker than the log redaction",
+   "dimension": "duplication",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 58,
+     "endLine": 61,
+     "note": "_SECRETS: sk-, Bearer (capitalized only) and eyJ"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 89,
+     "endLine": 90,
+     "note": "public_text, imported by 7 other modules, 26 calls in src"
+    },
+    {
+     "file": "services/agent/src/autobots/operations/logs.py",
+     "line": 12,
+     "endLine": 25,
+     "note": "_SECRET: 11 alternatives, including tvly-, jina_, GitHub tokens and credentialed URLs"
+    },
+    {
+     "file": "services/agent/tests/test_contracts.py",
+     "line": 126,
+     "endLine": 127,
+     "note": "tests cover only sk-or and Bearer"
+    }
+   ],
+   "occurrences": 2,
+   "evidence": "run_projection.py:59-61 compiles three alternatives: sk- followed by 4 or more characters, Bearer with a capital B, and eyJ tokens. The log redactor matches sk-or-, sk-, tvly-, jina_, ghp_/gho_/ghu_/ghs_/ghr_, github_pat_, bearer in any case, JWTs, credentialed database and HTTP URLs, and password or token assignments. Re-run in memory: public_text leaves tvly-, jina_, ghp_ and github_pat_ tokens, a lowercase bearer value and https://user:pass@host intact, while logs.redact masks every one. public_text sanitizes plans, summaries, evidence, goal labels and run-list text written by the model, for display in the UI. Its importers are four api route modules, memory.py, workflows.py and operations/route_qualification.py.",
+   "impact": "A Tavily, Jina or GitHub token that a model echoes into a plan or summary is redacted in the logs but shown to workspace members, although the projection's own comment (run_projection.py:58) says a key the model was shown must not be displayed. Each new tool key widens the gap, because nothing ties the two lists together.",
+   "recommendation": "Keep the token shapes in one pure module that both logs.redact and public_text use. Display keeps its 500-character cut and can skip the key=value heuristic. Share one fixture list of token shapes across both modules' tests.",
+   "sketch": "# autobots/domain/secrets.py: pure, no I/O\nTOKEN_SHAPES: Final[tuple[str, ...]] = (SK_OR, SK, TAVILY, JINA, GITHUB_CLASSIC, GITHUB_PAT,\n                                        BEARER_ANY_CASE, JWT, CREDENTIALED_URL)   # one list, one owner\n_TOKENS = re.compile('|'.join(TOKEN_SHAPES))\ndef mask_tokens(text: str) -> str: return _TOKENS.sub('[redacted]', text)\n\n# operations/logs.py  redact(text)      = mask identifiers and key=value pairs, then mask_tokens(text)\n# run views           public_text(text) = mask_tokens(text)[:limit]\n# tests               one TOKEN_FIXTURES list asserted against both redact and public_text",
+   "effort": "S",
+   "risk": "medium",
+   "ruleCheck": "SP-011 (the public projection never exposes secrets) and python-worker.md 'sanitized public projections'; Decision 0025 V2 states the same principle for stored keys. The change only widens display redaction and keeps log redaction's coverage, so no guardrail is loosened.",
+   "verdict": "revised",
+   "verifierNote": "Reproduced the gap in memory for every token shape listed. The rule check now cites SP-011 ('never exposes secrets') as the governing rule, and the change risk is medium rather than low because the shared module also feeds log redaction."
+  },
+  {
+   "id": "PRUN-06",
+   "title": "apply_command packs replay, ownership, guard, cancel cascade and job rules into one 97-line transaction",
+   "dimension": "functions",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 390,
+     "endLine": 403,
+     "note": "11 parameters, C901 13"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 411,
+     "endLine": 413,
+     "note": "a receipt applies only when both actor_id and idempotency_key are given"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 436,
+     "endLine": 438,
+     "note": "live-claim test, first copy"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 449,
+     "endLine": 461,
+     "note": "cancel side effects inline, recursing into apply_command for children"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 462,
+     "endLine": 467,
+     "note": "second copy, overriding _job_status"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 468,
+     "endLine": 476,
+     "note": "third copy"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 381,
+     "endLine": 387,
+     "note": "_require_owner unpacks the job row by position"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 298,
+     "endLine": 304,
+     "note": "_job_status, the pure part of the rule"
+    }
+   ],
+   "occurrences": 3,
+   "evidence": "        if following is RunStatus.CANCELLING and not (\n            job is not None and job[0] == \"claimed\" and bool(job[2])\n        ):\n            # Open work with no live owner. Something has to come back and settle it.\n            job_status = \"queued\"\nThe same positional test appears at lines 436, 464 and 472-473. Passing actor_id without idempotency_key, or the reverse, silently skips the receipt.",
+   "impact": "After each transition, a rule decides whether a worker or nobody owns the run. It is split across _job_status and two inline overrides on a tuple, and can only be tested against a database.",
+   "recommendation": "Name the locked job row and make the post-transition job status one pure, unit-tested function. Move the cancel side effects into a helper. Make the receipt an optional parameter object, so the actor and key are passed together or not at all. Keep the lock order (job row, then run row), the version check and the receipt in the one transaction.",
+   "sketch": "@dataclass(frozen=True)\nclass LockedJob:\n    status: str | None; generation: int | None; live: bool\n    @property\n    def live_claim(self) -> bool: return self.status == 'claimed' and self.live\n\n@dataclass(frozen=True)\nclass Receipt:\n    actor_id: UUID; idempotency_key: str\n\ndef job_status_after(following: RunStatus, actor: Actor, job: LockedJob) -> str | None: ...  # pure\nasync def _withdraw_waits_and_cascade(conn, workspace_id: UUID, run_id: UUID) -> None: ...",
+   "effort": "M",
+   "risk": "high",
+   "ruleCheck": "SP-010 'atomic domain update/outbox event' and SP-012 ownership checked in the writing transaction: everything stays inside the same transaction and lock order; only code moves.",
+   "verdict": "confirmed",
+   "verifierNote": "Opened apply_command and its helpers; the three positional live-claim tests and the paired receipt condition are as stated."
+  },
+  {
+   "id": "PRUN-07",
+   "title": "Run and job state are written from four modules, beside the command table rather than through it",
+   "dimension": "structure",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/worker_leases.py",
+     "line": 101,
+     "endLine": 103,
+     "note": "the claim writes queued to running with record_transition and never consults next_status"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/runs.py",
+     "line": 86,
+     "note": "RunCommand.CLAIM is never issued, and neither is REPAIR (line 90)"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 713,
+     "endLine": 718,
+     "note": "job requeued with a literal status"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 734,
+     "endLine": 739,
+     "note": "job released with a literal status"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 748,
+     "endLine": 763,
+     "note": "read the version, then apply: one of 7 copies"
+    },
+    {
+     "file": "services/agent/src/autobots/application/workflow_runner.py",
+     "line": 346,
+     "endLine": 357,
+     "note": "another copy"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 350,
+     "endLine": 357,
+     "note": "cascade cancel issued as Actor.USER"
+    },
+    {
+     "file": "services/agent/src/autobots/application/approvals.py",
+     "line": 222,
+     "endLine": 229,
+     "note": "approval expiry, run by the worker, pauses the run as Actor.USER"
+    }
+   ],
+   "occurrences": 15,
+   "evidence": "The domain table (domain/runs.py:24-125) is the guard, and apply_command enforces it under locks. Around it, run or job rows are written directly in four modules: the claim transition in worker_leases.py bypasses next_status; job rows get literal statuses in runs.py:477, worker_leases.py:90 and goal_loop.py:714 and 735; and operations/browse_trial.py:213 sets status='running' itself after its claim. Seven call sites (goal_loop.py:457, 564, 624 and 748, workflow_runner.py:346, approvals.py:66, assignments.py:279) read the run's version and pass it straight back. Four system actions (runs.py:355, goal_loop.py:634, approvals.py:227, assignments.py:292) are issued as Actor.USER because the table has only USER and WORKER, and the status event (runs.py:96-97) records no actor. Total: 4 job writers + 7 version-read copies + 4 system commands issued as USER.",
+   "impact": "To answer 'what can move this run or its job', an engineer has to read several modules. A guard added to the CLAIM entry would not apply to claims, and guards and events can't tell a cascaded or expiry-driven command from a person's.",
+   "recommendation": "Give the application one transitions surface. It should offer apply_command for people, and apply_worker_command(lease, ...), which reads the version and writes stop_reason in the same transaction. Add cascade_command with an explicit system actor, a claim that calls next_status(CLAIM), and named job helpers with a JobStatus enum. Keep every generation and status='claimed' predicate as it is.",
+   "sketch": "class JobStatus(StrEnum): QUEUED = 'queued'; CLAIMED = 'claimed'; DONE = 'done'\n\nasync def apply_worker_command(conn, lease: Lease, command: RunCommand, *, detail: str = '',\n                               stop_reason: str | None | Unset = UNSET) -> TransitionResult: ...\nasync def cascade_command(conn, *, workspace_id: UUID, run_id: UUID, command: RunCommand,\n                          cause: Cascade) -> TransitionResult: ...       # Actor.SYSTEM\nasync def requeue_job(conn, lease: Lease, *, available_at: datetime) -> None: ...  # generation + claimed guard\nasync def release_job(conn, lease: Lease) -> None: ...",
+   "effort": "M",
+   "risk": "high",
+   "ruleCheck": "DH-06 'documented transition table with actors, guards, writes' and SP-010 actor authorization. The system actor would be added to domain/runs.py together with the py-domain reviewers. CANCEL and RESUME stay refused to WORKER, and no guard is removed.",
+   "verdict": "revised",
+   "verifierNote": "Confirmed that CLAIM and REPAIR are never issued, the 4 job writers, the 7 version-read copies and the 4 system commands issued as USER. The evidence now names the four modules that write run or job rows directly, adding operations/browse_trial.py:213."
+  },
+  {
+   "id": "PRUN-08",
+   "title": "The frozen policy snapshot is an untyped dict, written once and parsed ad hoc in seven places",
+   "dimension": "types",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 136,
+     "endLine": 154,
+     "note": "the only writer: version, bindings, sources, routes"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 580,
+     "endLine": 589,
+     "note": "_summary_route: snapshot.get('bindings', {})"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 592,
+     "endLine": 599,
+     "note": "_route_is_bound: the same read, in a second query"
+    },
+    {
+     "file": "services/agent/src/autobots/application/worker_inference.py",
+     "line": 107,
+     "endLine": 123,
+     "note": "frozen_policy: (snapshot or {}) four times"
+    },
+    {
+     "file": "services/agent/src/autobots/application/worker_inference.py",
+     "line": 306,
+     "endLine": 313,
+     "note": "bind selects it again"
+    },
+    {
+     "file": "services/agent/src/autobots/application/worker_inference.py",
+     "line": 354,
+     "endLine": 361,
+     "note": "role_route selects it again"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 275,
+     "endLine": 292,
+     "note": "_role_map: 'or {}' at every level"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 580,
+     "endLine": 586,
+     "note": "read_inspector selects it again"
+    }
+   ],
+   "occurrences": 7,
+   "evidence": "goal_loop.py:598 reads snapshot.get('bindings', {}).get(config.route.role), which raises on a null snapshot or a null bindings value. worker_inference.py:109 reads (snapshot or {}).get('bindings') or {}, and run_projection.py:280-282 coalesces each level. Three more readers are SQL in run_projection.py (lines 251, 428 and 445). One worker pass can select the snapshot four times (bind, role_route, _summary_route, _route_is_bound).",
+   "impact": "The snapshot is durable admission state whose frozen routes must survive releases, yet its shape lives only in dict keys. Readers disagree about missing values, and a change to the writer has no type to update with it.",
+   "recommendation": "Add a PolicySnapshot type with parse() and a to_json() that produces exactly today's bytes, plus one load_policy_snapshot(conn, run_id). Parse once in bind and pass the result into the loop instead of selecting it again.",
+   "sketch": "@dataclass(frozen=True)\nclass FrozenRoute:\n    wire_id: str; canonical_id: str\n\n@dataclass(frozen=True)\nclass PolicySnapshot:\n    version: int\n    bindings: Mapping[str, str]          # role -> profile\n    sources: Mapping[str, str]           # empty for snapshots from before MD-02\n    routes: Mapping[str, FrozenRoute]    # profile -> frozen identities\n    @classmethod\n    def parse(cls, raw: Mapping[str, Any] | None) -> 'PolicySnapshot': ...\n    def to_json(self) -> str: ...        # sort_keys, same bytes as runs._snapshot",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "model-gateway.md 'freeze canonical/wire identities and role policy at admission' and DH-06 'version role-policy snapshots'. The stored format is unchanged, and the type stays separate from the FrozenBinding DTO.",
+   "verdict": "confirmed",
+   "verifierNote": "Confirmed the writer, the Python readers' differing null handling (goal_loop.py:598 raises on a null snapshot), the three SQL readers and the four selects in one pass."
+  },
+  {
+   "id": "PRUN-09",
+   "title": "The invocation ledger's states, failure classes and spend formula are restated as literals in five modules",
+   "dimension": "duplication",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/model_admission.py",
+     "line": 9,
+     "endLine": 11,
+     "note": "ACTIVE and OUTSTANDING, the only named sets"
+    },
+    {
+     "file": "services/agent/src/autobots/application/model_admission.py",
+     "line": 128,
+     "endLine": 136,
+     "note": "admission's spend formula, again at 308-310"
+    },
+    {
+     "file": "services/agent/src/autobots/application/model_admission.py",
+     "line": 188,
+     "endLine": 195,
+     "note": "status guard as a SQL literal, SET clause built with an f-string"
+    },
+    {
+     "file": "services/agent/src/autobots/application/recovery.py",
+     "line": 21,
+     "endLine": 32,
+     "note": "a second writer of reserved-to-cancelled and dispatched-to-uncertain"
+    },
+    {
+     "file": "services/agent/src/autobots/application/model_attempts.py",
+     "line": 148,
+     "note": "'charge_not_reported', a failure class outside FailureClass"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 332,
+     "endLine": 333,
+     "note": "'reserved' and 'dispatched' restated"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 62,
+     "note": "comment: the public figures can't drift from what admission counted"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 79,
+     "endLine": 83,
+     "note": "the projection's own spend formula, copied at 446-450"
+    }
+   ],
+   "occurrences": 14,
+   "evidence": "The six invocation states (reserved, dispatched, succeeded, failed_before_acceptance, uncertain, cancelled) have no enum, and both ModelAdmission and recovery.classify_interrupted change them. Four failure classes live outside FailureClass: charge_not_reported, worker_lost, cancelled_after_dispatch and cancelled. Admission counts spend as the reservation while an attempt is outstanding and the charge otherwise. The projection computes two separate sums with an extra reconciled_at filter, and workflow_overview.py:24 holds a third copy. About 14 literal sites, counted by reading the 13 files plus grep for reconciled_at and the status lists.",
+   "impact": "SP-008 requires shared root and workspace accounting, and SP-010 asks for documented state machines kept separate from run status, which the model-call ledger lacks. Today a new status or failure class has to be found in five files, and nothing enforces the comment that promises the public figures match admission.",
+   "recommendation": "Add InvocationStatus and settlement-reason enums beside FailureClass, and make ModelAdmission the only writer (recovery calls a method on it). Define spend once, either as a SQL view or function in a forward migration or as one shared SQL fragment. Add a test that admission and projection agree on a seeded ledger.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "high",
+   "ruleCheck": "SP-008 (reserve before dispatch, shared accounting) and SP-010's separately documented state machines. Migrations only move forward, and the reservation and settlement rules are unchanged.",
+   "verdict": "revised",
+   "verifierNote": "Opened every cited writer and formula. SP-010 names steps, tool attempts, approvals and credentials for documented state machines, so the model-call ledger is covered by extension; the impact and rule check now say so instead of quoting a rule SP-010 doesn't state."
+  },
+  {
+   "id": "PRUN-10",
+   "title": "Run-status sets are restated as literals instead of derived from RunStatus and TERMINAL",
+   "dimension": "duplication",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/domain/runs.py",
+     "line": 22,
+     "note": "TERMINAL, the canonical set"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 339,
+     "note": "can_continue restates the terminal set"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 383,
+     "endLine": 387,
+     "note": "GROUPS lists all ten statuses by hand"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 346,
+     "note": "SQL literal list for the cancel cascade"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 655,
+     "note": "a local terminal set"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 709,
+     "note": "'cancelling' as a literal, six lines after RunStatus.CANCELLING.value"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 732,
+     "note": "'paused' as a literal"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 157,
+     "endLine": 169,
+     "note": "the repeat-goal rule that can_continue mirrors in Python"
+    }
+   ],
+   "occurrences": 7,
+   "evidence": "The terminal set appears four times in this area (run_projection.py:339 and 386, runs.py:346, goal_loop.py:655) and three more times in application/ (retention.py:107, routines.py:306, workflows.py:492). Counted with grep for the literal triple, plus goal_loop.py:655. can_continue (terminal, no parent, not a workflow) restates in Python what _goal_to_repeat checks in SQL.",
+   "impact": "A status added to or renamed in RunStatus would be missing from GROUPS (the run would show under 'all' and in no group), from the cancel cascade and from settlement, and no test would fail. The UI's Continue can drift from what admission accepts.",
+   "recommendation": "Use RunStatus members and TERMINAL everywhere, passing [s.value for s in TERMINAL] as an SQL parameter. Build GROUPS from RunStatus, with a test that each status belongs to exactly one group. Share one repeat-goal eligibility rule between the projection and admission.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "SP-010 canonical states and contracts.md 'canonical states/guards are shared'. Serialized values are unchanged.",
+   "verdict": "confirmed",
+   "verifierNote": "grep found the literal triple at run_projection.py:339 and :386, runs.py:346, retention.py:107, routines.py:306 and workflows.py:492, plus goal_loop.py:655's local set."
+  },
+  {
+   "id": "PRUN-11",
+   "title": "Run views read one run with 7 to 19 statements and no common snapshot",
+   "dimension": "approach",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 305,
+     "endLine": 380,
+     "note": "read_workspace: 19 statements"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 373,
+     "note": "the event cursor comes from the first statement"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 576,
+     "endLine": 664,
+     "note": "read_inspector: 7 statements, selecting again the row _require_run already read"
+    },
+    {
+     "file": "services/agent/src/autobots/api/event_routes.py",
+     "line": 71,
+     "endLine": 76,
+     "note": "a pool connection with no transaction block, so READ COMMITTED per statement"
+    }
+   ],
+   "occurrences": 2,
+   "evidence": "read_workspace runs these in sequence: _require_run, load_goal, usage, tokens, artifacts, two outstanding counts, a workflow check, five plan queries, verification, Expert, assignments, unknown operations, the role map and metered calls. Under READ COMMITTED each statement sees its own snapshot, so status and cursor come from the first query while plan, verification and counts can include later commits.",
+   "impact": "SP-011 asks for an authoritative snapshot on reconnect. One response can pair a 'verifying' status with a passed verification, or show counts taken at different moments, and each page load costs 19 round trips.",
+   "recommendation": "Run each view inside one read-only REPEATABLE READ transaction opened before its first statement. Then fold lookups of data the run row already holds (goal_summary, policy_snapshot) into the first query.",
+   "sketch": "@asynccontextmanager\nasync def snapshot_read(conn) -> AsyncIterator[None]:\n    async with conn.transaction():           # opened before any other statement on this connection\n        await conn.execute('set transaction isolation level repeatable read, read only')\n        yield",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "SP-011 'obtains an authoritative snapshot'. Read-only: no write path, field or sanitization changes.",
+   "verdict": "confirmed",
+   "verifierNote": "Counted 19 statements in read_workspace and 7 in read_inspector. The API passes a pool connection at psycopg's default READ COMMITTED, so each statement takes its own snapshot."
+  },
+  {
+   "id": "PRUN-12",
+   "title": "The database boundary is untyped: connection Any, positional rows and a bypassed RunRow",
+   "dimension": "types",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 63,
+     "endLine": 76,
+     "note": "_NAMES repeats RunRow's keys by hand"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 119,
+     "endLine": 120,
+     "note": "zip by position, then type: ignore[arg-type]"
+    },
+    {
+     "file": "services/agent/src/autobots/persistence/rows.py",
+     "line": 8,
+     "endLine": 20,
+     "note": "RunRow, the declared row type, which no query produces"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 509,
+     "endLine": 526,
+     "note": "16 columns by index; tasks_complete=row[10] comes before tasks_total=row[9]"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 597,
+     "endLine": 621,
+     "note": "18 columns by index"
+    },
+    {
+     "file": "services/agent/src/autobots/application/model_admission.py",
+     "line": 151,
+     "endLine": 157,
+     "note": "limits[0], limits[1], limits[2]"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 554,
+     "note": "(await cursor.fetchone())[0], one of 17 in scope"
+    },
+    {
+     "file": "services/agent/src/autobots/application/worker_inference.py",
+     "line": 309,
+     "note": "the same pattern"
+    }
+   ],
+   "occurrences": 73,
+   "evidence": "The 13 files have 73 parameters typed connection: Any (grep), 17 unguarded `(await ...fetchone())[0]` subscripts, and 84 positional indexes in run_projection.py (row[...], item[...], usage[...], totals[...], tokens[...], shown[...]). mypy runs in strict mode (services/agent/pyproject.toml:51), but every query result is Any.",
+   "impact": "A missing row surfaces as a TypeError far from its cause, and a reordered SELECT silently shifts values between columns of the same type. RunRow exists to keep rows explicit, yet its only producer bypasses it.",
+   "recommendation": "Type connections with a small Protocol, as api/app.py:30 already does for the pool, or with psycopg.AsyncConnection. Use psycopg's dict_row or class_row with explicit column aliases for wide reads (RunRow, the run list, model calls). Add a fetch_one helper that raises a named error instead of subscripting None. Start with run_projection.py, which has the widest reads.",
+   "sketch": "",
+   "effort": "L",
+   "risk": "medium",
+   "ruleCheck": "DH-06 'mypy strict for owned modules' and 'validate data at trust boundaries'. Rows stay separate from DTOs and domain types, and only the named adapters (contracts/adapters.py) convert them.",
+   "verdict": "confirmed",
+   "verifierNote": "Recounted with grep: 73 connection: Any, 17 unguarded fetchone subscripts (16 on cursor plus one on expiry) and 84 positional indexes in run_projection.py. PDOM-08 reports the same pattern outside this area."
+  },
+  {
+   "id": "PRUN-13",
+   "title": "Ledger conflicts and missing rows are signalled with built-in exceptions that callers catch broadly",
+   "dimension": "errors",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/model_admission.py",
+     "line": 194,
+     "endLine": 195,
+     "note": "ValueError: already settled"
+    },
+    {
+     "file": "services/agent/src/autobots/application/model_admission.py",
+     "line": 204,
+     "endLine": 205,
+     "note": "ValueError: closed before it was sent"
+    },
+    {
+     "file": "services/agent/src/autobots/application/model_admission.py",
+     "line": 291,
+     "endLine": 292,
+     "note": "ValueError: not awaiting reconciliation"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+     "line": 585,
+     "endLine": 592,
+     "note": "any ValueError out of call_with_policy is read as 'recovery classified this call'"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+     "line": 276,
+     "endLine": 278,
+     "note": "float(cost) raises ValueError on a non-numeric charge"
+    },
+    {
+     "file": "services/agent/src/autobots/application/plans.py",
+     "line": 102,
+     "endLine": 103,
+     "note": "LookupError for a run with no goal"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 308,
+     "endLine": 316,
+     "note": "except LookupError also catches KeyError and IndexError"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 137,
+     "endLine": 138,
+     "note": "ValueError for a missing policy"
+    }
+   ],
+   "occurrences": 5,
+   "evidence": "The ledger's key signal, 'this attempt was settled elsewhere', is a plain ValueError, so loop_middleware.py:585 catches ValueError around the whole call. A reply whose cost metadata isn't numeric makes _charged raise ValueError inside dispatch, after the call was sent, so call_with_policy never settles it and the invocation stays dispatched. The middleware then treats it as a recovery race, and the handler's own _charged call raises again.",
+   "impact": "An unrelated ValueError is misclassified on the paid path. A KeyError bug while loading a goal would render a run with no objective instead of failing. Callers can't catch the ledger's conditions by name.",
+   "recommendation": "Add AttemptAlreadySettled, subclassing ValueError during the migration so existing catches keep working, and GoalMissing(LookupError). Raise them and catch only those names. Give CommandRefused a code like the other coded errors in application/runs.py.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "medium",
+   "ruleCheck": "DH-06 'centralize error handling ... expose safe typed errors'. The MP-08 classification and the handling of attempts settled elsewhere are unchanged.",
+   "verdict": "confirmed",
+   "verifierNote": "Traced a non-numeric cost through dispatch, call_with_policy and the middleware's ValueError handler; each step behaves as stated."
+  },
+  {
+   "id": "PRUN-14",
+   "title": "An unclassified exception leaves the job claimed for endless re-claims, and nothing reads attempts",
+   "dimension": "errors",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 373,
+     "endLine": 376,
+     "note": "non-stale exceptions are re-raised"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 377,
+     "endLine": 379,
+     "note": "the keeper stops, and the job stays claimed until the lease runs out"
+    },
+    {
+     "file": "services/agent/src/autobots/application/worker_leases.py",
+     "line": 80,
+     "endLine": 81,
+     "note": "an expired claim can be claimed again"
+    },
+    {
+     "file": "services/agent/src/autobots/application/worker_leases.py",
+     "line": 91,
+     "note": "attempts incremented on every claim"
+    },
+    {
+     "file": "services/agent/src/autobots/application/worker_leases.py",
+     "line": 56,
+     "note": "Lease.attempts, read nowhere"
+    },
+    {
+     "file": "services/agent/src/autobots/operations/worker.py",
+     "line": 143,
+     "endLine": 150,
+     "note": "the step failure is logged as worker.step_failed and dropped"
+    }
+   ],
+   "occurrences": 1,
+   "evidence": "A grep for '.attempts' under application/ and operations/ finds no reader, and no migration bounds run_jobs.attempts (supabase/migrations/20261105000007_run_admission.sql:14 only checks attempts >= 0). worker.step_failed logs the error type and no run_id. A pass that raises before its first dispatch (in prompt building, scope guidance or graph construction) is claimed again after every lease period and fails the same way.",
+   "impact": "A deterministic bug becomes an infinite loop of claims, recovery passes and error logs that operations shows only as expired leases. The run never reaches a state a person can act on.",
+   "recommendation": "In the dispatch step, catch Exception (not BaseException, so cancellation still propagates) and log the run_id and error type. After N claims, suspend the run with a worker_error code; below N, release the job with a backoff through available_at.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "high",
+   "ruleCheck": "SP-012 bounded retries and DH-06 'bound timeouts, retries ... propagate cancellation'. asyncio.CancelledError is a BaseException and stays uncaught, and a paused run remains resumable.",
+   "verdict": "revised",
+   "verifierNote": "Confirmed that nothing reads Lease.attempts or run_jobs.attempts and that worker.step_failed logs only the error type. Raised the change risk to high, since the fix adds failure-path transitions on durable job and run state."
+  },
+  {
+   "id": "PRUN-15",
+   "title": "The lease keeper is started and stopped by hand in three places, and its cancelled task is never awaited",
+   "dimension": "approach",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 340,
+     "note": "create_task in run_goal"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 378,
+     "note": "cancel without await"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 449,
+     "endLine": 455,
+     "note": "the same pair in _settle_candidate"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 491,
+     "endLine": 547,
+     "note": "57 lines, two nested infinite loops, C901 11"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 535,
+     "endLine": 547,
+     "note": "except Exception retries forever, logging the first and every 30th failure"
+    },
+    {
+     "file": "services/agent/src/autobots/application/workflow_runner.py",
+     "line": 309,
+     "endLine": 319,
+     "note": "the same pair in run_workflow"
+    },
+    {
+     "file": "services/agent/src/autobots/operations/worker.py",
+     "line": 158,
+     "endLine": 160,
+     "note": "the worker already cancels and then awaits its own heartbeat task"
+    }
+   ],
+   "occurrences": 3,
+   "evidence": "    beating = asyncio.create_task(_keep_lease(database_url, lease, config))\n    ...\n    finally:\n        beating.cancel()\n        await end_segment(connection, lease.run_id)",
+   "impact": "Each new kind of pass has to copy the pattern. A cancelled task that nobody awaits closes its connection at some later point. A programming error in discount_sleep becomes a quiet reconnect loop while the lease keeps being extended, because the beat runs before the discount.",
+   "recommendation": "Wrap the keeper in an async context manager that cancels and then awaits the task, as operations/worker.py does for its heartbeat. Split one look into a method that unit tests can drive with the injected WakeClock.",
+   "sketch": "@asynccontextmanager\nasync def keep_lease(database_url, lease, config, clock=None) -> AsyncIterator[None]:\n    task = asyncio.create_task(_LeaseKeeper(database_url, lease, config, clock).run())\n    try:\n        yield\n    finally:\n        task.cancel()\n        await asyncio.wait({task})     # cleanup finished; the caller's own cancellation still propagates\n\nclass _LeaseKeeper:\n    async def run(self) -> None: ...             # reconnect loop\n    async def _look(self, conn) -> bool: ...     # one tick: wake check, beat or revive, discount",
+   "effort": "S",
+   "risk": "medium",
+   "ruleCheck": "DH-06 'propagate cancellation after cleanup' and SP-012 heartbeats by database time. The heartbeat, revive and discount SQL and their order (beat before discount) are unchanged.",
+   "verdict": "confirmed",
+   "verifierNote": "Confirmed the three create_task and cancel pairs, the unawaited cancels, the broad retry loop, and that operations/worker.py:158-160 awaits its heartbeat task after cancelling it."
+  },
+  {
+   "id": "PRUN-16",
+   "title": "run_projection.py holds five read models, the cursor codec and the shared redaction in 664 lines",
+   "dimension": "size",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 54,
+     "endLine": 90,
+     "note": "constants and public_text, used by 7 other modules"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 129,
+     "endLine": 150,
+     "note": "read_events"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 157,
+     "endLine": 222,
+     "note": "_plan_summary: 66 lines with two nested helpers"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 305,
+     "endLine": 380,
+     "note": "read_workspace: 76 lines"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 383,
+     "endLine": 533,
+     "note": "run list: groups, cursor codec, two SQL fragments and read_run_list (76 lines)"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 536,
+     "endLine": 544,
+     "note": "_canonical_id, defined 249 lines after its first use at line 287"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 576,
+     "endLine": 664,
+     "note": "read_inspector: 89 lines"
+    }
+   ],
+   "occurrences": 1,
+   "evidence": "Five entry points (read_summary, read_events, read_workspace, read_run_list, read_inspector) share one file with the redaction helper, the cursor codec and three SQL fragments. The theme is cohesive, but a change to any view touches the module that 7 others import for redaction.",
+   "impact": "Navigation and review cost grow with each view, and the redaction everyone depends on changes in the same diffs as the UI read models.",
+   "recommendation": "Turn the module into a package of the same name with one module per view, and re-export today's names from __init__ so api imports don't change. Move public_text to the shared redaction module (PRUN-05).",
+   "sketch": "application/run_projection/__init__.py  re-exports read_summary, read_events, read_workspace, read_run_list,\n                                        read_inspector, InvalidCursor, RUN_LIST_SIZE\n  summary.py    _SELECT_RUN, run row mapping, require_run, read_summary\n  events.py     project_event, read_events\n  workspace.py  read_workspace, plan_summary, verification, assignments, expert, role_map\n  run_list.py   GROUPS, encode_cursor and decode_cursor, list SQL, read_run_list\n  inspector.py  read_inspector, evidence, canonical_id",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "DH-06 'small cohesive modules' and SP-011's sanitized projection: no query, field or redaction behavior changes.",
+   "verdict": "confirmed",
+   "verifierNote": "Confirmed the five entry points, the 664 lines and the _canonical_id placement. Moving public_text is shared with PRUN-05."
+  },
+  {
+   "id": "PRUN-17",
+   "title": "Settlement and transition decisions have no unit seam, so tests reach for private names and global patches",
+   "dimension": "tests",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 697,
+     "note": "_finish: exercised only by tests/db scripts"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 298,
+     "endLine": 304,
+     "note": "_job_status: pure, with no unit test"
+    },
+    {
+     "file": "tests/db/blocker_check.py",
+     "line": 21,
+     "note": "imports _finish (as does assignment_check.py:21)"
+    },
+    {
+     "file": "tests/db/review_check.py",
+     "line": 21,
+     "note": "imports _drive and _settle_children"
+    },
+    {
+     "file": "tests/db/wake_check.py",
+     "line": 16,
+     "note": "imports _keep_lease"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 480,
+     "note": "patches the private InferenceSource._refusal"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 867,
+     "note": "patches psycopg.AsyncConnection.connect globally"
+    },
+    {
+     "file": "services/agent/src/autobots/application/worker_inference.py",
+     "line": 230,
+     "endLine": 232,
+     "note": "open_attempt opens connections by URL, so tests can't inject them"
+    }
+   ],
+   "occurrences": 13,
+   "evidence": "services/agent/tests has no tests for runs.py's transitions, goal_loop's settlement, recovery.py, verification.py or run_projection's row mapping. These run only in tests/db scripts under the db profile. Thirteen test files import private names from these modules (found by parsing every import: ten take goal_loop names, two take runs._snapshot, one takes plans._evidence_exists), and test_worker_inference.py patches ProviderSettings, InferenceSource or psycopg at four sites in shared helpers (lines 480, 867, 868 and 1004).",
+   "impact": "The riskiest decisions get feedback only from the slow disposable-database profile, and any refactor breaks tests that depend on private names.",
+   "recommendation": "After the pure extractions (stop-code table, decide, job_status_after), add table-driven unit tests for them. Inject a connect callable into InferenceSource instead of patching psycopg. Keep tests/db for locks, fencing and restart behavior, importing public names only.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "python-worker.md 'test stale ownership, cancellation, duplicate delivery and restart' stays in the db profile; DH-06 'tests use controlled clocks and injected transports' extends to connections.",
+   "verdict": "revised",
+   "verifierNote": "An import scan finds 13 test files using private names, not ten, and the worker-inference tests patch at four sites, not six. No unit test covers apply_command, settlement, recovery, verification or the projection's row mapping."
+  },
+  {
+   "id": "PRUN-18",
+   "title": "Long positional signatures invite swapped arguments, and two constructors hand-copy every field",
+   "dimension": "functions",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 208,
+     "endLine": 218,
+     "note": "build_stage: 9 positional parameters"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 346,
+     "endLine": 356,
+     "note": "called positionally, with two awaits among the arguments"
+    },
+    {
+     "file": "services/agent/src/autobots/application/compaction.py",
+     "line": 198,
+     "endLine": 207,
+     "note": "store_summary: 8 positional parameters"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+     "line": 480,
+     "endLine": 489,
+     "note": "called positionally; role and profile are adjacent str arguments"
+    },
+    {
+     "file": "services/agent/src/autobots/application/worker_inference.py",
+     "line": 158,
+     "endLine": 167,
+     "note": "bind_tools copies 7 fields by position"
+    },
+    {
+     "file": "services/agent/src/autobots/application/model_attempts.py",
+     "line": 158,
+     "endLine": 169,
+     "note": "_with_attempt copies 9 fields by hand"
+    },
+    {
+     "file": "services/agent/pyproject.toml",
+     "line": 47,
+     "note": "ruff select has no C90 or PLR09 rule"
+    }
+   ],
+   "occurrences": 4,
+   "evidence": "_with_attempt rebuilds AdmissionRequest field by field where dataclasses.replace(request, attempt=attempt) would do, so a field added with a default would be silently dropped. store_summary(conn, run_id, cut, text, earlier, previous, route.role, route.profile) still type-checks with role and profile swapped.",
+   "impact": "Swapped arguments of the same type pass mypy, and hand copies drift when a dataclass gains a field. Nothing in the lint configuration stops the lists from growing (admit_run reached 15).",
+   "recommendation": "Make trailing parameters keyword-only, compute awaited arguments before the call, and use dataclasses.replace for copies (with AttemptModel as a frozen dataclass). Enable ruff PLR0917 and C901 with a per-file baseline, so new code meets them.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06 'Ruff for lint/format'. A baseline adds a gate without failing today's code.",
+   "verdict": "confirmed",
+   "verifierNote": "Confirmed each signature and call. ruff 0.17.3 lists PLR0917 as a stable rule (not preview), so it can be enabled as recommended."
+  },
+  {
+   "id": "PRUN-19",
+   "title": "plan_tools is a 121-line factory whose handlers can't be tested alone",
+   "dimension": "functions",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/plans.py",
+     "line": 177,
+     "endLine": 297,
+     "note": "plan_tools, C901 13"
+    },
+    {
+     "file": "services/agent/src/autobots/application/plans.py",
+     "line": 178,
+     "endLine": 210,
+     "note": "propose, a closure that only needs limits.plan_revisions"
+    },
+    {
+     "file": "services/agent/src/autobots/application/plans.py",
+     "line": 221,
+     "endLine": 261,
+     "note": "complete, a closure that needs nothing from the factory"
+    },
+    {
+     "file": "services/agent/src/autobots/application/plans.py",
+     "line": 107,
+     "endLine": 116,
+     "note": "latest_plan returns a bare (int, list) tuple"
+    },
+    {
+     "file": "services/agent/src/autobots/application/plans.py",
+     "line": 184,
+     "endLine": 187,
+     "note": "used as plan[1] and plan[0]"
+    }
+   ],
+   "occurrences": 1,
+   "evidence": "test_plans.py covers validate_proposal and reference_shape, but propose, proposed_already and complete (hold_lease, consume and the idempotent inserts) run only in tests/db. validate_proposal's C901 score of 14 comes from a flat sequence of guard clauses, which reads well as it is.",
+   "impact": "The handlers that write plans and evidence under a lease have no fast test, and positional plan tuples make each caller re-learn the order.",
+   "recommendation": "Move the three handlers to module level, taking limits as a parameter (functools.partial in plan_tools), and return a small Plan(version, tasks) dataclass from latest_plan.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "SP-011 'the model proposes; deterministic logic commits': hold_lease and consume stay inside the same transactions.",
+   "verdict": "confirmed",
+   "verifierNote": "Confirmed plan_tools spans lines 177-297 and that test_plans.py imports only validate_proposal, reference_shape and PlanRejected from plans.py."
+  },
+  {
+   "id": "PRUN-20",
+   "title": "Active-time segments are written without the fence that discount_sleep uses",
+   "dimension": "approach",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/run_usage.py",
+     "line": 59,
+     "endLine": 64,
+     "note": "begin_segment: no generation check"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_usage.py",
+     "line": 67,
+     "endLine": 74,
+     "note": "end_segment: no generation check"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_usage.py",
+     "line": 77,
+     "endLine": 94,
+     "note": "discount_sleep: fenced, 'so a lost one can't move a new owner's clock'"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 377,
+     "endLine": 379,
+     "note": "a stale owner's finally block still runs end_segment"
+    }
+   ],
+   "occurrences": 2,
+   "evidence": "A worker that lost its lease reaches the finally block after its next fenced write fails. end_segment then adds the new owner's elapsed time and sets its segment_started_at to null, so the new owner's later time is never counted.",
+   "impact": "The 15-minute active-time limit undercounts after a reassignment, and the module's own stated invariant holds for only one of its three writers.",
+   "recommendation": "Pass the lease to begin_segment and end_segment, and reuse discount_sleep's generation predicate.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "medium",
+   "ruleCheck": "Decision 0014 accepts uncounted active time as a release limit; removing one of its causes doesn't contradict that. The call, tool and money limits are untouched, and the fence matches discount_sleep's.",
+   "verdict": "revised",
+   "verifierNote": "Traced the stale owner's finally block: end_segment adds the new owner's elapsed time and nulls its segment. Reworded the rule check, because Decision 0014 accepts the limit but doesn't say it can be changed under its ID."
+  },
+  {
+   "id": "PRUN-21",
+   "title": "The central decision points have no contract docstring, and one module docstring is wrong",
+   "dimension": "comments",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 291,
+     "note": "run_goal: no docstring"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 697,
+     "note": "_finish: no docstring"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 116,
+     "note": "NOT_OURS: no comment"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 148,
+     "endLine": 159,
+     "note": "LoopResult.outcome takes five values, none of them listed"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 1,
+     "note": "says nothing here reads checkpoints"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 640,
+     "endLine": 645,
+     "note": "read_inspector selects from agent_runtime.checkpoints"
+    },
+    {
+     "file": "services/agent/src/autobots/application/worker_inference.py",
+     "line": 324,
+     "endLine": 328,
+     "note": "two function-local imports with no reason given, unlike goal_loop.py:433"
+    }
+   ],
+   "occurrences": 4,
+   "evidence": "Small helpers carry precise comments explaining why, but run_goal (90 lines) and _finish (86 lines) have no docstring, so the codes they emit and the outcomes they return can only be learned by reading the bodies. The projection's module docstring contradicts read_inspector, which reads checkpoint ids, step and source (metadata only, as its own docstring says).",
+   "impact": "Readers have to reverse-engineer the pass contract, and a reviewer checking SP-011's rule against raw checkpoint data is misled by the module docstring.",
+   "recommendation": "Document run_goal and _finish (inputs, codes emitted, outcome values), say what NOT_OURS means, and give the deferred imports a reason. Change the projection docstring to 'reads checkpoint metadata (ids, step, source), never checkpoint content'.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06 'explain nonobvious invariants in code'. Decision and story citations stay.",
+   "verdict": "confirmed",
+   "verifierNote": "Confirmed the missing docstrings, the five outcome values and that read_inspector reads checkpoint metadata from agent_runtime.checkpoints despite the module docstring."
+  },
+  {
+   "id": "PRUN-22",
+   "title": "Names that hide meaning: profiles.py, two spellings of one credential code, and generation + 1",
+   "dimension": "naming",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/profiles.py",
+     "line": 1,
+     "endLine": 5,
+     "note": "member display names, while 'profile' elsewhere in the service means a model profile"
+    },
+    {
+     "file": "services/agent/src/autobots/application/profiles.py",
+     "line": 54,
+     "endLine": 64,
+     "note": "returns a positional (id, name, role, timezone) tuple"
+    },
+    {
+     "file": "services/agent/src/autobots/application/worker_inference.py",
+     "line": 68,
+     "endLine": 72,
+     "note": "credential_invalid mapped to invalid_credential"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 722,
+     "note": "classify_interrupted(..., lease.generation + 1)"
+    },
+    {
+     "file": "services/agent/src/autobots/application/recovery.py",
+     "line": 33,
+     "endLine": 37,
+     "note": "the 'generation < %s' predicate the + 1 relies on"
+    }
+   ],
+   "occurrences": 3,
+   "evidence": "domain/models.PROFILES, run_profile, ModelRoute.profile and approved_profile all mean model profiles, so application/profiles.py reads as their home. The public settings contract uses credential_invalid (contracts/settings.py:179), while FailureClass uses invalid_credential. Passing generation + 1 makes classify_interrupted also mark the current owner's started receipts as unknown, which only the SQL reveals.",
+   "impact": "Small, repeated misreads: the wrong file opened when looking for model profiles, a grep for one spelling that misses the other, and a + 1 that looks like an off-by-one error.",
+   "recommendation": "Rename the module to member_profiles.py (one import, in api/routes.py) and return a small named type. Keep both public codes, but comment the mapping. Give classify_interrupted an explicit keyword such as include_current_owner.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "Public error codes stay unchanged; the renames are internal.",
+   "verdict": "confirmed",
+   "verifierNote": "Confirmed the module's purpose, its single importer (api/routes.py:15), the two credential spellings and the generation predicate in recovery.py."
+  }
+ ],
+ "rejected": [],
+ "notCovered": "This was a static review: no tests or verify profiles were run, and nothing was written. Supporting files outside the area were read only around the cited lines: workflow_runner.py, loop_middleware.py, assignments.py, approvals.py, experts.py, routines.py, workflows.py, improvements.py, artifacts.py, operations/worker.py, operations/logs.py, operations/browse_trial.py, the api route modules, tests/db checks and test_worker_inference.py. The SQL migrations and triggers behind database fencing (SQLSTATE AB001) were not read, so claims about database-enforced checkpoint fencing rest on adapters/checkpoints.py and its call sites. Query cost (for example the correlated subqueries in _LIST_SELECT) was not measured. Only the task-named sections of PRD-Development-Harness.md (DH-03 to DH-06) and option-b-contract.md (SP-006 to SP-014) were read, and metrics.md was read in part. An extra exploratory ruff run (BLE, TRY, S608, FBT, PLC0415, ARG, SLF, PLR2004) printed to the terminal only and was not saved. No earlier review existed to compare against."
+}

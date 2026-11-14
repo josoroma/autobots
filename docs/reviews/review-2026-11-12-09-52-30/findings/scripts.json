@@ -1,0 +1,1253 @@
+{
+  "schema": "autobots.code-review/v1",
+  "area": "scripts",
+  "title": "Scripts and hooks",
+  "kind": "area",
+  "timestamp": "2026-11-12-09-52-30",
+  "revision": "156534da0bd5b19417f05d313077d767804b175b",
+  "summary": "The scripts area (28 modules, 10,215 lines, plus the 243-line hook dispatcher) is careful about safety and honest about what it proves. Every entry point documents its exit codes and what passing does not establish. Target guards refuse before any Docker or database change and prove ownership before removal. The hook is a thin adapter that fails closed. Pure logic such as release scoring, refusal rules and request shapes is covered by about 235 harness tests. Maintainability is weak, though. No linter, formatter or type checker covers this code: under the service's own configuration none of the 29 files passes `ruff format --check`, and 2,092 lines exceed 100 characters. The code grows by copying. The child-check runner appears 29 times, the disposable-stack setup, teardown and report skeleton 13 times, and the paid-run helper and watchdog 3 to 4 times, and the copies have started to drift on exit-code checks and on spend reporting. Qualifier scripts double as libraries: qualify_identity and qualify_operations are imported by 7 and 6 other scripts. Meanwhile harness_lib's hand-written domain map ignores that import graph, so the Stop hook can accept stale db evidence. Six functions run 215 to 410 lines, and qualify_identity.qualify takes on an inline fixture for nearly every story (52 commits between 2026-11-05 and 2026-11-08). Records and reports are untyped dicts whose vocabulary drifts. Two unrelated `Unavailable` classes break the exit-code contract in three scripts.",
+  "scores": [
+    {
+      "dimension": "standards",
+      "score": 2,
+      "why": "DH-06 asks for Ruff and strict mypy on owned modules, and neither runs here (0 of 29 files formatted, 2,092 lines over 100 characters), though the project's own conventions (exit codes, no installs, stated limits) are followed consistently."
+    },
+    {
+      "dimension": "modules",
+      "score": 2,
+      "why": "Qualifiers double as libraries (fan-in 7 and 6), harness_lib mixes six concerns behind 24 importers, and the check-domain map ignores the import graph."
+    },
+    {
+      "dimension": "size",
+      "score": 2,
+      "why": "Ten functions exceed 150 lines (410, 326, 315, 250, 240, 215, 165, 164, 160, 153) and three files exceed 700 lines (persistent_install.py 810, qualify_identity.py 754, app_db.py 721)."
+    },
+    {
+      "dimension": "functions",
+      "score": 2,
+      "why": "Scenario monoliths are built from nested closures, browser_cases takes 14 parameters, and validators mutate what they validate; well-shaped pure helpers are the exception."
+    },
+    {
+      "dimension": "structure",
+      "score": 3,
+      "why": "Entry points are named and documented consistently, but one flat directory mixes harness tools, libraries, DB tooling, qualifiers and paid trials, and DH-03's scripts/db/ does not exist."
+    },
+    {
+      "dimension": "approach",
+      "score": 3,
+      "why": "The guard design is sound (refuse first, prove ownership, fail closed), but orchestration relies on copied code, f-string SQL piped to psql and inline -c programs."
+    },
+    {
+      "dimension": "comments",
+      "score": 4,
+      "why": "Every module states its purpose, exit codes and limits, and why-comments cite stories and decisions; one module docstring is stale, and the giant functions lean on section comments."
+    },
+    {
+      "dimension": "types",
+      "score": 2,
+      "why": "Records and reports are untyped dicts, Any and object appear with 14 type: ignore in persistent_install.py and no checker running, and evidence vocabulary is free text; the specs.py and toolchain.py dataclasses are the exception."
+    },
+    {
+      "dimension": "errors",
+      "score": 3,
+      "why": "There is a clear Refused/Unavailable/exit-code contract and a fail-closed hook, but scripts that mix two Unavailable classes break it, JSON at child boundaries is unguarded, and 33 results are discarded."
+    },
+    {
+      "dimension": "tests",
+      "score": 3,
+      "why": "About 235 harness tests cover guards, hooks, specs, evidence and scoring, but the paid watchdog has no behavioral test, goal's call to its guard has only a source-text test, and some qualifier cases can pass vacuously."
+    },
+    {
+      "dimension": "maintainability",
+      "score": 2,
+      "why": "The busiest files (qualify_identity.py with 52 commits, app_db.py with 31) grow by copying blocks, and no lint or type ratchet catches the drift that has already started."
+    }
+  ],
+  "strengths": [
+    {
+      "title": "Thin, fail-closed hook adapter",
+      "evidence": ".claude/hooks/dispatch.py bounds its input (MAX_INPUT and MAX_PATH_BYTES, lines 24-25 and 227-229), lets an environment override only shorten the 9 s deadline (207-213), passes filenames after `--` in an argument array (134-138), keeps stdout for the JSON response and turns any failure into exit 2 (235-237). It chooses the worktree by asking Git with a ceiling directory (58-93). tests/harness/test_hooks.py holds 45 tests for it."
+    },
+    {
+      "title": "Refuse before any change, prove ownership before removal",
+      "evidence": "scripts/disposable_db.py identity_refusals runs before any Docker call and refuses connection variables that name another target (122-153). rendered_refusals inspects the merged Compose output (162-190). require_labels and the marker row prove ownership before cleanup or reset (202-230). scripts/persistent_install.py identity_refusals checks the name, label, port and identity row (135-158). scripts/qualify_persistent_apply.py refused() asserts that the database state is unchanged after each refusal (32-40). tests/harness/test_disposable_guard.py has 11 guard tests."
+    },
+    {
+      "title": "Pure decisions pulled out of effectful runs and unit-tested",
+      "evidence": "scripts/release_scoring.py is pure and has 26 tests in test_release_qualification.py. qualify_worker_inference.request_shape_problems (52-58), qualify_mac_sleep.assess (85-102) and persistent_install refuse_other_work and note_failed (309-321) are tested without Docker in test_final_review.py. This is the shape to spread to the paid watchdog and ledger settlement."
+    },
+    {
+      "title": "Results that cannot overclaim",
+      "evidence": "scripts/verify.py judge_unittest and judge_pytest fail an empty or skipped suite (91-107), exit_code_for ranks a failure above an unavailable prerequisite (190-197), the non-mutation guard compares before and after snapshots (scripts/toolchain.py:271-290), and every report lists what it does not establish (verify.py:42-49)."
+    },
+    {
+      "title": "Docstrings as contracts",
+      "evidence": "Each entry point's module docstring states its purpose, exit codes and limits (scripts/verify.py:2-7, scripts/disposable_db.py:2-10, scripts/local_backup.py:2-10, scripts/qualify_web.py:2-9), and why-comments record constraints that are not obvious (.claude/hooks/dispatch.py:23 and 26, scripts/toolchain.py:183-185, scripts/local_backup.py:345-346)."
+    },
+    {
+      "title": "Careful backup format",
+      "evidence": "scripts/local_backup.py seals chunks with AES-GCM and binds the component, index and final flag into the associated data, so frames cannot be reordered, dropped or moved (98-141). It verifies an HMAC'd manifest before Docker is touched (261-280) and creates every file with O_EXCL and mode 0600 (105, 225-230)."
+    },
+    {
+      "title": "specs.py as a typed, layered tool",
+      "evidence": "scripts/specs.py uses frozen or plain dataclasses for Issue, Task, Story, Epic and Document (40-87), keeps parse, validate, render and promote as separate steps, and writes atomically, refusing a concurrent edit (565-582). It has 41 tests in tests/harness/test_specs.py."
+    },
+    {
+      "title": "Reproducible toolchain selection",
+      "evidence": "scripts/toolchain.py find_pinned accepts only an install that reports the exact pinned version and never downloads (152-157). child_env reduces the environment, keeps tool state inside the repository and forces offline mode when verifying (172-189). run_step kills the whole process group on timeout (229-256)."
+    }
+  ],
+  "findings": [
+    {
+      "id": "SCRP-01",
+      "title": "The service child-check runner is hand-copied 29 times, with divergent failure handling",
+      "dimension": "duplication",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "scripts/app_db.py",
+          "line": 408,
+          "endLine": 491,
+          "note": "tool_cases: nine copies in one function"
+        },
+        {
+          "file": "scripts/app_db.py",
+          "line": 334,
+          "endLine": 358,
+          "note": "credential_cases: Popen variant that returns on failure"
+        },
+        {
+          "file": "scripts/app_db.py",
+          "line": 501,
+          "endLine": 514,
+          "note": "loop_cases: parses stdout even after a failure"
+        },
+        {
+          "file": "scripts/app_db.py",
+          "line": 586,
+          "endLine": 593,
+          "note": "routine_cases: also writes stderr to a .err file"
+        },
+        {
+          "file": "scripts/qualify_identity.py",
+          "line": 175,
+          "endLine": 187,
+          "note": "16 children in one loop, with browser_env side output"
+        },
+        {
+          "file": "scripts/qualify_operations.py",
+          "line": 314,
+          "endLine": 321
+        },
+        {
+          "file": "scripts/qualify_upgrade.py",
+          "line": 181,
+          "endLine": 188
+        },
+        {
+          "file": "scripts/qualify_browse_goal.py",
+          "line": 74,
+          "endLine": 84
+        }
+      ],
+      "occurrences": 29,
+      "evidence": "There are 29 copies of the replay statement `for case in json.loads(<proc>.stdout.strip().splitlines()[-1])['cases']: cases.check(case['id'], case['expected'], case['observed'], case['passed'])`, counted with grep: 19 in app_db, 4 in qualify_identity, 2 in qualify_upgrade, and one each in qualify_operations, qualify_backup, qualify_browse_goal and qualify_browser_executor. Each follows its own subprocess call with an inline service environment, and `'PYTHONPATH': str(root / 'services/agent/src')` appears 39 times in 10 files. On failure, some copies return, some parse whatever stdout holds, and 9 of the 29 save stderr to a .err file. No copy guards the parse:\n    if result.returncode:\n        cases.check('the goal loop check ran', 'exit 0', f'exit {result.returncode}: ...', False)\n        if not result.stdout.strip():\n            return\n    for case in json.loads(result.stdout.strip().splitlines()[-1])['cases']:",
+      "impact": "Each db story adds another copy (app_db.py has 31 commits since 2026-10-01), and the copies already disagree on what a crashed child records. If a child's last stdout line is not its JSON report, for example after a late warning or a crash with partial output, json.loads raises out of qualify(). main catches only Refused and Unavailable, so the run ends in a traceback with exit 1. The report file was already deleted at the start, so every other case's evidence is lost too.",
+      "recommendation": "Write one run_child_check helper in a shared qualification module. It should build the service environment once, run the child with its own argv, timeout and cwd, always keep stderr under the profile's .checks directory, and record a failed '<label> check ran' case on a non-zero exit. It should replay cases only from a last line that parses as {'cases': [...]}, so a parse failure becomes one failed case instead of an exception. Express app_db.tool_cases and qualify_identity's child loop as data tables. Prove the change with the db and operations profiles.",
+      "sketch": "# scripts/qualification/children.py\ndef service_env(root: Path, database_url: str, **extra: str) -> dict[str, str]\ndef run_child_check(cases: Cases, root: Path, script: str, *args: str, label: str,\n                    env: Mapping[str, str], timeout: float = 180, cwd: Path | None = None,\n                    err_dir: Path) -> ChildReport | None   # never raises on bad output\n# scripts/app_db.py\nTOOL_CHILDREN = (Child('tool_gateway_check.py', 'tool gateway', temp_cwd=True),\n                 Child('tool_use_check.py', 'tool-use'), ...)\nfor child in TOOL_CHILDREN:\n    run_child_check(cases, root, child.script, WORKSPACE_A, label=child.label, env=..., err_dir=...)",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-09.2 and AGENTS.md completion evidence: a check that could not run must stay visible as failed and never count as passed. The helper keeps each child's argv, environment and timeout and touches no target guard, so nothing is weakened.",
+      "verdict": "confirmed",
+      "verifierNote": "29 replay statements recounted with grep (19 in app_db, 4 in qualify_identity, 2 in qualify_upgrade, one each in four more), plus 39 inline PYTHONPATH entries in 10 files and 9 .err writes. app_db.main catches only Refused and Unavailable, and qualify() deletes the report before the run, so a bad last line loses the whole report."
+    },
+    {
+      "id": "SCRP-02",
+      "title": "qualify_identity.py takes on a new inline fixture for nearly every story",
+      "dimension": "size",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "scripts/qualify_identity.py",
+          "line": 414,
+          "endLine": 739,
+          "note": "qualify, 326 lines"
+        },
+        {
+          "file": "scripts/qualify_identity.py",
+          "line": 252,
+          "endLine": 411,
+          "note": "browser_cases, 160 lines and 14 parameters"
+        },
+        {
+          "file": "scripts/qualify_identity.py",
+          "line": 140,
+          "endLine": 249,
+          "note": "artifact_cases, 110 lines, mostly not about artifacts"
+        },
+        {
+          "file": "scripts/qualify_identity.py",
+          "line": 474,
+          "endLine": 494,
+          "note": "US-15.4 arrangement as an f-string SQL fixture"
+        },
+        {
+          "file": "scripts/qualify_identity.py",
+          "line": 590,
+          "endLine": 646,
+          "note": "US-15.13 arrangement, 57 lines"
+        },
+        {
+          "file": "scripts/qualify_identity.py",
+          "line": 317,
+          "note": "442-character Playwright argv of substring filters"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "qualify() holds 12 story-labelled arrangement blocks (US-15.3 to US-16.3). Each one bootstraps an owner (15 calls with the same four leading arguments), runs an f-string SQL fixture with hand-escaped JSON and grows `artifacts` (12 `artifacts = {**artifacts, ...}` steps). The later blocks record an 'arranged' case, but seven arrangements record none (the first run, member C, the no-key run and the US-15.3, 15.4, 15.6 and 15.7 blocks). Only then does browser_cases receive 14 parameters. artifact_cases also runs 16 unrelated child checks, the US-16.2 schema-state arrangement and the US-13.1 legacy-approval arrangement, so its name hides most of what it does. Ordering invariants live only in comments, such as 'Last, so no later check's cleanup ends the runs they leave claimed for the browser' (line 170). The file has 52 commits, all between 2026-11-05 and 2026-11-08, and 48 of the repository's 114 Deliver commits edit it.",
+      "impact": "Every browser story edits the same 326-line function, so unrelated fixtures collide in review and merge, ordering between arrangements stays implicit, and no arrangement can be run or tested on its own. SQL and JSON hand-escaped inside f-strings break easily, and in the seven unasserted arrangements they break silently. Which browser spec runs where can only be read from argv lists like the one at line 317.",
+      "recommendation": "Introduce an IdentityRun context (stack, base, db_port, runtime_url, service key, anon key) and an Owner record (email, password, workspace_id, user_id). Move each story's arrangement into an `arrange_<story>(run, cases) -> dict[str, str]` function registered in an ordered tuple, and keep its SQL in tests/db fixture files or build it with a quoting helper. browser_cases then takes (run, owners, env). Rename artifact_cases to say what it does, or split it into artifact children, schema-state cases and legacy-approval cases. Name the Playwright suite lists as constants.",
+      "sketch": "@dataclass(frozen=True)\nclass Owner: email: str; password: str; workspace_id: str; user_id: str\n@dataclass\nclass IdentityRun:\n    root: Path; stack: AppStack; base: str; db_port: int; runtime_url: str\n    def owner(self, email: str) -> Owner          # bootstrap_owner + generated password\nArrangement = Callable[[IdentityRun, Cases], dict[str, str]]\nARRANGEMENTS: tuple[Arrangement, ...] = (arrange_no_key_run, arrange_reader_15_3, arrange_runs_15_4, ...)\ndef qualify(root):\n    with disposable_app_stack(root, cases, extra_ports=0) as stack_run:\n        run = IdentityRun(...); env: dict[str, str] = {}\n        for arrange in ARRANGEMENTS: env |= arrange(run, cases)\n        browser_cases(run, owners, env)\nMAIN_SUITE: tuple[str, ...] = ('browser/workflows.spec', 'browser/operations', ...)",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-07: test fixtures are synthetic and used in disposable environments only. Moving them into tests/db fixture files keeps them out of supabase/migrations and supabase/seeds, and the qualification stays on its disposable target.",
+      "verdict": "revised",
+      "verifierNote": "Spans recounted with ast (qualify 414-739, browser_cases 252-411 with 14 parameters, artifact_cases 140-249), and the 12 story blocks, 15 owner bootstraps, 12 artifact merges and 442-character argv confirmed. Corrected: seven arrangements go unasserted rather than most, and 48 of 114 Deliver commits touch the file rather than most."
+    },
+    {
+      "id": "SCRP-03",
+      "title": "Paid-run guards are copied across four entry points and already disagree",
+      "dimension": "duplication",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "scripts/persistent_install.py",
+          "line": 324,
+          "endLine": 476,
+          "note": "goal, 153 lines"
+        },
+        {
+          "file": "scripts/persistent_install.py",
+          "line": 535,
+          "endLine": 698,
+          "note": "examples, 164 lines"
+        },
+        {
+          "file": "scripts/persistent_install.py",
+          "line": 399,
+          "endLine": 415,
+          "note": "watchdog copy 1"
+        },
+        {
+          "file": "scripts/persistent_install.py",
+          "line": 633,
+          "endLine": 650,
+          "note": "watchdog copy 2"
+        },
+        {
+          "file": "scripts/persistent_install.py",
+          "line": 660,
+          "endLine": 663,
+          "note": "examples stores None for an unreadable spend; goal records a failed check"
+        },
+        {
+          "file": "scripts/live_goal.py",
+          "line": 127,
+          "endLine": 143,
+          "note": "watchdog copy 3"
+        },
+        {
+          "file": "scripts/qualify_release.py",
+          "line": 99,
+          "endLine": 103,
+          "note": "fourth identical helper()"
+        },
+        {
+          "file": "tests/harness/test_final_review.py",
+          "line": 91,
+          "endLine": 93,
+          "note": "the only test of goal's guard reads its source text"
+        }
+      ],
+      "occurrences": 4,
+      "evidence": "helper() is identical in persistent_install.goal (337), examples (549), live_goal.attempt (74) and qualify_release.attempt (99). The spend watchdog loop exists three times. stop_worker, owner sign-in, refuse_other_work, the post-run key-usage and leak checks and the ledger settlement are duplicated between goal and examples. The copies have drifted: goal records an unreadable spend as a failed check (427-430), but examples stores None and can still exit 0 (660-663, 698):\n        spent = sql(spent_since)\n        report['committed_micro_usd'] = int(spent) if spent else None\n        charged = int(spent) if spent else None\nAll three watchdogs read spend through a helper that returns '' on any SQL error, and `if committed and int(committed) > limit` then skips that poll. The only unit test of goal's guard asserts on inspect.getsource(persistent_install.goal), because the function cannot be called on its own. There are 14 `type: ignore[attr-defined]` because reserve_goal returns `tuple[object, dict]`.",
+      "impact": "These paths spend real money under the shared cap. A fix to the watchdog, the settlement or the after-run checks must be made in three or four places, and the examples copy can already report success without knowing what it spent. An unreadable spend never stops the worker, so each poll fails open, and none of this logic has a behavioral test.",
+      "recommendation": "Start with tests. Extract pure decision functions and test them in tests/harness with a fake clock and a fake sql: watchdog_verdict(committed, limit, unreadable_polls), settlement(started, finals, charged) and goal_exit_code(report). Then move the shared mechanics into one module that goal, examples, live_goal and qualify_release all use. Make 'spend unreadable for N polls' an explicit decision, such as stopping the worker, rather than an accident. Type the ledger through a TYPE_CHECKING import or a Protocol so the ignores can go.",
+      "sketch": "# scripts/paid_run.py\nclass Ledger(Protocol):\n    def settle(self, entry: dict, charged: int | None, state: str) -> None: ...\n    def committed(self) -> int: ...\n@dataclass\nclass PaidSession:\n    root: Path; stack: AppStack; env: dict[str, str]\n    def helper(self, *argv: str) -> str\n    def sql(self, statement: str) -> str | None        # None = unreadable, never ''\n    def sign_in(self, owner: Mapping[str, str]) -> str\n    def start_worker(self, log: Path) -> Popen; def stop_worker(self, report: dict) -> None\ndef watch(session, run_ids, limit, spend_query, worker, *, clock=time.monotonic, sleep=time.sleep) -> WatchResult\ndef settle(ledger: Ledger, entry, started: bool, finals: Mapping[str, str], charged: int | None) -> None\ndef after_run_checks(session, key_file: Path, logs: Path, report: dict) -> None",
+      "effort": "M",
+      "risk": "high",
+      "ruleCheck": "AGENTS.md Boundaries (OpenRouter only, budgets before live inference) and the ground rule never to weaken a guardrail. Keep the --paid refusal, refuse_other_work, the reservation before any request, the SIGKILL watchdog and the hold-on-unfinished settlement; the change only makes them single and tested. The extracted pure functions need no paid run; a live check stays a separately authorized task.",
+      "verdict": "confirmed",
+      "verifierNote": "Four helper() bodies (differing only in their env), three watchdog loops (persistent_install.py:399 and 633, live_goal.py:127), the goal/examples drift on an unreadable spend (persistent_install.py:427-430 versus 660-663 and 698) and 14 type: ignore comments confirmed. The source-text test sits at test_final_review.py:91-93."
+    },
+    {
+      "id": "SCRP-04",
+      "title": "No linter, formatter or type checker covers scripts/ or the hook",
+      "dimension": "standards",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "services/agent/pyproject.toml",
+          "line": 41,
+          "endLine": 52,
+          "note": "ruff and mypy configured for src and tests only"
+        },
+        {
+          "file": "scripts/toolchain.py",
+          "line": 208,
+          "endLine": 213,
+          "note": "ruff and mypy steps run inside services/agent"
+        },
+        {
+          "file": ".claude/hooks/dispatch.py",
+          "line": 161,
+          "note": "post-edit ruff diagnostic only for services/agent paths"
+        },
+        {
+          "file": "scripts/app_db.py",
+          "line": 117,
+          "note": "578-character line"
+        },
+        {
+          "file": "scripts/persistent_install.py",
+          "line": 31,
+          "note": "F401: other_resources imported but unused"
+        },
+        {
+          "file": "scripts/qualify_backup.py",
+          "line": 89,
+          "note": "F841: workspace_b never used"
+        },
+        {
+          "file": "scripts/persistent_install.py",
+          "line": 331,
+          "note": "one of 15 type: ignore with no checker running"
+        }
+      ],
+      "occurrences": 29,
+      "evidence": "ruff and mypy run only on services/agent (`files = [\"src\", \"tests\"]`). Under the service's own configuration, `ruff format --check` would reformat all 29 files. 2,092 lines exceed 100 characters (464 exceed 150, 102 exceed 200, and the longest is 578 at app_db.py:117). Beyond 2,079 E501 hits, `ruff check` reports 94 more: 30 unsorted import blocks, 34 datetime.UTC aliases, five deliberate UP036 interpreter-version guards and 25 others, including F401 at persistent_install.py:31, F841 at qualify_backup.py:89, five unused unpacked values and four zip() calls without strict=. The 15 `type: ignore` comments (14 in persistent_install.py) suppress a checker that never runs. The hook's post-edit ruff diagnostic fires only when `domains == {'python'}`, so editing a script gets no lint feedback. Quoting style also diverges: single quotes everywhere except specs.py, against the service's double-quoted ruff format.",
+      "impact": "About 10,000 lines that guard disposable targets, the persistent install, backups and paid caps change daily with no mechanical check. The defect classes found in this review (dead variables, mismatched exception classes, untyped records, escaped newlines) can recur unnoticed, and no ratchet stops size and duplication from growing.",
+      "recommendation": "Add a ruff and mypy scope for scripts/ and .claude/hooks/ that the fast profile runs with the prepared binaries, with no install. (1) Reformat once in an explicit commit, then rerun the profiles because the verifier fingerprint changes. (2) Run `ruff check` with the service's rule set, baselining E501 per file and ratcheting it down. (3) Run mypy --strict first on dispatch.py, harness_lib.py, verify.py, specs.py, evidence.py and toolchain.py, which form the hook's trust boundary, then on the libraries, listing per-module overrides in config. Map script edits to this step in check_domains, and let the hook's post-edit diagnostic lint scripts too.",
+      "sketch": "# ruff.toml at the root, or a scripts section that extends the service config\nextend = 'services/agent/pyproject.toml'\nsrc = ['scripts', '.claude/hooks']\n[lint.per-file-ignores]\n'scripts/qualify_identity.py' = ['E501']   # baseline, shrink per wave\n# mypy config\nfiles = ['scripts', '.claude/hooks']; strict = true\n[[tool.mypy.overrides]] module = ['qualify_*', 'app_db']; disallow_untyped_defs = false   # ratchet list\n# verify.py: Step('scripts_lint', (venv / 'ruff', 'check', 'scripts', '.claude/hooks'), root) in PYTHON_STEPS",
+      "effort": "L",
+      "risk": "low",
+      "ruleCheck": "DH-06: 'Use Ruff for lint/format, mypy strict for owned modules'. DH-05 forbids automatic formatter rewrites in hooks, so formatting is one explicit commit and the hook only diagnoses. AGENTS.md says checks use prepared environments and install nothing; the service venv already holds ruff and mypy.",
+      "verdict": "confirmed",
+      "verifierNote": "Re-ran `ruff format --check --no-cache` with the service configuration: 29 files would be reformatted. Line counts, the 15 ignores and the hook's python-only diagnostic (dispatch.py:161) confirmed; the ruff check breakdown comes from the run saved in .checks/reviews/review-2026-11-12-09-52-30/scripts/."
+    },
+    {
+      "id": "SCRP-05",
+      "title": "Six more qualifiers are single 165-410 line functions held together by closures and section comments",
+      "dimension": "size",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "scripts/qualify_worker_inference.py",
+          "line": 65,
+          "endLine": 474,
+          "note": "qualify, 410 lines"
+        },
+        {
+          "file": "scripts/qualify_worker_inference.py",
+          "line": 94,
+          "endLine": 147,
+          "note": "13 closures over shared locals"
+        },
+        {
+          "file": "scripts/qualify_release.py",
+          "line": 76,
+          "endLine": 390,
+          "note": "attempt, 315 lines, paid"
+        },
+        {
+          "file": "scripts/qualify_release.py",
+          "line": 192,
+          "endLine": 266,
+          "note": "run_task rebinds the outer worker with nonlocal"
+        },
+        {
+          "file": "scripts/qualify_backup.py",
+          "line": 43,
+          "endLine": 292,
+          "note": "qualify, 250 lines"
+        },
+        {
+          "file": "scripts/qualify_operations.py",
+          "line": 136,
+          "endLine": 375,
+          "note": "qualify, 240 lines; scenarios separated by comments"
+        },
+        {
+          "file": "scripts/qualify_upgrade.py",
+          "line": 47,
+          "endLine": 261,
+          "note": "qualify, 215 lines"
+        },
+        {
+          "file": "scripts/qualify_mac_sleep.py",
+          "line": 105,
+          "endLine": 269,
+          "note": "observe, 165 lines"
+        }
+      ],
+      "occurrences": 6,
+      "evidence": "qualify_worker_inference.qualify is 410 lines with 13 nested closures (helper, save_key, admit, status, settled, sent, goal_view, invocations, reply_facts, verdict, stop_reason, resume, verified_report) and a later why(). qualify_release.attempt is 315 lines with seven closures, including a 75-line run_task. qualify_operations.qualify separates its scenarios only with comments ('# Drain: ...', '# Readiness failures ...', '# Ordinary shutdown ...', '# Recovery ...', '# Retention ...'). One worker process started at qualify_worker_inference.py:195 serves every later case; the comment above it says so, but nothing marks which later cases depend on the state earlier ones leave.",
+      "impact": "No scenario can be run, reviewed or retried on its own. An unexpected exception mid-function skips every later scenario, and the report records nothing about them. Reading one case means holding up to 400 lines of shared local state in mind.",
+      "recommendation": "Turn the closures into methods of a small context class per qualifier, and each commented section into a scenario function `def drain(ctx, cases) -> None`. Run the scenarios from an ordered tuple through a shared runner that records a scenario that raised as one failed case and marks the remaining ones not_run. Keep the order explicit in the tuple.",
+      "sketch": "class InferenceRun:            # was the closures inside qualify()\n    def status(self, run_id: str) -> str\n    def settled(self, run_id: str, wanted: str, seconds: float = 90) -> bool\n    def sent(self, tag: str) -> list[RequestLine]; def invocations(self, run_id: str) -> str\nScenario = Callable[[InferenceRun, Cases], None]\nSCENARIOS: tuple[Scenario, ...] = (switch_off, partial_config, happy_path, other_profile, reasoning,\n                                   workflow, compaction, request_shapes, child_billing, rotation, ...)\ndef run_scenarios(ctx, cases, scenarios) -> None   # exception -> failed case; the rest -> not_run",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "AGENTS.md: the operations profile runs on disposable projects with a scripted model. Scenarios keep their assertions and arranged inputs, and not_run stays visible as DH-09.2 requires, so nothing that passes today can pass by being skipped.",
+      "verdict": "revised",
+      "verifierNote": "Six spans recounted with ast (410, 315, 250, 240, 215 and 165 lines) and the closures confirmed. The shared worker is documented at qualify_worker_inference.py:194, so the evidence now says the order is stated for the worker, though not for the cases that follow it."
+    },
+    {
+      "id": "SCRP-06",
+      "title": "Qualifiers double as libraries, and the Stop hook's domain map ignores that import graph",
+      "dimension": "modules",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "scripts/qualify_identity.py",
+          "line": 40,
+          "endLine": 66,
+          "note": "http, bootstrap_owner and password_token, used by 7 scripts"
+        },
+        {
+          "file": "scripts/qualify_operations.py",
+          "line": 35,
+          "endLine": 133,
+          "note": "Checks, Ops, api_call, wait and exited, used by 6 scripts"
+        },
+        {
+          "file": "scripts/live_goal.py",
+          "line": 30,
+          "endLine": 46,
+          "note": "constants and rows, used by persistent_install and qualify_release"
+        },
+        {
+          "file": "scripts/qualify_identity.py",
+          "line": 30,
+          "note": "a db qualifier imports qualify_web"
+        },
+        {
+          "file": "scripts/persistent_install.py",
+          "line": 799,
+          "note": "lazy import of live_goal, which qualify_persistent_apply exercises"
+        },
+        {
+          "file": "scripts/harness_lib.py",
+          "line": 51,
+          "endLine": 57,
+          "note": "domain lists kept by hand"
+        },
+        {
+          "file": "scripts/harness_lib.py",
+          "line": 145,
+          "endLine": 157,
+          "note": "check_domains"
+        },
+        {
+          "file": "scripts/harness_lib.py",
+          "line": 236,
+          "endLine": 247,
+          "note": "evidence_state asks for a db report only for paths mapped to 'db'"
+        }
+      ],
+      "occurrences": 4,
+      "evidence": "qualify_identity is imported by 7 scripts for bootstrap_owner, password_token, http, PYTHON and STORAGE_SQL. qualify_operations is imported by 6 for Ops, api_call, wait, exited, Checks, conditions and durable_counts. live_goal provides constants to persistent_install and qualify_release, and qualify_web provides start, stop and BROWSERS to 3 scripts. For this review an ast walk computed the import closure of the db profile's five step scripts. It includes qualify_web and toolchain, which check_domains maps to {'python', 'web'}, and live_goal and qualify_operations, which it maps to {'harness'}. The path runs through persistent_install's `goal` branch, which qualify_persistent_apply's CLI cases execute and which imports live_goal, qualify_operations, qualify_identity and qualify_web.",
+      "impact": "Editing a helper inside one qualifier silently changes six or seven others. An edit to qualify_web.py or qualify_operations.py, both on the db profile's import path, is accepted at Stop on a fast or harness report while the db evidence is stale. DB_CHECK_FILES has to follow the imports by hand, and only two of its entries are tested (test_final_review.py:60-62).",
+      "recommendation": "Move the shared helpers out of the qualifiers into a library package (owners, ops processes, HTTP, report writing) whose files belong to every profile that imports them. Derive script domains from the import closure: compute the closure of each profile's step scripts with ast in harness_lib (stdlib only), or at least assert it in a harness test, so a new import cannot fall outside the db domain unnoticed.",
+      "sketch": "scripts/qualification/          # library only, no __main__\n  owners.py   Owner, bootstrap_owner, password_token\n  ops.py      Ops, api_call, wait, exited, conditions, durable_counts\n  net.py      http(method, url, headers, body, *, follow_redirects=False)\n# harness_lib.py\ndef profile_closure(root: Path, profile: str) -> set[str]   # ast import walk from verify's step scripts\ndef check_domains(relative): ... 'db' if relative in profile_closure(root, 'db') ...\n# test: profile_closure('db') <= {p for p in scripts if 'db' in check_domains(p)}",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-05: Stop inspects fresh evidence for the changed scope. Deriving domains from imports only adds required profiles and never removes one, and the hook stays a thin adapter over repository scripts.",
+      "verdict": "confirmed",
+      "verifierNote": "Fan-in recomputed with an ast walk (qualify_identity 7, qualify_operations 6, qualify_web 3, live_goal 2, harness_lib 23 plus the hook). The db profile's closure includes qualify_web and toolchain ({'python', 'web'}) and live_goal and qualify_operations ({'harness'}), reached through persistent_install's goal branch at line 799, which qualify_persistent_apply drives."
+    },
+    {
+      "id": "SCRP-07",
+      "title": "The disposable-stack skeleton is copied into 13 entry points, and only one copy checks its cleanup listing",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "scripts/disposable_db.py",
+          "line": 591,
+          "endLine": 597,
+          "note": "the one copy that checks the listing's exit codes"
+        },
+        {
+          "file": "scripts/app_db.py",
+          "line": 689,
+          "endLine": 692
+        },
+        {
+          "file": "scripts/qualify_identity.py",
+          "line": 726,
+          "endLine": 729
+        },
+        {
+          "file": "scripts/supabase_stack.py",
+          "line": 312,
+          "endLine": 315
+        },
+        {
+          "file": "scripts/qualify_operations.py",
+          "line": 136,
+          "endLine": 153,
+          "note": "setup copy"
+        },
+        {
+          "file": "scripts/qualify_browse_goal.py",
+          "line": 45,
+          "endLine": 47,
+          "note": "an image probe stands in for a Docker probe"
+        },
+        {
+          "file": "scripts/qualify_mac_sleep.py",
+          "line": 105,
+          "endLine": 126,
+          "note": "no Docker probe at all"
+        },
+        {
+          "file": "scripts/qualify_identity.py",
+          "line": 733,
+          "endLine": 738,
+          "note": "hand-built report"
+        }
+      ],
+      "occurrences": 13,
+      "evidence": "13 scripts repeat the same steps: a project name from PROJECT_PREFIX plus token_hex(4), chained free_port calls, `AppStack(target, root, root / 'infra/supabase/upstream/docker-compose.yml', ...)`, the migrator and runtime password pair, require_identity, a Docker probe, require_rendered and require_images, and an other_resources snapshot. Then come `finally: remove_stack`, the 'cleanup removed the owned containers and volumes' case, the 'other Docker resources are untouched' case and a hand-built JSON report. The copies diverge. 11 of the 12 cleanup checks join the stdout of `docker volume ls` and `docker ps` without checking exit codes, so a failed listing reads as 'none left'; only disposable_db.py:594 raises. The other_resources call that follows raises when Docker can list nothing, so the gap is a filtered listing that fails on its own. qualify_mac_sleep, qualify_release and the three browser scripts never probe the engine, so a stopped Docker is reported as an image that 'is not built' or 'is not on this machine'. Reports differ in their trailing newline, their project field and their transport labels.",
+      "impact": "Fixes to setup or to the ownership proof land in one copy at a time, and how trustworthy a cleanup case is depends on which copy a script inherited. Each new qualifier starts by pasting about 30 lines.",
+      "recommendation": "Provide one context manager that owns the lifecycle and records both cleanup cases, checking every listing's exit code, plus one report writer that writes atomically and includes the trailing newline, fingerprint, schema and not_established list.",
+      "sketch": "@contextmanager\ndef disposable_app_stack(root: Path, cases: Cases, *, extra_ports: int = 0, wait: int = 240,\n                         services: Sequence[str] = ()) -> Iterator[StackRun]:\n    # project, ports, AppStack, passwords, require_identity, docker info, render, images, before snapshot\n    try: yield StackRun(stack, ports, base, runtime_url)\n    finally: remove_stack(stack); record_cleanup(cases, project, before)   # Unavailable on a failed listing\ndef write_report(root: Path, path: Path, schema: str, cases: Cases, started_at: float,\n                 not_established: Sequence[str], **extra: object) -> int",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "Infrastructure rule: distinct disposable projects and ownership guards come before cleanup. The shared manager keeps require_identity and require_labels before any removal and makes the cleanup listing stricter, never looser.",
+      "verdict": "revised",
+      "verifierNote": "13 qualifier skeletons confirmed (15 scripts create a disposable project; disposable_db and supabase_stack use their own stack classes, and local_backup's AppStack serves a restore), and 12 cleanup listings, of which only disposable_db.py checks exit codes. Noted that other_resources(project) on the next line raises Unavailable when Docker is unreachable, which narrows that risk."
+    },
+    {
+      "id": "SCRP-08",
+      "title": "Two unrelated Unavailable classes break the exit-code contract where scripts mix them",
+      "dimension": "errors",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "scripts/toolchain.py",
+          "line": 78,
+          "endLine": 79
+        },
+        {
+          "file": "scripts/disposable_db.py",
+          "line": 52,
+          "endLine": 57
+        },
+        {
+          "file": "scripts/qualify_identity.py",
+          "line": 255,
+          "note": "find_tools raises toolchain.Unavailable"
+        },
+        {
+          "file": "scripts/qualify_identity.py",
+          "line": 742,
+          "endLine": 750,
+          "note": "catches only disposable_db.Unavailable"
+        },
+        {
+          "file": "scripts/qualify_release.py",
+          "line": 155,
+          "endLine": 156
+        },
+        {
+          "file": "scripts/qualify_release.py",
+          "line": 361,
+          "endLine": 385,
+          "note": "the miss skips setting stopped, then the report is written"
+        },
+        {
+          "file": "scripts/persistent_install.py",
+          "line": 706,
+          "endLine": 717,
+          "note": "screens: the same mismatch"
+        },
+        {
+          "file": "scripts/qualify_github_connector.py",
+          "line": 118,
+          "endLine": 119,
+          "note": "a second Refused class, mapped to exit 2"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "toolchain.Unavailable and disposable_db.Unavailable are separate classes. qualify_identity, qualify_release and persistent_install import the second but call find_tools and qualify_web.wait_until_up, which raise the first, so their `except Unavailable` never matches. In qualify_release the miss also skips `stopped = str(error)`, so the finally block writes report.json with 'stopped': '' and then the traceback follows. Refusals disagree too: persistent_install raises Refused for a missing --paid and exits 1 (lines 794-798), live_goal and qualify_release print REFUSED for the same missing flag and exit 2, and qualify_github_connector defines its own Refused for a missing prerequisite and maps it to 2. evidence.py record indexes a hand-written plan's keys directly (plan['profiles'], plan['runbook'], plan['retention'], lines 392-413), so a missing key ends in a traceback with exit 1 ('not complete') rather than 2 ('unusable request').",
+      "impact": "A web server that never answers or a missing pinned tool is reported as a failed check (exit 1) instead of an unavailable prerequisite (exit 2), and verify.py and readers treat those differently. The identity report is lost, because it was deleted at the start. A paid-run report can say it stopped for no reason.",
+      "recommendation": "Define Refused and Unavailable once, in harness_lib or a small errors module, and import them everywhere, including toolchain and qualify_github_connector. Give every CLI one wrapper that maps Refused to 1, Unavailable to 2 and anything else to 1 with a short message, and document once which code a paid script's missing --paid flag uses. Validate the shapes of the plan and install.json at the top of their commands.",
+      "sketch": "# scripts/errors.py (stdlib only)\nclass Refused(Exception): exit_code = 1\nclass Unavailable(Exception): exit_code = 2\ndef cli(main: Callable[[], int]) -> int   # prints 'REFUSED before any change: ...' or 'ERROR: ...'\n# toolchain.py, disposable_db.py, qualify_github_connector.py: from errors import Refused, Unavailable",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "AGENTS.md Commands: exit 0 passed, 1 a check failed, 2 a prerequisite is unavailable. The change restores that mapping and does not change any refusal condition.",
+      "verdict": "revised",
+      "verifierNote": "Both Unavailable classes and the three mixing scripts confirmed: find_tools and wait_until_up raise toolchain.Unavailable, which the except clauses in qualify_identity, qualify_release and persistent_install never match. The Refused comparison is restated as the concrete missing --paid case."
+    },
+    {
+      "id": "SCRP-09",
+      "title": "Arrangements whose failures are never checked let qualifier cases pass vacuously",
+      "dimension": "tests",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "scripts/qualify_identity.py",
+          "line": 93,
+          "endLine": 101,
+          "note": "canary result discarded; the denial cases after it pass either way"
+        },
+        {
+          "file": "scripts/qualify_identity.py",
+          "line": 104,
+          "endLine": 107,
+          "note": "a conjunct computed over 'where false'"
+        },
+        {
+          "file": "scripts/app_db.py",
+          "line": 344,
+          "endLine": 345,
+          "note": "escaped backslash-n in SQL and in the child's stdin"
+        },
+        {
+          "file": "scripts/qualify_identity.py",
+          "line": 272,
+          "note": "literal backslash-n appended to the arranged key in .env.local"
+        },
+        {
+          "file": "scripts/qualify_identity.py",
+          "line": 275,
+          "endLine": 277,
+          "note": "escaped backslash-n in SQL, result discarded"
+        },
+        {
+          "file": "scripts/qualify_identity.py",
+          "line": 461,
+          "note": "the same on the member insert"
+        },
+        {
+          "file": "scripts/qualify_upgrade.py",
+          "line": 207,
+          "note": "arrangement result discarded"
+        },
+        {
+          "file": "scripts/qualify_upgrade.py",
+          "line": 217,
+          "note": "cleanup result discarded"
+        }
+      ],
+      "occurrences": 36,
+      "evidence": "33 statement-level stack.sql, runtime or migrator calls in 7 files discard their result, arrangements and cleanups alike, 16 of them in qualify_identity.py (counted with an ast walk). If the canary tables at qualify_identity.py:93 fail to create, the PostgREST cases that follow still pass, because a missing table is also a 4xx. Six string literals double the backslash before n, so they write a literal backslash-n where a newline was meant: four SQL strings (psql runs the statement at its semicolon, then rejects an unknown meta-command, and the result is ignored), the arranged OPENROUTER_API_KEY line in .env.local, and the child's stdin at app_db.py:345, which works only because communicate() then closes stdin. qualify_identity.py:104 then asserts on a query that cannot return anything but 0:\n```\n    grants = rows(stack, \"select count(*) from information_schema.role_usage_grants where false;\")\n```",
+      "impact": "A broken arrangement shows up as a confusing downstream failure or not at all, and a disposable 'passed' case can rest on a fixture that never existed.",
+      "recommendation": "Route every arrangement through a helper that records 'arranged: <label>' as a case, or raises Unavailable, when it fails, as qualify_identity.py:204-226 already does for the schema states. Replace the escaped sequences with real newlines and drop the vacuous query. Add a SQL literal helper for interpolated values, which are quoted by hand in only two places today (persistent_install.py:522 and 603).",
+      "sketch": "def arrange(cases: Cases, label: str, result: CompletedProcess[str]) -> bool:\n    cases.check(f'arranged: {label}', 'exit 0', f'exit {result.returncode}: {result.stderr[-200:]}', result.returncode == 0)\n    return result.returncode == 0\ndef sql_literal(value: str) -> str: ...   # wrap in single quotes, doubling any inside",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "AGENTS.md completion evidence: skipped tests or templates never count as passing. DH-07: synthetic fixtures in disposable environments only. Recording arrangements makes failures visible and touches no persistent target.",
+      "verdict": "revised",
+      "verifierNote": "33 discarded calls recounted with ast, the six doubled backslash-n literals and the always-zero query confirmed. The evidence now says the count includes cleanups, and the recommendation points at the schema-state block that already records its arrangement. psql's handling of the stray meta-command is inferred, not run."
+    },
+    {
+      "id": "SCRP-10",
+      "title": "Case records and qualification reports are untyped dicts whose vocabulary drifts",
+      "dimension": "types",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "scripts/evidence.py",
+          "line": 27,
+          "endLine": 28,
+          "note": "the only definition of classes and transports"
+        },
+        {
+          "file": "scripts/verify.py",
+          "line": 34,
+          "endLine": 40,
+          "note": "STEP_CLASSES written as free strings"
+        },
+        {
+          "file": "scripts/disposable_db.py",
+          "line": 337,
+          "endLine": 349,
+          "note": "Cases writes {'status': ...} records"
+        },
+        {
+          "file": "scripts/qualify_operations.py",
+          "line": 35,
+          "endLine": 37,
+          "note": "Checks defaults every case to transport 'none'"
+        },
+        {
+          "file": "scripts/qualify_worker_inference.py",
+          "line": 460,
+          "endLine": 468,
+          "note": "positional relabel, then 'fake' at report level"
+        },
+        {
+          "file": "scripts/live_goal.py",
+          "line": 84,
+          "note": "'live OpenRouter'"
+        },
+        {
+          "file": "scripts/qualify_browser_executor.py",
+          "line": 98,
+          "endLine": 103,
+          "note": "report the service reads at runtime"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/browser_executor.py",
+          "line": 489,
+          "endLine": 500,
+          "note": "executor_qualified() reads that report with .get()"
+        }
+      ],
+      "occurrences": 8,
+      "evidence": "The allowed classes and transports are defined only in evidence.py (CLASSES, TRANSPORTS). Qualifier reports use other words or keys: 'model_transport': 'fake' (qualify_worker_inference.py:468), 'live OpenRouter' (live_goal.py:84, persistent_install.py:347 and 560), 'scripted, over a fake HTTP transport' (qualify_mac_sleep.py:64), 'model': 'scripted, no provider' (qualify_browse_goal.py:104), and 'evidence_class' (qualify_release.py:105, qualify_github_connector.py:109). Checks() gives every operations, backup and upgrade case the transport 'none', although their fixture workers run a scripted model and verify.py classes those steps ('disposable', 'mock'). qualify_worker_inference relabels by position:\n    for record in cases.records[:-2]:\n        record['model_transport'] = 'mock'\nChildren report {'passed': bool} while parents record {'status': 'passed'}. The executor report is read by the service's executor_qualified() with no shared schema.",
+      "impact": "Evidence readers cannot rely on one vocabulary, and a mislabelled transport is exactly the confusion DH-09.2 forbids. A renamed key or case id in the executor report would silently disable browsing (it fails closed), and nothing links its writer to its reader.",
+      "recommendation": "Define the vocabulary and record shapes once and type them: Literal aliases for class and transport, and TypedDicts for a case record, a child report and a qualification report, used by Cases, verify.STEP_CLASSES and evidence.py. Give Cases its transport at construction instead of relabelling by position. Add a harness test that round-trips a report written by the qualifier's writer through executor_qualified() with REQUIRED_CASES.",
+      "sketch": "VerificationClass = Literal['static', 'mock', 'disposable', 'local_runtime', 'live']\nModelTransport = Literal['none', 'mock', 'openrouter_live']\nCaseRecord = TypedDict('CaseRecord', {'id': str, 'class': VerificationClass, 'model_transport': ModelTransport,\n                                      'expected': str, 'observed': str, 'status': Literal['passed', 'failed']})\nclass ChildCase(TypedDict): id: str; expected: str; observed: str; passed: bool\nclass QualificationReport(TypedDict): schema_version: str; status: str; cases: list[CaseRecord]; not_established: list[str]",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-09.2 class and model-transport vocabulary, which docs/engineering/evidence/README.md extends with local_runtime. The change narrows free text to that vocabulary and touches only script records, not DTO, row or UI types.",
+      "verdict": "confirmed",
+      "verifierNote": "Cases defaults to 'none' (disposable_db.py:338), Checks inherits it, verify.py classes the operations, backup, upgrade and app_db steps as 'mock', and qualify_worker_inference relabels all but the last two records. The service's own tests build an executor report from REQUIRED_CASES, but nothing ties the qualifier that writes it to that list."
+    },
+    {
+      "id": "SCRP-12",
+      "title": "harness_lib is a grab bag, and each profile's checks are registered in five places",
+      "dimension": "modules",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "scripts/harness_lib.py",
+          "line": 55,
+          "endLine": 67,
+          "note": "DB_CHECK_FILES, DB_CHECKS, OPERATIONS_CHECKS"
+        },
+        {
+          "file": "scripts/verify.py",
+          "line": 30,
+          "endLine": 40,
+          "note": "SELF_REPORTING_STEPS and STEP_CLASSES"
+        },
+        {
+          "file": "scripts/verify.py",
+          "line": 132,
+          "endLine": 143,
+          "note": "the db and operations steps in tool_plan"
+        },
+        {
+          "file": "scripts/verify.py",
+          "line": 223,
+          "endLine": 229,
+          "note": "scope and not_tested per profile"
+        },
+        {
+          "file": "scripts/harness_lib.py",
+          "line": 160,
+          "endLine": 165,
+          "note": "read_report"
+        },
+        {
+          "file": "scripts/harness_lib.py",
+          "line": 193,
+          "endLine": 200,
+          "note": "report_state reads the same file again itself"
+        },
+        {
+          "file": "scripts/harness_lib.py",
+          "line": 230,
+          "endLine": 231,
+          "note": "fingerprint and input_manifest walk the tree twice"
+        },
+        {
+          "file": "tests/harness/test_final_review.py",
+          "line": 64,
+          "endLine": 71,
+          "note": "tests that compare the registry's copies"
+        }
+      ],
+      "occurrences": 5,
+      "evidence": "harness_lib (520 lines, imported by 23 scripts and the hook) holds environment reduction, the input manifest, check-domain routing, report and evidence state, configuration validation and the Claude version probe. Adding a db qualifier means editing DB_CHECKS and DB_CHECK_FILES (harness_lib.py:55 and 65) and SELF_REPORTING_STEPS, STEP_CLASSES and tool_plan (verify.py:31, 38 and 136), plus the scope and not_tested dicts; 'identity_qualification' appears in all five places. Tests compare tool_plan with DB_CHECKS and OPERATIONS_CHECKS, and check two STEP_CLASSES entries. report_state reads the report itself instead of calling read_report, and it computes the manifest twice. Measured for this review, one evidence_state call computed the 723-file manifest 8 times at 0.11 to 0.16 s each, inside the hook's 9 s deadline.",
+      "impact": "A step added in one place and missed in another changes what 'passed' means for a profile, and only tests that compare the copies notice. The hook's Stop path pays for repeated hashing that grows with the repository.",
+      "recommendation": "Split harness_lib into focused modules behind the same import names, or keep it as a facade. Describe each profile once as data, with steps that carry id, argv, timeout, class, transport and self-reporting, and let verify.tool_plan, report_state and evidence consume it. Compute the manifest once per evaluation and pass it down.",
+      "sketch": "@dataclass(frozen=True)\nclass CheckStep: id: str; argv: tuple[str, ...]; timeout: float; klass: VerificationClass; transport: ModelTransport; self_reporting: bool\n@dataclass(frozen=True)\nclass Profile: steps: tuple[CheckStep, ...]; scope: str; not_tested: tuple[str, ...]\nPROFILES: dict[str, Profile] = {'db': Profile(steps=(CheckStep('identity_qualification', ...), ...), ...)}\n# scripts/harness/: manifest.py, domains.py, reports.py, config_check.py, adapter.py (harness_lib re-exports)\ndef evidence_state(root: Path, manifest: dict[str, str] | None = None) -> tuple[bool, str]",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-05: the hook stays a thin adapter and substantive checks live in repository scripts. DH-09.2 statuses are unchanged, and a single registry removes drift without removing any required check.",
+      "verdict": "confirmed",
+      "verifierNote": "'identity_qualification' sits in five registries (harness_lib.py:55 and 65, verify.py:31, 38 and 136). Re-measured one evidence_state call: 8 manifest computations of 723 files, 0.10 to 0.20 s each, about 0.95 s in all."
+    },
+    {
+      "id": "SCRP-15",
+      "title": "scripts/ is a flat mix of entry points and libraries, without the scripts/db/ that DH-03 lays out",
+      "dimension": "structure",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "PRD-Development-Harness.md",
+          "line": 54,
+          "note": "DH-03: scripts/db/ for target-checked migration and seed operations"
+        },
+        {
+          "file": "scripts/disposable_db.py",
+          "line": 622,
+          "endLine": 656,
+          "note": "a CLI inside a module 16 scripts import"
+        },
+        {
+          "file": "scripts/app_db.py",
+          "line": 705,
+          "endLine": 717,
+          "note": "a CLI inside a module 14 scripts import"
+        },
+        {
+          "file": "scripts/supabase_stack.py",
+          "line": 331,
+          "endLine": 352
+        },
+        {
+          "file": "scripts/qualify_identity.py",
+          "line": 742,
+          "endLine": 750,
+          "note": "a qualifier that 7 scripts import"
+        },
+        {
+          "file": "scripts/harness_lib.py",
+          "line": 29,
+          "endLine": 35,
+          "note": "ALLOWED_LINK_PATHS pins the entry-point paths"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "28 modules sit side by side: harness entry points (verify, specs, evidence, toolchain, generate_contracts), plain libraries (harness_lib, release_scoring), libraries that are also CLIs (disposable_db, supabase_stack and app_db, imported by 16, 15 and 14 scripts, plus qualify_identity and qualify_operations), 13 qualify_ scripts of different kinds (disposable, mock, local runtime and paid), paid trials (live_goal, browse_trial, qualify_release and parts of persistent_install) and a shell helper (tool_keys_env). Only the qualify_ prefix and the docstrings tell them apart. DH-03 places target-checked migration and seed operations under scripts/db/, which does not exist.",
+      "impact": "Nothing in the layout says which modules are safe to import, which spend money and which touch the persistent install, so new code lands next to whatever file it was copied from.",
+      "recommendation": "Keep entry-point paths stable, because AGENTS.md, rule links, settings, runbooks and tests name them. Move shared code into packages: scripts/qualification/ for the disposable-run library, and scripts/db/ for target-checked migration and seed operations as DH-03 lays out, with thin compatibility shims. Mark paid entry points in one place, such as a PAID_SCRIPTS list that a harness test checks for a --paid refusal.",
+      "sketch": "scripts/\n  verify.py specs.py evidence.py toolchain.py generate_contracts.py   # unchanged entry points\n  harness/        manifest.py domains.py reports.py config_check.py adapter.py   (harness_lib re-exports)\n  qualification/  stack.py children.py cases.py report.py owners.py ops.py net.py paid_run.py\n  db/             disposable.py app.py supabase_stack.py persistent_apply.py   (DH-03)\n  qualify_*.py    thin entry points: scenarios only",
+      "effort": "L",
+      "risk": "medium",
+      "ruleCheck": "DH-03 lists scripts/db/ for target-checked migration and seed operations. harness_lib.ALLOWED_LINK_PATHS and AGENTS.md name scripts/verify.py and scripts/specs.py, so those entry points stay where they are. infrastructure.md's paths frontmatter names scripts/persistent_install.py and scripts/local_backup.py, so any move updates those globs and the harness tests that pin them.",
+      "verdict": "revised",
+      "verifierNote": "DH-03's scripts/db/ (PRD-Development-Harness.md:54), the fan-in figures and ALLOWED_LINK_PATHS confirmed. The 13 qualify_ scripts are not all disposable (qualify_faults is mock, qualify_web local runtime, qualify_release paid), and the rule check now names the infrastructure.md globs a move must carry."
+    },
+    {
+      "id": "SCRP-11",
+      "title": "config_errors validates six concerns in 91 lines, and its early returns drop errors",
+      "dimension": "functions",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "scripts/harness_lib.py",
+          "line": 250,
+          "endLine": 340,
+          "note": "config_errors"
+        },
+        {
+          "file": "scripts/harness_lib.py",
+          "line": 264,
+          "endLine": 266,
+          "note": "returns a fresh list, dropping errors already collected"
+        },
+        {
+          "file": "scripts/harness_lib.py",
+          "line": 278,
+          "endLine": 280,
+          "note": "returns early, skipping the asset, rule-link and AGENTS checks"
+        },
+        {
+          "file": "scripts/harness_lib.py",
+          "line": 284,
+          "endLine": 320,
+          "note": "event, group and handler checks nested five levels deep"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "One function reads both configuration files, then checks the interpreter, the document map, the settings keys, every hook event, group and handler (nested five levels deep), and skill and agent frontmatter, before calling the rule-link and AGENTS checks. A non-object `documents` returns a fresh list, discarding the activation and interpreter errors collected so far:\n    documents = config.get('documents')\n    if not isinstance(documents, dict):\n        return ['Document mappings must be an object.']\nA non-object `hooks` returns early and skips the frontmatter, rule-link and AGENTS checks.",
+      "impact": "project_configuration is the harness gate that the hook and every profile rely on. Incomplete diagnostics turn one fix into several runs, and every new rule lengthens a function whose sections cannot be tested separately.",
+      "recommendation": "Split it into independent validators that each return a list, and concatenate their results, so a malformed section never hides another.",
+      "sketch": "def config_errors(root: Path) -> list[str]:\n    config, settings, errors = load_config(root)          # unreadable or non-object -> errors\n    return [*errors, *activation_errors(config), *interpreter_errors(config), *document_errors(root, config),\n            *hook_errors(settings, interpreter=config.get('python_executable')),\n            *asset_frontmatter_errors(root), *rule_link_errors(root), *agents_mapping_errors(root)]\ndef hook_errors(settings: Mapping, interpreter: object) -> list[str]   # flat helpers per event, group and handler",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "AGENTS.md rule-check table: project_configuration in verify.py checks .claude/settings.json and the hook configuration CLAUDE.md describes. The split keeps every check and only stops early returns from hiding others.",
+      "verdict": "revised",
+      "verifierNote": "Both early returns (harness_lib.py:264-266 and 278-280) and the 91-line span confirmed. Lowered to low: the lost diagnostics appear only with a malformed documents or hooks section, and the rest is size."
+    },
+    {
+      "id": "SCRP-13",
+      "title": "Secret-file names are listed three times, and the input manifest's list is the shortest",
+      "dimension": "duplication",
+      "severity": "low",
+      "locations": [
+        {
+          "file": ".claude/hooks/dispatch.py",
+          "line": 38,
+          "endLine": 43,
+          "note": "is_secret"
+        },
+        {
+          "file": ".claude/hooks/dispatch.py",
+          "line": 104,
+          "endLine": 106,
+          "note": "install directory paths"
+        },
+        {
+          "file": ".claude/hooks/dispatch.py",
+          "line": 118,
+          "endLine": 122,
+          "note": "Bash patterns, another subset"
+        },
+        {
+          "file": "scripts/harness_lib.py",
+          "line": 128,
+          "endLine": 137,
+          "note": "is_non_input"
+        },
+        {
+          "file": "scripts/persistent_install.py",
+          "line": 35,
+          "note": "DEFAULT_DIR, repeated as text in the hook"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "dispatch.is_secret treats stack.env, app.env, owner.env, master.key, provider-master.key, backup.key and .env* as secret. The Bash patterns repeat a different subset plus the install path. harness_lib.is_non_input excludes only .env* and provider-master.key from the input manifest:\n    secret = (path.name.startswith('.env') and not path.name.endswith('.example')) or path.name == 'provider-master.key'\nSo a master.key, backup.key or stack.env placed under an input directory would be hashed into .checks/<profile>/latest.json.",
+      "impact": "The three lists can only drift further apart, and the manifest's list, the one that feeds .checks/<profile>/latest.json, is the one that falls behind, contrary to DH-09.2's rule against hashing secrets. No such file sits under an input directory today, because the install and the master key live outside the repository.",
+      "recommendation": "Define SECRET_FILE_NAMES, the install-directory markers and an is_secret_name() function once in harness_lib, which the hook already imports, and use them in is_secret, the Bash guard and is_non_input. Add a harness test that every listed name is both refused by the hook and absent from input_manifest.",
+      "sketch": "# harness_lib.py\nSECRET_FILE_NAMES = frozenset({'stack.env', 'app.env', 'owner.env', 'master.key', 'provider-master.key', 'backup.key'})\nINSTALL_MARKERS = ('application support/autobots/secrets', '.local/share/autobots-install/')\ndef is_secret_name(name: str) -> bool: ...   # casefolded; .env and .env.* except .example",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-05 secret guard and DH-09.2 'exclude raw secrets entirely'. The union of today's lists is kept, so nothing the hook refuses today becomes allowed.",
+      "verdict": "revised",
+      "verifierNote": "All three lists confirmed. Lowered to low: the named files live outside the repository today, and a hash would reach only the ignored per-profile report, since versioned evidence stores digests of the manifest."
+    },
+    {
+      "id": "SCRP-14",
+      "title": "Small helpers are re-implemented per script, often under the same name with different behavior",
+      "dimension": "duplication",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "scripts/disposable_db.py",
+          "line": 281,
+          "endLine": 291,
+          "note": "free_port scans the disposable range"
+        },
+        {
+          "file": "scripts/qualify_web.py",
+          "line": 40,
+          "endLine": 43,
+          "note": "free_port binds port 0; imported elsewhere as any_port"
+        },
+        {
+          "file": "scripts/disposable_db.py",
+          "line": 352,
+          "endLine": 354,
+          "note": "rows returns a string"
+        },
+        {
+          "file": "scripts/live_goal.py",
+          "line": 43,
+          "endLine": 46,
+          "note": "rows returns a list of dicts"
+        },
+        {
+          "file": "scripts/disposable_db.py",
+          "line": 304,
+          "endLine": 313,
+          "note": "http, copy 1"
+        },
+        {
+          "file": "scripts/supabase_stack.py",
+          "line": 196,
+          "endLine": 207,
+          "note": "http, copy 2, without redirects"
+        },
+        {
+          "file": "scripts/qualify_identity.py",
+          "line": 40,
+          "endLine": 45,
+          "note": "http, copy 3"
+        },
+        {
+          "file": "scripts/app_db.py",
+          "line": 66,
+          "endLine": 69,
+          "note": "repeats Stack.as_role verbatim"
+        }
+      ],
+      "occurrences": 23,
+      "evidence": "11 helper names are defined in two or three modules, 23 definitions in all. Some share a name but not a contract: free_port (a fixed range or any port), rows (a string or a list of JSON rows), require_rendered and rendered_refusals (disposable_db or supabase_stack), and identity_refusals (a disposable target or the install). Others are copied with the same contract: three http helpers, alongside api_call and http_json; b64 twice, with two HS256 signers (disposable_db.jwt and qualify_web.session_token); utc and the EXIT_* constants in both verify and toolchain; the PYTHON path constant in 7 modules, plus 20 inline literals in app_db; and executor_fingerprint, identical in two files. There are also three pollers (wait_for, an untyped wait and wait_until_up). AppStack.as_role repeats Stack.as_role (disposable_db.py:94-99) verbatim, beside two local variants that only add a setup prefix (app_db.py:227 and 258).",
+      "impact": "Readers must check which free_port or rows a module imported, and fixes to redirects, timeouts or the comment explaining why both JWT claim settings are set reach only one copy.",
+      "recommendation": "Collect these helpers in the shared library proposed in the modules finding, with distinct names (disposable_free_port and any_free_port, rows_text and rows_json). Give Stack.as_role an optional setup prefix and delete the three copies.",
+      "sketch": "qualification/net.py   any_free_port(), disposable_free_port(excluded), http(method, url, headers, body, *, redirects=False)\nqualification/jwt.py   b64url(data), hs256(secret, claims)\nqualification/wait.py  poll(check: Callable[[], bool], seconds: float, interval: float = 0.5, ignore=(OSError,)) -> bool\nStack.as_role(self, role: str, user: str | None, statement: str, *, setup: str = '') -> CompletedProcess[str]",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "No rule names these helpers. Distinct names keep every contract, and the db and operations profiles cover the callers that move.",
+      "verdict": "revised",
+      "verifierNote": "An ast walk finds 18 top-level names defined in more than one script; 11 of them are helpers rather than per-area case or entry functions, with 23 definitions. AppStack.as_role (app_db.py:66-69) overrides Stack.as_role with the same body. Lowered to low: each copy works, and the cost is in reading and in fixes that reach one copy."
+    },
+    {
+      "id": "SCRP-16",
+      "title": "Three ad hoc dotenv parsers ignore the quoting and export rules the app's own parser applies",
+      "dimension": "duplication",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "scripts/local_backup.py",
+          "line": 159,
+          "endLine": 165
+        },
+        {
+          "file": "scripts/persistent_install.py",
+          "line": 77,
+          "endLine": 83,
+          "note": "reads stack.env, app.env and owner.env"
+        },
+        {
+          "file": "scripts/supabase_stack.py",
+          "line": 91,
+          "endLine": 99
+        },
+        {
+          "file": "scripts/tool_keys_env.py",
+          "line": 22,
+          "note": "already reuses the service parser"
+        },
+        {
+          "file": "services/agent/src/autobots/application/credentials/precedence.py",
+          "line": 24,
+          "endLine": 39
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "parse_env and read_values are the same split-on-'=' loop, and example_defaults is a third. The service's parse_dotenv, which tool_keys_env.py and qualify_github_connector.py already reuse, strips `export`, matching quotes and trailing comments. read_values reads the persistent install's stack.env, app.env and owner.env.",
+      "impact": "A quoted or exported value hand-edited into the install's env files would be read with its quotes by the install tooling and without them by the app.",
+      "recommendation": "Use the service's parse_dotenv in local_backup and persistent_install, which already require the venv interpreter. Give scripts that run on the plain interpreter one stdlib copy in harness_lib that mirrors it, tested against the same fixtures.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "Infrastructure rule: persistent configuration stays target-guarded, and parsing changes no guard. Secret values are never printed.",
+      "verdict": "confirmed",
+      "verifierNote": "parse_env and read_values are the same loop and example_defaults a third; tool_keys_env.py and qualify_github_connector.py already import parse_dotenv. local_backup.py and persistent_install.py both document the venv interpreter, so the service parser is importable there."
+    },
+    {
+      "id": "SCRP-17",
+      "title": "Six Python programs are passed as -c strings and import service internals out of sight",
+      "dimension": "approach",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "scripts/app_db.py",
+          "line": 303,
+          "endLine": 312
+        },
+        {
+          "file": "scripts/supabase_stack.py",
+          "line": 233,
+          "endLine": 240
+        },
+        {
+          "file": "scripts/qualify_upgrade.py",
+          "line": 120,
+          "endLine": 126
+        },
+        {
+          "file": "scripts/qualify_upgrade.py",
+          "line": 208,
+          "endLine": 215,
+          "note": "imports autobots.application.goal_loop.execution_block"
+        },
+        {
+          "file": "scripts/qualify_browse_goal.py",
+          "line": 34,
+          "endLine": 41
+        },
+        {
+          "file": "scripts/qualify_browser_executor.py",
+          "line": 34,
+          "endLine": 41,
+          "note": "identical to the qualify_browse_goal copy"
+        }
+      ],
+      "occurrences": 6,
+      "evidence": "These strings import autobots.application.goal_loop.execution_block, autobots.adapters.browser_executor.images_fingerprint, langgraph's PostgresSaver and psycopg. executor_fingerprint is the same 8 lines in two files. No linter, type checker or usage search sees these programs, unlike the 67 Python files already kept in tests/db/.",
+      "impact": "Renaming a service function breaks a qualifier, and that only shows up when Docker runs it.",
+      "recommendation": "Move each program into tests/db/, or into the shared library, as a file with a main(), so tooling and the db domain see it, and share executor_fingerprint.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "No rule governs this. Kept as files in tests/db, the probes fall under the db domain's change detection and the service's lint.",
+      "verdict": "revised",
+      "verifierNote": "Six -c programs confirmed; executor_fingerprint is identical in qualify_browse_goal.py:34-41 and qualify_browser_executor.py:34-41. tests/db holds 67 Python files, not 30-odd."
+    },
+    {
+      "id": "SCRP-18",
+      "title": "verify runs checks two ways, with different timeout semantics and record shapes",
+      "dimension": "approach",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "scripts/verify.py",
+          "line": 61,
+          "endLine": 76,
+          "note": "run_check"
+        },
+        {
+          "file": "scripts/toolchain.py",
+          "line": 229,
+          "endLine": 256,
+          "note": "run_step"
+        },
+        {
+          "file": "scripts/harness_lib.py",
+          "line": 454,
+          "endLine": 482,
+          "note": "a third copy of the process-group kill"
+        },
+        {
+          "file": "scripts/evidence.py",
+          "line": 367,
+          "note": "papers over the two record shapes"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "run_check uses subprocess.run(timeout=60) without a process group, so a timed-out unittest run can leave its children behind, and it records 'command_argv' with full paths. run_step starts a new session, kills the whole group on timeout and records 'argv' with only the executable's basename. probe_version is a third copy of the group-kill logic. evidence.py accepts either shape: `check.get('command_argv') or check.get('argv')`.",
+      "impact": "Harness checks and toolchain checks in the same report behave differently on timeout and look different to every reader.",
+      "recommendation": "Move the group-kill runner into harness_lib, the lower layer, and have run_check, run_step and probe_version all use it with one record shape.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-05 asks for deadlines and bounded output, and DH-09.2 for argv recorded per check. One runner satisfies both consistently.",
+      "verdict": "confirmed",
+      "verifierNote": "run_check (subprocess.run with a 60 s timeout and no process group, full argv as command_argv), run_step (a new session, killpg, basename argv) and probe_version confirmed; evidence.py:367 reads either key."
+    },
+    {
+      "id": "SCRP-19",
+      "title": "Schema facts are hard-coded where they will go stale",
+      "dimension": "naming",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "scripts/app_db.py",
+          "line": 114,
+          "endLine": 123,
+          "note": "reset lists all 24 public tables on one 578-character line"
+        },
+        {
+          "file": "scripts/qualify_upgrade.py",
+          "line": 84,
+          "note": "applied >= 24"
+        },
+        {
+          "file": "scripts/qualify_upgrade.py",
+          "line": 151,
+          "endLine": 153,
+          "note": "cut at the literal '20261105000024_'"
+        },
+        {
+          "file": "scripts/app_db.py",
+          "line": 522,
+          "note": "Path(__file__) instead of root / MIGRATIONS"
+        }
+      ],
+      "occurrences": 4,
+      "evidence": "The reset list matches the 24 tables created in supabase/migrations today (compared for this review), so every new public table must also be added to that line, or the upgrade case's reset will leave it behind. qualify_upgrade asserts at least 24 prior migrations and cuts its broken copy at a literal file name.",
+      "impact": "These checks pass today and will fail confusingly later, far from the migration that caused the failure.",
+      "recommendation": "Derive the drop list from the catalog (tables and functions in public owned by autobots_migrator), name the prior-release facts as constants next to PRIOR_REVISION, and use root / MIGRATIONS consistently.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "AGENTS.md: no persistent reset. reset() is disposable-only behind require_marker, which stays, and no migration is edited.",
+      "verdict": "confirmed",
+      "verifierNote": "The drop list holds 23 tables on line 117 and public.workspaces on line 118, the 24 public tables the migrations create; `applied >= 24`, the literal cut and the Path(__file__) lookup confirmed."
+    },
+    {
+      "id": "SCRP-20",
+      "title": "specs.py validate_story fills in the Story while validating it, and fence parsing exists twice",
+      "dimension": "functions",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "scripts/specs.py",
+          "line": 274,
+          "endLine": 354,
+          "note": "validate_story, 81 lines"
+        },
+        {
+          "file": "scripts/specs.py",
+          "line": 301,
+          "note": "sets status as a side effect"
+        },
+        {
+          "file": "scripts/specs.py",
+          "line": 324,
+          "endLine": 325,
+          "note": "sets dependencies and qualified_dependency"
+        },
+        {
+          "file": "scripts/specs.py",
+          "line": 247,
+          "endLine": 249,
+          "note": "closure inside the block loop (ruff B023)"
+        },
+        {
+          "file": "scripts/specs.py",
+          "line": 98,
+          "endLine": 132,
+          "note": "outside_fences and fenced_blocks"
+        },
+        {
+          "file": "scripts/harness_lib.py",
+          "line": 365,
+          "endLine": 378,
+          "note": "unfenced_lines, with the same FENCE regex"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "validate_story sets story.status, dependencies, qualified_dependency, tasks and unresolved_questions as side effects of validation, so parse_document's dependency checks and promote depend on validation having run first. The closing-fence rule (`match[1][0] == opening[0] and len(match[1]) >= len(opening) and not match[2].strip()`) is written three times, in specs.py outside_fences and fenced_blocks and in harness_lib.unfenced_lines, with the same FENCE regex in both modules.",
+      "impact": "This parser decides story status and promotion. Separating parsing from validation makes promote testable on its own, and one fence parser keeps SPECS parsing and rule-link checking in agreement.",
+      "recommendation": "Split field parsing (sections into typed Story fields) from validation (issues), and move the fence and link Markdown helpers into one stdlib module that both use.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "AGENTS.md: render changes only generated navigation. Validate, render and promote behavior must stay identical, as the 41 tests in tests/harness/test_specs.py check.",
+      "verdict": "confirmed",
+      "verifierNote": "The side effects at specs.py:301, 324-325, 333 and 338, ruff's B023 at line 248 and the three copies of the closing-fence rule with two copies of FENCE confirmed."
+    },
+    {
+      "id": "SCRP-21",
+      "title": "specs.py's module docstring understates what the tool writes",
+      "dimension": "comments",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "scripts/specs.py",
+          "line": 1,
+          "endLine": 8
+        },
+        {
+          "file": "scripts/specs.py",
+          "line": 551,
+          "endLine": 562,
+          "note": "promote_text rewrites story Status lines"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "The docstring says rendering 'owns only the three navigation sections preceding Product Context, never story content', but the promote command rewrites story Status lines from BLOCKED to READY. Elsewhere in this area, module docstrings are accurate and state exit codes and limits.",
+      "impact": "The docstring is what a reviewer reads to judge a tool's write scope, and promote is the one command that edits story content.",
+      "recommendation": "Add promote to the docstring: it rewrites only a promotable story's Status line, under the rule in .claude/rules/ohmyorch-delivery.md.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": ".claude/rules/ohmyorch-delivery.md: promote moves BLOCKED to READY only when every dependency is DONE. Documenting that does not change it.",
+      "verdict": "confirmed",
+      "verifierNote": "The docstring covers validation and rendering only, while promote_text (specs.py:551-562) rewrites story Status lines."
+    }
+  ],
+  "rejected": [],
+  "notCovered": "mypy was not run, because it is not among the permitted read-only commands, so the type findings rest on reading the code rather than on checker output. No qualifier, profile or paid script was executed. Docker-backed behavior is inferred from the code and from documented tool behavior, not observed: this includes psql's handling of the stray backslash-n meta-command and the PostgREST status codes in the canary cases. Files outside this area were read only in part, where they test or are called by these scripts: tests/harness/test_final_review.py lines 52-110, test_hooks.py lines 395-410, test_verify_profiles.py lines 198-222, the stdin handling in tests/db/credential_store_check.py, services/agent's parse_dotenv and executor_qualified, and the ruff and mypy sections of services/agent/pyproject.toml. Other areas own those files. PRD-Development-Harness.md was read for DH-03 through DH-09.2 only, and metrics.md for its Python sections only. The Makefile wrapper around persistent_install.py and the runbooks were not reviewed. Measurements made for this review: ruff with the service configuration in check mode (outputs in .checks/reviews/review-2026-11-12-09-52-30/scripts/), plus an ast import-closure walk and a timed harness_lib.evidence_state call. Those two ran as read-only python3.12 -I scripts kept in the session scratchpad, outside the repository."
+}

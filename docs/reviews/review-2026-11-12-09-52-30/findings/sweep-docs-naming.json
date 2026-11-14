@@ -1,0 +1,661 @@
+{
+ "schema": "autobots.code-review/v1",
+ "area": "sweep-docs-naming",
+ "title": "Lens: comments, documentation and naming",
+ "kind": "lens",
+ "timestamp": "2026-11-12-09-52-30",
+ "revision": "156534da0bd5b19417f05d313077d767804b175b",
+ "summary": "Comments, docstrings and names are among this repository's strengths. Every service, script and hook module opens with a docstring that states its purpose and an invariant. The inline comments in the largest modules of each language explain why rather than restate code. Ruff finds no commented-out code, owned source carries no TODO markers, units sit in names (micro_usd, seconds, bytes), and each language follows one file-naming convention. The traceability practice is accurate: all 220 decision, 338 story and 364 requirement citations in source resolve, and nearly every one states the rule it cites. The weaknesses are drift and the absence of written, checked conventions. Nine comments in four languages describe an earlier state of the code: a 'later story', a 'first' tool set, a side panel that is now a modal, an app with 'no dialogs'. The root README and the developer Q&A still describe a product before implementation, with two models and Terra for every role. Names such as run_intent, default_registry, test_final_review and review_majors record the story or review that introduced them rather than what they do, and five words (operation, profile, settings, adapters, workspace) each carry two or three meanings. None of the conventions the code follows is written down or checked: 36 'PRD x.y' citations name none of the three PRDs that number their sections that way, ERA and pep8-naming would pass today but are not selected, and nothing resolves citations or flags delivery wording. Contract documentation is thinnest on the largest entry points: 21 of 80 route handlers have a docstring, and the biggest screen components have no header. The area reviews cover single-file issues; these findings are the patterns shared across areas.",
+ "scores": [
+  {
+   "dimension": "comments",
+   "score": 4,
+   "why": "Inline comments explain why, every service, script and hook module has a docstring and every citation resolves. Nine stale comments, a stale root README and thin contract docs on the largest entry points keep it at 4."
+  },
+  {
+   "dimension": "standards",
+   "score": 3,
+   "why": "DH-06's one comment sentence is met, but the citation format, the ban on delivery wording and the naming conventions the code follows are written nowhere. ERA, pep8-naming and citation resolution are off, though they would pass today."
+  },
+  {
+   "dimension": "structure",
+   "score": 4,
+   "why": "Each language has one file-naming convention with no exceptions (snake_case Python, kebab-case TypeScript, timestamped migrations). The exceptions are seven files named after review rounds and modules whose names collide, such as operations/, contracts/adapters.py and profiles.py."
+  },
+  {
+   "dimension": "tests",
+   "score": 4,
+   "why": "Test names read as behavior sentences (a median of 7 words in Python and 11 in Playwright), and tests/db checks state expected and observed results in words. The gaps are files named after review rounds and a stale inventory in the visual walk."
+  },
+  {
+   "dimension": "maintainability",
+   "score": 4,
+   "why": "Comments are accurate and give reasons, and names are descriptive almost everywhere. The main risk is drift with no check behind it, plus a few names based on history, some of them on the paid path."
+  }
+ ],
+ "strengths": [
+  {
+   "title": "Every service, script and hook module opens with a docstring that states its purpose and an invariant",
+   "evidence": "No service, script or hook module lacks a module docstring: 139 service files, 28 scripts and the hook (metrics.md section 3). Only five deliberately minimal samples in tests/faults/python have none. Examples: services/agent/src/autobots/api/routes.py:1 'A request never owns a run or a background task', api/event_routes.py:1 'Closing a stream never touches the run', and adapters/models/factory.py:1 'Nothing else builds a model client', which a grep confirms: only factory.py constructs ChatOpenRouter or OpenRouter. Scripts state their cost and guard: scripts/live_goal.py:2-7 'This spends money. It refuses without --paid', and scripts/qualify_release.py does the same."
+  },
+  {
+   "title": "Comments explain why and state invariants; comments that restate code are essentially absent",
+   "evidence": "Every comment was read in goal_loop.py (28 comments), tool_gateway.py (31), loop_middleware.py (12), run_projection.py, workflows.py, route_qualification.py, persistent_install.py, disposable_db.py, .claude/hooks/dispatch.py and the three largest TSX files. Examples: goal_loop.py:462 'The verdict commits with the transition, so a worker that lost the run records nothing', tool_gateway.py:441-442, loop_middleware.py:504-505, run-workspace.tsx:236, approvals-panel.tsx:686 and dispatch.py:235. A grep for comments that open by restating code ('Return', 'Get', 'Set', 'Loop', 'Create', 'Initialize' and similar) over src, web, scripts, hooks and tests/db finds one hit, and that one gives a reason (tests/db/product_inference_worker.py:35)."
+  },
+  {
+   "title": "Traceability citations resolve and state the rule they cite",
+   "evidence": "A python3.12 -I script over files.txt resolved 220 decision mentions (155 decision rows), 338 story IDs, 364 requirement IDs, 37 PRD section numbers and 47 file paths in comments. The only failures are synthetic fixture IDs in tests/harness. Only 1 of 489 comment lines that cite something in non-test source is a bare pointer (operations/route_qualification.py:67). Amendments are cited together, as in app-shell.tsx:42 'Decision 0022 D3 and D16'. No citation appears in UI text: grepping apps/web for IDs outside comments finds none."
+  },
+  {
+   "title": "No commented-out code and no TODO markers",
+   "evidence": "ruff ERA001 reports 0 in services/agent src and tests and 0 in scripts, tests and .claude/hooks. A grep for TODO, FIXME, XXX and HACK over owned source finds only the vendored infra/supabase/upstream/docker-compose.yml:384 and :465."
+  },
+  {
+   "title": "Units live in names, in all three languages",
+   "evidence": "Counts over services/agent/src, apps/web and scripts: micro_usd 386, seconds 247, bytes 176, tokens 119. Examples: charged_micro_usd and limit_micro_usd in application/run_projection.py:522-525, MAX_BODY_BYTES and RUN_BODY_BYTES with their reason in apps/web/lib/bff.ts:10-13, DB_SECONDS and DEFAULT_MIN_FREE_BYTES in application/operations.py:26-29, and environment variables such as AUTOBOTS_WORKER_DRAIN_SECONDS."
+  },
+  {
+   "title": "One naming convention per language, followed without a linter",
+   "evidence": "Python modules are all snake_case and TypeScript files are all kebab-case, apart from Next.js bracket routes. 128 TypeScript module constants holding literals are UPPER_SNAKE; camelCase appears only where Next.js requires it (metadata, dynamic) and for cva variants. SQL tables are plural snake_case, and migrations are timestamped. ruff's pep8-naming rules, with N818 ignored, report 0 in services/agent and 3 in tests/db/assignment_check.py:82-84. Of 61 exception classes, 58 are named for the outcome, such as ProfileNotOffered, LeaseLost and StaleVersion."
+  },
+  {
+   "title": "Tests are named as behavior sentences",
+   "evidence": "786 Python test functions have a median of 7 words, for example services/agent/tests/test_final_review.py:58 test_a_larger_request_reserves_for_every_byte_past_it. 206 Playwright and unit test titles have a median of 11 words. tests/db checks state expected and observed results in words, as in tests/db/artifact_check.py:225 'and a later repeat reuses the receipt'."
+  },
+  {
+   "title": "The Makefile explains each guard it adds",
+   "evidence": "Makefile:5-7 explains := over ?=, :93-96 explains why the pid file must match the process's start time, and :176-177 explains why it never sends KILL while a paid call may be running. A help target is at :35."
+  }
+ ],
+ "findings": [
+  {
+   "id": "XDOC-01",
+   "title": "Comments that narrate delivery go stale in every layer, and amended requirements leave their comments behind",
+   "dimension": "comments",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/api/settings_routes.py",
+     "line": 388,
+     "note": "'It admits nothing: run admission is a later story.' admitRun exists at api/run_routes.py:170-177, and no component calls /api/runs/intent"
+    },
+    {
+     "file": "services/agent/src/autobots/application/tools.py",
+     "line": 1,
+     "note": "'Nothing else exists.' The same file defines write_run_file (69), read_run_file v2 (128) and read_csv (164)"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 1,
+     "note": "'Nothing here reads checkpoints', but read_inspector selects from agent_runtime.checkpoints at 642"
+    },
+    {
+     "file": "apps/web/components/tool-catalog.tsx",
+     "line": 228,
+     "endLine": 229,
+     "note": "Keeps TL-01's old text, 'opens beside the list'. The detail is a modal dialog since Decision 0026 G2 (437-452)"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/service.py",
+     "line": 1,
+     "note": "'Contracts for the first routes.': delivery narrative on a module of six contract classes"
+    },
+    {
+     "file": "apps/web/tests/browser/slice-visual.spec.ts",
+     "line": 31,
+     "endLine": 36,
+     "note": "Records dialogs and charts as absent. Three components render a dialog element, and jobs-chart.tsx draws a chart on /operations"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/tools.py",
+     "line": 26,
+     "note": "Orphaned: describes propose_improvement (40) but sits above PROVIDER_TOOLS (28)"
+    },
+    {
+     "file": "apps/web/app/globals.css",
+     "line": 102,
+     "endLine": 103,
+     "note": "Orphaned: describes the .control-boundary rule that US-16.1 (747bc88) deleted, above the reduced-motion block"
+    }
+   ],
+   "occurrences": 9,
+   "evidence": "Nine verified instances in nine files, found by reading every comment in the largest modules of each language and by grepping for delivery wording. This is a sample, not a census. Besides the eight listed, application/operations.py:51 ends mid-sentence: 'The newest code relies on.' Three mechanisms recur. Delivery narrative: 'a later story', 'first', 'Nothing else exists', 'The app has none'. A requirement amended by a later decision: PRD-Studio.md:139 now says TL-01's side panel 'is a modal dialog since Decision 0026', but the comment that cites TL-01 kept the old text. A comment left behind when its subject moved or was deleted: domain/tools.py:26 describes propose_improvement but sits above PROVIDER_TOOLS, and globals.css:102 describes a .control-boundary rule that US-16.1 removed. The area reviews report several of these one at a time.",
+   "impact": "Readers trust a comment over the code beneath it. settings_routes.py:388 sits on the paid path's readiness check and tells a maintainer that run admission does not exist. slice-visual.spec.ts records the DS-03 dialog and chart surfaces as absent ('The app has none'), so the visual walk never opens the tool modal, the search palette or the About dialog, and its chart entry is false although its /operations capture includes the jobs chart. Each story adds more of these, because the wording ties a statement to the time it was delivered.",
+   "recommendation": "Fix the nine now. State what holds and keep the citation, for example 'Decision 0026 G2: the detail opens in a modal dialog, and the URL keeps ?tool='. Move the propose_improvement note down to EXPERT_TOOLS, delete the globals.css note along with the rule it described, and finish or delete the operations.py:51 fragment. When a decision amends a requirement row, grep for the row ID and fix every comment that cites it. The written rule against delivery narrative and its warning-level phrase check belong with the conventions in XDOC-02. Adding the grep step to ohmyorch-delivery.md is the user's call, since Decision 0003 keeps that loop deliberately lean.",
+   "sketch": "AGENTS.md > Comments (written with the conventions in XDOC-02)\n- Say what holds now, then cite it: '<rule>. (Decision 0026 G2)'\n- No delivery narrative: later story, Nothing else exists, has none, scaffold\n- Amending a requirement row? rg '<row ID>' and fix every comment that cites it",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06 asks code to explain nonobvious invariants, and a false comment does the opposite. Every decision and story citation stays, as ground rule 2 requires; only the claim is rewritten. A grep step in ohmyorch-delivery.md would strengthen a rule and weaken no check, but that file follows the user's Decision 0003, so the step is proposed rather than assumed.",
+   "verdict": "revised",
+   "verifierNote": "Re-opened all ten cited comments. Nine are stale or orphaned as described; contracts/service.py:1 replaces app-shell.tsx:12 among the locations. app-shell.tsx:12 was dropped: New run and Search are buttons (new-run.tsx:45, search-palette.tsx:112), so Home is still the first link after the skip link, though no longer the first stop. globals.css:102 lost its subject when US-16.1 (747bc88) deleted .control-boundary, rather than gaining a declaration in between. The recommendation now leaves the written rule to XDOC-02. TWEB-09 reports the visual inventory from the web-tests area."
+  },
+  {
+   "id": "XDOC-02",
+   "title": "The comment and naming conventions the code follows are not written down or checked",
+   "dimension": "standards",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "PRD-Development-Harness.md",
+     "line": 129,
+     "note": "DH-06's only comment rule: 'Explain nonobvious invariants in code; avoid comments that restate syntax.'"
+    },
+    {
+     "file": "services/agent/src/autobots/api/memory_routes.py",
+     "line": 1,
+     "note": "'PRD 8.4': PRD-AutoGPT.md:346, PRD-LangChain-Deep-Agents.md:509 and PRD-NextJS.md:471 each have a section 8.4"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/approvals.py",
+     "line": 1,
+     "note": "'PRD 9.2': three PRDs have a section 9.2"
+    },
+    {
+     "file": "services/agent/src/autobots/application/tool_gateway.py",
+     "line": 110,
+     "note": "Bare 'AB-02', five lines after 'PRD-Studio GH-06' at 105"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/tavily.py",
+     "line": 3,
+     "endLine": 6,
+     "note": "Decision rows (C1), (C2), (C6) and (C5), with the decision named only on line 1"
+    },
+    {
+     "file": "services/agent/pyproject.toml",
+     "line": 47,
+     "note": "select omits ERA and N, though both report 0 today with N818 ignored"
+    },
+    {
+     "file": "scripts/verify.py",
+     "line": 79,
+     "endLine": 87,
+     "note": "The harness profile checks configuration, the backlog and the harness tests. Nothing resolves citations in source"
+    },
+    {
+     "file": "scripts/specs.py",
+     "line": 33,
+     "note": "Story IDs are validated only in SPECS.md"
+    }
+   ],
+   "occurrences": 36,
+   "evidence": "A python3.12 -I script over files.txt counted these citation forms in non-test source: 'Decision NNNN Xn' 100, 'Decision NNNN' with no row 66, 'Decision NNNN's <section>' 6, 'PRD-Studio XX-NN' 97, Studio IDs with no document 62, and 'PRD x.y' 36. 'PRD x.y' names no document, although three PRDs number their sections. Every citation resolves today: 220 decision mentions (155 rows), 338 story IDs, 364 requirement IDs, the section numbers and 47 file paths. Only synthetic fixture IDs in tests/harness fail. That holds by discipline alone: AGENTS.md:44 makes scripts/specs.py the source-traceability check, but it validates only SPECS.md. `ruff --select N,ERA --ignore N818` reports 0 in services/agent src and tests, and 3 N806 in tests/db/assignment_check.py:82-84. Nothing records the exception naming that N818 would reject: 58 of 61 exceptions are named for the outcome, such as ProfileNotOffered.",
+   "impact": "Contributors can learn the format only by imitation. They cannot tell which PRD 'PRD 9.2' means without opening three, and they get no signal when a citation stops resolving or delivery wording goes stale. Two gates that would pass today are off, so the first violation of either lands unnoticed.",
+   "recommendation": "Write the conventions down where rules live: a short 'Comments and names' section in AGENTS.md, or .claude/rules/comments.md. It covers the citation form (document and ID after the rule: Decision 0022 D11, PRD-Studio SR-01, PRD-LangChain-Deep-Agents section 8.4), naming the row of a decision that has rows, no review-round IDs, exceptions named for the outcome, and names that describe behavior rather than history. Select ERA and N (ignoring N818) in services/agent/pyproject.toml now. Add `scripts/specs.py refs` as a harness check that resolves every citation in tracked source and warns on delivery phrases. It warns first, then fails. When it lands, rewrite the 36 'PRD x.y' citations.",
+   "sketch": "# services/agent/pyproject.toml\n[tool.ruff.lint]\nselect = [\"E\", \"F\", \"W\", \"I\", \"B\", \"UP\", \"ASYNC\", \"RUF\", \"ERA\", \"N\"]\nignore = [\"N818\"]  # exceptions are named for the outcome: ProfileNotOffered\n\n# scripts/verify.py harness_checks: add run_check(root, 'citations', [sys.executable, 'scripts/specs.py', 'refs'])\n# refs: Decision NNNN [Xn] -> docs/engineering/decisions/NNNN-*.md contains Xn\n#       US-n.m, SP-nnn -> SPECS.md; XX-nn -> some PRD; 'PRD x.y' with no document -> error\n#       delivery phrases (later story, not yet, scaffold) -> warning, with an allowlist",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "AGENTS.md:44 already makes scripts/specs.py the source-traceability check, so the new check extends the tool that owns it. It stays deterministic and needs no service or model, as the harness profile requires. The citation practice stays, as ground rule 2 requires. No decision governs ruff rule selection; docs/engineering/decisions was searched. Rules with no current hits weaken nothing when enabled.",
+   "verdict": "confirmed",
+   "verifierNote": "36 'PRD x.y' citations in 36 non-test files; PRD-AutoGPT.md, PRD-LangChain-Deep-Agents.md and PRD-NextJS.md each have a section 8.4 and a 9.2. `ruff --select N,ERA --ignore N818` reports 0 in services/agent src and tests and 3 N806 in tests/db/assignment_check.py:82-84. A resolver run over the scope resolved every decision, decision-row and story citation; the only failures are synthetic IDs in tests/harness. specs.py validates only SPECS.md, and no decision governs ruff selection or comment conventions. XTOL-08 reports the same followed-but-unenforced pattern for other rules."
+  },
+  {
+   "id": "XDOC-03",
+   "title": "The front-door docs still describe the product before it was built",
+   "dimension": "comments",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "README.md",
+     "line": 3,
+     "note": "'Implementation and release qualification remain pending.'"
+    },
+    {
+     "file": "README.md",
+     "line": 15,
+     "note": "Says the provider PRD has 'Two approved OpenRouter models'. It lists three (PRD-Model-Providers.md:18)"
+    },
+    {
+     "file": "README.md",
+     "line": 23,
+     "note": "Says to finish the harness 'before feature code, product migrations or production worker logic'. 53 migrations and a worker ship"
+    },
+    {
+     "file": "README.md",
+     "line": 36,
+     "note": "'All 14 inference roles default to Terra', but builtin_default gives researcher Sol (services/agent/src/autobots/domain/models.py:102-105)"
+    },
+    {
+     "file": "README-QA.md",
+     "line": 156,
+     "note": "'currently no generic browser, web search ... connector', but loop_registry registers Tavily, Jina, GitHub and cronjob tools (goal_loop.py:162-188)"
+    },
+    {
+     "file": "README-QA.md",
+     "line": 282,
+     "note": "'Arbitrary execution is currently rejected by registration', but register admits it once its executor is qualified (tool_gateway.py:142-147)"
+    },
+    {
+     "file": "services/agent/pyproject.toml",
+     "line": 4,
+     "note": "description: 'Autobots agent service: minimal non-feature scaffold.'"
+    },
+    {
+     "file": "tests/faults/README.md",
+     "line": 5,
+     "note": "Says the run state machine and contract generation are for 'later stories'. domain/runs.py and scripts/generate_contracts.py exist"
+    }
+   ],
+   "occurrences": 4,
+   "evidence": "Four documents hold eight stale statements, found by reading README.md and tests/faults/README.md in full and grepping README-QA.md and pyproject.toml. README.md is the repository's front page. Its opening, document table and model section describe the state before implementation on November 4, and line 62 still says nothing was installed or launched. README-QA.md's own table offers it as 'How do I extend this safely?', yet it describes revision ecb34900e46c as inspected on 2026-11-05 (line 5). Its tool inventory (section 8) lists ten tools, while the grant vocabulary in domain/tools.py holds 31 tool IDs. The service manifest and the fault-fixture README use the same early wording.",
+   "impact": "These are the first things a new engineer reads. They say the product, its migrations and its worker do not exist yet. They give the wrong default model for the browsing role, which is a paid route, and they teach an outdated registration rule for new tools. CLAUDE.md and AGENTS.md are current, so an agent is steered correctly while a person is not.",
+   "recommendation": "Rewrite README.md's opening as the current state in a few lines: what runs, the three profiles with researcher on Sol, and where to start (README-SETUP-RUN.md, AGENTS.md#commands, CODEBASE.md). Move the dated planning paragraphs under a dated History heading, or delete them. Refresh README-QA.md sections 8 and 19 from goal_loop.loop_registry and ToolRegistry.register. Otherwise, retitle it as a snapshot of ecb34900e46c and stop presenting it as the extension guide. Fix the pyproject description and the sentence in the faults README. Naming these files beside CODEBASE.md in the delivery rule's 'keep honest' step is the user's call, since Decision 0003 keeps that loop lean.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "AGENTS.md says CODEBASE.md describes the current implementation, so the README should point there instead of preserving a past state. The root READMEs are outside docs/. Editing the description field in pyproject.toml changes no dependency or lock entry.",
+   "verdict": "revised",
+   "verifierNote": "All eight statements reproduce: README.md:3, 15, 23 and 36 (Sol is in OFFERED_FOR_NEW_RUNS at domain/models.py:72, so researcher resolves to Sol), README-QA.md:156 and 282 against loop_registry and ToolRegistry.register (tool_gateway.py:142-147), pyproject.toml:4 and tests/faults/README.md:5. README-QA section 8 lists 10 tools against 31 IDs in domain/tools.py. Revised: the delivery-rule step is proposed for the user's decision, under Decision 0003."
+  },
+  {
+   "id": "XDOC-04",
+   "title": "Names keep the story or first version that introduced them and now describe something else",
+   "dimension": "naming",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/provider_settings.py",
+     "line": 231,
+     "note": "run_intent, named after US-3.2's title. Its docstring calls it 'Every model call's gate'"
+    },
+    {
+     "file": "services/agent/src/autobots/application/worker_inference.py",
+     "line": 279,
+     "note": "The worker calls run_intent before each attempt. Six more call sites are in api/ and operations/worker.py:237"
+    },
+    {
+     "file": "services/agent/src/autobots/application/tools.py",
+     "line": 284,
+     "note": "default_registry(): three tools, called only by tests"
+    },
+    {
+     "file": "services/agent/src/autobots/application/tools.py",
+     "line": 291,
+     "note": "first_grants(): called only by tests"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 162,
+     "note": "loop_registry, the registry that runs actually use"
+    },
+    {
+     "file": "apps/web/components/tool-catalog.tsx",
+     "line": 229,
+     "note": "panelHref builds the link that opens the modal dialog (437-452)"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/models.py",
+     "line": 74,
+     "note": "NOT_OFFERED_MESSAGE holds DeepSeek's sentence and is the fallback for any refused profile (98)"
+    },
+    {
+     "file": "services/agent/src/autobots/api/workflow_routes.py",
+     "line": 95,
+     "note": "NOT_OFFERED_MESSAGE is the fallback text for any workflow model_not_offered refusal that has no reason"
+    }
+   ],
+   "occurrences": 5,
+   "evidence": "Five names, found by reading call sites and grepping for callers. run_intent (provider_settings.py:231) returns a credential-readiness code: ready, credentials_required, credential_invalid or credential_unavailable. Seven sites call it: four API handlers, the check_run_intent route, the routine check (operations/worker.py:237) and every worker attempt (worker_inference.py:279). Most spell it settings.run_intent(workspace), through the Settings alias. The name is US-3.2's title, 'explicit run intent' (SPECS.md:2799). default_registry() and first_grants() (application/tools.py:284, 291) return the first three tools. Nothing in src calls them; test_tools.py and five tests/db scripts do, while runs use goal_loop.loop_registry. panelHref is named for the side panel that Decision 0026 G2 replaced. NOT_OFFERED_MESSAGE carries DeepSeek's sentence under a generic name, and workflow_routes.py:95 also uses it as the fallback text for any workflow refusal coded model_not_offered that has no reason.",
+   "impact": "A name is read at every call site, a docstring only where it is defined. Someone adding a model-backed path looks for a credential or readiness check and won't recognize run_intent. Someone writing a gateway test reaches for default_registry and gets a three-tool registry that production never uses, and five tests/db scripts are already built on it. README-QA.md:158 has to warn readers about the name.",
+   "recommendation": "Rename each by behavior when its module is next touched. run_intent becomes credential_readiness; the public checkRunIntent route and RunIntentCheck contract stay unless a story changes them. default_registry and first_grants become three_tool_registry and three_tool_grants, moved to a test helper if src never needs them. panelHref becomes toolHref. NOT_OFFERED_MESSAGE becomes DEEPSEEK_NOT_OFFERED, with a fallback sentence that names no profile.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "Internal renames leave operation IDs, paths and Pydantic models unchanged, so contracts/generated and the TypeScript client are untouched. The readiness check on the paid path keeps its behavior, and tests cover its call sites (test_worker_inference.py:962-1004).",
+   "verdict": "revised",
+   "verifierNote": "run_intent has 7 outside call sites plus one inside provider_settings.py:251; default_registry and first_grants are called only by services/agent/tests/test_tools.py and five tests/db scripts; US-3.2's title is at SPECS.md:2799. Revised: NOT_OFFERED_MESSAGE is also the generic fallback at workflow_routes.py:95, which replaces README-QA.md:158 among the locations (the impact still cites that warning)."
+  },
+  {
+   "id": "XDOC-05",
+   "title": "Contract documentation is thinnest on the largest entry points, in both languages",
+   "dimension": "comments",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/api/run_routes.py",
+     "line": 177,
+     "note": "post_run: 101 lines and nine refusal points in a fixed order, with no docstring"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 291,
+     "note": "run_goal: 90 lines and complexity 14, with no docstring"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 305,
+     "note": "read_workspace: a root run's token totals include its descendants (324-327), and a missing goal reads as None. Neither is stated"
+    },
+    {
+     "file": "services/agent/src/autobots/api/membership.py",
+     "line": 13,
+     "note": "is_member answers False when there is no pool, so it fails closed. That is not stated"
+    },
+    {
+     "file": "services/agent/src/autobots/operations/worker.py",
+     "line": 45,
+     "note": "Step returns a bool meaning work was done, visible only at the call sites (140, 273)"
+    },
+    {
+     "file": "apps/web/lib/bff.ts",
+     "line": 71,
+     "note": "forward, the entry point for five BFF route modules, has no doc comment. Its private helper authorized has one (32-36)"
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 1,
+     "note": "864 lines with no header; the first comment is at 35. workflow-editor.tsx (78) and approvals-panel.tsx (46) are the same"
+    },
+    {
+     "file": "packages/api-client/src/runtime.ts",
+     "line": 142,
+     "note": "parseWith sits behind every generated parse function. It has no doc comment and does not state the subset it checks: 75 handles only additionalProperties false, and 137-138 accept unknown types"
+    }
+   ],
+   "occurrences": 16,
+   "evidence": "Measured with ast over services/agent/src (doc_cov.json) and ruff_complexity.json. Public functions over 60 lines are documented less often than mid-sized ones: 20 of 36 (55%), against 45 of 60 (75%) at 31 to 60 lines. 13 of the 24 functions over complexity 10 have no docstring. API routes are the weakest layer: 21 of 80 handlers and 0 of 11 API methods are documented. Of the 16 undocumented functions over 60 lines, 9 are tool factories whose module docstring and ToolDefinition description already document the tool (tavily.py:1-7). The other 7 are entry points: post_run, run_goal, read_workspace, run_workflow, get_local_status and the two run_trial functions. On the web, 31 of 43 component files and 20 of the 24 page and layout files have no comment before their first declaration. Declarations carry 73 '//' comments against 20 '/** */' doc comments, so most explanations do not show where the symbol is used.",
+   "impact": "Functions with refusal ladders, transactions and lease rules are where a caller most needs the contract, and where reading the body is slowest. post_run's refusal order decides which code the composer shows when several things are wrong at once. is_member's fail-closed answer is a security property, and nothing warns that an edit for local development could flip it.",
+   "recommendation": "Require a docstring in Python, or a '/** */' comment in TypeScript, on public functions that refuse with codes, hold a transaction or lease, or exceed about 60 lines. It gives one line of purpose, the refusal codes in order and the side effects. Start with the eight listed. Give each screen file over 300 lines a two-line header naming what it owns: data, stream and actions. Leave tool factories to their module docstrings. Enforce this by review; ruff's D1 rules would also flag more than 200 small functions that read fine as they are.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "DH-06: explain nonobvious invariants in code. This adds documentation only and changes no behavior. Route docstrings become OpenAPI descriptions, so regenerate contracts/generated with scripts/generate_contracts.py and never edit it by hand.",
+   "verdict": "revised",
+   "verifierNote": "ast over services/agent/src, nested functions excluded: 20 of 36 public functions over 60 lines and 45 of 60 at 31 to 60 lines have docstrings; 13 of the 24 C901 functions have none; 21 of 80 route handlers and 0 of 11 public API methods are documented; the web has 20 '/**' comments. post_run (101 lines), run_goal (90, complexity 14), read_workspace and is_member are as described. Revised two counts: 9 of the 16 undocumented long functions are tool factories, and 31 of 43 components (20 of 24 pages and layouts) have no comment before their first declaration."
+  },
+  {
+   "id": "XDOC-06",
+   "title": "Five words each name two or three different things across layers",
+   "dimension": "naming",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/api/run_routes.py",
+     "line": 397,
+     "endLine": 403,
+     "note": "operation_id twice in one route: the OpenAPI operation (398) and the effect's receipt key (403)"
+    },
+    {
+     "file": "services/agent/src/autobots/operations/__init__.py",
+     "line": 1,
+     "note": "operations/ holds the worker entry, paid trials, seeding and logs"
+    },
+    {
+     "file": "services/agent/src/autobots/application/operations.py",
+     "line": 1,
+     "note": "operations.py is what an operator sees"
+    },
+    {
+     "file": "services/agent/src/autobots/application/profiles.py",
+     "line": 1,
+     "note": "Display names, while everywhere else a profile is a model profile (domain/models.py:26)"
+    },
+    {
+     "file": "services/agent/src/autobots/api/settings_routes.py",
+     "line": 88,
+     "note": "Settings aliases ProviderSettings, while api/settings.py:10 defines Settings as the process configuration"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/adapters.py",
+     "line": 1,
+     "note": "Mappers between rows, the domain and DTOs, beside the adapters/ layer for external systems (adapters/__init__.py:1)"
+    },
+    {
+     "file": "services/agent/src/autobots/api/event_routes.py",
+     "line": 71,
+     "note": "get_workspace returns a run's screen view, RunWorkspace"
+    },
+    {
+     "file": "services/agent/src/autobots/api/routes.py",
+     "line": 109,
+     "note": "get_workspace returns a tenant workspace"
+    }
+   ],
+   "occurrences": 5,
+   "evidence": "Five words, counted with grep over services/agent/src. operation: the operations/ package (worker, browse and reasoning trials, concept seed, logs), application/operations.py (operator conditions), api/operation_routes.py (the Operations page: local status, jobs, retention) and operation_id, an external effect's receipt key in 19 modules outside api/. In api/, operation_id also means the OpenAPI operation name. profile: ModelProfile and run_profile on one side; application/profiles.py, /v1/profile and ProfileView for a person's display name on the other. settings: the process configuration (api/settings.py:10) and the alias for ProviderSettings (settings_routes.py:88), whose callers read settings.run_intent(...). adapters: the layer for external systems and the row mappers in contracts/adapters.py. workspace: the tenant, as in workspace_id everywhere, and the run page's projection RunWorkspace, so two handlers named get_workspace return unrelated things. py-run, py-api and sweep-boundaries each report one of these on its own.",
+   "impact": "A search for 'operation' or 'workspace' returns unrelated code. Reading settings.run_intent(workspace) means resolving two homonyms before you know the call checks credentials. With no glossary to consult, each new module picks one of the meanings.",
+   "recommendation": "Add a short glossary to AGENTS.md that gives each word one meaning: operation is an external effect with a receipt, profile is a model profile, and workspace is the tenant. Rename the other uses when they are next touched. operations/ gets a name for local processes, such as autobots.local. application/operations.py becomes operator_status.py, application/profiles.py becomes display_names.py, and contracts/adapters.py becomes contracts/mapping.py. The Settings alias becomes ProviderSettingsDep, and the run view's handler becomes get_run_workspace. Keep public paths and operation IDs.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "The renames move no code across layers and keep the public contracts, so contracts/generated is untouched. Risk is medium because tests/db and scripts import product modules without a type check, so a missed import shows up only when the db profile runs. The glossary goes in AGENTS.md, not CODEBASE.md, which is generated only through analysis.",
+   "verdict": "revised",
+   "verifierNote": "operation_id is an effect or receipt key in 19 modules outside api/ and the OpenAPI name at run_routes.py:398; Settings is both the process configuration and the ProviderSettings alias at settings_routes.py:88; the two get_workspace handlers return RunWorkspace and the tenant workspace. Corrected one line reference: the Settings class is at api/settings.py:10. XMOD-12 and XMOD-17 report parts of this from the boundaries lens."
+  },
+  {
+   "id": "XDOC-07",
+   "title": "Files, migrations and comments are named for the review round that found the issue",
+   "dimension": "naming",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/tests/test_final_review.py",
+     "line": 1,
+     "note": "'What US-11.12's independent review found': reservation sizing, uvicorn loggers, restore lines and schema columns"
+    },
+    {
+     "file": "tests/harness/test_final_review.py",
+     "line": 1,
+     "note": "Seven unrelated test classes grouped by the review that found them"
+    },
+    {
+     "file": "tests/db/blocker_check.py",
+     "line": 1,
+     "note": "'Blockers B1, B2, B6, B8 and B9 from review round 1'"
+    },
+    {
+     "file": "tests/db/major_check.py",
+     "line": 1,
+     "note": "'Majors from review round 1'"
+    },
+    {
+     "file": "tests/db/review_check.py",
+     "line": 1,
+     "note": "'US-11.12's review findings'"
+    },
+    {
+     "file": "supabase/migrations/20261105000028_review_majors.sql",
+     "line": 1,
+     "note": "'Review round 1, M21, M27 and M32': three unrelated changes"
+    },
+    {
+     "file": "supabase/migrations/20261106000034_route_limits_from_review.sql",
+     "line": 1,
+     "note": "Named for the review rather than the limits it adds"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+     "line": 85,
+     "note": "'N-15', like 'N-4' at application/assignments.py:60, is defined only in docs/engineering/evidence/US-11.12/review-r1-open-findings.md"
+    }
+   ],
+   "occurrences": 9,
+   "evidence": "A grep of files.txt finds seven files in four areas named for a review (final_review twice, blocker, major, review, review_majors, from_review), plus two source comments that cite review-round IDs. The contents span unrelated behavior: services/agent/tests/test_final_review.py covers reservation sizing (53-99), logging (101), restore parsing (123) and schema columns (175). Round-local IDs (B1, M21, N-4, N-15) appear in docstrings, a migration header and two source comments. Their definitions sit in docs/engineering/evidence/US-11.12/review-r1-open-findings.md, which none of the citations names. scripts/qualify_identity.py:162-167 lists the db checks under these names. py-tests, harness-tests, db-tests and sql-infra each report their own instance. N-4 is also defined twice more with other meanings, in docs/engineering/evidence/US-1.8/review-r2.md:35 and docs/engineering/work-items/US-1.2.md:71, so the bare ID is ambiguous as well as unlinked.",
+   "impact": "A file name is how someone finds the tests for a module. Tests for model admission, logging and schema release sit in files named after a review, so a change to those modules can miss them. A comment that cites N-15 sends the reader to an evidence folder it does not name.",
+   "recommendation": "Name tests and checks for the behavior or module they protect, and keep the provenance in the docstring ('Found in US-11.12's review'). Move the tests in test_final_review.py beside their modules' tests. Split blocker_check.py and major_check.py by subject, updating qualify_identity.py:162-167 in the same change. Replace N-4 and N-15 with the rule each comment already states, adding 'US-11.12 review' if the provenance matters. Applied migrations keep their names; name new ones for their content.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "database.md forbids editing applied migrations, so 20261105000028_review_majors.sql and 20261106000034_route_limits_from_review.sql stay as they are; only future migrations follow the rule. Moving tests keeps every assertion. Nothing counts the db cases, so compare the case IDs the identity qualifier reports before and after a split.",
+   "verdict": "revised",
+   "verifierNote": "Seven review-named files in four areas and two source comments with round-local IDs reproduce (20261108000047_approval_review_detail.sql names a product feature and is not counted). Revised: N-4 has three definitions in docs/engineering, which the evidence now states, and the rule check no longer claims a db check count, since qualify_identity.py reports cases by ID without counting them. TDBC-14 and PTST-05 report the per-area instances."
+  },
+  {
+   "id": "XDOC-08",
+   "title": "Only generated and fixture folders have a README; the app, the service, scripts and tests/db have none",
+   "dimension": "comments",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "packages/api-client/README.md",
+     "line": 3,
+     "note": "Says what is generated, but not how to regenerate it or run its contract test"
+    },
+    {
+     "file": "packages/db-types/README.md",
+     "line": 3,
+     "note": "Says what is generated and from where; no commands"
+    },
+    {
+     "file": "apps/web/package.json",
+     "line": 5,
+     "endLine": 10,
+     "note": "Scripts are lint, format:check, typegen, typecheck and build. There is no dev or test script"
+    },
+    {
+     "file": "scripts/verify.py",
+     "line": 161,
+     "endLine": 162,
+     "note": "The web unit tests are named only here"
+    },
+    {
+     "file": "scripts/live_goal.py",
+     "line": 2,
+     "endLine": 4,
+     "note": "Each script's docstring states its cost and guard, but there is no index of the 28 scripts"
+    },
+    {
+     "file": "README-SETUP-RUN.md",
+     "line": 224,
+     "endLine": 232,
+     "note": "'Checks' sends readers to AGENTS.md"
+    },
+    {
+     "file": "docs/engineering/runbooks/local-app.md",
+     "line": 9,
+     "endLine": 12,
+     "note": "Setup for the browser suite lives here"
+    }
+   ],
+   "occurrences": 6,
+   "evidence": "git ls-files finds READMEs at packages/api-client, packages/db-types, contracts/generated and tests/faults, each 3 to 5 lines on what is generated or deliberately broken. There are none in apps/web (146 files, 24,477 lines), services/agent (186 files, 35,925 lines), scripts (28 files, 10,215 lines), tests/db (75 files), supabase or infra. How to run is in README-SETUP-RUN.md and the Makefile. How to test is in AGENTS.md#commands, scripts/verify.py and runbooks/local-app.md. How to extend is in README-QA.md section 19, dated 2026-11-05. The scripts range from pure (release_scoring.py) through disposable Docker stacks to paid runs (live_goal.py, qualify_release.py, browse_trial.py) and the persistent install (persistent_install.py). Each docstring says which, but only once the file is opened.",
+   "impact": "A developer who opens apps/web or services/agent finds no starting point, and package.json has no test or dev script, so the web unit tests are named only in verify.py:161-162 and the browser suite only in verify.py and runbooks/local-app.md. Telling a paid or persistent script from a disposable one means reading 28 docstrings.",
+   "recommendation": "Add a short README to apps/web, services/agent, scripts and tests/db with three headings, Run, Test and Extend, that link to the existing runbook or AGENTS.md section instead of restating it. In scripts/, add a table of each script, its target (pure, disposable, persistent or paid) and its guard flag. Add the regenerate and check commands to the two package READMEs (python3.12 scripts/generate_contracts.py check).",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-03 requires none of these files, so adding them changes no required path. Linking instead of copying follows DH-03: 'Avoid maintaining contradictory copies of the same rule.'",
+   "verdict": "revised",
+   "verifierNote": "READMEs in scope exist only at packages/api-client, packages/db-types, contracts/generated and tests/faults; apps/web/package.json has no dev or test script; the folder totals reproduce (146 files and 24,477 lines, 186 and 35,925, 28 and 10,215, and 75 files). Revised the impact: runbooks/local-app.md:89 names scripts/qualify_web.py for the browser suite, so only the web unit tests are findable solely through verify.py."
+  },
+  {
+   "id": "XDOC-09",
+   "title": "Route handlers are named for the HTTP verb, so nine handlers share four generic names",
+   "dimension": "naming",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/api/workflow_routes.py",
+     "line": 308,
+     "note": "post_version for publishWorkflowVersion (304)"
+    },
+    {
+     "file": "services/agent/src/autobots/api/expert_routes.py",
+     "line": 110,
+     "note": "post_version for addExpertVersion (106)"
+    },
+    {
+     "file": "services/agent/src/autobots/api/routine_routes.py",
+     "line": 98,
+     "note": "post_version for addRoutineVersion (94)"
+    },
+    {
+     "file": "services/agent/src/autobots/api/approval_routes.py",
+     "line": 134,
+     "note": "post_decision for decideApproval (131)"
+    },
+    {
+     "file": "services/agent/src/autobots/api/improvement_routes.py",
+     "line": 140,
+     "note": "post_decision for decideImprovement (137)"
+    },
+    {
+     "file": "services/agent/src/autobots/api/settings_routes.py",
+     "line": 123,
+     "note": "get_status for getModelProviders (121)"
+    },
+    {
+     "file": "services/agent/src/autobots/api/memory_routes.py",
+     "line": 25,
+     "note": "get_search for searchMemory (24); search_routes.py:22 is also get_search"
+    },
+    {
+     "file": "services/agent/src/autobots/api/run_routes.py",
+     "line": 401,
+     "note": "post_effect_evidence for reconcileRunEffect (398)"
+    }
+   ],
+   "occurrences": 67,
+   "evidence": "Every route in the schema passes an explicit verb-object operation_id (78 in api/, such as cancelRun and publishWorkflowVersion), so the API already has names. 67 of the 80 Python handlers use HTTP-verb names instead, and FastAPI derives each operation's summary from them. Read with a python3.12 -I script, contracts/generated/openapi.json gives three operations the summary 'Post Version', two 'Post Decision', two 'Get Search' and two 'Get Workspace', and it summarizes getModelProviders as 'Get Status'. 19 of 78 operations have a description, taken from the handler docstring. Those mix contract text with story IDs and history, such as 'It admits nothing: run admission is a later story'. scripts/generate_contracts.py names client functions from operationId only, so none of this reaches generated.ts.",
+   "impact": "Tracebacks, profiles and grep results show post_version or post_decision without the resource, and the summaries in the contract that reviewers diff do not say what the operation does. The operation IDs that name the generated client's functions match no Python name, so getting from a client call to its handler takes a grep on the path.",
+   "recommendation": "Name each handler after its operation ID, in snake_case (publish_workflow_version, decide_approval, get_model_providers), so FastAPI derives a matching summary. Keep the handler docstring to the contract (who may call it and its refusals), and put story and decision citations in a # comment above it. Regenerate contracts/generated with scripts/generate_contracts.py. Operation IDs and paths do not change, so the TypeScript client stays the same.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "contracts.md: OpenAPI is generated from the Pydantic and FastAPI source, so the summaries change only by regeneration, never by editing openapi.json by hand. Moving citations from docstrings to # comments keeps the practice of citing them, as ground rule 2 requires.",
+   "verdict": "revised",
+   "verifierNote": "openapi.json reproduces the summaries: 'Post Version' 3 times, 'Post Decision', 'Get Search' and 'Get Workspace' twice each, 'Get Status' for getModelProviders, and 19 of 78 operations with a description. Revised the counts: 78 operation_id arguments, 67 verb-named handlers, and 9 handlers, not ten operations, sharing the 4 names."
+  },
+  {
+   "id": "XDOC-10",
+   "title": "HTTP statuses are spelled three ways, and header constants are bypassed in the file that imports them",
+   "dimension": "naming",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/api/improvement_routes.py",
+     "line": 84,
+     "note": "status_code=202 as a literal"
+    },
+    {
+     "file": "services/agent/src/autobots/api/run_routes.py",
+     "line": 175,
+     "note": "status.HTTP_202_ACCEPTED for the same status"
+    },
+    {
+     "file": "services/agent/src/autobots/api/run_routes.py",
+     "line": 186,
+     "note": "ApiError(422, ...): one of 85 literal statuses in 15 modules"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/github_pulls.py",
+     "line": 80,
+     "endLine": 82,
+     "note": "== 404 and != 200. 34 of ruff's 52 PLR2004 hits are HTTP statuses"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/market_tools.py",
+     "line": 74,
+     "note": "Compares the year difference with 30 to allow 31 years inclusive; the bare number leaves that reasoning to the reader"
+    },
+    {
+     "file": "services/agent/src/autobots/application/tool_catalog.py",
+     "line": 121,
+     "note": "depth < 2: a schema nesting limit with no name"
+    },
+    {
+     "file": "apps/web/lib/bff.ts",
+     "line": 82,
+     "note": "The literal 'x-autobots-workspace' here and at 141 and 143, though WORKSPACE_HEADER is imported at 8 and used at 66"
+    },
+    {
+     "file": "apps/web/lib/service-status.ts",
+     "line": 28,
+     "note": "'X-Autobots-Internal' is a literal here and in bff.ts:61, and no constant exists"
+    }
+   ],
+   "occurrences": 52,
+   "evidence": "ruff PLR2004 finds 52 magic comparisons in services/agent/src. 34 are HTTP statuses. The rest are checks on the shape of parsed text, a port and the UTF-16 surrogate range, which read fine where they are. A few encode a rule without a name: market_tools.py:74, tool_catalog.py:121, and route_qualification.py:484, which stops reading a stream after 3 chunks. Statuses take three forms: fastapi status constants in 11 route decorators, one literal in a decorator (improvement_routes.py:84), and 85 ApiError(<int>, ...) calls in 15 modules. In bff.ts the workspace header is written once as the imported constant and three times as a literal.",
+   "impact": "The header literals can drift from their constant without a type error, and the internal header is spelled out in two web files with nothing tying it to the x_autobots_internal parameter in api/security.py:40. Unnamed rule numbers hide the rule they encode. The mix of status spellings means enabling PLR2004 needs a decision first, not just a config line.",
+   "recommendation": "TypeScript: use WORKSPACE_HEADER in bff.ts, and add an INTERNAL_HEADER constant beside it for bff.ts and service-status.ts. Python: name the numbers that carry a rule (MAX_SERIES_YEARS = 31, SCHEMA_REF_DEPTH, STREAM_PROOF_CHUNKS). Pick one status spelling, http.HTTPStatus or fastapi.status, for comparisons and ApiError calls, then select PLR2004 for src, naming or allow-listing the 18 hits that are not statuses.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06 asks for readable names. No rule or decision governs how statuses are spelled.",
+   "verdict": "revised",
+   "verifierNote": "Reproduced 52 PLR2004 hits, 34 of them HTTP statuses (counting the 500 to 600 range at model_attempts.py:72); 85 ApiError(<int>) calls in 15 modules, 11 fastapi status constants and 1 literal in decorators; bff.ts writes the workspace header as a literal at 82, 141 and 143. Revised: market_tools.py:74 is consistent, since a difference of 30 is 31 years inclusive, so it is a naming issue rather than a mismatch; enabling PLR2004 also needs the 18 non-status hits named or allowed."
+  }
+ ],
+ "rejected": [],
+ "notCovered": "Every comment line was read in the six largest service modules, three large scripts, the hook and the three largest TSX files, and sampled elsewhere. The remaining files of the 545 were covered by greps and ast counts, so the ten stale comments are a verified sample, not a census. Project code was not run, so it is unverified whether Pydantic class docstrings on tool inputs reach the model's tool schemas; adapters/tool_middleware.py passes an explicit description, which normally replaces them. SQL migration comments were judged only by migration names, since sql-infra covers locks and recovery. The root README and README-QA.md are outside the code scope list and are judged here only as the onboarding path the lens asks about. A scratch folder for this lens from an earlier interrupted attempt existed; its outputs were used only as leads, and every number here was recomputed. No command was refused."
+}

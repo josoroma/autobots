@@ -1,0 +1,1230 @@
+{
+  "schema": "autobots.code-review/v1",
+  "area": "sweep-duplication",
+  "title": "Lens: duplication and reuse",
+  "kind": "lens",
+  "timestamp": "2026-11-12-09-52-30",
+  "revision": "156534da0bd5b19417f05d313077d767804b175b",
+  "summary": "Duplication in Autobots is mostly visible and signposted. Comments name the code that must change together (\"as the run list counts it\", \"see app/layout.tsx\", \"counted as admit counts it\"). Good shared pieces exist: a provider HTTP module, an ownership-checked disposable-stack teardown, an explicit run row-to-DTO mapping, one API error shape, and a harness test that enforces shared form controls. The problem is where sharing stops. In the browser, data access is hand-written at 74 call sites in 31 components, because the generated client's runtime discards error bodies. As a result, 19 error replies are cast instead of parsed, and the paid run-admission request exists in three copies; only one of them disables duplicate submits and keeps its idempotency key after a lost reply. On the server, several rules that guard secrets, money or state have copies that have already drifted apart. The public-text redactor misses the Tavily, Jina and GitHub token families that the log redactor gained under Decision 0017. An approval's return to pending is re-implemented in the GitHub pull-request adapter with its own TTL. The frozen model-policy snapshot has one writer and eight hand-written readers. The run ledger and the \"run plus descendants\" scope are rewritten in SQL text, with two tree definitions that disagree when delegation is two levels deep. Terminal states, profile names, the offered model set and budget limits are restated across Python, SQL, TypeScript and scripts. Tests and scripts repeat setup heavily: 36 sign-in helpers, 41 check() helpers, 27 blocks that parse a check's output, and 15 disposable-stack lifecycles. Those copies drift too: two leak scans are narrower than the other two, and most output parsers crash instead of recording a failed case. The 8-line detector found 239 file pairs. Its largest cluster, migrations 023 and 027, is the expected forward redefinition of two functions and is not reported.",
+  "scores": [
+    {
+      "dimension": "standards",
+      "score": 3,
+      "why": "DH-06 asks to avoid duplicated business rules and to use generated types; approval, policy, budget and state rules are copied across layers, and 19 error bodies are cast."
+    },
+    {
+      "dimension": "modules",
+      "score": 3,
+      "why": "Shared modules exist (provider_http, disposable_db, api-client runtime, contracts/adapters) but stop short: an adapter writes approval state, routes resolve admission policy, and the browser has no data-access module."
+    },
+    {
+      "dimension": "size",
+      "score": 3,
+      "why": "Copies swell the largest files: app_db.py repeats its check runner 19 times, the 10k-line Playwright suite repeats signIn 36 times, and 31 components each own their fetch code."
+    },
+    {
+      "dimension": "functions",
+      "score": 3,
+      "why": "Reusable functions exist but stay local or unused (useLoaded in one file; parseErrorResponse, admitRun and createWorkSession unused in the browser), so the same logic is written inline again and again."
+    },
+    {
+      "dimension": "structure",
+      "score": 3,
+      "why": "There are no shared support modules for browser specs, tests/db checks, web formatting or route dependencies; otherwise the layout follows DH-03."
+    },
+    {
+      "dimension": "approach",
+      "score": 3,
+      "why": "One architecture throughout, but client data access, run-tree scoping and snapshot reading are each solved several different ways."
+    },
+    {
+      "dimension": "comments",
+      "score": 4,
+      "why": "Comments name each copy's partner, which made every copy easy to find, but they stand in for shared code."
+    },
+    {
+      "dimension": "types",
+      "score": 3,
+      "why": "Generated parsers guard most success bodies, but error bodies, run and session acceptances, the frozen policy snapshot and 25 UI label tables are cast or keyed by plain string."
+    },
+    {
+      "dimension": "errors",
+      "score": 3,
+      "why": "Server errors share one ErrorResponse, but the browser re-reads it per screen, and lost-reply handling for paid admission exists in one of three flows."
+    },
+    {
+      "dimension": "tests",
+      "score": 3,
+      "why": "Coverage is broad, but helpers are copied and drift: leak scans of different breadth, unguarded output parsing, and 36 sign-in copies."
+    },
+    {
+      "dimension": "maintainability",
+      "score": 3,
+      "why": "Most duplication is signposted and mechanical to extract, but several copies guard secrets, money and state, and they have already diverged."
+    }
+  ],
+  "strengths": [
+    {
+      "title": "One shared provider HTTP module",
+      "evidence": "services/agent/src/autobots/adapters/provider_http.py:43-83 holds one client factory (no redirects, trust_env=False), one status-to-failure-code map and one text budget, used by tavily.py:47, jina.py:47 and market_data.py:83 and :121. It is the model for the GitHub adapters."
+    },
+    {
+      "title": "The ownership guard lives inside the shared teardown",
+      "evidence": "scripts/disposable_db.py:266-278: remove_stack re-checks project identity and labels before removing anything, so all 15 copied stack lifecycles inherit the guard; Cases (disposable_db.py:335) is the one result recorder for scripts."
+    },
+    {
+      "title": "A typed loader hook worth promoting",
+      "evidence": "apps/web/components/tool-catalog.tsx:156-181: useLoaded<T>(path, parse) returns a loading, unavailable or ready state and aborts on unmount. It is used three times in that file and nowhere else."
+    },
+    {
+      "title": "Label tables keyed by generated contract types",
+      "evidence": "apps/web/components/provider-settings-panel.tsx:19-64 keys its tables by generated types, e.g. Record<ProviderStatus[\"auth_status\"], string>, so a new enum value fails compilation; 25 other tables in components use Record<string, string>."
+    },
+    {
+      "title": "Reuse enforced by a harness test",
+      "evidence": "tests/harness/test_shared_form_controls.py:13-23 fails when any screen draws a raw input, select or textarea; it also checks that it still scans enough files and that it would catch a raw control. The same pattern can guard the new shared helpers."
+    },
+    {
+      "title": "Status sets passed to SQL from named constants",
+      "evidence": "services/agent/src/autobots/application/model_admission.py:8-11 and :139 pass OUTSTANDING into SQL as `status = any(%(outstanding)s)`; remaining_daily_micro_usd (:295-298) reuses it and says so. This is the model for the copied TERMINAL and ledger sets."
+    },
+    {
+      "title": "Explicit row, domain and DTO mapping for runs",
+      "evidence": "services/agent/src/autobots/contracts/adapters.py:8-42 maps the RunRow row type (persistence/rows.py) to the domain Run and then to RunSummary, naming each public field. api/errors.py:19-40 gives every API error a single ErrorResponse shape."
+    }
+  ],
+  "findings": [
+    {
+      "id": "XDUP-01",
+      "title": "Three different secret patterns, and the one for public text has fallen behind",
+      "dimension": "duplication",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/application/run_projection.py",
+          "line": 59,
+          "endLine": 61,
+          "note": "public_text's pattern: only sk-, Bearer and JWT"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/logs.py",
+          "line": 12,
+          "endLine": 24,
+          "note": "Log redaction: adds Tavily, Jina and GitHub tokens (Decision 0017), credentialed URLs and key=value pairs"
+        },
+        {
+          "file": "scripts/evidence.py",
+          "line": 35,
+          "endLine": 40,
+          "note": "Evidence scanner: the provider token families plus private keys; no bearer, JWT or DB URL"
+        },
+        {
+          "file": "services/agent/src/autobots/api/approval_routes.py",
+          "line": 86,
+          "note": "Approval arguments shown to reviewers pass through public_text (run goal at :100)"
+        },
+        {
+          "file": "services/agent/src/autobots/application/memory.py",
+          "line": 87,
+          "endLine": 88,
+          "note": "Memory titles and snippets"
+        },
+        {
+          "file": "services/agent/src/autobots/api/search_routes.py",
+          "line": 43,
+          "note": "Search titles"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "run_projection.py:59-61 matches only `sk-…`, `Bearer …` and `eyJ…` tokens. logs.py:12-24, under the comment 'Tool providers' keys, Decision 0017', also matches `tvly-`, `jina_`, `ghp_`/`gho_`…, `github_pat_`, credentialed postgres and https URLs, and `password=`-style pairs. evidence.py:35-40 carries the same comment and the same token families. I compiled both service patterns from their source and ran them on synthetic strings. public_text left a tvly- key, a jina_ key, a ghp_ token, a github_pat_ token and a postgresql://user:pw@… URL visible; logs.redact redacted all five.",
+      "impact": "The rule 'a key the model was shown is never displayed' (comment at run_projection.py:58; python-worker rule on sanitized public projections) was updated in two copies when Decision 0017 added tool keys, but not in the third. Approval arguments, run goals, search titles and memory snippets shown to every workspace member can therefore display a provider token that the logs would hide. Every new key family must be added in three places.",
+      "recommendation": "Keep one stdlib-only module of secret token families and credential shapes, compiled into the strictest union, and use it in both operations/logs.py and public_text. scripts/evidence.py runs under the system interpreter, so it keeps its own copy, plus a harness test that fails when its families differ from the shared module. This only widens public_text; never narrow any copy.",
+      "sketch": "# services/agent/src/autobots/domain/secret_patterns.py  (stdlib only)\nTOKEN_FAMILIES = (OPENROUTER, ANTHROPIC, TAVILY, JINA, GITHUB_CLASSIC, GITHUB_FINE_GRAINED)  # strings now in logs.py\nCREDENTIAL_SHAPES = (BEARER, JWT, CREDENTIALED_URL, POSTGRES_URL, KEY_VALUE)\nSECRET = re.compile('|'.join(TOKEN_FAMILIES + CREDENTIAL_SHAPES))\ndef redact(text: str) -> str\n# operations/logs.py: redact() = identifier shortening + secret_patterns.redact\n# application/run_projection.py: public_text() = secret_patterns.redact(text)[:limit]\n# tests/harness: every TOKEN_FAMILIES entry has a match in scripts/evidence.py SECRET_PATTERNS",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "python-worker.md requires sanitized public projections; nextjs.md says server keys never reach public events; AGENTS.md keeps secrets out of evidence. The change only widens redaction to the strictest union and adds a parity test, so no guardrail is weakened.",
+      "verdict": "confirmed",
+      "verifierNote": "Compiled both service patterns from source and ran them on synthetic tvly-, jina_, ghp_, github_pat_ and postgresql://user:pw@ strings: public_text left all five visible and logs.redact redacted all five. public_text feeds approval arguments (approval_routes.py:86-88), run goals and task titles (:100-101), search titles (search_routes.py:43) and memory snippets (memory.py:87-88, 105-106, 124-125)."
+    },
+    {
+      "id": "XDUP-02",
+      "title": "Approval transitions and approved-request reads are re-implemented outside approvals.py",
+      "dimension": "duplication",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/github_pulls.py",
+          "line": 134,
+          "endLine": 153,
+          "note": "return_to_review: approved to pending, TTL hard-coded as '1 day', emits approval.requested, does not call _enter_wait"
+        },
+        {
+          "file": "services/agent/src/autobots/application/approvals.py",
+          "line": 182,
+          "endLine": 198,
+          "note": "Canonical expired-to-pending path: TTL from ttl_seconds, then _enter_wait"
+        },
+        {
+          "file": "services/agent/src/autobots/application/approvals.py",
+          "line": 25,
+          "note": "DEFAULT_TTL_SECONDS = 86_400, which the adapter restates"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_issues.py",
+          "line": 101,
+          "endLine": 109,
+          "note": "Reads the approved row's resource_target by operation_id"
+        },
+        {
+          "file": "services/agent/src/autobots/application/tool_gateway.py",
+          "line": 216,
+          "endLine": 231,
+          "note": "Same query text, plus the same 'receipt not failed' rule"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_pulls.py",
+          "line": 122,
+          "endLine": 132,
+          "note": "Reads the approved row's review_detail by operation_id"
+        },
+        {
+          "file": "services/agent/src/autobots/application/approvals.py",
+          "line": 168,
+          "endLine": 177,
+          "note": "Second copy of 'a receipt not failed means sent or possibly sent'"
+        }
+      ],
+      "occurrences": 7,
+      "evidence": "```\n# adapters/github_pulls.py:142-145\n\"update public.approval_requests set status = 'pending', decided_by = null, \"\n\"decided_at = null, review_detail = %s, \"\n\"expires_at = clock_timestamp() + interval '1 day' \"\n# application/approvals.py:185-186\n\"update public.approval_requests set status = 'pending', decided_by = null, \"\n\"decided_at = null, expires_at = clock_timestamp() + make_interval(secs => %s) \"\n```\ngithub_issues.py:102-105 and tool_gateway.py:226-229 run the same approved-row query.",
+      "impact": "A change to approval state, a consent boundary, now lives in an adapter with its own TTL literal and its own event payload. It already differs from the canonical path: it makes no run transition through _enter_wait and uses a fixed '1 day' instead of DEFAULT_TTL_SECONDS. Any change to what a decision records (a new decided_* column, a different expiry, a different event) must be found in both places. The approved-row read (three copies) and the receipt rule (two copies) are checks that Decision 0025 V7 and V8 depend on.",
+      "recommendation": "Make application/approvals.py the only code that writes or reads approval rows by operation: a return_to_pending function used by both the expiry path and the pull request's base_moved path, an approved_request reader, and a predicate for the receipt rule. github_pulls keeps its GitHub reads and the receipt's reconciled_at update. Decide explicitly, with a test, whether base_moved should also enter the wait immediately.",
+      "sketch": "# application/approvals.py\n@dataclass(frozen=True)\nclass ApprovedRequest: approval_id: UUID; run_id: UUID; resource_target: str | None; review_detail: dict | None\nasync def approved_request(connection, operation_id: str) -> ApprovedRequest | None\nasync def return_to_pending(connection, *, operation_id: str, tool_id: str, review_detail: dict | None = None,\n                            ttl_seconds: int = DEFAULT_TTL_SECONDS) -> UUID | None   # one UPDATE plus the approval.requested event\ndef receipt_may_have_sent(status: str | None) -> bool      # used by approval_gate and _target_unchanged\n# adapters/github_pulls.py return_to_review: receipts update, then approvals.return_to_pending(...)\n# adapters/github_issues.py and tool_gateway.py: approved_request(...).resource_target",
+      "effort": "M",
+      "risk": "high",
+      "ruleCheck": "python-worker.md: use canonical transitions, and approvals bind the actual normalized effect; DH-06: avoid duplicated business rules; Decision 0025 V7 and V8 are cited in the code. Centralizing keeps every check and fence in place; whether base_moved enters the wait becomes an explicit, tested decision.",
+      "verdict": "confirmed",
+      "verifierNote": "Re-read both transitions, the three approved-row reads (github_issues.py:102-105, github_pulls.py:123-126, tool_gateway.py:226-229) and the two receipt rules (approvals.py:169-177, tool_gateway.py:220-225). The pull-request path raises base_moved right after returning the request to pending (github_pulls.py:194-199), so the run enters the wait only if the call is tried again. XMOD-02 covers the same code from the boundaries side."
+    },
+    {
+      "id": "XDUP-03",
+      "title": "Three copies of run admission; only one is protected against duplicate paid runs",
+      "dimension": "errors",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 287,
+          "endLine": 341,
+          "note": "New key on every press; a lost reply or a 503 becomes a plain error"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 591,
+          "endLine": 593,
+          "note": "The Run button stays enabled while the request is in flight"
+        },
+        {
+          "file": "apps/web/components/session-panel.tsx",
+          "line": 45,
+          "endLine": 79,
+          "note": "Same POST /v1/runs, new key, no pending state, its own refusal wording"
+        },
+        {
+          "file": "apps/web/components/continue-run.tsx",
+          "line": 21,
+          "endLine": 79,
+          "note": "Keeps the key across a lost reply or 5xx, and a pending state disables the button"
+        },
+        {
+          "file": "apps/web/lib/bff.ts",
+          "line": 102,
+          "note": "30 s upstream timeout, then 503, which can follow an admission that already committed"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 257,
+          "endLine": 274,
+          "note": "startSession; copied again at experts-panel.tsx:85 and :132 and expert-editor.tsx:189, each casting { id: string }"
+        }
+      ],
+      "occurrences": 7,
+      "evidence": "```\n// continue-run.tsx:39, 47-48\n\"Idempotency-Key\": (key.current ??= crypto.randomUUID()),\n// A 5xx can come after the API committed, so it proves no more than a lost reply.\nif (reply === null || reply.status >= 500) {\n// goal-composer.tsx:287, 292, 593\n// One key per press, so a retried request admits one run and each new press is a new intent.\n\"Idempotency-Key\": crypto.randomUUID(),\ndisabled={draft.trim() === \"\" || !budgetLeft}\n```",
+      "impact": "Run admission is a paid path. In the composer and the session panel (whose button at session-panel.tsx:190 is gated only by `ready`), a double click starts two billed runs. So does a retry after a lost reply, or after the BFF's 503 that follows a slow admission which already committed. continue-run, the third copy of the same request, handles both cases. The copies also word the same refusal codes differently, and the session start is cast rather than parsed four times.",
+      "recommendation": "Extract one admission client (startRun and startSession, built on the generated admitRun and createWorkSession) and one submit hook that holds the idempotency key until a definite answer and exposes a pending state. Use continue-run's rule: a success or a 4xx refusal clears the key; a lost reply or a 5xx keeps it. Map admission refusal codes to wording in one table, and use all of this from the composer, the session panel and continue-run.",
+      "sketch": "// apps/web/lib/use-idempotent-submit.ts\nexport function useIdempotentSubmit<T>(send: (key: string) => Promise<T>) {\n  // key kept until success or a 4xx refusal; a null reply or 5xx marks the outcome unknown and the retry reuses the key\n  return { submit, pending, outcome };   // pending disables the button\n}\n// apps/web/lib/runs.ts\nexport const startRun = (key: string, body: RunRequest) => admitRun(browserClient(key), body);\nexport const startSession = (key: string, body: SessionCreate) => createWorkSession(browserClient(key), body);\nexport const ADMISSION_REFUSALS: Partial<Record<string, string>>   // one wording per refusal code",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: disable duplicate submits, with server idempotency as the correctness mechanism; AGENTS.md paid-call boundaries. Server idempotency remains the mechanism; the UI only stops minting a new key when the outcome is unknown.",
+      "verdict": "revised",
+      "verifierNote": "Re-read all three admissions: only continue-run.tsx keeps its key (line 39) and disables while pending; the composer's Run button (591-593) and the session panel's (190) stay enabled in flight, and bff.ts:102 times out at 30 s. Corrected the session-start line numbers (experts-panel.tsx:85 and :132, expert-editor.tsx:189)."
+    },
+    {
+      "id": "XDUP-06",
+      "title": "Browser data access is hand-written in 31 components, and the generated client can't be used there",
+      "dimension": "duplication",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "packages/api-client/src/runtime.ts",
+          "line": 157,
+          "endLine": 172,
+          "note": "requestJson throws only the status, so the ErrorResponse body is lost"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 156,
+          "endLine": 181,
+          "note": "useLoaded<T>(path, parse): the one reusable loader, local to this file"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 36,
+          "endLine": 56,
+          "note": "Loader that never reads a failed body"
+        },
+        {
+          "file": "apps/web/components/provider-settings-panel.tsx",
+          "line": 161,
+          "endLine": 190,
+          "note": "Same GET written twice in one file: load() and an effect"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 142,
+          "note": "Drain rule stated as a comment; repeated at home-activity.tsx:73 and run-disclosure.tsx:53"
+        },
+        {
+          "file": "apps/web/components/keys-and-vars-panel.tsx",
+          "line": 181,
+          "endLine": 196,
+          "note": "Another copy of the loader"
+        },
+        {
+          "file": "apps/web/lib/csrf-fetch.ts",
+          "line": 2,
+          "endLine": 16,
+          "note": "The only shared piece: fetches a CSRF token, then the request"
+        }
+      ],
+      "occurrences": 74,
+      "evidence": "There are 45 fetch( and 29 csrfFetch( calls in 31 component files, 29 effects with hand-rolled active, live or stopped flags in 24 files, and 16 places that drain a failed body with `.text()`.\n```\n// experts-panel.tsx:36-44\nlet active = true;\nfetch(\"/api/v1/experts\", { cache: \"no-store\" })\n  .then(async (reply) => {\n    if (!active) return;\n    if (reply.ok) setExperts(parseExpertList(await reply.json()).experts);\n    else setFailed(true);\n  })\n```",
+      "impact": "Every screen re-decides cancellation, caching, parsing, failure reading and idempotency headers. The 'read an unread refusal' rule is applied in 16 places and skipped elsewhere. The browser uses none of the 78 generated request functions (the server uses 4), because runtime.requestJson discards the error body that screens need for code-specific messages. Changing a cross-cutting behavior such as timeouts, CSRF or error parsing means editing about 30 files.",
+      "recommendation": "Make the generated client usable in the browser: have runtime.requestJson throw a typed ApiFailure that carries the status and the error body, and accept per-call headers (or build ClientOptions per call). Add apps/web/lib/api.ts with browser ClientOptions (base URL '/api', CSRF-aware fetch, no-store, failed bodies drained), and move useLoaded from tool-catalog.tsx into lib as the one loader hook. Migrate screens as they are touched, and add a harness test like test_shared_form_controls.py that forbids new raw fetch( calls in components.",
+      "sketch": "// packages/api-client/src/runtime.ts (hand-written runtime; generated.ts is regenerated, never edited)\nexport class ApiFailure extends Error { constructor(readonly status: number, readonly body: unknown) }\n// requestJson(options, method, path, body?) throws ApiFailure(status, await response.json().catch(() => null))\n// apps/web/lib/api.ts\nexport function browserClient(idempotencyKey?: string): ClientOptions   // baseUrl '/api', CSRF fetch, no-store\nexport function failureOf(error: unknown): ErrorResponse | null           // parseErrorResponse on ApiFailure.body\n// apps/web/lib/use-loaded.ts (moved from tool-catalog.tsx:156)\nexport function useLoaded<T>(load: (c: ClientOptions) => Promise<T>, deps: unknown[]): Loaded<T>",
+      "effort": "L",
+      "risk": "medium",
+      "ruleCheck": "nextjs.md and DH-06: generated API types plus runtime parsing at untrusted boundaries, with explicit loading and unavailable states. runtime.ts is hand-written and in scope; generated.ts is only regenerated. Next.js stays a UI and BFF, and no business state moves into the browser.",
+      "verdict": "revised",
+      "verifierNote": "Recounted with git grep: 45 fetch( and 29 csrfFetch( calls in 31 component files, and 29 cancellation flags in 24 files. Failed-body drains are 16, not 14 (18 `.text()` calls, two of which read a file or a reply's content). The cited loaders and runtime.ts:157-172 match."
+    },
+    {
+      "id": "XDUP-04",
+      "title": "The frozen model-policy snapshot has one writer and eight hand-written readers",
+      "dimension": "types",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/application/runs.py",
+          "line": 136,
+          "endLine": 154,
+          "note": "Writer: version, bindings, sources (added later: 'Older snapshots have none'), routes"
+        },
+        {
+          "file": "services/agent/src/autobots/application/worker_inference.py",
+          "line": 107,
+          "endLine": 123,
+          "note": "frozen_policy(): the only validating reader"
+        },
+        {
+          "file": "services/agent/src/autobots/application/goal_loop.py",
+          "line": 580,
+          "endLine": 599,
+          "note": "Two raw readers via snapshot.get('bindings'): no validation and no routes check"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/browse_trial.py",
+          "line": 197,
+          "endLine": 203,
+          "note": "Raw read of snapshot['bindings'], then frozen_policy at :204"
+        },
+        {
+          "file": "services/agent/src/autobots/application/run_projection.py",
+          "line": 251,
+          "note": "SQL JSON path policy_snapshot -> 'bindings'"
+        },
+        {
+          "file": "services/agent/src/autobots/application/run_projection.py",
+          "line": 280,
+          "endLine": 291,
+          "note": "Raw Python read of routes, sources and bindings"
+        },
+        {
+          "file": "services/agent/src/autobots/application/run_projection.py",
+          "line": 428,
+          "note": "jsonb_each_text over bindings; again at :445"
+        },
+        {
+          "file": "services/agent/src/autobots/application/run_projection.py",
+          "line": 585,
+          "endLine": 586,
+          "note": "Inspector reads routes by hand"
+        }
+      ],
+      "occurrences": 9,
+      "evidence": "```\n# goal_loop.py:592-598\nasync def _route_is_bound(connection: Any, lease: Lease, config: LoopConfig) -> bool:\n    ...\"select policy_snapshot from public.runs where id = %s\"...\n    snapshot = (await cursor.fetchone())[0]\n    bound: str | None = snapshot.get(\"bindings\", {}).get(config.route.role)\n# worker_inference.py:107-109\ndef frozen_policy(snapshot: Mapping[str, Any] | None) -> RolePolicy:\n    bindings = (snapshot or {}).get(\"bindings\") or {}\n```\nOutside frozen_policy, the snapshot is read by hand at 8 sites: goal_loop.py:586 and :598, browse_trial.py:202, and run_projection.py:251, :281-291, :428, :445 and :586.",
+      "impact": "The snapshot is the immutable record of which models a run may use; the model-gateway rule says role policy is frozen at admission. Its JSON shape is implicit: the writer and the validating reader live in different modules. goal_loop's two readers decide routing from raw dict access with neither validation nor the routes check, and browse_trial asserts on the raw dict before it validates. The shape has already changed once (sources) without a format version, because `version` holds ROLE_POLICY_VERSION. A further change must be mirrored in Python dict access and in SQL JSON paths, none of which a type checks.",
+      "recommendation": "Define the snapshot's stored shape once, beside the other row shapes, with encode and decode functions that accept every historical shape. Route all Python readers through decode, via a read_frozen_policy(connection, run_id) helper. Keep run_projection's SQL JSON paths, but name the key once and add a test that encode writes it. Add an explicit format version at the next shape change.",
+      "sketch": "# services/agent/src/autobots/persistence/policy_snapshot.py   (row JSON shape, not a DTO)\nclass StoredPolicy(TypedDict): version: int; bindings: dict[str, str]; sources: NotRequired[dict[str, str]]; routes: dict[str, StoredRoute]\nBINDINGS_KEY = 'bindings'                         # also used by run_projection's SQL paths\ndef encode(policy: RolePolicy) -> str              # moved from runs._snapshot\ndef decode(raw: Mapping[str, Any] | None) -> RolePolicy   # from frozen_policy, without the role check\nasync def read_frozen_policy(connection, run_id: UUID) -> RolePolicy\n# worker_inference.frozen_policy = decode + the executor-role check; goal_loop and browse_trial call decode",
+      "effort": "M",
+      "risk": "high",
+      "ruleCheck": "contracts.md: version immutable model-policy snapshots; model-gateway.md: freeze role policy at admission. Row, domain (RolePolicy) and DTO types stay distinct, with an explicit mapping between them; stored snapshots are not rewritten.",
+      "verdict": "revised",
+      "verifierNote": "Reader list corrected: run_projection.py:585-586 also reads routes by hand, and browse_trial validates through frozen_policy right after its raw check, so two readers (goal_loop's) bypass validation, not three. Severity lowered from high to medium: every reader agrees with the writer today and tolerates the older shape, so the cost lands at the next shape change, which the recommendation itself ties to the format version; risk stays high because it is durable state."
+    },
+    {
+      "id": "XDUP-05",
+      "title": "Run spend and 'run plus descendants' are rewritten in SQL text, with two tree definitions that disagree",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/application/run_projection.py",
+          "line": 77,
+          "endLine": 86,
+          "note": "_SELECT_RUN: spent and reserved"
+        },
+        {
+          "file": "services/agent/src/autobots/application/run_projection.py",
+          "line": 446,
+          "endLine": 454,
+          "note": "Run list: spent, reserved, unreported"
+        },
+        {
+          "file": "services/agent/src/autobots/application/workflow_overview.py",
+          "line": 17,
+          "endLine": 31,
+          "note": "Third copy: 'as the run list counts it (RN-01)'"
+        },
+        {
+          "file": "services/agent/src/autobots/application/model_admission.py",
+          "line": 11,
+          "note": "OUTSTANDING, the status set the SQL copies restate as text"
+        },
+        {
+          "file": "services/agent/src/autobots/application/recovery.py",
+          "line": 40,
+          "endLine": 56,
+          "note": "outstanding(): counts calls by run_id or root_run_id, but effects by recursive subtree"
+        },
+        {
+          "file": "services/agent/src/autobots/application/reconciliation.py",
+          "line": 36,
+          "note": "Recursive subtree CTE; repeated at :47 and :78"
+        },
+        {
+          "file": "services/agent/src/autobots/application/run_usage.py",
+          "line": 30,
+          "note": "child_levels = 2, so grandchild runs exist"
+        },
+        {
+          "file": "scripts/qualify_mac_sleep.py",
+          "line": 43,
+          "endLine": 47,
+          "note": "Fourth ledger copy, scoped by root_run_id only"
+        }
+      ],
+      "occurrences": 20,
+      "evidence": "There are 4 copies of the ledger SQL, 4 of the subtree CTE, and 12 lines using the `run_id = X or root_run_id = X` scope (grep).\n```\n# recovery.py:44 and :50-53\n\"from app_private.model_invocations where (run_id = %s or root_run_id = %s) \"\n\"with recursive tree as (select id from public.runs where id = %s union all \"\n\"select r.id from public.runs r join tree t on r.parent_run_id = t.id) \"\n\"select count(*) from app_private.tool_receipts \"\n\"where run_id in (select id from tree) and status = 'unknown'\",\n```",
+      "impact": "Children inherit the top root (assignments.py:79 and :134), so for a depth-1 child X with its own child, `run_id = X or root_run_id = X` matches only X's own calls while the recursive CTE matches X's whole subtree, and outstanding() mixes the two for verification (verification.py:43) and resume gating (assignments.py:285). Whether a mid-level run can then pass verification with a grandchild's uncertain call still open is not established: each level checks its direct child when resuming, and the top root counts every descendant through root_run_id. The ledger's status set also appears as SQL text in four places beside the OUTSTANDING constant that admission uses, so a new invocation status would change enforcement but not the figures screens show.",
+      "recommendation": "Name each scope once and choose deliberately: one subtree helper (a Python SQL fragment, or a SQL function added by a forward migration) and one ledger helper. Build the ledger columns from model_admission.OUTSTANDING passed as a parameter, as admission already does. Then decide, with a disposable-database test using depth-2 delegation, which scope outstanding() should count calls in.",
+      "sketch": "# services/agent/src/autobots/application/run_scope.py\nSUBTREE = ('with recursive tree as (select id from public.runs where id = %(run)s union all '\n           'select r.id from public.runs r join tree t on r.parent_run_id = t.id)')\ndef ledger_columns(alias: str = 'r') -> str     # spent, reserved, unreported, using status = any(%(outstanding)s)\nLEDGER_PARAMS = {'outstanding': list(OUTSTANDING)}\n# run_projection and workflow_overview: f'select ..., {ledger_columns(\"r\")} from ...'\n# recovery and reconciliation: SUBTREE, with one stated rule for calls versus effects\n# optional forward migration: create function app_private.run_subtree(p_run uuid) returns setof uuid",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "The Option B contract owns recovery guarantees; python-worker.md: reconcile unknown outcomes before retry; database.md: never edit applied migrations, so any SQL function comes in a forward migration. The extraction is read-only; changing the scope is a separate, tested behavior change.",
+      "verdict": "revised",
+      "verifierNote": "Counts reproduced with git grep: 4 ledger copies (run_projection.py:79-83 and :446-450, workflow_overview.py:21-25, qualify_mac_sleep.py:45-48), 4 subtree CTEs and 12 scope lines. Severity lowered from high to medium: the two scopes do disagree at depth 2, but the effect on verification is inferred and partly covered by the per-level resume check, and the recommendation already asks for the deciding test."
+    },
+    {
+      "id": "XDUP-07",
+      "title": "Error replies are cast at 19 sites instead of parsed with the generated parseErrorResponse",
+      "dimension": "types",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 220,
+          "note": "Four casts in this file: :220, :254, :351, :392"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 179,
+          "endLine": 182,
+          "note": "Also :208"
+        },
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 38,
+          "endLine": 43,
+          "note": "refusalOf reads only message"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 119,
+          "endLine": 128,
+          "note": "Maps code to local wording"
+        },
+        {
+          "file": "apps/web/components/session-panel.tsx",
+          "line": 65,
+          "note": "Success body cast as { run_id: string }; parseRunAccepted is unused"
+        },
+        {
+          "file": "services/agent/src/autobots/api/errors.py",
+          "line": 19,
+          "endLine": 21,
+          "note": "Every API error body is ErrorResponse"
+        },
+        {
+          "file": "packages/api-client/src/generated.ts",
+          "line": 7698,
+          "note": "parseErrorResponse is generated but never imported by the web app"
+        }
+      ],
+      "occurrences": 27,
+      "evidence": "There are 19 error-body casts in 15 files and 8 success-body casts in 6 files (grep for `.json()...) as {`).\n```\n// model-policy-panel.tsx:179-182\nconst failure = (await reply?.json().catch(() => null)) as {\n  code?: string;\n  message?: string;\n} | null;\n```",
+      "impact": "The API's error contract is centralized and has a generated parser, but the browser reads it through 19 hand-written shapes. A contract change still compiles everywhere and silently falls back to generic wording. DH-06 forbids blanket assertions at untrusted boundaries.",
+      "recommendation": "Replace the casts with a single failureOf(reply) helper that runs parseErrorResponse and returns null on a mismatch, and replace the success casts with parseRunAccepted and parseSessionView. This is a quick first step, before the data-access refactor.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06 and nextjs.md: generated types plus runtime parsing at untrusted boundaries, and no blanket type assertions. It uses the existing generated parsers without editing generated.ts.",
+      "verdict": "confirmed",
+      "verifierNote": "Reproduced with grep for ') as {': 19 error-body casts in 15 files and 8 success-body casts in 6 files. parseErrorResponse (generated.ts:7698), parseRunAccepted (:8534) and parseSessionView (:8840) exist, and createWorkSession returns SessionView, so every cast has a generated parser."
+    },
+    {
+      "id": "XDUP-08",
+      "title": "The model policy for new work is loaded and resolved separately on each admission path",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 202,
+          "endLine": 246,
+          "note": "Run admission in a route: policy row, Expert bindings, run_profile, require_offered"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 121,
+          "endLine": 150,
+          "note": "Preview 'as admission would see them now', a second copy"
+        },
+        {
+          "file": "services/agent/src/autobots/api/improvement_routes.py",
+          "line": 100,
+          "endLine": 114,
+          "note": "Replay admission in a route"
+        },
+        {
+          "file": "services/agent/src/autobots/application/workflows.py",
+          "line": 362,
+          "endLine": 376,
+          "note": "Workflow execution"
+        },
+        {
+          "file": "services/agent/src/autobots/application/routines.py",
+          "line": 354,
+          "endLine": 367,
+          "note": "Routine runs"
+        },
+        {
+          "file": "services/agent/src/autobots/application/workflow_overview.py",
+          "line": 119,
+          "endLine": 139,
+          "note": "Per-step preview"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 393,
+          "endLine": 402,
+          "note": "Settings view"
+        }
+      ],
+      "occurrences": 7,
+      "evidence": "```\n# routines.py:354-363\ncursor = await connection.execute(\n    \"select default_profile, role_overrides from app_private.model_policies \"\n    \"where workspace_id = %s\", (workspace_id,))\npolicy_row = await cursor.fetchone()\npolicy = resolve_role_policy(\n    run_role_overrides={r: p.value for r, p in expert.role_bindings.items()},\n    workspace_default=policy_row[0] if policy_row else None,\n```",
+      "impact": "What a new run freezes is decided on four admission paths, two of them inside API route handlers, each with its own SQL and refusal mapping, and three previews promise to show 'what admission would see'. A new input to resolution, such as another override source, must be threaded through every copy, or previews and admission paths will freeze different policies for the same inputs.",
+      "recommendation": "Add one application function that loads the workspace policy, resolves it for new work, and optionally requires the profiles to be offered, taking Expert bindings and run_profile as arguments. Call it from every admission path and preview, and keep the mapping from refusals to HTTP errors in the routes.",
+      "sketch": "# application/model_policy.py\nasync def policy_for_new_work(connection, workspace_id: UUID, *, expert_bindings: Mapping[str, str] | None = None,\n                              run_profile: str | None = None, require_offer: bool = True) -> RolePolicy",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "model-gateway.md: freeze role policy at admission; DH-06: keep domain decisions independent of HTTP. This moves the decision out of the routes and adds no profile, default or fallback.",
+      "verdict": "confirmed",
+      "verifierNote": "All seven sites re-read: four admission paths (post_run, replay, workflow execution, routine) and three views (run preview, workflow step preview, run intent check). XMOD-05 covers the same reads from the boundaries side."
+    },
+    {
+      "id": "XDUP-09",
+      "title": "Canonical run-state sets are restated as literals in Python, SQL, TypeScript and scripts",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/domain/runs.py",
+          "line": 22,
+          "note": "TERMINAL, the canonical set"
+        },
+        {
+          "file": "services/agent/src/autobots/application/runs.py",
+          "line": 346,
+          "note": "SQL text in a module that imports TERMINAL (:13)"
+        },
+        {
+          "file": "services/agent/src/autobots/application/retention.py",
+          "line": 107,
+          "note": "SQL text"
+        },
+        {
+          "file": "services/agent/src/autobots/application/routines.py",
+          "line": 306,
+          "note": "SQL text"
+        },
+        {
+          "file": "services/agent/src/autobots/application/run_projection.py",
+          "line": 383,
+          "endLine": 387,
+          "note": "GROUPS as string tuples; another literal at :339"
+        },
+        {
+          "file": "services/agent/src/autobots/application/workflows.py",
+          "line": 492,
+          "note": "Python literal set"
+        },
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 16,
+          "endLine": 36,
+          "note": "TERMINAL, PAUSABLE and commandsFor restate the guards in domain/runs.py; Command type and LABELS are copied in run-panel.tsx:14-21"
+        },
+        {
+          "file": "apps/web/components/workflow-monitor.tsx",
+          "line": 13,
+          "note": "Second UI TERMINAL; script copies at qualify_mac_sleep.py:42, persistent_install.py:45 and qualify_release.py:45"
+        }
+      ],
+      "occurrences": 11,
+      "evidence": "The terminal set is restated 11 times (6 in Python, 2 in TypeScript, 3 in scripts); the web never imports the generated RunStatus type.\n```\n# application/runs.py:345-346\n\"select id, version from public.runs where parent_run_id = %s \"\n\"and status not in ('succeeded', 'failed', 'cancelled', 'cancelling')\",\n// apps/web/components/run-controls.tsx:16\nconst TERMINAL = new Set([\"succeeded\", \"failed\", \"cancelled\"]);\n```",
+      "impact": "Terminal states are a shared canonical rule: terminal runs cannot resume. A new terminal or waiting state would change domain/runs.py but leave retention, routine overlap checks, child cancellation, the run-list groups and the UI controls on the old set. Nothing would fail to compile, because the UI tables (25 Record<string, string> in components) are keyed by string rather than by the generated RunStatus.",
+      "recommendation": "In Python, pass TERMINAL, and group sets built from RunStatus, as SQL parameters, as model_admission does with OUTSTANDING. In the web, keep one lib/run-status.ts keyed by the generated RunStatus (using `satisfies Record<RunStatus, ...>`) for labels, tones, the terminal set and the commands offered, or have the API return a terminal flag and the allowed commands. Follow provider-settings-panel.tsx's typed tables.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "contracts.md: canonical states and guards are shared; DH-06: do not invent a second state enum for the UI. It uses generated types, and no state transition moves into Next.js.",
+      "verdict": "revised",
+      "verifierNote": "Recounted with git grep for the three-state literal: 6 Python sites, 2 TypeScript sites and 3 script copies, not 1 (persistent_install.py:45 and qualify_release.py:45, the latter named FINAL, besides qualify_mac_sleep.py:42)."
+    },
+    {
+      "id": "XDUP-10",
+      "title": "Profile names and the offered model set are kept by hand in four places, and already differ",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 104,
+          "endLine": 108,
+          "note": "PROFILE_LABELS: 'DeepSeek'"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 75,
+          "endLine": 79,
+          "note": "PROFILE_NAMES: 'DeepSeek Flash'"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 295,
+          "endLine": 299,
+          "note": "Copy of PROFILE_NAMES"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 484,
+          "note": "Shows the API's label for the same profile"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 21,
+          "endLine": 25,
+          "note": "Hard-coded offered list: Terra and Sol"
+        },
+        {
+          "file": "services/agent/src/autobots/domain/models.py",
+          "line": 72,
+          "note": "OFFERED_FOR_NEW_RUNS, the server's set"
+        },
+        {
+          "file": "apps/web/components/run-disclosure.tsx",
+          "line": 118,
+          "note": "Reads ModelAvailability.offered, as goal-composer.tsx:394 does"
+        }
+      ],
+      "occurrences": 4,
+      "evidence": "```\n# api/run_routes.py:104-105\nPROFILE_LABELS = {\n    ModelProfileId.DEEPSEEK_FLASH: \"DeepSeek\",\n// apps/web/components/run-list.tsx:75-78\nconst PROFILE_NAMES: Record<string, string> = {\n  openrouter_deepseek_flash: \"DeepSeek Flash\",\n// apps/web/components/expert-editor.tsx:21-24\nconst PROFILES = [{ id: \"\", label: \"Workspace setting\" }, { id: \"openrouter_terra\", label: \"Terra\" }, { id: \"openrouter_sol\", label: \"Sol\" }];\n```",
+      "impact": "The same profile is called 'DeepSeek' in the composer's preview but 'DeepSeek Flash' in the run list and on the Experts page. The Expert editor's choice list duplicates OFFERED_FOR_NEW_RUNS, which changes by decision (0013, 0019). When a profile is qualified or withdrawn, three screens follow the API and the editor does not; the server still refuses, so it fails safe, but the editor offers the wrong choices.",
+      "recommendation": "Add a display label to ModelAvailability, served from one Python table next to PROFILES in domain/models.py, and regenerate the client. Have every screen use /v1/models for both label and offered status, and delete the TypeScript tables and the hard-coded list.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "model-gateway.md: exactly three approved profiles, offered by decision; contracts.md: Pydantic/OpenAPI owns the public definition and TypeScript is generated. No new profile or default is introduced.",
+      "verdict": "confirmed",
+      "verifierNote": "Labels and lists confirmed; ModelAvailability (contracts/settings.py:97-110) has no label field today. The editor's list equals OFFERED_FOR_NEW_RUNS now, so that copy is drift risk; the 'DeepSeek' versus 'DeepSeek Flash' mismatch is current. The web-build area reports the editor copy as WBLD-07."
+    },
+    {
+      "id": "XDUP-11",
+      "title": "GitHub adapters re-implement provider HTTP, and their client and failure codes differ",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/provider_http.py",
+          "line": 43,
+          "endLine": 69,
+          "note": "provider_client (no redirects, trust_env=False) and failure_for"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/tavily.py",
+          "line": 47,
+          "endLine": 61,
+          "note": "call(): request, then provider_unavailable, failure_for or provider_reply_malformed"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/jina.py",
+          "line": 47,
+          "endLine": 63,
+          "note": "Same block"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/market_data.py",
+          "line": 121,
+          "endLine": 138,
+          "note": "Same block again; also at :83-100"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_issues.py",
+          "line": 127,
+          "endLine": 138,
+          "note": "Own client; trust_env is not disabled"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_issues.py",
+          "line": 45,
+          "note": "_REFUSED; the sets at github_pulls.py:45 and github_reads.py:40 differ"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_pulls.py",
+          "line": 48,
+          "note": "UnclearReply defined again (also github_issues.py:55)"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_reads.py",
+          "line": 53,
+          "endLine": 71,
+          "note": "429 becomes github_refused_429; transport errors become destination_unreachable"
+        }
+      ],
+      "occurrences": 8,
+      "evidence": "```\n# provider_http.py:51-57\nreturn httpx.AsyncClient(base_url=base_url, headers=dict(headers), transport=transport,\n                         timeout=seconds, follow_redirects=False, trust_env=False)\n# github_issues.py:128-137\nreturn httpx.AsyncClient(base_url=API_URL, transport=transport, timeout=_REQUEST_SECONDS,\n                         follow_redirects=False, headers={\"Authorization\": f\"Bearer {token}\", ...})\n```\nRefused sets: issues {400,401,403,404,410,422,429}, pulls adds 409, reads lacks 400.",
+      "impact": "The token-bearing GitHub client honors HTTP(S)_PROXY, ALL_PROXY and SSL_CERT_* settings from the worker's environment (httpx 0.28.1 defaults to trust_env=True), while every other provider client sets trust_env=False. The same 429 reaches the model as rate_limited from Tavily but as github_refused_429 from GitHub. The two write sets decide which replies count as 'nothing was created' rather than an unknown outcome, and they differ on 409 (pull requests only) with no comment saying why; the read set also lacks 400 but only picks the failure code.",
+      "recommendation": "Move the request-and-map block into provider_http as a request_json(client, method, path, credential=...) helper, build github_client through provider_client, and keep one UnclearReply. Give the refused-status tables a single home, with a comment per write class stating which statuses prove there was no effect.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: centralize error handling; python-worker.md: reconcile unknown outcomes before retry. The GitHub distinction between a refused write and an unclear one is kept, and made explicit instead of copied.",
+      "verdict": "revised",
+      "verifierNote": "Confirmed that github_client (github_issues.py:127-138) omits trust_env=False and that the three refused sets differ as stated. Dropped the .netrc claim: httpx 0.28.1 (uv.lock) takes proxies and SSL settings from the environment, and netrc only through an explicit NetRCAuth. Clarified that only the issue and pull-request sets decide 'nothing was created'."
+    },
+    {
+      "id": "XDUP-12",
+      "title": "BFF route handlers assemble the same-origin guard and their refusals separately",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/lib/bff.ts",
+          "line": 21,
+          "endLine": 51,
+          "note": "safeError and the guard input"
+        },
+        {
+          "file": "apps/web/app/api/session/route.ts",
+          "line": 13,
+          "endLine": 31,
+          "note": "guard(): refusal without Cache-Control: no-store"
+        },
+        {
+          "file": "apps/web/app/api/workspace/route.ts",
+          "line": 8,
+          "endLine": 31,
+          "note": "refused() is identical to safeError; third guard input"
+        },
+        {
+          "file": "apps/web/app/api/workspace/route.ts",
+          "line": 55,
+          "note": "Cookie secure flag computed from the origin"
+        },
+        {
+          "file": "apps/web/app/api/csrf/route.ts",
+          "line": 15,
+          "note": "secure: false, as in lib/session.ts:19"
+        },
+        {
+          "file": "apps/web/lib/bff.ts",
+          "line": 82,
+          "note": "Header literal duplicates WORKSPACE_HEADER; again at :141-143"
+        },
+        {
+          "file": "apps/web/lib/service-status.ts",
+          "line": 28,
+          "note": "Internal-token header built again (bff.ts:61)"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "```\n// app/api/session/route.ts:25-30\nreturn refusal === null\n  ? null\n  : NextResponse.json(\n      { code: refusal, message: \"This request was refused.\" },\n      { status: 403 },\n    );\n```\nlib/bff.ts:26-28 and workspace/route.ts:9-11 both add { headers: { \"Cache-Control\": \"no-store\" } }.",
+      "impact": "The CSRF and origin check itself is pure and tested, but what it is fed and how refusals are answered are copied. One copy already omits no-store, and the three cookies disagree on `secure` for the same origin. A new guard input, such as another header, would have to be added in three handlers.",
+      "recommendation": "Export from lib/bff.ts (server-only) a guardOf(request), a refusal(status, code, message) and one cookieOptions(config, { httpOnly }); use them in the session and workspace handlers. Use WORKSPACE_HEADER everywhere, and share one internal-headers helper with service-status.ts.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "nextjs.md: protect mutations with Host, Origin and CSRF checks, and verify session and workspace per BFF operation. The guard logic and its unit tests are unchanged; only input assembly and responses are shared.",
+      "verdict": "confirmed",
+      "verifierNote": "session/route.ts:25-30 refuses without no-store; workspace/route.ts:8-13 duplicates safeError; the secure flags differ (workspace/route.ts:55 from the origin, csrf/route.ts:15 and lib/session.ts:19 always false); bff.ts:82 and :141-143 spell the workspace header as a literal; service-status.ts:28 rebuilds the internal-token header."
+    },
+    {
+      "id": "XDUP-13",
+      "title": "Fifteen scripts repeat the disposable-stack lifecycle and build their report envelopes by hand",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "scripts/qualify_browse_goal.py",
+          "line": 44,
+          "endLine": 107,
+          "note": "Near-copy of qualify_browser_executor.py:44-105 (36 shared 8-line windows)"
+        },
+        {
+          "file": "scripts/app_db.py",
+          "line": 643,
+          "endLine": 660,
+          "note": "Setup block, repeated at qualify_identity.py:414 and qualify_operations.py:136"
+        },
+        {
+          "file": "scripts/disposable_db.py",
+          "line": 266,
+          "endLine": 278,
+          "note": "remove_stack re-checks ownership, so the guard itself is shared"
+        },
+        {
+          "file": "scripts/qualify_browser_executor.py",
+          "line": 99,
+          "note": "One of the hand-written schema_version envelopes"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/browser_executor.py",
+          "line": 463,
+          "endLine": 500,
+          "note": "The service reads that report: path, status, case ids, fingerprint"
+        },
+        {
+          "file": "tests/db/browser_executor_check.py",
+          "line": 49,
+          "note": "Its check() calls emit the 20 case ids that REQUIRED_CASES repeats as free text"
+        },
+        {
+          "file": "scripts/live_goal.py",
+          "line": 198,
+          "note": "Paid guard exits 2; persistent_install.py:794 exits 1; route_qualification.py:681 exits 0 with not_sent"
+        }
+      ],
+      "occurrences": 15,
+      "evidence": "grep: remove_stack and other_resources(project) are called in 15 scripts, require_identity appears in 16 and PROJECT_PREFIX naming in 17; 25 distinct 'autobots.*/vN' report schema identifiers appear in 23 scripts, and 'not_established' in 19.\n```\n# qualify_browse_goal.py:50-56 (same in 14 others)\nproject = f'{PROJECT_PREFIX}{secrets.token_hex(4)}'\ngateway_port = free_port()\ndb_port = free_port([gateway_port])\ntarget = Target(project, db_port, gateway_port)\nstack = AppStack(target, root, root / 'infra/supabase/upstream/docker-compose.yml', values=generated_values(gateway_port, db_port))\n```",
+      "impact": "Cleanup ownership is safe, because remove_stack checks identity and labels. Everything around it is copied: starting the stack, migrating, seeding the workspace, comparing other Docker resources, and the evidence envelope that AGENTS.md requires. One report is also a runtime contract: browsing counts as qualified only if the service finds 20 case ids that live as free text in another file, so rewording a case silently disables browsing (it fails closed). A paid refusal exits 2, 1 or 0 depending on the script.",
+      "recommendation": "In app_db.py, add a disposable_app_stack(root, services=...) context manager that yields the stack and records the other-resources check, and a write_report(...) used by every qualifier. Give the executor's case ids one tuple imported by both the check and the adapter, or add a schema test. Add one paid-guard helper with a single exit code; route_qualification's no-flag plan preview can stay a separate, documented dry run.",
+      "sketch": "# scripts/app_db.py\n@contextmanager\ndef disposable_app_stack(root, *, services=('db',), seed_workspace=True) -> Iterator[DisposableRun]:\n    # name, ports, Target, AppStack, passwords, require_identity, render and images, before = other_resources\n    # up --wait, bootstrap, migrate, seed; finally remove_stack and the 'other Docker resources are untouched' case\ndef write_report(root, path, schema, cases, *, target_class, not_established, started_at, **extra) -> bool",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "infrastructure.md: distinct disposable projects and ownership guards come before cleanup, and these stay inside remove_stack; AGENTS.md: completion evidence and paid-call boundaries. No guard leaves the shared primitive, and the paid guard stays mandatory.",
+      "verdict": "revised",
+      "verifierNote": "remove_stack and other_resources are called in 15 scripts, and the browse-goal and executor qualifiers share 36 windows in the detector output. The envelope count is restated from git grep (25 schema identifiers in 23 scripts), and the title no longer fixes a number of formats. Risk raised from low to medium: the qualifiers are themselves the disposable tests, so reshaping 15 lifecycles changes ports, ordering and before-and-after resource checks."
+    },
+    {
+      "id": "XDUP-14",
+      "title": "Copied check runners and case helpers in tests/db and scripts have drifted",
+      "dimension": "tests",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "scripts/app_db.py",
+          "line": 361,
+          "endLine": 373,
+          "note": "Run a tests/db check, parse its last line, translate the cases: 19 copies in this file"
+        },
+        {
+          "file": "scripts/app_db.py",
+          "line": 506,
+          "endLine": 514,
+          "note": "Variant that skips parsing only when a failed run printed nothing"
+        },
+        {
+          "file": "scripts/qualify_browse_goal.py",
+          "line": 74,
+          "endLine": 84,
+          "note": "One of the 8 copies that also handle empty output after exit 0"
+        },
+        {
+          "file": "tests/db/admission_check.py",
+          "line": 25,
+          "note": "Local check(): one of 41, with six truncation variants (none, 300, 400, 600, 700, 900)"
+        },
+        {
+          "file": "tests/db/provider_key_check.py",
+          "line": 91,
+          "endLine": 102,
+          "note": "Whole-database secret scan, identical to tool_use_check.py:64"
+        },
+        {
+          "file": "tests/db/connector_check.py",
+          "line": 178,
+          "endLine": 180,
+          "note": "Narrower three-table secret scan; also pull_request_check.py:215"
+        },
+        {
+          "file": "services/agent/tests/test_github_issues.py",
+          "line": 40,
+          "note": "FakeGithub, defined again at test_github_reads.py:23, connector_check.py:39 and keys_and_vars_check.py:64"
+        }
+      ],
+      "occurrences": 27,
+      "evidence": "There are 27 sites in 7 scripts that parse a check's cases from its last output line, and 18 copies of the runtime URL literal.\n```\n# app_db.py:364-371\nresult = subprocess.run([str(root / 'services/agent/.venv/bin/python'), str(root / 'tests/db/admission_check.py'), WORKSPACE_A],\n                        env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, ...},\n                        capture_output=True, text=True, timeout=120, check=False)\nif result.returncode:\n    cases.check('the admission check ran', 'exit 0', f'exit {result.returncode}: {result.stderr.strip()[-400:]}', False)\n    return\nfor case in json.loads(result.stdout.strip().splitlines()[-1])['cases']:\n```",
+      "impact": "19 of the 27 parse sites (all in app_db.py) take splitlines()[-1] without first checking that a check which exited 0 printed anything, so empty output crashes the qualifier with a traceback instead of recording a failed case; the 8 sites in the other qualifiers guard it. The two case-record shapes ('passed' versus 'status') must be translated at every call. The 'no durable copy of a secret' assertion is a whole-database scan in two checks but a three-table scan in the two GitHub connector checks, which therefore never look at tool_uses, run_files or checkpoints.",
+      "recommendation": "Add tests/db/support.py with the check recorder, the database scan, the runtime URL and the connection, plus a run_check(stack, root, script, *args, timeout, extra_env) helper in app_db.py that records empty output as a failure. Use the whole-database scan in the connector checks, which only widens them, and move FakeGithub into a shared test-support module.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "AGENTS.md: synthetic fixtures on disposable targets, and skipped checks never count as passing; database.md: verify actual roles. Widening the narrow leak scans strengthens the assertion, and nothing is skipped.",
+      "verdict": "revised",
+      "verifierNote": "Recounted: 27 case parsers (json.loads(...splitlines()[-1])['cases']), of which the 8 outside app_db.py check for empty output first, so 19 are unguarded, not 23. The check() helpers truncate in six ways, not four. The 18 runtime URL literals, four FakeGithub classes and the run-scoped three-table scans in connector_check.py:178-180 and pull_request_check.py:215-216 match."
+    },
+    {
+      "id": "XDUP-15",
+      "title": "Playwright specs copy sign-in, CSRF, key and admission helpers",
+      "dimension": "tests",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/tests/browser/slice-controls.spec.ts",
+          "line": 10,
+          "endLine": 60,
+          "note": "signIn, write, ensureKey and admit in one spec"
+        },
+        {
+          "file": "apps/web/tests/browser/slice-inspector.spec.ts",
+          "line": 12,
+          "endLine": 49,
+          "note": "The same helpers again, plus a hard-coded model id"
+        },
+        {
+          "file": "apps/web/tests/browser/approvals.spec.ts",
+          "line": 23,
+          "note": "signIn copy; write at :43"
+        },
+        {
+          "file": "apps/web/tests/browser/slice.spec.ts",
+          "line": 7,
+          "note": "Variant that also arranges a key"
+        },
+        {
+          "file": "apps/web/tests/browser/identity.spec.ts",
+          "line": 12,
+          "note": "Variant without the signed-in assertion"
+        },
+        {
+          "file": "apps/web/playwright.config.ts",
+          "line": 4,
+          "endLine": 24,
+          "note": "No fixtures, globalSetup or storageState"
+        }
+      ],
+      "occurrences": 36,
+      "evidence": "signIn is defined in 36 of the 41 specs (38 definitions), write in 15, ensureKey in 5 and admit in 3; process.env is read on 263 lines across all 41 specs; the Terra model ids are hard-coded in 6 specs and the arranged key in 11. All signIn bodies are the same flow, differing only in which constants they read.\n```\n// slice-controls.spec.ts:15-19\nawait page.goto(\"/sign-in\");\nawait page.getByLabel(\"Email\").fill(email);\nawait page.getByLabel(\"Password\").fill(password);\nawait page.getByRole(\"button\", { name: \"Sign in\" }).click();\nawait expect(page.getByText(/Signed in, with access to/)).toBeVisible();\n```",
+      "impact": "A change to the sign-in form's labels, the CSRF header contract or the signed-in text breaks 36 files at once. The hard-coded Terra model ids duplicate domain/models.py and will fail at the next route change.",
+      "recommendation": "Add apps/web/tests/browser/support/ with a typed test.extend fixture for each role (owner A, owner B, member, ops) built from one env reader, a csrfHeaders(page, key) helper, ensureKey and admit. Read model ids from /api/models instead of literals, and consider storageState per role.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-06: Playwright for key browser flows, including keyboard use and accessible labels. Specs still exercise the real sign-in flow; nothing is skipped.",
+      "verdict": "revised",
+      "verifierNote": "Recounted with grep over apps/web/tests/browser: signIn defined in 36 specs (38 definitions), write 15 (not 14), env reads on 263 lines in 41 specs (not 242 in 40), Terra ids in 6 specs (not 5) and the arranged key 'sk-or-valid-arranged-first' in 11 (not 10). The sign-in bodies at slice-controls.spec.ts:15-19 and slice-inspector.spec.ts:14-24 match."
+    },
+    {
+      "id": "XDUP-17",
+      "title": "Money, duration and times are formatted by local copies that give different results",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 87,
+          "endLine": 89,
+          "note": "dollars(): US$x.xx; same at run-panel.tsx:30, workflows-panel.tsx:50, goal-composer.tsx:74, home-activity.tsx:34"
+        },
+        {
+          "file": "apps/web/components/run-inspector.tsx",
+          "line": 10,
+          "endLine": 12,
+          "note": "dollars() without rounding"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 802,
+          "endLine": 822,
+          "note": "One page: rounded 'US$' limit, unrounded spend, then '$' in Usage"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 658,
+          "note": "Inline formatter"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 36,
+          "note": "relative() with Intl, same as home-activity.tsx:24"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 88,
+          "note": "relative() as 'in 5 min' or '3 h'; experts-panel.tsx:310 lastRun is a fourth version"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 393,
+          "note": "ISO UTC start time, as operations-panel.tsx:420; approvals use toLocaleString (:111)"
+        },
+        {
+          "file": "apps/web/components/home-greeting.tsx",
+          "line": 11,
+          "note": "The only use of the workspace time zone"
+        }
+      ],
+      "occurrences": 16,
+      "evidence": "There are 6 dollars() copies, 6 inline conversions, and 4 relative-time functions with 3 output styles.\n```\n// run-list.tsx:87-89 and run-inspector.tsx:10-12\nfunction dollars(micro: number): string { return `US$${(micro / 1_000_000).toFixed(2)}`; }\nfunction dollars(micro: number): string { return `US$${micro / 1_000_000}`; }\n```",
+      "impact": "The same micro-USD value shows as 'US$0.00', 'US$0.001234' or '$0.001234' depending on the screen, sometimes on the same page. Times appear as UTC ISO strings in the run list but in the browser's locale on approvals. Every new screen picks its own convention.",
+      "recommendation": "Create apps/web/lib/format.ts with money(micro, { precision }), relativeTime(iso, now), duration(seconds) and instant(iso, timeZone), using the workspace time zone as home-greeting does, with unit tests in tests/unit. Replace the local copies as screens are touched.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "python-worker.md: exact monetary units, so amounts stay integer micro-USD and are formatted only for display.",
+      "verdict": "confirmed",
+      "verifierNote": "Six dollars() copies in two formats, the three styles on run-workspace.tsx:802-822, four relative-time functions, and the ISO (run-list.tsx:393, operations-panel.tsx:420) versus locale (approvals-panel.tsx:111) times confirmed."
+    },
+    {
+      "id": "XDUP-18",
+      "title": "Loading, unavailable and empty states are hand-built per screen and announced inconsistently",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/provider-settings-panel.tsx",
+          "line": 236,
+          "endLine": 246,
+          "note": "Unavailable text; loading text with no role"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 222,
+          "endLine": 231,
+          "note": "Same pair"
+        },
+        {
+          "file": "apps/web/components/keys-and-vars-panel.tsx",
+          "line": 231,
+          "endLine": 240,
+          "note": "Same pair"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 284,
+          "endLine": 298,
+          "note": "role=status and data-state on its states"
+        },
+        {
+          "file": "apps/web/components/tool-uses.tsx",
+          "line": 262,
+          "endLine": 273,
+          "note": "Failed, loading and empty switch, copied at workflow-monitor.tsx:264-273"
+        },
+        {
+          "file": "apps/web/components/jobs-chart.tsx",
+          "line": 121,
+          "endLine": 126,
+          "note": "Neither state is announced"
+        }
+      ],
+      "occurrences": 33,
+      "evidence": "19 of 33 loading messages carry role=\"status\" on their own element (found by scanning the enclosing element); 'Sign in, and check that the local API is running' is repeated in 5 components.\n```\n// model-policy-panel.tsx:229-231\nif (models === null || state === null) {\n  return <p className=\"text-muted-foreground text-sm\">Loading models.</p>;\n}\n```",
+      "impact": "DH-06 asks for deliberate loading, empty, denied, unavailable and retryable states. Each screen re-decides markup, role and test hooks, so a screen reader announces loading on some screens and not others, and Playwright's data-state hooks exist only where an author added them.",
+      "recommendation": "Add components/ui/view-state.tsx with Loading, Unavailable (with retry) and Empty, each with a fixed role and data-state, rendered from the shared loader's state. Adopt it as screens move to that loader.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-06 and nextjs.md: explicit error, empty and loading states and accessible flows; PRD-Design-System DS-01 to DS-05: shadcn components and Luma tokens.",
+      "verdict": "confirmed",
+      "verifierNote": "The cited states were re-read. A heuristic rescan found 18 of 32 loading messages with role=status within five lines, close to the review's 19 of 33. The unavailable sentence (wrapped across lines) repeats in 5 components: data-summary, model-policy, keys-and-vars, provider-settings and run-list."
+    },
+    {
+      "id": "XDUP-16",
+      "title": "Budget limits and choices are restated outside domain/budgets.py",
+      "dimension": "duplication",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/domain/budgets.py",
+          "line": 5,
+          "endLine": 8,
+          "note": "BUDGET_MIN, MAX, STEP and DEFAULT"
+        },
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 93,
+          "endLine": 97,
+          "note": "Messages hard-code US$0.25, US$5.00 and the step"
+        },
+        {
+          "file": "apps/web/components/run-disclosure.tsx",
+          "line": 19,
+          "endLine": 20,
+          "note": "MICRO_USD and a copy of the default budget"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 118,
+          "note": "useState(1_000_000): another copy of the default"
+        },
+        {
+          "file": "apps/web/components/workflow-editor.tsx",
+          "line": 144,
+          "endLine": 157,
+          "note": "'the same budget choices as a goal run', kept by copying the step expansion"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 196,
+          "endLine": 205,
+          "note": "Step expansion"
+        },
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 30,
+          "note": "Third MICRO_USD"
+        }
+      ],
+      "occurrences": 7,
+      "evidence": "```\n# api/run_routes.py:94-95\n\"budget_out_of_range\": \"Choose a budget from US$0.25 to US$5.00.\",\n\"budget_off_step\": \"Choose a budget in steps of US$0.25.\",\n# domain/budgets.py:5-8\nBUDGET_MIN_MICRO_USD = 250_000 ... BUDGET_DEFAULT_MICRO_USD = 1_000_000\n```",
+      "impact": "If the range or step changes in domain/budgets.py (Decision 0022 D11), the API's refusal text keeps stating the old limits, and the editor's fallback default can differ from the composer's. The WF-05 comment promises both screens offer the same choices, which only copying maintains.",
+      "recommendation": "Format the messages from the constants using one money formatter, and move the step expansion and default into one web helper fed by RunPreview.budget. The UI's fallback default should come from the preview's BudgetRange.default_micro_usd, not a literal.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: avoid duplicated business rules; python-worker.md: exact monetary units, so amounts stay integer micro-USD and are formatted only for display.",
+      "verdict": "revised",
+      "verifierNote": "Constants, messages and UI copies confirmed, and contracts/settings.py BudgetRange already carries default_micro_usd for the UI fallback. Severity lowered from medium to low: every copy agrees with domain/budgets.py today, both screens expand the same server-supplied range, and the API validates every budget."
+    },
+    {
+      "id": "XDUP-19",
+      "title": "Appearance storage keys and values are written twice: in the before-paint script and in the settings control",
+      "dimension": "duplication",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/app/layout.tsx",
+          "line": 17,
+          "note": "BEFORE_PAINT hard-codes autobots.theme, .serif, .density, .motion and .stream with their values"
+        },
+        {
+          "file": "apps/web/components/appearance-control.tsx",
+          "line": 84,
+          "endLine": 96,
+          "note": "The same keys and attribute values as a typed table"
+        },
+        {
+          "file": "apps/web/components/theme-provider.tsx",
+          "line": 15,
+          "note": "Third copy of the theme storage key"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "```\n// appearance-control.tsx:82-83\n// PRD-Studio SE-03: presentation only, stored in this browser. The page applies a saved choice before\n// paint (see app/layout.tsx), and each change here sets the same attribute on the root element.\n```",
+      "impact": "Adding or renaming a preference requires a matching edit inside a minified string. A missed edit shows the wrong presentation until hydration, which DS-02's before-paint rule is meant to prevent.",
+      "recommendation": "Generate BEFORE_PAINT from the exported preference table with a small serializer in lib/appearance.ts, and export the theme key for theme-provider. A cheaper alternative is a unit test that every preference key and attribute value appears in BEFORE_PAINT.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "nextjs.md and DS-02: an explicit light or dark choice applied before paint and persisted. The script stays inline and minimal, and behavior is unchanged.",
+      "verdict": "confirmed",
+      "verifierNote": "BEFORE_PAINT (layout.tsx:17) hard-codes the keys and values that appearance-control.tsx:84-96 and theme-provider.tsx:15 also define. Added the parity-test alternative, which needs no change to the inline script."
+    },
+    {
+      "id": "XDUP-20",
+      "title": "API route modules copy pool access, dependency aliases and idempotency-conflict replies",
+      "dimension": "duplication",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/api/run_routes.py",
+          "line": 63,
+          "endLine": 70,
+          "note": "Key alias and _pool"
+        },
+        {
+          "file": "services/agent/src/autobots/api/workflow_routes.py",
+          "line": 62,
+          "endLine": 72,
+          "note": "Same"
+        },
+        {
+          "file": "services/agent/src/autobots/api/routine_routes.py",
+          "line": 29,
+          "endLine": 39,
+          "note": "Same"
+        },
+        {
+          "file": "services/agent/src/autobots/api/settings_routes.py",
+          "line": 83,
+          "note": "Inline variant with 'Provider settings are unavailable.' (4 times)"
+        },
+        {
+          "file": "services/agent/src/autobots/api/approval_routes.py",
+          "line": 156,
+          "endLine": 159,
+          "note": "Different conflict message"
+        },
+        {
+          "file": "services/agent/src/autobots/api/improvement_routes.py",
+          "line": 128,
+          "endLine": 129,
+          "note": "Another different message"
+        }
+      ],
+      "occurrences": 10,
+      "evidence": "_pool is defined 10 times, the Key alias 5 times and the Member alias 4 times; IdempotencyConflict maps to 409 in 6 places with 3 messages.\n```\n# run_routes.py:66-70 (same in 9 modules)\ndef _pool(request: Request) -> Any:\n    pool = request.app.state.pool\n    if pool is None:\n        raise ApiError(503, \"service_unavailable\", \"The database is unavailable.\")\n    return pool\n```",
+      "impact": "The harm is small today, but every new router copies the block, and one database outage reads as two different messages.",
+      "recommendation": "Add api/dependencies.py with Connection (a dependency that yields a pooled connection or raises 503), Key, Member, Owner and User, and map IdempotencyConflict once in the handlers in api/errors.py.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: centralize error handling. Resources stay owned by the FastAPI lifespan.",
+      "verdict": "confirmed",
+      "verifierNote": "_pool 10 times, Key 5, Member 4; IdempotencyConflict mapped to 409 in 6 functions (approval, expert, improvement, routine, run and workflow routes) with 3 messages; 'Provider settings are unavailable.' 4 times in settings_routes.py. XMOD-11 proposes the same dependencies module from the boundaries side."
+    }
+  ],
+  "rejected": [],
+  "notCovered": "The 8-line detector only finds exact repeats. I found structural duplicates with targeted greps over all 545 in-scope files and opened the code behind every reported pattern, but I did not read every file in full (see filesRead), so near-duplicates outside the listed suspects may remain. Repeats within a single file that the detector flagged (persistent_install.py 327/539, goal_loop.py 457/748, improvements.py 205/361, slice-workflows.spec.ts 141/156) are left to the area reviewers. The 40 windows shared by migrations 023 and 027 are the expected forward redefinition of purge_run_content and expire_idempotency_receipts; their current definitions are easy to find in 027, so they are not reported. Whether purge_run_content should also cover run-scoped tables added later (improvement_replay_runs in 037, tool_uses in 038, plan_task_times in 048) is a retention-policy question for the py-ops and sql-infra areas. The depth-2 disagreement in the run-tree finding is inferred from code paths and child_levels = 2, not exercised. This is a static review: no checks or services were run, and nothing here is runtime, H1 or product-acceptance evidence. One grep accidentally included the apps/web/.next build output; those results were discarded. The only files written were scratch detector output in .checks/reviews/review-2026-11-12-09-52-30/sweep-duplication/."
+}

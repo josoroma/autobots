@@ -1,0 +1,893 @@
+{
+ "schema": "autobots.code-review/v1",
+ "area": "sweep-tooling",
+ "title": "Lens: standards enforcement and tooling",
+ "kind": "lens",
+ "timestamp": "2026-11-12-09-52-30",
+ "revision": "156534da0bd5b19417f05d313077d767804b175b",
+ "summary": "Where tools run, they are strict and unusually well engineered. services/agent has ruff, ruff format, strict mypy and strict pytest. apps/web has strict TypeScript (with noUncheckedIndexedAccess and exactOptionalPropertyTypes), zero-warning ESLint, Prettier and a production build. Every check runs offline, cannot change the tree, counts skips and empty suites as failures, and is proven by known-bad fixtures. Enforcement stops at directory boundaries rather than where the rules intend. The 133 repository-level Python files (25,788 lines, 42% of all Python, including the verifier, the hooks, the qualifiers and the persistent install) have no lint, format or type gate. They follow a second house style and carry 295 dead suppressions, and the 881 service names they import are checked only when a slow profile runs them. packages/api-client's runtime and contract test, and the infra JavaScript, fall outside lint and format. Tests are selected from hand-kept lists, so schema-value.test.ts and the static manifest suite run in no profile. Nothing documents the five test mechanisms or why the web unit runner departs from DH-06. Neither language sets size or complexity limits. No rule stops the 28 type assertions on response bodies, most of which skip an available generated parser. Layering is clean but unguarded, and one web import cycle exists. Nothing runs any profile automatically, and no test guards the gates' own settings. Most fixes are configuration with zero or small baselines. Ruff's RUF100 and ESLint's bulk suppressions make those baselines shrink-only.",
+ "scores": [
+  {
+   "dimension": "standards",
+   "score": 3,
+   "why": "Strict, pinned, fault-proven gates cover services/agent and apps/web. 42% of Python (133 files) and the infra JS run under none, packages/api-client is type-checked but not linted or format-checked, nothing triggers the gates, and their settings are unguarded."
+  },
+  {
+   "dimension": "modules",
+   "score": 3,
+   "why": "Web layering and domain/ are clean today (0 hits under the proposed zones and bans). One web import cycle exists, adapters and application import each other (26 and 21 statements), and no rule holds any direction."
+  },
+  {
+   "dimension": "size",
+   "score": 2,
+   "why": "No limit is configured. 33 service functions exceed lenient thresholds (41 hits), web functions reach 677 lines and files 829 counted lines, and a script holds a 410-line function."
+  },
+  {
+   "dimension": "functions",
+   "score": 3,
+   "why": "62 service functions take more than five parameters (8 take more than eight). Pure helpers such as valueFor and draftOf live inside component files, out of unit-test reach."
+  },
+  {
+   "dimension": "structure",
+   "score": 3,
+   "why": "Directory boundaries, not intent, decide coverage. Tests span five mechanisms in six places, and packages/api-client falls between the web's lint and format paths."
+  },
+  {
+   "dimension": "approach",
+   "score": 4,
+   "why": "The verification design is a model: offline, pinned, non-mutating, fingerprinted, skip-is-failure and fault-proven. Hand-kept test lists and the lack of any automatic trigger undercut it."
+  },
+  {
+   "dimension": "comments",
+   "score": 3,
+   "why": "Service suppressions carry codes and reasons. 295 noqa comments in tests/db and scripts are unused, and 25 type: ignore comments target a type checker that never runs."
+  },
+  {
+   "dimension": "types",
+   "score": 3,
+   "why": "Strict mypy and strict TypeScript where applied. No rule stops 28 type assertions on response bodies and 2 on JSON.parse, type-aware lint is off, and 881 service names imported by checks and scripts go unchecked statically."
+  },
+  {
+   "dimension": "errors",
+   "score": 3,
+   "why": "Tooling shares one 0/1/2 exit contract and never passes a timeout or missing tool. Nothing lints the service's 22 broad catches (BLE001), and verify.run_check leaves descendant processes alive on timeout."
+  },
+  {
+   "dimension": "tests",
+   "score": 3,
+   "why": "Skip-as-failure and known-bad fixtures are exemplary. Selection is hand-kept (one unit test and a static suite run in no profile), the five runners are undocumented, and component logic has no unit-test path."
+  },
+  {
+   "dimension": "maintainability",
+   "score": 3,
+   "why": "Strong gates cover about half the code. The rest, the gates' settings and the triggers are unguarded, and most fixes are configuration with small, shrink-only baselines."
+  }
+ ],
+ "strengths": [
+  {
+   "title": "Verification cannot install or mutate, and proves it",
+   "evidence": "scripts/toolchain.py:187-188 sets UV_OFFLINE, UV_NO_SYNC and COREPACK_ENABLE_NETWORK=0 for checks. run_guarded (scripts/toolchain.py:299-321) fails a run whose locks, manifests, changed files or installed package names differ, even when every step passed. scripts/verify.py:184-187 records the same guard as non_mutation_guard. Use this as the template for every new step."
+  },
+  {
+   "title": "Skips, empty suites, timeouts and missing tools never pass",
+   "evidence": "scripts/verify.py:91-107 turns an empty unittest suite or any skip into a failure and reads pytest's skip summary. scripts/harness_lib.py:221-229 refuses reports with skipped tests or failed commands. verify.py, toolchain.py and qualify_faults.py share one exit contract: 0 passed, 1 failed, 2 unavailable."
+  },
+  {
+   "title": "Known-bad fixtures prove each checker bites",
+   "evidence": "scripts/qualify_faults.py:55-75 runs ruff, mypy, pytest, tsc and ESLint on good and bad fixtures. A bad fixture counts only if it fails with its expected marker (F401, return-value, TS2322, no-explicit-any), so a crashed tool is not a detected fault. Add a bad fixture with every new rule."
+  },
+  {
+   "title": "Strict typing where it is applied",
+   "evidence": "services/agent/pyproject.toml:49-59 sets mypy strict over src and tests, pytest --strict-markers --strict-config and strict asyncio mode. All 62 service type: ignore comments carry an error code. apps/web/tsconfig.json:7-9 adds noUncheckedIndexedAccess and exactOptionalPropertyTypes to strict, and apps/web/package.json:6 fails lint on any warning."
+  },
+  {
+   "title": "Repository conventions as small stdlib tests that check themselves",
+   "evidence": "tests/toolchain/test_scaffold_scope.py:41-50 bans the unused provider SDKs and proves each import form is detected. tests/harness/test_shared_form_controls.py:14-23 bans raw form controls and fails if it no longer sees more than 20 screens. Reuse this shape for test ownership and import contracts."
+  },
+  {
+   "title": "Generated validators and server-only guards at the web boundary",
+   "evidence": "25 component files use generated parse functions at 60 sites, e.g. apps/web/components/approvals-panel.tsx:143. Five server modules begin with import \"server-only\" (apps/web/lib/bff.ts:1). All 237 internal imports in app, components and lib use the @/ alias, with none relative, which makes path-based layering rules easy to write."
+  },
+  {
+   "title": "Exact, hashed pins, refused when inexact",
+   "evidence": "scripts/toolchain.py:109-121 refuses any pin that is not an exact version, and a pnpm packageManager without its sha512. pnpm-workspace.yaml sets engineStrict, strictPeerDependencies and verifyDepsBeforeRun: error."
+  },
+  {
+   "title": "Habits that already meet lockable rules",
+   "evidence": "DTZ, S602, S604 and S605 report 0 across all 318 Python files, and so do S110 and S112. The web reports 0 floating or misused promises (rerun with type information over 95 files) and 0 layering violations under the proposed zones. These rules can start as errors with no baseline."
+  }
+ ],
+ "findings": [
+  {
+   "id": "XTOL-01",
+   "title": "Repository-level Python runs under no lint, format or type gate",
+   "dimension": "standards",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "scripts/toolchain.py",
+     "line": 210,
+     "endLine": 213,
+     "note": "ruff check, ruff format --check and mypy run from services/agent with no path arguments"
+    },
+    {
+     "file": "services/agent/pyproject.toml",
+     "line": 41,
+     "endLine": 53,
+     "note": "Ruff run without paths checks the services/agent directory, and mypy's files are src and tests"
+    },
+    {
+     "file": "scripts/harness_lib.py",
+     "line": 145,
+     "endLine": 157,
+     "note": "tests/harness and .claude/hooks fall to the harness domain, which runs no static check"
+    },
+    {
+     "file": ".claude/hooks/dispatch.py",
+     "line": 161,
+     "endLine": 164,
+     "note": "the edit-time ruff diagnostic runs only for the python domain"
+    },
+    {
+     "file": "scripts/persistent_install.py",
+     "line": 31,
+     "note": "F401: other_resources imported and unused, one of 5,775 hits"
+    },
+    {
+     "file": "scripts/qualify_backup.py",
+     "line": 89,
+     "note": "F841: workspace_b assigned and never used"
+    }
+   ],
+   "occurrences": 133,
+   "evidence": "toolchain.py:210-213 runs `ruff check`, `ruff format --check` and `mypy` from services/agent with no paths, and pyproject.toml:52 sets mypy `files = [\"src\", \"tests\"]`. Whatever domain check_domains gives a script, the Python steps lint only services/agent. tests/harness and .claude/hooks map to the harness domain, which runs only unittest. The PostToolUse hook runs ruff only for the python domain. So 133 files and 25,788 lines (42% of all Python) have no static check. They include verify.py, harness_lib.py, dispatch.py, the qualifiers and persistent_install.py. Under the service's own rules (metrics.md section 6) they give 5,775 hits: 5,269 E501, 295 RUF100, 119 I001, 34 UP017, 9 B023, 7 F401, 7 RUF012, 7 RUF059, 4 B905, 3 ASYNC240 and 2 F841. 458 of them have safe autofixes.",
+   "impact": "DH-06 asks for Ruff and strict mypy on owned modules, and DH-09 treats check infrastructure as the most conservative scope. Yet the code that decides whether every other check passed, and the guarded persistent install, has no static check. Its defects surface as wrong verdicts or as runtime failures on the real install. The unused workspace_b at qualify_backup.py:89, a second owner's workspace that nothing reads, may already mark a check the backup qualifier never makes.",
+   "recommendation": "Create one shared Python standard. Add a root ruff.toml and have services/agent extend it. Add a repo_ruff_check step over scripts, tests and .claude/hooks to fast and full, and a check_domains domain for those paths so fast, the Stop hook and the PostToolUse diagnostic cover them. Adoption path:\n1. Report only, with `ruff check --exit-zero --statistics`.\n2. One explicit commit applying the 458 safe fixes and `--select RUF100 --fix`, after the rule selection is settled (XTOL-14).\n3. Gate with E501 ignored for these paths.\n4. Reformat separately (XTOL-04).\n5. Drop the E501 ignore.\n\nLand the import-contract check (XTOL-03) before considering mypy there.",
+   "sketch": "# ruff.toml (repository root): the shared Python standard\ntarget-version = \"py312\"\nline-length = 100\nsrc = [\"scripts\", \"services/agent/src\"]\nextend-exclude = [\"tests/faults/python/bad_*\"]   # deliberately bad fixtures\n[lint]\nselect = [\"E\", \"F\", \"W\", \"I\", \"B\", \"UP\", \"ASYNC\", \"RUF\"]\n[lint.per-file-ignores]\n\"scripts/**\" = [\"E501\"]          # until the one-time reformat\n\"tests/**\" = [\"E501\"]\n\".claude/hooks/**\" = [\"E501\"]\n\n# services/agent/pyproject.toml: inherit instead of restating; no own select\n[tool.ruff]\nextend = \"../../ruff.toml\"\nsrc = [\"src\", \"tests\"]\n\n# scripts/toolchain.py check_steps, run from the root\nStep('repo_ruff_check', (str(venv_bin / 'ruff'), 'check', 'scripts', 'tests', '.claude/hooks'), root)\n# scripts/harness_lib.py: a domain that fast and the Stop hook require\nREPO_PYTHON_STEPS = frozenset({'repo_ruff_check'})",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "DH-06 (Ruff lint and format, mypy strict for owned modules; safe autofix is an explicit operation) and DH-05 (substantive checks live in repository scripts; no formatter rewrites in hooks). The change only adds checks, and the hook stays diagnostic.",
+   "verdict": "revised",
+   "verifierNote": "133 files and 25,788 lines recounted from files.txt (42% of 61,654 Python lines), and both cited hits reproduce; the 9 B023 hits look benign. Revised: the RUF100 cleanup waits until the rule selection is settled, so the reasoned BLE001 markers survive (XTOL-14)."
+  },
+  {
+   "id": "XTOL-02",
+   "title": "Hand-kept test lists let tests drop out unseen, and two suites already run in no profile",
+   "dimension": "tests",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "scripts/verify.py",
+     "line": 161,
+     "endLine": 162,
+     "note": "web_unit_tests names two of the three unit test files"
+    },
+    {
+     "file": "apps/web/tests/unit/schema-value.test.ts",
+     "line": 1,
+     "endLine": 17,
+     "note": "US-16.2's test, run by no profile"
+    },
+    {
+     "file": "scripts/verify.py",
+     "line": 154,
+     "endLine": 156,
+     "note": "only test_scaffold_scope.py runs; the comment says the rest bootstrap copies from registries"
+    },
+    {
+     "file": "tests/toolchain/test_manifests.py",
+     "line": 1,
+     "endLine": 3,
+     "note": "offline static tests of pins, locks and the runbook, run by no profile"
+    },
+    {
+     "file": "scripts/qualify_identity.py",
+     "line": 317,
+     "note": "19 of the 28 Playwright name filters, kept inline"
+    },
+    {
+     "file": "scripts/qualify_web.py",
+     "line": 169,
+     "note": "three more filters in another script"
+    },
+    {
+     "file": "apps/web/tests/browser/install.spec.ts",
+     "line": 4,
+     "endLine": 5,
+     "note": "manual by design, recorded only in a comment"
+    }
+   ],
+   "occurrences": 2,
+   "evidence": "verify.py:161-162 passes only request-guard.test.ts and credential-precedence.test.ts to `node --test`. schema-value.test.ts, added by US-16.2, is in no list, and .checks/full/latest.json records exactly those two files in web_unit_tests' argv. The archived US-16.2 verification.md cites schema-value.test.ts for a PASS row and says fast passed its 'web unit tests'. test_manifests.py calls itself 'Static tests of pins, locks and the runbook' and makes no network call. toolchain_scope_tests discovers only test_scaffold_scope.py, so no report's check argv names test_manifests.py. Playwright specs are chosen by 28 name filters spread over qualify_identity.py (including its -g runs at 329-376), qualify_web.py, qualify_release.py:342 and persistent_install.py:720. All 41 specs match one today except install.spec.ts, which is manual by design, but nothing would notice a new spec that matches none.",
+   "impact": "The profiles' skip-is-failure rules cannot see an unrun test, and evidence records can cite one as passing. That has already happened once. A pin changed without its runbook row also goes uncaught.",
+   "recommendation": "Select tests by glob, not by name: Node 22 expands `--test` patterns itself. Add test_manifests.py to the offline toolchain step. Move the Playwright filters into one module the qualifiers import. Add a stdlib harness test that every test file is claimed by a runner or listed as manual with a reason, plus a self-check that an unclaimed file is detected (the test_shared_form_controls.py pattern).",
+   "sketch": "# scripts/verify.py: globs, so a new test file cannot be missed\nStep('web_unit_tests', (node, '--test', 'apps/web/tests/unit/**/*.test.ts'), root)\nStep('api_client_tests', (node, '--test', 'packages/api-client/tests/**/*.test.ts'), root)\nStep('toolchain_manifest_tests', (sys.executable, '-m', 'unittest', 'discover', '-s', 'tests/toolchain',\n                                  '-p', 'test_manifests.py'), root)\n\n# scripts/test_suites.py: the one list the qualifiers import\nBROWSER_FILTERS = {'qualify_web': ('appearance', 'boundary', 'browser/tools.spec'), ...}\nMANUAL = {'apps/web/tests/browser/install.spec.ts': 'run by hand on the persistent install'}\n\n# tests/harness/test_test_ownership.py\ndef unclaimed(paths, filters, manual):\n    return [p for p in paths if p not in manual and not any(re.search(f, p) for f in filters)]\nclass TestOwnership(unittest.TestCase):\n    def test_every_spec_has_a_runner(self): self.assertEqual(unclaimed(specs(), all_filters(), MANUAL), [])\n    def test_an_unclaimed_spec_is_seen(self): self.assertEqual(unclaimed(['x.spec.ts'], ['y'], {}), ['x.spec.ts'])",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-09 (no passing badge for an empty suite; skipped checks never count) and the OhMyOrch delivery rule (never report a scenario as passing without observing it). The change adds coverage and a guard and removes no check.",
+   "verdict": "confirmed",
+   "verifierNote": "verify.py and the full report argv list two of the three unit files, and test_manifests.py only reads repository files. The archived US-16.2 record cites schema-value.test.ts in PASS rows (verification.md:13, 17) and line 22 says fast passed its web unit tests. Filter coverage simulated with regular expressions."
+  },
+  {
+   "id": "XTOL-03",
+   "title": "Service internals used by the database checks and scripts are never checked statically",
+   "dimension": "types",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "scripts/harness_lib.py",
+     "line": 147,
+     "endLine": 148,
+     "note": "a services/agent change affects only the python domain"
+    },
+    {
+     "file": "tests/db/wake_check.py",
+     "line": 16,
+     "note": "imports the private _keep_lease"
+    },
+    {
+     "file": "tests/db/assignment_check.py",
+     "line": 21,
+     "note": "imports the private _finish"
+    },
+    {
+     "file": "scripts/persistent_install.py",
+     "line": 288,
+     "endLine": 292,
+     "note": "returns tuple[object, dict] to keep a lazy import"
+    },
+    {
+     "file": "scripts/persistent_install.py",
+     "line": 437,
+     "endLine": 449,
+     "note": "type: ignore[attr-defined] on Ledger.settle and committed in the paid goal"
+    },
+    {
+     "file": "services/agent/src/autobots/operations/route_qualification.py",
+     "line": 167,
+     "note": "the signature those calls rely on"
+    },
+    {
+     "file": "scripts/app_db.py",
+     "line": 421,
+     "endLine": 423,
+     "note": "the checks run only as subprocesses inside the db profile"
+    }
+   ],
+   "occurrences": 881,
+   "evidence": "# scripts/persistent_install.py:288 and 437\ndef reserve_goal(ledger_path: Path, limit: int) -> tuple[object, dict]:\n        ledger.settle(entry, 0, 'not_started')  # type: ignore[attr-defined]\nA stdlib resolver written for this review checked the 881 names that 68 files in tests/ and scripts/ import from autobots. Those include 473 import lines in 60 tests/db files and 18 imports of 13 private names, such as _keep_lease and _finish. All resolve today, but no tool checks them on change. mypy covers only services/agent, and check_domains sends services/agent/ to the python domain alone. A rename therefore passes fast, the PostToolUse diagnostic and the Stop hook, and breaks only inside the next db run (about 610 s with Docker in the latest report). The 25 type: ignore comments in scripts and tests serve a type checker that never runs there; 14 of them are in persistent_install.py, all caused by reserve_goal's object return type.",
+   "impact": "A service refactor can silently break the database and qualification suites. It can also break settlement of the shared spending cap after a paid install goal. The failure appears late, in the slowest profile or on the real install.",
+   "recommendation": "Add an import-contract test to the fast profile, in the style of tests/toolchain/test_scaffold_scope.py. It resolves every `from autobots... import name` in tests/ and scripts/ against services/agent/src. The review's resolver is about 60 lines and runs in under a second. Include a fixture proving a missing name is reported. Type reserve_goal with a TYPE_CHECKING import of Ledger and drop its 14 ignores. Once the lint gate lands, consider mypy with a non-strict override over scripts and tests/db.",
+   "sketch": "# tests/toolchain/test_import_contract.py (stdlib, offline, run by fast)\ndef unresolved(sources: dict[str, str], defined: Callable[[str], set[str] | None]) -> list[str]:\n    \"\"\"Every name imported from autobots that the source tree does not define.\"\"\"\nclass ImportContract(unittest.TestCase):\n    def test_tests_and_scripts_import_only_existing_names(self): self.assertEqual(unresolved(sources(), defined), [])\n    def test_a_missing_name_is_reported(self): self.assertTrue(unresolved({'x.py': 'from autobots.domain.runs import Gone'}, defined))\n\n# scripts/persistent_install.py\nif TYPE_CHECKING:\n    from autobots.operations.route_qualification import Ledger\ndef reserve_goal(ledger_path: Path, limit: int) -> tuple['Ledger', dict[str, Any]]: ...",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "DH-06 (mypy for owned modules; keep typing exceptions narrow and documented) and python-worker.md (checks use prepared environments and do not install). The check is static and needs no services.",
+   "verdict": "revised",
+   "verifierNote": "An AST recount gives 881 names in 68 files and 473 statements in 60 tests/db files, and all 14 ignores in persistent_install.py follow from the object type. Revised: the 18 private-name imports cover 13 distinct names."
+  },
+  {
+   "id": "XTOL-04",
+   "title": "Two Python house styles, and only the service's is checked",
+   "dimension": "standards",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/pyproject.toml",
+     "line": 41,
+     "endLine": 44,
+     "note": "100 columns and ruff format defaults (double quotes)"
+    },
+    {
+     "file": "scripts/toolchain.py",
+     "line": 31,
+     "endLine": 35,
+     "note": "repository scripts use single quotes"
+    },
+    {
+     "file": "scripts/specs.py",
+     "line": 236,
+     "endLine": 249,
+     "note": "a scripts/ file in the service style"
+    },
+    {
+     "file": "tests/harness/test_specs.py",
+     "line": 13,
+     "note": "a harness test in the service style"
+    },
+    {
+     "file": "scripts/app_db.py",
+     "line": 117,
+     "note": "a 578-character line"
+    }
+   ],
+   "occurrences": 133,
+   "evidence": "String literals, counted with tokenize including f-strings: services/agent/src has 7,369 double-quoted and 47 single-quoted; scripts 8,648 single and 978 double; tests/db 9,432 single and 711 double; and tests/harness 2,978 single and 360 double. Nine repository-level files follow the service, among them scripts/specs.py, tests/harness/test_specs.py and tests/db/tool_keys_check.py. Lines over 100 columns: 11 in the service (src and tests, longest 116); 2,060 in scripts (626 over 140, longest 578 at app_db.py:117); 2,763 in tests/db (1,117 over 140). `ruff format --line-length 100` would change 121 of 134 files: 43,508 diff lines, or 34,007 with quote-style preserve. On a scratch copy it grows them from 25,788 to 47,666 lines (41,473 at 120 columns) and leaves 1,015 E501 hits (437 at 120).",
+   "impact": "Reviewers read two dialects. Very long lines hide logic in diffs. Formatting nearly doubles the true size of this code, which any Python size limit must account for.",
+   "recommendation": "Adopt the service's style everywhere through the shared root ruff.toml: double quotes, 100 columns. After the lint gate lands, and with no story open on those files, reformat repository-level Python in one mechanical commit listed in .git-blame-ignore-revs. Then add `ruff format --check` for those paths, drop their E501 ignore and wrap the remaining long strings. Calibrate Python size limits after the reformat, and prefer statement and complexity limits to line counts.",
+   "sketch": "# ruff.toml (root)\n[format]\nquote-style = \"double\"   # the service's style; \"preserve\" would cut the churn by about 22%\n\n# .git-blame-ignore-revs\n<sha>  # one mechanical ruff format of scripts/, tests/ and .claude/hooks/\n\n# scripts/toolchain.py, after the reformat\nStep('repo_ruff_format', (str(venv_bin / 'ruff'), 'format', '--check', 'scripts', 'tests', '.claude/hooks'), root)",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "DH-06 (Ruff check and formatting are separate gates; safe autofix is an explicit operation) and DH-05 (no formatter rewrites on ordinary edits). The reformat is one reviewed commit, never a hook action. It needs harness, db and operations reruns because tests/db and the qualifiers change.",
+   "verdict": "revised",
+   "verifierNote": "Single-quote and long-line counts reproduce, and the three named files are double-quoted. Revised: the double-quote counts include f-strings here, so they are higher; the format churn comes from the reviewer's scratch copy and was not rerun (metrics.md records 121 of 134 files to reformat)."
+  },
+  {
+   "id": "XTOL-05",
+   "title": "No size or complexity limit is configured in either language",
+   "dimension": "size",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/pyproject.toml",
+     "line": 46,
+     "endLine": 47,
+     "note": "lint.select has no C90 or PLR09 rules"
+    },
+    {
+     "file": "apps/web/eslint.config.mjs",
+     "line": 4,
+     "endLine": 8,
+     "note": "Next presets only"
+    },
+    {
+     "file": "apps/web/package.json",
+     "line": 6,
+     "note": "--max-warnings=0, so a warn-level rule fails lint"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/github_pulls.py",
+     "line": 68,
+     "note": "complexity 37, 92 statements"
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 152,
+     "note": "677-line component, complexity 39"
+    },
+    {
+     "file": "apps/web/components/goal-composer.tsx",
+     "line": 113,
+     "note": "527 lines, complexity 37"
+    },
+    {
+     "file": "scripts/qualify_worker_inference.py",
+     "line": 65,
+     "note": "410-line function"
+    }
+   ],
+   "occurrences": 86,
+   "evidence": "Counted in this review over the service's src and tests at the proposed thresholds. C901 at 15: 5 (at 12: 17; at 10: 26). PLR0911 at 8 returns: 6. PLR0912 at 15 branches: 2. PLR0913 at 8 arguments: 8 (at 5: 62). PLR0915 at 60 statements: 3. PLR0917 at 6 positional arguments: 17 (at 5: 38). That makes 41 hits on 33 functions in 25 files. Repository-level C901 at 15: scripts 18, tests/db 6, tests/harness 1. Web, non-test: complexity at 15: 11; max-lines-per-function at 150: 24; max-lines at 400: 10, with 6 more in tests/browser.",
+   "impact": "Hotspots grow without any signal. Because lint fails on any warning, a new limit cannot be introduced at warn level inside the gate.",
+   "recommendation": "Enable calibrated limits now, with baselines that can only shrink. Ruff: enable the rules, then run `ruff check --add-noqa` once. RUF100, already on through RUF, then fails on any suppression that is no longer needed. ESLint: enable the rules as errors and baseline them with `eslint --suppress-rule`, which writes eslint-suppressions.json and, by default, fails on entries that no longer match. For a report-only look first, use `ruff check --exit-zero --statistics` and a separate `lint:report` script with --max-warnings=-1. As baselines empty, tighten C901 from 15 to 12 to 10 and function length from 150 to 100. Relax file length for tests/browser.",
+   "sketch": "# services/agent/pyproject.toml\n[tool.ruff.lint]\nextend-select = [\"C90\", \"PLR0911\", \"PLR0912\", \"PLR0913\", \"PLR0915\", \"PLR0917\"]\n[tool.ruff.lint.mccabe]\nmax-complexity = 15        # 5 today; then 12 (17) and 10 (26)\n[tool.ruff.lint.pylint]\nmax-args = 8               # 8 today\nmax-positional-args = 6    # 17\nmax-branches = 15          # 2\nmax-statements = 60        # 3\nmax-returns = 8            # 6\n\n// apps/web/eslint.config.mjs\n{ files: [\"**/*.{ts,tsx}\"], rules: {\n    complexity: [\"error\", 15],                                                                    // 11\n    \"max-lines-per-function\": [\"error\", { max: 150, skipBlankLines: true, skipComments: true }],  // 24\n    \"max-lines\": [\"error\", { max: 400, skipBlankLines: true, skipComments: true }] } },           // 10\n{ files: [\"tests/**\"], rules: { \"max-lines\": \"off\", \"max-lines-per-function\": \"off\" } },\n\n# baselines, once each\n(cd services/agent && .venv/bin/ruff check --add-noqa)\n(cd apps/web && node_modules/.bin/eslint --suppress-rule complexity --suppress-rule max-lines-per-function --suppress-rule max-lines .)",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06 (small cohesive modules) and DH-09 (no speculative frameworks or arbitrary quotas). Thresholds are calibrated to today's counts and only tighten; DH-04 forbids raising one to pass a gate.",
+   "verdict": "confirmed",
+   "verifierNote": "Every Python count reproduces with ruff 0.17.3, where PLR0917 is stable, and the web counts match eslint_proposed.json. ESLint 9.39.5 has --suppress-rule, and stale suppressions fail unless --pass-on-unpruned-suppressions is set."
+  },
+  {
+   "id": "XTOL-06",
+   "title": "No rule stops JSON casts at the web boundary, though generated parsers exist",
+   "dimension": "types",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "apps/web/components/approvals-panel.tsx",
+     "line": 216,
+     "endLine": 218,
+     "note": "error body cast to { code?: string }"
+    },
+    {
+     "file": "apps/web/components/approvals-panel.tsx",
+     "line": 143,
+     "note": "the same file parses its list with parseApprovalList"
+    },
+    {
+     "file": "apps/web/components/goal-composer.tsx",
+     "line": 311,
+     "note": "success body cast to { run_id: string }"
+    },
+    {
+     "file": "apps/web/components/session-panel.tsx",
+     "line": 65,
+     "note": "the same cast, inline"
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 224,
+     "note": "JSON.parse(...) as { cursor: number }"
+    },
+    {
+     "file": "packages/api-client/src/generated.ts",
+     "line": 7698,
+     "note": "parseErrorResponse exists"
+    },
+    {
+     "file": "packages/api-client/src/generated.ts",
+     "line": 8534,
+     "note": "parseRunAccepted exists"
+    },
+    {
+     "file": "apps/web/eslint.config.mjs",
+     "line": 4,
+     "endLine": 8,
+     "note": "no rule covers this"
+    }
+   ],
+   "occurrences": 30,
+   "evidence": "// components/approvals-panel.tsx:216-218\nconst failure = (await reply?.json().catch(() => null)) as {\n  code?: string;\n} | null;\nA no-restricted-syntax selector for a type assertion over a `.json()` call flags 28 non-test sites in 17 files: 19 read error bodies and 9 read success bodies. It also flags 2 `JSON.parse(...) as T` sites, and 10 more sites in tests. Meanwhile 25 component files already use generated parsers (60 sites), and the client exports parseErrorResponse and parseRunAccepted.",
+   "impact": "DH-06 asks for explicit response parsing at untrusted boundaries. Today a renamed error code or response field reaches the screen as undefined instead of failing with a ContractError.",
+   "recommendation": "Add the selector rule now, scoped to app, components and lib; it needs no type information. Baseline today's 30 sites in eslint-suppressions.json. Then replace the error-body casts with one shared helper around parseErrorResponse, and the success casts with the matching generated parse function, showing a ContractError as the unavailable state. Two sites have no generated parser: workflow-editor.tsx:81 deep-clones an already parsed graph, where structuredClone fits, and lib/csrf-fetch.ts:6 reads the BFF's own /api/csrf, so fix those in place.",
+   "sketch": "const PARSE = \"Parse response bodies with a generated parse* function (DH-06), not a type assertion.\";\n\"no-restricted-syntax\": [\"error\",\n  { selector: \"TSAsExpression:has(CallExpression[callee.property.name='json'])\", message: PARSE },\n  { selector: \"TSAsExpression > CallExpression[callee.object.name='JSON'][callee.property.name='parse']\", message: PARSE }],\n// scoped with files: [\"app/**\", \"components/**\", \"lib/**\"]\n// lib/error-body.ts\nexport async function errorCode(reply: Response | null): Promise<string | null> // wraps parseErrorResponse",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "DH-06 Next.js (explicit response parsing at untrusted boundaries; no blanket type assertions) and nextjs.md (generated API types plus runtime parsing). Generated files are consumed, never edited.",
+   "verdict": "revised",
+   "verifierNote": "A regex recount over app, components and lib gives the same 28 sites in 17 files plus 2 over JSON.parse, and eslint_proposed.json shows 30 with 10 more in tests. Revised: the rule is scoped to non-test code, and the deep clone and the /api/csrf read, which have no generated parser, are handled in place."
+  },
+  {
+   "id": "XTOL-07",
+   "title": "Layering is clean but unguarded, and one web import cycle has formed",
+   "dimension": "modules",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "apps/web/components/run-list.tsx",
+     "line": 8,
+     "note": "imports RunPanel"
+    },
+    {
+     "file": "apps/web/components/run-panel.tsx",
+     "line": 9,
+     "note": "imports StateLine back from run-list"
+    },
+    {
+     "file": "apps/web/components/home-activity.tsx",
+     "line": 13,
+     "note": "STATUS_TEXT comes from the run-list screen"
+    },
+    {
+     "file": "apps/web/components/workflows-panel.tsx",
+     "line": 17,
+     "note": "the same"
+    },
+    {
+     "file": "tests/toolchain/test_scaffold_scope.py",
+     "line": 13,
+     "note": "the only import rule today, run in full only"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+     "line": 34,
+     "note": "adapters import application"
+    },
+    {
+     "file": "services/agent/src/autobots/application/provider_settings.py",
+     "line": 14,
+     "note": "application imports adapters"
+    }
+   ],
+   "occurrences": 1,
+   "evidence": "Run in check mode for this review, import/no-cycle reports run-list.tsx:8 and run-panel.tsx:9. import/no-restricted-paths with the three zones below reports 0; an inverted zone reported 59, so the @/ alias resolves. no-restricted-imports patterns for components/ui, components and lib also report 0. In Python, an AST scan finds domain/ importing only the standard library. On a scratch tree, ruff TID251 in a nested domain/ruff.toml that extends the service config and uses extend-banned-api flagged module, submodule and function-level imports. adapters and application import each other: 26 and 21 import statements.",
+   "impact": "Clean boundaries erode one import at a time when nothing checks them. The cycle ties two run screens together and leaves shared run status without a clear home.",
+   "recommendation": "Turn on import/no-cycle and the zones as errors. Break the cycle by moving StateLine and STATUS_TEXT into a small shared run-status module. Add the domain ban, which has 0 hits and needs TID251 selected (see XTOL-08). Decide the adapters-application direction in a decision record before banning either way.",
+   "sketch": "// apps/web/eslint.config.mjs\n\"import/no-cycle\": [\"error\", { maxDepth: 10 }],   // 2 today\n\"import/no-restricted-paths\": [\"error\", { zones: [\n  { target: \"./components/ui/**/*\", from: [\"./components/*.tsx\", \"./app/**/*\"], message: \"UI primitives stay feature-free.\" },\n  { target: \"./lib/**/*\", from: [\"./components/**/*\", \"./app/**/*\"], message: \"lib/ never imports UI.\" },\n  { target: \"./components/**/*\", from: [\"./app/**/*\"], message: \"Screens never import route modules.\" } ] }],  // 0\n\n# services/agent/src/autobots/domain/ruff.toml\nextend = \"../../../pyproject.toml\"\n[lint.flake8-tidy-imports.extend-banned-api]\n\"autobots.application\".msg = \"domain/ stays independent of the other layers (DH-06).\"\n\"autobots.adapters\".msg = \"domain/ stays independent of the other layers (DH-06).\"\n\"autobots.api\".msg = \"domain/ stays independent of the other layers (DH-06).\"\n\"fastapi\".msg = \"domain/ is framework-free (DH-06).\"\n\"psycopg\".msg = \"domain/ is framework-free (DH-06).\"\n\"langgraph\".msg = \"domain/ is framework-free (DH-06).\"\n\"pydantic\".msg = \"DTOs live in contracts/ (python-worker.md).\"",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06 (keep domain decisions independent of HTTP, Supabase clients and LangGraph internals) and python-worker.md (pure domain types separate from DTOs). The bans only add checks; the adapters-application direction is left to a decision.",
+   "verdict": "confirmed",
+   "verifierNote": "Rerun with the exact zones as command-line rules: 2 cycle hits and 0 zone hits, while an inverted zone gives 59. An AST scan confirms domain/ imports only the standard library and itself, and the 26 and 21 cross-layer statements."
+  },
+  {
+   "id": "XTOL-08",
+   "title": "Rules the code already follows are enforced only by review",
+   "dimension": "standards",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": ".claude/rules/python-worker.md",
+     "line": 11,
+     "note": "Use explicit UTC"
+    },
+    {
+     "file": "PRD-Development-Harness.md",
+     "line": 116,
+     "note": "subprocess argument arrays, never shell code"
+    },
+    {
+     "file": "AGENTS.md",
+     "line": 27,
+     "note": "OpenRouter only, no alternative provider"
+    },
+    {
+     "file": "tests/toolchain/test_scaffold_scope.py",
+     "line": 13,
+     "note": "the SDK ban, as a test"
+    },
+    {
+     "file": "scripts/verify.py",
+     "line": 154,
+     "endLine": 156,
+     "note": "that test runs in full only"
+    },
+    {
+     "file": "services/agent/src/autobots/application/tool_gateway.py",
+     "line": 372,
+     "endLine": 373,
+     "note": "a broad catch that neither logs nor re-raises"
+    },
+    {
+     "file": "PRD-Development-Harness.md",
+     "line": 129,
+     "note": "preserve causes; avoid swallowed exceptions"
+    }
+   ],
+   "occurrences": 27,
+   "evidence": "Counted over all 318 Python files in this review. DTZ (naive datetimes): 0. S602, S604 and S605 (shell execution): 0. TID251, banning the unused and non-OpenRouter SDKs: 0. The SDK ban exists only as a test that only the full profile runs, so an edit gets no warning. BLE001 finds 22 broad catches in services/agent/src, 3 in scripts and 2 in .claude/hooks, none annotated. Ruff cannot see log_event, so it also flags handlers that do log: about 10 of the 22 log a named event and 2 raise a new error. The silent ones include `except Exception: return _denied(\"review_unavailable\")`.",
+   "impact": "Rules a pinned linter checks in milliseconds depend on reviewers noticing, and nothing marks which broad catches are deliberate.",
+   "recommendation": "Select DTZ, S602, S604, S605 and TID251 in the shared config as errors. They need no baseline and then also run in the PostToolUse diagnostic. Add BLE001 and run `ruff check --add-noqa`, then write the reason on each of the 27 current sites, so each kept broad catch says why and any new one needs a reason. Keep test_scaffold_scope.py.",
+   "sketch": "# ruff.toml (root), inherited by services/agent\n[lint]\nselect = [\"E\", \"F\", \"W\", \"I\", \"B\", \"UP\", \"ASYNC\", \"RUF\",\n          \"DTZ\", \"S602\", \"S604\", \"S605\", \"TID251\", \"BLE001\"]   # new: 0, 0, 0, 0, 0, 27\n[lint.flake8-tidy-imports.banned-api]\n\"anthropic\".msg = \"Application inference is OpenRouter only (AGENTS.md).\"\n\"langchain_anthropic\".msg = \"Locked for deepagents only; owned code never imports it.\"\n\"google\".msg = \"Locked for deepagents only; owned code never imports it.\"\n\"langchain_google_genai\".msg = \"Locked for deepagents only; owned code never imports it.\"\n\"openai\".msg = \"Application inference is OpenRouter only (AGENTS.md).\"\n\"langchain_openai\".msg = \"Application inference is OpenRouter only (AGENTS.md).\"",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "python-worker.md (explicit UTC), DH-05 (argument arrays, never shell), AGENTS.md and the 2026-11-05 SDK decision recorded in test_scaffold_scope.py (OpenRouter only), and DH-06 (no swallowed exceptions). The lint rules complement the existing test, which stays.",
+   "verdict": "revised",
+   "verifierNote": "DTZ, S602/S604/S605 and every banned SDK import give 0 on rerun. Revised: BLE001 cannot see log_event, so the 22 src hits are not all silent, and with the hooks the baseline is 27 sites, not 25."
+  },
+  {
+   "id": "XTOL-09",
+   "title": "The gates' own settings have no regression check",
+   "dimension": "standards",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "scripts/qualify_faults.py",
+     "line": 46,
+     "endLine": 47,
+     "note": "tsc fault cases pass their own flags, not the project tsconfig"
+    },
+    {
+     "file": "scripts/qualify_faults.py",
+     "line": 64,
+     "endLine": 65,
+     "note": "the typescript_type cases"
+    },
+    {
+     "file": "apps/web/tsconfig.json",
+     "line": 7,
+     "endLine": 9,
+     "note": "strict, noUncheckedIndexedAccess, exactOptionalPropertyTypes"
+    },
+    {
+     "file": "apps/web/package.json",
+     "line": 6,
+     "note": "--max-warnings=0"
+    },
+    {
+     "file": "services/agent/pyproject.toml",
+     "line": 46,
+     "endLine": 59,
+     "note": "ruff select, mypy strict, pytest strict options"
+    },
+    {
+     "file": "scripts/harness_lib.py",
+     "line": 276,
+     "endLine": 320,
+     "note": "settings.json is guarded down to each hook key"
+    }
+   ],
+   "occurrences": 5,
+   "evidence": "No file under tests/ or scripts/ mentions noUncheckedIndexedAccess, exactOptionalPropertyTypes, --max-warnings or mypy strict. project_configuration checks .claude/settings.json key by key. Deleting `strict = true`, a select code or `--max-warnings=0` would still pass every profile. The TypeScript fault cases run `tsc --noEmit --strict ...` on the fixture, so they prove tsc catches TS2322, not that apps/web/tsconfig.json is strict. The ESLint, ruff and mypy cases do use the project configs.",
+   "impact": "DH-04 forbids approving a failed gate by changing thresholds. Today a weakened setting is visible only to a reviewer who reads the config diff.",
+   "recommendation": "Add a static test asserting the agreed settings, next to test_manifests.py, which already parses these files, and schedule it in a profile (test_manifests.py itself runs in none, XTOL-02). Include altered copies proving each weakening is caught. Run the TypeScript fault cases through `tsc -p` on a fixture tsconfig that extends apps/web/tsconfig.json, and add a fixture that only noUncheckedIndexedAccess catches.",
+   "sketch": "# tests/toolchain/test_gate_settings.py (static; scheduled with the manifest tests)\nREQUIRED_TS = {'strict': True, 'noUncheckedIndexedAccess': True, 'exactOptionalPropertyTypes': True}\ndef gate_errors(tsconfig: dict, web_package: dict, pyproject: dict) -> list[str]:\n    errors = [f'tsconfig {k} must be {v}' for k, v in REQUIRED_TS.items() if tsconfig['compilerOptions'].get(k) is not v]\n    if '--max-warnings=0' not in web_package['scripts']['lint']: errors.append('lint must fail on warnings')\n    if pyproject['tool']['mypy'].get('strict') is not True: errors.append('mypy must stay strict')\n    return errors   # plus ruff select and pytest addopts\n# one altered copy per setting, as test_manifests.py does for pins",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-04 (no agent approves its own failed gate by changing thresholds) and nextjs.md (never suppress build type errors). This adds a check.",
+   "verdict": "revised",
+   "verifierNote": "rg finds none of the four settings named in tests/ or scripts/; the tsc cases pass their own flags while ruff and mypy use CONFIG = services/agent/pyproject.toml (qualify_faults.py:25). Revised: the new test must be scheduled in a profile, since test_manifests.py, its proposed neighbor, runs in none."
+  },
+  {
+   "id": "XTOL-10",
+   "title": "Five test mechanisms, and the web unit runner departs from DH-06 without a decision",
+   "dimension": "tests",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/pyproject.toml",
+     "line": 55,
+     "endLine": 59,
+     "note": "pytest: services/agent/tests"
+    },
+    {
+     "file": "scripts/verify.py",
+     "line": 84,
+     "endLine": 86,
+     "note": "unittest: tests/harness"
+    },
+    {
+     "file": "scripts/verify.py",
+     "line": 160,
+     "endLine": 162,
+     "note": "node --test: api-client and web unit tests"
+    },
+    {
+     "file": "apps/web/playwright.config.ts",
+     "line": 3,
+     "endLine": 5,
+     "note": "Playwright, only through the qualifier scripts"
+    },
+    {
+     "file": "scripts/app_db.py",
+     "line": 421,
+     "endLine": 427,
+     "note": "tests/db scripts print JSON cases that app_db.py relays"
+    },
+    {
+     "file": "apps/web/lib/bff.ts",
+     "line": 1,
+     "endLine": 8,
+     "note": "server-only and @/ imports, which node --test cannot load"
+    },
+    {
+     "file": "apps/web/components/operations-panel.tsx",
+     "line": 121,
+     "note": "pure valueFor (complexity 17) inside a component file"
+    },
+    {
+     "file": "apps/web/components/expert-editor.tsx",
+     "line": 59,
+     "note": "pure draftOf (complexity 13), likewise"
+    }
+   ],
+   "occurrences": 5,
+   "evidence": "Five mechanisms run the tests. pytest runs services/agent/tests. unittest runs tests/harness and tests/toolchain on the standard library, so harness needs no prepared environment. node --test runs the api-client contract test and two of the three web unit files (XTOL-02) through Node type stripping. Playwright runs 40 of the 41 specs through four qualifier scripts; install.spec.ts is run by hand. 44 tests/db *_check.py scripts print JSON cases that app_db.py and the qualifiers relay. DH-06 names Vitest and React Testing Library for pure and client behavior. US-1.3's proposal deferred them to 'the story that first has behavior to test', and later stories used node --test with no decision record. node --test loads only modules with no @/ alias, no server-only import and no JSX. So valueFor and draftOf, pure helpers inside component files, are reachable only through Playwright, as is the decision logic in the onKey handler at approvals-panel.tsx:229 (complexity 27).",
+   "impact": "Contributors cannot tell where a new test belongs, and the riskiest client logic has no fast test path.",
+   "recommendation": "Record a short decision naming each mechanism's scope and the reason for it, as DH-09 asks for exceptions. Then either move pure component logic into leaf lib/ modules covered by node --test, or adopt Vitest and React Testing Library in a scoped story with pinned versions. Document the tests/db JSON-case protocol in the harness runbook.",
+   "sketch": "docs/engineering/decisions/00xx-test-runners.md\n- pytest: services/agent (async, fake transports)\n- unittest: tests/harness, tests/toolchain (stdlib, so harness runs unprepared)\n- node --test: pure TypeScript leaf modules (apps/web/lib, packages/*), selected by glob\n- Playwright: browser flows, from the qualifiers' shared suite list\n- JSON-case scripts: tests/db on disposable targets\napps/web/lib/operations-values.ts  <- valueFor, tested by node --test\napps/web/lib/expert-draft.ts       <- draftOf, tested by node --test",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "DH-06 Next.js testing and DH-09 (keep decisions and exceptions in concise ADRs; no speculative frameworks). The decision makes the deviation explicit and mandates no framework. A Vitest adoption would be a repo-local, pinned install inside its own story.",
+   "verdict": "revised",
+   "verifierNote": "The mechanisms, the US-1.3 deferral (proposal.md:28), the 44 check scripts and the complexity figures (eslint.json) confirmed. Revised: node --test runs two web unit files, Playwright 40 specs, and onKey is a handler closure rather than a pure helper."
+  },
+  {
+   "id": "XTOL-11",
+   "title": "No CI or Git hook runs any profile, and make check covers only the harness",
+   "dimension": "standards",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "Makefile",
+     "line": 232,
+     "endLine": 234,
+     "note": "validate, then the harness profile"
+    },
+    {
+     "file": "scripts/verify.py",
+     "line": 79,
+     "endLine": 88,
+     "note": "the harness profile validates the backlog a second time"
+    },
+    {
+     "file": "PRD-Development-Harness.md",
+     "line": 123,
+     "note": "Git hooks may call the same runner"
+    }
+   ],
+   "occurrences": 1,
+   "evidence": ".github does not exist, core.hooksPath is unset and .git/hooks holds only samples; CODEBASE.md also notes no CI. `make check` runs `specs.py validate` and then the harness profile, which runs `specs.py validate` again as backlog_validation and runs no lint, type check or application test. Latest durations: harness 28 s, fast 44 s (Python scope), full 95 s, db 610 s, operations 266 s.",
+   "impact": "Commits made outside an assistant session reach main with no gate. The Stop hook is the only trigger, and DH-05 says bypassable hooks cannot be the only completion check.",
+   "recommendation": "Track `.githooks/pre-commit` running the fast profile (changed scope; no services, network or model), and document the explicit opt-in `git config core.hooksPath .githooks`. Run full before merging, either as a pre-push opt-in or as a job on a self-hosted Apple Silicon runner after `scripts/toolchain.py bootstrap`, keeping `.checks/full/latest.json` as the artifact. Keep db and operations manual, because they start disposable Docker projects. Drop make check's duplicate `specs.py validate`, and add a fast target beside it: fast exits 2 on a checkout that was never bootstrapped, so check can stay on harness for unprepared checkouts.",
+   "sketch": "#!/bin/sh\n# .githooks/pre-commit. Opt in with: git config core.hooksPath .githooks\n# DH-05: the same runner as the assistant hooks; bypassable, so never the completion check.\nexec python3.12 scripts/verify.py --profile fast\n\n# Makefile\ncheck:        # harness only, so it works before bootstrap; it already validates the backlog\n\tpython3.12 scripts/verify.py --profile harness\ncheck-fast:   # needs scripts/toolchain.py bootstrap\n\tpython3.12 scripts/verify.py --profile fast\n\n# CI, if adopted: pinned node, python3.12 and uv on PATH\n#   -> python3.12 scripts/toolchain.py bootstrap -> python3.12 scripts/verify.py --profile full",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-05 (Git hooks may call the same runner; bypassable hooks are not the only completion check) and AGENTS.md (no installs or services in hooks). The hook runs fast only, and the opt-in is explicit, not a silent settings change.",
+   "verdict": "revised",
+   "verifierNote": ".github is absent, core.hooksPath is unset, .git/hooks holds only samples, and make check validates the backlog twice; durations match the latest reports within a second. Revised: fast needs a prepared toolchain, so the Makefile gains a target instead of repointing check."
+  },
+  {
+   "id": "XTOL-12",
+   "title": "packages/api-client and infra JavaScript sit outside lint and format, and the contract test outside any type check",
+   "dimension": "standards",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "apps/web/package.json",
+     "line": 6,
+     "endLine": 7,
+     "note": "lint and format paths cover apps/web only"
+    },
+    {
+     "file": "packages/api-client/tsconfig.json",
+     "line": 19,
+     "endLine": 21,
+     "note": "includes src only"
+    },
+    {
+     "file": "packages/api-client/src/runtime.ts",
+     "line": 1,
+     "note": "the hand-written validator behind every parse function"
+    },
+    {
+     "file": "packages/api-client/tests/contract.test.ts",
+     "line": 5,
+     "endLine": 6,
+     "note": "run by node, never type-checked"
+    },
+    {
+     "file": "infra/browser/browser-entrypoint.js",
+     "line": 8,
+     "endLine": 11,
+     "note": "the DevTools forwarder, with no check at all"
+    }
+   ],
+   "occurrences": 3,
+   "evidence": "`lint` is `eslint --max-warnings=0 .` run in apps/web, and `format:check` lists apps/web paths only, so runtime.ts (172 lines) is neither linted nor format-checked. The api-client tsconfig includes only `src/**/*.ts`, so contract.test.ts (40 lines) runs but is never type-checked. infra/browser/browser-entrypoint.js (69 lines) has no lint or type check. Linted from the root with the web config in this review, runtime.ts and contract.test.ts pass.",
+   "impact": "The module that validates every response at the trust boundary has looser checks than the screens that consume it. Its drift would show only at runtime.",
+   "recommendation": "Extend lint and format to packages/api-client, excluding generated.ts. Include tests/**/*.ts in its tsconfig. Give infra/browser/*.js `// @ts-check` and a checkJs type check.",
+   "sketch": "// packages/api-client/tsconfig.json\n\"include\": [\"src/**/*.ts\", \"tests/**/*.ts\"]\n\n# scripts/toolchain.py check_steps\nStep('api_client_lint', (eslint, '--config', 'apps/web/eslint.config.mjs', '--max-warnings=0',\n                         'packages/api-client/src/runtime.ts', 'packages/api-client/tests'), root)\nStep('api_client_format', (prettier, '--check', 'packages/api-client/src/runtime.ts', 'packages/api-client/tests'), root)",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "contracts.md (generated TypeScript consumes the contract; runtime parsing validates it) and DH-06 (Prettier for supported formats). generated.ts stays excluded and unedited.",
+   "verdict": "confirmed",
+   "verifierNote": "The lint and format scripts, the src-only include and the missing @ts-check confirmed, with line counts 172, 40 and 69; api_client_typecheck does type-check runtime.ts itself."
+  },
+  {
+   "id": "XTOL-13",
+   "title": "Prettier runs on implicit defaults, and no editor settings are shared",
+   "dimension": "standards",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "apps/web/package.json",
+     "line": 7,
+     "note": "format:check with no config file"
+    },
+    {
+     "file": "apps/web/package.json",
+     "line": 34,
+     "note": "the style lives in this pin"
+    }
+   ],
+   "occurrences": 1,
+   "evidence": "git ls-files finds no .prettierrc, prettier.config.*, .prettierignore or .editorconfig, and no prettier key in any package.json. format:check passes on Prettier 3.9.10's defaults (80 columns, double quotes, trailing commas everywhere), while Python uses 100 columns.",
+   "impact": "An upgrade that changes a default would reformat the app, and editors cannot pick up either language's width or indentation.",
+   "recommendation": "Commit a `.prettierrc.json` stating today's effective options, which changes no file, and a small `.editorconfig` for both languages.",
+   "sketch": "// .prettierrc.json\n{ \"printWidth\": 80, \"singleQuote\": false, \"semi\": true, \"trailingComma\": \"all\" }\n\n# .editorconfig\nroot = true\n[*]\nend_of_line = lf\ninsert_final_newline = true\n[*.py]\nindent_size = 4\nmax_line_length = 100\n[*.{ts,tsx,mjs,json,css}]\nindent_size = 2\nmax_line_length = 80",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06 (pinned ESLint and Prettier for supported text formats).",
+   "verdict": "confirmed",
+   "verifierNote": "git ls-files finds no Prettier or editor configuration and only one prettier entry, the 3.9.10 pin; the stated options are Prettier 3 defaults."
+  },
+  {
+   "id": "XTOL-14",
+   "title": "295 suppression comments are dead, written for a linter that never runs there",
+   "dimension": "comments",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "tests/db/assignment_check.py",
+     "line": 16,
+     "endLine": 24,
+     "note": "E402 suppressions ruff does not need after a sys.path change"
+    },
+    {
+     "file": "tests/db/wake_check.py",
+     "line": 16,
+     "note": "names PLC2701, a preview rule no config enables"
+    },
+    {
+     "file": "tests/db/restore_check.py",
+     "line": 71,
+     "note": "names BLE001, enabled nowhere"
+    },
+    {
+     "file": "scripts/persistent_install.py",
+     "line": 291,
+     "endLine": 292,
+     "note": "names PLC0415, enabled nowhere"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 127,
+     "note": "the service's form: a code and a reason"
+    }
+   ],
+   "occurrences": 295,
+   "evidence": "RUF100 over scripts and tests reports 295 unused suppressions, 290 of them in tests/db. 272 are unused E402 suppressions, because ruff exempts imports that follow a sys.path change; 6 of those also name PLC2701. Another 14 name PLC0415, 8 name BLE001 and 1 names PLC2701. The service's three suppressions are all used, and two give a reason after ' - '.",
+   "impact": "Dead suppressions suggest rules are active where none are, and they hide the few that will matter once a linter runs.",
+   "recommendation": "When the shared config lands, settle its rule selection first, then run `ruff check --select RUF100 --fix scripts tests` once, as an explicit commit. Selecting BLE001 first (XTOL-08) keeps the 8 BLE001 markers, which already carry reasons; selecting PLC0415 would keep its 14. The 272 E402 markers and the PLC2701 mentions, for a preview rule, can go. Keep a suppression only with a code and a reason, as the service does.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06 (keep exceptions narrow and documented) and the ground rule to keep decision and story citations. Only lint directives are removed.",
+   "verdict": "revised",
+   "verifierNote": "A RUF100 rerun reproduces 295 hits (290 in tests/db; 272 E402, 14 PLC0415, 8 BLE001, 7 PLC2701 mentions), and ruff 0.17.3 marks PLC2701 as preview. Revised: the cleanup follows the rule selection, so reasoned BLE001 markers are not deleted only to be re-added."
+  },
+  {
+   "id": "XTOL-15",
+   "title": "apps/web omits erasableSyntaxOnly although its unit tests run through Node type stripping",
+   "dimension": "types",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "packages/api-client/tsconfig.json",
+     "line": 15,
+     "note": "set here"
+    },
+    {
+     "file": "apps/web/tsconfig.json",
+     "line": 2,
+     "endLine": 18,
+     "note": "absent here"
+    },
+    {
+     "file": "apps/web/tests/unit/request-guard.test.ts",
+     "line": 4,
+     "note": "imports a lib file by its .ts path under node --test"
+    }
+   ],
+   "occurrences": 1,
+   "evidence": "node --test strips types and cannot run enums, namespaces or parameter properties. packages/api-client sets erasableSyntaxOnly for this reason. apps/web does not, though its unit tests load lib files the same way. No such syntax exists in apps/web today (a grep finds none), so the flag costs nothing.",
+   "impact": "A lib file using an enum would type-check and lint cleanly, then fail only when the unit runner loads it.",
+   "recommendation": "Add `\"erasableSyntaxOnly\": true` to apps/web/tsconfig.json, so tsc rejects what the unit runner cannot execute.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "nextjs.md (strict TypeScript). It only tightens a compiler option.",
+   "verdict": "confirmed",
+   "verifierNote": "The flag sits at packages/api-client/tsconfig.json:15 and is absent from apps/web; rg finds no enum, namespace, parameter property or import-equals in apps/web, and TypeScript is 6.0.3."
+  },
+  {
+   "id": "XTOL-16",
+   "title": "verify.py keeps a weaker subprocess runner beside toolchain.run_step",
+   "dimension": "duplication",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "scripts/verify.py",
+     "line": 61,
+     "endLine": 76,
+     "note": "subprocess.run with a literal 60-second timeout"
+    },
+    {
+     "file": "scripts/verify.py",
+     "line": 24,
+     "endLine": 25,
+     "note": "run_step is already imported"
+    },
+    {
+     "file": "scripts/toolchain.py",
+     "line": 229,
+     "endLine": 256,
+     "note": "new session, group kill, bounded output"
+    },
+    {
+     "file": "scripts/harness_lib.py",
+     "line": 454,
+     "endLine": 482,
+     "note": "a third copy of the group-kill logic"
+    },
+    {
+     "file": "scripts/verify.py",
+     "line": 27,
+     "note": "exit codes and utc() are also defined twice (toolchain.py:48 and :225)"
+    }
+   ],
+   "occurrences": 3,
+   "evidence": "run_check calls `subprocess.run(argv, ..., timeout=60)`. On timeout CPython kills only the direct child, so processes a test started keep running, whereas toolchain.run_step starts a new session and kills the whole group. The harness suite uses 24 to 27 s of that fixed 60 s in the latest reports. EXIT_* and utc() are defined in both verify.py and toolchain.py.",
+   "impact": "Two runners in one verifier time out differently. As the harness suite grows, it will hit an unnamed limit and may leave stray processes behind.",
+   "recommendation": "Move the group-kill process runner into one helper that run_step, run_check and probe_version share, with a named timeout constant for the harness checks, and keep each report's fields (command_argv, duration_seconds). Import the exit codes and utc() from one module.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-05 (deadlines and bounded output for checks). Behavior is unchanged except that a timeout also ends descendants.",
+   "verdict": "revised",
+   "verifierNote": "The literal 60-second timeout, the two group-kill copies and the duplicated constants confirmed; harness_behavior_tests took 23.7 to 26.2 s. Revised: the reports carry fields run_step does not write, so share the process helper rather than swap the runner."
+  }
+ ],
+ "rejected": [],
+ "notCovered": "mypy, tsc and Prettier are not in this lens's command list, so I ran none of them. How many errors a relaxed mypy over scripts and tests/db would report is not measured, and the import-contract claim rests on a stdlib resolver written for this review. I did not run scripts/verify.py. Durations, argv and statuses come from .checks/<profile>/latest.json, whose fast (2026-11-09) and full (2026-11-08) runs may predate HEAD; verify.py itself last changed on 2026-11-06. The type-aware ESLint counts used --parser-options projectService:true on the command line, not a committed config. Playwright filter coverage was simulated with Python regular expressions against spec paths, which may differ from Playwright's matching in edge cases. The format-churn and residual-E501 numbers come from a scratch copy formatted outside the repository. SQL (64 files), YAML, Dockerfiles and the Makefile have no static tooling; I evaluated no SQL linter, because adopting one needs a new dependency and a decision. PRD-Development-Harness.md, the toolchains runbook, qualify_faults.py, test_manifests.py, persistent_install.py and app_db.py were read only in the sections cited. Code quality beyond the cited lines is left to the area reviewers. Scratch ESLint outputs are in .checks/reviews/review-2026-11-12-09-52-30/sweep-tooling/."
+}

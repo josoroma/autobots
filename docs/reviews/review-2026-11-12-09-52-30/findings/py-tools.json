@@ -1,0 +1,628 @@
+{
+  "schema": "autobots.code-review/v1",
+  "area": "py-tools",
+  "title": "Python: tools and approvals",
+  "kind": "area",
+  "timestamp": "2026-11-12-09-52-30",
+  "revision": "156534da0bd5b19417f05d313077d767804b175b",
+  "summary": "The tools-and-approvals area is the one place a tool runs, and its durable-effect design is strong. A receipt commits under the lease before any effect. A failure is classified as failed or unknown. Readback reconciles interrupted effects. An approval binds the operation identity built from run, instance, tool version and the normalized parsed arguments, and the reviewed hash and resolved target are checked again. The cost of change sits in two functions, `ToolGateway._dispatch` (complexity 19, 15 returns) and `approval_gate` (116 lines, 18 parameters), which took in each new guardrail inline. The approval rule is restated in the catalog, and the approval and receipt state machines are bare strings written from six modules, one of them an adapter. One defect was confirmed by measurement: `search_files` runs a model-supplied regex in a thread, but CPython's `re` holds the GIL, so a catastrophic pattern freezes the worker's event loop, its lease heartbeat and the gateway's own timeout. An approved `browse_goal` call leaves no receipt, so the same call can repeat without a person for up to 24 hours. Key precedence follows the documented order but is coded in four resolvers. Types stop at the database boundary (`Any` connections, rows read by position), and gateway codes are strings matched by hand. `code_tools.search` (61 lines) was read and is acceptable as a pure, tested function. Its only issue is that `truncated` means different things in count mode depending on the target.",
+  "scores": [
+    {
+      "dimension": "standards",
+      "score": 3,
+      "why": "Project ruff passes on all 13 files and mypy strict is configured, but DH-06 bars are missed: 39 `connection: Any`, 5 blind `except Exception`, 5 narrowing `assert`s, and no enums for approval or receipt states."
+    },
+    {
+      "dimension": "modules",
+      "score": 3,
+      "why": "tool_gateway.py is a hub: 27 modules import it, adapters use its lease helpers, and it has a cycle with tool_uses. The catalog imports the whole run stack just to list tools."
+    },
+    {
+      "dimension": "size",
+      "score": 3,
+      "why": "Most functions are short, but `_dispatch` (19), `approval_gate` (116 lines, 18 parameters) and `browse` (13) concentrate the risky logic, and tool_gateway.py is 594 lines."
+    },
+    {
+      "dimension": "functions",
+      "score": 3,
+      "why": "Helpers are mostly single-purpose. The cronjob if-chain, re-resolving and re-validating every call, and a GET that writes rows add friction."
+    },
+    {
+      "dimension": "structure",
+      "score": 3,
+      "why": "13 tool modules sit flat among 41 top-level application files under three naming forms, and tool definitions are split between application/ and adapters/ with no stated rule."
+    },
+    {
+      "dimension": "approach",
+      "score": 3,
+      "why": "Receipt-before-effect, fencing and readback are well designed. But the regex thread does not bound work, approvals without receipts can be reused, and the catalog rebuilds the worker registry with dummy dependencies."
+    },
+    {
+      "dimension": "comments",
+      "score": 4,
+      "why": "Most comments explain why and cite decisions and stories. A handful are stale, misplaced or wrong, including one that says a thread bounds a slow regex."
+    },
+    {
+      "dimension": "types",
+      "score": 2,
+      "why": "The database boundary is `Any` with rows read by position. Approval and receipt states and gateway codes are bare strings matched by hand, and the decision commands widen contract Literals to `str`."
+    },
+    {
+      "dimension": "errors",
+      "score": 3,
+      "why": "Typed refusals and the failed/unknown split are careful. Unexpected causes are dropped with no log or receipt detail, and one `suppress(BaseException)` can swallow a cancellation."
+    },
+    {
+      "dimension": "tests",
+      "score": 3,
+      "why": "The pure parts have focused unit tests and the DB checks cover gateway recovery. Gateway decisions reach unit tests only through a `connection=None` seam, and four risks found here have no test."
+    },
+    {
+      "dimension": "maintainability",
+      "score": 3,
+      "why": "The durable-effect design is sound, but central long functions and string-typed state machines make each new guardrail costly to add safely."
+    }
+  ],
+  "strengths": [
+    {
+      "title": "One enforcement point that refuses before any effect",
+      "evidence": "services/agent/src/autobots/application/tool_gateway.py:1 calls itself the one place a tool runs, and `_dispatch` (322-408) refuses ungranted, unqualified, invalid, out-of-scope or unowned calls before the handler. services/agent/src/autobots/adapters/tool_middleware.py:35-48 answers every SDK tool call from `gateway.execute`. `ToolResult.for_model` (tool_gateway.py:127-135) returns only codes and validated output."
+    },
+    {
+      "title": "Receipt before effect, fenced, with an explicit failed/unknown split",
+      "evidence": "`_effect` (services/agent/src/autobots/application/tool_gateway.py:441-490) commits a 'started' receipt under `hold_running` before the handler runs. `_attempt` (529-554) maps ToolFailed to failed, LeaseLost to denied and anything else to unknown. `_record` (563-594) only moves a receipt forward. `_replay` (492-527) reads back from the destination instead of resending."
+    },
+    {
+      "title": "Approvals bound to the normalized operation",
+      "evidence": "`_operation_id` (services/agent/src/autobots/application/tool_gateway.py:209-213) hashes run, instance, tool, version and the canonical dump of the parsed arguments. `decide` requires the reviewed argument hash and refuses oversized arguments (services/agent/src/autobots/application/approvals.py:273-277). `_target_unchanged` refuses a changed target (tool_gateway.py:216-232). services/agent/tests/test_tools.py:105-133 pins the policy version."
+    },
+    {
+      "title": "Declarative tool definitions checked at registration and by tests",
+      "evidence": "`ToolRegistry.register` (services/agent/src/autobots/application/tool_gateway.py:142-153) refuses unqualified arbitrary execution and retried effects. services/agent/tests/test_tool_catalog.py:35-54 checks that public fields are model fields. services/agent/tests/test_execution_contract.py:23-29 keeps domain/execution.py's TOOL_VERSIONS equal to the registry."
+    },
+    {
+      "title": "Ports and injected clocks keep browsing testable",
+      "evidence": "The browsing loop takes a `Page` Protocol (services/agent/src/autobots/application/browsing_loop.py:59-67), a `Step` callable (142) and a `clock` (226). `browse_tool(None)` describes itself and fails before any container starts (services/agent/src/autobots/application/browsing_tool.py:148-156). services/agent/tests/test_browsing_loop.py:95 opens 12 behavior-named test functions, three of them parametrized, all with fakes."
+    },
+    {
+      "title": "Secrets never leave key resolution",
+      "evidence": "`KeySources` holds markers, never values (services/agent/src/autobots/application/tool_keys.py:146-167). `ToolKeyUnavailable` blocks fallback when a saved secret can't be unsealed (tool_keys.py:69-75, 179-180), as model-gateway.md requires. Key errors name the credential only (61-66)."
+    },
+    {
+      "title": "Why-comments that cite decisions",
+      "evidence": "services/agent/src/autobots/application/tool_gateway.py:441-442 says why the receipt commits first, 549 why a success is recorded whoever owns the run, and 571-573 why `_record` only moves forward. services/agent/src/autobots/application/approvals.py:176-183 explains receipt-aware release. services/agent/src/autobots/application/tool_keys.py:1-9 states the precedence order."
+    },
+    {
+      "title": "Risky paths have behavior-named database checks",
+      "evidence": "tests/db/tool_gateway_check.py:163 ('a lost response is reconciled by readback, without repeating') and its check at line 100 ('a stale generation cannot use a tool'), tests/db/effect_check.py and tests/db/approval_check.py:152 ('the next model turn with changed arguments needs its own approval') exercise the gateway and approvals on disposable databases."
+    }
+  ],
+  "findings": [
+    {
+      "id": "PTOL-01",
+      "title": "A model-supplied regex runs under the GIL and can freeze the worker's event loop",
+      "dimension": "approach",
+      "severity": "high",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/code_tools.py", "line": 114, "endLine": 117, "note": "_search moves search() to a thread, with a comment saying this bounds a slow pattern"},
+        {"file": "services/agent/src/autobots/application/code_tools.py", "line": 41, "note": "re.compile on the model's pattern; each line is matched by pattern.search at 67"},
+        {"file": "services/agent/src/autobots/contracts/code_tools.py", "line": 19, "note": "pattern: any regular expression up to 200 characters"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 417, "note": "the only bound is asyncio.wait_for around the handler (10 s for search_files)"},
+        {"file": "services/agent/src/autobots/application/goal_loop.py", "line": 340, "note": "the lease heartbeat _keep_lease is a task on the same event loop"},
+        {"file": "services/agent/src/autobots/application/worker_leases.py", "line": 12, "note": "DEFAULT_LEASE_SECONDS = 60.0"},
+        {"file": "services/agent/src/autobots/operations/worker.py", "line": 128, "note": "the worker's status beat shares the loop too"}
+      ],
+      "occurrences": 1,
+      "evidence": "async def _search(arguments: SearchFilesInput, context: ToolContext) -> SearchFilesOutput:\n    files = await _latest_files(context)\n    # In a thread, so the gateway's timeout bounds a slow pattern instead of the event loop.\n    return await asyncio.to_thread(search, files, arguments)\nCPython's `re` engine holds the GIL for a whole `pattern.search(line)` call. Measured with Python 3.12.16 in a scratch script that touched no project file: `asyncio.wait_for(asyncio.to_thread(...), 0.2)` around `re.compile('(a+)+$').search('a'*25 + 'b')` returned only after 1.90 s, and the event loop ticked once in that time. The same wrapper around `time.sleep(1.9)` returned at 0.20 s with 18 ticks. For this pattern, each added character doubles the time. Run files hold up to 256,000 characters.",
+      "impact": "One nested-quantifier pattern, written by mistake or steered by third-party text in a run file, stops every task in the worker process. `_keep_lease` can't renew the 60 s lease, the worker's status beat stops, and the 10 s tool timeout can't fire until the match ends. The run is handed to another worker, and the stalled process is fenced only when it wakes. The comment tells maintainers the opposite of what happens.",
+      "recommendation": "Run `search` where it can be stopped: a child process (stdlib `multiprocessing`, spawn context, with `search` kept in a module with light imports) that is terminated when the tool's time runs out and reported as `ToolFailed('search_timeout')`. This keeps the search pure Python, as Decision 0017 C7 requires. A linear-time engine (`google-re2`) or the `regex` package's `timeout=` would also bound it, but each is a new compiled dependency that needs its own story and a check against C7. Correct the comment. Add a unit test with a pathological pattern that asserts the call ends within the limit while a ticker task keeps running.",
+      "sketch": "application/bounded.py\n  async def run_in_child(fn, *args, seconds: float) -> T\n      # one spawned process; await its result off the loop; terminate() on timeout; raise BoundExceeded\napplication/code_tools.py\n  async def _search(arguments, context):\n      files = await _latest_files(context)\n      try: return await run_in_child(search, files, arguments, seconds=SEARCH_SECONDS)\n      except BoundExceeded: raise ToolFailed('search_timeout') from None\ntests/test_code_tools.py\n  test_a_catastrophic_pattern_times_out_and_the_loop_keeps_running",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: keep blocking work off the async event loop and bound timeouts. SP-012: leases must keep renewing. Decision 0017 C7 (search is pure Python, with no rg binary) holds with the stdlib child process. A compiled regex engine would be a new dependency under the delivery rule (story-scoped, pinned and recorded) and would need checking against C7.",
+      "verdict": "revised",
+      "verifierNote": "Re-measured inline under python3.12 -I with no file written: wait_for(to_thread(...), 0.2) raised TimeoutError only after 1.90 s while a 0.1 s ticker stalled, against 0.20 s for time.sleep(1.9); a to_thread worker also can't be cancelled, so it keeps scanning lines after the timeout. Added Decision 0017 C7 to the recommendation and rule check."
+    },
+    {
+      "id": "PTOL-02",
+      "title": "`ToolGateway._dispatch` holds every guardrail in one 87-line function and recomputes the call's identity",
+      "dimension": "size",
+      "severity": "high",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 322, "endLine": 408, "note": "_dispatch: complexity 19, 15 returns, 18 branches (ruff)"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 349, "endLine": 398, "note": "50-line inline approval block: condition, target, review detail, gate, target recheck"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 355, "note": "_operation_id(scope, tool, parsed) at 355, 364, 379 and 396, again at 439; _hash(parsed) also at 383 and 438"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 399, "note": "metered test written inline, while tool_uses.is_metered (tool_uses.py:186) has no caller"},
+        {"file": "services/agent/src/autobots/application/tool_uses.py", "line": 91, "endLine": 161, "note": "begin_use (71 lines) looks the tool up and validates the arguments again (97-104)"},
+        {"file": "services/agent/src/autobots/application/tool_uses.py", "line": 190, "note": "complete_use (7 parameters) looks the tool up a third time (204-205)"},
+        {"file": "services/agent/src/autobots/application/tool_uses.py", "line": 95, "note": "`if connection is None: return None`, a seam for unit tests"},
+        {"file": "services/agent/tests/test_market_data.py", "line": 132, "note": "unit tests reach the pure checks through execute(None, ...)"}
+      ],
+      "occurrences": 1,
+      "evidence": "reviewing = ToolContext(connection, scope, _operation_id(scope, tool, parsed))\n...\nif tool.review_detail is not None and not await _has_approval(\n    connection, _operation_id(scope, tool, parsed)\n...\n    operation_id=_operation_id(scope, tool, parsed),\nThe guards run in a fixed order (grant, registry, qualification, validation, path grants, ownership, Expert-only, approval, metered budget), each ending in `return _denied(...)`. The field comments cite Decision 0025 V7, Decision 0026 C3 and PRD-Studio GH-06 for parts of the inline approval block.",
+      "impact": "This is the single enforcement point for every tool call, so each new rule lands in the riskiest function. A reader must confirm by eye that five identity computations agree, and that agreement is what binds an approval to its effect. Unit tests reach the pure checks only by passing `connection=None` and relying on those checks running first. Reordering the guards would crash those tests instead of failing them.",
+      "recommendation": "Resolve the call once into a frozen `Call` (tool, parsed arguments, argument hash, operation ID), then run named steps. The pure `resolve` step covers grant, registry, qualification, validation and path grants, is tested directly, and replaces the `connection is None` seams. Pass the `Call` to `begin_use`, `complete_use`, `_effect` and `_read` so each call is looked up and validated once. Keep the guard order, the codes and `APPROVAL_POLICY_VERSION` unchanged. Prove behavior with the existing `db` checks (tool_gateway_check, approval_check, effect_check).",
+      "sketch": "@dataclass(frozen=True)\nclass Call:  # built once per dispatch\n    tool: ToolDefinition; parsed: BaseModel; argument_hash: str; operation_id: str\ndef resolve(registry, scope, name, arguments) -> Call | ToolResult        # pure, unit-tested\nasync def admission_refusal(conn, scope, call) -> str | None              # ownership, expert-only\nasync def hold_for_approval(conn, scope, call) -> str | None              # target, review detail, gate, recheck\nasync def admit_budget(conn, scope, call, use) -> str | None              # metered calls\nasync def _dispatch(...): resolve -> admission -> approval if needed -> budget -> _effect | _read",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "SP-013: completed arguments are validated before any effect; the sketch keeps validation, ownership, approval and budget in their current order. Decision 0015: no rule or reason text changes, so the policy version stays.",
+      "verdict": "confirmed",
+      "verifierNote": "Ruff reports C901 19, PLR0911 15 and PLR0912 18 at tool_gateway.py:322; _operation_id is called at 355, 364, 379, 396 and 439, is_metered has no caller, and five unit tests call execute(None, ...)."
+    },
+    {
+      "id": "PTOL-03",
+      "title": "Approval and receipt states are bare strings changed from six modules, one of them an adapter",
+      "dimension": "modules",
+      "severity": "high",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 447, "note": "receipt inserted as 'started'; reopened at 472; moved by _record at 583 and 590"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 563, "note": "_record: six positional parameters and two near-identical UPDATEs"},
+        {"file": "services/agent/src/autobots/application/reconciliation.py", "line": 94, "note": "an operator's ruling sets 'succeeded' or 'failed'"},
+        {"file": "services/agent/src/autobots/application/recovery.py", "line": 34, "note": "worker loss sets 'unknown'"},
+        {"file": "services/agent/src/autobots/application/approvals.py", "line": 185, "note": "a stale approval goes back to 'pending'; 'expired' at 208; decided at 299"},
+        {"file": "services/agent/src/autobots/application/runs.py", "line": 451, "note": "cancelling sets 'withdrawn'"},
+        {"file": "services/agent/src/autobots/adapters/github_pulls.py", "line": 142, "note": "adapter sends a request back to 'pending' with its own `interval '1 day'` and event, and writes tool_receipts.reconciled_at directly (137-139)"},
+        {"file": "services/agent/src/autobots/application/approvals.py", "line": 315, "note": "DECIDED is a tuple of strings; no ApprovalStatus or ReceiptStatus enum exists"}
+      ],
+      "occurrences": 11,
+      "evidence": "rg for 'approval_requests set status|tool_receipts set status|into app_private.tool_receipts' finds 11 statements in tool_gateway.py (4), reconciliation.py, recovery.py, approvals.py (3), runs.py and adapters/github_pulls.py. The values are literals: 'started', 'succeeded', 'failed', 'unknown' and 'pending', 'approved', 'rejected', 'expired', 'withdrawn'. `ToolOutcome` overlaps the receipt values but adds 'denied' and lacks 'started'. The adapter's re-request copies approvals.py:184-199 with a hard-coded day instead of `DEFAULT_TTL_SECONDS`.",
+      "impact": "No module owns either state machine. A change such as consuming an approval after use (PTOL-06) must reach several modules, including an adapter, and nothing catches a missed writer. The adapter's copy hard-codes the one-day TTL that approvals.py takes from DEFAULT_TTL_SECONDS: the same value today, from a second source. SP-010 asks for these state machines to be documented separately from run status. Today they exist only as scattered SQL.",
+      "recommendation": "Add `ReceiptStatus` and `ApprovalStatus` StrEnums in the domain, with their permitted transitions and tests. Make a new `application/receipts.py` the only writer of receipt status (start, reopen, record, mark_unknown, rule); `_record` becomes `receipts.record(context, operation_id, outcome)`. Make approvals.py the only writer of approval status (request, return_to_review, expire, decide, withdraw). runs.py, recovery.py, reconciliation.py and the GitHub adapter call these. Document both tables beside SP-010's run table. Stored values stay the same, so no migration is needed. A CHECK constraint, if wanted, is a forward migration.",
+      "sketch": "domain/effects.py         ReceiptStatus(StrEnum), ApprovalStatus(StrEnum), RECEIPT_MOVES, APPROVAL_MOVES\napplication/receipts.py   start / reopen / record / mark_unknown / rule          # sole tool_receipts writer\napplication/approvals.py  request / return_to_review / expire / decide / withdraw  # sole approval writer\nadapters/github_pulls.py  return_to_review -> approvals.return_to_review(conn, operation_id, detail)\nruns.apply_command(CANCEL) -> approvals.withdraw_pending(conn, run_id)\ntests/test_effect_states.py  every permitted move accepted, every other move refused",
+      "effort": "L",
+      "risk": "high",
+      "ruleCheck": "SP-010 (document separate state machines for tool attempts and approvals) and DH-06 (explicit enums; keep tool-attempt and approval states distinct). Values are unchanged and applied migrations are untouched; any constraint is a new forward migration.",
+      "verdict": "revised",
+      "verifierNote": "Recounted 11 status writes in six modules with the same pattern (github_pulls.py:138 sets only reconciled_at and isn't counted); the adapter's TTL equals DEFAULT_TTL_SECONDS today, so the impact now calls it a second source, not a different value."
+    },
+    {
+      "id": "PTOL-04",
+      "title": "The approval rule is written in four places, and the version test pins only two",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 349, "endLine": 353, "note": "inline condition that decides whether a call waits"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 189, "note": "_approval_rule"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 198, "note": "_approval_reason"},
+        {"file": "services/agent/src/autobots/application/tool_catalog.py", "line": 173, "endLine": 175, "note": "the catalog recomputes the condition"},
+        {"file": "services/agent/src/autobots/application/tool_catalog.py", "line": 203, "endLine": 205, "note": "and derives the always/by_action/never label"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 183, "endLine": 186, "note": "comment: bump the version when the condition changes; a unit test pins it"},
+        {"file": "services/agent/tests/test_tools.py", "line": 105, "endLine": 133, "note": "the pin test calls _approval_rule and _approval_reason only"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 78, "endLine": 107, "note": "six approval fields scattered among ToolDefinition's 31 flat fields"}
+      ],
+      "occurrences": 4,
+      "evidence": "approval = tool.approval_required or (\n    tool.operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE\n)\n...\n\"always\" if approval else \"by_action\" if tool.approval_when is not None else \"never\"\nThe catalog's lines above (tool_catalog.py:173-175 and 204) restate the gateway's own condition (tool_gateway.py:349-353), which reads the same three fields. Only `_approval_rule` and `_approval_reason` are pinned with APPROVAL_POLICY_VERSION.",
+      "impact": "Decision 0015 says the policy version is only as honest as its bumps. A change to the condition passes the pin test, and the Tools page could then show 'never' for a tool the gateway holds, or the reverse.",
+      "recommendation": "Group the six approval fields into one `ApprovalPolicy` value on `ToolDefinition`, with `applies(tool, parsed)`, `rule`, `reason` and `label`. The gateway, the catalog and the pin test all call it. Extend the pin test to cover the condition for each operation class and for `approval_when`.",
+      "sketch": "@dataclass(frozen=True)\nclass ApprovalPolicy:\n    always: bool = False; when: Callable[[Any], bool] | None = None; reason: str | None = None\n    resource_target: ...; target_resolver: ...; review_detail: ...\n    def applies(self, tool, parsed) -> bool\n    def rule(self, tool) -> str; def text(self, tool) -> str\n    def label(self, tool) -> Literal['always', 'by_action', 'never']",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "Decision 0015 (the policy version names the rules) and Decision 0026 C9 (the catalog's by_action label). No rule or text changes, so APPROVAL_POLICY_VERSION stays approval-policy/2.",
+      "verdict": "confirmed",
+      "verifierNote": "Decision 0015 says the version 'is only as honest as its bumps'; test_tools.py:105-133 pins _approval_rule and _approval_reason but neither the condition at tool_gateway.py:349-353 nor the catalog's condition and label at tool_catalog.py:173-175 and 203-205."
+    },
+    {
+      "id": "PTOL-05",
+      "title": "`approval_gate` takes 18 parameters, three of them optional although Decision 0015 requires them",
+      "dimension": "size",
+      "severity": "medium",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/approvals.py", "line": 87, "endLine": 202, "note": "116 lines, 18 parameters, 9 returns"},
+        {"file": "services/agent/src/autobots/application/approvals.py", "line": 102, "endLine": 104, "note": "scope, policy_version and policy_rule default to None"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 374, "endLine": 392, "note": "the only caller builds all 16 keyword arguments inline"},
+        {"file": "services/agent/src/autobots/application/approvals.py", "line": 153, "endLine": 159, "note": "event plus _enter_wait for a new request"},
+        {"file": "services/agent/src/autobots/application/approvals.py", "line": 184, "endLine": 200, "note": "the same event plus wait again for a stale approval"},
+        {"file": "services/agent/src/autobots/application/approvals.py", "line": 169, "endLine": 178, "note": "receipt check, repeated in tool_gateway._target_unchanged"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 220, "endLine": 225, "note": "the same 'not failed means it may have been sent' test"}
+      ],
+      "occurrences": 1,
+      "evidence": "One transaction block locks the request, creates it (reading the requester from the run), decides among pending, approved, rejected and expired, reads the receipt, and reopens a stale approval. The 'approval.requested' event plus `_enter_wait` is written twice. `scope`, `policy_version` and `policy_rule` default to None, though the only caller always passes them.",
+      "impact": "The optional fields let a future caller store a request without the scope snapshot, policy version and rule that Decision 0015 requires. The decision table (status, expiry, scope match, receipt state) can be exercised only through a database.",
+      "recommendation": "Pass one frozen `ApprovalProposal` built by the gateway, with the Decision 0015 fields required. Split the body into `_request_review`, `_reopen` and a pure `gate_decision(row, scope_hash, receipt)` that returns release, wait, re-request or a refusal code, and unit-test that table. Share one `_receipt_state` reader with `_target_unchanged`.",
+      "sketch": "@dataclass(frozen=True)\nclass ApprovalProposal: operation_id, tool_id, tool_version, operation_class, argument_hash,\n    arguments, scope_hash, scope (required), policy: PolicyStamp(version, rule, reason),\n    resource_target, review_detail\ndef gate_decision(row: RequestRow | None, scope_hash: str, receipt: ReceiptState | None) -> Gate  # pure\nasync def approval_gate(conn, run: RunRef, proposal, ttl=DEFAULT_TTL_SECONDS) -> str | None\n    # -> _request_review | _reopen | _enter_wait | refusal code",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "Decision 0015's fields become required. SP-013's binding (operation identity, argument hash, scope hash, expiry) is unchanged.",
+      "verdict": "confirmed",
+      "verifierNote": "approval_gate has one caller (tool_gateway.py:374, connection plus 16 keyword arguments); ruff reports PLR0913 18 and PLR0911 9; the event-plus-wait pair appears at 153-158 and 190-199."
+    },
+    {
+      "id": "PTOL-06",
+      "title": "An approved `browse_goal` call can run again without a person until the approval expires",
+      "dimension": "approach",
+      "severity": "medium",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/approvals.py", "line": 166, "endLine": 201, "note": "approved, no receipt, not expired: released (return None at 201)"},
+        {"file": "services/agent/src/autobots/application/approvals.py", "line": 298, "endLine": 303, "note": "a decision sets expires_at to now plus 24 hours"},
+        {"file": "services/agent/src/autobots/domain/tools.py", "line": 69, "endLine": 71, "note": "EFFECTFUL excludes arbitrary_execution, so browse_goal gets no receipt"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 406, "endLine": 408, "note": "non-effect calls go to _read, which writes no receipt"},
+        {"file": "services/agent/src/autobots/application/browsing_tool.py", "line": 173, "note": "approval_required=True; its description (165) says 'A person approves every call.'"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 209, "endLine": 213, "note": "operation ID: run, instance, tool, version, argument hash; only workflow steps set instance"}
+      ],
+      "occurrences": 1,
+      "evidence": "For effects, the receipt makes an approval single-use: a repeated call finds the receipt and replays it. `browse_goal` is `arbitrary_execution`, outside `EFFECTFUL`, so it never gets a receipt. If the model repeats the identical call in the same run, the operation ID is the same, and `approval_gate` finds the request approved, with no receipt and not expired. It returns None, so a second browser session and its paid model calls start with no new approval. Only the metered cap (20 per root run tree) and the run budget limit this. No check in tests/db/browse_goal_check.py repeats an approved call.",
+      "impact": "Decision 0018 B6 and Decision 0020 L5 require approval on every browse_goal call. Any future read tool that requires approval inherits the same reuse.",
+      "recommendation": "Consume an approval when it releases a call that leaves no receipt: record `consumed_at` (forward migration) in the releasing transaction, and treat a consumed approval as needing a new request. A crash after release then asks again, which fails safe. Add a db check that repeats an approved browse_goal call and expects approval_pending. Do this inside the approvals owner proposed in PTOL-03.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "high",
+      "ruleCheck": "Strengthens a guardrail: Decisions 0018 B6 and 0020 L5 (approval on every call) and SP-013 (a replayed approval cannot authorize more work). Any new column is a forward migration.",
+      "verdict": "confirmed",
+      "verifierNote": "Traced: browse_goal is arbitrary_execution, so _dispatch sends it to _read with no receipt, and approval_gate's approved branch returns None at 201 for the same operation ID until expiry; no loop-level duplicate-call check exists, and no browse_goal_check case repeats an approved call."
+    },
+    {
+      "id": "PTOL-07",
+      "title": "tool_gateway.py is a hub: lease fencing and the tool vocabulary live in it, and it has a cycle with tool_uses",
+      "dimension": "modules",
+      "severity": "medium",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 256, "endLine": 298, "note": "ownership_refusal, hold_lease, NotRunning, hold_running: run-lease fencing"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 310, "note": "function-level import of begin_use and complete_use"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 402, "note": "function-level import of admit_metered"},
+        {"file": "services/agent/src/autobots/application/tool_uses.py", "line": 17, "endLine": 23, "note": "tool_uses imports ToolDefinition, ToolScope, ToolRegistry, ToolResult and hold_lease from the gateway"},
+        {"file": "services/agent/src/autobots/adapters/loop_middleware.py", "line": 64, "note": "an adapter imports ownership_refusal from the gateway"},
+        {"file": "services/agent/src/autobots/adapters/browser_executor.py", "line": 443, "note": "another adapter does the same with a local import"},
+        {"file": "services/agent/src/autobots/application/worker_leases.py", "line": 12, "note": "the existing lease module, where fencing belongs"}
+      ],
+      "occurrences": 27,
+      "evidence": "`rg -l 'from autobots.application.tool_gateway import'` lists 27 modules. Eight of them (tools, tool_uses, plans, artifacts, assignments, workflow_runner, adapters/loop_middleware, adapters/browser_executor) import the lease helpers. The gateway needs begin_use, complete_use and admit_metered from tool_uses, which needs the gateway's types, so the gateway imports them inside functions.",
+      "impact": "Any edit to the gateway invalidates a large share of the package. Adapters reach into the gateway for a lease check, and the cycle forces function-level imports that hide the dependency. The file is 594 lines partly because it holds three concerns.",
+      "recommendation": "Move ToolScope, ToolContext, ToolDefinition, ToolResult, ToolRegistry, ToolFailed and NotDelivered (lines 20-176) to `application/tool_definitions.py`. Move ownership_refusal, hold_lease, hold_running and NotRunning to `worker_leases.py`. If needed, re-export them from tool_gateway for a short transition, then update importers. tool_gateway then imports tool_uses at the top and keeps dispatch, effects and receipts, under 400 lines.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-06: explicit ownership and narrow interfaces. No behavior change, and the DH-03 layer layout is unchanged.",
+      "verdict": "confirmed",
+      "verifierNote": "Recounted 27 importing modules in src (14 more in tests); an AST scan finds exactly the eight lease-helper importers named; tool_gateway imports tool_uses only inside execute (310) and _dispatch (402)."
+    },
+    {
+      "id": "PTOL-08",
+      "title": "Tool registration has no single source, so the catalog rebuilds the worker's registry with dummies",
+      "dimension": "approach",
+      "severity": "medium",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/goal_loop.py", "line": 162, "endLine": 197, "note": "loop_registry: a hard-coded tuple plus factories that need limits, an object store and delegation"},
+        {"file": "services/agent/src/autobots/application/tool_catalog.py", "line": 57, "endLine": 79, "note": "catalog_registry: `_never` drive, `object_store=object()`, and APPROVAL_GATE and browse_tool added by hand"},
+        {"file": "services/agent/src/autobots/application/workflow_runner.py", "line": 304, "endLine": 305, "note": "workflow runs add APPROVAL_GATE"},
+        {"file": "services/agent/src/autobots/application/worker_inference.py", "line": 330, "endLine": 344, "note": "the worker adds browse_tool according to the workspace switch"},
+        {"file": "services/agent/tests/test_execution_contract.py", "line": 23, "endLine": 29, "note": "a third registry built with dummy dependencies"},
+        {"file": "services/agent/tests/test_tool_catalog.py", "line": 23, "endLine": 32, "note": "the parity test compares catalog_registry with itself"},
+        {"file": "services/agent/src/autobots/application/tool_catalog.py", "line": 12, "endLine": 17, "note": "the catalog imports goal_loop, assignments, run_usage, workflow_runner and workflows"}
+      ],
+      "occurrences": 3,
+      "evidence": "catalog_registry's docstring says it is built as the worker builds it, but the extras (APPROVAL_GATE, browse_tool) are mirrored by hand. test_every_registered_tool_appears_once_and_nothing_else derives both sides from `catalog_registry()`. tool_catalog.py is 348 lines covering registry assembly, JSON-schema walking, guides, descriptors, filtering and grant availability.",
+      "impact": "A tool added to or removed from a worker's extras can be missing from the catalog, or wrongly listed in it, and no test fails. PRD-Tool-Catalog TC-01 says the catalog derives from the registry the worker runs. The dummy `object()` dependency breaks as soon as a factory touches its dependency at build time.",
+      "recommendation": "Add `application/tool_set.py` with one `tool_definitions(runtime: ToolRuntime | None, ...)` used by every site. Follow browse_tool's pattern: with no runtime, a definition still describes itself, and its handler fails before any effect. loop_registry, the workflow runner, the worker, the catalog and test_execution_contract all call it. Move the schema walking (`_SCHEMA_KEYS`, `_type`, `_fields`) to `tool_schema.py`, which brings tool_catalog.py under 300 lines. Add one parity test: the catalog's registered set equals the set a qualified worker builds, workflow extras included.",
+      "sketch": "application/tool_set.py\n  @dataclass(frozen=True) class ToolRuntime: limits, object_store, delegation, browsing\n  def tool_definitions(runtime: ToolRuntime | None, *, workflow=False, browsing_ready=False)\n      -> tuple[ToolDefinition, ...]\napplication/tool_schema.py   _SCHEMA_KEYS, schema_type(), fields()          # from tool_catalog\napplication/tool_catalog.py  describe, describe_planned, all_descriptors, tool_catalog, filters",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "PRD-Tool-Catalog TC-01 (the catalog derives from the worker's registry). AB-02 and Decision 0025 V6 are kept: browse_goal is registered only while qualified and switched on, and the switch stays an input.",
+      "verdict": "confirmed",
+      "verifierNote": "catalog_registry adds APPROVAL_GATE and browse_tool by hand (tool_catalog.py:66-79), as workflow_runner.py:304-306 and worker_inference.py:330-344 do separately (that range corrected from 338-343), and test_tool_catalog.py:23-32 derives both sides of its comparison from catalog_registry()."
+    },
+    {
+      "id": "PTOL-09",
+      "title": "Gateway result codes are bare strings matched by hand-kept sets in four modules",
+      "dimension": "types",
+      "severity": "medium",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 316, "note": "whether complete_use is fenced depends on result.code == 'approval_pending'"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 119, "endLine": 125, "note": "ToolResult.code: str | None"},
+        {"file": "services/agent/src/autobots/application/goal_loop.py", "line": 116, "note": "NOT_OURS"},
+        {"file": "services/agent/src/autobots/application/workflow_runner.py", "line": 87, "endLine": 97, "note": "STOPS"},
+        {"file": "services/agent/src/autobots/adapters/loop_middleware.py", "line": 76, "endLine": 87, "note": "REPAIRABLE and STOPPING"},
+        {"file": "services/agent/src/autobots/application/approvals.py", "line": 159, "note": "gate codes returned as literals (159, 163, 165, 168, 181, 200, 202)"}
+      ],
+      "occurrences": 22,
+      "evidence": "# A call now waiting for a person released the lease in its own approval gate.\nwaiting = result.code == \"approval_pending\"\nawait complete_use(\n    connection, scope, self.registry, use, name, result, fenced=not waiting\n)\nReading every `_denied(`, ToolResult code and gate return in tool_gateway.py and approvals.py gives 22 distinct codes. goal_loop, workflow_runner and loop_middleware each keep their own frozenset of the codes that stop a loop or are 'not ours'.",
+      "impact": "A typo or a renamed code in any set silently changes control flow (stop or continue, fenced or unfenced write), and type checking can't help. Each new code means finding every set by search.",
+      "recommendation": "Define `GatewayCode(StrEnum)` in domain/tools.py for the codes the gateway produces, with the classifications (STOPS_LOOP, NOT_OURS, REPAIRABLE) declared beside it and imported by the loops. Make `ToolResult.code` `GatewayCode | str`, since handlers keep their own codes. StrEnum values equal the stored strings, so events, receipts and the generated contract don't change.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "Contracts are untouched because StrEnum serializes as today; no generated file is edited.",
+      "verdict": "confirmed",
+      "verifierNote": "Recounted 22 distinct codes from _denied calls, ToolResult codes and gate returns in tool_gateway.py and approvals.py. PPRD-03 in py-product proposes the same vocabulary from the workflow side, so plan the two together."
+    },
+    {
+      "id": "PTOL-10",
+      "title": "Unexpected failures leave no cause anywhere, and one cleanup can swallow a cancellation",
+      "dimension": "errors",
+      "severity": "medium",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 542, "endLine": 544, "note": "an exception from an effect becomes 'unknown' with no failure detail"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 514, "endLine": 515, "note": "a failing readback is treated as 'nothing found'"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 422, "endLine": 423, "note": "a read's exception becomes 'tool_failed'"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 372, "endLine": 373, "note": "a review-detail exception becomes 'review_unavailable'"},
+        {"file": "services/agent/src/autobots/application/tool_uses.py", "line": 103, "endLine": 104, "note": "`except Exception` around validation, where ValidationError is meant"},
+        {"file": "services/agent/src/autobots/application/browsing_tool.py", "line": 142, "note": "suppress(BaseException) around `await watcher`"},
+        {"file": "services/agent/src/autobots/application/browsing_tool.py", "line": 133, "note": "watcher.result() re-raises the watcher's own error inside the except block"},
+        {"file": "services/agent/src/autobots/application/browsing_tool.py", "line": 100, "note": "sweep failures suppressed silently (cdp.close too, at 139)"}
+      ],
+      "occurrences": 8,
+      "evidence": "except Exception:\n    await _record(context, operation_id, \"unknown\", None)\n    return ToolResult(ToolOutcome.UNKNOWN, \"outcome_unknown\", operation_id=operation_id)\nNone of the 13 modules logs anything. operations/logs.py provides `log_event` with type-only exception fields and secret redaction, and services/agent/src/autobots/operations/worker.py:142-147 uses it with `error=type(error).__name__`.",
+      "impact": "An operator asked to rule on an unknown effect (reconciliation.py) has no record of what failed, and repeated provider errors go unseen. A cancellation that arrives while the browse handler awaits the watcher is discarded, and the handler can return normally. A failing watcher replaces the browsing error with an unrelated exception, which is reported as 'tool_failed'.",
+      "recommendation": "Record `failure_detail=type(error).__name__` on 'unknown' and 'failed' receipts. Log `tool.outcome_unknown` and `tool.readback_failed` with tool_id, operation_id and the exception type through `log_event`. Catch `ValidationError` in begin_use. Replace `suppress(BaseException)` with a shared `cancel_and_wait(task)` that suppresses the watcher's CancelledError but re-raises when `asyncio.current_task().cancelling()` is set. Check `watcher.exception()` before calling `result()`.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: preserve causes in private logs, expose safe typed errors, and propagate cancellation after cleanup. Logging only the type follows operations/logs.py and keeps secrets and model text out.",
+      "verdict": "confirmed",
+      "verifierNote": "None of the 13 modules logs; the five blind except Exception and the suppress(BaseException) are at the cited lines. Under Python 3.12, wait_for runs the handler in the caller's task, so a CancelledError swallowed at browsing_tool.py:142-143 lets the handler return its result normally."
+    },
+    {
+      "id": "PTOL-11",
+      "title": "Run-file and plan readers are copied instead of shared",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/tools.py", "line": 45, "endLine": 49, "note": "latest version of a run file, in the v1 read"},
+        {"file": "services/agent/src/autobots/application/tools.py", "line": 116, "endLine": 125, "note": "_latest: the same query with media_type"},
+        {"file": "services/agent/src/autobots/application/code_tools.py", "line": 120, "endLine": 129, "note": "_latest: the same query again, returning a different tuple"},
+        {"file": "services/agent/src/autobots/application/tools.py", "line": 56, "endLine": 66, "note": "_existing_save: readback by operation_id"},
+        {"file": "services/agent/src/autobots/application/code_tools.py", "line": 173, "endLine": 184, "note": "_written: the same readback; a reconciled patch loses `replacements`"},
+        {"file": "services/agent/src/autobots/application/tool_uses.py", "line": 64, "endLine": 88, "note": "served_task re-runs latest_plan's and completed_tasks' SQL on untyped dicts"},
+        {"file": "services/agent/src/autobots/application/plans.py", "line": 107, "endLine": 123, "note": "latest_plan returns typed PlanTask; completed_tasks returns the done IDs"},
+        {"file": "services/agent/src/autobots/application/tools.py", "line": 69, "note": "write_run_file, which code_tools also uses, lives in the 'first tool set' module"}
+      ],
+      "occurrences": 7,
+      "evidence": "The 'latest version of a run file' query appears three times with different column lists, and two private helpers both named `_latest` return different tuples. `_existing_save` and `_written` are the same readback. `served_task` repeats the SQL of `latest_plan` and `completed_tasks` word for word, walks `task.get('depends_on', [])` on raw JSON, and restates the readiness rule that plans.py:231 writes as `set(task.depends_on) <= done`.",
+      "impact": "A change to run-file storage (a column, a retention rule, a path policy) must find every copy, and the code tools already differ: a reconciled patch reports `replacements=None`. Task attribution can drift from plan readiness.",
+      "recommendation": "Create `application/run_files.py` (latest, latest_all, by_operation, write) and use it from tools.py and code_tools.py, giving reconciled and fresh writes the same result shape. In `served_task`, call `plans.latest_plan`, `plans.completed_tasks` and a new `plans.ready_tasks(plan, done)`, keeping begin_use tolerant: latest_plan validates every task, so a stored plan that fails validation must still not stop the use from being recorded. tools.py then holds only tool definitions.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "SP-013: readback by operation ID stays the proof that a write committed; otherwise none.",
+      "verdict": "revised",
+      "verifierNote": "Confirmed the three latest-version queries, the two identical operation-ID readbacks and replacements=None on a reconciled patch (CodeFileWritten defaults it); served_task deliberately tolerates malformed plan JSON inside begin_use, so the recommendation now keeps that."
+    },
+    {
+      "id": "PTOL-12",
+      "title": "Key precedence is coded in four resolvers, and item names live in up to three modules",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/tool_keys.py", "line": 128, "note": "resolve_item: for availability"},
+        {"file": "services/agent/src/autobots/application/tool_keys.py", "line": 184, "note": "resolve_tool_key: Tavily and Jina at call time; reads the environment by requirement.variables[0]"},
+        {"file": "services/agent/src/autobots/application/tool_keys.py", "line": 200, "note": "resolve_value: for values"},
+        {"file": "services/agent/src/autobots/application/tool_keys.py", "line": 225, "note": "github_target: token, with a literal 'GITHUB_TOKEN' at 234"},
+        {"file": "services/agent/src/autobots/application/tool_keys.py", "line": 57, "endLine": 58, "note": "TOOL_KEY_PROVIDERS: its keys gate resolve_tool_key's saved-secret lookup (190), and its values repeat ITEMS' variables and are never read"},
+        {"file": "services/agent/src/autobots/application/tool_keys.py", "line": 122, "note": "saved_providers, and key_source at 142: no callers in services, tests or scripts"},
+        {"file": "services/agent/src/autobots/application/tool_key_settings.py", "line": 49, "endLine": 52, "note": "validation chosen by item name"},
+        {"file": "services/agent/src/autobots/adapters/tavily.py", "line": 36, "note": "TAVILY_API_KEY again in the adapter's KeyRequirement; likewise jina.py:30 and github_issues.py:31-32, 43"}
+      ],
+      "occurrences": 4,
+      "evidence": "The documented order is implemented correctly: Settings, then the process environment, then .env files in MP-03 order, and a saved secret that can't be unsealed blocks fallback. But four functions each restate 'settings first, then environment' for one kind of item, and two more (saved_providers, key_source) have no callers. TAVILY_API_KEY and JINA_API_KEY appear in ITEMS, as the never-read values of TOOL_KEY_PROVIDERS and in the adapters. GITHUB_TOKEN appears in ITEMS, github_target and adapters/github_issues.py. AUTOBOTS_BROWSER_EXECUTOR appears in ITEMS and browsing_tool.py:46. The repository regex is in tool_keys.py:30 and github_issues.py:43, and refusal text is a third name-keyed table (api/settings_routes.py:184-194).",
+      "impact": "Adding or renaming a key means editing up to five modules. Availability reads `ITEMS[...].variable` and call time reads `requirement.variables[0]`, so the two can read different variables with no failing test.",
+      "recommendation": "Make `Item` the only description of a key or value: variable, kind, validator and refusal text. Build the adapters' KeyRequirements from ITEMS. Replace the four resolvers with one `resolve(item, saved, environ, unseal) -> Resolved(source, value)` that keeps `ToolKeyUnavailable` blocking fallback, and drop TOOL_KEY_PROVIDERS together with resolve_tool_key. Delete saved_providers and key_source now, since nothing calls them.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "model-gateway.md: honor the configured key precedence; a nonblank invalid higher-priority key blocks fallback. The Decision 0024 and 0025 order is unchanged, and availability still never unseals or returns a secret.",
+      "verdict": "revised",
+      "verifierNote": "TOOL_KEY_PROVIDERS is still read by resolve_tool_key (tool_keys.py:190), which adapters/provider_http.py:33-36 calls for Tavily and Jina, so it can't be deleted on its own; saved_providers and key_source have no callers. Note and recommendation corrected."
+    },
+    {
+      "id": "PTOL-13",
+      "title": "The database boundary is untyped: `Any` connections and rows read by position",
+      "dimension": "types",
+      "severity": "medium",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 57, "note": "ToolContext.connection: Any; 39 `connection: Any` in the 13 files"},
+        {"file": "services/agent/src/autobots/application/tool_uses.py", "line": 282, "endLine": 307, "note": "22 columns mapped as item[0] to item[21] (list_tool_uses, 60 lines)"},
+        {"file": "services/agent/src/autobots/application/approvals.py", "line": 344, "endLine": 370, "note": "24 names zipped onto a 24-column select, returned as dict[str, Any]"},
+        {"file": "services/agent/src/autobots/api/approval_routes.py", "line": 78, "endLine": 108, "note": "read back by string keys with no type check"},
+        {"file": "services/agent/src/autobots/application/reconciliation.py", "line": 42, "note": "UnknownOperation(row[0], row[1], row[2], row[3])"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 500, "note": "`status, result = await cursor.fetchone()` unpacks a possible None"},
+        {"file": "services/agent/src/autobots/persistence/rows.py", "line": 8, "note": "the RunRow TypedDict shows the intended pattern; it isn't used here"},
+        {"file": "services/agent/src/autobots/application/tool_keys.py", "line": 190, "note": "`connection is not None` seams for tests (also 205, 231 and tool_uses.py:95)"}
+      ],
+      "occurrences": 39,
+      "evidence": "rg counts 39 `connection: Any` in these files and 208 in application/. Results are read by index. In list_approvals, `zip(..., strict=True)` catches a count mismatch but not two swapped columns. `(await cursor.fetchone())[0]` appears at approvals.py:68, tool_uses.py:138 and 178, tools.py:88 and reconciliation.py:53.",
+      "impact": "mypy strict checks nothing on any query. A reordered SELECT, a misspelled row key in the API or a None row shows up only at runtime, usually in the db profile. The None-connection seams exist so unit tests can pass `None`, which mixes test support into production paths.",
+      "recommendation": "Introduce a narrow `DbConnection` Protocol, or an alias of psycopg's AsyncConnection, in persistence, and use it in these signatures. Read list results with psycopg `class_row` into row dataclasses or TypedDicts in persistence/rows.py (ToolUseRow, ApprovalRow, UnknownOperationRow), mapped to DTOs explicitly as RunRow is. Add a `fetch_one(cursor)` helper that raises a named error on None.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-06 (no broad any or untyped dictionaries) and SP-009 (rows, DTOs and domain types stay distinct, and adapters convert explicitly). Rows stay separate from the contract views.",
+      "verdict": "confirmed",
+      "verifierNote": "Recounted 39 connection: Any in scope, 208 in application/ and 225 in src; list_tool_uses maps item[0] to item[21] and list_approvals zips 24 names onto 24 selected columns. PPRD-12 proposes the same persistence types for the product services, so one change serves both."
+    },
+    {
+      "id": "PTOL-14",
+      "title": "The cronjob handler falls through to `run`, and narrows with asserts",
+      "dimension": "functions",
+      "severity": "medium",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/cronjob_tool.py", "line": 85, "endLine": 151, "note": "handle: 67 lines, one if-chain over seven actions"},
+        {"file": "services/agent/src/autobots/application/cronjob_tool.py", "line": 143, "endLine": 149, "note": "any action not matched above runs the routine now"},
+        {"file": "services/agent/src/autobots/application/cronjob_tool.py", "line": 107, "note": "assert narrowing (also 119 and 122)"},
+        {"file": "services/agent/src/autobots/application/cronjob_tool.py", "line": 168, "note": "approval_when: action != 'list'"},
+        {"file": "services/agent/src/autobots/application/cronjob_tool.py", "line": 76, "endLine": 79, "note": "_target builds the approval label from the action"},
+        {"file": "services/agent/src/autobots/contracts/cronjob.py", "line": 54, "endLine": 62, "note": "_FIELDS: the per-action field table"}
+      ],
+      "occurrences": 1,
+      "evidence": "if action == \"remove\":\n    await remove_routine(connection, workspace, routine)\n    return CronjobOutput(action=action, status=\"removed\", routine_id=routine)\n\nasync def ready(workspace_id: UUID) -> str:\n    return await check(connection, workspace_id)\n\nstatus, reason, run_id = await run_routine_now(connection, workspace, routine, ready)\nExcerpt from cronjob_tool.py:139-146, dedented. Knowledge of each action lives in four places: the contract's `_FIELDS`, this if-chain, `approval_when` and `_target`.",
+      "impact": "An eighth action added to `CronjobAction` and `_FIELDS` would start a paid run instead of failing, and mypy can't flag it. The asserts are stripped under `python -O`. If one failed, the effect path would record the outcome as unknown instead of invalid.",
+      "recommendation": "Keep one tool with seven actions (Decision 0026 C1), but dispatch with `match arguments.action:`, an explicit `case 'run':` and a `case _: assert_never(action)` arm, or with a `dict[CronjobAction, handler]` whose completeness a test checks. Replace the asserts with per-action narrowing that raises `ToolFailed('invalid_arguments')`.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Decision 0026 C1 (one tool, seven actions) and C3 (every action but list is approved) are kept; only the internal dispatch changes.",
+      "verdict": "confirmed",
+      "verifierNote": "The chain has no branch for run, so any unmatched action reaches run_routine_now; the contract validator (contracts/cronjob.py:74-81) makes today's asserts unreachable, so the risk is the next action, not today's calls."
+    },
+    {
+      "id": "PTOL-15",
+      "title": "Decision commands widen the contracts' Literals to `str` and repeat the idempotent-command skeleton",
+      "dimension": "types",
+      "severity": "medium",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/approvals.py", "line": 251, "endLine": 255, "note": "`decision: str`; anything but 'approve' is a rejection"},
+        {"file": "services/agent/src/autobots/application/reconciliation.py", "line": 64, "endLine": 71, "note": "`outcome: str`; anything but 'delivered' reopens the effect for another attempt (also 92)"},
+        {"file": "services/agent/src/autobots/contracts/approvals.py", "line": 115, "note": "the API's Literal['approve', 'reject']"},
+        {"file": "services/agent/src/autobots/contracts/run_commands.py", "line": 71, "note": "the API's Literal['delivered', 'not_delivered']"},
+        {"file": "services/agent/src/autobots/application/approvals.py", "line": 256, "endLine": 262, "note": "scope tuple, fingerprint, existing_receipt; store_receipt at 309"},
+        {"file": "services/agent/src/autobots/application/reconciliation.py", "line": 69, "endLine": 75, "note": "the same skeleton; store_receipt at 104"},
+        {"file": "services/agent/src/autobots/application/reconciliation.py", "line": 36, "endLine": 37, "note": "the run-tree CTE is written three times here (36, 47, 78) and once in recovery.py (50)"}
+      ],
+      "occurrences": 2,
+      "evidence": "wanted = \"approved\" if decision == \"approve\" else \"rejected\"\n...\nstatus = \"succeeded\" if outcome == \"delivered\" else \"failed\"\nThe routes validate both values with Literals; the application signatures then accept any string. 14 application commands take `idempotency_key: str`. These two rebuild the (workspace, actor, operation, target, key) scope and fingerprint by hand, and their 7 and 9 parameters are the PLR0913 leads at approvals.py:244 and reconciliation.py:56.",
+      "impact": "An internal caller passing the stored status 'approved' records a rejection. One passing 'Delivered' rules the effect not delivered, which allows a fresh attempt and possibly a duplicate external effect. A copied idempotency skeleton is easy to get subtly wrong.",
+      "recommendation": "Type the parameters with the contracts' Literals, or domain enums, and match exhaustively. Introduce a `CommandKey(workspace_id, actor_id, idempotency_key)` parameter object and an `idempotent(connection, key, operation, target, payload)` helper around existing_receipt and store_receipt. That shortens both parameter lists, and the other 12 commands can adopt it when touched. Write the run-tree CTE once, as a named constant.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Pydantic contracts own the public values (contracts.md), and the application accepts them unchanged. SP-012 reconciliation semantics are unchanged.",
+      "verdict": "confirmed",
+      "verifierNote": "Literals confirmed at contracts/approvals.py:115 and contracts/run_commands.py:71; internal callers (operations/browse_trial.py:246 and the db checks) pass valid values today. The third CTE is at line 78, not 77. PPRD-08 proposes the same receipt helper for the product commands; plan one helper."
+    },
+    {
+      "id": "PTOL-16",
+      "title": "Type narrowing is done with assert, ignore, cast and getattr where a precise type would do",
+      "dimension": "types",
+      "severity": "low",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/browsing_loop.py", "line": 169, "endLine": 180, "note": "action_of returns tuple[str, BaseModel], losing the action type"},
+        {"file": "services/agent/src/autobots/application/browsing_loop.py", "line": 258, "note": "assert isinstance(action, _Action)"},
+        {"file": "services/agent/src/autobots/application/browsing_loop.py", "line": 269, "note": "`action.url  # type: ignore[attr-defined]` in the else branch"},
+        {"file": "services/agent/src/autobots/application/tool_catalog.py", "line": 112, "note": "`# type: ignore[arg-type]` because direction is typed str"},
+        {"file": "services/agent/src/autobots/application/tool_catalog.py", "line": 217, "note": "cast(list[GrantSiteName], ...); grant_sites returns list[str]"},
+        {"file": "services/agent/src/autobots/application/tool_catalog.py", "line": 135, "note": "getattr(environ, 'sources', {}) on a Mapping"},
+        {"file": "services/agent/src/autobots/application/tool_keys.py", "line": 146, "endLine": 160, "note": "KeySources.sources is only annotated; key_sources sets it after construction"},
+        {"file": "services/agent/src/autobots/application/tool_keys.py", "line": 173, "note": "assert item.credential is not None"}
+      ],
+      "occurrences": 8,
+      "evidence": "`browse` (61 lines, complexity 13) branches on isinstance and falls back to `# type: ignore` for GoTo. The catalog ignores a Literal mismatch it could declare. `_key_source` depends on an attribute that only `key_sources()` sets. Ruff's S101 finds 5 asserts in scope, cronjob's 3 included.",
+      "impact": "Each bypass hides the next mismatch. A new browsing action would reach the ignore silently, and a KeySources built any other way raises AttributeError or quietly reports 'environment'.",
+      "recommendation": "Make `action_of` return `OpenLink | GoTo | Scroll | Finish` and use `match`, which also splits browse into a per-action step. Type `_fields(direction: Literal['input', 'output'])`. Give `grant_sites` a return type the contract accepts without a cast: a grant-site Literal alias the domain owns, checked equal to `GrantSiteName` by a test, or one typed mapping from GrantSite to it. Make KeySources a frozen Mapping that takes `sources` in its constructor, and pass the sources to `_key_source` explicitly. Narrow `item.credential` with an `if` that raises.",
+      "sketch": "Action = OpenLink | GoTo | Scroll | Finish\ndef action_of(message) -> tuple[str, Action] | None\nasync def _step(page, state, view, action: Action) -> Stopped | None:\n    match action:\n        case Finish(): return 'done'\n        case Scroll(): ...\n        case OpenLink(number=n): target = view.links[n - 1].url\n        case GoTo(url=u): target = u\nasync def browse(...): loop -> limits -> reply -> _step",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: keep typing exceptions narrow and documented. Decision 0020's one-action rule (BM-03) is unchanged.",
+      "verdict": "revised",
+      "verifierNote": "grant_sites (domain/tool_catalog.py:115) appends GrantSite values to a list[str]; returning list[GrantSite] would still need a cast against the contract's Literal under mypy, so the recommendation now names a typed alias or mapping instead."
+    },
+    {
+      "id": "PTOL-17",
+      "title": "A few comments are stale, misplaced or omit a non-obvious invariant",
+      "dimension": "comments",
+      "severity": "low",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 104, "endLine": 109, "note": "the TU-04 comment for public fields sits above review_detail, cut off from its field by GH-06's comment"},
+        {"file": "services/agent/src/autobots/application/tools.py", "line": 1, "note": "'Nothing else exists', though the module also holds read_run_file v2, read_csv and the shared write_run_file"},
+        {"file": "services/agent/src/autobots/application/tool_uses.py", "line": 33, "note": "claims the gateway's normalization but hashes the raw arguments, not the parsed ones"},
+        {"file": "services/agent/src/autobots/application/approvals.py", "line": 258, "endLine": 311, "note": "decide commits an expiry, then refuses after the transaction (expired_row), with no why-comment"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 158, "endLine": 159, "note": "versions() keeps whichever version was registered last; undocumented"}
+      ],
+      "occurrences": 5,
+      "evidence": "# Top-level fields a run's screens may show, TU-04. The default shows none.\n# PRD-Studio GH-06: what the reviewer sees beyond the arguments, read before the approval\n# request exists. It may read the destination, never write it.\nreview_detail: Callable[[Any, \"ToolContext\"], Awaitable[dict[str, Any]]] | None = None\npublic_input_fields: tuple[str, ...] = ()\nMost comments in these files explain why and cite decisions; these five mislead or omit an invariant. The thread comment at code_tools.py:116 is covered by PTOL-01.",
+      "impact": "A maintainer may simplify decide by raising inside the transaction, which rolls back the expiry and the pause. They may join tool uses to approvals on input_digest, expecting it to equal the argument hash, or treat tools.py as the whole built-in tool set.",
+      "recommendation": "Move the TU-04 line onto public_input_fields. Rewrite tools.py's docstring, or move write_run_file as PTOL-11 proposes. Say that input_digest covers what the model sent, before validation, so it differs from the argument hash. Add a one-line why to decide's deferred refusal. Document versions() as 'last registered', or make it return the highest version.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Keeps the practice of citing decisions and stories in comments; each comment is judged on its own.",
+      "verdict": "revised",
+      "verifierNote": "Dropped the TOOL_KEY_PROVIDERS comment (tool_keys.py:57): the dict is read by resolve_tool_key on the Tavily and Jina adapters' behalf, through adapters/provider_http.py, so 'kept for the adapters' is accurate. The other five comments are as described; occurrences 6 to 5."
+    },
+    {
+      "id": "PTOL-18",
+      "title": "Reading Keys & vars inserts rows and makes two queries per item",
+      "dimension": "functions",
+      "severity": "low",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/tool_key_settings.py", "line": 64, "endLine": 77, "note": "_version inserts the settings row if it is missing, then selects"},
+        {"file": "services/agent/src/autobots/application/tool_key_settings.py", "line": 86, "endLine": 101, "note": "status() calls _version for each of the five items"},
+        {"file": "services/agent/src/autobots/api/settings_routes.py", "line": 217, "endLine": 222, "note": "GET /settings/keys-and-vars, for every member"},
+        {"file": "supabase/migrations/20261108000051_tool_provider_keys.sql", "line": 12, "note": "version defaults to 0"}
+      ],
+      "occurrences": 1,
+      "evidence": "status() makes two queries for saved items, then an insert and a select for each item: 12 queries per GET, which can write five rows. Each item's resolve_item may also read the .env files from disk on the event loop.",
+      "impact": "A read path needs insert privilege and does N+1 work, and a failed write turns a read into an error.",
+      "recommendation": "Read every version with one `select provider, version ... where workspace_id = %s` and treat a missing row as version 0, the column default, so results are unchanged. Keep the insert in save and remove, which lock the row.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "none",
+      "verdict": "confirmed",
+      "verifierNote": "status() runs saved_items (2 queries) and _version (insert plus select) for each of the five ITEMS, so 12 statements per GET; migration 20261108000051 line 12 defaults version to 0."
+    },
+    {
+      "id": "PTOL-19",
+      "title": "Small rules are copied: the browsing URL check, URL scrubbing, JSON hashing and a contract ceiling",
+      "dimension": "duplication",
+      "severity": "low",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/browsing_tool.py", "line": 68, "endLine": 76, "note": "permitted() repeats the contract's https, no-credentials and within-domains check"},
+        {"file": "services/agent/src/autobots/contracts/browsing.py", "line": 44, "endLine": 48, "note": "the contract's copy in BrowseGoalInput._inside"},
+        {"file": "services/agent/src/autobots/application/browsing_loop.py", "line": 163, "endLine": 166, "note": "bare() drops the query and fragment"},
+        {"file": "services/agent/src/autobots/application/tool_uses.py", "line": 41, "endLine": 45, "note": "_scrub() does the same"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 178, "endLine": 180, "note": "_hash: compact canonical JSON SHA-256"},
+        {"file": "services/agent/src/autobots/application/approvals.py", "line": 54, "endLine": 56, "note": "scope_hash: default separators; stored with each request and pinned by test_tools.py:131"},
+        {"file": "services/agent/src/autobots/application/tool_uses.py", "line": 32, "endLine": 38, "note": "input_digest: compact with default=str (also tool_catalog.catalog_digest at 264)"},
+        {"file": "services/agent/src/autobots/application/browsing_tool.py", "line": 172, "note": "`300 + GRACE_SECONDS + 30` repeats max_seconds le=300 (contracts/browsing.py:36)"}
+      ],
+      "occurrences": 9,
+      "evidence": "There are four canonical-JSON hashes in scope (`_hash`, `scope_hash`, `input_digest`, `catalog_digest`), plus runs.request_hash, using two separator styles. There are two URL scrubbers and two copies of the https-within-domains rule, and the browsing timeout restates the contract ceiling as a literal: nine copies in all.",
+      "impact": "The egress check in the tool and the one in the contract can diverge silently. Raising the browsing ceiling without changing the timeout would cut off long approved calls.",
+      "recommendation": "Add `plain_https_within(url, domains)` to contracts/browsing and use it in both places. Use one `strip_query(url)` and one `canonical_sha256(value, *, separators=COMPACT)`; scope_hash passes its current separators explicitly, because stored approvals are compared against it. Define `MAX_SECONDS = 300` once and use it in both the Field and the timeout.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Decision 0015: the stored scope hash must keep its format, so scope_hash passes its separators explicitly. The AB-03 egress rules are unchanged.",
+      "verdict": "revised",
+      "verifierNote": "Recounted 9 rather than 8: four canonical-JSON hashes in scope, two URL scrubbers, two copies of the https-within-domains rule and one restated ceiling."
+    },
+    {
+      "id": "PTOL-20",
+      "title": "Names collide or say too little: two REPOSITORYs, a bare `Item` and an unnamed 100-character cut",
+      "dimension": "naming",
+      "severity": "low",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/tool_keys.py", "line": 30, "note": "REPOSITORY is a compiled regex, imported by tool_key_settings"},
+        {"file": "services/agent/src/autobots/application/browsing_tool.py", "line": 41, "note": "REPOSITORY is the repository root Path"},
+        {"file": "services/agent/src/autobots/application/tool_key_settings.py", "line": 21, "endLine": 28, "note": "imports ITEMS, REPOSITORY, SWITCH_VALUES and Item as bare names"},
+        {"file": "services/agent/src/autobots/application/tool_keys.py", "line": 35, "note": "public `Item`, one key or value of Keys & vars"},
+        {"file": "services/agent/src/autobots/application/tool_uses.py", "line": 124, "note": "`name[:100]` three times (124, 153, 239) with no named limit"}
+      ],
+      "occurrences": 6,
+      "evidence": "tool_key_settings.py:21-28 imports `ITEMS, REPOSITORY, SWITCH_VALUES, Item` from tool_keys, where `REPOSITORY` reads like a value but is a pattern, while browsing_tool.py's `REPOSITORY` is a directory. tool_uses.py cuts the tool name to 100 characters in three places.",
+      "impact": "Search results and imports mislead: the same name is a regex in one module and a path in its sibling, and a cut repeated three times can drift apart.",
+      "recommendation": "Rename to intent: REPOSITORY_PATTERN and REPOSITORY_ROOT, and KeyItem for Item. Name the cut once (TOOL_ID_CHARS = 100) and use it at all three places.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "none",
+      "verdict": "revised",
+      "verifierNote": "Dropped `_read`, `_latest`, `checked`, `latest` and `Saved` as taste or as covered by PTOL-11 (`Saved` is module-local); kept the REPOSITORY collision, the bare `Item` that tool_key_settings imports and the three `name[:100]` cuts."
+    },
+    {
+      "id": "PTOL-21",
+      "title": "Tool code has no home: flat modules, three naming forms, and tools split across two layers with no rule",
+      "dimension": "structure",
+      "severity": "low",
+      "locations": [
+        {"file": "services/agent/src/autobots/application/browsing_tool.py", "line": 23, "endLine": 34, "note": "an application module built from four adapters"},
+        {"file": "services/agent/src/autobots/application/browsing_loop.py", "line": 280, "endLine": 316, "note": "adapter glue (StepRequest, StepResponse, admitted_steps) beside the pure loop"},
+        {"file": "services/agent/src/autobots/adapters/tavily.py", "line": 36, "note": "external-client tools are defined in adapters/"},
+        {"file": "services/agent/src/autobots/application/tools.py", "line": 1, "note": "tools.py, code_tools.py, cronjob_tool.py, browsing_tool.py and tool_*.py"},
+        {"file": "services/agent/src/autobots/application/code_tools.py", "line": 1, "note": "'*_tools' form"},
+        {"file": "services/agent/src/autobots/application/cronjob_tool.py", "line": 1, "note": "'*_tool' form"},
+        {"file": "services/agent/src/autobots/application/tool_gateway.py", "line": 1, "note": "the gateway among 41 top-level application files"}
+      ],
+      "occurrences": 17,
+      "evidence": "`rg -l 'ToolDefinition('` finds 10 application modules and 7 adapter modules. The GitHub, Tavily, Jina and market tools live in adapters/, but browse_goal, which drives Docker and CDP through four adapters, lives in application/. application/ already has one subpackage, credentials/.",
+      "impact": "Nothing says where a new tool goes or what its module is called, so readers search two layers, and application and adapters depend on each other in both directions.",
+      "recommendation": "State the placement rule in docs/engineering: in-process tools in application/tools/, external-client tools in adapters/. Group the gateway, definitions, registry, uses, catalog, grants, keys, key settings, approvals and receipts in an `application/tools/` subpackage, as with credentials/. Move browsing_tool.py and admitted_steps to adapters/browsing.py and keep the pure loop in application.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-03 fixes only the top-level layers; a subpackage inside application/ keeps it, as credentials/ does.",
+      "verdict": "revised",
+      "verifierNote": "Recounted: application/ has 41 top-level files (46 with credentials/), not 46 flat modules; ToolDefinition( appears in 10 application and 7 adapter modules, and browsing_loop.py imports adapters.loop_middleware, so the layers do depend on each other both ways."
+    }
+  ],
+  "rejected": [],
+  "notCovered": "This review is static. The only runtime evidence is the regex timing, measured with a standalone scratch script under Python 3.12.16, not inside the project's worker. Its scratch scripts sit in the session scratchpad, and the ruff output in .checks/reviews/review-2026-11-12-09-52-30/py-tools/. No other finding was exercised. I read the tests/db checks only for the names of their cases, not run or reviewed in depth, since they belong to db-tests. I read only the cited parts of PRD-Development-Harness.md (DH-03, DH-06), option-b-contract.md (sections 6-7), metrics.md, goal_loop.py, worker_inference.py, plans.py, runs.py, workflow_runner.py, recovery.py, loop_middleware.py, browser_executor.py, github_pulls.py, github_issues.py, operations/logs.py, operations/worker.py, api/approval_routes.py, api/settings_routes.py, domain/execution.py and the unit tests for the catalog, keys, code, cronjob and browsing tools. The project hook refused one read-only search because its pattern named the provider master-key file. I repeated it without that term, so the default key-file path constant in tool_keys.py was not compared with other modules. I did not run mypy, and per the ground rules I did not run scripts/verify.py."
+}

@@ -1,0 +1,1031 @@
+{
+  "schema": "autobots.code-review/v1",
+  "area": "web-tools-approvals",
+  "title": "Web: tool catalog and approvals",
+  "kind": "area",
+  "timestamp": "2026-11-12-09-52-30",
+  "revision": "156534da0bd5b19417f05d313077d767804b175b",
+  "summary": "The tool catalog and approvals screens are careful where it matters most. Every read goes through the generated runtime parsers. A decision binds the argument hash shown on screen, and the list is re-read from the API instead of being updated optimistically. Request text is rendered as React text nodes only. The tool guide is a native modal that closes on the backdrop and Escape and returns focus. Playwright covers decisions, replay, tabs, J/K, the two-press shortcut, both request views, the modal's close paths and axe in both themes. The cost sits in two oversized client modules. approvals-panel.tsx has 773 lines, including a 308-line panel with nine useState hooks and a key handler with complexity 27. tool-catalog.tsx has 853 lines and eight components, plus pure text helpers that the Expert editor imports. Reading them in full surfaced defects where their responsibilities meet. A held ⌘↵ or Ctrl+↵ satisfies AP-04's second press, and the arm is not tied to a request. Decisions have no in-flight state, and the button and keyboard paths apply different truncation rules. The list fetch exists twice, because the project's react-hooks/set-state-in-effect rule forbids the obvious reuse, and the unguarded copy can put waiting requests under Decided. Each screen turns every load failure into one message with no retry, and that message is sometimes wrong. The recommended split fixes these without moving any decision out of the API: pure text, field and shortcut rules move to lib with node:test, one reloadable useLoaded hook serves both screens, decisions and shortcuts get their own hooks, and each detail surface gets its own file.",
+  "scores": [
+    {
+      "dimension": "standards",
+      "score": 3,
+      "why": "Strict TypeScript flags and the project ESLint pass and colors are semantic, but DH-06's rules on duplicate submits, deliberate states and assertions are each missed, and the tool dialog departs from DS-03's dialog surface."
+    },
+    {
+      "dimension": "modules",
+      "score": 3,
+      "why": "Dependencies run correctly from the generated client into the components, but pure text and a generic data hook live inside client component files, and the Expert editor imports from the catalog panel."
+    },
+    {
+      "dimension": "size",
+      "score": 2,
+      "why": "These are two of the five largest web files (773 and 853 lines), with functions of 308, 249, 245 and 174 lines and a key handler with complexity 27."
+    },
+    {
+      "dimension": "functions",
+      "score": 3,
+      "why": "The small pure formatters at the top of approvals-panel are well separated, but onKey, ToolCatalogPanel and ToolDetail each mix state, URL handling and rendering."
+    },
+    {
+      "dimension": "structure",
+      "score": 3,
+      "why": "The thin server pages and the flat, feature-prefixed components folder match the rest of apps/web, but four and eight components per file hide the area's shape."
+    },
+    {
+      "dimension": "approach",
+      "score": 3,
+      "why": "The server stays authoritative, with no optimistic updates and a native modal, but fetching is hand-rolled twice, nine useStates carry an implicit state machine, and the two-press guard accepts key repeat."
+    },
+    {
+      "dimension": "comments",
+      "score": 4,
+      "why": "Most comments explain why and trace to AP, TL, TG and Decision IDs; a few invariants are unstated, and two comments no longer match the code."
+    },
+    {
+      "dimension": "types",
+      "score": 3,
+      "why": "Generated types and runtime parsers are used at every read, but the label tables ignore the contract's unions and one error body is cast."
+    },
+    {
+      "dimension": "errors",
+      "score": 2,
+      "why": "Each screen collapses every failure into one state, with copy that can be wrong ('sign in', 'not in the catalog'), no retry and the cause discarded."
+    },
+    {
+      "dimension": "tests",
+      "score": 3,
+      "why": "Playwright covers the main flows and accessibility thoroughly, but the pure logic has no unit tests, and nothing covers held keys, races or failure states."
+    },
+    {
+      "dimension": "maintainability",
+      "score": 3,
+      "why": "Readable, accessible and well traced, but the two oversized modules concentrate this area's defects; the split plus shared hooks would make it a model."
+    }
+  ],
+  "strengths": [
+    {
+      "title": "Runtime contract parsing on every read",
+      "evidence": "approvals-panel.tsx:143 and 168 use parseApprovalList. tool-catalog.tsx:192, 582-585 and 780-783 parse through useLoaded with parseToolCatalog, parseToolVersions and parseToolGrants. These are backed by parseWith in packages/api-client/src/runtime.ts:142-149, which rejects unknown enum values and missing fields."
+    },
+    {
+      "title": "A typed, abortable load hook worth promoting",
+      "evidence": "tool-catalog.tsx:156-181 useLoaded returns a discriminated union (loading, unavailable, ready). It aborts on cleanup, ignores stale replies and turns parse errors into a visible state. It is the best fetch shape in the area, and 24 hand-rolled 'let active = true' effects elsewhere in apps/web/components could share it."
+    },
+    {
+      "title": "Server-authoritative decisions with no optimistic state",
+      "evidence": "approvals-panel.tsx:195-206 posts through csrfFetch with an Idempotency-Key and binds the decision to approval.argument_hash. Lines 24-33 turn the API's refusal codes into plain words, and line 223 re-reads the list after the reply instead of editing it locally, as DH-06 asks ('browser state is a view of durable state')."
+    },
+    {
+      "title": "Untrusted request content rendered safely and faithfully",
+      "evidence": "approvals-panel.tsx:700-742 Markdown and inline build only React text nodes, and neither file uses dangerouslySetInnerHTML. At 686-698, parsedFields withholds the Fields view when JSON would reorder integer-like keys, which keeps AP-03's 'never reorders' promise."
+    },
+    {
+      "title": "Accessibility engineered in",
+      "evidence": "tool-catalog.tsx:439-481 opens a native modal dialog with showModal, a form method='dialog' Close button and backdrop detection, and 422-429 returns focus. approvals-panel.tsx:391-395 uses a roving-tabindex list with aria-current, 362-368 a polite live announcement for the two-press shortcut, and 744-773 sr-only colons in dt/dd pairs. Axe checks assert this in tools.spec.ts:246-263 (both themes) and approvals.spec.ts:399-402."
+    },
+    {
+      "title": "Schema rendering driven by server-flattened fields",
+      "evidence": "tool-catalog.tsx:483-579 renders the API's FieldDescriptor rows (path, type, required, constraints, public) as a captioned table with column and row scopes inside a focusable, named scroll region, instead of walking JSON Schema in the browser. Lines 739-751 keep the raw schema behind a disclosure, and 831-853 copies exactly the shown version's input schema (TL-03)."
+    },
+    {
+      "title": "Exhaustive table typing where it is used",
+      "evidence": "tool-catalog.tsx:117-121 declares APPROVAL_TEXT as Record<ToolDescriptor['approval'], string>, so tsc fails if the contract adds an approval mode. This is the pattern to spread to the other label tables."
+    },
+    {
+      "title": "Comments that explain why and trace to requirements",
+      "evidence": "approvals-panel.tsx:115-116 (AP-01 to AP-04), 232 (arrows only inside the list), 686 (integer-like keys) and 700 (text nodes only). tool-catalog.tsx:43 (state in words), 116 (Decision 0026 C9), 437-438 (G2/G3 native dialog), 458 (backdrop click) and 501 (axe scrollable-region rule)."
+    }
+  ],
+  "findings": [
+    {
+      "id": "WTAP-01",
+      "title": "approvals-panel.tsx packs data loading, decisions, a shortcut state machine and two large views into one module",
+      "dimension": "size",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 117,
+          "endLine": 434,
+          "note": "ApprovalsPanel: 308 lines, complexity 11; fetches, decides, handles keys and renders tabs and list"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 123,
+          "endLine": 134,
+          "note": "nine useState hooks carrying one implicit state machine"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 228,
+          "endLine": 298,
+          "note": "keyboard machine and disarm timer inside the panel"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 436,
+          "endLine": 684,
+          "note": "ApprovalDetail: 245 lines, complexity 13: facts, exact request, diffs, alert, decision bar"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 47,
+          "endLine": 113,
+          "note": "five pure formatters that node:test cannot import from a 'use client' TSX module"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 686,
+          "endLine": 742,
+          "note": "Fields parser and a self-contained markdown renderer"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 746,
+          "endLine": 773,
+          "note": "Fact component"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "Reading confirms the ESLint leads. ApprovalsPanel declares nine useState hooks (123-134), fetches the list (136-187), sends decisions (192-226), runs the two-press shortcut machine (228-298) and renders the tabs, messages and list (317-433). ApprovalDetail adds 245 more lines. The file also holds five formatters, parsedFields, Markdown and inline, and Fact: 4 components and 735 counted lines (max-lines rule).",
+      "impact": "Every change to the approval gate edits one 300-line closure. The defects found in this area sit exactly where these responsibilities meet: a held key confirms a decision, a reload can land under the wrong tab, and the button and keyboard paths apply different guards. None of the pure logic can reach the node:test suite.",
+      "recommendation": "Split by responsibility without changing behavior, keeping every data-* hook and visible string so approvals.spec.ts passes unchanged. First, move the formatters, parsedFields and the shortcut rule to lib, with node:test cases. Then extract a reloadable useLoaded, useApprovalDecision and useApprovalShortcuts. Finally, move ApprovalDetail and its parts, and the markdown renderer, to their own files. ApprovalsPanel ends up holding tab and selection state plus composition.",
+      "sketch": "lib/approval-text.ts      requesterText, scopeText, policyText, decidedText, OUTCOME, DECISION_MESSAGES\nlib/approval-fields.ts    parsedFields (AP-03 no-reorder rule)\nlib/approval-shortcut.ts  chord(event), press(arm, input): pure two-press machine\nlib/use-loaded.ts         useLoaded(path, parse) -> { state, reload }\ncomponents/approvals-panel.tsx  ApprovalsPanel: tab + selection + composition\n  useApprovalDecision(reload)  { pending, message, decide }\n  useApprovalShortcuts(...)    keydown via useEffectEvent, subscribed once\n  ApprovalTabs, ApprovalList   segmented control with counts; roving-tabindex list\ncomponents/approval-detail.tsx ApprovalFacts, ExactRequest(RequestFields | RequestJson), ReviewDiffs, DecisionBar\ncomponents/markdown-text.tsx   MarkdownText, looksLikeMarkdown (text nodes only)",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06 'small cohesive modules'. Every decision stays in the API, so no business transition moves into Next.js, and AP-04's two-press confirmation and the hash binding are kept.",
+      "verdict": "confirmed",
+      "verifierNote": "Nine useState hooks, the 308- and 245-line functions, four components and 735 counted lines confirmed against the code and eslint.json."
+    },
+    {
+      "id": "WTAP-02",
+      "title": "The two-press shortcut accepts a held key, Alt chords, and an arm that is not tied to a request",
+      "dimension": "approach",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 229,
+          "endLine": 283,
+          "note": "onKey, complexity 27: navigation, focus moves and decision arming in one function; line 231 routes any meta, ctrl or alt chord to decisions"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 269,
+          "endLine": 279,
+          "note": "the second-press check never reads event.repeat"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 129,
+          "endLine": 132,
+          "note": "arm is { decision, until } with no approval id"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 146,
+          "endLine": 150,
+          "note": "list reload changes the selection without clearing the arm (again at 172)"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 427,
+          "note": "button path decides without clearing the arm"
+        },
+        {
+          "file": "apps/web/lib/shortcuts.ts",
+          "line": 32,
+          "note": "documents ⌘ or Ctrl, not Alt"
+        },
+        {
+          "file": "apps/web/components/search-palette.tsx",
+          "line": 52,
+          "endLine": 53,
+          "note": "peer handler requires meta or ctrl and excludes alt"
+        },
+        {
+          "file": "apps/web/tests/browser/approvals.spec.ts",
+          "line": 407,
+          "endLine": 455,
+          "note": "presses each chord discretely; no held key or Alt case"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "      if (\n        armed !== null &&\n        armed.decision === decision &&\n        Date.now() <= armed.until\n      ) {\n        setArmed(null);\n        setAnnouncement(\"\");\n        void decide(current, decision);\nNothing reads event.repeat (grep finds no use in apps/web/components or lib). Line 231 sends any chord with meta, ctrl or alt to the decision branch, so ⌥↵ and ⌥⌫ act too. The arm holds no request id. Example: arm ⌘↵ on request A, click Reject on A, and once the list reloads (selection moves to B) a single ⌘↵ within 2 s approves B.",
+      "impact": "AP-04 requires a second press within 2 s. Holding ⌘↵ or Ctrl+↵ past the OS key-repeat delay fires a repeated keydown that counts as the second press, so one long press decides. The stale-arm path decides a request other than the one announced. The server still binds the decision to the hash shown, but the screen's confirmation step is bypassed.",
+      "recommendation": "Make the rule a pure function in lib/approval-shortcut.ts. Inputs: current arm, decision, approval id, now, repeat and truncated. Outputs: next arm, decision to send or none, and announcement. Cover repeat, Alt, approval change, expiry and truncation with node:test. Call it from useApprovalShortcuts, which subscribes once through React 19's useEffectEvent; react 19.3.1 is installed, and a stdin probe of this shape passes the project ESLint. The hook ignores event.repeat, requires (metaKey || ctrlKey) && !altKey, stores the approval id in the arm and clears the arm when the selection or pending state changes. Keep J/K/arrow navigation as its own small function. Add a browser case: hold Meta, call keyboard.down('Enter') twice (Playwright sends the second with repeat set), and expect no decision.",
+      "sketch": "// lib/approval-shortcut.ts (pure, node:test)\ntype Decision = \"approve\" | \"reject\";\nexport type Arm = { decision: Decision; approvalId: string; until: number } | null;\nexport function chord(e: KeyLike): Decision | \"next\" | \"previous\" | null; // repeat or Alt -> null\nexport function press(arm: Arm, p: { decision: Decision; approvalId: string; now: number; truncated: boolean }):\n  { arm: Arm; send: Decision | null; announce: string };\n// components: useApprovalShortcuts({ approvals, selectedId, enabled, onSelect, onDecide }) -> { announcement }",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "PRD-Studio AP-04 (PRD-Studio.md:99), and ground rule 2 against weakening an approval: this change tightens the confirmation. typing() still gates every shortcut, and the server's hash binding is untouched.",
+      "verdict": "confirmed",
+      "verifierNote": "No use of event.repeat exists in apps/web; line 231 routes Alt chords to decisions and the arm carries no id; a fresh ESLint stdin probe of the useEffectEvent hook passes. The held-key path is reasoned from the code, not observed."
+    },
+    {
+      "id": "WTAP-03",
+      "title": "Decisions have no in-flight state, and the button and keyboard paths follow different rules",
+      "dimension": "standards",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 192,
+          "endLine": 226,
+          "note": "decide: no pending flag; new Idempotency-Key per call (201); lost reply reported as a failure (220)"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 664,
+          "endLine": 675,
+          "note": "Approve and Reject never disabled; Approve stays live on truncated requests"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 265,
+          "endLine": 268,
+          "note": "keyboard path refuses truncated approvals before sending"
+        },
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 60,
+          "note": "peer: busy state disables submit (142, 188)"
+        },
+        {
+          "file": "apps/web/components/continue-run.tsx",
+          "line": 47,
+          "endLine": 48,
+          "note": "peer: lost reply or 5xx is an unknown outcome, not a failure"
+        },
+        {
+          "file": "services/agent/src/autobots/application/approvals.py",
+          "line": 278,
+          "endLine": 281,
+          "note": "server replays a same-decision repeat"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "decide() sets no pending flag. Approve and Reject stay enabled across the CSRF fetch, the POST and the reload, and each click mints a new Idempotency-Key (201). The keyboard path refuses to approve a truncated request before sending (265-268). The Approve button sends it and waits for the server's approval_too_large refusal. A null reply (lost connection) shows 'That decision couldn't be saved.' (220), although the API may have committed.",
+      "impact": "DH-06 asks for duplicate submits to be disabled, with server idempotency as the correctness mechanism; only the server half exists here. Double clicks send duplicate POSTs and race two reloads. The truncation rule has two homes with different behavior. A lost reply asserts a failure that the reloaded list may contradict. No optimistic update is made, which is correct and should stay.",
+      "recommendation": "Extract useApprovalDecision(reload) returning { pending, message, decide }. Set pending before the request and clear it in finally; disable both buttons while pending, and have the shortcut hook ignore presses while pending. Give the truncation rule one home: either derive canApprove once from the server's arguments_truncated flag and use it for both the button and the shortcut, or drop the client check from both and rely on the refusal. For reply === null or status >= 500, say the outcome is not known yet and let the reloaded list show it, as continue-run.tsx does.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "DH-06 'Disable duplicate submits with server idempotency as the correctness mechanism' and 'avoid duplicated business rules'. The API's hash binding and refusal codes stay authoritative, and no state transition moves into Next.js.",
+      "verdict": "confirmed",
+      "verifierNote": "The buttons at 664-675 never disable, the keyboard refuses truncated approvals at 265-268 while the button sends, and the server replays a same-decision repeat at approvals.py:278-281."
+    },
+    {
+      "id": "WTAP-04",
+      "title": "The approval list fetch exists twice, and the unguarded copy can show waiting requests under Decided",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 136,
+          "endLine": 156,
+          "note": "load(): no stale-reply guard; parse errors escape"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 158,
+          "endLine": 187,
+          "note": "effect copy: guarded, but a separate implementation"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 170,
+          "endLine": 171,
+          "note": "setCounts called twice"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 223,
+          "note": "decide reloads the tab captured at click time"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 337,
+          "note": "comment promises a stale list from the other tab is never shown"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 165,
+          "endLine": 200,
+          "note": "same load plus inline-effect pair in another area"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "          const parsed = parseApprovalList(await reply.json());\n          setList(parsed);\n          setCounts(parsed.counts);\n          setCounts(parsed.counts);\nload() and the effect repeat the same URL choice, parse and selection fallback. load() has no active flag or abort and parses outside any catch, so a ContractError rejects decide() unhandled, while the effect turns the same error into the failed state. The copy exists because the project's react-hooks/set-state-in-effect rule (eslint-plugin-react-hooks 7.1.1) rejects an effect that calls load(); a stdin ESLint probe confirmed the error.",
+      "impact": "Switching to Decided while a decision is in flight lets load('waiting') finish after the Decided fetch and replace the list. That contradicts the invariant stated at line 337, and the waiting requests then render with Decided labels. The two copies have already drifted (duplicate setCounts, different error handling).",
+      "recommendation": "Keep one guarded fetch path and reload through it. A shared useLoaded(path, parse) keeps a reload counter in the effect's dependencies, aborts on cleanup and returns { state, reload }; decide() calls reload() instead of fetching. A stdin probe of this shape passes the project ESLint. Make the selection fallback (keep the current id if still listed, else the first) a pure function called from one place.",
+      "sketch": "// lib/use-loaded.ts\nexport type Load<T> = { kind: \"loading\" } | { kind: \"failed\"; reason: FailReason } | { kind: \"ready\"; value: T };\nexport function useLoaded<T>(path: string, parse: (v: unknown) => T): { state: Load<T>; reload: () => void };\n//   effect deps [path, parse, version]; AbortController; setState only inside the async callbacks\n// approvals: const { state, reload } = useLoaded(approvalsPath(tab), parseApprovalList);",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "The project ESLint react-hooks/set-state-in-effect rule still holds, since setState stays inside the async callbacks. DH-06 'Browser state is a view of durable state'.",
+      "verdict": "confirmed",
+      "verifierNote": "A fresh ESLint stdin probe reproduces react-hooks/set-state-in-effect for an effect that calls load(), and a reload-counter hook passes; the duplicate setCounts is at 170-171 and operations-panel.tsx:165-200 has the same pair."
+    },
+    {
+      "id": "WTAP-05",
+      "title": "Every load failure becomes one message with no retry, and some messages are wrong",
+      "dimension": "errors",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 300,
+          "endLine": 309,
+          "note": "'Sign in, then try again.' for any failure; tabs hidden; no retry"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 179,
+          "endLine": 183,
+          "note": "status and error discarded into a boolean"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 156,
+          "endLine": 181,
+          "note": "useLoaded keeps only { kind: 'unavailable' } for status, network and ContractError"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 202,
+          "endLine": 209,
+          "note": "'Check that the local service is running' also for 401 and 403"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 587,
+          "endLine": 593,
+          "note": "'That tool isn't in the catalog.' also for 401, 403 and 503"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 603,
+          "note": "a tool with no versions renders nothing"
+        },
+        {
+          "file": "apps/web/lib/bff.ts",
+          "line": 53,
+          "endLine": 57,
+          "note": "BFF already returns 403 and 401 (and 503 at 120)"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 171,
+          "note": "peer screen words 403 separately"
+        }
+      ],
+      "occurrences": 4,
+      "evidence": "Neither file reads the reply status. The BFF distinguishes refusals (403), not_signed_in (401) and service_unavailable (503), and operations-panel.tsx and run-inspector.tsx word them separately. Here, Approvals says 'Sign in, then try again.' for every failure and replaces its tabs. The catalog blames the local service for auth failures. The detail page says a tool is not in the catalog when the session expired or the API is down. None of the four states offers a retry.",
+      "impact": "DH-06 requires loading, empty, denied, unavailable and retryable states to be represented deliberately. A stopped API tells a signed-in owner to sign in, an expired session says the tool doesn't exist, and contract drift looks like an outage with no trace. If the reload fails right after a successful decision, the sign-in message replaces the confirmation, and only a full page reload recovers.",
+      "recommendation": "Give the shared load hook a typed failure reason: signed_out for 401, denied for 403, not_found for 404, unavailable for 5xx or network errors, and invalid for a ContractError. Render one shared failure component with reason-specific copy and a Retry button bound to reload(). Keep the approvals tabs visible on failure. Log a ContractError's path to the console in development, since it carries no secret. Render an explicit empty state for a tool with no versions.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06 'Represent loading, empty, denied, unavailable and retryable states deliberately' and 'preserve causes in private logs and expose safe typed errors'. The user-facing copy reveals no server detail.",
+      "verdict": "confirmed",
+      "verifierNote": "Neither file reads reply.status; the BFF returns 401, 403 and 503 with distinct codes (bff.ts:53-57, 120); a failed reload after a decision leaves only the sign-in text, since the tabs are not rendered."
+    },
+    {
+      "id": "WTAP-07",
+      "title": "Pure tool text is exported from a client component and imported by the Expert editor",
+      "dimension": "modules",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 67,
+          "endLine": 114,
+          "note": "AVAILABILITY, keySource and repair exported from a 'use client' panel module"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 17,
+          "note": "imports AVAILABILITY and repair from @/components/tool-catalog"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 330,
+          "note": "calls repair"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 386,
+          "endLine": 389,
+          "note": "row re-derives the key source inline instead of calling keySource"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 80,
+          "note": "keySource exported with no outside caller (used only at 710)"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "tool-catalog.tsx exports its label table and two text functions from a module that also imports next/navigation and lucide icons. expert-editor.tsx:17 reads 'import { AVAILABILITY, repair } from \"@/components/tool-catalog\";'. repair() holds five branches of TS-03 repair wording and has no unit test.",
+      "impact": "A web-build screen now depends on the web-tools panel file for text rules, so restructuring the catalog can break the Expert editor. The PK-05 and TS-03 wording can only be checked through Playwright on a disposable stack.",
+      "recommendation": "Move the label tables, keySource, repair (renamed repairText) and the row summary text to lib/tool-text.ts, with no React and no 'use client'. Import it from both components, unexport anything with no outside caller, and add node:test cases for each repair branch.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06 'explicit ownership, narrow interfaces'. lib/ already holds pure helpers tested with node:test (apps/web/tests/unit).",
+      "verdict": "confirmed",
+      "verifierNote": "grep finds expert-editor.tsx as the only importer of these exports and no outside caller of keySource; the same move appears in web-build WBLD-13."
+    },
+    {
+      "id": "WTAP-08",
+      "title": "tool-catalog.tsx has a 249-line panel and a 174-line detail among eight components",
+      "dimension": "size",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 183,
+          "endLine": 435,
+          "note": "ToolCatalogPanel: URL state, filtering, toolbar, grouped list and dialog wiring"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 194,
+          "endLine": 239,
+          "note": "three URLSearchParams helpers; choose redeclares query at 198"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 318,
+          "endLine": 348,
+          "note": "the same group filter computed three times (319, 321, 347-348)"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 349,
+          "endLine": 412,
+          "note": "row callback: 64 lines, complexity 12"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 581,
+          "endLine": 754,
+          "note": "ToolDetail: 174 lines, complexity 18"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 483,
+          "endLine": 579,
+          "note": "FieldTable: 96 lines; takes the whole tool and filters by direction itself (490)"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 516,
+          "endLine": 532,
+          "note": "five identical header cells; constraint text formatted inline at 559-567"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 156,
+          "endLine": 181,
+          "note": "generic data hook kept inside the file"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "Reading confirms the leads: the group callback runs 97 lines and the row callback 64, and there are eight components in 853 lines. The panel interleaves URL state, filtering (218-227), the toolbar and the grouped list. It filters shown by group three times instead of reusing inGroup. The TS-01 row wording is assembled inline (372-390). FieldTable receives the whole ToolDescriptor but needs only its fields and title, repeats <th scope='col' className='pr-3 pb-2 font-medium'> five times and builds constraint text inline as `${key} ${JSON.stringify(value)}`. Its table semantics are good and should stay: caption, column and row scopes, and a focusable, named scroll region (501-507).",
+      "impact": "Adding a filter, a row fact or a detail field means editing a 250-line function that mixes URL, filter and markup logic. The row wording and the constraint wording cannot be tested on their own, and changing a field column means editing several places.",
+      "recommendation": "Split following the repository's flat feature-prefix convention (as the run-*.tsx files do): move pure parts to lib first, then give each surface its own file. Group once with a Map and pass each group's tools down. Give FieldTable a { title, caption, fields } signature with a COLUMNS constant and a FieldRow, let ToolDetail split fields by direction once, and move constraintText to lib/tool-text.ts with tests. Behavior and data-* hooks, data-fields and data-field-path included, stay as they are, so tools.spec.ts covers the move.",
+      "sketch": "lib/tool-text.ts     label tables by union, keySource, repairText, toolSummary(tool): string[], constraintText\nlib/tool-filters.ts  readFilters(params), withParam(params, name, value | null), filterTools, groupTools\nlib/use-loaded.ts    useLoaded(path, parse) -> { state, reload }\ncomponents/tool-catalog.tsx  ToolCatalogPanel (~60 lines): useCatalogFilters + useLoaded + layout\n  CatalogToolbar, ToolGroupSection, ToolRow\ncomponents/tool-dialog.tsx   ToolDialog (native dialog, focus return)\ncomponents/tool-detail.tsx   ToolDetail -> ToolHeader, ToolGuide, ToolFacts, ToolIdentity, GrantableTo, RawSchema\ncomponents/tool-fields.tsx   FieldTable({ title, caption, fields }) with COLUMNS, FieldRow({ field })\ncomponents/tool-grants.tsx   Grants, CopySchema",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-06 'small cohesive modules'. DH-03 prescribes no component folders, so the split keeps the flat layout.",
+      "verdict": "revised",
+      "verifierNote": "Spans and complexities match eslint.json; WTAP-14 (FieldTable's whole-tool parameter, repeated header cells and inline constraint text) was merged here, because this split already moves FieldTable and constraintText."
+    },
+    {
+      "id": "WTAP-09",
+      "title": "Pure logic has no unit tests, and the riskiest interactions are untested",
+      "dimension": "tests",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 47,
+          "endLine": 113,
+          "note": "requesterText, scopeText, policyText, relative, decidedText"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 687,
+          "endLine": 742,
+          "note": "parsedFields (AP-03 order rule), Markdown and inline"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 80,
+          "endLine": 114,
+          "note": "keySource and repair, shared with expert-editor"
+        },
+        {
+          "file": "apps/web/tests/browser/approvals.spec.ts",
+          "line": 407,
+          "endLine": 455,
+          "note": "no held chord, Alt chord, tab switch mid-decision or failure state"
+        },
+        {
+          "file": "apps/web/tests/browser/tools.spec.ts",
+          "line": 223,
+          "endLine": 239,
+          "note": "close paths covered; filtered deep link not covered"
+        },
+        {
+          "file": "scripts/verify.py",
+          "line": 161,
+          "endLine": 162,
+          "note": "web_unit_tests lists files one by one and already omits schema-value.test.ts"
+        },
+        {
+          "file": "apps/web/tests/unit/schema-value.test.ts",
+          "line": 1,
+          "note": "the node:test pattern against lib/ to follow"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "apps/web/tests/unit holds three node:test files, all for lib modules. None covers the ten pure functions here. The browser suites are strong: decisions and replay, tabs, J/K, two-press, typing guard, Fields/JSON with axe, modal close paths, focus return and Copy schema. But they run only in the db profile, and none holds a chord, switches tabs during a decision, returns a 503 or deep-links a filtered-out tool.",
+      "impact": "The rules most likely to regress here are checked only by slow end-to-end runs: the two-press machine, AP-03's no-reorder rule, text-only markdown and the repair wording. The held-key and stale-reload defects in this area passed those runs.",
+      "recommendation": "Once the pure code has moved to lib, add node:test files for approval-shortcut (repeat, Alt, approval change, expiry, truncation), approval-text and relative-time boundaries, parsedFields (integer-like keys, arrays, truncation), markdown inline splitting and the tool-text repair branches. Register each file in the web_unit_tests step, or switch that step to a glob, which would also pick up schema-value.test.ts. Add browser cases for a held chord, a tab switch during a decision and a BFF 503.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-06 names Vitest and React Testing Library for pure and client behavior. The repository's current runner is node:test against lib, so this adds no dependency; adopting Vitest would be a separate tooling decision.",
+      "verdict": "confirmed",
+      "verifierNote": "Three unit files exist and web_unit_tests runs two of them, and nothing else runs schema-value.test.ts; approvals.spec.ts and tools.spec.ts contain no route injection or held key."
+    },
+    {
+      "id": "WTAP-06",
+      "title": "Label tables are typed Record<string, …> although the contract gives exact unions",
+      "dimension": "types",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 45,
+          "endLine": 74,
+          "note": "PROVIDERS, CLASSES, COSTS, AVAILABILITY and AVAILABILITY_FILTERS typed by string"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 124,
+          "endLine": 138,
+          "note": "GROUP_ICONS keyed by string; '?? Wrench' at 322 and 607"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 117,
+          "endLine": 121,
+          "note": "APPROVAL_TEXT already uses the exhaustive form"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 377,
+          "endLine": 385,
+          "note": "three raw-value fallbacks in one row"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 705,
+          "endLine": 707,
+          "note": "two more in the detail"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 376,
+          "note": "same fallback in the Expert editor"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 24,
+          "endLine": 33,
+          "note": "MESSAGES by string forces '?? \"\"' at 266"
+        },
+        {
+          "file": "packages/api-client/src/generated.ts",
+          "line": 8896,
+          "endLine": 8919,
+          "note": "ToolDescriptor declares each of these fields as a union"
+        }
+      ],
+      "occurrences": 7,
+      "evidence": "ToolDescriptor declares provider, operation_class, cost_class, availability and group as literal unions, and the generated runtime schema rejects any other value. Yet six tables in tool-catalog.tsx are keyed by string. Counted by grep, there are 12 lookups (11 here and 1 in expert-editor.tsx), and 11 of them carry a '?? tool.x' or '?? Wrench' fallback that cannot run after parsing.",
+      "impact": "When the Pydantic contract gains a provider, class, cost class or group, tsc stays green and the screen shows the raw snake_case id; nothing points at the table to update.",
+      "recommendation": "Type each table by its union, for example const PROVIDERS: Record<ToolDescriptor['provider'], string> and const AVAILABILITY_FILTERS: readonly ToolDescriptor['availability'][]. Then delete the fallbacks, so tsc fails at the table when the contract adds a value. Declare MESSAGES as const satisfies Record<string, string>. ApprovalView.status and operation_class are plain strings in the contract (generated.ts:7457, 7467). Narrowing them to Literals in the Pydantic DTO and regenerating would let OUTCOME become exhaustive too.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Contracts rule: Pydantic owns the contract, generated TypeScript consumes it, and unknown enums fail at runtime; this adds the compile-time half. No generated file is edited by hand.",
+      "verdict": "revised",
+      "verifierNote": "Recounted 12 lookups, 11 with a fallback that parsing makes unreachable; downgraded from medium to low because nothing is wrong today and the fallbacks degrade gracefully to the raw id."
+    },
+    {
+      "id": "WTAP-10",
+      "title": "Relative time is formatted four ways, and the approvals countdown freezes",
+      "dimension": "duplication",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 88,
+          "endLine": 98,
+          "note": "hand-rolled 'in 5 min' / '5 min ago'"
+        },
+        {
+          "file": "apps/web/components/home-activity.tsx",
+          "line": 24,
+          "note": "Intl.RelativeTimeFormat copy"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 36,
+          "note": "identical Intl copy"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 310,
+          "note": "'min ago', 'h ago', then a date"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 134,
+          "note": "now changes only on reload (155, 178)"
+        }
+      ],
+      "occurrences": 4,
+      "evidence": "There are four helpers, counted by grep for relative-time functions. Approvals reads 'in 5 min' where Home reads 'in 5 minutes'. In approvals, Math.round turns an expiry 20 s in the past into -0, which `minutes >= 0` reads as 'in 0 min'. now only advances when the list reloads, so 'Expires in 3 min' stays on screen as time passes.",
+      "impact": "The same kind of time reads differently on Home and in Approvals, and a request can show a future expiry after it has expired. The next fix will land in one copy only.",
+      "recommendation": "Add lib/relative-time.ts based on Intl.RelativeTimeFormat, as two copies already are, with node:test boundary cases. Add a small useNow(intervalMs) hook for screens that show countdowns, then replace the four helpers.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "none",
+      "verdict": "revised",
+      "verifierNote": "Four helpers confirmed, and Math.round(-1/3) is -0, which passes minutes >= 0; experts-panel's lastRun starts at line 310, not 309. web-build WBLD-14 counts the same helpers."
+    },
+    {
+      "id": "WTAP-11",
+      "title": "The segmented 'tabs with counts' control is copied in three screens",
+      "dimension": "duplication",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 319,
+          "endLine": 352,
+          "note": "Waiting/Decided toggle"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 236,
+          "endLine": 251,
+          "note": "same classes"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 186,
+          "endLine": 198,
+          "note": "same classes"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 516,
+          "endLine": 537,
+          "note": "Fields/JSON: a fourth, slightly different variant"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "Three screens repeat verbatim the button class 'text-foreground/80 inline-flex h-7 items-center gap-1.5 rounded-md border border-transparent px-3 text-[13px]' and the selected state 'bg-background text-foreground border-border font-medium dark:bg-accent': approvals-panel.tsx:344, run-list.tsx:243 and experts-panel.tsx:192 (grep for the class string).",
+      "impact": "A focus or token change under DS-03 or DS-04 has to be made three or four times, and the copies already differ in data attributes and container markup.",
+      "recommendation": "Add components/ui/segmented-control.tsx. It takes items (id, label, optional count), a value, onChange and an aria-label, renders aria-pressed buttons with the shared classes and passes data-* attributes through. Adopt it in the three screens and for the Fields/JSON toggle.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DS-03 shared semantic tokens across the UI. The primitive keeps the aria-pressed semantics and the data-tab hooks the browser tests use.",
+      "verdict": "confirmed",
+      "verifierNote": "grep finds both class strings at exactly the three cited lines (approvals-panel.tsx:344 and 346, run-list.tsx:243 and 245, experts-panel.tsx:192 and 194)."
+    },
+    {
+      "id": "WTAP-12",
+      "title": "The tool modal uses page colors where DS-03 maps dialogs to popover, and each dialog hand-rolls its chrome",
+      "dimension": "standards",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 461,
+          "note": "bg-background text-foreground … backdrop:bg-black/60"
+        },
+        {
+          "file": "apps/web/components/search-palette.tsx",
+          "line": 132,
+          "note": "bg-popover text-popover-foreground … backdrop:bg-black/50"
+        },
+        {
+          "file": "apps/web/components/about-services.tsx",
+          "line": 22,
+          "note": "bg-popover text-popover-foreground … backdrop:bg-black/50"
+        },
+        {
+          "file": "PRD-Design-System.md",
+          "line": 65,
+          "note": "menus, selects and dialogs use popover and popover-foreground"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "The tool modal is the only dialog on the page surface, with a darker backdrop. No comment explains the difference. The cards inside use bg-card, which has the same value as popover in both themes (docs/design/luma.css:4-7 and 39-42), so a popover-surfaced dialog would hide their edges; that may be the reason.",
+      "impact": "The modal's surface and backdrop differ from the other two dialogs and from DS-03, and a fourth dialog will copy one of the three variants.",
+      "recommendation": "Add a shared native-dialog primitive, components/ui/dialog.tsx: showModal on mount, backdrop click, a form method='dialog' close, the popover surface and one backdrop class. Use it for all three dialogs. If the tool modal keeps the page surface so its cards stand out, say so in a comment and record it as a documented design-system exception rather than a per-screen override, then check both themes as DS-05 requires.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DS-03 (dialogs use popover and popover-foreground; no per-screen theme overrides). The primitive keeps Decision 0026 G3's native dialog and the browser's focus trap.",
+      "verdict": "revised",
+      "verifierNote": "Surfaces and backdrops confirmed at the three dialogs; card and popover share one value in both themes, not only in dark mode, so the evidence was corrected."
+    },
+    {
+      "id": "WTAP-13",
+      "title": "The modal's accessible name and focus return rest on fixed IDs and a DOM query",
+      "dimension": "standards",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 455,
+          "note": "aria-labelledby='tool-heading'"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 619,
+          "endLine": 621,
+          "note": "the heading exists only after ToolDetail loads"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 424,
+          "endLine": 428,
+          "note": "focus return; the promised first-link fallback is not implemented"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 492,
+          "note": "fixed input-heading and output-heading ids"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 692,
+          "note": "fixed tool-version id"
+        },
+        {
+          "file": "apps/web/tests/browser/tools.spec.ts",
+          "line": 223,
+          "endLine": 239,
+          "note": "no filtered deep-link case"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "              // Back to the link that opened it, or the list's first link for a deep link.\n              const opener = document.querySelector<HTMLAnchorElement>(\n                `[data-tool=\"${CSS.escape(selected)}\"] a`,\n              );\n              opener?.focus();\nWhile ToolDetail shows 'Loading this tool.' or its failure text, no element has id tool-heading, so the dialog has no accessible name. Fixed ids tie ToolDialog to ToolDetail's markup. For a deep link whose tool is filtered out (for example ?group=files&tool=calculate), the query finds nothing and focus falls to the document.",
+      "impact": "Decision 0026 G3 says the dialog is labelled by the tool's title, but screen readers meet an unnamed dialog while it loads. TG-02's focus return fails silently in the filtered case, and the comment misleads the next maintainer.",
+      "recommendation": "Create the ids with useId() in ToolDialog and pass the heading id down to ToolDetail, using aria-label={toolId} until the title loads. Implement a real fallback chain: the tool's link, else the first tool link, else the search field. Update the comment to match, and add a browser case for a filtered deep link.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "PRD-Tool-Catalog TG-02 (focus returns to the tool's link), Decision 0026 G3 (labelled by the tool's title), and DS-04 labels and focus.",
+      "verdict": "confirmed",
+      "verifierNote": "aria-labelledby targets a heading rendered only after the tool loads, and the first-link fallback promised at 424 is absent; the filtered deep-link case is reasoned, not observed."
+    },
+    {
+      "id": "WTAP-15",
+      "title": "The search box is uncontrolled while the other filters follow the URL",
+      "dimension": "approach",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 251,
+          "endLine": 257,
+          "note": "defaultValue read once; router.replace on every keystroke"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 263,
+          "note": "selects take value from the URL (also 278, 293)"
+        },
+        {
+          "file": "apps/web/components/sidebar-nav.tsx",
+          "line": 45,
+          "note": "Tools link to /tools"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "The input uses defaultValue={params.get('q') ?? ''}, which is read only on mount. Following the sidebar's Tools link from /tools?q=calc keeps the panel mounted, because no template.tsx remounts it. The filter clears, but the box still shows 'calc'.",
+      "impact": "The visible query and the applied filter can disagree, breaking the promise that the URL holds the filter state.",
+      "recommendation": "In a useCatalogFilters hook, keep a local draft for q that resets when the URL's q changes from outside, and write it back to the URL, debounced if needed. Add a browser case: type a query, follow the Tools link, and expect an empty box and the full list.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "PRD-Tool-Catalog TS-01 (filters live in the URL) and PRD-Studio TL-01 (the text filter).",
+      "verdict": "confirmed",
+      "verifierNote": "defaultValue is read once while the three selects follow the URL, and no template.tsx exists under apps/web/app; the same uncontrolled search exists in workflows-panel.tsx:212. Reasoned from the code, not observed."
+    },
+    {
+      "id": "WTAP-16",
+      "title": "Names that hide what they return, or collide",
+      "dimension": "naming",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 93,
+          "note": "repair() returns a sentence or null"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 330,
+          "note": "const fix = repair(tool)"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 746,
+          "note": "Fact { label, colon, data-* }"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 756,
+          "note": "a different Fact { icon, term }"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 198,
+          "note": "query redeclared inside choose(), shadowing line 190"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 88,
+          "note": "relative"
+        }
+      ],
+      "occurrences": 4,
+      "evidence": "repair(tool) reads as an action but returns text, and it is exported to another screen. Two components named Fact both render a dt/dd pair, with different props. choose() shadows the filter query with the serialized params.",
+      "impact": "Readers have to open each definition to know what it returns. Once the parts move to shared files, the two Fact components become an import clash.",
+      "recommendation": "Rename while splitting: repairText, setFilter (with a local name that doesn't shadow) and relativeTime. For Fact, either create one ui/description-item.tsx with an optional icon, or name them ApprovalFact and ToolFact.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06 'readable names'.",
+      "verdict": "confirmed",
+      "verifierNote": "All four naming issues confirmed at the cited lines; the repairText rename is the same one WTAP-07 makes and should land with it."
+    },
+    {
+      "id": "WTAP-17",
+      "title": "Typography is set with 44 one-off pixel sizes",
+      "dimension": "naming",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 344,
+          "note": "text-[13px]"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 365,
+          "note": "text-[12.5px]"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 452,
+          "note": "text-[22px]"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 373,
+          "note": "text-[11.5px]"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 621,
+          "note": "text-[22px] tracking-[-0.015em]"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 682,
+          "note": "text-[12px]"
+        },
+        {
+          "file": "apps/web/app/globals.css",
+          "line": 31,
+          "note": "@theme defines fonts but no text sizes"
+        }
+      ],
+      "occurrences": 44,
+      "evidence": "grep -oE 'text-\\[[0-9.]+px\\]' counts 21 in approvals-panel.tsx and 23 in tool-catalog.tsx, and 212 across apps/web components and app. They use seven sizes: 11.5, 12, 12.5, 13, 13.5, 15 and 22 px.",
+      "impact": "The type scale exists only as repeated literals. DS-03 asks for consistent typography, and changing one step means editing hundreds of sites by hand.",
+      "recommendation": "Define the steps once as --text-* tokens in the @theme block of globals.css, for example meta 12.5px, body-sm 13px, body 13.5px and title 22px, and use the generated utilities. Migrate files as they are split, and add a lint or grep ratchet against new text-[Npx] uses.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DS-03 'Keep layout spacing and typography consistent'. This adds size tokens only and leaves the Luma color tokens in docs/design/luma.css untouched.",
+      "verdict": "confirmed",
+      "verifierNote": "grep counts 21 and 23 arbitrary sizes in the seven stated values, and 212 in 39 files repo-wide; the globals.css @theme block (31-77) defines no text sizes."
+    },
+    {
+      "id": "WTAP-18",
+      "title": "The decision error body is cast instead of parsed",
+      "dimension": "types",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 216,
+          "endLine": 221,
+          "note": "blanket assertion on an untrusted reply"
+        },
+        {
+          "file": "packages/api-client/src/generated.ts",
+          "line": 7693,
+          "endLine": 7700,
+          "note": "ErrorResponse and parseErrorResponse, unused in apps/web"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "        const failure = (await reply?.json().catch(() => null)) as {\n          code?: string;\n        } | null;\n        setMessage(\n          MESSAGES[failure?.code ?? \"\"] ?? \"That decision couldn't be saved.\",\n        );\ngrep finds the same `{ code?: string }` shape 15 times in 11 component files, this one included: 14 casts and one return type (workflow-editor.tsx:236).",
+      "impact": "DH-06 forbids blanket assertions at untrusted boundaries. The fallback keeps this instance harmless today, but the cast hides any change to the error envelope and is copied across the app.",
+      "recommendation": "Add lib/error-code.ts with errorCode(reply: Response | null): Promise<string | null>, which parses with parseErrorResponse inside try/catch. Use it here; the other copies can follow.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06 'explicit response parsing at untrusted boundaries … No blanket type assertions'. It consumes the generated client without editing it.",
+      "verdict": "revised",
+      "verifierNote": "The cast at 216-221 is confirmed; of the 15 grep hits for the shape, one is a return type rather than a cast, so the count is now stated as 14 casts plus one return type."
+    },
+    {
+      "id": "WTAP-19",
+      "title": "Invariants the code relies on are unstated, and two comments no longer match the code",
+      "dimension": "comments",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 602,
+          "note": "versions.at(-1) taken as the newest"
+        },
+        {
+          "file": "services/agent/src/autobots/application/tool_catalog.py",
+          "line": 261,
+          "note": "order comes from sorted(..., key=(tool_id, version))"
+        },
+        {
+          "file": "services/agent/src/autobots/contracts/tools.py",
+          "line": 381,
+          "note": "ToolVersions.versions states no order"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 74,
+          "note": "three of four availability values, reason not given"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 179,
+          "note": "parse in effect deps: an inline parser would refetch on every render"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 125,
+          "note": "counts kept apart from list without saying why"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 473,
+          "note": "repeats the NOT_RECORDED text instead of the constant at 35"
+        }
+      ],
+      "occurrences": 6,
+      "evidence": "ToolDetail depends on the server's sort for 'newest', and nothing documents that order. AVAILABILITY_FILTERS omits not_qualified without a comment. useLoaded would loop on an inline parser, and nothing tells callers to pass a module-level function. The comments at approvals-panel.tsx:337 (no stale list) and tool-catalog.tsx:424 (first-link fallback) describe behavior the code does not have.",
+      "impact": "A server-side reorder, a caller passing an inline parser, or a well-meant cleanup of the filter list would break the screen silently. Comments that disagree with the code mislead the next change.",
+      "recommendation": "Pick the newest version by maximum version number, or document the order in the Pydantic field description so it reaches the generated contract. Add one-line why-comments for the filter list, the separate counts state and useLoaded's stable-parse requirement, or read parse through useEffectEvent. Use NOT_RECORDED at line 473, and fix the two comments together with the code changes they describe.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06 'Explain nonobvious invariants in code; avoid comments that restate syntax'. A change to the Pydantic description reaches TypeScript only by regeneration.",
+      "verdict": "confirmed",
+      "verifierNote": "versions.at(-1) relies on the sort at tool_catalog.py:261 and ToolVersions declares no order; line 473 repeats NOT_RECORDED's exact text."
+    }
+  ],
+  "rejected": [
+    {
+      "id": "WTAP-14",
+      "title": "FieldTable takes a whole tool and repeats its column markup",
+      "reason": "merged into WTAP-08"
+    }
+  ],
+  "notCovered": "This was a static review. Ground rules ruled out running the app, a browser suite or tsc. Three claims are therefore reasoned from the code and standard browser and App Router behavior, not observed: a held ⌘↵ or Ctrl+↵ counting as the second press, the tab switch during an in-flight decision, and the stale search box after following the sidebar link. ESLint ran only on stdin probes, writing no files, to check the recommended hook shapes (a reload counter, and useEffectEvent) against the project config, and to confirm that react-hooks/set-state-in-effect rejects an effect that calls load(). Several files were read only in part: PRD-Development-Harness.md (DH-03 to DH-06), metrics.md, the PRD-Studio and PRD-Tool-Catalog sections for AP, TL, TS and TG, and decision 0026. The peer files cited for comparison or counts were read only around those lines: run-controls, continue-run, operations-panel, run-inspector, search-palette, new-run, home-activity, workflows-panel, experts-panel, run-list, expert-editor, about-services, sidebar-nav, lib/bff.ts, the two browser specs, scripts/verify.py and the Python approval and tool routes. Requirement coverage was not judged. TS-01 lists side effects per tool row, but `side_effects` is rendered nowhere in apps/web (grep), which acceptance owners may want to check. No comparison with an earlier review was made."
+}

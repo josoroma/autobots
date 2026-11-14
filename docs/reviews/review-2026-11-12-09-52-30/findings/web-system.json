@@ -1,0 +1,1122 @@
+{
+  "schema": "autobots.code-review/v1",
+  "area": "web-system",
+  "title": "Web: operations and settings",
+  "kind": "area",
+  "timestamp": "2026-11-12-09-52-30",
+  "revision": "156534da0bd5b19417f05d313077d767804b175b",
+  "summary": "The operations and settings family is careful where it matters most and is well covered end to end. Secret fields are uncontrolled and cleared before sending, every success body goes through a generated runtime parser, settings writes carry expected_version, every control comes from components/ui/field.tsx (the harness check passes), and browser suites check refusals, stale writes and that no key leaks. The cost is in how each panel is built: each one hand-rolls its own view-state machine. Three panels write their initial read twice, because react-hooks/set-state-in-effect forbids calling load() from the effect. The save flow exists in five copies that have drifted. Failure bodies are cast instead of parsed with the generated parseErrorResponse, which apps/web never uses. Busy is cleared before the success body is parsed, so a parse error escapes as an unhandled rejection. There are three different conflict strategies, and the retention save reports one validation rule for every failure. Its days() parser turns \"1,000\" into 1 and \"3O\" into 3, ahead of a timed worker pass that deletes run content. Loading, unavailable and denied states look and announce differently, blur their causes and offer no retry. The measured leads hold: OperationsPanel (377 lines, complexity 28) and ModelPolicyPanel (350) need splitting, and ProviderSettingsPanel (222) less urgently. The small private subcomponents behind the no-multi-comp hits are fine. Pure formatting sits in client components with no fast tests. Operations keys its lookup tables by string although the contract has unions. role_overrides is cast over a runtime gap. Appearance preferences are defined both in the control and in the root layout's before-paint script.",
+  "scores": [
+    {
+      "dimension": "standards",
+      "score": 3,
+      "why": "Strict TS, the shared field controls (harness check passes) and semantic tokens are followed. Arbitrary pixel type sizes, eight copied token literals, four untitled pages and unassociated help text fall short of DH-06 and DS-03."
+    },
+    {
+      "dimension": "modules",
+      "score": 3,
+      "why": "Dependencies point the right way (generated client, small lib helpers). But each panel embeds its own read, send and state machinery, and the appearance preference table is split between the control and the root layout."
+    },
+    {
+      "dimension": "size",
+      "score": 2,
+      "why": "OperationsPanel (377 lines, complexity 28), ModelPolicyPanel (350) and ProviderSettingsPanel (222) each hold a whole screen. Three of the five component files exceed 300 lines."
+    },
+    {
+      "dimension": "functions",
+      "score": 3,
+      "why": "Small pure helpers exist (perMillion, sameForm, sourceLabel, schemaValue). But the panels mix fetching, mutation, draft state, formatting and layout, and the provider mutate reports one outcome for every action."
+    },
+    {
+      "dimension": "structure",
+      "score": 3,
+      "why": "Pages are thin Server Components under a settings layout. But feature components sit flat among 43 files, a page link lives inside a panel, and the settings section layout is copied page by page."
+    },
+    {
+      "dimension": "approach",
+      "score": 3,
+      "why": "One consistent path (BFF, generated parsers, CSRF, expected_version), but implemented as a hand-written state machine per panel. The lint-forced duplicate read and client-only initial reads add cost."
+    },
+    {
+      "dimension": "comments",
+      "score": 4,
+      "why": "Comments explain why and cite decisions and PRD IDs. A few are cryptic ('Its name holds the database's') or slightly wrong ('Numbers only' above values that include text)."
+    },
+    {
+      "dimension": "types",
+      "score": 3,
+      "why": "Success bodies use the generated parsers, and two panels use exhaustive union-keyed maps. But four failure bodies and three role_overrides values are cast, operations keys its maps by string, and preferences are string-typed."
+    },
+    {
+      "dimension": "errors",
+      "score": 2,
+      "why": "A misparse can silently shorten retention, and success-path parse errors escape as unhandled rejections. Failures are cast and sometimes misreported. Unavailable, denied and signed-out states blur together, with no retry."
+    },
+    {
+      "dimension": "tests",
+      "score": 3,
+      "why": "Browser suites cover flows, refusals, stale versions and secret leakage well, but they need the db profile. The pure helpers in these panels have no fast tests, and the one precedent, schema-value.test.ts, runs in no verify profile (WSHL-08)."
+    },
+    {
+      "dimension": "maintainability",
+      "score": 3,
+      "why": "The code behaves carefully and is well tested end to end. But changing save or error behavior means editing five drifting copies, and the two largest panels need splitting first."
+    }
+  ],
+  "strengths": [
+    {
+      "title": "Secrets never enter React state or props",
+      "evidence": "The OpenRouter key and tool secrets are read from an uncontrolled field through FormData, and the form is reset before the request (apps/web/components/provider-settings-panel.tsx:221-232, apps/web/components/keys-and-vars-panel.tsx:65-72). The fields use type=password, autoComplete=off and data-1p-ignore (provider-settings-panel.tsx:313-322), and a secret's value is never rendered (keys-and-vars-panel.tsx:88-95). Browser suites check that the field is cleared and that page content, responses and logs never contain the key (apps/web/tests/browser/settings.spec.ts:107,117,125,408; settings-keys-and-vars.spec.ts:161,184)."
+    },
+    {
+      "title": "Generated runtime parsers on every success body, no-store reads",
+      "evidence": "parseLocalStatus, parseModelList, parseModelPolicyState, parseProviderStatus and parseKeysAndVars validate each success body instead of casting it (operations-panel.tsx:176,194; model-policy-panel.tsx:147-148,175,202; provider-settings-panel.tsx:166,179,210; keys-and-vars-panel.tsx:173,186,217). Every read sends cache: \"no-store\"."
+    },
+    {
+      "title": "Exhaustive label maps keyed by generated unions",
+      "evidence": "provider-settings-panel.tsx:19-63 declares Record<ProviderStatus[\"auth_status\"], string> and similar maps. keys-and-vars-panel.tsx:18-35 keys TITLES and USES by KeyOrVar[\"name\"]. account/page.tsx:10 maps the role union. A new enum value then fails type checking. This is the model for operations-panel."
+    },
+    {
+      "title": "Shared form controls with explicit labels",
+      "evidence": "Every input, select and radio comes from apps/web/components/ui/field.tsx (operations-panel.tsx:506,515; model-policy-panel.tsx:356,400; provider-settings-panel.tsx:313; keys-and-vars-panel.tsx:107,117; appearance-control.tsx:163,185,194,220,244). Each is labelled through htmlFor or a wrapping label. tests/harness/test_shared_form_controls.py was run during this review: 2 tests passed."
+    },
+    {
+      "title": "Optimistic concurrency and honest saved state",
+      "evidence": "Every settings write sends expected_version (model-policy-panel.tsx:167,198; provider-settings-panel.tsx:230,358; keys-and-vars-panel.tsx:247,250) with a specific stale_version message (model-policy-panel.tsx:184-186,213-215). RoleEffect describes only the saved policy (72-116). A saved choice that is no longer offered stays visible and is flagged (232-252, 329-345), so the browser stays a view of durable state."
+    },
+    {
+      "title": "Comments that explain why, with traceable IDs",
+      "evidence": "Examples: 'Cleared before the request, so the key never waits in the form, in any outcome.' (provider-settings-panel.tsx:226). 'Read, or an unread refusal holds its connection open...' (model-policy-panel.tsx:142). 'A refused save keeps what was typed' (operations-panel.tsx:223). The hydration note at appearance-control.tsx:141. The file header at keys-and-vars-panel.tsx:16-17 cites Decisions 0024 and 0025 and PK-04 to PK-08."
+    },
+    {
+      "title": "Thin server pages and a hydration-safe appearance control",
+      "evidence": "Most pages are 11 to 28-line Server Components that put the client boundary at the interactive panel (apps/web/app/operations/page.tsx, settings/models/page.tsx, settings/keys-and-vars/page.tsx). settings/layout.tsx:5-6 records the tab-order reasoning. appearance-control.tsx:98-124 handles unreadable or unwritable storage, and 141-148 gates checked state on mount without suppressing warnings, as DS-02 asks."
+    },
+    {
+      "title": "Meaning carried by words, indicators decorative",
+      "evidence": "Status dots and icons are aria-hidden and only repeat the text (operations-panel.tsx:79,91,242-256,310-316, with an sr-only separator at 309; provider-settings-panel.tsx:51,70-80). This follows DS-03: never infer state from color alone."
+    }
+  ],
+  "findings": [
+    {
+      "id": "WSYS-01",
+      "title": "Retention day fields misparse typos before a destructive retention pass",
+      "dimension": "errors",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 153,
+          "endLine": 156,
+          "note": "days() keeps leading digits and maps any other text to null"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 208,
+          "endLine": 222,
+          "note": "save() sends the parsed values unchecked and reports Saved on any 2xx"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 504,
+          "endLine": 521,
+          "note": "free-text inputs: inputMode=numeric only, no validation or error association"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/worker.py",
+          "line": 216,
+          "endLine": 219,
+          "note": "the worker applies every declared window on a timer"
+        },
+        {
+          "file": "services/agent/src/autobots/contracts/operations.py",
+          "line": 39,
+          "endLine": 40,
+          "note": "the server accepts any whole number from 1 to 36500, so it cannot see the misparse"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "```ts\nfunction days(value: string): number | null {\n  const parsed = Number.parseInt(value, 10);\n  return Number.isNaN(parsed) ? null : parsed;\n}\n```\nRunning the same body in node gives \"1,000\" -> 1, \"3O\" -> 3, \"2e3\" -> 2, \"7.9\" -> 7 and \"abc\" -> null (keep everything). save() puts these values into the PUT body (213-216) and, on a 2xx, shows \"Saved. Nothing is removed until the next retention pass.\"",
+      "impact": "A 1,000-day window typed with a thousands separator is stored as one day. The worker's next timed pass (apply_all) then removes the checkpoints, working files and artifact bytes of every run that finished more than a day ago. The loss is irreversible and is reported as a success; the only hint is the refreshed field showing 1. A mistyped value can also silently clear a window.",
+      "recommendation": "Parse each field strictly in a pure helper: empty means keep everything, and otherwise only whole digits are accepted. Then validate the draft with the generated parseRetentionSettings, which already checks the contract's 1 to 36500 bounds, instead of copying the bounds. On a bad value, send nothing, set aria-invalid on that input and point aria-describedby at an inline message. Leave the cross-field rule to the server. Because the API hides validation details ('The request is not valid.'), show today's rule sentence only for code invalid_request, and show the server's message for other refusals. Cover the inputs above with node:test cases.",
+      "sketch": "// lib/retention.ts (pure, tests/unit/retention.test.ts)\nexport function parseDays(text: string): number | null | \"invalid\" {\n  const value = text.trim();\n  if (value === \"\") return null; // empty keeps everything\n  return /^\\d+$/.test(value) ? Number(value) : \"invalid\";\n}\n// components/operations/retention-form.tsx\n// const run = parseDays(runText), keys = parseDays(keysText);\n// if either is \"invalid\": aria-invalid + aria-describedby \"Whole days, such as 30.\"; send nothing\n// parseRetentionSettings({ run_days: run, receipt_days: keys }) // range from the contract\n// sendJson(PUT); invalid_request -> the rule sentence; other codes -> the server's message",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "DH-06: validate data at trust boundaries and build accessible forms. The server's RetentionSettings validation stays the authority, including the cross-field rule. The client checks only format and reuses the generated range, so no retention rule moves into Next.js.",
+      "verdict": "confirmed",
+      "verifierNote": "Re-ran days() in node ('1,000' gives 1, '3O' 3, '2e3' 2, '7.9' 7, 'abc' null); apply_retention purges every finished run older than run_days on the worker's timed pass (retention.py:92-158, worker.py:217-219), and the contract accepts any whole number from 1 to 36500."
+    },
+    {
+      "id": "WSYS-02",
+      "title": "Five save flows hand-roll request, parsing and messages, and they have drifted",
+      "dimension": "errors",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/provider-settings-panel.tsx",
+          "line": 192,
+          "endLine": 219,
+          "note": "busy is cleared at 208, before the parse at 210; the failure body is cast at 213"
+        },
+        {
+          "file": "apps/web/components/keys-and-vars-panel.tsx",
+          "line": 203,
+          "endLine": 226,
+          "note": "the same mutate, differing only in path, parser and success text"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 158,
+          "endLine": 188,
+          "note": "save: cast at 179; stale_version asks for a page reload"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 191,
+          "endLine": 217,
+          "note": "resetAll: a near-copy of save"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 208,
+          "endLine": 225,
+          "note": "no catch around csrfFetch, no busy state, and one fixed rule sentence for any failure"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 286,
+          "endLine": 289,
+          "note": "Check again has no busy state either"
+        },
+        {
+          "file": "apps/web/components/account-form.tsx",
+          "line": 18,
+          "endLine": 45,
+          "note": "the family's one try/catch/finally save, a local precedent"
+        },
+        {
+          "file": "packages/api-client/src/generated.ts",
+          "line": 7693,
+          "endLine": 7700,
+          "note": "ErrorResponse and parseErrorResponse are generated; apps/web never uses them"
+        }
+      ],
+      "occurrences": 5,
+      "evidence": "```tsx\n    setBusy(false);\n    if (reply?.ok === true) {\n      setStatus(parseProviderStatus(await reply.json()));\n      setMessage(\"Saved.\");\n    } else {\n      const failure = (await reply?.json().catch(() => null)) as {\n```\nprovider-settings-panel.tsx:208-213. Diffing provider mutate against keys mutate, and policy save against resetAll, leaves only path, body, parser and wording. Bad JSON or a ContractError on a 2xx escapes the void-called handler as an unhandled rejection, with busy already false and no message. Failure bodies are cast at provider:213, keys:220 and policy:179 and 208. git grep counts 19 such casts of failure bodies in 15 component files (20 with the success body cast at continue-run.tsx:53), and 0 uses of parseErrorResponse in apps/web.",
+      "impact": "Changing how a save reports failure, conflict or progress means five edits to copies that already disagree. The policy panel asks for a page reload on stale_version (184-186), while provider and keys refetch after any failure (217, 224). Retention shows a validation rule for a 401, 403 or 503 (218-221) and leaves a network failure unhandled. An error body that drifts from {code, message} is trusted through a cast and rendered.",
+      "recommendation": "Add one non-throwing sendJson helper, built once in apps/web/lib and shared with the web-shell forms (WSHL-06 proposes the same helper; agree one outcome shape). It wraps csrfFetch, parses 2xx bodies with the generated parser and refusals with parseErrorResponse, and returns a discriminated outcome. Add a small useMutation hook that owns busy (cleared in finally) and a typed notice, with per-call wording for success, stale_version and fallback. Panels then keep only path, body, parser and words. Give Save retention and Check again the same busy state. Keep the strings the browser suites pin (settings.spec.ts:83, 87, 142 and 219, models.spec.ts:189, settings-keys-and-vars.spec.ts:160 and 206, operations.spec.ts:51), or update them in the same change.",
+      "sketch": "// lib/send-json.ts\nexport type Outcome<T> =\n  | { kind: \"ok\"; value: T }\n  | { kind: \"refused\"; status: number; failure: ErrorResponse | null } // parseErrorResponse\n  | { kind: \"unreadable\" } // a 2xx whose body failed the contract: say so, suggest a reload\n  | { kind: \"unreachable\" }; // network or CSRF token fetch failed\nexport async function sendJson<T>(path: string, method: \"PUT\" | \"POST\" | \"DELETE\",\n    body: unknown, parse: (value: unknown) => T): Promise<Outcome<T>> { /* never throws */ }\n// lib/use-mutation.ts\n// const { busy, notice, run } = useMutation();\n// run(() => sendJson(url, \"PUT\", draft, parseKeysAndVars),\n//     { success: \"Saved.\", stale: \"...\", fallback: \"That did not work. Nothing changed.\" }, setItems);\n// notice: { tone: \"success\" | \"error\"; text }, busy cleared in finally",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: centralize error handling, parse responses explicitly at untrusted boundaries, avoid blanket type assertions, and disable duplicate submits while expected_version stays the correctness mechanism. This consumes the generated parseErrorResponse; generated.ts is not edited.",
+      "verdict": "revised",
+      "verifierNote": "Flows, the busy-before-parse order and the casts confirmed (19 failure-body casts in 15 files, no parseErrorResponse use). Lowered to medium: success bodies are parsed, and the unhandled paths need a contract-violating 2xx or an unreachable Next server, as XDUP-07 and WSHL-06 rate the same pattern."
+    },
+    {
+      "id": "WSYS-03",
+      "title": "Three panels write their initial read twice, because the effect may not call load()",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 165,
+          "endLine": 206,
+          "note": "load and the mount effect; only load handles a null reply and clears failed"
+        },
+        {
+          "file": "apps/web/components/provider-settings-panel.tsx",
+          "line": 161,
+          "endLine": 190,
+          "note": "load and the mount effect"
+        },
+        {
+          "file": "apps/web/components/keys-and-vars-panel.tsx",
+          "line": 168,
+          "endLine": 197,
+          "note": "load and the mount effect"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 141,
+          "endLine": 145,
+          "note": "drains refused bodies, because 'an unread refusal holds its connection open'"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 189,
+          "endLine": 192,
+          "note": "refusals left unread here, as in provider 180-181 and keys 187-188"
+        },
+        {
+          "file": "apps/web/app/settings/account/page.tsx",
+          "line": 14,
+          "note": "the one settings page that reads on the server and passes initial data"
+        },
+        {
+          "file": "packages/api-client/src/runtime.ts",
+          "line": 168,
+          "endLine": 170,
+          "note": "requestJson puts the HTTP status only inside its message"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "I replaced keys-and-vars-panel's effect with useEffect(() => { void load(); }, [load]) and linted it from stdin, with no file written. It fails react-hooks/set-state-in-effect (eslint-plugin-react-hooks 7.1.1), so each panel inlines a second fetch-and-parse. The copies drift. load lets a parse error escape from void load() (operations 176 and 286) or await load() (provider 217, keys 224), while the effect's .catch turns the same error into the unavailable state. The policy panel drains refused bodies for a stated reason that the other three ignore. git grep for `const load = useCallback` finds 4 components that pair a load callback with an inline mount fetch: these 3 and approvals-panel.tsx.",
+      "impact": "Every change to how a panel reads (error codes, retry, draining refusals) has to be made twice per panel, and the two copies already react differently to the same failure.",
+      "recommendation": "Give each resource one module-level reader that never throws and returns a discriminated result (value, signed_out, denied, unavailable). Apply it from the effect's .then and from refresh. The same probe rewritten this way, with readKeysAndVars and an apply callback, lints clean (exit 0). Keep one shape across screens: tool-catalog.tsx:156-181 already has a typed useLoaded that WTAP-01 proposes promoting to lib with a reload, so extend it with these problem kinds rather than adding a third shape. Longer term, the Server Component pages could read initial data on the server with the generated getLocalStatus, getModelPolicy, getModelProviders, getKeysAndVars and getModels, as AccountPage reads its session, leaving the client panels for interaction. That first needs requestJson to expose the HTTP status as a field (WSHL-03) and service-status' module-private memberClient to be exported.",
+      "sketch": "async function readKeysAndVars(): Promise<Read<KeysAndVars>> { /* fetch, drain refusals, parse; never throws */ }\nconst apply = useCallback((result: Read<KeysAndVars>) => { /* setItems or setProblem */ }, []);\nuseEffect(() => {\n  let active = true;\n  void readKeysAndVars().then((result) => { if (active) apply(result); });\n  return () => { active = false; };\n}, [apply]);\nconst reload = useCallback(async () => apply(await readKeysAndVars()), [apply]);",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "This keeps react-hooks/set-state-in-effect on rather than weakening lint. DH-06 prefers Server Components for the longer-term option. Reads stay per request and no-store, and by contract none of these bodies carries a secret.",
+      "verdict": "revised",
+      "verifierNote": "Both stdin lint probes reproduced (calling load() fails react-hooks/set-state-in-effect; the module-level reader exits 0). Count corrected from 5 to 4 components; memberClient is module-private, so the server-read option needs it exported."
+    },
+    {
+      "id": "WSYS-04",
+      "title": "Loading, unavailable and denied states differ by panel, blur causes and cannot be retried",
+      "dimension": "errors",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 227,
+          "endLine": 228,
+          "note": "bare alert paragraph; loading has role=status"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 219,
+          "endLine": 231,
+          "note": "Card alert; 'Loading models.' has no role"
+        },
+        {
+          "file": "apps/web/components/provider-settings-panel.tsx",
+          "line": 234,
+          "endLine": 246,
+          "note": "Card alert; 'Loading settings.' has no role"
+        },
+        {
+          "file": "apps/web/components/keys-and-vars-panel.tsx",
+          "line": 228,
+          "endLine": 240,
+          "note": "Card alert; 'Loading settings.' has no role"
+        },
+        {
+          "file": "apps/web/app/settings/account/page.tsx",
+          "line": 18,
+          "endLine": 24,
+          "note": "a null session shows 'Sign in', also when the API is down"
+        },
+        {
+          "file": "apps/web/lib/service-status.ts",
+          "line": 51,
+          "endLine": 61,
+          "note": "fetchSession returns null both when signed out and on any failure"
+        },
+        {
+          "file": "apps/web/lib/bff.ts",
+          "line": 53,
+          "endLine": 57,
+          "note": "typed refusal and not_signed_in codes (and service_unavailable at 120) that the panels never read"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 463,
+          "endLine": 472,
+          "note": "one message string: a refusal reads and announces like a success"
+        }
+      ],
+      "occurrences": 5,
+      "evidence": "Three panels show '<X> unavailable. Sign in, and check that the local API is running.' for any non-OK or network failure; only operations tells a 403 apart. Loading reads 'Loading…' with role=status in one panel, and 'Loading models.' or 'Loading settings.' without a role in the others. No failed state offers a retry, and operations' Check again button unmounts with the data when a refresh fails. /settings/models stacks two loading lines or two unavailable cards. Outcome notices (policy 463-472, provider 291-295, keys 262-266, operations 527-531) render success and refusal alike: role=status, plain text, no destructive tone or icon.",
+      "impact": "Users cannot tell signed out, denied and unreachable apart, and must reload the page to recover. A signed-in user whose API is down is told to sign in. Each new panel copies one of four variants.",
+      "recommendation": "Add components/ui/panel-state.tsx. It covers loading (role=status) and the signed_out, denied and unavailable problems (role=alert in a Card, with an icon and an optional Retry). Feed it from the shared reader's result, which maps the BFF codes. Make the outcome notice a {tone, text} pair, and render refusals with role=alert, the destructive tone and an icon. settings.spec.ts:83, 87 and 142 find provider refusals by role=status, so update them in the same change. On the account page, call fetchServiceStatus() beside fetchSession(), as the home page does (app/page.tsx:33-38).",
+      "sketch": "// components/ui/panel-state.tsx\ntype Problem = \"signed_out\" | \"denied\" | \"unavailable\";\nexport function PanelLoading({ what }: { what: string }) { /* <p role=\"status\">Loading {what}.</p> */ }\nexport function PanelProblem({ problem, what, onRetry }: {\n  problem: Problem; what: string; onRetry?: () => void;\n}) { /* Card + CircleAlert + role=\"alert\" + wording per problem + Retry */ }\nexport function Notice({ tone, text }: { tone: \"success\" | \"error\"; text: string }) { /* status or alert */ }",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-06: represent loading, empty, denied, unavailable and retryable states deliberately. DS-03: errors use the destructive tone plus an explicit label or icon. Keep the hooks the browser tests pin (data-state=policy-unavailable and the 403 sentence).",
+      "verdict": "revised",
+      "verifierNote": "Variants, the unmounting Check again and the null-session Sign in confirmed. Added that settings.spec.ts:83, 87 and 142 read refusals by role=status and must move with the role change."
+    },
+    {
+      "id": "WSYS-05",
+      "title": "OperationsPanel is one 377-line function mixing reads, a retention form and eight sections",
+      "dimension": "size",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 158,
+          "endLine": 539,
+          "note": "377 lines, complexity 28 (ESLint)"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 179,
+          "endLine": 180,
+          "note": "a status refresh overwrites the unsaved retention draft"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 333,
+          "endLine": 397,
+          "note": "five fact rows of one shape, with nested ternaries"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 491,
+          "endLine": 534,
+          "note": "the retention form inside the status view"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "One component holds the read and refresh, the retention draft (runDays, receiptDays, message), the verdict, the checks grid, five facts, the jobs chart, delayed schedules, restores, route qualification and retention. Because the draft and the status share one component, Check again runs load(), which resets both retention fields from the server (179-180) and discards typing that was not saved.",
+      "impact": "Every edit lands in a 380-line render with complexity 28, and the draft reset above is the kind of defect this coupling produces.",
+      "recommendation": "Split along the sections that already exist, give the retention form its own draft state, and move formatting into lib (see the types and tests findings). Move the data-field hooks and wording unchanged.",
+      "sketch": "components/operations/\n  operations-panel.tsx          compose; owns useLocalStatus()\n  use-local-status.ts           shared reader, refresh, busy, view state\n  readiness-verdict.tsx         sentence, counts, Check again (233-290)\n  condition-grid.tsx            ConditionTile per check, from a CHECKS table (291-332)\n  operation-facts.tsx           FactRow x5: tracing, backup, OpenRouter, network, jobs (333-397)\n  history-lists.tsx             DelayedSchedules and RestoreHistory (400-455)\n  route-qualification-list.tsx  (460-490), sharing qualificationText with the provider panel\n  retention-form.tsx            own draft, parseDays, sendJson, busy, notice (491-534)",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: small cohesive modules. A behavior-preserving split: the roles, wording and data-* hooks that the operations browser suites read move unchanged. Decision 0021 R1's presentation-only scope applied to that decision's own change only, per its Amended note.",
+      "verdict": "revised",
+      "verifierNote": "377 lines and complexity 28 (eslint.json) and the draft reset at 179-180 confirmed. Rule check corrected: Decision 0021's Amended note limits R1 to its own change, so the hooks stay because the browser suites read them."
+    },
+    {
+      "id": "WSYS-06",
+      "title": "ModelPolicyPanel is 350 lines with draft logic, catalog cards and form rows inline",
+      "dimension": "size",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 118,
+          "endLine": 475,
+          "note": "350 lines; the file is 475"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 233,
+          "endLine": 252,
+          "note": "six derived values computed in render"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 262,
+          "endLine": 318,
+          "note": "approved-model card markup"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 403,
+          "endLine": 411,
+          "note": "inline override onChange that copies and deletes keys"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 62,
+          "note": "SUMMARIZER is declared between helpers, apart from EXECUTOR at 21"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "The component holds the paired read and two near-identical requests. It also holds the draft (defaultProfile, overrides, and dirty through sameForm) and six derived values. On top of that sit the approved-model cards with prices and capabilities, the not-offered alert, the workspace-default row, one override row per role with an inline onChange, and the action bar.",
+      "impact": "Policy rules can only be checked through the db-profile browser suite: what counts as dirty, which choices are offered, and whether a saved choice is no longer offered. Any change to one section means reading and re-testing the whole function.",
+      "recommendation": "Extract the pure policy logic into lib/model-policy.ts with unit tests, and split the view into cards, form rows and actions.",
+      "sketch": "components/settings/model-policy/\n  model-policy-panel.tsx   paired read, compose\n  approved-model-card.tsx  label, availability, prices, capabilities (262-318)\n  role-effect.tsx          the existing RoleEffect (73-116)\n  policy-form.tsx          WorkspaceDefaultRow, RoleOverrideRow per role, PolicyActions (346-462)\n  use-policy-draft.ts      defaultProfile, overrides, setOverride(role, profile | null), dirty, adopt\nlib/model-policy.ts        roleOverrides, sameForm, choices, followingCount, savedChoiceNotOffered,\n                           perMillion, fetchedAt (pure, node:test)",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: small cohesive modules. The roles, wording and data-* hooks that models.spec.ts reads move unchanged. The panel keeps describing only the saved policy (its own comment at 72) and sends expected_version unchanged.",
+      "verdict": "revised",
+      "verifierNote": "350 counted lines, the six derived values and the inline onChange confirmed. Rule check corrected as in WSYS-05: the hooks stay because models.spec.ts reads them, not because of Decision 0021 R1."
+    },
+    {
+      "id": "WSYS-07",
+      "title": "ProviderSettingsPanel mixes the credential flow, status bar and a page link in 222 lines",
+      "dimension": "size",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/provider-settings-panel.tsx",
+          "line": 155,
+          "endLine": 382,
+          "note": "222 lines, complexity 11"
+        },
+        {
+          "file": "apps/web/components/provider-settings-panel.tsx",
+          "line": 86,
+          "endLine": 153,
+          "note": "RouteQualifications, 68 lines; four identical dt/dd grid rows at 114-146"
+        },
+        {
+          "file": "apps/web/components/provider-settings-panel.tsx",
+          "line": 377,
+          "endLine": 379,
+          "note": "page navigation owned by the panel"
+        },
+        {
+          "file": "apps/web/app/settings/models/page.tsx",
+          "line": 9,
+          "endLine": 10,
+          "note": "so the link renders between the two panels"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "One function holds the read, refresh and mutate, plus saveKey with its reset-before-send rule. It also holds the four-cell connection bar, the key form, Validate and Disconnect, two explanatory notes, the qualification cards and a 'Return to your draft' link. On /settings/models that link sits above the model policy section.",
+      "impact": "The security-relevant part (the uncontrolled key field, cleared before the request) is buried among layout, so a reviewer of a credential change has to read the whole screen.",
+      "recommendation": "Once the shared reader and sendJson land, split the view so the key form stands alone, and move the link to the page.",
+      "sketch": "components/settings/provider/\n  provider-settings-panel.tsx  read + compose (about 60 lines once reads and sends are shared)\n  connection-bar.tsx           Source, Authentication, Catalog, Stored version cells (250-289)\n  key-form.tsx                 uncontrolled password field, reset before send (302-333)\n  key-actions.tsx              Validate and Disconnect, each with its own success text (335-373)\n  route-qualifications.tsx     RouteCard + FactRow for the dt/dd rows (86-153)\napp/settings/models/page.tsx   owns the Return to your draft link",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "nextjs.md and DH-06: credentials stay out of props and state. The split keeps the FormData read and form.reset() before the request, and the wording and hooks that settings.spec.ts reads.",
+      "verdict": "revised",
+      "verifierNote": "222 lines, complexity 11 and the 68-line RouteQualifications confirmed. Rule check corrected: wording and hooks stay because settings.spec.ts reads them; Decision 0021 R1 bound only its own change."
+    },
+    {
+      "id": "WSYS-08",
+      "title": "role_overrides casts hide that its values are never checked at runtime",
+      "dimension": "types",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 55,
+          "note": "as Record<string, string>"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 130,
+          "note": "as Record<string, string>"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 250,
+          "endLine": 252,
+          "note": "profile cast to the ModelProfileId union"
+        },
+        {
+          "file": "packages/api-client/src/runtime.ts",
+          "line": 71,
+          "endLine": 78,
+          "note": "only additionalProperties === false is enforced; a schema-valued one is skipped"
+        },
+        {
+          "file": "packages/api-client/src/generated.ts",
+          "line": 2808,
+          "endLine": 2811,
+          "note": "the schema says each value is a ModelProfileId"
+        },
+        {
+          "file": "packages/api-client/src/generated.ts",
+          "line": 8125,
+          "note": "the generated type is Record<string, unknown>"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "```tsx\nconst saved = state.role_overrides as Record<string, string>;   // 55\nsetOverrides(next.role_overrides as Record<string, string>);   // 130\nnotOffered.has(profile as (typeof listed)[number][\"profile\"])  // 251\n```\nparseModelPolicyState passes role_overrides through checkObject. That function validates named properties and rejects extras only when additionalProperties is false, so the $ref to ModelProfileId on each value is never applied. The generator emits Record<string, unknown> for any object without properties (scripts/generate_contracts.py:46-47).",
+      "impact": "A drifted override (a renamed profile, or a number) is accepted by the parser and then trusted by three casts. The form would show it as a selected value with no matching option, and sameForm would compare it as a string.",
+      "recommendation": "Narrow once, in lib/model-policy.ts. roleOverrides(state) checks each key against the roles bound in state.policy.bindings and each value with the generated parseModelProfileId, and returns Partial<Record<ModelRole, ModelProfileId>>. An unknown role or profile throws ContractError, so the panel shows its unavailable state. It never drops or displays the value, because Save sends the whole map and would then delete the server's override. Use it in sameForm, adopt and the not-offered check. The root fix belongs to the api-client runtime and generator (WSHL-01): check schema-valued additionalProperties and emit typed records, then regenerate. Do not edit generated.ts.",
+      "sketch": "import { ContractError } from \"@autobots/api-client/runtime\";\nexport function roleOverrides(state: ModelPolicyState): Partial<Record<ModelRole, ModelProfileId>> {\n  const roles = new Map<string, ModelRole>(state.policy.bindings.map((b) => [b.role, b.role]));\n  const out: Partial<Record<ModelRole, ModelProfileId>> = {};\n  for (const [role, profile] of Object.entries(state.role_overrides)) {\n    const bound = roles.get(role);\n    if (bound === undefined) throw new ContractError(`role_overrides.${role}`, \"not a bound role\");\n    out[bound] = parseModelProfileId(profile); // throws ContractError on drift, never drops it\n  }\n  return out;\n}",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "contracts.md: generated TypeScript consumes the Pydantic/OpenAPI contract, and TypeScript types do not validate JSON. Ground rule: generated files are regenerated, never hand-edited. DH-06: no blanket type assertions.",
+      "verdict": "revised",
+      "verifierNote": "Casts at 55, 130 and 251, checkObject's skip (runtime.ts:71-78) and the generator rule confirmed. Recommendation revised: an unknown role or profile must fail like a contract error, since silently dropping it would make the next Save delete the server's override."
+    },
+    {
+      "id": "WSYS-10",
+      "title": "Display formatting and draft logic sit in client components with no fast tests",
+      "dimension": "tests",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 105,
+          "endLine": 156,
+          "note": "count, gb, valueFor and days"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 349,
+          "note": "'1 hours ago.' for one hour"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 143,
+          "note": "queue counts printed raw, while storage uses Intl at 135"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 276,
+          "endLine": 278,
+          "note": "the worker plural written again, as at 147"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 420,
+          "note": "dates as raw ISO strings, while the policy panel uses locale medium (44-47)"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 32,
+          "endLine": 61,
+          "note": "perMillion, fetchedAt, sameForm"
+        },
+        {
+          "file": "apps/web/components/keys-and-vars-panel.tsx",
+          "line": 37,
+          "endLine": 49,
+          "note": "sourceLabel"
+        },
+        {
+          "file": "apps/web/lib/schema-value.ts",
+          "line": 1,
+          "endLine": 9,
+          "note": "the precedent: 'Pure, so it can be tested without a browser', with tests/unit/schema-value.test.ts"
+        }
+      ],
+      "occurrences": 9,
+      "evidence": "Nine pure helpers are module-private in client components: valueFor, gb, days, perMillion, fetchedAt, sameForm, sourceLabel, and appearance's read and apply. apps/web/tests/unit holds three files, and only schema-value.test.ts covers this area; otherwise the helpers are checked only by Playwright suites in the db profile on a disposable stack. Formatting has already drifted. Plurals are hand-written twice and missing once ('1 hours ago.'). Counts use Intl in one branch and not the next. Dates appear as ISO strings here and as locale text in the policy panel.",
+      "impact": "A wording, rounding or parsing change needs the slowest profile to check, and defects such as days() and the hour plural go unseen until someone reads the screen.",
+      "recommendation": "Move the helpers into lib/ beside schema-value.ts (operations-format.ts, retention.ts, model-policy.ts, and appearance read/apply with injected storage), keep them free of '@/' aliases and other imports that node --test cannot resolve, export them, and add node:test files under apps/web/tests/unit. Register each new file in verify.py's web_unit_tests step, or land WSHL-08's folder discovery first: that step names two files today, so even schema-value.test.ts runs in no profile. Share one plural helper (or Intl.PluralRules) and one count and date formatter across the family. Name parsers and formatters for what they do (parseDays, formatGigabytes, integerFormat).",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06 asks for unit tests of pure and client behavior. Follow the repository's node:test precedent in apps/web/tests/unit rather than adding a runner, which would be a separate tooling decision. AGENTS.md: a test that no profile runs is not evidence.",
+      "verdict": "revised",
+      "verifierNote": "Helpers, the '1 hours ago.' plural and the format drift confirmed. Revised: verify.py:161-162 names its unit files, so schema-value.test.ts runs in no profile, and new tests need that list or WSHL-08's discovery."
+    },
+    {
+      "id": "WSYS-12",
+      "title": "Help text and errors are not tied to their controls; field.tsx offers bare controls only",
+      "dimension": "standards",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/provider-settings-panel.tsx",
+          "line": 306,
+          "endLine": 332,
+          "note": "the disclosure under the key field has no aria-describedby"
+        },
+        {
+          "file": "apps/web/components/keys-and-vars-panel.tsx",
+          "line": 98,
+          "endLine": 140,
+          "note": "label and control assembled by hand in each card"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 497,
+          "endLine": 531,
+          "note": "retention rules and the outcome are not associated with the inputs"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 383,
+          "endLine": 397,
+          "note": "saved source and model are shown beside the select, not as its description"
+        },
+        {
+          "file": "apps/web/components/ui/field.tsx",
+          "line": 13,
+          "endLine": 67,
+          "note": "Input, Textarea, Select and Choice; no Field with description and error"
+        },
+        {
+          "file": "tests/harness/test_shared_form_controls.py",
+          "line": 9,
+          "endLine": 19,
+          "note": "the check stops at raw elements"
+        }
+      ],
+      "occurrences": 6,
+      "evidence": "git grep finds no aria-describedby and no aria-invalid in the 14 files; across apps/web source there are 2 aria-describedby and no aria-invalid. The provider panel's disclosure is a sibling paragraph (328-332): the key goes to this Mac's server and is checked against OpenRouter's key metadata. The retention rule appears only after a failed save, in a status line away from the inputs.",
+      "impact": "A screen-reader user tabbing into the key field or a retention field hears neither the disclosure nor the error that applies to it. Each panel also re-assembles label, control and help with its own spacing.",
+      "recommendation": "Add a Field part to components/ui/field.tsx that takes id, label, description and error, wires htmlFor, aria-describedby and aria-invalid, and renders the shared control as its child. Use it in these five forms. Optionally, extend test_shared_form_controls.py to flag a described control outside Field.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-06: accessible forms; DS-04: labels and disabled states. This builds on the shared controls that the US-11.11 harness check requires.",
+      "verdict": "confirmed",
+      "verifierNote": "Recounted: no aria-describedby or aria-invalid in the 14 files, and 2 aria-describedby with no aria-invalid across app, components and lib; the harness check matches raw elements only. WSHL-12's Label fits the same field.tsx change."
+    },
+    {
+      "id": "WSYS-09",
+      "title": "Operations lookup tables are keyed by string although the contract gives unions",
+      "dimension": "types",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 68,
+          "endLine": 96,
+          "note": "LABELS, ICONS and DOTS declared as Record<string, ...>"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 121,
+          "endLine": 151,
+          "note": "valueFor(name: string): a switch with a default; hold falls through"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 296,
+          "note": "ICONS needs a fallback to Activity"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 308,
+          "note": "LABELS has no fallback, so a missing entry renders an unnamed tile"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 321,
+          "endLine": 327,
+          "note": "valueFor runs twice per tile"
+        },
+        {
+          "file": "apps/web/components/provider-settings-panel.tsx",
+          "line": 19,
+          "endLine": 63,
+          "note": "exhaustive maps keyed by generated unions, the family's model"
+        },
+        {
+          "file": "packages/api-client/src/generated.ts",
+          "line": 8168,
+          "endLine": 8172,
+          "note": "OperationCondition name and state are literal unions"
+        }
+      ],
+      "occurrences": 4,
+      "evidence": "```ts\nconst LABELS: Record<string, string> = { database: \"Database\", ... };\nconst ICONS: Record<string, LucideIcon> = { ... };\nconst DOTS: Record<string, string> = { ok: ..., degraded: ..., unavailable: ... };\nfunction valueFor(name: string, values: Values): string | null { switch (name) { ... default: return null; } }\n```\nThe provider panel, by contrast, declares Record<ProviderStatus[\"auth_status\"], string> and similar maps, so a new enum value fails type checking.",
+      "impact": "When the contract gains a ninth check or renames a state and the client is regenerated, this still compiles, then renders a tile with no name or a default icon. At runtime parseLocalStatus already refuses unknown values. valueFor, at complexity 17, hides which checks have values.",
+      "recommendation": "Key the tables by OperationCondition['name'] and ['state'], and replace the switch with one CHECKS table {label, icon, value(values)}, so the compiler demands an entry per check. Keep CONDITIONS and HOLD_TEXT keyed by string, because code is a free string in the contract. Compute the value once per tile.",
+      "sketch": "type CheckName = OperationCondition[\"name\"];\nconst CHECKS: Record<CheckName, { label: string; icon: LucideIcon;\n    value: (v: OperationValues) => string | null }> = {\n  database: { label: \"Database\", icon: Database, value: databaseValue },\n  hold: { label: \"Hold\", icon: Pause, value: () => null },\n  // one entry per name\n};\nconst DOTS: Record<OperationCondition[\"state\"], string> = { /* ok, degraded, unavailable */ };",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06 and nextjs.md: strict TypeScript over generated API types. The CHECKS table is a UI view mapping, kept separate from the DTO.",
+      "verdict": "revised",
+      "verifierNote": "Tables, switch and double call confirmed. Lowered to low, as WTAP-06 and WCMP-14: parseLocalStatus already rejects an unknown name or state (runtime.ts:106), so the gap is compile-time completeness only."
+    },
+    {
+      "id": "WSYS-11",
+      "title": "Appearance preferences are defined twice: in the control and in the before-paint script",
+      "dimension": "modules",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/appearance-control.tsx",
+          "line": 84,
+          "endLine": 124,
+          "note": "Preference, DEFAULTS, ATTRIBUTE_VALUE, plus read and apply on autobots.<name>"
+        },
+        {
+          "file": "apps/web/app/layout.tsx",
+          "line": 17,
+          "note": "BEFORE_PAINT repeats the four keys and values as literals"
+        },
+        {
+          "file": "apps/web/app/globals.css",
+          "line": 19,
+          "note": "with 23 and 111: CSS keyed by the same attribute values"
+        },
+        {
+          "file": "apps/web/components/run-workspace.tsx",
+          "line": 120,
+          "note": "reads dataset.stream"
+        },
+        {
+          "file": "apps/web/components/appearance-control.tsx",
+          "line": 126,
+          "endLine": 139,
+          "note": "usePreference returns string and (value: string) => void"
+        },
+        {
+          "file": "apps/web/components/appearance-control.tsx",
+          "line": 210,
+          "endLine": 256,
+          "note": "density and motion: the same radio group twice"
+        },
+        {
+          "file": "apps/web/components/notifications-control.tsx",
+          "line": 12,
+          "note": "the same noop subscribe and mounted gate as appearance-control.tsx:8 and 144-148"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "```text\nlayout.tsx:17: ...if(s.getItem(\"autobots.serif\")===\"off\")d.dataset.serif=\"off\";if(s.getItem(\"autobots.density\")===\"compact\")d.dataset.density=\"compact\";...\nappearance-control.tsx:91-96: const ATTRIBUTE_VALUE: Record<Preference, string> = { serif: \"off\", density: \"compact\", motion: \"reduce\", stream: \"off\" };\n```\nThe key prefix, the names and the non-default values live in both files. The values are typed string, so setDensity(\"compat\") compiles.",
+      "impact": "Adding or renaming a preference value in one file breaks the restore before paint, and only the db-profile suites catch it: appearance.spec.ts:422-490 for serif, density and motion, and stream-result.spec.ts:124-134 for stream.",
+      "recommendation": "Create one shared module, the lib/preferences.ts that WSHL-11 also proposes, with one typed PREFERENCES table, the storage key, and read/apply. Build BEFORE_PAINT from it in layout.tsx and use it in the control. Type the values per preference. Extract a PreferenceRadioGroup for the density and motion fieldsets and one useMounted() hook for the two mounted gates; AppearanceControl then drops well under its current 115 lines.",
+      "sketch": "// lib/preferences.ts, imported by app/layout.tsx and the control (one module with WSHL-11)\nexport const PREFERENCES = {\n  serif: { fallback: \"on\", attribute: \"off\" },\n  density: { fallback: \"comfortable\", attribute: \"compact\" },\n  motion: { fallback: \"system\", attribute: \"reduce\" },\n  stream: { fallback: \"on\", attribute: \"off\" },\n} as const;\nexport type Preference = keyof typeof PREFERENCES;\nexport type PreferenceValue<P extends Preference> = (typeof PREFERENCES)[P][\"fallback\" | \"attribute\"];\nexport function beforePaintScript(): string { /* theme guard + one statement per entry */ }\n// components/ui/preference-radio-group.tsx and lib/use-mounted.ts",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "DS-02: a dedicated nonsecret appearance key, applied before paint. Keys, values and before-paint behavior stay as they are. DH-06 keeps theme preference separate from credentials and agent state.",
+      "verdict": "revised",
+      "verifierNote": "Duplicated keys and values, string-typed setters and the repeated mounted gate confirmed. Lowered to low, as XDUP-19: db-profile suites restore all four keys through the script. One change with WSHL-11."
+    },
+    {
+      "id": "WSYS-13",
+      "title": "The provider panel says 'Saved.' after Validate and Disconnect",
+      "dimension": "functions",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/provider-settings-panel.tsx",
+          "line": 209,
+          "endLine": 211,
+          "note": "mutate has one success message"
+        },
+        {
+          "file": "apps/web/components/provider-settings-panel.tsx",
+          "line": 340,
+          "endLine": 345,
+          "note": "Validate"
+        },
+        {
+          "file": "apps/web/components/provider-settings-panel.tsx",
+          "line": 353,
+          "endLine": 361,
+          "note": "Disconnect"
+        },
+        {
+          "file": "apps/web/tests/browser/settings.spec.ts",
+          "line": 218,
+          "endLine": 219,
+          "note": "pins 'Saved.' after Validate"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "mutate(path, method, body?) ends every 2xx with setMessage(\"Saved.\"). Validate and Disconnect both call it, so a successful validation or removal is announced as a save, and settings.spec.ts:219 asserts that text.",
+      "impact": "Users are told something was saved when nothing was written (Validate) or when a key was removed (Disconnect). The keys panel already distinguishes Saved from Removed (218).",
+      "recommendation": "Pass the success wording per action through the shared mutation helper (for example 'The key validated.' and 'Disconnected.'), and update the test in the same change.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "none",
+      "verdict": "confirmed",
+      "verifierNote": "mutate's single 'Saved.' (211), Validate (340-345), Disconnect (353-361) and settings.spec.ts:219 asserting 'Saved.' after Validate confirmed."
+    },
+    {
+      "id": "WSYS-14",
+      "title": "ItemCard branches on specific item names, and one busy flag relabels every card",
+      "dimension": "size",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/keys-and-vars-panel.tsx",
+          "line": 51,
+          "endLine": 160,
+          "note": "109 lines, complexity 15"
+        },
+        {
+          "file": "apps/web/components/keys-and-vars-panel.tsx",
+          "line": 99,
+          "endLine": 103,
+          "note": "nested ternary for the label"
+        },
+        {
+          "file": "apps/web/components/keys-and-vars-panel.tsx",
+          "line": 106,
+          "note": "browser_executor gets a Select"
+        },
+        {
+          "file": "apps/web/components/keys-and-vars-panel.tsx",
+          "line": 126,
+          "note": "github_repository gets a placeholder"
+        },
+        {
+          "file": "apps/web/components/keys-and-vars-panel.tsx",
+          "line": 138,
+          "note": "every card reads 'Saving' while any one of them saves"
+        },
+        {
+          "file": "apps/web/components/keys-and-vars-panel.tsx",
+          "line": 162,
+          "endLine": 281,
+          "note": "KeysAndVarsPanel, 115 lines, mostly the duplicated read and mutate"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "The generic card switches its control on item.name === \"browser_executor\" and its placeholder on item.name === \"github_repository\". It picks its label through a nested ternary and receives the panel-wide busy flag, so all five Save buttons say 'Saving' during one request.",
+      "impact": "Each new key or var with a different control adds another name check to a card already at complexity 15.",
+      "recommendation": "Describe each item's field in a table keyed by Name, split the card, and track which item is pending.",
+      "sketch": "const FIELDS: Record<Name, { control: \"toggle\" } | { control: \"text\"; placeholder?: string }> = {\n  tavily: { control: \"text\" }, jina: { control: \"text\" }, github_token: { control: \"text\" },\n  github_repository: { control: \"text\", placeholder: \"owner/name\" },\n  browser_executor: { control: \"toggle\" },\n};\n// ItemCard = ItemSummary (title, uses, source, value) + ItemForm (label from kind and source,\n// control from FIELDS) + RemoveSaved. The panel keeps pending: Name | null instead of busy.",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Keeps the secret field's reset-before-send rule (65-72), and a secret's value is still never rendered (88-95).",
+      "verdict": "confirmed",
+      "verifierNote": "109 lines and complexity 15 (eslint.json), both name checks and the panel-wide busy flag confirmed."
+    },
+    {
+      "id": "WSYS-15",
+      "title": "The settings section layout is copied by hand, with drifting grids",
+      "dimension": "duplication",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/app/settings/page.tsx",
+          "line": 10,
+          "endLine": 24,
+          "note": "minmax(0,240px) column, gap-7, 12.5px description"
+        },
+        {
+          "file": "apps/web/app/settings/notifications/page.tsx",
+          "line": 12,
+          "endLine": 25,
+          "note": "the same block"
+        },
+        {
+          "file": "apps/web/app/settings/account/page.tsx",
+          "line": 27,
+          "endLine": 42,
+          "note": "260px column, gap-4, 13px description"
+        },
+        {
+          "file": "apps/web/app/settings/account/page.tsx",
+          "line": 43,
+          "endLine": 66,
+          "note": "a second copy on the same page"
+        }
+      ],
+      "occurrences": 4,
+      "evidence": "settings/page.tsx:12 and notifications/page.tsx:14 use md:grid-cols-[minmax(0,240px)_minmax(0,1fr)] md:gap-7, while account/page.tsx:29 and 45 use md:grid-cols-[260px_1fr] with gap-4. settings/page.tsx:4 cites Decision 0021: 'one settings section, a label column on the left and its control on the right'.",
+      "impact": "The label column is 240px on two pages and 260px on a third, and each new settings page copies one of the variants. The copies are also why AccountPage crosses the 60-line lead (62 lines).",
+      "recommendation": "Add a SettingsSection component (id, title, description, children) that implements the Decision 0021 layout once, and use it on these pages.",
+      "sketch": "export function SettingsSection({ id, title, description, children }: {\n  id: string; title: string; description?: ReactNode; children: ReactNode;\n}) {\n  return (\n    <section aria-labelledby={id} className={SECTION_GRID}>\n      <div className=\"space-y-1\"><h2 id={id} className=\"text-sm font-semibold\">{title}</h2>{description}</div>\n      {children}\n    </section>\n  );\n}",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "The layout that the comment at settings/page.tsx:4 describes for Decision 0021's Studio look; the component encodes it once. Settling on 240px or 260px changes one page, so check it in both themes (DS-05).",
+      "verdict": "revised",
+      "verifierNote": "Grids confirmed (240px with md:gap-7 at settings/page.tsx:12 and notifications/page.tsx:14; 260px with gap-4 at account/page.tsx:29 and 45). Rule check corrected: Decision 0021 adopts the Studio look but does not itself state this layout."
+    },
+    {
+      "id": "WSYS-16",
+      "title": "Route qualification and status dots are drawn twice, with different words and sizes",
+      "dimension": "duplication",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 467,
+          "endLine": 487,
+          "note": "'Tested <date>, with limits.' or 'Not qualified.'"
+        },
+        {
+          "file": "apps/web/components/provider-settings-panel.tsx",
+          "line": 39,
+          "endLine": 49,
+          "note": "'Qualified, with the limits below' or 'Not qualified'"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 92,
+          "endLine": 96,
+          "note": "DOTS, size-1.5, used at 310-316"
+        },
+        {
+          "file": "apps/web/components/provider-settings-panel.tsx",
+          "line": 51,
+          "endLine": 80,
+          "note": "StatusDot, size-[7px], a ring for idle"
+        },
+        {
+          "file": "apps/web/components/ui/badge.tsx",
+          "line": 41,
+          "endLine": 43,
+          "note": "a third dot inside Badge"
+        }
+      ],
+      "occurrences": 4,
+      "evidence": "Both panels render RouteQualification[] (operations from LocalStatus.route_qualifications, the provider panel from ProviderStatus.qualification), each with its own status wording. Each also draws its own decorative dot with its own tone map and size, next to the dot that Badge already offers.",
+      "impact": "The same qualification reads differently on two screens, and a change to dot tone or size has three places to go.",
+      "recommendation": "Share one qualificationText(route) and one StatusDot primitive with a tone prop in components/ui, used by both panels and by Badge.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DS-03 and Decision 0021 R4: the words carry the meaning and the dot only repeats it; both stay.",
+      "verdict": "confirmed",
+      "verifierNote": "Both wordings and the three dots (operations size-1.5, provider size-[7px] with an idle ring, Badge's size-1.5) confirmed."
+    },
+    {
+      "id": "WSYS-17",
+      "title": "Four settings pages have no document title",
+      "dimension": "standards",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/app/settings/page.tsx",
+          "line": 6,
+          "note": "no metadata"
+        },
+        {
+          "file": "apps/web/app/settings/account/page.tsx",
+          "line": 13,
+          "note": "no metadata"
+        },
+        {
+          "file": "apps/web/app/settings/keys-and-vars/page.tsx",
+          "line": 4,
+          "note": "no metadata"
+        },
+        {
+          "file": "apps/web/app/settings/models/page.tsx",
+          "line": 5,
+          "note": "no metadata"
+        },
+        {
+          "file": "apps/web/app/settings/data/page.tsx",
+          "line": 6,
+          "note": "sibling pages export metadata"
+        },
+        {
+          "file": "apps/web/app/layout.tsx",
+          "line": 9,
+          "endLine": 11,
+          "note": "root title 'Autobots', no template"
+        }
+      ],
+      "occurrences": 4,
+      "evidence": "Settings, Account, Keys & vars and Models export no metadata, while Data, Keyboard, Notifications and Operations do. The root layout sets the title 'Autobots' with no template, so all four of those tabs read 'Autobots'.",
+      "impact": "Tabs, history and screen readers cannot tell these pages apart (WCAG 2.4.2), and the convention is inconsistent within one section.",
+      "recommendation": "Export metadata with a title from each page, and give the root layout a title template such as '%s · Autobots' (the web-shell area owns that file).",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "none",
+      "verdict": "confirmed",
+      "verifierNote": "Four pages lack metadata while Data, Keyboard, Notifications and Operations export it; the root title has no template, and no browser spec asserts a title."
+    },
+    {
+      "id": "WSYS-18",
+      "title": "UI copy restates server rules that can change without it",
+      "dimension": "duplication",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 361,
+          "endLine": 363,
+          "note": "'Built-in default (Sol for researcher, Terra otherwise)'"
+        },
+        {
+          "file": "services/agent/src/autobots/domain/models.py",
+          "line": 102,
+          "endLine": 105,
+          "note": "Sol for researcher only once Sol is offered"
+        },
+        {
+          "file": "apps/web/components/keys-and-vars-panel.tsx",
+          "line": 27,
+          "endLine": 35,
+          "note": "tool names per key"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/tavily.py",
+          "line": 219,
+          "note": "the tool titles are defined in the adapters"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "The option label hardcodes the built-in default rule but drops its condition: builtin_default returns Sol for researcher only while Sol is offered (models.py:103-105). USES repeats the Tavily and Jina tool titles that the adapters define.",
+      "impact": "If Sol stops being offered or a tool is renamed, these screens describe something the server no longer does, and nothing fails.",
+      "recommendation": "Derive the text from API data, or word it without restating the rule ('Built-in default for each role'). The bindings already carry each role's resolved model, and a built-in default per role could be added to ModelPolicyState. For USES, prefer catalog data where the API exposes it.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: avoid duplicated business rules. model-gateway.md: researcher defaults to Sol once Sol is offered; the rule stays on the server.",
+      "verdict": "confirmed",
+      "verifierNote": "builtin_default gives Sol only while Sol is offered (models.py:102-105); Sol is offered today (models.py:72), so the label is right now and would drift silently."
+    },
+    {
+      "id": "WSYS-19",
+      "title": "The theme preview copies eight Luma values outside the single-definition check",
+      "dimension": "standards",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/appearance-control.tsx",
+          "line": 13,
+          "endLine": 26,
+          "note": "eight oklch() literals"
+        },
+        {
+          "file": "apps/web/tests/browser/appearance.spec.ts",
+          "line": 173,
+          "endLine": 182,
+          "note": "checks only globals.css for oklch("
+        },
+        {
+          "file": "docs/design/luma.css",
+          "line": 37,
+          "note": "the values match today (lines 2, 17, 26, 28, 37, 47, 60, 62)"
+        }
+      ],
+      "occurrences": 8,
+      "evidence": "PREVIEWS hardcodes bg-[oklch(0.145_0_0)] and seven more, with a comment explaining that a light preview cannot inherit :root inside a dark page. These are the only oklch() literals in apps/web source (two dialog backdrops use Tailwind's bg-black), and the single-definition test only asserts that globals.css has none.",
+      "impact": "The risk is low today because Decision 0021 R2 freezes luma.css, but nothing fails if the copy and the canonical file ever diverge.",
+      "recommendation": "Extend the single-definition test to compare each PREVIEWS swatch with tokens(':root') and tokens('.dark'). Alternatively, draw the dark half inside an element with the .dark class using semantic utilities, so only the light half needs literals.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DS-01: a single maintained token definition, consumed deterministically. Decision 0021 R2 and R3 keep luma.css the only palette.",
+      "verdict": "revised",
+      "verifierNote": "Values match luma.css lines 2, 17, 26, 28, 37, 47, 60 and 62, and the test reads only globals.css. Wording narrowed to oklch() literals, since two dialog backdrops use bg-black."
+    },
+    {
+      "id": "WSYS-20",
+      "title": "Font sizes are arbitrary pixel values instead of a named scale",
+      "dimension": "naming",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 103,
+          "note": "text-[13px]"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 260,
+          "note": "text-[21px]"
+        },
+        {
+          "file": "apps/web/components/operations-panel.tsx",
+          "line": 318,
+          "note": "text-[12.5px]"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 83,
+          "note": "text-[13.5px]"
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 307,
+          "note": "text-[11.5px]"
+        },
+        {
+          "file": "apps/web/components/provider-settings-panel.tsx",
+          "line": 97,
+          "note": "text-[12.5px]"
+        },
+        {
+          "file": "apps/web/components/keys-and-vars-panel.tsx",
+          "line": 83,
+          "note": "text-[12.5px]"
+        },
+        {
+          "file": "apps/web/app/settings/account/page.tsx",
+          "line": 35,
+          "note": "text-[13px]"
+        }
+      ],
+      "occurrences": 39,
+      "evidence": "git grep -o 'text-\\[[0-9.]*px\\]' finds 39 in the 14 files, with 7 sizes: 12.5px x17, 13px x13, 13.5px x4, 12px x2, and one each of 11.5px, 15px and 21px. Across apps/web/app and components it finds 212, with 13 sizes.",
+      "impact": "Choosing between 12.5px, 13px and 13.5px is a guess on every new line, and the Studio scale cannot be adjusted in one place.",
+      "recommendation": "Name the sizes the Studio screens use as @theme font-size tokens in globals.css (for example meta, row and row-strong), and replace literals as files are touched. Add a harness grep that ratchets the count down.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DS-03: consistent typography. Font-size tokens leave luma.css and the no-color-literal rule untouched (Decision 0021 R2 to R4).",
+      "verdict": "confirmed",
+      "verifierNote": "Recounted with git grep -ohE: 39 in the 14 files (7 sizes) and 212 in 39 files across app and components (13 sizes). WSHL-13 owns the shared scale."
+    }
+  ],
+  "rejected": [],
+  "notCovered": "This was a static review only. No browser suite, typecheck, build or app run was performed, so the unhandled rejections and the connection-hold rationale come from reading the code, not from observation. The only commands run were two ESLint probes on stdin against a modified keys-and-vars panel (no file written) and the read-only harness check tests/harness/test_shared_form_controls.py; scripts/verify.py was not run. The PRD-Studio requirement texts (OP, MD, SE, PK) were not read, so cited IDs were judged for clarity, not conformance. Some context files were read only in part: PRD-Development-Harness.md (DH-03 to DH-06), metrics.md (sections 1 to 3, 7 and 8), apps/web/lib/bff.ts (lines 1-140), the openings of apps/web/app/page.tsx, data-summary.tsx and notifications-control.tsx, Decision 0021, and the generated types and Python contracts behind these screens. Components that the settings pages render from other areas (settings-nav, sign-out-button, data-summary, notifications-control, jobs-chart) were not reviewed. Contrast, focus and both themes (DS-04, DS-05) need rendered checks and were not assessed."
+}

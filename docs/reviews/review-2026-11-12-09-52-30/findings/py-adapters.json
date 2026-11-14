@@ -1,0 +1,1185 @@
+{
+  "schema": "autobots.code-review/v1",
+  "area": "py-adapters",
+  "title": "Python: adapters",
+  "kind": "area",
+  "timestamp": "2026-11-12-09-52-30",
+  "revision": "156534da0bd5b19417f05d313077d767804b175b",
+  "summary": "The 22 adapter files (4,103 lines) pass the service's ruff, format and mypy-strict gates and contain practices worth spreading: failure codes that say whether an external write certainly did not happen, injectable transports and resolvers tested with sockets blocked, per-attempt credentials, a fail-closed OpenRouter factory, one URL guard and a fenced checkpointer. The cost sits in three hotspots. Each tool module is one factory closure of 68 to 226 lines. github_pull_request_tool's complexity of 37 is the sum of 13 nested functions, the largest of which is 62 lines. Request, status and reply handling is re-implemented for each provider and has drifted: three refused-status sets, two UnclearReply classes, six client constructors with different proxy and timeout defaults, and untyped JSON replies. loop_middleware.py (674 lines) holds model-route and stop policy that application code imports back; its _admitted_call passes state through four lists and treats any ValueError as a lost lease. browser_executor.py packs five concerns into one file covered by the qualification fingerprint. Two defects were reproduced in memory. First, the live-result tap raises on malformed save_artifact arguments, which stops a paid reply as partial_stream or uncertain_acceptance, depending on when the tap flushes. Second, a date-only `since` crashes github_list_pull_requests. Reading also found three more problems: the PR connector resets approvals with inline SQL outside a transaction and without the lease, the URL guard lets httpx resolve a name again after checking it (certificate verification, not the guard, is what stops a rebound request), and the worker converts reported charges with float arithmetic. Apart from those two reproductions, the review is static.",
+  "scores": [
+    {
+      "dimension": "standards",
+      "score": 3,
+      "why": "Ruff, format and mypy strict pass on all 22 files. But some DH-06 requirements are met unevenly (lease-fenced writes, trust-boundary validation, client lifecycles, exact money), and the rule path scopes miss loop_middleware."
+    },
+    {
+      "dimension": "modules",
+      "score": 2,
+      "why": "Approval state is written from a GitHub adapter, application imports loop policy back from adapters, and a 500-line fingerprinted browser module all add recurring cost. models/, url_guard and checkpoints are cohesive."
+    },
+    {
+      "dimension": "size",
+      "score": 3,
+      "why": "There are seven factory closures of 68 to 226 lines and two files over 300 lines, though each nested handler is small (the largest, open_pull_request, is 62 lines)."
+    },
+    {
+      "dimension": "functions",
+      "score": 3,
+      "why": "Handlers are mostly single-purpose. _admitted_call passes state through four mutable lists, and open_pull_request chains six steps."
+    },
+    {
+      "dimension": "structure",
+      "score": 3,
+      "why": "The flat adapters/ folder mixes providers, LangChain middleware, a Docker executor and a sidecar. DH-03's graphs/ and adapters/persistence/ don't exist."
+    },
+    {
+      "dimension": "approach",
+      "score": 3,
+      "why": "Per-attempt keys, injected transports and certainty-aware failures are strong. Against that, the URL guard resolves DNS twice, clients are built six ways, and GitHub reads resolve the target per request."
+    },
+    {
+      "dimension": "comments",
+      "score": 4,
+      "why": "Module docstrings cite decisions and comments explain why. Two docstrings promise more than the code delivers (result_stream, url_guard)."
+    },
+    {
+      "dimension": "types",
+      "score": 3,
+      "why": "mypy strict passes, but middleware hooks, connections and every provider reply are Any, and ToolDefinition keywords are passed through dict[str, Any] splats."
+    },
+    {
+      "dimension": "errors",
+      "score": 3,
+      "why": "Typed codes with explicit certainty are a model for the repository. They are undercut by a tap that turns parse errors into uncertain calls, ValueError used as a signal, and drifting status maps."
+    },
+    {
+      "dimension": "tests",
+      "score": 3,
+      "why": "Every adapter test uses fake transports with sockets blocked. There are no fast tests for the PR connector, the gateway middleware or storage, and the parsers have no malformed-input cases."
+    },
+    {
+      "dimension": "maintainability",
+      "score": 3,
+      "why": "Small, well-commented helpers surround three hotspots (the PR connector, the loop middleware and the browser executor) that need planned refactors."
+    }
+  ],
+  "strengths": [
+    {
+      "title": "Failure codes that state certainty",
+      "evidence": "Effectful adapters raise ToolFailed only when the destination proves nothing happened, and leave every other outcome unknown for a readback. See services/agent/src/autobots/adapters/github_issues.py:44-45 and 180-186 (connection never opened, the refused set, any other status is UnclearReply) and github_pulls.py:175-184. Readbacks raise NotDelivered only after the settle waits (github_issues.py:48-52, 189-212). The gateway contract they follow is written at application/tool_gateway.py:24-29."
+    },
+    {
+      "title": "Every network seam is injectable, and tests run with sockets blocked",
+      "evidence": "Transports, resolvers, environ, clocks and waits are parameters: tavily.py:42-46, jina.py:42-46, market_data.py:78-80, github_issues.py:145-150, url_guard.py:90-98 and egress_proxy.py:137-143. services/agent/tests/conftest.py:22-27 blocks connect and getaddrinfo for the whole session, and the adapter tests use httpx.MockTransport."
+    },
+    {
+      "title": "Credentials live for one attempt and one client",
+      "evidence": "provider_http.py:1-8 and 28-40 resolve a key per attempt and name only the credential on failure. github_issues.py:75-98 pins writes and readbacks to the repository the approval recorded. models/factory.py:90-107 hands a SecretStr to one prepared client."
+    },
+    {
+      "title": "A fail-closed OpenRouter factory and catalog",
+      "evidence": "models/factory.py:22-64 refuses forbidden or unsupported options instead of dropping them. Lines 110-115 turn SDK retries off and set a timeout above the loop's bound, pinned by services/agent/tests/test_model_attempts.py:297-298. models/catalog.py:45-62 and 133-149 price with Decimal ceilings and refuse stale, future-dated, ambiguous or drifted entries without substituting a model."
+    },
+    {
+      "title": "One URL guard with typed refusals, and a proxy that pins its address",
+      "evidence": "url_guard.py:51-79 and 107-153 check https only, userinfo, length, public DNS answers, every redirect, size and time, each with a typed code. Tavily, Jina and store_remote_file share the guard. The egress proxy connects to the address it checked (egress_proxy.py:73-99, 156-162)."
+    },
+    {
+      "title": "Streaming without weakening tool-call validation",
+      "evidence": "loop_middleware.py:175-205 re-parses each streamed tool call so a cut-off argument stays an invalid call (tested at services/agent/tests/test_result_stream.py:159-166). tavily.py:37-38 and 53 merge the no-inference options last, so no caller can turn provider-side generation on."
+    },
+    {
+      "title": "Comments that record why, citing the decision",
+      "evidence": "github_issues.py:48-52 explains the readback waits by pointing to a live run; models/catalog.py:13-17 states what RESERVED_PROMPT_TOKENS can't catch; models/factory.py:110-115 explains why SDK retries are off; url_guard.py:130-132 explains why the peer is checked again; browser_executor.py:267 records a Docker counting quirk."
+    },
+    {
+      "title": "A fenced checkpointer tied to its qualified stack",
+      "evidence": "checkpoints.py:59-77 sets the lease generation on the checkpointer's own connection so the database refuses stale writes. Lines 21-47 fingerprint the adapter release, its migrations and the SQL it relies on."
+    }
+  ],
+  "findings": [
+    {
+      "id": "PADP-01",
+      "title": "The live-result tap's JSON reader can stop a paid reply as partial_stream or uncertain_acceptance",
+      "dimension": "errors",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/result_stream.py",
+          "line": 196,
+          "endLine": 205,
+          "note": "flush parses every save_artifact call before checking its path, and nothing catches the parser"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/result_stream.py",
+          "line": 57,
+          "endLine": 91,
+          "note": "_read_string raises through json.loads (66, 91) and int(..., 16) (73)"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/result_stream.py",
+          "line": 7,
+          "endLine": 8,
+          "note": "Docstring: a failure here never stops the run"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/result_stream.py",
+          "line": 241,
+          "endLine": 246,
+          "note": "Only send failures are caught"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 152,
+          "endLine": 171,
+          "note": "_streamed turns any exception after the first chunk into PARTIAL_STREAM"
+        },
+        {
+          "file": "services/agent/src/autobots/application/goal_loop.py",
+          "line": 359,
+          "endLine": 361,
+          "note": "Every goal run sets a tap"
+        },
+        {
+          "file": "services/agent/tests/test_result_stream.py",
+          "line": 145,
+          "note": "Only a failing send is tested"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "flush parses each save_artifact call before checking its path, and nothing catches the parser. _streamed then converts any exception raised after the first chunk:\n```\ncall.changed = False\nfields, growing = partial_object(call.arguments)        # result_stream.py:201-202\n...\nexcept Exception:\n    if assembled is not None:\n        raise ProviderFailure(FailureClass.PARTIAL_STREAM) from None   # loop_middleware.py:163-165\n```\nReproduced in memory with the service venv, using a fake stream and a fake notify and no database or network. A save_artifact call whose content holds a raw newline gives one invalid tool call without a tap. With a tap it gives ProviderFailure(partial_stream) when the bad text arrives in a feed that flushes, and a bare JSONDecodeError out of tap.finish() in the finally clause when it arrives inside the 0.15-second coalescing window; dispatch then classifies that one as uncertain_acceptance. partial_object also raises JSONDecodeError on an invalid escape such as backslash-q, and ValueError on backslash-u followed by non-hex characters.",
+      "impact": "Every goal run sets a tap. Without the tap, a reply with a malformed tool call gets an invalid-tool-call message and the model can try again. With the tap, the call is recorded as uncertain (partial_stream or uncertain_acceptance, depending on when the tap flushes): the reservation stays open for reconciliation and the run stops. The module's own invariant, 'A failure here never stops the run', holds only for send failures. Parsing happens before the outputs/ path check, so any save_artifact call can trigger it.",
+      "recommendation": "Make the tap total. In flush, catch ValueError (JSONDecodeError is a subclass) around partial_object and stop streaming that call. In _streamed, call tap.begin, feed and finish through a helper that logs result_text.unavailable once, disables the tap and never raises. Add tests with a tap present for a raw control character, an invalid escape and a bad unicode escape; each should assert that the reply comes back with an invalid tool call. Add one more test showing that an error in finish() doesn't escape. Reword the 'tolerant reader' comment at line 48 to say it tolerates incomplete input, not malformed input.",
+      "sketch": "# result_stream.py\nasync def flush(self) -> None:\n    for call in self._calls.values():\n        if call.name != RESULT_TOOL or not call.changed or call.unreadable:\n            continue\n        call.changed = False\n        try:\n            fields, growing = partial_object(call.arguments)\n        except ValueError:      # malformed, not just incomplete: the stored artifact stays the record\n            call.unreadable = True\n            continue\n        ...\n# loop_middleware._streamed\nawait _tap_safely(tap.feed, chunk)   # any Exception: logged once, tap disabled, nothing raised",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "Decision 0022 D4 and US-15.24 (the module docstring) say a tap failure never stops the run; the fix enforces that. Real stream failures keep the model-gateway classification (partial_stream, reconciled, not retried), and tests stay on fake streams (python-worker rule).",
+      "verdict": "revised",
+      "verifierNote": "Reproduced both paths in memory with fakes: a parse error during feed gives partial_stream, and one inside finish() escapes as JSONDecodeError that dispatch classifies uncertain_acceptance; severity stays high."
+    },
+    {
+      "id": "PADP-02",
+      "title": "The pull-request connector rewrites approval state with inline SQL, outside a transaction and without the lease",
+      "dimension": "modules",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/github_pulls.py",
+          "line": 122,
+          "endLine": 154,
+          "note": "approved_detail and return_to_review: four writes, no transaction, no lease check"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_pulls.py",
+          "line": 194,
+          "endLine": 199,
+          "note": "Called when the base branch moved"
+        },
+        {
+          "file": "services/agent/src/autobots/application/approvals.py",
+          "line": 183,
+          "endLine": 199,
+          "note": "The owning module's re-request, inside approval_gate's transaction (109)"
+        },
+        {
+          "file": "services/agent/src/autobots/application/approvals.py",
+          "line": 25,
+          "note": "DEFAULT_TTL_SECONDS = 86_400; the adapter hard-codes interval '1 day'"
+        },
+        {
+          "file": "services/agent/src/autobots/application/tools.py",
+          "line": 76,
+          "endLine": 77,
+          "note": "Handler-side writes take hold_lease inside a transaction"
+        },
+        {
+          "file": "services/agent/src/autobots/application/runs.py",
+          "line": 80,
+          "endLine": 93,
+          "note": "append_event is two statements; the gapless sequence relies on the caller's transaction"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/worker.py",
+          "line": 135,
+          "endLine": 136,
+          "note": "The step connection the tool context runs on is autocommit"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "When the base has moved, return_to_review runs four separate statements on the worker's autocommit connection, with no hold_lease or hold_running first:\n```\nawait context.connection.execute(\n    \"update app_private.tool_receipts set reconciled_at = now() where operation_id = %s\", ...)\ncursor = await context.connection.execute(\n    \"update public.approval_requests set status = 'pending', decided_by = null, \"\n    \"decided_at = null, review_detail = %s, \"\n    \"expires_at = clock_timestamp() + interval '1 day' \" ...)\n```\nIt then calls append_event, which updates runs.event_sequence and inserts into run_events. Elsewhere, a handler-side write takes the lease inside a transaction (tools.py:76-77), and approval_gate's own re-request runs in one transaction with a TTL parameter.",
+      "impact": "The approvals state machine is split between application/approvals.py and a GitHub adapter. Each statement commits on its own. A crash or cancel between them can leave the receipt reconciled while the approval stays approved, or skip a run_events sequence number that append_event documents as gapless. A worker that lost its lease during the GitHub reads can still reset a person's decision, which the python-worker rule forbids. The TTL duplicates DEFAULT_TTL_SECONDS, and any new approval column or rule must also be remembered in this adapter.",
+      "recommendation": "Move the transition into application/approvals.py as one function that runs in a single transaction. It takes the lease first (hold_lease, as write_run_file does), reconciles the receipt, resets the approval with the new detail and the standard TTL, and appends approval.requested. tool_gateway imports approvals, so move hold_lease into application/worker_leases.py to avoid an import cycle. The adapter keeps only the reads that build the new diff, then raises base_moved. Move approved_detail and github_issues.approved_repository next to the new function as read helpers. Before the move, add a stale-generation case to tests/db/pull_request_check.py next to its base-moved and re-approval cases.",
+      "sketch": "# application/worker_leases.py (moved from tool_gateway, which imports approvals)\nasync def hold_lease(connection, run_id: UUID, generation: int) -> None: ...\n\n# application/approvals.py\nasync def rerequest_review(connection, *, run_id: UUID, generation: int, operation_id: str,\n                           tool_id: str, detail: dict[str, Any],\n                           ttl_seconds: int = DEFAULT_TTL_SECONDS) -> None:\n    \"\"\"Decision 0022 D15: nothing was sent, so a person sees the diff against the new head.\"\"\"\n    async with connection.transaction():\n        await hold_lease(connection, run_id, generation)\n        await _mark_receipt_reconciled(connection, operation_id)\n        approval_id = await _reset_to_pending(connection, operation_id, detail, ttl_seconds)\n        await append_event(connection, run_id, _requested(approval_id, tool_id))\n\nasync def approved_review_detail(connection, operation_id: str) -> dict[str, Any]: ...\n\n# adapters/github/pulls.py, when the base moved\nawait rerequest_review(ctx.connection, run_id=ctx.scope.run_id, generation=ctx.scope.generation, ...)\nraise ToolFailed(\"base_moved\")",
+      "effort": "M",
+      "risk": "high",
+      "ruleCheck": "python-worker rule: enforce leases and fencing on product writes and persist outbox events. SP-010: transitions need guards and an atomic update with their event. Decision 0022 D15's behavior (return to pending with a diff against the new head) is kept, only moved into the module that owns approvals. Nothing in the approval binding is relaxed.",
+      "verdict": "revised",
+      "verifierNote": "Four unfenced autocommit statements and the hard-coded day confirmed; the tool context's step connection is opened autocommit at operations/worker.py:135-136, not line 79 (the heartbeat), so that location was corrected."
+    },
+    {
+      "id": "PADP-03",
+      "title": "Each tool module is one factory closure of 68 to 226 lines, which hides its helpers from per-function metrics and tests",
+      "dimension": "size",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/github_pulls.py",
+          "line": 68,
+          "endLine": 293,
+          "note": "13 nested functions; C901 37 and 92 statements are their sum; largest handler is open_pull_request at 186-247"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_reads.py",
+          "line": 61,
+          "endLine": 272,
+          "note": "5 nested handlers; C901 18"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/tavily.py",
+          "line": 42,
+          "endLine": 229,
+          "note": "7 nested functions; tool() at 148 takes 9 positional arguments"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/market_data.py",
+          "line": 78,
+          "endLine": 211,
+          "note": "C901 15 across two handlers"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/jina.py",
+          "line": 42,
+          "endLine": 152
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_issues.py",
+          "line": 145,
+          "endLine": 239,
+          "note": "Three 'if version == 2' expressions and a getattr on the input union (173)"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/remote_files.py",
+          "line": 29,
+          "endLine": 96
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_reads.py",
+          "line": 204,
+          "endLine": 213,
+          "note": "common: dict[str, Any] splatted into ToolDefinition; also jina.py:112, market_data.py:167, remote_files.py:74"
+        }
+      ],
+      "occurrences": 7,
+      "evidence": "```\ndef github_pull_request_tool(\n    transport: httpx.AsyncBaseTransport | None = None,\n    environ: Mapping[str, str] = os.environ,\n) -> ToolDefinition:\n    async def read(http: httpx.AsyncClient, path: str, params: Any = None) -> httpx.Response:\n    ...                                     # 12 more nested functions, 226 lines in all\nGITHUB_PULL_REQUEST = github_pull_request_tool()\n```\nThe same shape appears in github_read_tools (212 lines), tavily_tools (188), market_tools (134), jina_tools (111), github_issue_tool (95) and store_remote_file_tool (68), 1,034 lines in all. Ruff's C901 counts nested bodies, so the scores 37, 18, 15 and 12 are totals for each container. An AST count per closure puts the largest handlers at open_pull_request (62 lines), workflow_runs (48) and inflation (47).",
+      "impact": "Helpers such as head_of, content_at, existing and write can't be imported or tested on their own, and handlers are reached only by building the whole definition with a fake transport, as test_github_reads.py does. The riskiest connector, the PR one, is exercised only by the db profile. Shared state (transport, environ) is captured implicitly, so each module re-creates its own client, error and parsing helpers; the drift is described in the next findings. Complexity limits can't be applied per handler: the metric flags containers while the real hotspot, open_pull_request, stays hidden. ToolDefinition keywords passed through dict[str, Any] escape mypy.",
+      "recommendation": "Adopt one shape for tool adapters and migrate module by module, starting with the PR connector behind new fast tests. The shape has four parts. (1) A small frozen connector per provider owns transport and environ and opens one client per attempt. (2) Handlers are module-level functions taking (api, arguments, context), so each can be tested directly. (3) A typed, keyword-only builder replaces the dict splats and Tavily's positional tool(). (4) Exported singletons, tool IDs, versions and schemas stay unchanged.",
+      "sketch": "adapters/github/\n  connector.py  @dataclass(frozen=True) class GithubConnector: transport, environ\n                  async with connector.attempt(ctx) as api   # target, token, one client per attempt\n                class GithubApi: read(path, params) / write(path, payload)   # one status and error table\n  issues.py     create_issue(api, args, ctx), find_issue(api, ctx), ISSUE_VERSIONS = {1: ..., 2: ...}\n  pulls.py      review_detail(api, args); open_pull_request(api, args, ctx):\n                  _check_base -> _commit_files (tree, commit, ref) -> _find_open_pull or _open_pull\n  reads.py      list_pull_requests, list_workflow_runs, search_issues, read_file: (api, args)\nadapters/web/tavily.py, jina.py; adapters/market/yahoo.py, world_bank.py   # same three parts\nadapters/tool_builders.py  def read_only_tool(*, tool_id, title, description, input_model,\n                           output_model, handler, ...) -> ToolDefinition   # typed, keyword-only\nGITHUB_READ_TOOLS = github_read_tools()   # exported names, tool IDs and versions unchanged",
+      "effort": "L",
+      "risk": "medium",
+      "ruleCheck": "Tool IDs, versions, input and output models and public fields stay identical, so version-pinned grants and catalogs are unaffected. Keys and targets are still resolved per attempt (PK-01, Decisions 0017, 0024 and 0025). No generated contract changes.",
+      "verdict": "revised",
+      "verifierNote": "Closure sizes, nesting and C901 totals (37, 18, 15, 15, 12) confirmed with ast and ruff; handlers are already unit-tested through the built definitions, so severity lowered to medium and the impact reworded."
+    },
+    {
+      "id": "PADP-04",
+      "title": "Status and error mapping is copied per provider and has drifted",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/github_issues.py",
+          "line": 45,
+          "note": "_REFUSED without 409"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_issues.py",
+          "line": 55,
+          "endLine": 56,
+          "note": "First UnclearReply"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_pulls.py",
+          "line": 45,
+          "endLine": 49,
+          "note": "_REFUSED with 409, and a second UnclearReply"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_pulls.py",
+          "line": 72,
+          "endLine": 84,
+          "note": "Any HTTPError becomes destination_unreachable; any non-200, 5xx included, becomes github_refused_N"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_reads.py",
+          "line": 40,
+          "endLine": 58,
+          "note": "_REFUSED without 400; 5xx becomes github_unavailable"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/provider_http.py",
+          "line": 61,
+          "endLine": 69,
+          "note": "failure_for: 429 becomes rate_limited; GitHub doesn't use it"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/tavily.py",
+          "line": 47,
+          "endLine": 61,
+          "note": "Re-implements client, transport-error, status and JSON mapping; also jina.py:47-63 and market_data.py:83-99"
+        }
+      ],
+      "occurrences": 14,
+      "evidence": "```\n_REFUSED = frozenset({400, 401, 403, 404, 410, 422, 429})        # github_issues.py:45\n_REFUSED = frozenset({400, 401, 403, 404, 409, 410, 422, 429})   # github_pulls.py:45\n_REFUSED = frozenset({401, 403, 404, 410, 422, 429})             # github_reads.py:40\nraise ToolFailed(f\"github_refused_{reply.status_code}\")  # github_pulls.py:83, any non-200 incl. 5xx\nraise ToolFailed(\"github_unavailable\")                   # github_reads.py:57, the same 5xx\nif status == 429: return ToolFailed(\"rate_limited\")      # provider_http.py:63-64\n```\nCounted by grep: four status-to-code mappings (three _REFUSED sets and failure_for), two identical UnclearReply classes, and eight 'except httpx' blocks in six tool modules.",
+      "impact": "The model and the receipts see different codes for the same condition. A GitHub 429 is github_refused_429 while Tavily's is rate_limited. A GitHub 503 is github_refused_503 in the PR connector and github_unavailable in the read tools. Each new connector copies one of the variants, and two UnclearReply classes with one meaning leave readers unsure which one to raise.",
+      "recommendation": "Give the mechanics one home in provider_http (or a new adapters/http module): one UnclearReply, a read helper (transport error becomes ToolFailed(unreachable), a non-2xx status a mapped code, bad JSON malformed) and a write helper (only connect errors and statuses that prove nothing was written become ToolFailed; anything unclear raises UnclearReply). Keep each destination's write-refused set in one named constant, with a comment on why each status proves no write (409 for refs). Make every GitHub read map 5xx the same way.",
+      "sketch": "# adapters/provider_http.py\nclass UnclearReply(Exception): ...                       # one, shared by every write\nasync def read_json(client, path, *, params=None, code_for=failure_for) -> Any\nasync def write_json(client, path, payload, *, refused: frozenset[int], code_for) -> Any\n# adapters/github/connector.py\nGITHUB_WRITE_REFUSED = frozenset({...})   # why each status proves nothing was created\ndef github_code(status: int) -> str       # one read mapping: 5xx -> github_unavailable everywhere",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "tool_gateway.ToolFailed: on a write, only a status that proves nothing was created may become ToolFailed; everything else stays unknown and is reconciled. Codes are stored on receipts and asserted by tests (test_github_issues.py:147, tests/db/connector_check.py:172), so rename them only deliberately.",
+      "verdict": "confirmed",
+      "verifierNote": "Three refused sets, two UnclearReply classes, failure_for and eight except-httpx blocks in six tool modules recounted with grep."
+    },
+    {
+      "id": "PADP-05",
+      "title": "Six httpx client constructors use different defaults, and the GitHub token client honors proxy environment variables",
+      "dimension": "approach",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/github_issues.py",
+          "line": 127,
+          "endLine": 138,
+          "note": "Token client without trust_env=False; 15 s"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/provider_http.py",
+          "line": 43,
+          "endLine": 58,
+          "note": "trust_env=False, no redirects, 20 s"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/url_guard.py",
+          "line": 115,
+          "endLine": 117,
+          "note": "trust_env=False, no timeout (httpx's 5 s) under a 20 s cap"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/models/openrouter_metadata.py",
+          "line": 15,
+          "endLine": 18,
+          "note": "trust_env left at the default; 15 s"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/object_storage.py",
+          "line": 38,
+          "endLine": 46,
+          "note": "trust_env left at the default; a new client per operation for a process-wide key; 30 s"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/browser_executor.py",
+          "line": 74,
+          "note": "trust_env=False; 10 s"
+        },
+        {
+          "file": "services/agent/src/autobots/api/main.py",
+          "line": 49,
+          "note": "The store is built at startup but opens a client per call"
+        }
+      ],
+      "occurrences": 6,
+      "evidence": "Abridged:\n```\nreturn httpx.AsyncClient(base_url=base_url, headers=dict(headers), transport=transport,\n    timeout=seconds, follow_redirects=False, trust_env=False)                  # provider_http.py:51-58\nreturn httpx.AsyncClient(base_url=API_URL, transport=transport, timeout=_REQUEST_SECONDS,\n    follow_redirects=False, headers={\"Authorization\": f\"Bearer {token}\", ...})  # github_issues.py:128-138\n```\nopenrouter_metadata.http_client and SupabaseObjectStore._client also leave trust_env at httpx's default of True. Timeouts are 20, 15, 15, 30 and 10 seconds plus httpx's 5-second default, and none is derived from the tool's timeout_seconds.",
+      "impact": "The GitHub client carries a token with write scope on the repository (Decision 0022 D6) and will use whatever HTTPS_PROXY or ALL_PROXY the worker's environment sets, while the Tavily and Jina clients and the URL guard refuse the environment. The storage client's service key is process-wide, yet the client is rebuilt for every operation instead of being owned by the lifespan, as DH-06 asks. A reader can't tell which timeout bounds a given call.",
+      "recommendation": "Create clients through one factory with follow_redirects=False and trust_env=False fixed and a required, named timeout. Keep per-attempt clients where a per-attempt key requires them (tools, PK-01). Own one client in the API and worker lifespans for process-level credentials (storage, OpenRouter metadata). Define each timeout next to the tool timeout it must fit inside, and pin that relation in a test, as test_model_attempts.py:297-298 does for the model client.",
+      "sketch": "# adapters/http.py\ndef new_client(base_url: str = \"\", *, timeout: float, headers: Mapping[str, str] | None = None,\n               transport: httpx.AsyncBaseTransport | None = None) -> httpx.AsyncClient:\n    return httpx.AsyncClient(base_url=base_url, headers=dict(headers or {}), timeout=timeout,\n                             transport=transport, follow_redirects=False, trust_env=False)\n# per attempt (PK-01): tool connectors; per process (lifespan): SupabaseObjectStore, OpenRouter metadata",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: own HTTP clients in process lifecycles and bound timeouts. PK-01 keeps tool keys per attempt, so tool clients stay per attempt. The OpenRouter SDK client in models/factory.py is outside this change (model-gateway rule).",
+      "verdict": "confirmed",
+      "verifierNote": "Six constructors and their defaults confirmed; with trust_env left on, httpx 0.28.1 also reads SSL_CERT_FILE and SSL_CERT_DIR, so a proxy plus a custom CA could see the GitHub token."
+    },
+    {
+      "id": "PADP-06",
+      "title": "GitHub read tools resolve the target and open a new client for every request, so one call can read two repositories",
+      "dimension": "approach",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/github_reads.py",
+          "line": 65,
+          "endLine": 72,
+          "note": "get resolves the target and opens a client per request"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_reads.py",
+          "line": 117,
+          "endLine": 127,
+          "note": "workflow_runs: one get for the runs plus one per failed run, up to 10"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_reads.py",
+          "line": 154,
+          "endLine": 163,
+          "note": "search_issues resolves the target, then get resolves it again"
+        },
+        {
+          "file": "services/agent/src/autobots/application/tool_keys.py",
+          "line": 225,
+          "endLine": 235,
+          "note": "Each resolution reads the repository setting and loads and decrypts the token (170-181)"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_pulls.py",
+          "line": 189,
+          "endLine": 192,
+          "note": "By contrast, one resolution and one client per attempt"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "```\nasync def get(context: ToolContext, path: str, params: Mapping[str, Any] | None = None) -> Any:\n    repository, token = await attempt_target(context, environ)\n    async with github_client(token, transport) as http:\n        try:\n            reply = await http.get(path.format(repository=repository), params=params)\n```",
+      "impact": "In one attempt, github_list_workflow_runs makes up to 11 target resolutions (each a settings read, a credential load and a decryption) and 11 TLS connections. If the workspace's repository setting changes mid-call, the jobs come from a different repository than the runs list they annotate.",
+      "recommendation": "Resolve (repository, token) once per attempt and pass one open client and repository to the handler, as open_pull_request does. search_issues then uses the same resolution for its repo: qualifier. GithubConnector.attempt() from the factory-closure finding provides this.",
+      "sketch": "async def list_workflow_runs(api: GithubApi, arguments) -> GithubListWorkflowRunsOutput:\n    found = (await api.read(runs_path(arguments), params(arguments))).get(\"workflow_runs\") or []\n    ...   # each failed run's jobs through the same api: one repository, token and pool per call",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "PK-01 and Decision 0025 resolve the key and repository per attempt; resolving once per attempt meets that. The approved-repository pinning in attempt_target is unchanged.",
+      "verdict": "confirmed",
+      "verifierNote": "get resolves the target per request; workflow_runs makes up to 11 resolutions, each a settings read plus a credential load and decryption in tool_keys.github_target."
+    },
+    {
+      "id": "PADP-07",
+      "title": "Provider replies are parsed as Any with ad hoc .get chains, so malformed replies fail with different codes or crash consumers",
+      "dimension": "types",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/tavily.py",
+          "line": 47,
+          "endLine": 68,
+          "note": "call returns Any; reply.get with no dict check"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/jina.py",
+          "line": 72,
+          "note": "Checks isinstance(reply, dict)"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/market_data.py",
+          "line": 96,
+          "endLine": 104,
+          "note": "AttributeError caught for one level only"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_reads.py",
+          "line": 53,
+          "endLine": 58,
+          "note": "_checked returns raw JSON; handlers index item['number'] (89)"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/models/openrouter_metadata.py",
+          "line": 37,
+          "endLine": 49,
+          "note": "Unvalidated dict[str, Any]; JSON errors not caught; both factories return Any"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/models/catalog.py",
+          "line": 110,
+          "endLine": 119,
+          "note": "parse_catalog trusts the payload's shape"
+        },
+        {
+          "file": "services/agent/src/autobots/application/worker_inference.py",
+          "line": 99,
+          "note": "The worker's consumer catches AttributeError and TypeError"
+        },
+        {
+          "file": "services/agent/src/autobots/application/provider_settings.py",
+          "line": 274,
+          "endLine": 277,
+          "note": "The settings path parses without that catch"
+        }
+      ],
+      "occurrences": 14,
+      "evidence": "Counted by grep: 15 .json() calls in 9 adapter modules, 14 in 8 without browser_executor's local DevTools reply, none checked against a declared shape.\n```\nitems = [item for item in reply.get(\"results\", []) if isinstance(item, dict)]   # tavily.py:68\ndata = reply.get(\"data\") if isinstance(reply, dict) else None                    # jina.py:72\nchart = reply.json().get(\"chart\") or {}    # market_data.py:97\nnumber=int(item[\"number\"]),                # github_reads.py:89\ndata: dict[str, Any] = reply.json()        # openrouter_metadata.py:46\nexcept (OSError, ValueError, TypeError, AttributeError) as error:   # worker_inference.py:99\n```",
+      "impact": "Each module validates the trust boundary in its own way, despite DH-06's single requirement. A list where Tavily expects an object fails as the generic tool_failed, while the same shape is provider_reply_malformed from Jina's reader and an empty success from Jina search. A malformed GitHub item is retried once as tool_failed. A non-object catalog reply makes provider_settings.models raise, because only the worker's consumer catches AttributeError and TypeError.",
+      "recommendation": "Declare small, lenient, adapter-private Pydantic reply models with extra='ignore' and only the fields used, and parse through one helper that maps ValidationError or ValueError to ToolFailed('provider_reply_malformed') for reads. For effectful writes, a body that can't be parsed after a 201 must stay unknown (raise UnclearReply), never become ToolFailed. Make catalog_fetcher return None on malformed JSON or shape, and type both metadata factories with the existing CatalogFetcher alias and a KeyValidator alias instead of Any.",
+      "sketch": "class _TavilyItem(BaseModel):\n    model_config = ConfigDict(extra=\"ignore\")\n    title: str = \"\"; url: str = \"\"; content: str = \"\"; score: float | None = None\nclass _TavilyResults(BaseModel):\n    model_config = ConfigDict(extra=\"ignore\")\n    results: list[_TavilyItem] = []\ndef parse_reply(model: type[T], reply: httpx.Response) -> T:\n    try:\n        return model.model_validate_json(reply.content)\n    except ValueError:                    # pydantic's ValidationError is a ValueError\n        raise ToolFailed(\"provider_reply_malformed\") from None",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: validate data at trust boundaries. The reply models are adapter-private, not public contracts, so OpenAPI and the generated client are unaffected. Write semantics from tool_gateway.ToolFailed are preserved.",
+      "verdict": "revised",
+      "verifierNote": "Recounted 15 .json() calls in 9 modules (14 in 8 without the local CDP reply); a list reply from Jina search is an empty success rather than provider_reply_malformed, so the impact was corrected."
+    },
+    {
+      "id": "PADP-08",
+      "title": "LoopMiddleware._admitted_call passes state out of a nested closure through four mutable lists",
+      "dimension": "functions",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 491,
+          "endLine": 597,
+          "note": "107 lines, C901 15, 65 statements"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 497,
+          "endLine": 500,
+          "note": "Four out-parameter lists"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 502,
+          "endLine": 549,
+          "note": "The nested dispatch writes to them"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 400,
+          "endLine": 426,
+          "note": "_bounded appends to its caller's stopped list (423)"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 579,
+          "endLine": 596,
+          "note": "Lists decoded in priority order; only the last reply and ticket are read"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "```\nlimit: list[LimitReached] = []\nstopped: list[str] = []\nreplies: list[Any] = []\nlast_ticket: list[Any] = []\n\nasync def dispatch(ticket: Any) -> ModelOutput:\n    last_ticket.append(ticket)\n```",
+      "impact": "Which stop code wins depends on list order and on a callee mutating its caller's list. Replies and tickets are kept as lists although only the last of each is read. One method mixes usage reads, prompt sizing, building the admission request, retry policy, failure translation, late-charge reconciliation and reply facts, so changing any one of them on the paid path means re-reading all of them.",
+      "recommendation": "Replace the four lists with one record object, and have _bounded raise a typed interruption instead of appending to a list. Extract _admission_request (usage read, size, price tier), _dispatch_once (guard, consume, bounded call), a pure _classify(error) -> ProviderFailure and _reconcile_late_charge. Keep the stop priority (guard or run stop, then limit, then failure class), and cover it with the existing test_worker_inference.py cases before moving code.",
+      "sketch": "@dataclass\nclass _CallRecord:\n    stop_code: str | None = None      # guard, run or limit stop; first wins\n    ticket: Ticket | None = None\n    reply: ModelResponse | None = None\n\nasync def _admitted_call(self, request, handler, remaining, route=None):\n    chosen, record = route or self._route, _CallRecord()\n    admission_request = await self._admission_request(chosen, request)\n    try:\n        output = await call_with_policy(self._admission, admission_request,\n            partial(self._dispatch_once, record, request, handler), self._policy(remaining))\n    except ProviderFailure as failure:\n        raise LoopStopped(record.stop_code or failure.failure.value) from None\n    except AttemptClosed:\n        await self._reconcile_late_charge(record)\n        raise LoopStopped(\"lease_lost\") from None\n    await self._record_reply(record)\n    return record.reply, output.complete",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "model-gateway rule: admission, budget reservation, the no-SDK-retry policy and uncertain classification stay exactly as they are; only control flow moves. Tests first: test_worker_inference.py and the db profile's goal-loop and recovery checks.",
+      "verdict": "confirmed",
+      "verifierNote": "107 lines, C901 15 and 65 statements confirmed with ruff; the four out-parameter lists and _bounded's append to its caller's list confirmed."
+    },
+    {
+      "id": "PADP-09",
+      "title": "loop_middleware.py holds application policy that application modules import back from adapters",
+      "dimension": "modules",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 208,
+          "endLine": 259,
+          "note": "ModelRoute (the run's frozen route) and the reservation arithmetic"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 70,
+          "endLine": 112,
+          "note": "STOPPING, REPAIRABLE, INTERRUPTING, the ContextVars and LoopStopped"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 349,
+          "endLine": 674,
+          "note": "Guard, compaction, summarization and admitted calls"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 32,
+          "endLine": 66,
+          "note": "Imports six application modules"
+        },
+        {
+          "file": "services/agent/src/autobots/application/browsing_loop.py",
+          "line": 23
+        },
+        {
+          "file": "services/agent/src/autobots/application/browsing_tool.py",
+          "line": 33
+        },
+        {
+          "file": "services/agent/src/autobots/application/worker_inference.py",
+          "line": 17
+        },
+        {
+          "file": "services/agent/src/autobots/application/goal_loop.py",
+          "line": 30
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "application/browsing_loop.py:23 has 'from autobots.adapters.loop_middleware import AdmittedModel, LoopMiddleware, LoopStopped, ModelRoute'. ModelRoute's docstring says 'A worker takes this from the run's frozen policy'. reservation_for and past_known_price compute budget reservations. The module imports compaction, model_admission, model_attempts, plans, run_usage and tool_gateway, and four application modules import it back.",
+      "impact": "A 674-line adapter is the home of policy that the application layer owns, so dependencies run both ways between application and adapters. A change to the reservation arithmetic gets reviewed as LangChain glue, and the model-gateway rule doesn't load for this file (see the rule-scope finding).",
+      "recommendation": "Split by layer without changing behavior. Pure loop policy goes to application. Admission and compaction orchestration becomes an application service over plain request and handler protocols. Only AdmittedModel, the streaming helpers and a thin AgentMiddleware subclass stay in the framework layer: DH-03's graphs/, or adapters/ until that folder exists. Application then imports only application modules.",
+      "sketch": "application/loop_policy.py     ModelRoute, request_bytes, reservation_for, past_known_price,\n                               reply_facts, STOPPING, REPAIRABLE, LoopStopped     # pure, no LangChain\napplication/loop_admission.py  LoopAdmission(connection, scope, limits): guard(), consume(),\n                               call(request, send), compact(messages, summarize)  # database and policy\ngraphs/agent_middleware.py     AdmittedModel, _streamed, _strictly_parsed, and a thin\n                               LoopMiddleware(AgentMiddleware) translating ModelRequest and\n                               ToolCallRequest into LoopAdmission calls",
+      "effort": "L",
+      "risk": "medium",
+      "ruleCheck": "DH-03 places LangGraph glue under graphs/, and DH-06 keeps domain decisions independent of LangGraph internals. The move preserves behavior. The model-gateway rule then covers the policy files by path.",
+      "verdict": "confirmed",
+      "verifierNote": "Six application imports in loop_middleware and four application modules importing it back (plus operations/browse_trial.py) confirmed; no decision governs the placement."
+    },
+    {
+      "id": "PADP-10",
+      "title": "Rule path scopes miss the adapter that admits model calls and point at folders that don't exist",
+      "dimension": "standards",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": ".claude/rules/model-gateway.md",
+          "line": 2,
+          "endLine": 7,
+          "note": "adapters/models/**, application/**, graphs/**"
+        },
+        {
+          "file": ".claude/rules/database.md",
+          "line": 2,
+          "endLine": 5,
+          "note": "adapters/persistence/**"
+        },
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 54,
+          "endLine": 70,
+          "note": "Representative paths are invented files"
+        },
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 620,
+          "endLine": 633,
+          "note": "The check matches globs only against those invented paths"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 248,
+          "endLine": 259,
+          "note": "Reservation and price-tier logic outside model-gateway's paths"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "services/agent/src/autobots has no graphs/ folder and adapters/ has no persistence/, so those two globs match no file. Meanwhile loop_middleware.py, which reserves budget per call, bounds calls and classifies their failures, matches only python-worker.md. The harness test passes because its representative paths are 'services/agent/src/autobots/graphs/run.py', 'services/agent/src/autobots/adapters/persistence/runs.py' and 'services/agent/src/autobots/adapters/models/gateway.py', none of which exist.",
+      "impact": "Editing the per-call admission code doesn't load the rule that owns budget reservations, catalog mapping and the no-fallback policy, and the SQL scattered through adapters is outside the database rule's scope. The drift is invisible because the check validates globs against paths that don't exist.",
+      "recommendation": "Either move the graph glue into DH-03's graphs/ (see the loop_middleware finding) or add adapters/loop_middleware.py and adapters/tool_middleware.py to model-gateway.md now. In the harness test, include at least one real tracked file per rule among the governed paths and assert that it exists, so moving or renaming governed code fails the check.",
+      "sketch": "# .claude/rules/model-gateway.md, until graph glue moves to graphs/\n  - \"services/agent/src/autobots/adapters/loop_middleware.py\"\n  - \"services/agent/src/autobots/adapters/tool_middleware.py\"\n# tests/harness/test_assistant_assets.py\nGOVERNED = {'model-gateway.md': ['services/agent/src/autobots/adapters/loop_middleware.py']}\nfor name, paths in GOVERNED.items():\n    for path in paths:\n        self.assertTrue((ROOT / path).exists(), path)\n        self.assertTrue(any(glob_matches(glob, path) for glob in scoped[name]), path)",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-03: use supported paths frontmatter and test representative paths. This only widens what the rules govern; no rule is relaxed.",
+      "verdict": "confirmed",
+      "verifierNote": "No tracked file matches graphs/** or adapters/persistence/**; the real row-type module, services/agent/src/autobots/persistence/rows.py, is outside database.md's globs as well."
+    },
+    {
+      "id": "PADP-11",
+      "title": "A bare ValueError is read as 'recovery closed this attempt'",
+      "dimension": "errors",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 585,
+          "endLine": 592,
+          "note": "Catches any ValueError from call_with_policy"
+        },
+        {
+          "file": "services/agent/src/autobots/application/model_admission.py",
+          "line": 195,
+          "note": "'already been settled'"
+        },
+        {
+          "file": "services/agent/src/autobots/application/model_admission.py",
+          "line": 205,
+          "note": "'closed before it was sent'"
+        },
+        {
+          "file": "services/agent/src/autobots/application/model_admission.py",
+          "line": 292,
+          "note": "'not awaiting reconciliation'"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 276,
+          "endLine": 278,
+          "note": "_charged runs float() on provider metadata inside dispatch"
+        }
+      ],
+      "occurrences": 4,
+      "evidence": "```\nexcept ValueError:\n    # Recovery classified this call while it was out. Its charge is late evidence.\n    charged = _charged(replies[-1].result[-1]) if replies else None\n    if charged is not None and last_ticket:\n        await ModelAdmission(self._connection).reconcile(...)\n    raise LoopStopped(\"lease_lost\") from None\n```",
+      "impact": "Every ValueError raised under call_with_policy is read as a recovery race. Suppose _charged's float() raises on a provider's cost inside dispatch. The attempt is never settled or marked uncertain, the except block calls _charged on the same reply and raises the ValueError again, and the loop ends with an unclassified error instead of a stop code. A bug and a recovery race look alike in stop codes and logs.",
+      "recommendation": "Raise a typed AttemptClosed from _transition, mark_dispatched and reconcile, and catch only that in _admitted_call. Make _charged total, returning None when the cost is unreadable or not finite, as _retry_after already does (see the money finding), so other ValueErrors surface as bugs.",
+      "sketch": "# application/model_admission.py\nclass AttemptClosed(Exception):\n    \"\"\"Recovery settled or closed this attempt while it was out.\"\"\"\n# _transition, mark_dispatched and reconcile raise AttemptClosed instead of ValueError\n# loop_middleware._admitted_call\nexcept AttemptClosed:\n    await self._reconcile_late_charge(record)\n    raise LoopStopped(\"lease_lost\") from None",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "model-gateway: a charge is never invented, and late evidence is reconciled. DH-06: typed, safe errors. The lease_lost outcome for a real recovery race is unchanged.",
+      "verdict": "confirmed",
+      "verifierNote": "Three ValueError raises in model_admission and the bare except at loop_middleware.py:585 confirmed; a non-numeric or NaN cost makes _charged raise ValueError inside dispatch."
+    },
+    {
+      "id": "PADP-12",
+      "title": "Reported charges are converted to micro-USD with float arithmetic and rounded differently on two paths",
+      "dimension": "standards",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 276,
+          "endLine": 278,
+          "note": "round(float(cost) * 1_000_000): rounds half to even"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/route_qualification.py",
+          "line": 244,
+          "endLine": 246,
+          "note": "math.ceil(float(cost) * 1_000_000): rounds up"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/models/catalog.py",
+          "line": 45,
+          "endLine": 53,
+          "note": "Prices use Decimal with ROUND_CEILING: a price never under-counts"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "```\nreturn None if cost is None else round(float(cost) * 1_000_000)          # loop_middleware.py:278\nreturn None if cost is None else math.ceil(float(cost) * 1_000_000)      # route_qualification.py:246\nreturn int((number * factor).to_integral_value(rounding=ROUND_CEILING))  # catalog.py:53\n```\nChecked with python3.12: a reported 0.0000125 USD gives 12 micro-USD with round() and 13 with ceil(); 0.000001234 gives 1 and 2.",
+      "impact": "DH-06 requires exact decimal or integer monetary units and forbids float arithmetic for money. Because the worker rounds half to even, the ledger charge it settles (model_attempts.py:150) can be one micro-USD below what the qualification path records for the same reply. That contradicts the catalog's policy that a price never under-counts. A non-numeric or non-finite cost raises inside dispatch instead of leaving the charge unreported.",
+      "recommendation": "Add one micro_usd(reported) helper next to Pricing or in domain/models.py: Decimal(str(value)), a finite check, ROUND_CEILING, and None when the value is unreadable. Use it in _charged and in route_qualification._cost_micro_usd, and add a test with half-micro values.",
+      "sketch": "def micro_usd(reported: object) -> int | None:\n    \"\"\"A reported USD charge in micro-USD, rounded up; None when unreadable or not finite.\"\"\"\n    try:\n        amount = Decimal(str(reported))\n    except InvalidOperation:\n        return None\n    if not amount.is_finite():\n        return None\n    return int((amount * 1_000_000).to_integral_value(rounding=ROUND_CEILING))",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06 and the python-worker rule require exact monetary units. model-gateway: a charge is never invented, so an unreadable cost stays None and the estimate stays open for reconciliation.",
+      "verdict": "confirmed",
+      "verifierNote": "round versus ceil reproduced with python3.12 (12.5 micro-USD gives 12 and 13); DH-06 forbids float arithmetic for money."
+    },
+    {
+      "id": "PADP-13",
+      "title": "Adapters query run, lease and approval tables directly and re-spell rules that the domain and gateway own",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 72,
+          "note": "INTERRUPTING spelled as string literals"
+        },
+        {
+          "file": "services/agent/src/autobots/domain/runs.py",
+          "line": 22,
+          "note": "The canonical TERMINAL set"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 384,
+          "endLine": 392,
+          "note": "Recursive parent-status query with a literal 'running'"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 418,
+          "endLine": 422,
+          "note": "Run status poll"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 551,
+          "endLine": 554,
+          "note": "run_usage read"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/browser_executor.py",
+          "line": 448,
+          "endLine": 460,
+          "note": "lease_alive repeats ownership_refusal's rule without the workspace check"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_issues.py",
+          "line": 101,
+          "endLine": 109,
+          "note": "Reads approval_requests"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/remote_files.py",
+          "line": 55,
+          "endLine": 72,
+          "note": "Reads run_files, whose writer is application/tools.write_run_file"
+        }
+      ],
+      "occurrences": 7,
+      "evidence": "```\nINTERRUPTING = frozenset({\"cancelling\", \"cancelled\", \"failed\", \"succeeded\"})          # loop_middleware.py:72\nTERMINAL = frozenset({RunStatus.SUCCEEDED, RunStatus.FAILED, RunStatus.CANCELLED})   # domain/runs.py:22\n\"where j.run_id::text = %s and j.generation = %s and j.status = 'claimed' \"           # browser_executor.py:454\n\"and j.lease_expires_at > clock_timestamp() and r.status = 'running'\",\n```\nownership_refusal (tool_gateway.py:256-272) and hold_lease (275) state the same lease rule twice more. Counted: six SQL statements in four adapter modules (loop_middleware 3, browser_executor 1, github_issues 1, remote_files 1) plus one re-spelled state set. The checkpointer's SQL and the NOTIFY call are excluded because they belong to the adapters.",
+      "impact": "A new interrupting state, a lease column change or a run_files change has to be found in adapters by grep. The lease rule is written three times (ownership_refusal, hold_lease and lease_alive), and the copies already differ in shape: lease_alive drops the workspace filter, which is harmless only because run IDs are unique. The browser executor's copy sits inside the qualification fingerprint, so even aligning it requires a live re-qualification.",
+      "recommendation": "Derive INTERRUPTING from domain.runs.TERMINAL plus CANCELLING. Move each query next to the module that owns its table: one lease query in worker_leases used by both the sweeper and the gateway, the run status and parent-chain reads in runs, the usage read in run_usage, the approved target in approvals, and the run-file lookup beside write_run_file. Adapters then call those functions.",
+      "sketch": "# domain/runs.py\nINTERRUPTING = TERMINAL | {RunStatus.CANCELLING}\n# application/worker_leases.py\nasync def generation_alive(connection, run_id, generation) -> bool   # the one lease query\n# application/runs.py: run_status(), parents_running(); run_usage.py: model_calls_used()\n# application/approvals.py: approved_target(); application/tools.py: run_file_by_operation()",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "contracts rule: canonical states and guards are shared, with no second state vocabulary. SP-012: ownership is decided by database time, which the single shared query keeps through clock_timestamp().",
+      "verdict": "revised",
+      "verifierNote": "Six SQL statements in four modules and the re-spelled state set recounted; lease_alive's missing workspace filter is harmless with unique run IDs, so the impact now rests on the three copies of the lease rule."
+    },
+    {
+      "id": "PADP-14",
+      "title": "browser_executor.py bundles five responsibilities into one file covered by the qualification fingerprint",
+      "dimension": "modules",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/browser_executor.py",
+          "line": 82,
+          "endLine": 309,
+          "note": "Docker session lifecycle"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/browser_executor.py",
+          "line": 312,
+          "endLine": 360,
+          "note": "CDP client"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/browser_executor.py",
+          "line": 363,
+          "endLine": 424,
+          "note": "Request guard"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/browser_executor.py",
+          "line": 427,
+          "endLine": 438,
+          "note": "images_fingerprint hashes this whole file (434)"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/browser_executor.py",
+          "line": 441,
+          "endLine": 460,
+          "note": "Lease checks with SQL"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/browser_executor.py",
+          "line": 489,
+          "endLine": 500,
+          "note": "The qualification gate requires that hash"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/browser_page.py",
+          "line": 4,
+          "endLine": 5,
+          "note": "Split out so the fingerprint isn't touched"
+        },
+        {
+          "file": "services/agent/src/autobots/application/tool_gateway.py",
+          "line": 332,
+          "endLine": 337,
+          "note": "Qualification is checked again on every browse dispatch"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "One 500-line module holds the Docker session lifecycle, a CDP client, the request guard, the qualification gate and lease checks with SQL. images_fingerprint hashes the whole file, and executor_qualified requires that hash. That is why browser_page.py describes itself as 'a separate module from the executor so the executor's qualification fingerprint isn't touched'. ExecutorConfig.environ (57) is never read. executor_qualified reads a JSON report and hashes five files synchronously, and the gateway calls it on every browse dispatch.",
+      "impact": "Any edit to any of the five concerns, even a docstring, turns browsing off until a live Docker re-qualification. That makes unrelated maintenance expensive and pushes new code into side modules to avoid the file. Reviewing an isolation change means also reading the lease SQL and the report parsing. Hashing the files on every dispatch is small, but it is blocking work on the event loop (DH-06).",
+      "recommendation": "Split into cohesive modules in one change, scheduled together with the re-qualification: a Docker session module, a CDP module (client and request guard) and a qualification module. List every one of them explicitly in images_fingerprint, together with egress_proxy.py, the Dockerfiles, the entrypoint and wherever the lease query ends up, so the binding stays as strict as today. Compute the fingerprint off the event loop (asyncio.to_thread) or cache it by file modification times, and remove ExecutorConfig.environ.",
+      "sketch": "adapters/browser/session.py        ExecutorConfig, BrowserSession, BrowserExecutor (Docker CLI only)\nadapters/browser/cdp.py            Cdp, RequestGuard\nadapters/browser/qualification.py  FINGERPRINTED = (browser/session.py, browser/cdp.py, egress_proxy.py,\n                                   Dockerfiles, entrypoint, the lease query's module)\n                                   images_fingerprint (off the event loop), REQUIRED_CASES, executor_qualified",
+      "effort": "M",
+      "risk": "high",
+      "ruleCheck": "BX-05 and Decision 0018 B8: the qualification must keep binding everything it exercises, and the split must be re-qualified live, which is an explicitly authorized task. attempt_alive already depends on the unfingerprinted ownership_refusal, so the fingerprint list should name the lease module explicitly rather than drop it. No isolation flag or cap changes.",
+      "verdict": "confirmed",
+      "verifierNote": "Five concerns, the self-hashing fingerprint, the never-read ExecutorConfig.environ and the per-dispatch executor_ready call (tool_gateway.py:334) confirmed."
+    },
+    {
+      "id": "PADP-16",
+      "title": "The two agent middlewares type their hooks as Any and communicate through JSON in ToolMessage.content",
+      "dimension": "types",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 629,
+          "endLine": 674,
+          "note": "awrap_model_call and awrap_tool_call with Any request and handler"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+          "line": 668,
+          "note": "Re-parses the inner middleware's JSON for its code"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/tool_middleware.py",
+          "line": 28,
+          "endLine": 58,
+          "note": "The same hooks typed Any; content=result.for_model() (44)"
+        },
+        {
+          "file": "services/agent/src/autobots/application/goal_loop.py",
+          "line": 229,
+          "endLine": 243,
+          "note": "The pairing depends on list order"
+        }
+      ],
+      "occurrences": 12,
+      "evidence": "```\nasync def awrap_tool_call(\n    self, request: Any, handler: Callable[[Any], Awaitable[Any]]\n) -> ToolMessage:\n    ...\n    code = json.loads(reply.content).get(\"code\")      # loop_middleware.py:668\n```\nCounted with ast: 12 hook and helper signatures take request or handler as Any (9 in loop_middleware.py, 3 in tool_middleware.py). LangChain types this handler as returning ToolMessage | Command[Any] (langchain/agents/middleware/types.py:756-759).",
+      "impact": "With Any, mypy can't see that a handler may return a Command, which has no content, or that LoopMiddleware depends on the inner middleware's JSON format. Reordering the middleware list, or adding a middleware between the two, would fail at runtime. Neither class documents the required order.",
+      "recommendation": "Annotate the hooks with ModelRequest, ModelResponse and ToolCallRequest from langchain.agents.middleware.types, and type the connection as psycopg's AsyncConnection or a small Protocol. Have GatewayMiddleware set ToolMessage.artifact to {outcome, code}, and have LoopMiddleware read it after an isinstance check. State the ordering requirement in both class docstrings.",
+      "sketch": "# GatewayMiddleware\nreturn ToolMessage(content=result.for_model(), artifact={\"outcome\": result.outcome.value,\n                   \"code\": result.code}, tool_call_id=call[\"id\"], name=call[\"name\"], status=...)\n# LoopMiddleware (outer; GatewayMiddleware must be the inner middleware)\nasync def awrap_tool_call(self, request: ToolCallRequest,\n        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command[Any]]]) -> ToolMessage:\n    reply = await handler(request)\n    if not isinstance(reply, ToolMessage) or not isinstance(reply.artifact, dict):\n        raise LoopStopped(\"tool_reply_unrecognized\")\n    code = reply.artifact.get(\"code\")",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: typing exceptions stay narrow and documented. The model still sees only ToolResult.for_model(). The artifact carries an outcome and a code and no secrets, so checkpoint contents stay safe.",
+      "verdict": "revised",
+      "verifierNote": "Recounted with ast: 12 signatures, not 13; LangChain's ToolMessage | Command[Any] handler type confirmed in the installed langchain/agents/middleware/types.py:756-760."
+    },
+    {
+      "id": "PADP-17",
+      "title": "A naive `since`, which the input contract accepts, crashes the pull-request filter",
+      "dimension": "types",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/github_reads.py",
+          "line": 47,
+          "endLine": 50,
+          "note": "Compares an aware GitHub timestamp with since"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_reads.py",
+          "line": 97,
+          "endLine": 98,
+          "note": "Call site in pull_requests"
+        },
+        {
+          "file": "services/agent/src/autobots/contracts/tools.py",
+          "line": 86,
+          "note": "since: datetime | None"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "```\ndef _after(value: str | None, since: datetime | None) -> bool:\n    if since is None or value is None:\n        return True\n    return datetime.fromisoformat(value.replace(\"Z\", \"+00:00\")) >= since\n```\nReproduced with the service venv: GithubListPullRequestsInput(since='2026-01-01') parses to a naive datetime, and _after('2026-02-01T00:00:00Z', since) raises TypeError: can't compare offset-naive and offset-aware datetimes.",
+      "impact": "A model that sends a date-only or offset-less since, which the schema accepts, gets the generic tool_failed after one retry instead of results. DH-06 and the python-worker rule require explicit UTC.",
+      "recommendation": "Treat a naive since as UTC in the adapter, say so in the tool description, and add tests for date-only and offset-less values. Use AwareDatetime for since fields in the next version of these tools rather than changing the pinned v1 schema.",
+      "sketch": "def _after(value: str | None, since: datetime | None) -> bool:\n    if since is None or value is None:\n        return True\n    floor = since if since.tzinfo is not None else since.replace(tzinfo=UTC)   # a date-only since is naive\n    return datetime.fromisoformat(value) >= floor                             # 3.11+ reads the Z suffix",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06 and the python-worker rule require explicit UTC. Grants pin the v1 input schema, so the fix normalizes in the adapter instead of changing a published contract; a stricter AwareDatetime belongs in a new tool version (py-domain).",
+      "verdict": "confirmed",
+      "verifierNote": "Reproduced with the service venv: date-only and offset-less since values parse naive and _after raises TypeError; a Z-suffixed value works."
+    },
+    {
+      "id": "PADP-18",
+      "title": "The most complex connector, the gateway middleware and storage have no fast unit tests",
+      "dimension": "tests",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/github_pulls.py",
+          "line": 68,
+          "note": "No importer in services/agent/tests"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/tool_middleware.py",
+          "line": 19,
+          "note": "Exercised only by tests/db scripts"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/object_storage.py",
+          "line": 29,
+          "note": "Exercised only by tests/db and tests/web scripts"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/remote_files.py",
+          "line": 29,
+          "note": "Exercised only by tests/db/web_tools_check.py"
+        },
+        {
+          "file": "tests/db/pull_request_check.py",
+          "line": 1,
+          "endLine": 2,
+          "note": "db-profile JSON cases with a fake GitHub"
+        },
+        {
+          "file": "services/agent/tests/test_result_stream.py",
+          "line": 20,
+          "endLine": 35,
+          "note": "partial_object fed only well-formed prefixes"
+        }
+      ],
+      "occurrences": 4,
+      "evidence": "A grep over services/agent/tests finds no import of github_pulls, tool_middleware, object_storage or remote_files; remote_files appears only as the tool ID string in test_tool_catalog.py:158. github_pulls runs only in tests/db/pull_request_check.py. That script's cases cover approval, the diff, the branch, the marker, a lost reply, readback and a moved base, but no refused or unclear reply at the tree, commit or ref write.",
+      "impact": "A refactor of the most complex connector (complexity 37) can be proven only on Docker with a disposable database, and the write-step failure paths that decide failed versus unknown aren't proven at all. The malformed-escape defect in the tap survived because the parser had no malformed-input tests.",
+      "recommendation": "Before refactoring, add fast tests that use httpx.MockTransport and a small fake connection that records SQL. Cover refused and unclear replies at each PR write step, an existing branch without a pull request, a readback with none open, and content_at on a directory. Add tests for GatewayMiddleware's granted-tool filter and its synchronous refusal, for SupabaseObjectStore's path scoping and status mapping, and for partial_object over every prefix of valid and malformed objects.",
+      "sketch": "services/agent/tests/test_github_pulls.py   fake Git + recording connection: refused/unclear at the\n    tree, commit, ref and pull writes; base moved; branch exists without a pull; readback -> NotDelivered\nservices/agent/tests/test_tool_middleware.py  granted-only tools, synchronous refusal, refusing tool bodies\nservices/agent/tests/test_object_storage.py   scoped paths, 'exists' -> False, 404 -> None\nservices/agent/tests/test_result_stream.py    partial_object over every prefix, valid and malformed",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "python-worker rule: fake transports and no paid calls. The refactor plan's principle requires tests first for medium-risk changes.",
+      "verdict": "confirmed",
+      "verifierNote": "No services/agent/tests file imports github_pulls, tool_middleware, object_storage or remote_files; pull_request_check.py has no refused or unclear write case."
+    },
+    {
+      "id": "PADP-15",
+      "title": "The URL guard checks one DNS answer and then lets httpx resolve the name again",
+      "dimension": "approach",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/url_guard.py",
+          "line": 1,
+          "endLine": 7,
+          "note": "Docstring: no tool can reach loopback, a private network or cloud metadata"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/url_guard.py",
+          "line": 67,
+          "endLine": 79,
+          "note": "First resolution, through the resolver"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/url_guard.py",
+          "line": 115,
+          "endLine": 136,
+          "note": "httpx resolves again and sends; the peer check runs after the request and is skipped without a peer"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/egress_proxy.py",
+          "line": 97,
+          "endLine": 99,
+          "note": "The proxy returns the address it checked"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/egress_proxy.py",
+          "line": 161,
+          "endLine": 162,
+          "note": "and connects to that address"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "```\nanswers = await resolver(host, port)                         # url_guard.py:72, first resolution\nasync with client.stream(\"GET\", current) as reply:           # :121, httpx resolves and sends\n    stream = reply.extensions.get(\"network_stream\")\n    peer = stream.get_extra_info(\"server_addr\") if stream is not None else None\n    if peer and not public(str(peer[0])):\n        raise UrlRefused(\"url_host_refused\")\n```",
+      "impact": "Suppose a name answers public to the check and private to the connection (DNS rebinding). The guard's own check then proves nothing about the connection, and when the stream reports no peer nothing is checked at all. In practice the https-only rule and httpx's default certificate verification keep the request line and headers from being sent unless the private address presents a valid certificate for the requested name, so the realistic exposure is a connection and TLS handshake to a private address. The docstring's 'every refusal is a typed code raised before the request it refuses' is stronger than the code: UG-01 is met by TLS, not by the guard. store_remote_file fetches through this path.",
+      "recommendation": "Connect to the vetted address, as the egress proxy already does. Have check_url return the public address it checked, then request that address with the original Host header and httpx's sni_hostname extension (the installed httpcore 1.0.9 supports it), so TLS still verifies the name. Keep the peer check, and refuse when no peer is reported. Add a test whose resolver answers public first and private second. Until then, say in the module docstring that certificate verification, not the guard, stops a rebound name.",
+      "sketch": "vetted = await check_url(current, resolver)      # host, port and the public address it checked\nasync with client.stream(\"GET\", vetted.address_url, headers={\"Host\": vetted.host_header},\n                         extensions={\"sni_hostname\": vetted.host}) as reply:\n    peer = ...                                   # defense in depth\n    if peer is None or not public(str(peer[0])):\n        raise UrlRefused(\"url_host_refused\")",
+      "effort": "M",
+      "risk": "high",
+      "ruleCheck": "PRD-Tool-Catalog UG-01 ('a refusal is a typed code before any request') and BX-03's 'a connection to the address it checked'. The change enforces both on the worker side and relaxes nothing.",
+      "verdict": "revised",
+      "verifierNote": "Double resolution and the post-request peer check confirmed, but https with httpx's default certificate verification blocks a rebound request in practice, so severity lowered to low and the impact reworded."
+    },
+    {
+      "id": "PADP-19",
+      "title": "Seven `*target` definitions under five names cover three ideas in the GitHub connectors",
+      "dimension": "naming",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/github_issues.py",
+          "line": 75,
+          "endLine": 98,
+          "note": "attempt_target returns the repository and token"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_issues.py",
+          "line": 112,
+          "endLine": 124,
+          "note": "approval_target returns the label recorded on the approval"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_issues.py",
+          "line": 154,
+          "endLine": 163,
+          "note": "Closures review_target, target and resolve_target"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/github_pulls.py",
+          "line": 261,
+          "endLine": 266,
+          "note": "A second review_target, unvalidated, and a second resolve_target"
+        },
+        {
+          "file": "services/agent/src/autobots/application/tool_gateway.py",
+          "line": 356,
+          "endLine": 359,
+          "note": "resource_target's value is replaced whenever a target_resolver is set"
+        }
+      ],
+      "occurrences": 7,
+      "evidence": "The issues module validates with REPOSITORY_VARIABLE and _REPOSITORY.fullmatch (154-157). The pulls copy does not:\n```\ndef review_target(_arguments: Any) -> str | None:              # github_pulls.py:261-263\n    repository = environ.get(\"GITHUB_REPOSITORY\", \"\")\n    return f\"{TARGET_PREFIX}{repository}\" if repository else None\n```",
+      "impact": "Three ideas (this attempt's repository and token, the label an approval records, and the label a reviewer is shown) share one word, so a reader has to trace each function to learn which one returns credentials. Both review_target closures are dead in practice: the gateway replaces resource_target's value with target_resolver's whenever a resolver is set (tool_gateway.py:356-359), as it is for both GitHub writes. The unvalidated pulls copy is therefore never shown, but it still has to be read and kept in step.",
+      "recommendation": "Delete both review_target closures, since target_resolver supersedes them. Name the remaining functions by what they return and define each once in the GitHub connector module: attempt_credentials (was attempt_target) and approval_label (was approval_target), wired to ToolDefinition's target_resolver.",
+      "sketch": "async def attempt_credentials(context, environ) -> tuple[str, str]   # was attempt_target\nasync def approval_label(context, environ) -> str                   # was approval_target\n# both review_target closures removed: the gateway records target_resolver's label (approval_label)",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "ToolDefinition's resource_target and target_resolver fields are the gateway's API and keep their names.",
+      "verdict": "revised",
+      "verifierNote": "Definitions confirmed, but tool_gateway.py:356-359 always replaces resource_target's value with target_resolver's, so the unvalidated pulls copy is never shown; the recommendation now removes both closures."
+    },
+    {
+      "id": "PADP-20",
+      "title": "The proxy's copy of the public-address check has no parity test with the URL guard's",
+      "dimension": "duplication",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/egress_proxy.py",
+          "line": 33,
+          "endLine": 46,
+          "note": "public and system_resolver, 'as the worker's URL guard decides it'"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/url_guard.py",
+          "line": 34,
+          "endLine": 48,
+          "note": "The originals"
+        },
+        {
+          "file": "services/agent/tests/test_url_guard.py",
+          "line": 200,
+          "endLine": 204,
+          "note": "Tests url_guard.public alone"
+        },
+        {
+          "file": "services/agent/tests/test_browser_executor.py",
+          "line": 157,
+          "endLine": 159,
+          "note": "Checks only that the proxy imports nothing from Autobots"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "egress_proxy.public (33-41) repeats url_guard.public (39-48) line for line, and system_resolver is repeated as well (44-46 and 34-36). The proxy's decisions are tested through decide (test_browser_executor.py:41-64), and url_guard.public is tested directly; no test compares the two.",
+      "impact": "The copy is deliberate, because the sidecar must use only the standard library. But if one copy changes what counts as public and the other doesn't, the browser and the fetch tools will disagree about what is private.",
+      "recommendation": "Keep both copies and add one parametrized test that runs both functions over a shared table (private, CGNAT, link-local and metadata, multicast, IPv4-mapped IPv6, scoped IPv6, documentation ranges and garbage) and asserts equal answers.",
+      "sketch": "@pytest.mark.parametrize(\"address\", [\"93.184.215.14\", \"127.0.0.1\", \"10.0.0.1\", \"100.64.0.1\",\n    \"169.254.169.254\", \"224.0.0.1\", \"::1\", \"fe80::1%eth0\", \"::ffff:127.0.0.1\", \"2001:db8::1\", \"junk\"])\ndef test_the_proxy_and_the_guard_agree_on_public(address: str) -> None:\n    assert egress_proxy.public(address) == url_guard.public(address)",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Decision 0018 B3 and the sidecar's standard-library-only constraint (test_browser_executor.py:157) stay in place; the test imports both modules from the worker's test suite.",
+      "verdict": "confirmed",
+      "verifierNote": "egress_proxy.public and system_resolver repeat url_guard's line for line, and no test compares them."
+    },
+    {
+      "id": "PADP-21",
+      "title": "Two superseded credential helpers remain: one unused and one called only by tests",
+      "dimension": "duplication",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/adapters/github_issues.py",
+          "line": 63,
+          "endLine": 69,
+          "note": "configured_target: no caller in the repository"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/provider_http.py",
+          "line": 20,
+          "endLine": 25,
+          "note": "provider_key: environment-only"
+        },
+        {
+          "file": "services/agent/tests/test_tool_catalog.py",
+          "line": 224,
+          "endLine": 238,
+          "note": "Its only service-test caller"
+        },
+        {
+          "file": "tests/db/provider_key_check.py",
+          "line": 79,
+          "note": "Its only other caller"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "grep finds no caller of github_issues.configured_target outside its definition. provider_http.provider_key is called only by the two tests listed. Tavily and Jina resolve keys with attempt_key (provider_http.py:28-40), which follows PK-04's workspace-first order through resolve_tool_key.",
+      "impact": "Both helpers implement an environment-only resolution that production has replaced. Tests that pass on provider_key suggest coverage of a path no tool takes.",
+      "recommendation": "Delete configured_target. Point the two tests at attempt_key or resolve_tool_key and delete provider_key, or move it into the test helpers if the db check needs an environment-only path.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "PK-04 and Decisions 0024 and 0025 define the order production uses; removing the unused environment-only helpers changes nothing at runtime.",
+      "verdict": "confirmed",
+      "verifierNote": "configured_target has no caller; provider_key is called only at test_tool_catalog.py:230 and 238 and tests/db/provider_key_check.py:79."
+    }
+  ],
+  "rejected": [],
+  "notCovered": "mypy and pytest were not run because they are not among the permitted commands. .checks/fast/latest.json and .checks/full/latest.json report that ruff, mypy and pytest passed, at a revision not compared with this run. Two reproductions ran in memory with services/agent/.venv/bin/python -I -B: the tap with a fake stream and a fake notify, and the contract parsing and _after for a naive since. Neither touched a database, the network or a model. ruff check ran without --no-cache, so it refreshed the git-ignored services/agent/.ruff_cache; git status shows no change. The application modules the adapters call (tool_gateway, approvals, model_admission, model_attempts, tool_keys, goal_loop, browsing_tool, worker_inference) were read only around the cited lines; they belong to the py-tools and py-run areas. The Docker-backed behavior of browser_executor and egress_proxy and the live DNS behavior of url_guard were not exercised, so the rebinding finding comes from reading the code. The tests/db scripts were scanned only for which cases they cover. PRD-Development-Harness.md, option-b-contract.md, Decisions 0017 and 0018 and PRD-Tool-Catalog.md were read only in the relevant sections, and metrics.md through its tables and commands."
+}

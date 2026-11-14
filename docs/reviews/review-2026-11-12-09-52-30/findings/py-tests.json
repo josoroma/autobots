@@ -1,0 +1,1177 @@
+{
+ "schema": "autobots.code-review/v1",
+ "area": "py-tests",
+ "title": "Python: service tests",
+ "kind": "area",
+ "timestamp": "2026-11-12-09-52-30",
+ "revision": "156534da0bd5b19417f05d313077d767804b175b",
+ "summary": "The service suite (46 files, 9,379 lines, 496 tests, 77 parametrize decorators) runs offline by design and tests the right risks. conftest.py blocks sockets at import and drops any inherited OpenRouter key. Model tests go through the real SDK and adapter over httpx.MockTransport, and leak, SSRF, credential, budget and fencing behavior is pinned with planted sentinels and typed codes. Its weakness is that no shared test layer ever formed: the suite defines no pytest fixture at all. As a result, fake OpenRouter replies, catalog payloads, API auth setup, SQL connection fakes and graph builders are copied from file to file, and the provider fakes are copied again in tests/db. The shared fake transport has also drifted to the superseded two-profile policy and refuses Sol. Where production offers no seam, tests subclass LoopMiddleware and ProviderSettings, or build them without running their constructors, and override their private methods. The suite has 38 private touches, 26 of them on these paid-path classes. This makes the paid-path middleware, already a measured hotspot, costly to refactor. The same gap shows in 44 type: ignore comments (24 for fakes, placeholders and patched methods standing in for concrete types, 14 caused by the tests' own loose annotations) and 173 Any annotations. Files are partly organized by the story or review that added them rather than by module. test_worker_inference.py (1,149 lines) spans six production modules under section headings that no longer match, test_final_review.py spans eight, and loop_middleware.py has no test file of its own. Of the other files over 300 lines, test_final_review.py is a structure problem. The rest (route qualification, model policy, workflows, browsing loop, GitHub issues, tool keys, model attempts) are mostly cohesive around one module and would shrink once shared fakes exist, so their size alone is not a finding. Order-dependent global state (a gc-based model check, logging reconfigured without restore) and source-text assertions are the remaining risks. Duplication with tests/db is limited to the fake provider builders: the split between offline tests and disposable-database checks is deliberate and documented in module docstrings. Findings come from reading code and read-only tool runs; no test was run.",
+ "scores": [
+  {
+   "dimension": "standards",
+   "score": 3,
+   "why": "The project's ruff and mypy strict runs pass on tests, but nothing enforces pytest-style, private-access or local-import rules (47 function-level imports, 16 private accesses), async style is split between asyncio.run and pytest-asyncio, and DH-06's controlled clocks are not used everywhere."
+  },
+  {
+   "dimension": "modules",
+   "score": 3,
+   "why": "Two helper modules exist (conftest.py, fake_openrouter.py) but are imported through pytest's sys.path insertion, test_tool_catalog.py imports helpers from test_api.py, and there is no support package, so helpers live wherever they were first needed."
+  },
+  {
+   "dimension": "size",
+   "score": 3,
+   "why": "Functions are short (8 over 40 lines), but test_worker_inference.py is 1,149 lines, nine files exceed 300 lines, and a fake's __call__ and one test run 86 and 102 lines."
+  },
+  {
+   "dimension": "functions",
+   "score": 4,
+   "why": "Most tests check one behavior with a clear arrange, act and assert. A few helpers mix patching, building and running (bind_with, call, real_attempt), and one test helper copies the runner's block logic."
+  },
+  {
+   "dimension": "structure",
+   "score": 3,
+   "why": "Most files map to one module, but some are filed by story or review (test_final_review.py, parts of test_worker_inference.py), so loop_middleware's tests sit in six files and pricing tests in four."
+  },
+  {
+   "dimension": "approach",
+   "score": 3,
+   "why": "Transport-level fakes under the real SDK are a model approach, but paid-path internals are tested by overriding private methods, SQL fakes match on substrings with silent defaults, and some wiring is checked by searching source text."
+  },
+  {
+   "dimension": "comments",
+   "score": 4,
+   "why": "Every file has a docstring giving its scope, its story or decision and where the live or disposable counterpart runs. The section headings in test_worker_inference.py and the two-profile docstring in fake_openrouter.py are stale, and a few comments are hard to parse (test_operation_values.py:84-85)."
+  },
+  {
+   "dimension": "types",
+   "score": 3,
+   "why": "mypy strict covers tests and passes, but 44 type: ignore comments and 173 Any annotations mean fakes and helpers are not checked against the production signatures they stand in for."
+  },
+  {
+   "dimension": "errors",
+   "score": 4,
+   "why": "Failures are asserted by typed code or failure class almost everywhere. Only 3 broad pytest.raises and 2 raises(Exception, match=...) remain, and a few tests convert exceptions to strings to work around the gc-based check."
+  },
+  {
+   "dimension": "tests",
+   "score": 3,
+   "why": "Coverage of risky logic is strong and offline, but the lack of fixtures, the copied fakes, coupling to private internals and order-dependent global state make the suite costly to change."
+  },
+  {
+   "dimension": "maintainability",
+   "score": 3,
+   "why": "A careful, well-documented suite without a shared layer: adding a profile, route, SQL query or middleware refactor means editing several copies or several private overrides."
+  }
+ ],
+ "strengths": [
+  {
+   "title": "Network and provider key are blocked for the whole session, and tests prove it",
+   "evidence": "conftest.py:10 removes OPENROUTER_API_KEY, and lines 23-27 replace socket connect, connect_ex, sendto, create_connection and getaddrinfo at import, so third-party import-time code also runs under the block. test_model_transport.py:50-54 shows that a real-looking key still ends in SocketBlockedError, and test_app_factory.py:11-15 and test_contracts.py:162-168 prove the block is in force, as model-gateway.md requires."
+  },
+  {
+   "title": "Fakes sit at the HTTP transport, under the real SDK and adapter",
+   "evidence": "test_model_attempts.py:247-271 proves the SDK retries neither a 5xx nor a connection error, and lines 274-298 check the read timeout the SDK actually sends. test_worker_inference.py:355-364 asserts the model, max_tokens and provider routing flags on the wire, and test_route_qualification.py:226-234 checks every request the paid runner sends. Faking at the transport covers serialization and client configuration that a mocked client would skip."
+  },
+  {
+   "title": "Leak tests use planted sentinels across every output channel",
+   "evidence": "test_worker_inference.py:582-598 plants reply text in an SDK exception and proves it reaches no log field. test_result_stream.py:117-126 keeps reasoning, plan arguments and private paths out of notifications. test_reasoning_trial.py:214-227 checks the report, the ledger and caplog. test_operation_values.py:224-236 scans the status body for paths, hosts and secrets."
+  },
+  {
+   "title": "Architecture rules are enforced by AST and source scans",
+   "evidence": "test_model_policy.py:355-374 fails if any module other than factory.py imports an inference SDK. test_api.py:201-209 forbids background work in request handlers. test_route_qualification.py:346-355 forbids strict-output requests in application code, per Decision 0005."
+  },
+  {
+   "title": "Docstrings and names state scope, source and where the rest is proven",
+   "evidence": "test_github_issues.py:1 points to tests/db/connector_check.py for the gateway, test_credentials.py:1 and test_model_attempts.py:1 point to scripts/app_db.py, and test_browser_executor.py:1-5 points to the Docker qualifier. test_environment.py:1-5 states what it does not claim. Test names read as behavior, for example test_a_401_for_a_key_replaced_mid_call_leaves_its_successor_alone at test_worker_inference.py:954."
+  },
+  {
+   "title": "Injected clocks and sleepers wherever production offers the seam",
+   "evidence": "test_wake_clock.py:6-12 drives both clocks by hand. test_model_attempts.py:79-85 records RetryPolicy sleeps against a fixed now. test_browsing_loop.py:164-171 feeds clock ticks. test_worker_inference.py:197-215 advances CatalogCache's clock across the refresh boundary."
+  },
+  {
+   "title": "Shared fixture files drive boundary validation in both languages",
+   "evidence": "test_contracts.py:30 and 61-75 run every case in contracts/fixtures/boundary-cases.json and check that each required kind is covered. test_credentials.py:34 and 39-49 run credential-precedence.json. contracts.md asks for exactly this kind of shared fixture."
+  },
+  {
+   "title": "Protocol seams let fakes type-check with no ignore",
+   "evidence": "Membership (test_api.py:29-37) satisfies MembershipStore (api/security.py:14), FakePool (test_api.py:159-168) satisfies the app's Pool protocol (api/app.py:30), and Pages (test_browsing_loop.py:40-54) satisfies browsing_loop.Page (browsing_loop.py:59). None of them needs a type: ignore, unlike the fakes for concrete classes."
+  }
+ ],
+ "findings": [
+  {
+   "id": "PTST-01",
+   "title": "Paid-path tests replace private LoopMiddleware and ProviderSettings internals instead of using seams",
+   "dimension": "tests",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 770,
+     "endLine": 786,
+     "note": "Busy skips __init__, overrides _guard, _sleep and _admitted_call, and calls _with_slot, although the constructor takes sleep= and slot_wait_seconds="
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 744,
+     "endLine": 763,
+     "note": "Refusing overrides _guard and _admitted_call and calls _summarize"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 811,
+     "endLine": 831,
+     "note": "Stopping overrides _guard, _compacted, _with_slot and _repair"
+    },
+    {
+     "file": "services/agent/tests/test_operations.py",
+     "line": 207,
+     "endLine": 219,
+     "note": "Builds LoopMiddleware with __new__ and assigns _guard and _compacted"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 921,
+     "endLine": 945,
+     "note": "Settings(ProviderSettings) skips __init__, sets self._store = self and overrides _effective_environment, _settings_row and _record"
+    },
+    {
+     "file": "services/agent/tests/test_readiness.py",
+     "line": 83,
+     "endLine": 84,
+     "note": "Patches ProviderSettings.__init__ to a no-op"
+    },
+    {
+     "file": "services/agent/tests/test_browsing_loop.py",
+     "line": 209,
+     "endLine": 218,
+     "note": "Sets the private ContextVar _ADMITTED; also at test_worker_inference.py:1133-1139, and _MIDDLEWARE at test_browsing_tool.py:235"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+     "line": 350,
+     "endLine": 380,
+     "note": "The constructor needs connection, scope, limits and route. _guard reads ownership from the connection, and _admitted_call builds ModelAdmission(self._connection) itself at lines 577, 589 and 594"
+    }
+   ],
+   "occurrences": 26,
+   "evidence": "To swap out private steps, tests subclass production classes or build them without running their constructors. test_worker_inference.py:770-786:\n```python\nclass Busy(LoopMiddleware):\n    def __init__(self) -> None:\n        self._slot_wait_seconds = 30.0\n    async def _guard(self) -> float:\n        return 1.0\n    async def _sleep(self, seconds: float) -> None:\n        waits.append(seconds)\n```\nThe constructor already accepts sleep= and slot_wait_seconds= (loop_middleware.py:357-358). But _guard checks ownership over the connection, and _admitted_call constructs its own admission ledger, so Refusing, Busy and Stopping skip __init__ and override _guard, _admitted_call, _sleep, _compacted, _with_slot and _repair. ProviderSettings builds its own credential store (provider_settings.py:85-88), so tests subclass it, set self._store = self and override its private row methods. Three files set the private ContextVars _ADMITTED and _MIDDLEWARE. Counted across the suite: 16 private-member accesses (ruff --select SLF001 on tests/), 16 private names imported from autobots in 8 files (an ast scan of the import statements) and 6 classes subclassed or built without running __init__, 38 in all. 26 of them reach into the paid path: 15 of the SLF001 hits (LoopMiddleware, its two ContextVars, ProviderSettings, CatalogCache and AttemptModel), the 5 loop_middleware helpers imported by name (_charged, _failure_without_status, _finished, _retry_after and _streamed) and the 6 constructor bypasses. The other 12 touch workflow_runner, tool_gateway, runs, goal_loop, domain.workflows and the route qualifier's _main.",
+   "impact": "loop_middleware.py is 674 lines, and _admitted_call is a measured hotspot (C901 15, PLR0915 65; the constructor takes 10 parameters, PLR0913), so it is a likely refactor target. Any behavior-preserving extraction there would break the tests for budget refusal during compaction, busy-slot waits and cut-off repair at the same moment, for example moving slot waits or summaries into collaborators, renaming a private method, or turning _sleep into a collaborator. The fast, offline safety net disappears exactly where paid calls are admitted. The disposable db checks (tests/db/goal_loop_check.py, memory_check.py and admission_check.py) still drive the real middleware, but only on the db profile. Because the subclasses skip __init__, a new attribute read on these paths raises AttributeError only in tests, and the tests keep passing against overridden steps even when the real guard or admission changes. ProviderSettings' key-rejection and run-intent tests have the same problem.",
+   "recommendation": "Add seams, then test through public methods. Write the seam-based tests next to the current ones before deleting the overrides.\n- LoopMiddleware: inject the per-dispatch guard and the admission ledger as keyword-only arguments whose defaults keep today's database-backed behavior, so no production call site passes them. Use the existing sleep=, slot_wait_seconds= and summary_route= parameters. Add public context managers for the two ContextVars, as result_stream already does with use_tap and reset_tap.\n- Pure reply helpers: make _charged, _finished, _retry_after and _failure_without_status public in a small module.\n- ProviderSettings: accept the credential store and a settings-row reader as optional constructor arguments.\n- CatalogCache: it already takes now=, so drive staleness with a clock, as test_worker_inference.py:197-215 does, instead of writing _snapshot and _fetch.\n- Reuse the in-memory Ledger at test_model_attempts.py:50-72 as the admission fake, adding the reconcile and record_reply methods that _admitted_call also calls.\n- Run ruff SLF001 on tests with today's count as a baseline, so new private access shows up in review.",
+   "sketch": "adapters/loop_middleware.py\n  LoopMiddleware(connection, scope, limits, route, *, guard: Guard | None = None,\n                 admission: Callable[[], Admission] | None = None, sleep=..., slot_wait_seconds=..., ...)\n    Guard = Callable[[], Awaitable[float]]   # default: today's ownership and time-left check\n    Admission: Protocol                       # default: ModelAdmission(connection)\n  admitted_scope(), active_middleware(m)    # public context managers for _ADMITTED and _MIDDLEWARE\nadapters/model_replies.py                    # charged, finished, retry_after, failure_without_status, reply_facts\napplication/provider_settings.py\n  ProviderSettings(connection, context, *, store: CredentialStore | None = None, rows: SettingsRows | None = None)\ntests/support/middleware.py\n  middleware(guard=..., admission=Ledger(), sleep=recorder)   # builds the real class with fakes",
+   "effort": "M",
+   "risk": "high",
+   "ruleCheck": "python-worker.md and DH-06 ask for tests of ownership, cancellation and budget behavior through injected collaborators, and model-gateway.md requires budget reservations and concurrency limits to be enforced. The seams default to today's guard and admission, so no lease, fence or budget check is weakened (ground rule 2). Only how tests reach them changes. Tests come first because this is a paid path. The new arguments are keyword-only, default to today's guard and ModelAdmission, and stay unset at every production call site.",
+   "verdict": "revised",
+   "verifierNote": "All eight locations and the ruff measures match (SLF001 16, C901 15, PLR0915 65, PLR0913 10), but 12 of the 38 private touches are outside the paid path, so occurrences are now the 26 on LoopMiddleware, ProviderSettings, CatalogCache and AttemptModel. The impact now notes that the db profile still drives the real middleware, and the Ledger fake needs reconcile and record_reply."
+  },
+  {
+   "id": "PTST-02",
+   "title": "Fake OpenRouter replies, catalog payloads and SDK clients are hand-built in six test files and again in tests/db",
+   "dimension": "duplication",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/tests/fake_openrouter.py",
+     "line": 34,
+     "endLine": 51,
+     "note": "The shared fake's completion body"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 255,
+     "endLine": 298,
+     "note": "A second fake: completion, SSE through completion_to_sse, and an SDK factory"
+    },
+    {
+     "file": "services/agent/tests/test_browse_trial.py",
+     "line": 48,
+     "endLine": 82,
+     "note": "Completion and SDK client built inline"
+    },
+    {
+     "file": "services/agent/tests/test_model_policy.py",
+     "line": 244,
+     "endLine": 277,
+     "note": "recording_factory builds a completion and an OpenRouter client"
+    },
+    {
+     "file": "services/agent/tests/test_reasoning_trial.py",
+     "line": 101,
+     "endLine": 134,
+     "note": "FakeRoute builds a completion and an AsyncClient"
+    },
+    {
+     "file": "services/agent/tests/test_route_qualification.py",
+     "line": 104,
+     "endLine": 146,
+     "note": "A hand-written SSE encoder, beside autobots.operations.fake_stream.completion_to_sse"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 97,
+     "endLine": 109,
+     "note": "catalog_payload; others at test_browse_trial.py:21-31, test_reasoning_trial.py:31-42, test_final_review.py:81-91, test_route_qualification.py:31-41 and 358-368, test_model_policy.py:483-496"
+    },
+    {
+     "file": "tests/db/product_inference_worker.py",
+     "line": 195,
+     "endLine": 204,
+     "note": "The same completion and SDK factory in the db area; tests/db/keys_and_vars_check.py:50-51 repeats test_browse_trial.py's catalog exactly"
+    }
+   ],
+   "occurrences": 27,
+   "evidence": "Counted with grep:\n- 8 hand-written \"object\": \"chat.completion\" bodies: six in service tests (also test_route_qualification.py:148-172) and two in tests/db (product_inference_worker.py:195, sleep_inference_worker.py:54).\n- 10 catalog-payload builders: seven in six service files and three outside (two in tests/db, tests/web/fixture_upstream_api.py:40).\n- 9 SDK client factories: seven call default_sdk_client over MockTransport, five here and two in tests/db, and two more build openrouter.OpenRouter directly.\ntest_route_qualification.py:104-146 writes its own SSE encoder, although autobots.operations.fake_stream.completion_to_sse exists for exactly this and test_worker_inference.py:289 and tests/db already use it. The copies already differ: cost present or absent, an extra provider field, stream pieces of 4 versus 16 characters, and words split by spaces.",
+   "impact": "A change to the provider's reply shape, like Decision 0022's switch to streaming, has to be made in eight places. The worker's fake and the qualifier's fake can also disagree about the streams they produce, so a parsing bug can pass one suite and fail the other.",
+   "recommendation": "Build one fake-provider kit, and let each test choose only its reply policy.\n- Put the pure shape builders (completion, tool_call, catalog_payload, with catalog entries derived from PROFILES) next to completion_to_sse in autobots.operations.fake_stream, which tests/db already imports.\n- Keep the recording transport and the SDK factory helper in tests/fake_openrouter.py.\n- Replace test_route_qualification.py's _stream with completion_to_sse, after checking that the cancellation fixture still gets enough chunks to stop on.",
+   "sketch": "autobots/operations/fake_stream.py   (already shared with tests/db)\n  completion(message, finish='stop', *, model, usage=USAGE, cost=None) -> dict\n  tool_call(name, arguments, call_id='call-1') -> dict\n  catalog_payload(profiles=PROFILES.values(), supported=(...), pricing=PRICE) -> dict\n  completion_to_sse(completion, piece=16) -> bytes      # exists\ntests/fake_openrouter.py\n  class RecordingOpenRouter: bodies, keys, clients; __call__ answers reply(body), streaming when asked\n  def sdk_factory(handler, *, sync=False) -> Callable[[str], openrouter.OpenRouter]",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "model-gateway.md makes fake transports the default test path, and DH-06 asks for fake-transport tests of catalog mapping. The kit keeps every test offline and only removes copies. fake_stream.py's own docstring says the fake transports in tests and qualifiers use it.",
+   "verdict": "confirmed",
+   "verifierNote": "Recounted with rg: 8 chat.completion bodies, 10 catalog builders and 9 SDK client factories, 27 in all. completion_to_sse takes a piece argument, so the qualifier's 4-character tool-argument chunks can be kept."
+  },
+  {
+   "id": "PTST-03",
+   "title": "The shared fake transport still encodes the superseded two-profile policy and refuses Sol",
+   "dimension": "tests",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/tests/fake_openrouter.py",
+     "line": 11,
+     "endLine": 13,
+     "note": "Hardcoded DeepSeek and Terra wire IDs; the allowlist has two entries"
+    },
+    {
+     "file": "services/agent/tests/fake_openrouter.py",
+     "line": 18,
+     "note": "The docstring says 'the two-profile policy'"
+    },
+    {
+     "file": "services/agent/tests/fake_openrouter.py",
+     "line": 31,
+     "endLine": 33,
+     "note": "Any other model gets a 400 'not an approved profile'"
+    },
+    {
+     "file": "services/agent/tests/test_model_transport.py",
+     "line": 21,
+     "endLine": 25,
+     "note": "test_each_approved_profile_round_trips_through_the_fake covers two wire IDs"
+    },
+    {
+     "file": "services/agent/tests/test_model_policy.py",
+     "line": 79,
+     "endLine": 88,
+     "note": "The same suite asserts exactly three profiles"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/models.py",
+     "line": 72,
+     "note": "OFFERED_FOR_NEW_RUNS includes SOL"
+    }
+   ],
+   "occurrences": 2,
+   "evidence": "```python\nDEEPSEEK_WIRE_ID = \"deepseek/deepseek-v4.1-flash-1017\"\nTERRA_WIRE_ID = \"openai/gpt-6.1-terra\"\nAPPROVED_WIRE_IDS = frozenset({DEEPSEEK_WIRE_ID, TERRA_WIRE_ID})\n        if body.get(\"model\") not in APPROVED_WIRE_IDS or body.get(\"models\"):\n```\nThe file last changed in e793570 on 2026-11-05 (Astra to Terra). Decision 0019 added Sol as the third approved profile on 2026-11-07 (5349d39), and Sol is now offered for new runs.",
+   "impact": "The shared fake answers Sol, an approved profile that is now offered and is the researcher role's built-in default, with a 400 'not an approved profile'. Its users, test_model_transport.py, one assertion in test_model_policy.py and the three tests/faults/model_transport fixtures, therefore can't exercise Sol through it, and test_each_approved_profile_round_trips_through_the_fake claims every approved profile while covering two. Sol does reach the real factory and SDK in test_browse_trial.py:45-90, through that file's own fake, which it needs anyway for an async SDK factory and tool-call replies. The fault fixture's docstring repeats 'two approved profiles' (tests/faults/model_transport/test_bad_unapproved_model.py:1).",
+   "recommendation": "Derive the allowlist from the domain table: APPROVED_WIRE_IDS = frozenset(p.wire_id for p in PROFILES.values()). Parametrize the round-trip test over PROFILES.values(), using profile IDs as test ids, and fix the docstring. test_model_policy.py:79-88 keeps pinning the exact three identities, so deriving the fake from PROFILES can't hide a wrong entry. The stale fault-fixture docstring belongs to the db-tests area, which covers tests/faults/. Keep the 400 message, which scripts/qualify_faults.py:79 expects from the model_unapproved_bad fixture; 'openai/gpt-unapproved' stays outside PROFILES, so that fixture still fails as intended. The fixtures run under the service environment (scripts/qualify_faults.py:41-49), so fake_openrouter.py can import autobots.domain.models there.",
+   "sketch": "from autobots.domain.models import PROFILES\nAPPROVED_WIRE_IDS = frozenset(profile.wire_id for profile in PROFILES.values())\n\n@pytest.mark.parametrize('profile', list(PROFILES.values()), ids=lambda p: p.id.value)\ndef test_each_approved_profile_round_trips_through_the_fake(profile: ModelProfile) -> None: ...",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "model-gateway.md: exactly three approved profiles by Decision 0019 (S2). The fake still refuses unapproved models and fallback arrays, so no guard is weakened.",
+   "verdict": "revised",
+   "verifierNote": "Confirmed the two-entry allowlist, the docstring, the two-ID parametrization and the dates of e793570 and 5349d39. Narrowed the impact to the fake's real users, since test_browse_trial.py needs its own async fake anyway, and sent the stale fixture docstring to db-tests, which owns tests/faults."
+  },
+  {
+   "id": "PTST-04",
+   "title": "test_worker_inference.py is 1,149 lines across six production modules, under section headings that no longer match",
+   "dimension": "size",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 120,
+     "endLine": 150,
+     "note": "'# Pricing': parse_pricing and worst_case_cost"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 508,
+     "endLine": 553,
+     "note": "More pricing tests, filed under '# Binding a job'"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 556,
+     "endLine": 831,
+     "note": "loop_middleware: reply facts, log fields, retry-after, summary, slot and repair"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 918,
+     "endLine": 989,
+     "note": "provider_settings: mark_invalid, run_intent, status, revalidate"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 1011,
+     "endLine": 1016,
+     "note": "A CatalogCache test filed under '# The worker's refusal'"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 1019,
+     "endLine": 1082,
+     "note": "The operations.worker entry point"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 1085,
+     "endLine": 1149,
+     "note": "Browsing researcher routes, still under '# The entry point'"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 245,
+     "endLine": 298,
+     "note": "A second fake OpenRouter beside tests/fake_openrouter.py"
+    }
+   ],
+   "occurrences": 1,
+   "evidence": "The file has 64 tests and 10 section comments, and imports from 16 autobots modules (lines 21-89):\n```text\n120:# Pricing\n194:# The catalog cache\n447:# Binding a job          <- more pricing tests at 508-553\n556:# What a provider's replies mean for the ledger  <- LoopMiddleware internals at 741-831\n918:# Marking a key rejected <- ProviderSettings\n992:# The worker's refusal   <- a CatalogCache test at 1011-1016\n1019:# The entry point       <- browsing role routes at 1085-1149\n```\nThe file also holds 67 of the suite's 173 Any annotations (ruff ANN401) and 26 asyncio.run calls.",
+   "impact": "Someone changing adapters/models/catalog.py, loop_middleware.py or provider_settings.py won't find the tests by file name. Pricing tests sit in two places in this file alone, so a new pricing case can land in either. A review of this file mixes six concerns, and edits conflict with unrelated work.",
+   "recommendation": "Split the file by the module under test. First move the tests unchanged, as one mechanical, reviewable change. Then remove duplication, merging the local Fake into the shared fake module (see the fake OpenRouter finding). Keep the story and decision references in docstrings.",
+   "sketch": "tests/test_model_catalog.py      parse_pricing and listed prices, for adapters/models/catalog.py (120-146, 515-541)\ntests/test_model_admission.py    worst_case_cost (147-150, 508-512, 544-553), with test_model_attempts.py:224-231\ntests/test_worker_inference.py   frozen_policy, prepared, CatalogCache, AttemptModel, InferenceSource bind, open_attempt\n                                 and role_route (153-240, 299-506, 834-915, 992-1016, 1085-1149)\ntests/test_loop_middleware.py    reply facts, uncertain-call fields, retry-after, summary, slot, repair (556-831),\n                                 plus the loop_middleware tests from test_final_review.py\ntests/test_provider_settings.py  mark_invalid, run_intent, status, revalidate (918-989), joining the existing file\ntests/test_worker.py             inference_from_environment and both(), for operations/worker.py (1019-1082)\ntests/fake_openrouter.py         the Fake at 245-298, merged with FakeOpenRouter",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "DH-06 asks for small cohesive modules. A move changes no behavior and keeps the story and decision references the project requires.",
+   "verdict": "revised",
+   "verifierNote": "Confirmed 1,149 lines, 64 tests, 10 headings, 16 imported autobots modules, 67 ANN401 hits and 26 asyncio.run calls. The sketch now files each test by the module it exercises, keeping CatalogCache, which lives in worker_inference.py, in test_worker_inference.py, so it agrees with the rule in PTST-05."
+  },
+  {
+   "id": "PTST-05",
+   "title": "Tests are filed by the story or review that added them, so one module's tests sit in several files",
+   "dimension": "structure",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/tests/test_final_review.py",
+     "line": 1,
+     "note": "Filed by provenance: 19 tests over 8 modules"
+    },
+    {
+     "file": "services/agent/tests/test_final_review.py",
+     "line": 53,
+     "endLine": 76,
+     "note": "loop_middleware reservation tests, more at 249-302"
+    },
+    {
+     "file": "services/agent/tests/test_final_review.py",
+     "line": 182,
+     "endLine": 207,
+     "note": "reasoning_trial.key_usage, also tested at test_reasoning_trial.py:230-253"
+    },
+    {
+     "file": "services/agent/tests/test_operations.py",
+     "line": 167,
+     "endLine": 200,
+     "note": "Compaction summary tests in the redaction file, although test_compaction.py exists"
+    },
+    {
+     "file": "services/agent/tests/test_model_attempts.py",
+     "line": 224,
+     "endLine": 231,
+     "note": "worst_case_cost here and in test_worker_inference.py; parse_pricing also at test_final_review.py:249-263 and test_model_policy.py:482-512"
+    },
+    {
+     "file": "services/agent/tests/test_workflows.py",
+     "line": 292,
+     "endLine": 294,
+     "note": "run_projection.public_text in the workflows file, also at test_contracts.py:126-128"
+    }
+   ],
+   "occurrences": 5,
+   "evidence": "```python\n\"\"\"What US-11.12's independent review found, held in place. Fakes only, and no model call.\"\"\"\nfrom autobots.adapters.loop_middleware import (\nfrom autobots.application.operations import (\nfrom autobots.operations.worker import inference_step\n```\nThe 19 tests in test_final_review.py exercise loop_middleware, worker_inference, operations.logs, application.operations, reasoning_trial, operations.worker, assignments and contracts.run_commands. loop_middleware.py (674 lines) has no test file of its own: grep finds its tests in six files. Pricing is tested in four files, and public_text, key_usage and the compaction summary in two each.",
+   "impact": "Finding a module's tests takes a grep, and a change to loop_middleware or to pricing means edits in four to six files. New tests keep landing in whichever file the current story or review created, so the scatter grows with each round.",
+   "recommendation": "Adopt one rule: a test lives in test_<module>.py for the module it exercises, or in test_<module>_<topic>.py when that file grows large. The story, decision or review that motivated it goes in the test's docstring. Then:\n- Distribute test_final_review.py's tests into those files.\n- Create test_loop_middleware.py and test_model_catalog.py.\n- Move the compaction tests to test_compaction.py and public_text to test_run_projection.py.\n- Record the rule in the tests section of standards.md.",
+   "sketch": "test_final_review.py -> test_loop_middleware.py   reservation_for, request_bytes, past_known_price, unencodable requests\n                     -> test_worker_inference.py   price refusal, reservation passed on\n                     -> test_logs.py, test_operations.py   uvicorn loggers; restore_history, database_conditions\n                     -> test_reasoning_trial.py, test_assignments.py, test_contracts.py   key_usage, narrowed_tools, RunRequest\ntest_operations.py:167-200 -> test_compaction.py",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "Ground rule 2 keeps the practice of citing decisions and stories. The recommendation moves those citations from file names into docstrings.",
+   "verdict": "confirmed",
+   "verifierNote": "Confirmed 19 tests over 8 modules in test_final_review.py, loop_middleware imported by 6 test files and pricing tested in 4. It shares the loop_middleware and pricing moves with PTST-04, which splits test_worker_inference.py; this finding owns the filing rule and test_final_review.py."
+  },
+  {
+   "id": "PTST-06",
+   "title": "44 type: ignore comments: 14 from the tests' own loose annotations, 24 from fakes, placeholders and patched methods standing in for concrete types",
+   "dimension": "types",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/tests/test_code_tools.py",
+     "line": 16,
+     "endLine": 42,
+     "note": "The helper returns object although search() returns SearchFilesOutput, forcing nine attr-defined ignores"
+    },
+    {
+     "file": "services/agent/tests/test_url_guard.py",
+     "line": 39,
+     "endLine": 49,
+     "note": "An untyped handler causes two ignores"
+    },
+    {
+     "file": "services/agent/tests/test_provider_settings.py",
+     "line": 20,
+     "endLine": 43,
+     "note": "validator() -> object, then an operator ignore"
+    },
+    {
+     "file": "services/agent/tests/test_model_attempts.py",
+     "line": 101,
+     "endLine": 102,
+     "note": "The Ledger fake is passed where ModelAdmission is named"
+    },
+    {
+     "file": "services/agent/tests/test_final_review.py",
+     "line": 221,
+     "note": "A Source fake for InferenceSource; line 93 passes None for ProviderContext"
+    },
+    {
+     "file": "services/agent/tests/test_browsing_loop.py",
+     "line": 223,
+     "note": "A Middleware fake for LoopMiddleware; also at line 252, test_browsing_tool.py:235 and test_worker_inference.py:1141"
+    },
+    {
+     "file": "services/agent/tests/test_browser_executor.py",
+     "line": 100,
+     "note": "A Stream fake for asyncio.StreamWriter; also at lines 119 and 149"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 337,
+     "endLine": 352,
+     "note": "source_with(...) -> Any and invoke(model: Any) -> Any carry the fakes"
+    }
+   ],
+   "occurrences": 44,
+   "evidence": "```python\ndef run(**arguments: object) -> object:  # test_code_tools.py:16\n    return search(FILES, SearchFilesInput.model_validate(arguments))\n    first = found.matches[0]  # type: ignore[attr-defined]\n```\nInventory from grep, by cause:\n- 14 from the tests' own helpers: nine in test_code_tools.py, two in test_url_guard.py, and one each at test_provider_settings.py:43, test_plans.py:41 and test_browser_executor.py:38.\n- 14 fakes for concrete classes: StreamWriter, LoopMiddleware, ModelAdmission, InferenceSource, the CDP client, BrowserExecutor and ToolGateway (test_workflows.py:318, 320 and 377).\n- 5 placeholder values: a string for ModelRoute, None for ProviderContext, SimpleNamespace stand-ins.\n- 5 method replacements on instances.\n- 6 deliberate: three socket patches in conftest.py, an immutability check, a TypedDict override and a third-party attribute.\nruff ANN401 also finds 173 Any annotations, 67 of them in test_worker_inference.py.",
+   "impact": "mypy strict runs on tests, but these fakes are never checked against the signatures they stand in for. If InferenceSource.open_attempt or ModelAdmission.settle changes, ScriptedKeys and Ledger still type-check: they fail only at run time, or keep passing on paths the test doesn't reach. Where production declares a Protocol (MembershipStore, Pool, browsing_loop.Page), the fakes need no ignore at all, so this cost is avoidable.",
+   "recommendation": "Work in four steps:\n1. Fix the 14 self-inflicted ignores now. Annotate run(...) -> SearchFilesOutput, type the Recorder handler as Callable[[httpx.Request], httpx.Response | Awaitable[httpx.Response]], declare validator(...) -> Callable[[SecretStr], Awaitable[KeyCheck]], and give rejected() the real parameter types.\n2. Add narrow Protocols at the seams the tests use:\n   - AttemptSource (open_attempt, reject_key) for AttemptModel.\n   - An admission protocol for call_with_policy; test_model_attempts.py's Ledger already fits it.\n   - The one-method middleware protocol that admitted_steps needs.\n   - A writer protocol for the egress handlers.\n   - A gateway protocol for workflow_runner._tool.\n3. Replace placeholder values with typed fixtures, such as a ROUTE and a ProviderContext.\n4. Give every remaining ignore a reason comment.",
+   "sketch": "class AttemptSource(Protocol):\n    async def open_attempt(self, workspace_id: UUID, policy: RolePolicy, *,\n                           reserved_micro_usd: int | None = ..., role: ModelRole = ...) -> tuple[Any, CredentialReference]: ...\n    async def reject_key(self, workspace_id: UUID, used: CredentialReference) -> None: ...\nclass Admits(Protocol):\n    async def admitted(self, request: Any, handler: Handler, route: ModelRoute) -> tuple[Any, bool]: ...\nclass ByteWriter(Protocol):   # egress_proxy handlers\n    def write(self, data: bytes) -> None: ...; async def drain(self) -> None: ...; def close(self) -> None: ...",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "DH-06 asks for narrow interfaces and for third-party typing exceptions that are narrow and documented. contracts.md keeps domain, row, DTO, graph and UI types distinct; these Protocols describe call seams only and merge no types. The change is type-only, and mypy strict verifies it.",
+   "verdict": "revised",
+   "verifierNote": "Recounted all 44 by cause and the breakdown holds: 14 self-inflicted, 14 fakes for concrete classes, 5 placeholders, 5 method replacements and 6 deliberate. The title now names the placeholders and patched methods among the 24, and search() does return SearchFilesOutput."
+  },
+  {
+   "id": "PTST-07",
+   "title": "Session-global state couples tests: a gc-based model check depends on earlier files, and logging is reconfigured without restore",
+   "dimension": "tests",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/tests/test_environment.py",
+     "line": 75,
+     "endLine": 76,
+     "note": "Asserts that no BaseChatModel exists anywhere in the process"
+    },
+    {
+     "file": "services/agent/tests/test_browsing_loop.py",
+     "line": 231,
+     "endLine": 245,
+     "note": "Returns strings instead of raising and calls gc.collect() so that test_environment passes"
+    },
+    {
+     "file": "services/agent/tests/test_browsing_loop.py",
+     "line": 248,
+     "endLine": 260,
+     "note": "The same workaround"
+    },
+    {
+     "file": "services/agent/tests/test_final_review.py",
+     "line": 101,
+     "endLine": 120,
+     "note": "Runs dictConfig(uvicorn) and configure_logging(stream) with no restore"
+    },
+    {
+     "file": "services/agent/tests/test_operations.py",
+     "line": 64,
+     "endLine": 66,
+     "note": "Runs configure_logging(stream) with no restore"
+    },
+    {
+     "file": "services/agent/src/autobots/operations/logs.py",
+     "line": 70,
+     "endLine": 86,
+     "note": "Replaces the root handlers and changes root, uvicorn and httpx logger settings"
+    },
+    {
+     "file": "services/agent/tests/test_github_issues.py",
+     "line": 260,
+     "endLine": 267,
+     "note": "Re-executes a script and writes sys.modules on every call"
+    }
+   ],
+   "occurrences": 6,
+   "evidence": "```python\ndef test_no_model_is_constructed() -> None:  # test_environment.py:75\n    assert [item for item in gc.get_objects() if isinstance(item, BaseChatModel)] == []\n# test_browsing_loop.py:235\n        # No traceback is kept, so no model outlives this test (see test_environment).\n```\nTest files run in alphabetical order, so test_browsing_loop.py runs before test_environment.py, and it has to free every AdmittedModel it builds. After test_final_review.py, the root logger writes to a StringIO that nothing reads, at INFO level, with uvicorn propagation and the httpx level changed. Counted with grep: one gc.get_objects() scan, two tests that call gc.collect() to protect it (test_browsing_loop.py:245 and 260), two tests that reconfigure logging without restoring it (test_final_review.py:103-107 and test_operations.py:66) and one sys.modules write (test_github_issues.py:265), 6 sites.",
+   "impact": "test_environment's import check scans gc.get_objects() without collecting first, so it passes only if every earlier test has freed its models, and thirteen test files sort before it. A new one that leaves a model in a reference cycle, such as a traceback kept by pytest.raises, would fail test_environment far from the cause, and the workaround spreads: exceptions are already being turned into strings to avoid keeping a traceback. After the logging tests, the root logger stays at INFO behind a StringIO handler and the httpx logger at WARNING for every later file. No current assertion depends on that (test_reasoning_trial.py:217 sets its own caplog level), but any later log assertion would.",
+   "recommendation": "Make the import check independent of test order. The smallest step is a gc.collect() before the scan, which already makes the workarounds unnecessary. The precise one checks what the PRD 3.1 import gate means, right after collection: a pytest_collection_finish hook in conftest.py that runs gc.collect() and asserts that no BaseChatModel exists, or a fresh interpreter with sockets blocked. Then drop the gc.collect() calls and the string-returning wrappers. Add a restore_logging fixture that snapshots and restores the root, uvicorn and httpx handlers, levels and propagation, and use it in both logging tests. Load the qualifier script once in a module-scoped fixture, and remove it from sys.modules on teardown.",
+   "sketch": "# conftest.py\ndef pytest_collection_finish(session: pytest.Session) -> None:\n    gc.collect()\n    built = [o for o in gc.get_objects() if isinstance(o, BaseChatModel)]\n    assert not built, 'a chat model was built at import'\n\n@pytest.fixture\ndef restore_logging() -> Iterator[None]: ...   # snapshot handlers, levels and propagate; restore after",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "python-worker.md keeps model tests fake and offline. The PRD 3.1 import check stays; it just runs at a point that doesn't depend on test order.",
+   "verdict": "revised",
+   "verifierNote": "Confirmed the uncollected gc scan, both workarounds, both unrestored logging reconfigurations and the sys.modules write: 6 sites, not 5. Narrowed the logging impact, since test_reasoning_trial.py sets its own caplog level, and added the smallest fix, a gc.collect() before the scan."
+  },
+  {
+   "id": "PTST-08",
+   "title": "Paid-path wiring, and the egress proxy's import rule, are checked by searching source text",
+   "dimension": "tests",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/tests/test_final_review.py",
+     "line": 266,
+     "endLine": 270,
+     "note": "Three substring checks on inspect.getsource"
+    },
+    {
+     "file": "services/agent/tests/test_final_review.py",
+     "line": 280,
+     "endLine": 290,
+     "note": "Checks the order of two strings in _admitted_call's source"
+    },
+    {
+     "file": "services/agent/src/autobots/application/worker_inference.py",
+     "line": 317,
+     "endLine": 318,
+     "note": "The pinned text: a positional ModelRoute(...) call and reserved_micro_usd=worst_case"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 485,
+     "endLine": 492,
+     "note": "bind_with() already runs bind but doesn't assert rate, tier or the reservation"
+    },
+    {
+     "file": "services/agent/tests/test_browser_executor.py",
+     "line": 157,
+     "endLine": 159,
+     "note": "Checks imports by substring"
+    }
+   ],
+   "occurrences": 5,
+   "evidence": "```python\ndef test_the_wiring_a_unit_test_cant_reach_is_in_place() -> None:\n    \"\"\"Text only: these three call sites otherwise run only with a real worker.\"\"\"\n    assert \"inference_step(config, source, store, stop)\" in inspect.getsource(worker_module)\n    assert \"reserved_micro_usd=worst_case\" in inspect.getsource(InferenceSource.bind)\n    assert \"worst_case, rate, tier)\" in inspect.getsource(InferenceSource.bind)\n```\ntest_browser_executor.py:157-159 checks with two substring tests that the egress proxy imports nothing from autobots. Counted with grep for inspect.getsource and read_text: three substring checks at test_final_review.py:268-270, one order check at 289-290 and the proxy's import check, 5 in all. The scans at test_api.py:201-209, test_model_policy.py:355-374 and test_route_qualification.py:346-355 forbid patterns rather than pin wiring, and are not counted.",
+   "impact": "Switching the ModelRoute call to keyword arguments, renaming a local or a formatter line break would fail these tests with behavior unchanged. A comment containing the same text would keep them green after the real argument is gone. These lines guard whether a fresh price is compared with what was reserved, so a false pass could let an under-reserved paid call through unnoticed. Moving the AdmissionRequest construction into a helper would likewise make test_final_review.py:290 raise ValueError with behavior unchanged.",
+   "recommendation": "Assert behavior instead:\n- bind_with() (test_worker_inference.py:472-482) already runs InferenceSource.bind, which returns a model factory with the config. Assert config.route.input_per_million_micro_usd and tier_from_tokens, then call the factory and invoke the AttemptModel it returns with InferenceSource.open_attempt monkeypatched to record reserved_micro_usd, the way test_final_review.py:210-224 records what an AttemptModel passes on, and check that it equals the worst case.\n- Test the unencodable-request ordering through awrap_model_call once the admission seam from the first finding exists: expect LoopStopped('request_unencodable') with no admission recorded.\n- The worker-loop wiring runs for real in tests/db/product_inference_worker.py on a disposable stack. If a fast check is wanted, inject the step builder.\n- Replace the proxy's substring check with an AST import scan like the one at test_model_policy.py:355-374.",
+   "sketch": "def test_bind_reserves_the_worst_case_and_carries_rate_and_tier(monkeypatch):\n    seen: list[int | None] = []\n    async def recording(self, *_, reserved_micro_usd=None, **__):\n        seen.append(reserved_micro_usd); raise ProviderFailure(FailureClass.OTHER)\n    monkeypatch.setattr(InferenceSource, 'open_attempt', recording)\n    factory, config = bind_with(snapshot(), (None, 777), monkeypatch)\n    assert config.route.input_per_million_micro_usd == 1_000_000 and config.route.tier_from_tokens is None\n    with pytest.raises(ProviderFailure): asyncio.run(factory().ainvoke([]))\n    assert seen == [777]",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "python-worker.md keeps model tests fake. Runs on the disposable db profile remain separate evidence, as AGENTS.md separates mocked, disposable and live evidence.",
+   "verdict": "revised",
+   "verifierNote": "Confirmed the three substring checks, the order check, and that bind_with() reaches bind without asserting rate, tier or the reservation; worker.main runs for real in tests/db/product_inference_worker.py. The sketch now calls the factory that bind returns, and the title names the egress proxy's import check, a boundary rule rather than paid-path wiring."
+  },
+  {
+   "id": "PTST-09",
+   "title": "SQL connection fakes are copied per file, match on substrings, and most answer unmatched SQL silently",
+   "dimension": "tests",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/tests/test_final_review.py",
+     "line": 141,
+     "endLine": 172,
+     "note": "Fakes database_conditions; answers the hold query with an empty tuple at lines 156-157"
+    },
+    {
+     "file": "services/agent/tests/test_schema_release.py",
+     "line": 62,
+     "endLine": 100,
+     "note": "Fakes the same function; answers the hold query with None at lines 84-85"
+    },
+    {
+     "file": "services/agent/src/autobots/application/operations.py",
+     "line": 147,
+     "endLine": 151,
+     "note": "held = await cursor.fetchone() is not None"
+    },
+    {
+     "file": "services/agent/tests/test_tool_keys.py",
+     "line": 94,
+     "endLine": 101,
+     "note": "Saved dispatches on SQL text"
+    },
+    {
+     "file": "services/agent/tests/test_tool_keys.py",
+     "line": 183,
+     "endLine": 201,
+     "note": "Recorded, with a nested Row class"
+    },
+    {
+     "file": "services/agent/tests/test_tool_keys.py",
+     "line": 226,
+     "endLine": 243,
+     "note": "Approvals dispatches on SQL text"
+    },
+    {
+     "file": "services/agent/tests/test_operation_values.py",
+     "line": 130,
+     "endLine": 133,
+     "note": "Pool, identical to test_readiness.py:51-54"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 454,
+     "endLine": 462,
+     "note": "Rows answers every statement with the same value"
+    }
+   ],
+   "occurrences": 14,
+   "evidence": "```python\nasync def execute(self, statement: str, *_: Any) -> FakeCursor:  # test_final_review.py:153\n    if \"pg_attribute\" in statement:\n        return FakeCursor((self.missing_columns,))\n    if \"installation_holds\" in statement:\n        return FakeCursor(())\n    return FakeCursor((0,))\n```\nbecause database_conditions reads an empty tuple as present (\"is not None\"), this fake quietly arranges a restore hold, which its test never asserts, while test_schema_release.py's fake of the same query arranges none. An ast scan for classes that define execute, fetchone or fetchall, or connection(), leaving out gateway fakes and the lifecycle pool in test_api.py, finds 14 top-level connection, cursor and pool classes in 6 files, and 19 with those nested inside tests. Unmatched SQL gets a plausible row from 4 of them (test_final_review.py's FakeConnection, test_schema_release.py's Connection, test_tool_keys.py's Both and test_worker_inference.py's Rows), None from 3, and an AssertionError only from Saved and Untouched in test_tool_keys.py.",
+   "impact": "A reworded or added query silently gets (0,) or a fixed value instead of failing. A fake can therefore pass while modeling a different database than its test intends, as the hold above shows. Each new query in operations or tool keys means updating several hand-written fakes.",
+   "recommendation": "Add one ScriptedConnection in tests/support/db.py. It holds a list of (SQL fragment, rows) rules, records statements and parameters, supports transaction() and async context use, and raises AssertionError for any statement that no rule matches. Add one FakePool beside it. Rebuild these fakes on it, and in test_final_review.py answer the hold query with None, or assert the hold condition. Real SQL stays covered by the db profile. The API helpers in PTST-11 import FakePool from here.",
+   "sketch": "class ScriptedConnection:\n    def __init__(self, *rules: tuple[str, list[tuple[Any, ...]]]) -> None: ...\n    async def execute(self, sql: str, params: Any = None) -> ScriptedCursor: ...   # raises when no rule matches\n    def transaction(self) -> AbstractAsyncContextManager[None]: ...\n    statements: list[tuple[str, Any]]\nclass FakePool:\n    def connection(self) -> ScriptedConnection: ...",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "None directly. Real SQL stays covered by the db profile's disposable checks, and these fakes stay offline.",
+   "verdict": "revised",
+   "verifierNote": "Confirmed that database_conditions reads an empty tuple as held (application/operations.py:151), so test_final_review.py's fake arranges a hold its test never checks. Recounted 14 top-level fakes in 6 files, 19 with nested ones: 4 answer unmatched SQL with a row, 3 with None and 2 assert, so the title now says most answer silently."
+  },
+  {
+   "id": "PTST-10",
+   "title": "The workflow golden-graph tests run a test-side copy of the runner's block rules, which already lacks the foreach bound",
+   "dimension": "duplication",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/tests/test_workflow_execution.py",
+     "line": 29,
+     "endLine": 63,
+     "note": "run(): 'The same decisions the runner makes, over plain dictionaries' (ruff C901 13)"
+    },
+    {
+     "file": "services/agent/tests/test_workflow_execution.py",
+     "line": 55,
+     "endLine": 57,
+     "note": "foreach emits every item, with no bound"
+    },
+    {
+     "file": "services/agent/src/autobots/application/workflow_runner.py",
+     "line": 175,
+     "endLine": 189,
+     "note": "The real pure blocks, including the foreach_over_bound check"
+    }
+   ],
+   "occurrences": 1,
+   "evidence": "```python\nelif block == \"foreach\":                                   # test_workflow_execution.py:55\n    for index, item in enumerate(step.inputs[\"items\"]):\n        emissions[(step.key, \"item\", index)] = item\nif block == \"foreach\":                                     # workflow_runner.py:185\n    items = step.inputs[\"items\"]\n    if len(items) > config[\"max_items\"]:\n        raise BlockFailed(\"foreach_over_bound\")\n```",
+   "impact": "These tests check domain readiness (next_steps) against emissions produced by the copy, not by _run_block. A change to ports, emission indexes or the foreach bound in the runner goes unseen here, and an over-bound list succeeds in these tests although the runner fails it.",
+   "recommendation": "Extract the pure block rules (input, output, join, transform, condition, and foreach with its bound) from _run_block into one domain function, and call it from both the runner and the test helper. Tool-backed blocks stay in the runner. Then add a golden case for an over-bound foreach. Write characterization tests first, because the runner executes durable workflow steps.",
+   "sketch": "domain/workflow_execution.py\n  def pure_emissions(block: str, config: Mapping[str, Any], step: Step,\n                     inputs: Mapping[str, Any]) -> list[tuple[str, int, Any]] | None\n      # None for tool-backed blocks; raises BlockFailed('foreach_over_bound')\napplication/workflow_runner.py\n  _run_block: emitted = pure_emissions(...); if emitted is not None: return emitted; then the tool blocks\ntests/test_workflow_execution.py\n  run(): records pure_emissions(...) under (step.key, port, index)",
+   "effort": "S",
+   "risk": "medium",
+   "ruleCheck": "DH-06 asks to keep domain decisions independent of HTTP and LangGraph and to avoid duplicated business rules. Execution stays in the Python runner; no transition or scheduling moves anywhere.",
+   "verdict": "confirmed",
+   "verifierNote": "Confirmed the copied block rules (ruff C901 13), the missing bound at test_workflow_execution.py:55-57 and the real check at workflow_runner.py:185-188. No golden case uses an over-bound list today, so the divergence is latent rather than a current false pass."
+  },
+  {
+   "id": "PTST-11",
+   "title": "API boundary setup is copied into three files, and one test module imports another's helpers",
+   "dimension": "duplication",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/tests/test_api.py",
+     "line": 17,
+     "endLine": 51,
+     "note": "Constants, Membership, token, client and headers"
+    },
+    {
+     "file": "services/agent/tests/test_api.py",
+     "line": 138,
+     "endLine": 146,
+     "note": "A second MembershipStore fake"
+    },
+    {
+     "file": "services/agent/tests/test_operation_values.py",
+     "line": 32,
+     "endLine": 38,
+     "note": "The same constants and Settings"
+    },
+    {
+     "file": "services/agent/tests/test_operation_values.py",
+     "line": 119,
+     "endLine": 133,
+     "note": "Membership and Pool copied"
+    },
+    {
+     "file": "services/agent/tests/test_operation_values.py",
+     "line": 203,
+     "endLine": 210,
+     "note": "JWT claims and headers built inline, again at lines 275-279"
+    },
+    {
+     "file": "services/agent/tests/test_readiness.py",
+     "line": 19,
+     "endLine": 62,
+     "note": "Constants, Membership, Pool and headers copied again"
+    },
+    {
+     "file": "services/agent/tests/test_tool_catalog.py",
+     "line": 17,
+     "note": "from test_api import client, headers, token"
+    }
+   ],
+   "occurrences": 14,
+   "evidence": "```python\nINTERNAL = \"fixture-internal\"                             # test_api.py:17, test_operation_values.py:32, test_readiness.py:19\nSECRET = \"fixture-jwt-secret-with-enough-length\"          # the same three files\nWORKSPACE = UUID(\"a0000000-0000-4000-8000-000000000001\")  # the same three files\nfrom test_api import client, headers, token               # test_tool_catalog.py:17\n```\nFour MembershipStore fakes implement the same three methods, plus a MemberOnly subclass (test_operation_values.py:263). Two Pool fakes are identical, and JWT headers are built four times. The suite defines no pytest fixture at all (grep '@pytest.fixture' finds 0). Counted: 3 copies of the identity constants and Settings, 4 MembershipStore fakes, 2 identical pools, 4 JWT builders and 1 cross-module import, 14 in all.",
+   "impact": "Adding a method to MembershipStore (api/security.py:14), or a required header, means editing four fakes in three files. Renaming test_api.py's helpers breaks test_tool_catalog.py. The fakes grant different roles on purpose (test_readiness.py:38-48 documents a member who isn't the owner), but only a docstring says so; a factory would make the role a visible argument.",
+   "recommendation": "Create the suite's first shared layer: tests/support/api.py, or fixtures in conftest.py. It holds the identity constants, a members(...) factory that returns a MembershipStore fake for given users and roles, auth_headers(user), and an api_client helper that takes a membership and a pool, using the FakePool of PTST-09. Point test_tool_catalog.py at it instead of at test_api.py.",
+   "sketch": "tests/support/api.py\n  INTERNAL, SECRET, WORKSPACE, SETTINGS\n  def members(roles: Mapping[UUID, str], workspace: UUID = WORKSPACE) -> MembershipStore\n  def auth_headers(user: UUID, *, internal: str = INTERNAL) -> dict[str, str]\n  FakePool                      # imported from tests/support/db.py (PTST-09)\n  def api_client(membership: MembershipStore, pool: Pool | None = None) -> TestClient",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "none",
+   "verdict": "revised",
+   "verifierNote": "Confirmed the three copies of the identity constants and Settings, four membership fakes plus MemberOnly, two identical pools, four JWT builders, the import from test_api and zero fixtures: 14. The owner-versus-member difference is deliberate and documented, so the impact no longer calls it drift, and FakePool now comes from the support module of PTST-09."
+  },
+  {
+   "id": "PTST-12",
+   "title": "Async tests use two styles with no rule: 81 asyncio.run calls in 15 files beside 45 asyncio marks in 10",
+   "dimension": "approach",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 1033,
+     "endLine": 1043,
+     "note": "A go() wrapper that exists only to await one call"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 197,
+     "endLine": 215,
+     "note": "An inner go() run through asyncio.run; the file has 26 asyncio.run calls"
+    },
+    {
+     "file": "services/agent/tests/test_tool_keys.py",
+     "line": 77,
+     "endLine": 83,
+     "note": "A resolve() wrapper"
+    },
+    {
+     "file": "services/agent/tests/test_operation_values.py",
+     "line": 163,
+     "endLine": 167,
+     "note": "number() is async only so that asyncio.run(number(2)) can return a stub (lines 194-196)"
+    },
+    {
+     "file": "services/agent/tests/test_model_attempts.py",
+     "line": 125,
+     "endLine": 137,
+     "note": "The native pytest-asyncio style"
+    },
+    {
+     "file": "services/agent/pyproject.toml",
+     "line": 55,
+     "endLine": 59,
+     "note": "asyncio_mode = 'strict' with pytest-asyncio pinned"
+    }
+   ],
+   "occurrences": 81,
+   "evidence": "```python\ndef test_a_failing_first_step_does_not_starve_the_second() -> None:\n    async def broken(_: Any) -> bool:\n        raise RuntimeError(\"arranged\")\n    async def working(_: Any) -> bool:\n        return True\n    async def go() -> bool:\n        return await worker.both(broken, working)(None)\n    assert asyncio.run(go()) is True\n```\n15 inner wrapper coroutines exist only to be passed to asyncio.run: six in test_worker_inference.py, three in test_browsing_loop.py, and two each in test_browsing_tool.py, test_result_stream.py and test_tool_keys.py.",
+   "impact": "Each wrapper adds three to six lines and hides the call under test. Readers can't tell a deliberate asyncio.run (in a sync test that also drives TestClient, which can't run inside a running loop) from habit, and the two styles get mixed as tests move between files.",
+   "recommendation": "Write the rule down. Async tests are async def functions marked @pytest.mark.asyncio, or the project sets asyncio_mode = 'auto'. asyncio.run is used only in sync tests that also use TestClient or need a separate loop, with a one-line comment saying why. Make number() a plain function. Convert files when they are next touched, starting with the test_worker_inference.py split.",
+   "sketch": "@pytest.mark.asyncio\nasync def test_a_failing_first_step_does_not_starve_the_second() -> None:\n    assert await worker.both(broken, working)(None) is True",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "DH-06 asks for pytest with qualified async support; pytest-asyncio 1.4.1.post1 is pinned in the dev group.",
+   "verdict": "confirmed",
+   "verifierNote": "Recounted 81 asyncio.run calls in 15 files, 45 asyncio marks in 10, and 15 wrappers passed only to asyncio.run, 16 with number()."
+  },
+  {
+   "id": "PTST-13",
+   "title": "Sibling test files copy their scaffolding: tool-adapter context, resolver and gateway-refusal block, and workflow graph builders",
+   "dimension": "duplication",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/tests/test_jina.py",
+     "line": 22,
+     "endLine": 26,
+     "note": "CONTEXT and resolve()"
+    },
+    {
+     "file": "services/agent/tests/test_tavily.py",
+     "line": 24,
+     "endLine": 25,
+     "note": "The identical resolve(); CONTEXT again at line 61"
+    },
+    {
+     "file": "services/agent/tests/test_jina.py",
+     "line": 93,
+     "endLine": 99,
+     "note": "The gateway-refusal block"
+    },
+    {
+     "file": "services/agent/tests/test_tavily.py",
+     "line": 103,
+     "endLine": 110,
+     "note": "The same block"
+    },
+    {
+     "file": "services/agent/tests/test_market_data.py",
+     "line": 128,
+     "endLine": 134,
+     "note": "The same block, again at lines 200-206; CONTEXT at line 18"
+    },
+    {
+     "file": "services/agent/tests/test_workflows.py",
+     "line": 26,
+     "endLine": 36,
+     "note": "node() and link()"
+    },
+    {
+     "file": "services/agent/tests/test_workflow_execution.py",
+     "line": 16,
+     "endLine": 26,
+     "note": "Identical node() and link()"
+    },
+    {
+     "file": "services/agent/tests/test_workflow_execution.py",
+     "line": 102,
+     "endLine": 114,
+     "note": "The branch graph again, as in test_workflows.py:68-81; loop() at test_workflows.py:50-65 is the same graph as upper_loop() at lines 66-82"
+    }
+   ],
+   "occurrences": 17,
+   "evidence": "```python\nfake = Fake()                                                # test_jina.py:93\nregistry = ToolRegistry()\nregistry.register(tools(fake)[tool_id])\nscope = ToolScope(uuid4(), uuid4(), 1, {tool_id: 1})\nresult = await ToolGateway(registry).execute(None, scope, tool_id, arguments)\nassert (result.outcome.value, result.code) == (\"denied\", \"invalid_arguments\")\nassert fake.seen == []\n```\nThe count, by grep: 4 gateway-refusal blocks, 5 ToolContext constants or factories (also test_github_reads.py:20 and test_github_issues.py:62), 2 resolvers, and 2 copies each of node/link, branch and loop.",
+   "impact": "A change to ToolScope's fields, to the gateway's refusal shape or to the graph IR's node format means editing every copy. The helpers are also bypassed where they exist: test_workflows.py:421-438 writes nodes and links as raw dicts beside node() and link().",
+   "recommendation": "Move the tool-adapter helpers into tests/support/tools.py and the graph builders into tests/support/graphs.py, then import them in both files of each pair.",
+   "sketch": "tests/support/tools.py\n  CONTEXT; def context(operation: str | None = None) -> ToolContext\n  def resolver(names: Mapping[str, list[str]]) -> Callable[[str, int], Awaitable[list[str]]]\n  async def refused_by_gateway(tool: ToolDefinition, arguments: dict[str, Any]) -> ToolResult\ntests/support/graphs.py\n  node, link, simple, loop, branch, chain",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "none",
+   "verdict": "revised",
+   "verifierNote": "Recounted 4 refusal blocks, 5 ToolContext constants or factories, 2 identical resolvers and 2 copies each of node/link, branch and loop: 17. The raw-dict graph at test_workflows.py:421-438 sits beside node() and link() in the same file, so it is cited as a bypassed helper, not as drift between copies."
+  },
+  {
+   "id": "PTST-14",
+   "title": "test_app_factory.py keeps a hand-written copy of all 68 API paths",
+   "dimension": "duplication",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/tests/test_app_factory.py",
+     "line": 18,
+     "endLine": 88,
+     "note": "An unsorted literal of 68 paths in a 71-line test"
+    },
+    {
+     "file": "scripts/verify.py",
+     "line": 158,
+     "note": "The contract_drift step already regenerates and compares the committed contract"
+    }
+   ],
+   "occurrences": 1,
+   "evidence": "```python\ndef test_the_schema_builds_without_any_connection() -> None:\n    assert set(create_app().openapi()[\"paths\"]) == {\n        \"/v1/health\",\n        \"/v1/models\",\n        \"/v1/approvals\",\n        ...  # 68 paths, unsorted, through line 88\n    }\n```\nThe committed contracts/generated/openapi.json holds the same 68 paths. Of the 35 commits that touched this file, 33 added path lines to this literal (git log -p).",
+   "impact": "Every story that adds a route edits this literal by hand, and a failure prints two 68-item sets to compare. The literal is a second copy of what contract_drift already pins.",
+   "recommendation": "Keep the test's purpose, showing that the schema builds with sockets blocked and no key, and compare its paths against the committed generated document, which tests may read but never edit. Alternatively, assert a few sentinel paths and leave the full list to contract_drift.",
+   "sketch": "def test_the_schema_builds_without_any_connection() -> None:\n    committed = json.loads((REPOSITORY / 'contracts/generated/openapi.json').read_text())\n    assert set(create_app().openapi()['paths']) == set(committed['paths'])",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "Ground rule 2 forbids hand-editing contracts/generated/; this test only reads it. contracts.md keeps drift detection with the contract_drift step.",
+   "verdict": "confirmed",
+   "verifierNote": "Confirmed 68 unsorted paths equal to the committed openapi.json, 33 of the file's 35 commits adding paths, and contract_drift at scripts/verify.py:158."
+  },
+  {
+   "id": "PTST-15",
+   "title": "FakeGithub.__call__ in test_github_reads.py is an 86-line chain of inline payloads",
+   "dimension": "size",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/tests/test_github_reads.py",
+     "line": 28,
+     "endLine": 113,
+     "note": "Five path branches with inline JSON, and a 599 fallback"
+    }
+   ],
+   "occurrences": 1,
+   "evidence": "```python\ndef __call__(self, request: httpx.Request) -> httpx.Response:\n    self.requests.append(request)\n    path = request.url.path\n    if path.endswith(\"/pulls\"):\n        return httpx.Response(\n            200,\n            json=[\n```\nThe method routes five endpoints by path suffix, with each endpoint's JSON written inside its branch (the pulls payload alone is 22 lines), and answers any other path with httpx.Response(599).",
+   "impact": "Adding a read tool or changing a payload means editing inside one long method where data and routing are interleaved. An unexpected path gets a 599, which the tool turns into a typed failure. Today's tests assert exact codes and values, so that shows up as a puzzling mismatch rather than a false pass, but it never says which path was unexpected.",
+   "recommendation": "Lift the payloads into module constants, route through a small table, and fail the test on any unknown path.",
+   "sketch": "ROUTES = ((\"/pulls\", PULLS), (\"/jobs\", JOBS), (\"/runs\", RUNS), (\"/search/issues\", ISSUES))\ndef __call__(self, request: httpx.Request) -> httpx.Response:\n    self.requests.append(request)\n    if \"/contents/\" in request.url.path:\n        return httpx.Response(200, json=file_payload(self.file_size))\n    for suffix, payload in ROUTES:\n        if request.url.path.endswith(suffix):\n            return httpx.Response(200, json=payload)\n    raise AssertionError(f\"unexpected GitHub path {request.url.path}\")",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "none",
+   "verdict": "revised",
+   "verifierNote": "Confirmed the 86-line method with five branches and a 599 fallback. Today's tests assert exact codes and values, so the 'pass for the wrong reason' risk was overstated; the impact now says the failure is confusing rather than silent."
+  },
+  {
+   "id": "PTST-16",
+   "title": "One 102-line test patches ten route dependencies by name to build the Operations status",
+   "dimension": "size",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/tests/test_operation_values.py",
+     "line": 136,
+     "endLine": 237,
+     "note": "Nine nested stubs, a socket guard, an app, a JWT and about 20 assertions (ruff C901 15)"
+    },
+    {
+     "file": "services/agent/tests/test_operation_values.py",
+     "line": 186,
+     "endLine": 198,
+     "note": "Ten module attributes of operation_routes patched by name"
+    },
+    {
+     "file": "services/agent/tests/test_readiness.py",
+     "line": 65,
+     "endLine": 89,
+     "note": "An arranged() helper for the same module already exists here"
+    }
+   ],
+   "occurrences": 1,
+   "evidence": "```python\nfor name, stub in (\n    (\"database_conditions\", conditions),\n    (\"storage_condition\", storage),\n    ...  # ten names in all, lines 187-196\n    (\"live_workers\", asyncio.run(number(2))),\n):\n    monkeypatch.setattr(operation_routes, name, stub)\n```",
+   "impact": "Each new data source that operation_routes reads means another stub in this test. test_readiness.py and this file each build their own arrangement for the same routes, so readiness and status tests can drift apart on defaults.",
+   "recommendation": "Share one helper that installs default stubs for every dependency of operation_routes and returns a client, so each test overrides only what it asserts on. Then split the 'numbers only' assertions from the 'nothing leaves this Mac' check.",
+   "sketch": "tests/support/api.py\n  def arranged_operation_routes(monkeypatch, *, membership=members({OWNER: 'owner'}), **stubs) -> TestClient\n      # defaults: ready conditions, zero counts, empty lists; stubs override by name\ntests/test_operation_values.py\n  def test_the_status_holds_d5_numbers_only(monkeypatch): ...\n  def test_producing_the_status_sends_nothing_off_this_mac(monkeypatch): ...",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "Decision 0022 D5's exact list of values stays asserted (D5_VALUES).",
+   "verdict": "confirmed",
+   "verifierNote": "Confirmed the 102-line test (ruff C901 15), the ten names patched at lines 187-196 and test_readiness.py's arranged() for the same routes; the shared helper fits beside the API helpers of PTST-11."
+  },
+  {
+   "id": "PTST-17",
+   "title": "Test cases hide in loops, branches and either-or assertions instead of one parametrized case each",
+   "dimension": "tests",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/tests/test_tool_keys.py",
+     "line": 306,
+     "endLine": 314,
+     "note": "For a secret item, the assertion passes whatever checked() returns"
+    },
+    {
+     "file": "services/agent/tests/test_workflows.py",
+     "line": 170,
+     "endLine": 171,
+     "note": "Accepts either of two codes"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 147,
+     "endLine": 150,
+     "note": "pytest.raises(Exception, match=...) where CostUnavailable is the type; again at lines 551-553"
+    },
+    {
+     "file": "services/agent/tests/test_credentials.py",
+     "line": 117,
+     "endLine": 135,
+     "note": "Five cases arranged through an if/elif chain"
+    },
+    {
+     "file": "services/agent/tests/test_code_tools.py",
+     "line": 30,
+     "endLine": 42,
+     "note": "Seven scenarios in one test"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 485,
+     "endLine": 492,
+     "note": "Loops over profiles instead of parametrizing"
+    },
+    {
+     "file": "services/agent/tests/test_browser_executor.py",
+     "line": 150,
+     "endLine": 154,
+     "note": "A branch on a parameter selects which assertions run"
+    }
+   ],
+   "occurrences": 25,
+   "evidence": "```python\nif accepted:                                                          # test_tool_keys.py:310\n    assert checked(ITEMS[name], value) == value.strip() or ITEMS[name].secret\nelse:\n    with pytest.raises(InvalidKey):\n        checked(ITEMS[name], value)\n```\nCounted with an ast scan and grep: 11 branches on a test parameter in 7 files; 10 loops that act once per scenario, out of 22 loops over literal lists in test bodies (also test_budgets.py:30, test_contracts.py:117, test_credentials.py:92, test_model_policy.py:225, 345 and 433, test_operation_values.py:280, test_url_guard.py:202 and test_workflows.py:316; the other 12 arrange files or stubs, or check several results of one act); 2 either-or assertions; and 2 uses of raises(Exception, match=...), 25 in all.",
+   "impact": "A wrong return value for a secret item passes. A loop stops at its first failing case, and the report names only the test. With branches inside a test, each parametrized id runs different assertions, so the ids don't say what was checked.",
+   "recommendation": "Give each scenario its own case:\n- Parametrize scenario lists, with ids.\n- Split accepted and refused inputs into two tests.\n- Pass arrange callables instead of switching on strings.\n- Assert the exact code for each case, and expect the specific exception type (CostUnavailable).\nEnable ruff's PT011 and PT012 for tests (4 hits today).",
+   "sketch": "@pytest.mark.parametrize(('name', 'value', 'expected'), ACCEPTED, ids=...)\ndef test_each_item_accepts_its_shape(name: str, value: str, expected: str) -> None:\n    assert checked(ITEMS[name], value) == expected\n\n@pytest.mark.parametrize(('name', 'value'), REFUSED, ids=...)\ndef test_each_item_refuses_other_shapes(name: str, value: str) -> None: ...",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "none",
+   "verdict": "revised",
+   "verifierNote": "Confirmed each location, and that test_tool_keys.py:311 is vacuous for github_token, a secret item. Recounted 10 scenario loops, not 5, for 25 in all; test_code_tools.py:30-42 holds seven scenarios, not eight, and PT011 plus PT012 do report 4 hits today."
+  },
+  {
+   "id": "PTST-18",
+   "title": "Some tests use the wall clock and real sleeps where DH-06 asks for controlled clocks",
+   "dimension": "tests",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 91,
+     "note": "NOW is taken from the wall clock at import"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 311,
+     "endLine": 320,
+     "note": "ScriptedKeys builds CatalogCache without now=; so does real_source() at line 469"
+    },
+    {
+     "file": "services/agent/tests/test_result_stream.py",
+     "line": 89,
+     "endLine": 116,
+     "note": "Asserts coalescing from 1 ms sleeps against a patched FLUSH_SECONDS"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/result_stream.py",
+     "line": 189,
+     "note": "ResultTap reads time.monotonic() directly"
+    },
+    {
+     "file": "services/agent/tests/test_url_guard.py",
+     "line": 186,
+     "endLine": 197,
+     "note": "Waits a real 0.2 s timeout against a 5 s sleep"
+    },
+    {
+     "file": "services/agent/tests/test_operation_values.py",
+     "line": 101,
+     "endLine": 112,
+     "note": "Measures a real 10 ms sleep"
+    },
+    {
+     "file": "services/agent/src/autobots/application/worker_inference.py",
+     "line": 131,
+     "note": "prepared() checks freshness against datetime.now(UTC); _input_rate does the same at line 295"
+    }
+   ],
+   "occurrences": 5,
+   "evidence": "```python\nNOW = datetime.now(UTC)                                        # test_worker_inference.py:91\nmonkeypatch.setattr(result_stream, \"FLUSH_SECONDS\", 0.05)      # test_result_stream.py:92\nassert len(sent) < len([chunk for chunk in chunks if chunk.tool_call_chunks]) / 4  # :116\n```\nBy contrast, test_model_attempts.py:46 and test_model_policy.py:40 use a fixed NOW.",
+   "impact": "Whether a fixture catalog counts as fresh depends on when the module was imported. Five minutes after import (MAX_CATALOG_AGE), the two tests that expect ModelUnavailable for a missing tool or output limit (test_worker_inference.py:176-185) would pass on staleness instead, and test_a_drifted_mapping_is_unavailable would fail. The coalescing bound can fail on a loaded machine, and the suite pays for real waits.",
+   "recommendation": "NOW comes from the wall clock because prepared() and InferenceSource._input_rate read datetime.now(UTC) themselves (worker_inference.py:131 and 295), so a fixed NOW alone would make every fixture catalog stale. Give prepared() the now= parameter that prepare_attempt already takes, and InferenceSource a clock that defaults to the wall clock, as CatalogCache does. Then fix NOW to a constant and pass that clock to every CatalogCache and InferenceSource. Give ResultTap and timed_catalog a monotonic parameter that defaults to time.monotonic, and drive them with a fake clock in tests. Keep one real-time timeout test for guarded_fetch, with a comment saying why.",
+   "sketch": "def prepared(policy: RolePolicy, catalog: CatalogSnapshot, role: ModelRole = ROLE,\n             *, now: datetime | None = None) -> tuple[PreparedAttempt, int]:\n    ...\n    entry = validated_entry(attempt.profile, catalog, now or datetime.now(UTC))\n# InferenceSource gains now: Callable[[], datetime] = lambda: datetime.now(UTC), used by _input_rate\n# ResultTap gains monotonic: Callable[[], float] = time.monotonic",
+   "effort": "S",
+   "risk": "medium",
+   "ruleCheck": "DH-06: tests use controlled clocks and injected transports rather than real time. The new clock parameters default to the wall clock, so the MAX_CATALOG_AGE freshness check is unchanged in production; tests come first because it guards the paid path.",
+   "verdict": "revised",
+   "verifierNote": "Confirmed the wall-clock NOW, the CatalogCache builds without now=, ResultTap's direct time.monotonic() and the real 0.2 s and 10 ms waits. Revised the fix, because prepared() and _input_rate read the wall clock themselves and a fixed NOW alone would make every fixture catalog stale; risk is now medium since the clock reaches the paid path's freshness check."
+  },
+  {
+   "id": "PTST-19",
+   "title": "Test doubles reuse generic names across files, and fixtures pass bare positional literals",
+   "dimension": "naming",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 245,
+     "note": "class Fake; more at test_jina.py:29, test_market_data.py:59 and test_route_qualification.py:52"
+    },
+    {
+     "file": "services/agent/tests/test_tavily.py",
+     "line": 28,
+     "note": "Another unrelated class Fake"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 921,
+     "note": "Settings is a ProviderSettings subclass, while three files import autobots.api.settings.Settings"
+    },
+    {
+     "file": "services/agent/tests/test_github_reads.py",
+     "line": 23,
+     "note": "A FakeGithub that differs from the one at test_github_issues.py:40"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 450,
+     "endLine": 451,
+     "note": "Lease built from positional literals"
+    },
+    {
+     "file": "services/agent/tests/test_model_attempts.py",
+     "line": 75,
+     "endLine": 76,
+     "note": "AdmissionRequest built from eight positional values"
+    },
+    {
+     "file": "services/agent/tests/test_final_review.py",
+     "line": 44,
+     "note": "ModelRoute built from positional literals"
+    },
+    {
+     "file": "services/agent/tests/test_worker_inference.py",
+     "line": 301,
+     "endLine": 305,
+     "note": "ProviderContext built from six positional values"
+    }
+   ],
+   "occurrences": 15,
+   "evidence": "```python\nreturn Lease(uuid4(), uuid4(), 1, \"worker\", 1, \"running\")                                  # test_worker_inference.py:451\nreturn AdmissionRequest(uuid4(), uuid4(), uuid4(), \"coder\", \"openrouter_terra\", \"w\", 1, 5)  # test_model_attempts.py:76\nROUTE = ModelRoute(\"executor\", \"openrouter_terra\", \"fixture/model\", 34_560, 1_000_000)    # test_final_review.py:44\nclass Settings(ProviderSettings):                                                         # test_worker_inference.py:921\n```\nThere are five unrelated classes named Fake, two named FakeGithub and a Settings that shadows the API's Settings, and model_over means different things in two files (test_model_attempts.py:234 and test_worker_inference.py:559). Six value objects are built from positional literals: Lease, AdmissionRequest, ProviderContext and three ModelRoutes in test_final_review.py (lines 44, 63 and 260). 15 in all, by grep for the class names and constructor calls.",
+   "impact": "A search for the fake OpenRouter or the GitHub fake finds unrelated classes. Positional fixtures hide which number is the generation, the attempt count or the budget, and swapping two fields of the same type (generation and attempts in Lease) still type-checks.",
+   "recommendation": "Name each double after what it replaces (FakeJina, FakeTavily, ScriptedOpenRouter, GithubReadsApi, StoredProviderSettings). Build value objects with keyword arguments in fixtures, and keep the shared ones in the support modules.",
+   "sketch": "def lease() -> Lease:\n    return Lease(run_id=uuid4(), workspace_id=uuid4(), generation=1,\n                 worker_id='worker', attempts=1, run_status='running')",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "none",
+   "verdict": "revised",
+   "verifierNote": "Confirmed every name and constructor, and that the sketch's keyword names match Lease's fields. Recounted 15, since test_final_review.py builds three positional ModelRoutes (lines 44, 63 and 260), not one."
+  },
+  {
+   "id": "PTST-20",
+   "title": "47 imports sit inside test functions, and helper imports rely on pytest putting tests/ on sys.path",
+   "dimension": "standards",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/tests/test_tool_catalog.py",
+     "line": 147,
+     "endLine": 149,
+     "note": "The same two imports are repeated in four tests (also lines 163-165, 182-184 and 191-193); 12 local imports in this file"
+    },
+    {
+     "file": "services/agent/tests/test_contracts.py",
+     "line": 110,
+     "endLine": 114,
+     "note": "Re-imports datetime and UTC, already imported at line 4"
+    },
+    {
+     "file": "services/agent/tests/test_final_review.py",
+     "line": 191,
+     "note": "Imports SecretStr inside two tests (lines 191 and 197), though pydantic is already imported at the top for BaseModel"
+    },
+    {
+     "file": "services/agent/tests/test_model_policy.py",
+     "line": 408,
+     "note": "import autobots.domain.models as models, beside the top-level import at line 29 (again at 426)"
+    },
+    {
+     "file": "services/agent/tests/test_app_factory.py",
+     "line": 8,
+     "note": "from conftest import SocketBlockedError; also at test_contracts.py:27 and test_model_transport.py:9"
+    },
+    {
+     "file": "services/agent/pyproject.toml",
+     "line": 55,
+     "endLine": 59,
+     "note": "No pythonpath is declared for the tests"
+    }
+   ],
+   "occurrences": 50,
+   "evidence": "```python\ndef test_a_raw_payload_never_projects() -> None:          # test_contracts.py:110\n    from datetime import UTC, datetime\n    from uuid import uuid4\n\n    from autobots.application.run_projection import project_event, public_text\n```\nruff --select PLC0415 finds 47 function-level imports in 12 files. Three files import from conftest. Those imports, and the imports of fake_openrouter and test_api, resolve only because pytest's default prepend import mode puts tests/ on sys.path.",
+   "impact": "A file's dependencies aren't visible at its top, and re-imports shadow names already in scope. The conftest and helper imports would break under pytest's importlib import mode, or when a file is run any other way.",
+   "recommendation": "Move imports to the top of the file unless a comment gives a reason, and add PLC0415 to the ruff rules for tests. Put SocketBlockedError and the other shared helpers in a support module that conftest.py imports, and declare pythonpath = ['tests'] under [tool.pytest.ini_options] so helper imports don't depend on the import mode. Keep the name SocketBlockedError, which scripts/qualify_faults.py:77-78 expects in a fault fixture's output, and keep tests/faults/model_transport/conftest.py able to load the guard.",
+   "sketch": "[tool.pytest.ini_options]\npythonpath = [\"tests\"]\n# tests/support/__init__.py\n# tests/support/network.py: SocketBlockedError, block_sockets(); conftest.py calls block_sockets()",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06 makes Ruff the lint gate. Adding a rule for tests is a ratchet within that gate.",
+   "verdict": "revised",
+   "verifierNote": "Confirmed 47 PLC0415 hits in 12 files, the three conftest imports and no pythonpath setting. Corrected one note, since test_final_review.py never imports SecretStr at the top, so lines 191 and 197 repeat a local import rather than shadow one; the guard must also keep the SocketBlockedError name that fault qualification matches."
+  }
+ ],
+ "rejected": [],
+ "notCovered": "This was a static review. No test was run: the ground rules forbid scripts/verify.py, and pytest was not among the permitted commands. The order-dependence, timing and logging-leak effects described above are therefore reasoned from code, not observed. Production modules were read only where the tests reach into them: loop_middleware.py at lines 89-140, 208-223, 349-380 and 491-600; worker_inference.py at 137-176 and 317-374; provider_settings.py at 82-105; operations.py at 112-171; workflow_runner.py at 163-235; result_stream.py at 186-198. Of PRD-Development-Harness.md, only DH-03 and DH-06 were read. tests/db, tests/web and tests/faults were sampled only where they duplicate service-test helpers (product_inference_worker.py, sleep_inference_worker.py, keys_and_vars_check.py and one fault fixture); reviewing them belongs to other areas. No coverage measurement was available. Ruff statistics for the selected test-quality rules were written to .checks/reviews/review-2026-11-12-09-52-30/py-tests/ruff_selected.txt."
+}

@@ -1,0 +1,1007 @@
+{
+  "schema": "autobots.code-review/v1",
+  "area": "harness-tests",
+  "title": "Tests: harness and toolchain",
+  "kind": "area",
+  "timestamp": "2026-11-12-09-52-30",
+  "revision": "156534da0bd5b19417f05d313077d767804b175b",
+  "summary": "The harness and toolchain tests cover 20 files and about 4,240 lines. The harness profile runs 290 tests in about 26 s, and tests/toolchain adds 36 more. The tests focus on behaviour and say honestly what kind of evidence they give. They drive hooks and CLIs at the process boundary with fakes on PATH, and they cover DH-05's whole hook fixture list. Keep unittest. The harness profile runs `python3.12 -m unittest discover` in a reduced environment before any bootstrap, and judge_unittest parses unittest's summary to refuse empty or skipped suites. pytest exists only in the service venv, so switching would tie the harness to bootstrap. The gains come from modern unittest habits (enterContext, subTest, a shared base and support module), not from a new runner. Two guards do not guard. The private run-column check reads only the first grant of the first runs migration, while five later migrations add grants to the same role. The offline pin and launcher tests in tests/toolchain run in no profile, though they pass in 0.08 s. The two largest files are arranged by when tests were added, not by what they test. test_hooks.py is one 45-test class covering seven subjects in 703 lines. test_assistant_assets.py packs eight suites and about 165 lines of checker code into 783 lines. Fixture plumbing (stub executables, Git repositories, config roots, report records) is rewritten in each file, and the Git setups are hardened differently. Failures are hard to read: 47 of 60 `assertTrue(any(...))` calls carry no message. Fourteen child processes have no timeout, under one 60-second cap for the whole suite. Five tests assert source text rather than behaviour. No lint or format configuration covers these files: the service's own ruff rules report 456 issues, and 20 of 20 files would be reformatted. test_evidence.py, test_specs.py and test_verify_profiles.py are over 300 lines but each tests one module. They need shared helpers, not splitting.",
+  "scores": [
+    {
+      "dimension": "standards",
+      "score": 2,
+      "why": "No lint, format or type configuration covers these files; the service's own ruff rules give 456 findings, 20 of 20 files would be reformatted, and two quote styles and two import orders coexist."
+    },
+    {
+      "dimension": "modules",
+      "score": 3,
+      "why": "About 165 lines of checker code live in a test module beside a second frontmatter parser in harness_lib; tests/toolchain has a support module but tests/harness has none."
+    },
+    {
+      "dimension": "size",
+      "score": 3,
+      "why": "No function exceeds 40 lines, but test_hooks.py and test_assistant_assets.py each pack six to eight subjects into 700 to 780 lines."
+    },
+    {
+      "dimension": "functions",
+      "score": 4,
+      "why": "Helpers are short builders with one job each; a few tests run several phases while their names describe only the first."
+    },
+    {
+      "dimension": "structure",
+      "score": 3,
+      "why": "Files follow when tests were added (test_final_review.py, appended classes) rather than the unit under test; fingerprint and config_errors tests are spread over three files."
+    },
+    {
+      "dimension": "approach",
+      "score": 4,
+      "why": "unittest suits the install-free harness; tests run at the process boundary with fakes on PATH and mutate one valid baseline, though some assert source text and some are lint rules in disguise."
+    },
+    {
+      "dimension": "comments",
+      "score": 4,
+      "why": "Module docstrings state the evidence class and its limits, and comments explain why; a few test names promise more than the test checks."
+    },
+    {
+      "dimension": "types",
+      "score": 3,
+      "why": "Helpers are partly annotated (bare dicts, untyped callbacks) and no type checker runs on them; the run-state oracle is a hand copy instead of the generated contract."
+    },
+    {
+      "dimension": "errors",
+      "score": 3,
+      "why": "Error paths of the code under test are covered thoroughly, but 14 child processes have no timeout and a hang shows up as an anonymous suite error."
+    },
+    {
+      "dimension": "tests",
+      "score": 3,
+      "why": "Strong behavioural coverage of DH-05's fixture list, weakened by a grant guard that misses later migrations, unwired static guards, unreadable failure messages and one order-dependent test."
+    },
+    {
+      "dimension": "maintainability",
+      "score": 3,
+      "why": "Each test reads well on its own, but extending the suite is costly: fixtures are duplicated, two files are oversized and no style is enforced."
+    }
+  ],
+  "strengths": [
+    {
+      "title": "One valid baseline, one change, one exact error",
+      "evidence": "valid_root in tests/harness/test_assistant_assets.py:173-198 is documented as making 'each negative fixture change one thing', and tests built on it assert the exact error list (test_assistant_assets.py:306, :313). test_evidence.py:77-112 builds valid_manifest from the real template, and its rejected() helper prints the error list on failure. test_disposable_guard.py:61-77 and test_supabase_stack.py:69-89 use named one-line mutators, with change.__name__ as the subTest label."
+    },
+    {
+      "title": "DH-05's hook fixture list is covered at the process boundary",
+      "evidence": "tests/harness/test_hooks.py covers malformed JSON (170-176), the input cap at its exact boundary (188-194), unsupported events and tools without echo (290-299), the deadline (301-311), a missing library (319-327), symlink loops and unusable paths (339-346), secret names before and after links (348-358), and shell metacharacters kept as data (360-377)."
+    },
+    {
+      "title": "Fakes on PATH show that refusals happen before any side effect",
+      "evidence": "test_disposable_guard.py:80-113 puts a recording fake docker on PATH and asserts it was never called. test_assistant_assets.py:438-444 shows the version probe inherits no credential. test_hooks.py:578-592 shows Git is asked only when an edit needs it. test_verify_profiles.py:121-126 makes find_tools raise if it is looked up."
+    },
+    {
+      "title": "Docstrings say honestly what kind of evidence each suite gives",
+      "evidence": "test_hooks.py:1 says 'not proof of Claude event delivery', test_verify_profiles.py:1 says they 'prove no real toolchain run', and test_evidence.py:1 says they 'qualify no real work item'. test_non_mutating.py:1-6 classifies each result as disposable, mock or static, and test_reproducible.py:1-5 says 'Neither absence is a skip'."
+    },
+    {
+      "title": "unittest suits the install-free harness, and the runner refuses empty or skipped suites",
+      "evidence": "scripts/verify.py:84-101 runs stdlib unittest in a reduced environment with no bootstrap. judge_unittest fails a suite that is empty or skips a test, and test_verify_profiles.py:260-283 tests that judgement itself."
+    },
+    {
+      "title": "Readable fixture builders and one shared arrangement",
+      "evidence": "test_specs.py:21-70 builds stories and documents with keyword-argument builders (story(), document()). forward_arrangement.py:45-96 is used by both the runbook and ArrangementTests. Each anchor must match exactly once, and the copy is built beside its destination, so a failed run leaves nothing behind."
+    },
+    {
+      "title": "tests/toolchain/support.py is the pattern to spread",
+      "evidence": "support.py:20-35 centralises paths and constants, :56-62 builds a credential-free environment, and :86-107 owns the copy lifecycle with guarded removal. Test modules import `from support import REPO_ROOT, toolchain` (test_manifests.py:14), and setUpClass cleans up when bootstrap fails (test_non_mutating.py:83-90, test_reproducible.py:27-37)."
+    },
+    {
+      "title": "Test names and comments say what is tested and why",
+      "evidence": "Names read as sentences, such as test_hooks.py:459 test_a_forged_cwd_never_chooses_a_root_outside_the_home_checkout. Comments explain why, at test_hooks.py:51 ('Naming a key isn't reading it.'), :352-355 and :605, and test_assistant_assets.py:364."
+    }
+  ],
+  "findings": [
+    {
+      "id": "THRN-01",
+      "title": "Private run-column guard reads only the first grant of one migration",
+      "dimension": "tests",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "tests/harness/test_app_db.py",
+          "line": 44,
+          "endLine": 49,
+          "note": "Reads 20261105000002_runs.sql only, and re.search keeps the first grant"
+        },
+        {
+          "file": "supabase/migrations/20261105000007_run_admission.sql",
+          "line": 7,
+          "note": "A later column grant to authenticated on public.runs that the guard never reads"
+        },
+        {
+          "file": "supabase/migrations/20261105000023_operations.sql",
+          "line": 30,
+          "note": "Another later grant the guard never reads"
+        },
+        {
+          "file": "scripts/app_db.py",
+          "line": 208,
+          "endLine": 209,
+          "note": "The db profile denies lease_generation at runtime; nothing checks checkpoint_thread_id"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "Five later migrations (…0003:19, …0007:7, …0012:3, …0014:34, …0023:30) add `grant select (...) on public.runs to authenticated`, and the test reads none of them. A table-level grant would also pass, because the pattern needs a column list.\ntext = (ROOT / app_db.MIGRATIONS / '20261105000002_runs.sql').read_text()\ngrant = re.search(r'grant select \\(([^)]*)\\) on public\\.runs to authenticated', text)\nself.assertNotIn('lease_generation', grant[1])\nself.assertNotIn('checkpoint_thread_id', grant[1])",
+      "impact": "The test is named to promise that the private lease and checkpoint columns never reach the authenticated role. Yet a forward migration that grants checkpoint_thread_id passes it, and the db profile's runtime probe covers only lease_generation. So drift at the grant boundary, which this guard exists to catch, goes unseen.",
+      "recommendation": "Scan every migration in name order for column-level and table-level grants on public.runs to authenticated. Collect the granted columns and assert they never include the private set or a table-level grant. Add a known-bad fixture (a later grant of checkpoint_thread_id) to show the scan fails on it. Separately, ask the owner of scripts/app_db.py to add a checkpoint_thread_id denial beside the lease_generation case.",
+      "sketch": "PRIVATE_RUN_COLUMNS = {'lease_generation', 'checkpoint_thread_id'}\n\ndef authenticated_run_columns(sql: str) -> set[str]:\n    \"\"\"Columns granted to authenticated on public.runs across all migrations; '*' marks a table-level grant.\"\"\"\n    found: set[str] = set()\n    for columns, roles in GRANT_ON_RUNS.findall(sql):  # optional '(cols)', 'on public.runs', 'to <roles>;'\n        if 'authenticated' in roles:\n            found |= {c.strip() for c in columns.split(',')} if columns else {'*'}\n    return found\n\n# test 1: all migrations joined in name order -> assertFalse(found & (PRIVATE_RUN_COLUMNS | {'*'}), found)\n# test 2: base + 'grant select (checkpoint_thread_id) on public.runs to authenticated;' -> caught",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "AGENTS.md and .claude/rules/database.md say migrations only move forward. The fix only reads migrations and edits none. It makes a guard stronger and leaves the db profile's runtime role checks in place.",
+      "verdict": "confirmed",
+      "verifierNote": "Verified: the test reads only 20261105000002_runs.sql, and five later migrations grant run columns to authenticated. None grants a private column today. app_db.py:208-209 denies only lease_generation at runtime, and no db check reads checkpoint_thread_id as authenticated."
+    },
+    {
+      "id": "THRN-02",
+      "title": "Static pin and launcher guards in tests/toolchain run in no profile",
+      "dimension": "tests",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "scripts/verify.py",
+          "line": 154,
+          "endLine": 156,
+          "note": "toolchain_scope_tests discovers only test_scaffold_scope.py"
+        },
+        {
+          "file": "tests/toolchain/test_manifests.py",
+          "line": 118,
+          "endLine": 207,
+          "note": "15 offline pin, lock and runbook tests; run read-only here, all pass in 0.08 s"
+        },
+        {
+          "file": "tests/toolchain/test_non_mutating.py",
+          "line": 19,
+          "endLine": 46,
+          "note": "The static N7 launcher ban shares a module with tests that need registry downloads"
+        },
+        {
+          "file": "scripts/toolchain.py",
+          "line": 203,
+          "note": "check_steps relies on it: 'Tests scan this list for install launchers'"
+        },
+        {
+          "file": "docs/engineering/runbooks/toolchains.md",
+          "line": 129,
+          "note": "The runbook relies on test_manifests.py to catch a pin it does not name"
+        },
+        {
+          "file": "docs/engineering/evidence/US-1.8/summary.md",
+          "line": 73,
+          "note": "Precedent: an unwired toolchain test broke and nobody noticed"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "verify.py builds Step('toolchain_scope_tests', (..., 'unittest', 'discover', '-s', 'tests/toolchain', '-p', 'test_scaffold_scope.py'), root). Its comment says 'Its copies bootstrap from registries, so the rest stays manual'. But test_manifests.py makes no copy: it only reads pyproject.toml, the package.json files, both locks and the runbook. `python3.12 -I -B -m unittest discover -s tests/toolchain -p test_manifests.py` ran 15 tests in 0.079 s, all passing, and wrote nothing. The N7 Launchers class is static too. Nothing else checks that manifests hold exact pins: toolchain check verifies lock freshness and runtime pins, not dependency ranges.",
+      "impact": "A `^` range in apps/web/package.json with a matching lock, an unqualified dependency bump, or a new `npx` or `uv run` in a package script passes harness, fast and full. DH-09's ban on download-at-runtime launchers and the runbook's pin procedure rest on tests that run only when someone remembers. US-1.8 already records this failure mode for the scope test.",
+      "recommendation": "Run the offline toolchain modules in the existing scope step. Move the N7 Launchers class into its own module, and give the offline modules one filename pattern that the step discovers, or list them explicitly. Because they take under a tenth of a second, consider running them in fast as well as full. Add a harness test that fails when a tests/toolchain module is neither matched by that pattern nor on an explicit manual list. Correct the verify.py comment and the development-harness runbook line that say the rest needs registries.",
+      "sketch": "tests/toolchain/\n  test_offline_scope.py      (today test_scaffold_scope.py)      toolchain_scope_tests\n  test_offline_manifests.py  (today test_manifests.py)           toolchain_scope_tests\n  test_offline_launchers.py  (N7, out of test_non_mutating.py)   toolchain_scope_tests\n  test_non_mutating.py       N1-N6 on a bootstrapped copy        manual, registries\n  test_reproducible.py       fresh-cache bootstrap               manual, registries\nverify.py: discover -s tests/toolchain -p 'test_offline_*.py'   (or list the modules and keep today's names)\ntests/harness: offline pattern + MANUAL_TOOLCHAIN_MODULES must cover every tests/toolchain/test_*.py",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-09 bans download-at-runtime launchers and never counts a skipped check as green. AGENTS.md says full uses prepared environments and installs nothing. These modules are offline and stdlib-only, so wiring them in adds no install, network call or service.",
+      "verdict": "confirmed",
+      "verifierNote": "Verified verify.py:154-156 discovers only test_scaffold_scope.py. Reran test_manifests.py read-only (python3.12 -I -B): 15 tests in 0.089 s, working tree unchanged. The Launchers class reads only manifests and check_steps with a placeholder. The development-harness runbook (line 58) and US-1.8's summary repeat the 'needs registries' claim."
+    },
+    {
+      "id": "THRN-03",
+      "title": "test_hooks.py is one 45-test class covering seven subjects",
+      "dimension": "size",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "tests/harness/test_hooks.py",
+          "line": 25,
+          "endLine": 699,
+          "note": "HookTests: 45 tests and 10 helpers in one class"
+        },
+        {
+          "file": "tests/harness/test_hooks.py",
+          "line": 83,
+          "endLine": 137,
+          "note": "report_state and fingerprint tests that exercise harness_lib, not the hook"
+        },
+        {
+          "file": "tests/harness/test_hooks.py",
+          "line": 139,
+          "endLine": 168,
+          "note": "config_errors cases"
+        },
+        {
+          "file": "tests/harness/test_hooks.py",
+          "line": 420,
+          "endLine": 436,
+          "note": "Git and worktree helpers in the middle of the class"
+        },
+        {
+          "file": "tests/harness/test_hooks.py",
+          "line": 552,
+          "note": "EDIT_EVENT constant defined after 30 tests"
+        },
+        {
+          "file": "tests/harness/test_hooks.py",
+          "line": 695,
+          "endLine": 699,
+          "note": "A scripts/verify.py test"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "The file is 703 lines with one class. By subject it holds: PreToolUse guard 6, Stop 1, report freshness and fingerprints 9 (harness_lib), hook-settings config_errors 3 (harness_lib), dispatcher process contract 6, PostToolUse diagnostics 3, worktree session roots and Git failures 16, and verify.py 1. 39 of the 45 tests open their temporary directory inline (`with tempfile.TemporaryDirectory() as ...: root = Path(...)`). The class grew by appending: commit 9a9b60a alone added 277 lines of worktree tests.",
+      "impact": "To find the tests for a function you search a 700-line class. Because 13 of the tests exercise harness_lib or verify.py, a fingerprinting change has tests here, in test_verify_profiles.py and in test_final_review.py. Each new hook behaviour lands in the same class, and the repeated temp-directory block adds an indentation level and two lines to almost every test.",
+      "recommendation": "Split by unit under test into focused modules that share a harness support module. Move the harness_lib and verify.py tests to their own modules. Give each class a setUp that uses `self.enterContext(tempfile.TemporaryDirectory())` (Python 3.11+) instead of a with-block in every test.",
+      "sketch": "tests/harness/harness_support.py   ROOT, load_dispatch(), dispatch(raw, script=None, env=None), executable_stub(),\n                                   fixture_repo(..., worktrees=()), copy_dispatcher(home), valid_report(root)\ntest_hook_guard.py         PreToolUse path and command policy, Stop once                         7 tests\ntest_hook_process.py       malformed/oversized input, unsupported events, deadlines, no library  6 tests\ntest_hook_diagnostics.py   PostToolUse domains and ruff outcomes                                 3 tests\ntest_hook_worktrees.py     session_root, Git failure and timeout, per-root Stop                 16 tests\ntest_inputs.py             input_manifest, fingerprint, report_state (+2 from test_verify_profiles.py, +1 from test_final_review.py)\nconfig_errors cases -> test_config_errors.py on valid_root; unknown profile -> test_verify_profiles.py\nbase setUp: self.root = Path(self.enterContext(tempfile.TemporaryDirectory())).resolve()",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-05 requires these hook fixtures (malformed JSON, metacharacters, symlinks, timeouts, missing executable, unsupported events). The split moves every case and drops none, and DH-03 keeps them under tests/harness/.",
+      "verdict": "confirmed",
+      "verifierNote": "Verified one class with 45 tests and 10 helpers; an ast count finds 39 tests opening TemporaryDirectory inline, and 9a9b60a added 277 lines to the file."
+    },
+    {
+      "id": "THRN-04",
+      "title": "test_assistant_assets.py bundles eight suites and the checks they test",
+      "dimension": "size",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 75,
+          "endLine": 240,
+          "note": "About 165 lines of checker and fixture helpers before the first test"
+        },
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 243,
+          "note": "RuleLinkTests, then AgentsMappingTests at 290 (config_errors)"
+        },
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 350,
+          "note": "AdapterStatusTests: version probing with stub executables"
+        },
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 546,
+          "note": "ReportTests: verify.main"
+        },
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 574,
+          "note": "InstructionAssetTests and IngestionAssetTests on the real tree"
+        },
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 705,
+          "note": "ArrangementTests for forward_arrangement.py"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "The file has 783 lines, 8 classes and 53 tests. They cover rule links, the AGENTS.md mapping, assistant adapter status, activation refusals, the verify report, real instruction assets, the ingestion grammar and the forward arrangement. Lines 75-240 hold the frontmatter parser and policy, the link checker, a hand-written glob matcher, the grammar check, the synthetic root builder, the stub writers and the specs CLI wrapper. The file name fits the instruction-asset classes but not the adapter, report or arrangement tests.",
+      "impact": "Someone looking for the adapter-status or arrangement tests must know they sit under 'assistant assets'. Any change to valid_root or the stub helpers touches five classes in one file. And the checker code shares a module with the tests that exercise it.",
+      "recommendation": "Split into one module per subject. Move the fixture helpers to the harness support module, and move the checker functions into scripts (see the finding on instruction-file checks).",
+      "sketch": "scripts/instruction_checks.py (or harness_lib)  frontmatter(), frontmatter_errors(), broken_links(),\n                                                rule_globs(), glob_matches(), ingestor_grammar_errors()\ntests/harness/harness_support.py                valid_root(), valid_agents(), edit_json(), write_stub(),\n                                                version_stub(), specs_cli(), sha256(), story_body()\ntest_config_errors.py        RuleLinkTests, AgentsMappingTests, ActivationRefusalTests (+ hook-settings cases from test_hooks.py)\ntest_adapter_status.py       AdapterStatusTests, ReportTests\ntest_instruction_assets.py   InstructionAssetTests, IngestionAssetTests\ntest_forward_arrangement.py  ArrangementTests",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "The DH-09 harness scope (configuration and frontmatter validation, known-good and known-bad fixtures) stays the same. Tests move and none is dropped.",
+      "verdict": "confirmed",
+      "verifierNote": "Verified 8 classes and 53 tests in 783 lines, with module-level checker and fixture helpers at 75-240."
+    },
+    {
+      "id": "THRN-05",
+      "title": "Instruction-file checks live in a test module beside a second frontmatter parser",
+      "dimension": "modules",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 75,
+          "endLine": 105,
+          "note": "frontmatter() and frontmatter_errors(): allowed keys, name matches path, model must be inherit"
+        },
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 115,
+          "endLine": 130,
+          "note": "broken_links(): link and fragment resolution"
+        },
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 133,
+          "endLine": 154,
+          "note": "rule_globs() and a hand-written glob matcher"
+        },
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 161,
+          "endLine": 170,
+          "note": "ingestor_grammar_errors()"
+        },
+        {
+          "file": "scripts/harness_lib.py",
+          "line": 321,
+          "endLine": 335,
+          "note": "config_errors parses frontmatter again, in a different way"
+        }
+      ],
+      "occurrences": 8,
+      "evidence": "A missing name or description is a named project_configuration error. Allowed keys, the name-to-path match and `model: inherit` are checked only by unittest assertions on the real tree (test_assistant_assets.py:594-597). The two readers split the header differently:\n# test_assistant_assets.py:79\nheader = text[4:].split('\\n---\\n', 1)[0]\n# scripts/harness_lib.py, inside config_errors\nheader = text.split('---', 2)[1]\nif not any(line.startswith('name:') for line in header.splitlines()):",
+      "impact": "Two readers of the same frontmatter can disagree: harness_lib's split ends the header at the first '---' anywhere, even inside a value, while the test's reader needs a line of its own. A policy violation shows up as a failing test inside harness_behavior_tests, not as a named project_configuration error in the report. And because only the test calls these checks, no skill or other validator can reuse them.",
+      "recommendation": "Move the eight functions into scripts, in harness_lib or a scripts/instruction_checks.py that it imports. Share one frontmatter parser, and have config_errors report their errors. Keep the known-good and known-bad fixtures as tests. Point those tests at the moved functions before switching config_errors over.",
+      "sketch": "scripts/instruction_checks.py\n  parse_frontmatter(text) -> dict[str, str] | None   one parser for skills, agents and rules\n  frontmatter_errors(root) -> list[str]               keys, name/path, model inherit, name/description present\n  broken_link_errors(paths, root) -> list[str]\n  ingestor_grammar_errors(text) -> list[str]\nharness_lib.config_errors(root): errors += frontmatter_errors(root) + broken_link_errors(...)\ntests/harness/test_instruction_checks.py: fixtures and assertions only",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-05 says substantive checks live in repository scripts. AGENTS.md's rule table names project_configuration in scripts/verify.py as the configuration check. Every check is kept; only where it lives and how it is reported change.",
+      "verdict": "revised",
+      "verifierNote": "Verified the eight module-level functions and the second parser in config_errors, at harness_lib.py:321-335 (location corrected from 320-334). Revised the impact: the unittest output names the failing test, so a violation is not anonymous, only reported under harness_behavior_tests rather than project_configuration. harness_lib's rule_link_errors checks only that each rule links a check target, so broken_links is the only check that resolves every link."
+    },
+    {
+      "id": "THRN-06",
+      "title": "Three hook tests' names and assertions disagree",
+      "dimension": "tests",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "tests/harness/test_hooks.py",
+          "line": 35,
+          "endLine": 53,
+          "note": "Named 'without echo', but only the deny decision is asserted"
+        },
+        {
+          "file": "tests/harness/test_hooks.py",
+          "line": 61,
+          "endLine": 73,
+          "note": "Named 'does not execute command input', but mostly asserts the command denylist"
+        },
+        {
+          "file": "tests/harness/test_hooks.py",
+          "line": 75,
+          "endLine": 81,
+          "note": "Named 'never claims live proof', but the reason is never read"
+        },
+        {
+          "file": ".claude/hooks/dispatch.py",
+          "line": 106,
+          "note": "The denial reason is a fixed string today, so 'no echo' holds only by construction"
+        },
+        {
+          "file": ".claude/hooks/dispatch.py",
+          "line": 199,
+          "note": "Stop's 'does not certify application completion' text, which no test reads"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "test_stop_blocks_once_and_never_claims_live_proof asserts only `response['decision'] == 'block'` and that the retry carries no decision. The secret-file test asserts only the deny decision:\ndef test_secret_files_rejected_without_echo(self):\n    ...\n        response = hook.handle(root, {'hook_event_name': 'PreToolUse',\n                                     'tool_name': 'Read', 'tool_input': {'file_path': name}})\n        self.assertEqual(response['hookSpecificOutput']['permissionDecision'], 'deny')",
+      "impact": "A change that puts the path into the denial reason, or drops Stop's statement that it certifies nothing, still passes the tests named after those guarantees. When the mixed test fails, its name points at the wrong behaviour.",
+      "recommendation": "Assert what each name promises. For each secret name and command, assert `name not in reason` inside a subTest. Read Stop's reason and assert it says the hook certifies no completion. Move the denylist cases out of the non-execution test into their own test driven by subTest.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-05 says stdout carries only the documented response and diagnostics are redacted. The change only adds assertions and loosens nothing.",
+      "verdict": "confirmed",
+      "verifierNote": "Verified: the three tests assert only the decision fields; dispatch.py:106 returns a fixed denial reason, and dispatch.py:197-199 ends Stop's reason with 'This hook does not certify application completion', which no test reads."
+    },
+    {
+      "id": "THRN-07",
+      "title": "Fourteen child processes have no timeout under a shared 60-second cap",
+      "dimension": "errors",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "scripts/verify.py",
+          "line": 67,
+          "endLine": 73,
+          "note": "One timeout=60 covers the whole harness suite; on expiry only 'TimeoutExpired' is kept"
+        },
+        {
+          "file": "tests/harness/test_specs.py",
+          "line": 265,
+          "note": "One of 8 specs.py runs in this file without a timeout"
+        },
+        {
+          "file": "tests/harness/test_verify_profiles.py",
+          "line": 47,
+          "note": "git in setUp without a timeout, run for each of 28 tests"
+        },
+        {
+          "file": "tests/harness/test_tool_keys_env.py",
+          "line": 32,
+          "note": "/bin/sh running Makefile lines, no timeout"
+        },
+        {
+          "file": "tests/harness/forward_arrangement.py",
+          "line": 92,
+          "note": "specs.py render with no timeout"
+        },
+        {
+          "file": "tests/toolchain/support.py",
+          "line": 83,
+          "note": "git with no timeout while setting up a copy"
+        },
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 229,
+          "endLine": 231,
+          "note": "specs_cli: the same call, with timeout=30"
+        }
+      ],
+      "occurrences": 14,
+      "evidence": "An ast scan of the 20 files finds 14 subprocess.run calls with no timeout argument, 8 of them in test_specs.py. The harness reports from 2026-11-12 ran 290 tests in 25.4 to 26.6 s against verify.py's `timeout=60`. When that timeout expires, run_check records status 'error' with output 'TimeoutExpired' and exits 2 ('could not run'), discarding everything the suite printed.",
+      "impact": "A hang in any of these children, such as Git waiting on a prompt or a regression in specs.py, uses up the whole budget. It then shows as an error that names no test, and the Stop hook blocks on a missing harness pass. As stories add more process-level tests, the suite creeps toward the cap and nothing shows which tests cost most.",
+      "recommendation": "Route every child process through one support helper, `run_cli`, with a default timeout of 30 s (as specs_cli already uses), so a hang fails the test that caused it. Ask the scripts owner to add unittest's `--durations 10` (Python 3.12) to the harness command and to keep the tail of partial output when the suite times out.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-05 asks for deadlines and bounded output, and DH-09 never counts a timed-out check as green. Per-test timeouts turn an anonymous suite error into a named failure.",
+      "verdict": "revised",
+      "verifierNote": "Recounted 14 subprocess.run calls without a timeout; the one Popen waits with timeout=10. The newest harness report, written after the reviewer read the 15:53Z one, ran the same 290 tests in 25.4 s, so the evidence now cites both. The 60-second cap and the discarded output are as cited (verify.py:67-73)."
+    },
+    {
+      "id": "THRN-08",
+      "title": "Stub executables, Git fixture repos and script copies are rewritten in each file",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 216,
+          "endLine": 222,
+          "note": "write_stub: shell stub that records argv"
+        },
+        {
+          "file": "tests/harness/test_hooks.py",
+          "line": 278,
+          "endLine": 283,
+          "note": "fake_ruff"
+        },
+        {
+          "file": "tests/harness/test_hooks.py",
+          "line": 540,
+          "endLine": 543,
+          "note": "fake git"
+        },
+        {
+          "file": "tests/harness/test_disposable_guard.py",
+          "line": 87,
+          "endLine": 89,
+          "note": "fake docker"
+        },
+        {
+          "file": "tests/harness/test_hooks.py",
+          "line": 420,
+          "endLine": 422,
+          "note": "git with reduced_env(): no HOME, so no global config"
+        },
+        {
+          "file": "tests/harness/test_verify_profiles.py",
+          "line": 42,
+          "endLine": 47,
+          "note": "git with the inherited environment and only gpgsign off; repeated at :249"
+        },
+        {
+          "file": "tests/toolchain/support.py",
+          "line": 79,
+          "endLine": 83,
+          "note": "git with HOME kept, gpgsign off and core.hooksPath=/dev/null"
+        },
+        {
+          "file": "tests/harness/test_hooks.py",
+          "line": 535,
+          "endLine": 539,
+          "note": "Copies dispatch.py and harness_lib.py; again at :665 and test_generate_contracts.py:63"
+        }
+      ],
+      "occurrences": 12,
+      "evidence": "Counted by reading the 20 files: 4 stub writers, 4 Git repository setups in 3 variants, and 4 blocks that copy scripts into a temp root. In addition, 12 files repeat ROOT and the sys.path insert, and scripts/specs.py is loaded under two module names (test_specs.py:14, test_assistant_assets.py:42).\n# test_hooks.py:421, env=reduced_env()\n['git', '-C', dir, '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', ...]\n# test_verify_profiles.py:42, inherited environment\n['git', '-C', root, '-c', 'user.name=t', '-c', 'user.email=t@invalid', '-c', 'commit.gpgsign=false']",
+      "impact": "When the suite runs outside verify.py, for example `python3.12 -m unittest` from a shell, the 28 setUp commits in test_verify_profiles.py read the developer's global Git config, so a global core.hooksPath or template hooks run inside the fixture. support.py's extra hardening never reached that file. Every fix to a stub or repository recipe must be found and repeated by hand.",
+      "recommendation": "Add tests/harness/harness_support.py, modelled on tests/toolchain/support.py, which already re-exports `toolchain` and owns the copy lifecycle. It should provide one hardened `fixture_repo()`, `executable_stub()`, `copy_scripts()` and `run_cli()` with a default timeout, and re-export the script modules so test files stop editing sys.path.",
+      "sketch": "# tests/harness/harness_support.py (standard library only)\nROOT = Path(__file__).resolve().parents[2]\nsys.path.insert(0, str(ROOT / 'scripts'))\nimport harness_lib, verify            # tests: from harness_support import ROOT, verify\nGIT_ENV = {**harness_lib.reduced_env(), 'GIT_CONFIG_GLOBAL': os.devnull, 'GIT_CONFIG_NOSYSTEM': '1'}\ndef fixture_repo(root: Path, *, worktrees: Sequence[str] = ()) -> Path: ...   # hooksPath and gpgsign off\ndef executable_stub(path: Path, body: str, *, record: Path | None = None) -> Path: ...\ndef copy_scripts(home: Path, *relative: str) -> None: ...\ndef run_cli(argv: Sequence[str], *, input: bytes | None = None, env=None, timeout: float = 30): ...",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "AGENTS.md says harness checks install nothing; the module uses only the standard library. verify.py:63 says tests receive no inherited configuration, and one hardened recipe extends that to direct runs.",
+      "verdict": "confirmed",
+      "verifierNote": "Verified 4 stub writers, 3 Git recipes (reduced_env without HOME in test_hooks.py, the inherited environment in test_verify_profiles.py, HOME kept with hooksPath off in support.py), 4 script-copy blocks, 12 files inserting scripts/ into sys.path, and specs.py loaded as autobots_specs and autobots_specs_for_assets."
+    },
+    {
+      "id": "THRN-09",
+      "title": "Config roots and harness reports are built four ways, which weakens assertions",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 173,
+          "endLine": 198,
+          "note": "valid_root: a complete synthetic root, so one change gives one error"
+        },
+        {
+          "file": "tests/harness/test_hooks.py",
+          "line": 139,
+          "endLine": 151,
+          "note": "Partial root built inline; asserts a count of matching errors"
+        },
+        {
+          "file": "tests/harness/test_hooks.py",
+          "line": 153,
+          "endLine": 168,
+          "note": "The same inline root; asserts with any()"
+        },
+        {
+          "file": "tests/harness/test_hooks.py",
+          "line": 329,
+          "endLine": 337,
+          "note": "A third inline root; asserts with any()"
+        },
+        {
+          "file": "tests/harness/test_hooks.py",
+          "line": 26,
+          "endLine": 33,
+          "note": "valid_report"
+        },
+        {
+          "file": "tests/harness/test_verify_profiles.py",
+          "line": 20,
+          "endLine": 23,
+          "note": "harness_records: the same three check records, retyped"
+        },
+        {
+          "file": "tests/harness/test_evidence.py",
+          "line": 267,
+          "endLine": 277,
+          "note": "write_report and passed_record"
+        },
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 551,
+          "endLine": 553,
+          "note": "passing_check"
+        }
+      ],
+      "occurrences": 8,
+      "evidence": "The inline roots in test_hooks.py copy autobots.json and settings.json but create no rules, skills, agents or AGENTS.md. config_errors therefore returns many unrelated errors, so those tests can only check `any('only the reviewed hooks' in error ...)` or count matches. Tests built on valid_root assert the exact list instead, e.g. `self.assertEqual(config_errors(self.root), ['AGENTS.md: missing the \"## Rule checks and review\" section.'])` (test_assistant_assets.py:306). The three passing harness check records are typed out twice, at test_hooks.py:30-33 and test_verify_profiles.py:21-23.",
+      "impact": "The inline-root tests would still pass if the edit also caused a second, wrong error. Any change to the report schema or to the required checks has to be made in four builders.",
+      "recommendation": "Move valid_root, valid_agents and edit_json into the support module, and rebuild the three test_hooks.py cases on valid_root with exact-list assertions. Provide one `harness_report(root, **overrides)` builder for test_hooks.py, test_verify_profiles.py and test_evidence.py.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-09 asks the harness for known-good and known-bad checker fixtures. One valid baseline per check makes each known-bad case differ by exactly one change.",
+      "verdict": "confirmed",
+      "verifierNote": "Verified: the inline roots at test_hooks.py:139-168 and 329-337 copy only autobots.json and settings.json, so their tests count or any() matches, while the valid_root tests assert exact lists (test_assistant_assets.py:306 and 313); the three passing records are typed twice."
+    },
+    {
+      "id": "THRN-10",
+      "title": "Two seed scanners have drifted apart, and only one looks for jobs",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "tests/harness/test_app_db.py",
+          "line": 31,
+          "endLine": 35,
+          "note": "Reference seeds: checks 'runs' and 'api_key', but no 'job'"
+        },
+        {
+          "file": "tests/harness/test_disposable_guard.py",
+          "line": 127,
+          "endLine": 131,
+          "note": "Fixture seeds: checks 'job', but no 'runs' or 'api_key'"
+        },
+        {
+          "file": "scripts/app_db.py",
+          "line": 175,
+          "endLine": 189,
+          "note": "db seed cases check repeatability and profiles, not jobs"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "Pending inference jobs live in app_private.run_jobs. No term in the reference-seed scan matches that table name, because 'run_jobs' does not contain 'runs'.\n# test_app_db.py:33, supabase/seeds/reference.sql\nfor word in ('create table', 'alter table', 'drop ', 'password', 'api_key', 'runs'):\n# test_disposable_guard.py:129, tests/db/seeds/fixtures.sql\nfor word in ('create table', 'alter table', 'drop ', 'password', 'job'):",
+      "impact": "The 'no pending inference jobs in seeds' rule is checked directly for fixture seeds but only indirectly for reference seeds, and a fix to one list never reaches the other. Bare substrings also reject harmless comments that contain 'drop ' or 'runs'.",
+      "recommendation": "Write one `seed_violations(text)` helper with the union of both term lists plus `run_jobs`, apply it to both seed files, and give each term a known-bad fixture string. Keep the secret terms (`password`, `api_key`) as plain substrings. If a bare table term rejects a harmless comment, narrow only that term to statement shapes (`insert into app_private.run_jobs`, `insert into public.runs`), with a known-bad fixture proving the insert is still caught.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "AGENTS.md and .claude/rules/database.md forbid DDL, real credentials and pending inference jobs in seeds. The helper keeps every current term, adds the missing ones and narrows a term only with a fixture that proves the guard still holds.",
+      "verdict": "revised",
+      "verifierNote": "Verified both term lists and that 'run_jobs' does not contain 'runs'; the db seed cases (app_db.py:175-189) check repeatability and profiles only. Revised the recommendation so the secret terms stay plain substrings: matching only statement shapes would let a password or key in a value pass."
+    },
+    {
+      "id": "THRN-11",
+      "title": "Most error-list assertions fail with only \"False is not true\"",
+      "dimension": "tests",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "tests/harness/test_specs.py",
+          "line": 99,
+          "note": "One of 31 message-less any() assertions in this file"
+        },
+        {
+          "file": "tests/harness/test_evidence.py",
+          "line": 155,
+          "note": "One of 8 here, while rejected() at :107 already prints the list"
+        },
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 283,
+          "note": "Message-less any() over config_errors"
+        },
+        {
+          "file": "tests/harness/test_hooks.py",
+          "line": 38,
+          "endLine": 42,
+          "note": "11 names in a loop, with no subTest and no message"
+        },
+        {
+          "file": "tests/toolchain/test_manifests.py",
+          "line": 128,
+          "endLine": 135,
+          "note": "Five mutations without subTest; a failure doesn't say which one"
+        },
+        {
+          "file": "tests/harness/test_verify_profiles.py",
+          "line": 52,
+          "note": "stdout and stderr replaced by mocks, so an unexpected exit code comes with no output"
+        }
+      ],
+      "occurrences": 50,
+      "evidence": "An ast count finds 47 of the 60 `assertTrue(any(...))` calls without a message, plus 3 loops over cases with no subTest or message (test_hooks.py:38, test_manifests.py:128 and :141).\nself.assertTrue(any(\"stale\" in issue for issue in self.errors(document(), navigation=True)))\n# compare test_evidence.py:112\nself.assertTrue(any(needle in error for error in errors), f'{needle!r} not in {errors}')",
+      "impact": "When a checker's wording or behaviour changes, the failure shows neither what the checker produced nor which case failed. Each such failure needs a rerun with print statements before anyone can see what went wrong.",
+      "recommendation": "Add a shared assertion to a harness TestCase base that prints the list when no error mentions the expected text. Use subTest in every loop over cases. Capture verify output with contextlib.redirect_stdout(io.StringIO()) so it can be attached to a failure.",
+      "sketch": "class HarnessTestCase(unittest.TestCase):\n    def assertMentions(self, errors: Sequence[str], needle: str) -> None:\n        if not any(needle in error for error in errors):\n            self.fail(f'{needle!r} not in {list(errors)}')",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "none",
+      "verdict": "confirmed",
+      "verifierNote": "Recounted with ast: 60 assertTrue(any(...)) calls, 47 without a message (31 in test_specs.py, 8 in test_evidence.py), plus the three loops without subTest; test_verify_profiles.py:52 patches stdout and stderr."
+    },
+    {
+      "id": "THRN-12",
+      "title": "Five tests assert source text instead of behaviour",
+      "dimension": "approach",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "tests/harness/test_release_qualification.py",
+          "line": 159,
+          "endLine": 163,
+          "note": "Expects the argparse call spelled with single quotes"
+        },
+        {
+          "file": "tests/harness/test_supabase_stack.py",
+          "line": 120,
+          "endLine": 122,
+          "note": "Expects the choices tuple spelled with single quotes"
+        },
+        {
+          "file": "tests/harness/test_final_review.py",
+          "line": 91,
+          "endLine": 93,
+          "note": "Reads inspect.getsource(persistent_install.goal)"
+        },
+        {
+          "file": "tests/harness/test_fault_fixtures.py",
+          "line": 80,
+          "endLine": 85,
+          "note": "Expects double-quoted state literals in check.py"
+        },
+        {
+          "file": "tests/harness/test_app_db.py",
+          "line": 21,
+          "endLine": 29,
+          "note": "Regex over schema_release.py, since the service package can't be imported here"
+        }
+      ],
+      "occurrences": 5,
+      "evidence": "Found by grepping for `.py').read_text()` and `inspect.getsource`:\nsource = (ROOT / 'scripts/qualify_release.py').read_text()\nself.assertIn(\"'--authorized-micro-usd', type=int, required=True\", source)\n...\nsource = (ROOT / 'scripts/supabase_stack.py').read_text()\nself.assertIn(\"choices=('preflight', 'qualify')\", source)",
+      "impact": "These tests fail when quotes change or a line wraps, even though behaviour is the same. They pass when behaviour changes but the text stays, for example if the refusal moved after the paid call. They also stop ruff format, whose default quote style is double, from being adopted for scripts without breaking two of them.",
+      "recommendation": "Test behaviour where the code allows it. `stack.main(['start'])` raising SystemExit works today, because supabase_stack.main accepts argv. For qualify_release, expose a build_parser() and check in-process that parsing without --authorized-micro-usd exits 2; never launch the paid-path script from a test. For persistent_install, extract the pre-goal refusal into a function that goal calls first, and test it with a stub `sql`. Keep the schema_release regex, since the harness can't import the service, and say why in its docstring.",
+      "sketch": "def test_no_persistent_start_exists(self):\n    with self.assertRaises(SystemExit) as raised, contextlib.redirect_stderr(io.StringIO()):\n        stack.main(['start'])\n    self.assertEqual(raised.exception.code, 2)",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "DH-09 says to avoid tests that merely restate implementation. The paid-run cap and the pre-goal refusal stay required. The two script refactors should be their own bounded work items, not edits made as part of this review.",
+      "verdict": "confirmed",
+      "verifierNote": "Verified the five source-text assertions. supabase_stack.main(argv) parses before any side effect, so main(['start']) raises SystemExit(2), while qualify_release.main() reads sys.argv and needs a build_parser() first."
+    },
+    {
+      "id": "THRN-13",
+      "title": "The canonical run states are typed by hand instead of read from the generated RunStatus",
+      "dimension": "types",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "tests/harness/test_fault_fixtures.py",
+          "line": 80,
+          "endLine": 86,
+          "note": "Ten states typed into the test"
+        },
+        {
+          "file": "contracts/generated/openapi.json",
+          "line": 4916,
+          "note": "RunStatus enum, generated from the Pydantic contract"
+        },
+        {
+          "file": "tests/faults/state/check.py",
+          "line": 10,
+          "endLine": 19,
+          "note": "TERMINAL and PERMITTED hold the checker's states"
+        },
+        {
+          "file": "tests/faults/state/check.py",
+          "line": 65,
+          "note": "Unguarded main() call, so the test can't import the checker"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "The test types the ten states by hand and looks for each one in the checker's source text:\nstates = {'queued', 'running', 'waiting_input', 'waiting_approval', 'paused', 'verifying', 'cancelling',\n          'succeeded', 'failed', 'cancelled'}\nsource = (STATE / 'check.py').read_text()\nfor state in states:\n    self.assertIn(f'\"{state}\"', source)",
+      "impact": "The test exists to keep the fault checker in step with the canonical states, but its reference list is a third hand copy. If RunStatus gains a state, neither list changes and the test still passes. It also checks only one direction, so a stale extra state left in the checker goes unnoticed.",
+      "recommendation": "Read the RunStatus enum from contracts/generated/openapi.json with json. Read the checker's states from TERMINAL and PERMITTED with ast.literal_eval, or import them once check.py guards its main() in its own work item. Assert the two sets are equal.",
+      "sketch": "contract = json.loads((ROOT / 'contracts/generated/openapi.json').read_text())\nrun_status = set(contract['components']['schemas']['RunStatus']['enum'])\nvalues = {t.id: ast.literal_eval(n.value) for n in ast.parse((STATE / 'check.py').read_text()).body\n          if isinstance(n, ast.Assign) for t in n.targets if getattr(t, 'id', '') in ('TERMINAL', 'PERMITTED')}\nknown = values['TERMINAL'] | set(values['PERMITTED']) | set().union(*values['PERMITTED'].values())\nself.assertEqual(known, run_status)",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "AGENTS.md says to use the canonical states from the preserved Option B contract, and DH-06 makes the generated OpenAPI the public source. The test only reads the generated file and edits nothing generated.",
+      "verdict": "confirmed",
+      "verifierNote": "Verified the hand-typed set, RunStatus at openapi.json:4916 with the same ten values, TERMINAL and PERMITTED as literals at check.py:10-19, and the unguarded main() at line 65; the sketched literal_eval read yields the ten states today."
+    },
+    {
+      "id": "THRN-14",
+      "title": "No lint, format or type configuration covers the harness and toolchain tests",
+      "dimension": "standards",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/pyproject.toml",
+          "line": 41,
+          "note": "The only ruff configuration, and it covers the service alone"
+        },
+        {
+          "file": "tests/harness/test_specs.py",
+          "line": 184,
+          "note": "194-character line; this file uses double quotes (299 to 5)"
+        },
+        {
+          "file": "tests/harness/test_hooks.py",
+          "line": 70,
+          "note": "141-character line; this file uses single quotes (664 to 1)"
+        },
+        {
+          "file": "tests/harness/test_disposable_guard.py",
+          "line": 4,
+          "note": "Unused import json"
+        },
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 254,
+          "note": "Trailing whitespace"
+        },
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 656,
+          "note": "Re-imports verify, already imported at :31"
+        },
+        {
+          "file": "tests/harness/test_tool_keys_env.py",
+          "line": 9,
+          "endLine": 15,
+          "note": "The one module that orders imports differently from the others"
+        }
+      ],
+      "occurrences": 20,
+      "evidence": "The service's own rules (E, F, W, I, B, UP, ASYNC, RUF; line length 100), run isolated over tests/harness and tests/toolchain, give 456 findings. 431 are E501, and 132 remain even at 120 columns. There are also 20 I001 and one each of F401, W291, RUF012, RUF059 and E402. `ruff format --check` would reformat all 20 files. With `force-sort-within-sections = true`, the I001 count drops from 20 to 7, so the import style most files already follow can be written down as a rule.",
+      "impact": "Two quote styles, two import orders and lines up to 194 characters make the files slower to read and review. Nothing stops an unused import or a duplicate import from landing. With no type checker, the helpers' annotations are documentation only.",
+      "recommendation": "Give root Python (scripts/, tests/, .claude/hooks/) one ruff configuration. Run it check-only in fast and full with the prepared ruff, so the harness profile stays install-free. Tighten in steps: first F, W, B, UP and I with force-sort-within-sections; then E501 at 120 with a per-file baseline. Adopt the formatter with quote-style single only after the source-text tests stop depending on quoting.",
+      "sketch": "# ruff.toml at the repository root; services/agent keeps its own [tool.ruff]\ntarget-version = \"py312\"\nline-length = 120\n[lint]\nselect = [\"E\", \"F\", \"W\", \"I\", \"B\", \"UP\", \"RUF\"]\n[lint.isort]\nforce-sort-within-sections = true\n[format]\nquote-style = \"single\"",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-06 calls for Ruff for lint and format, with check and format as separate gates and autofix as an explicit operation. AGENTS.md keeps the harness profile install-free, so the gate runs in fast and full with the prepared ruff.",
+      "verdict": "revised",
+      "verifierNote": "Reran ruff 0.17.3 read-only with --no-cache --isolated: 456 findings (431 E501, 20 I001 and one each of F401, W291, RUF012, RUF059 and E402), 132 E501 at 120 columns, and 20 of 20 files to reformat. Corrected the force-sort count from 6 to 7 and the quote counts (tokenize) to 299 to 5 and 664 to 1."
+    },
+    {
+      "id": "THRN-15",
+      "title": "test_final_review.py groups tests by the review that found them",
+      "dimension": "structure",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "tests/harness/test_final_review.py",
+          "line": 1,
+          "note": "Docstring: 'What US-11.12's review of the harness found, held in place.'"
+        },
+        {
+          "file": "tests/harness/test_final_review.py",
+          "line": 29,
+          "note": "qualify_web.run_problems"
+        },
+        {
+          "file": "tests/harness/test_final_review.py",
+          "line": 52,
+          "note": "Fingerprint test; others live in test_hooks.py and test_verify_profiles.py"
+        },
+        {
+          "file": "tests/harness/test_final_review.py",
+          "line": 74,
+          "note": "persistent_install refusals"
+        },
+        {
+          "file": "tests/harness/test_final_review.py",
+          "line": 96,
+          "note": "qualify_worker_inference.request_shape_problems"
+        },
+        {
+          "file": "tests/harness/test_final_review.py",
+          "line": 112,
+          "note": "toolchain.snapshot"
+        },
+        {
+          "file": "tests/harness/test_final_review.py",
+          "line": 120,
+          "note": "generate_contracts.main, while test_generate_contracts.py tests the same module"
+        }
+      ],
+      "occurrences": 7,
+      "evidence": "Seven classes test seven different scripts: qualify_web, harness_lib, verify, persistent_install, qualify_worker_inference, toolchain and generate_contracts. No test_qualify_web.py, test_persistent_install.py or test_qualify_worker_inference.py exists, so these are those scripts' only harness tests. ContractDrift sits apart from test_generate_contracts.py.",
+      "impact": "Someone changing qualify_web.py or persistent_install.py won't find these tests by file name. The next review is likely to add another file of the same mixed kind.",
+      "recommendation": "Use one test module per script under test. Move ContractDrift into test_generate_contracts.py, Domains into test_verify_profiles.py and Fingerprint into the inputs module. Give BrowserRuns, PaidWorkerGuard, RequestShape and NonMutationGuard modules named after their scripts. Keep 'found by US-11.12's review' in each class docstring.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "The review's ground rules keep story citations in comments, so the US-11.12 note moves into class docstrings rather than staying in the file name. DH-03 fixes only tests/harness/ as the location.",
+      "verdict": "revised",
+      "verifierNote": "Verified seven classes for seven scripts and no test module named after qualify_web, persistent_install or qualify_worker_inference. Lowered to low: grep finds these tests, and the cost is discoverability in a 146-line file, not risk to a change."
+    },
+    {
+      "id": "THRN-16",
+      "title": "N4 only works if it runs last against a shared prepared copy",
+      "dimension": "tests",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "tests/toolchain/test_non_mutating.py",
+          "line": 79,
+          "note": "Docstring: 'Test names set the order: drift goes last'"
+        },
+        {
+          "file": "tests/toolchain/test_non_mutating.py",
+          "line": 187,
+          "endLine": 196,
+          "note": "test_zz_n4 uninstalls idna and never restores it"
+        },
+        {
+          "file": "tests/toolchain/test_non_mutating.py",
+          "line": 100,
+          "endLine": 111,
+          "note": "edit() already restores by bootstrapping again"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "PreparedCopy bootstraps one copy in setUpClass. test_zz_n4 runs `uv pip uninstall idna` and leaves the environment drifted. It relies on unittest's alphabetical method order to run last.",
+      "impact": "Running with -k, under a runner that reorders tests, or after adding a test whose name sorts after zz, gives later tests a drifted environment, so they fail for the wrong reason.",
+      "recommendation": "Restore the environment in a cleanup, as edit() does for pyproject changes (`self.addCleanup(support.bootstrap_copy, self.root)`), and drop the zz prefix. Alternatively, give N4 its own class and its own copy.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "none",
+      "verdict": "confirmed",
+      "verifierNote": "Verified test_zz_n4 uninstalls idna and restores nothing, relying on unittest's alphabetical order, while edit() restores through bootstrap_copy."
+    },
+    {
+      "id": "THRN-17",
+      "title": "launch_env leaves a temporary .env directory behind on every call",
+      "dimension": "tests",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "tests/harness/test_tool_keys_env.py",
+          "line": 22,
+          "endLine": 35,
+          "note": "Creates the directory with mkdtemp and never removes it"
+        },
+        {
+          "file": "tests/harness/test_tool_keys_env.py",
+          "line": 44,
+          "endLine": 47,
+          "note": "Five calls in one loop"
+        }
+      ],
+      "occurrences": 8,
+      "evidence": "The fixtures are key-shaped values such as `OPENROUTER_API_KEY=sk-or-fixture` and `GITHUB_TOKEN='github_pat_fixture; touch pwned4'`. Each run makes 8 calls (6 in the first test, 1 in each of the next two), and nothing deletes the directories.\nwork = Path(tempfile.mkdtemp(prefix='tool-keys-env-'))\n(work / '.env').write_text(dotenv)",
+      "impact": "Every harness run leaves eight directories with .env files in the temp directory, and their key-shaped values can trip local secret scanners. Every other harness test cleans up after itself.",
+      "recommendation": "Let the test own the directory: pass `Path(self.enterContext(tempfile.TemporaryDirectory()))` into launch_env, or make launch_env a context manager.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "none",
+      "verdict": "confirmed",
+      "verifierNote": "Verified launch_env uses mkdtemp with no cleanup and runs 8 times per suite (6, 1 and 1)."
+    },
+    {
+      "id": "THRN-18",
+      "title": "Two lint rules are enforced only as tests",
+      "dimension": "approach",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "tests/harness/test_shared_form_controls.py",
+          "line": 9,
+          "endLine": 19,
+          "note": "Regex over raw TSX text"
+        },
+        {
+          "file": "tests/toolchain/test_scaffold_scope.py",
+          "line": 13,
+          "endLine": 44,
+          "note": "AST scan for banned SDK imports, run only in full"
+        },
+        {
+          "file": "apps/web/eslint.config.mjs",
+          "line": 4,
+          "endLine": 8,
+          "note": "No restricted-syntax rule for raw form controls"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "RAW = re.compile(r'<(input|select|textarea)\\b') is searched in each .tsx file's raw text, so it matches inside comments and strings and misses createElement('input'). The SDK import ban runs only in full, as toolchain_scope_tests. Neither rule appears in apps/web/eslint.config.mjs or in the service's ruff selection.",
+      "impact": "A developer learns about a raw `<input>` or an `anthropic` import only from a harness or full run, not from the editor or the web lint step. The TSX regex can also fail on a harmless comment.",
+      "recommendation": "Express the form-control rule as an ESLint `no-restricted-syntax` rule on JSXOpeningElement names, with an exception for components/ui/field.tsx. Express the import ban with ruff's flake8-tidy-imports banned-api in services/agent. Keep each test's known-bad cases until the lint rule has its own fixture, so no guard is lost during the move.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06 calls for pinned ESLint with Next.js, React and TypeScript rules, and Ruff for the service. Per the ground rules no guard is weakened: the tests stay until the lint rules are proven.",
+      "verdict": "confirmed",
+      "verifierNote": "Verified the raw-text regex over TSX files and the AST import scan that only full runs; apps/web/eslint.config.mjs has no restricted-syntax rule."
+    },
+    {
+      "id": "THRN-19",
+      "title": "Mutation lambdas and unexplained counts hide intent",
+      "dimension": "naming",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 503,
+          "endLine": 512,
+          "note": "Lambdas calling __setitem__, with default-argument capture"
+        },
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 533,
+          "note": "Nested __setitem__ on a hook's type"
+        },
+        {
+          "file": "tests/toolchain/test_manifests.py",
+          "line": 128,
+          "endLine": 132,
+          "note": "Five __setitem__ and append lambdas"
+        },
+        {
+          "file": "tests/harness/test_assistant_assets.py",
+          "line": 596,
+          "endLine": 597,
+          "note": "Pins 13 skills and 7 agents with no message"
+        },
+        {
+          "file": "tests/harness/test_disposable_guard.py",
+          "line": 62,
+          "endLine": 77,
+          "note": "Named one-line mutators: the readable pattern already in use"
+        }
+      ],
+      "occurrences": 13,
+      "evidence": "That is 11 __setitem__ lambdas and 2 bare counts, for example:\nself.assert_refused(f'plugin {value}', config,\n                    lambda data, v=value: data['upstream']['delivery_plugin'].__setitem__('event_delivery_qualification', v),\n                    'upstream.delivery_plugin.event_delivery_qualification', 'configuration_invalid')\nself.assertEqual(len(list((ROOT / '.claude/skills').glob('*/SKILL.md'))), 13)",
+      "impact": "Readers must decode dunder calls and default-argument capture to see what each negative case changes. Adding a skill fails with '13 != 14' and no word on why the count is pinned.",
+      "recommendation": "Use named one-line mutators, with the name as the subTest label, as test_disposable_guard.py and test_supabase_stack.py already do. Alternatively, use a small `setting(path, value)` helper that returns a labelled mutator. For the pinned counts, add a message saying why they are pinned, or compare against an explicit list of names.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "none",
+      "verdict": "confirmed",
+      "verifierNote": "Verified 11 __setitem__ lambdas (6 in test_assistant_assets.py, 5 in test_manifests.py) and the two bare counts at test_assistant_assets.py:596-597."
+    }
+  ],
+  "rejected": [],
+  "notCovered": "I did not run the harness or toolchain suites. They write under .checks and the system temp directory, outside this review's write scope, and most toolchain tests download from package registries. The one exception is tests/toolchain/test_manifests.py, which I ran read-only with -B: 15 tests passed in 0.08 s and the working tree was unchanged. Per-test durations are therefore unknown. Remarks about slow or process-heavy tests come from reading the code and from the latest harness report's total (290 tests, 26.6 s). I read only the parts of the code under test that the findings needed: scripts/verify.py (60-200), .claude/hooks/dispatch.py (90-200), scripts/harness_lib.py (77-84, 250-345), scripts/app_db.py (175-216), scripts/qualify_release.py (20-62), tests/faults/state/check.py (1-30 and its last lines), the runs migration (1-40) and the service's ruff section. Their own quality belongs to the scripts, sql-infra and db-tests areas. I read the PRD-Development-Harness.md sections DH-03, DH-05, DH-06 and DH-09, not the whole document."
+}

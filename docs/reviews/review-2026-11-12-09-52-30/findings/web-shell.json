@@ -1,0 +1,1154 @@
+{
+  "schema": "autobots.code-review/v1",
+  "area": "web-shell",
+  "title": "Web: shell, BFF, lib and configuration",
+  "kind": "area",
+  "timestamp": "2026-11-12-09-52-30",
+  "revision": "156534da0bd5b19417f05d313077d767804b175b",
+  "summary": "The web shell, BFF and lib are small and deliberately bounded. Every proxied operation passes one pure Host, Origin, Sec-Fetch-Site and double-submit guard, then a session check, before forward() adds the internal token and the cookie-chosen workspace. The API checks membership again (Decision 0023 E3). Server modules carry server-only, the proxy route handlers are one-liners, the exact Luma tokens are imported unedited, and every input, select and textarea goes through components/ui. The weak points are failure handling and how deeply responses are validated. The hand-written api-client validator ignores minItems, maxItems and schema-valued additionalProperties, which leaves 29 constraints in 19 generated schemas unchecked. requestJson reports HTTP failures as ContractError. Every catch in service-status.ts and bff.ts throws away its cause without logging it, so contract drift, a 401, a timeout and a missing environment variable all end up as 'Sign in', a generic 503 or a bare 500. Sign-in reports an outage as a wrong password. Each component writes its own mutation code: 20 response bodies are type-asserted and the generated parseErrorResponse is never used. They all sit on a csrfFetch that rotates the token on every write, so two overlapping writes can refuse each other. The tooling enforces less than it seems to. schema-value.test.ts never runs because verify.py names unit tests one by one. ESLint has no type-aware, assertion or size rules. packages/api-client is outside lint and format. DH-06's Vitest and React Testing Library layer is missing: US-1.3 deferred it, and no decision records node:test as its substitute. Size is not the problem in this area. I read the code behind the metric leads for guardRequest's complexity, the primitive files with several components and the test-fixture type assertion, and judged all three acceptable.",
+  "scores": [
+    {
+      "dimension": "standards",
+      "score": 3,
+      "why": "Strict flags (noUncheckedIndexedAccess, exactOptionalPropertyTypes), pinned versions and separate lint, typegen and typecheck steps meet DH-06 as written. ESLint has no assertion, size or type-aware rules, api-client is outside lint and format, and the Vitest/RTL layer is missing without a decision."
+    },
+    {
+      "dimension": "modules",
+      "score": 4,
+      "why": "Server-only modules, a pure guard and one forwarder make the boundaries clear. Alias routes, a credential module the app never calls and an incomplete primitive set blur the public surface."
+    },
+    {
+      "dimension": "size",
+      "score": 4,
+      "why": "The largest file is 175 lines. Four components run 63 to 75 lines, and forward() and guardRequest reach complexity 13. All modest."
+    },
+    {
+      "dimension": "functions",
+      "score": 4,
+      "why": "Most functions do one thing. forward() and AccountFooter each mix policy or derived state with output."
+    },
+    {
+      "dimension": "structure",
+      "score": 4,
+      "why": "The layout follows Next.js conventions and the DH-03 placement of apps/web and packages/api-client. Three alias routes give some endpoints two URLs."
+    },
+    {
+      "dimension": "approach",
+      "score": 3,
+      "why": "Server Components are the default, reads happen on the server and the SSE pass-through never owns a run. Rotating the CSRF token on every write causes a race, each component writes its own mutation code, and per-render reads are not memoized."
+    },
+    {
+      "dimension": "comments",
+      "score": 4,
+      "why": "Comments explain why and cite decisions and PRD IDs. Two no longer match the code, and a third gives a focus-order reason that has since changed."
+    },
+    {
+      "dimension": "types",
+      "score": 3,
+      "why": "Generated types are used at the server boundary. The runtime validator ignores 29 declared constraints, and 20 client sites type-assert response shapes instead of parsing them."
+    },
+    {
+      "dimension": "errors",
+      "score": 2,
+      "why": "Every server-side catch throws away its cause without a log. Drift and a 401 both read as signed out, and sign-in reports outages as bad credentials."
+    },
+    {
+      "dimension": "tests",
+      "score": 3,
+      "why": "The guard and credential tests are table-driven on shared fixtures, and boundary.spec.ts covers the BFF end to end. One unit test never runs, body limits are untested, and there is no fast layer for BFF or client logic."
+    },
+    {
+      "dimension": "maintainability",
+      "score": 3,
+      "why": "Readable, well-bounded code. Its main costs are failures nobody can see, a validator weaker than its contract, and mutation code repeated across screens."
+    }
+  ],
+  "strengths": [
+    {
+      "title": "A pure, table-tested request guard",
+      "evidence": "apps/web/lib/request-guard.ts:33-67 has no framework dependency and compares tokens in constant time (22-31). apps/web/tests/unit/request-guard.test.ts:31-76 tests it against forged hosts, DNS rebinding through localhost, cross-site and same-site fetches, and missing, empty and mismatched tokens."
+    },
+    {
+      "title": "Server-only boundaries held in code, not convention",
+      "evidence": "import \"server-only\" is line 1 of apps/web/lib/bff.ts, session.ts, server-config.ts, service-status.ts and workspace-choice.ts. Configuration is read on each call (server-config.ts:11). The internal token goes onto a fresh Headers object, so a client-sent Authorization or X-Autobots-Internal never gets through (bff.ts:59-62, 80-89). The Supabase client stays on the server behind an HttpOnly, SameSite=Strict cookie (session.ts:10-21), and accessToken says outright that nothing trusts the token's contents (session.ts:37)."
+    },
+    {
+      "title": "One path for every proxied operation",
+      "evidence": "Every proxy route calls forward() or streamFrom(). Their authorized() runs the guard, then the session check, then attaches the chosen workspace (apps/web/lib/bff.ts:37-69). The stream route validates its cursor and encodes the run id (apps/web/app/api/v1/runs/[id]/events/stream/route.ts:12-17). Only the stream's reader is tied to the browser, so a disconnect never cancels a run (bff.ts:128-131)."
+    },
+    {
+      "title": "Exact tokens, consumed rather than copied",
+      "evidence": "apps/web/app/globals.css:2-5 imports docs/design/luma.css unedited plus the one documented extension. Lines 31-77 map every color, including the chart and sidebar tokens, and the radius scale to Tailwind (DS-01, DS-03). Dark is the server fallback, and hydration suppression is limited to the root element (apps/web/app/layout.tsx:19-23). Invalid saved themes are removed before paint (layout.tsx:13-17)."
+    },
+    {
+      "title": "Form controls fully centralized",
+      "evidence": "apps/web/components/ui/field.tsx provides Input, Textarea, Select and Choice with data-slot markers, and keeps Decision 0023 E1's border in one constant (field.tsx:10-11). git grep finds no raw <input>, <select> or <textarea> in app/ or components/ outside components/ui."
+    },
+    {
+      "title": "State never carried by color alone",
+      "evidence": "SidebarNav marks the current page with aria-current, fill and weight (apps/web/components/sidebar-nav.tsx:69, 95-99) and gives the pending count screen-reader words (120). Badge and readiness put the meaning in words (badge.tsx:6, readiness.tsx:15). ServiceStatusBadge keeps \"Python API: available\" whole for assistive technology (service-status-badge.tsx:6-7). The shell opens with a skip link (app-shell.tsx:25-30)."
+    },
+    {
+      "title": "Cross-language fixtures instead of parallel test data",
+      "evidence": "apps/web/tests/unit/credential-precedence.test.ts:9-23 and packages/api-client/tests/contract.test.ts:8-20 read the same contracts/fixtures files as the Python tests (services/agent/tests/test_contracts.py:30). contract.test.ts:22-25 pins that a cast cannot stand in for validation."
+    },
+    {
+      "title": "Promise handling already clean",
+      "evidence": "Event handlers mark fire-and-forget calls with void (apps/web/components/account-form.tsx:49, workspace-chooser.tsx:48). A read-only ESLint run on this area with type-aware no-floating-promises and no-misused-promises found no violation in production code, so those rules can be enforced at no cost."
+    }
+  ],
+  "findings": [
+    {
+      "id": "WSHL-01",
+      "title": "The contract validator ignores array bounds, map value schemas and unknown keywords",
+      "dimension": "types",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "packages/api-client/src/runtime.ts",
+          "line": 125,
+          "endLine": 130,
+          "note": "The array branch checks items only. minItems and maxItems are never read."
+        },
+        {
+          "file": "packages/api-client/src/runtime.ts",
+          "line": 71,
+          "endLine": 78,
+          "note": "Extra properties are checked only when additionalProperties is false. A schema value is skipped."
+        },
+        {
+          "file": "packages/api-client/src/runtime.ts",
+          "line": 19,
+          "note": "The index signature admits any keyword, and the switch default (137-138) accepts an unknown type."
+        },
+        {
+          "file": "packages/api-client/src/generated.ts",
+          "line": 2808,
+          "endLine": 2810,
+          "note": "ModelPolicyState.role_overrides values must be a ModelProfileId. This is never checked."
+        },
+        {
+          "file": "packages/api-client/src/generated.ts",
+          "line": 6906,
+          "note": "WorkflowGraph.nodes has maxItems 200. This is never checked."
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 148,
+          "note": "A consumer that trusts the parsed role overrides"
+        },
+        {
+          "file": "packages/api-client/tests/contract.test.ts",
+          "line": 8,
+          "endLine": 20,
+          "note": "The shared fixtures cover four models and no array bound or map value."
+        }
+      ],
+      "occurrences": 29,
+      "evidence": "runtime.ts handles $ref, anyOf, const, enum, type, format, pattern, minimum and maximum, minLength and maxLength, items, properties, required and additionalProperties: false. It handles nothing else.\n```ts\ncase \"array\":\n  if (!Array.isArray(value)) throw new ContractError(path, \"not an array\");\n  value.forEach((item, index) => {\n    if (schema.items !== undefined) check(schemas, schema.items, item, `${path}[${index}]`);\n  });\n  return;\n```\nA read-only python3.12 -I walk of `schemas` in generated.ts finds 15 maxItems, 4 minItems and 10 schema-valued additionalProperties: 29 constraints in 19 schemas. They include ModelPolicyState.role_overrides, ExpertConfig.role_bindings and tools (max 20), JobsChart.hours (1 to 25), and WorkflowGraph.nodes and links. The shared boundary fixture (29 cases, four models) exercises none of them.",
+      "impact": "Generated parse functions are the only runtime check at the TypeScript trust boundary. Even so, parseModelPolicyState accepts a role override that names an unapproved profile, parseJobsChart accepts an empty or 26-hour chart, and parseWorkflowGraph accepts 201 nodes. The TypeScript side validates less than Pydantic. If Pydantic starts emitting a keyword this runtime ignores (oneOf with a discriminator for a tagged union, for example), every value would pass silently. That is the drift the shared fixtures exist to catch.",
+      "recommendation": "Write the failing cases first. In contracts/fixtures/boundary-cases.json, which both languages read, add a WorkflowGraph with 201 nodes and a ModelPolicyState whose role_overrides names an unapproved profile, and add ModelPolicyState to both model maps. Then implement minItems, maxItems and schema-valued additionalProperties in runtime.ts. Add a contract test that walks every schema position in `schemas` and fails on any keyword the runtime does not implement. Allow annotations (title, description, default, examples) explicitly. Leave generated.ts to the generator.",
+      "sketch": "// packages/api-client/src/runtime.ts\nexport const KEYWORDS = new Set([\"$ref\", \"anyOf\", \"const\", \"enum\", \"type\", \"format\", \"pattern\", \"minimum\",\n  \"maximum\", \"minLength\", \"maxLength\", \"items\", \"minItems\", \"maxItems\", \"properties\", \"required\",\n  \"additionalProperties\"]);\nexport const ANNOTATIONS = new Set([\"title\", \"description\", \"default\", \"examples\"]);\nfunction checkArray(schemas: Schemas, schema: Schema, value: unknown[], path: string): void; // bounds, then items\n// checkObject: typeof schema.additionalProperties === \"object\" -> check(schemas, it, item, `${path}.${name}`)\n// tests/contract.test.ts: walk properties, items, anyOf and additionalProperties of every entry in `schemas`;\n//   a key outside KEYWORDS and ANNOTATIONS fails the test, so a new Pydantic keyword cannot pass silently",
+      "effort": "S",
+      "risk": "high",
+      "ruleCheck": "contracts.md: shared validation fixtures cover both languages, and TypeScript types do not validate JSON. The fix lives in the hand-written runtime.ts, its test and the shared fixtures. generated.ts is regenerated, never edited.",
+      "verdict": "confirmed",
+      "verifierNote": "Re-walked `schemas` in generated.ts: 15 maxItems, 4 minItems and 10 schema-valued additionalProperties, 29 constraints in 19 of 170 schemas, and no other unimplemented keyword today. The shared cases cover four models and none of these constraints."
+    },
+    {
+      "id": "WSHL-02",
+      "title": "Server reads and the BFF throw away every failure cause, so drift, 401s and timeouts read as signed out or a generic 503",
+      "dimension": "errors",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "apps/web/lib/service-status.ts",
+          "line": 52,
+          "endLine": 61,
+          "note": "fetchSession turns any error, including ContractError, into null."
+        },
+        {
+          "file": "apps/web/lib/service-status.ts",
+          "line": 64,
+          "endLine": 85,
+          "note": "Readiness and pending approvals use the same catch-all null."
+        },
+        {
+          "file": "apps/web/lib/bff.ts",
+          "line": 119,
+          "endLine": 125,
+          "note": "forward() turns every failure into 503 service_unavailable without logging it."
+        },
+        {
+          "file": "apps/web/lib/bff.ts",
+          "line": 168,
+          "endLine": 174,
+          "note": "streamFrom() does the same."
+        },
+        {
+          "file": "apps/web/app/api/workspace/route.ts",
+          "line": 40,
+          "endLine": 43,
+          "note": "A null session, whatever caused it, is answered with 401 not_signed_in."
+        },
+        {
+          "file": "apps/web/components/account-footer.tsx",
+          "line": 24,
+          "endLine": 36,
+          "note": "A null session renders the Sign in link."
+        }
+      ],
+      "occurrences": 6,
+      "evidence": "```ts\nexport async function fetchSession(): Promise<SessionSummary | null> {\n  try {\n    const token = await accessToken();\n    return token === null ? null : await getSession(client({ Authorization: `Bearer ${token}` }));\n  } catch {\n    return null;\n  }\n}\n```\n(Reflowed.) Generated getSession throws ContractError both for a non-2xx status and for a body that fails parseSessionSummary (runtime.ts:168-170). git grep finds no console or logger call anywhere in apps/web app/, components/ or lib/.",
+      "impact": "Several unrelated failures all show a signed-in person the Sign in link: a role value this build does not know, an API on another revision, a missing AUTOBOTS_INTERNAL_TOKEN (the API answers 401), or a 3-second timeout. /api/workspace then tells them \"Sign in first.\" The BFF reports its own 30-second timeout as \"The local API is unavailable.\" No private log records which of these happened, so at runtime nobody can see the contract drift this layer is meant to expose. DH-06 asks for the opposite.",
+      "recommendation": "Add a server-only logFailure(operation, error). It records the operation, the error class, the ContractError path, the HTTP status and whether a timeout fired. It never records bodies, headers, tokens or query strings, which keeps the promise in bff.ts:33-35. Have service-status return a discriminated result: signed_out only when there is no token or the API answers 401, and unavailable (logged) for everything else. Render Sign in only for signed_out. Answer /api/workspace with 503 when the session read is unavailable. In forward(), log the cause and map a timeout to 504 upstream_timeout. This needs requestJson to keep the HTTP status; see the requestJson finding.",
+      "sketch": "// lib/server-log.ts (server-only)\nexport function logFailure(operation: string, error: unknown): void; // name, ContractError.path, status, timeout\n// lib/service-status.ts\nexport type MemberRead<T> = { kind: \"ok\"; value: T } | { kind: \"signed_out\" } | { kind: \"unavailable\" };\nasync function memberRead<T>(operation: string, call: (options: ClientOptions) => Promise<T>): Promise<MemberRead<T>>;\n//   no token or ApiError 401 -> signed_out; anything else -> logFailure, unavailable\n// lib/bff.ts: catch (error) { logFailure(`${method} ${pathOnly(apiPath)}`, error); return timeout ? 504 : 503 }",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: centralize error handling, preserve causes in private logs and expose safe typed errors. nextjs.md: server keys never reach props or public responses. The log therefore carries only names, codes, statuses and paths, and the browser still sees only the safe envelope.",
+      "verdict": "confirmed",
+      "verifierNote": "No console or logger call exists in apps/web app, components or lib, and every cited catch discards its error; security.py:42-45 refuses an empty internal token with 401. WSHL-20 covers the configuration side of the same symptom."
+    },
+    {
+      "id": "WSHL-03",
+      "title": "requestJson reports HTTP failures as ContractError and drops the API's typed error",
+      "dimension": "errors",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "packages/api-client/src/runtime.ts",
+          "line": 168,
+          "endLine": 170,
+          "note": "The status survives only inside the message, and the ErrorResponse body is never read."
+        },
+        {
+          "file": "packages/api-client/src/runtime.ts",
+          "line": 151,
+          "endLine": 155,
+          "note": "ClientOptions.fetch is typed as the full typeof fetch."
+        },
+        {
+          "file": "apps/web/lib/service-status.ts",
+          "line": 22,
+          "endLine": 27,
+          "note": "The `as typeof fetch` cast that type forces"
+        },
+        {
+          "file": "packages/api-client/tests/contract.test.ts",
+          "line": 33,
+          "endLine": 36,
+          "note": "This test locks in the conflation."
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "```ts\nif (!response.ok) {\n  throw new ContractError(path, `request failed with status ${response.status}`);\n}\nreturn (await response.json()) as unknown;\n```\nThe file's own header says ContractError is for values crossing a trust boundary. lib/service-status.ts is the only web caller of the generated request functions, and nothing in apps/web calls parseErrorResponse.",
+      "impact": "Callers cannot tell 401, 403, 503 and contract drift apart without parsing a message string, which is why service-status treats them all alike. Consumers also have to cast their fetch wrapper, because the option type is wider than requestJson needs.",
+      "recommendation": "For non-2xx responses, throw an ApiError that carries the status and the parsed JSON body, and keep ContractError for schema violations. Callers read the safe code with the generated parseErrorResponse(error.body). Narrow ClientOptions.fetch to `(url: string, init: RequestInit) => Promise<Response>`, which is all requestJson calls, and remove the cast in service-status.ts. Change contract.test.ts:33-36 first so it expects ApiError.",
+      "sketch": "export class ApiError extends Error {\n  readonly status: number;\n  readonly body: unknown;\n  constructor(status: number, body: unknown) { super(`request failed with status ${status}`); this.name = \"ApiError\"; this.status = status; this.body = body; }\n}\nexport interface ClientOptions { baseUrl: string; fetch: (url: string, init: RequestInit) => Promise<Response>; headers?: Record<string, string> }",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "contracts.md: Pydantic/OpenAPI owns ErrorResponse, so callers parse it with the generated parser instead of a hand-written shape. runtime.ts is hand-written and generated.ts is untouched. The package keeps erasableSyntaxOnly, so the sketch declares fields rather than using parameter properties.",
+      "verdict": "confirmed",
+      "verifierNote": "requestJson throws ContractError for any non-2xx (runtime.ts:168-170), contract.test.ts:33-36 pins it, and service-status.ts holds the only four web calls to generated request functions."
+    },
+    {
+      "id": "WSHL-04",
+      "title": "csrfFetch mints a new double-submit token for every write, so overlapping writes can refuse each other",
+      "dimension": "approach",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/lib/csrf-fetch.ts",
+          "line": 6,
+          "endLine": 15
+        },
+        {
+          "file": "apps/web/app/api/csrf/route.ts",
+          "line": 9,
+          "endLine": 16,
+          "note": "Every GET mints a token and replaces the cookie."
+        },
+        {
+          "file": "apps/web/lib/request-guard.ts",
+          "line": 57,
+          "endLine": 66,
+          "note": "The header must equal whichever cookie the browser sends at that moment."
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "```ts\nconst { header, token } = (await (\n  await fetch(\"/api/csrf\", { cache: \"no-store\" })\n).json()) as { header: string; token: string };\nreturn fetch(path, {\n  ...init,\n  headers: { ...init.headers, [header]: token },\n});\n```\n29 csrfFetch calls in 19 component files depend on this function (git grep -c).",
+      "impact": "Write A fetches token T1, and the cookie becomes T1. Before A is sent, write B (from another tab or a quick second action) fetches T2, and the cookie becomes T2. A then carries header T1 with cookie T2 and is refused with invalid_csrf. Callers show this as a generic failure, and sign-in shows it as a wrong password. Every write also costs an extra round trip. The token reply is type-asserted rather than checked. Spreading init.headers would drop every header if a caller passed a Headers instance or a tuple array, both of which RequestInit allows; no caller does today.",
+      "recommendation": "Keep one token per browser session. /api/csrf returns the request's existing autobots.csrf value and mints a new one only when there is none, and csrfFetch caches the token in module scope. After an invalid_csrf or missing_csrf refusal, fetch a token once more and resend. The guard refuses before forwarding, so the retry cannot duplicate a write. Check reply.ok and the reply's shape, and build headers with new Headers(init.headers) before setting the token. Add a browser test with two overlapping writes.",
+      "sketch": "// lib/csrf-fetch.ts\nlet current: { header: string; token: string } | null = null;\nasync function token(fresh: boolean): Promise<{ header: string; token: string }>; // GET /api/csrf, checks ok and shape\nexport async function csrfFetch(path: string, init: RequestInit): Promise<Response>;\n//   headers = new Headers(init.headers); headers.set(header, token); on 403 invalid_csrf or missing_csrf, refresh once and resend\n// app/api/csrf/route.ts: reuse request.cookies.get(CSRF_COOKIE) when present, mint only when absent",
+      "effort": "S",
+      "risk": "high",
+      "ruleCheck": "nextjs.md: protect mutations with Host, Origin and CSRF checks. The double-submit comparison, the Origin, Host and Sec-Fetch-Site checks and the SameSite=Strict cookie stay as they are. Only the token's lifetime changes, and double-submit protection does not depend on it.",
+      "verdict": "revised",
+      "verifierNote": "Every GET /api/csrf mints and sets a new cookie, and 29 csrfFetch calls in 19 files rely on it; the race is reasoned from the code, not observed. The header-spreading problem is marked latent: no caller passes a Headers instance or tuple array."
+    },
+    {
+      "id": "WSHL-05",
+      "title": "Three route files rebuild the same guard input, error envelope, cookie policy and JSON body read",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/lib/bff.ts",
+          "line": 41,
+          "endLine": 54
+        },
+        {
+          "file": "apps/web/app/api/session/route.ts",
+          "line": 13,
+          "endLine": 31,
+          "note": "A 403 without Cache-Control: no-store"
+        },
+        {
+          "file": "apps/web/app/api/workspace/route.ts",
+          "line": 8,
+          "endLine": 34,
+          "note": "refused() copies safeError()."
+        },
+        {
+          "file": "apps/web/app/api/session/route.ts",
+          "line": 38,
+          "endLine": 42,
+          "note": "Body read with a type assertion"
+        },
+        {
+          "file": "apps/web/app/api/workspace/route.ts",
+          "line": 35,
+          "endLine": 36,
+          "note": "Body read with a type assertion"
+        },
+        {
+          "file": "apps/web/lib/session.ts",
+          "line": 15,
+          "endLine": 21,
+          "note": "Session cookie with secure: false"
+        },
+        {
+          "file": "apps/web/app/api/csrf/route.ts",
+          "line": 11,
+          "endLine": 16,
+          "note": "CSRF cookie with secure: false"
+        },
+        {
+          "file": "apps/web/app/api/workspace/route.ts",
+          "line": 51,
+          "endLine": 56,
+          "note": "The workspace cookie derives secure from the origin."
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "The same six-field GuardInput literal is built in bff.ts:42-49, session/route.ts:15-22 and workspace/route.ts:22-29. The 403 helpers are safeError (bff.ts:21), refused (workspace/route.ts:8) and an inline response in session/route.ts:27-30. The inline one is the only one without Cache-Control: no-store. Cookie `secure` is false in session.ts:19 and csrf/route.ts:15, but workspace/route.ts:55 derives it from AUTOBOTS_ALLOWED_ORIGIN. Both JSON body reads assert a shape:\n```ts\nconst body: unknown = await request.json().catch(() => null);\nconst chosen = (body as { workspace_id?: unknown } | null)?.workspace_id;\n```",
+      "impact": "A new route that does not go through the proxy has to copy the guard by hand, and the existing copies have already diverged. On an https origin only the workspace cookie would be Secure, and one refusal response lacks no-store.",
+      "recommendation": "Move this shared preamble into one server-only module. refusalFor(request) builds GuardInput once and returns the 403 response or null. jsonError(status, code, message) always sets no-store. readJsonObject(request) returns a record or null, which removes both assertions. cookieOptions(config, httpOnly) serves the session, CSRF and workspace cookies. Type the refusal codes as a GuardRefusal union in request-guard.ts. Keep every check and its order; request-guard.test.ts and boundary.spec.ts already cover them.",
+      "sketch": "// lib/route-guard.ts (server-only)\nexport function refusalFor(request: NextRequest): NextResponse | null;\nexport function jsonError(status: number, code: string, message: string): NextResponse; // always no-store\nexport async function readJsonObject(request: NextRequest): Promise<Record<string, unknown> | null>;\nexport function cookieOptions(config: ServerConfig, httpOnly: boolean): { httpOnly: boolean; sameSite: \"strict\"; path: \"/\"; secure: boolean };\n// lib/request-guard.ts\nexport type GuardRefusal = \"forbidden_host\" | \"forbidden_origin\" | \"missing_csrf\" | \"invalid_csrf\";",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "nextjs.md: verify session and workspace on every BFF operation, and protect mutations with Host, Origin and CSRF checks. The extraction keeps each check in the same order. Decision 0023 E3's HttpOnly, SameSite=Strict workspace cookie keeps its flags.",
+      "verdict": "confirmed",
+      "verifierNote": "The three GuardInput literals, the missing no-store at session/route.ts:27-30, both body assertions and the three secure settings confirmed. XDUP-12 reports the same duplication from the lens."
+    },
+    {
+      "id": "WSHL-06",
+      "title": "Each component writes its own mutation code: 20 type-asserted response bodies and no shared helper",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/lib/csrf-fetch.ts",
+          "line": 2,
+          "endLine": 16,
+          "note": "The only shared piece, and it returns a raw Response."
+        },
+        {
+          "file": "apps/web/components/account-form.tsx",
+          "line": 23,
+          "endLine": 40
+        },
+        {
+          "file": "apps/web/components/sign-in-form.tsx",
+          "line": 21,
+          "endLine": 35
+        },
+        {
+          "file": "apps/web/components/workspace-chooser.tsx",
+          "line": 22,
+          "endLine": 30
+        },
+        {
+          "file": "apps/web/components/provider-settings-panel.tsx",
+          "line": 192,
+          "endLine": 206,
+          "note": "A local mutate() helper"
+        },
+        {
+          "file": "apps/web/components/keys-and-vars-panel.tsx",
+          "line": 203,
+          "note": "Another local mutate() helper"
+        },
+        {
+          "file": "apps/web/components/run-controls.tsx",
+          "line": 73,
+          "note": "A local send() helper (run-panel.tsx:84 has another)"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 216,
+          "endLine": 218,
+          "note": "Asserted error body"
+        }
+      ],
+      "occurrences": 20,
+      "evidence": "```ts\nconst body = (await reply.json().catch(() => null)) as {\n  code?: string;\n} | null;\n```\n(account-form.tsx:33-35.) git grep finds this `(await reply.json().catch(() => null)) as` form 20 times in 15 component files. It also finds 29 csrfFetch calls in 19 files, 28 JSON Content-Type literals in components, two local mutate() helpers and two local send() helpers, and no caller of the generated parseErrorResponse.",
+      "impact": "DH-06 asks for explicit response parsing and no blanket assertions. Yet 20 places read error codes from unchecked shapes, and every form repeats the same busy, try, catch and message sequence. That sequence is most of why AccountForm (63 lines) and SignInForm (66 lines) exceed the 60-line metric lead.",
+      "recommendation": "Add a browser-side sendJson(path, { method, body, parse, idempotencyKey }) built on csrfFetch. On success it returns the value parsed by the generated parser. On failure it returns the status and the error parsed by parseErrorResponse, or null when that body fails its contract or the network fails. Migrate this area's three forms first, and the other screens when they are next touched.",
+      "sketch": "// lib/bff-client.ts (browser)\nexport type Outcome<T> =\n  | { ok: true; value: T }\n  | { ok: false; status: number; error: ErrorResponse | null }; // status 0 for a network failure\nexport async function sendJson<T>(path: string, options: {\n  method: \"POST\" | \"PUT\" | \"PATCH\" | \"DELETE\"; body?: unknown;\n  parse: (value: unknown) => T; idempotencyKey?: string;\n}): Promise<Outcome<T>>;",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: use generated API types, parse responses explicitly at untrusted boundaries, avoid blanket type assertions, and rely on server idempotency for duplicate submits (the helper carries Idempotency-Key). contracts.md: ErrorResponse comes from the generated client.",
+      "verdict": "confirmed",
+      "verifierNote": "Recounted: 20 casts of this form in 15 files (19 on failure bodies; continue-run.tsx:53 casts a success body), 29 csrfFetch calls in 19 files and 28 JSON Content-Type literals in 18 files. WSYS-02 should use this same helper."
+    },
+    {
+      "id": "WSHL-07",
+      "title": "Sign-in reports an unavailable service as a wrong password, and sign-out fails silently",
+      "dimension": "errors",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/app/api/session/route.ts",
+          "line": 51,
+          "endLine": 55
+        },
+        {
+          "file": "apps/web/components/sign-in-form.tsx",
+          "line": 21,
+          "endLine": 35
+        },
+        {
+          "file": "apps/web/components/sign-in-form.tsx",
+          "line": 64,
+          "endLine": 72
+        },
+        {
+          "file": "apps/web/components/sign-out-button.tsx",
+          "line": 10,
+          "endLine": 13
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "```ts\nconst { error } = await client.auth.signInWithPassword({ email, password });\nif (error !== null) {\n  return NextResponse.json(REFUSED, { status: 401 });\n}\n```\nThe form treats any reply that is not ok, and any network failure, as `failed`, and shows \"That email and password did not work.\" That includes a 403 guard refusal and a 500. SignOutButton runs `await csrfFetch(\"/api/session\", { method: \"DELETE\" }).catch(() => null); router.refresh();` without checking the reply.",
+      "impact": "When Supabase Auth or the network is down, people are told their credentials are wrong and may retry or reset a password for nothing. A refused sign-out leaves them signed in with no message. DH-06 asks for unavailable and retryable states to be shown deliberately.",
+      "recommendation": "In the route, keep 401 sign_in_failed for credential errors, still without saying which field failed. Answer Auth transport errors and 5xx statuses with 503 service_unavailable in the BFF's envelope. In the form, show the credential message only for 401, an unavailable message for 503 or a network failure, and a prompt to reload for a 403 refusal. Show a message when sign-out fails.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "DH-06: represent loading, empty, denied, unavailable and retryable states deliberately. The 401 message still does not reveal whether the email exists.",
+      "verdict": "confirmed",
+      "verifierNote": "The route maps every Auth error to 401 sign_in_failed (51-55), the form shows the credential sentence for any non-ok reply or rejection, and SignOutButton ignores its reply."
+    },
+    {
+      "id": "WSHL-08",
+      "title": "schema-value.test.ts never runs, because verify.py names unit tests one by one",
+      "dimension": "tests",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "scripts/verify.py",
+          "line": 161,
+          "endLine": 162
+        },
+        {
+          "file": "apps/web/tests/unit/schema-value.test.ts",
+          "line": 6,
+          "endLine": 17
+        },
+        {
+          "file": "apps/web/package.json",
+          "line": 5,
+          "endLine": 11,
+          "note": "No test script"
+        },
+        {
+          "file": "packages/api-client/tsconfig.json",
+          "line": 19,
+          "endLine": 21,
+          "note": "Only src/ is type-checked, not tests/."
+        },
+        {
+          "file": "openspec/changes/archive/2026-11-08-us-16-2-schema-readiness-against-every/verification.md",
+          "line": 22,
+          "note": "Says fast passed web unit tests after this test was added"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "```py\nStep('web_unit_tests', (str(Path(tools.node_dir) / 'node'), '--test', 'apps/web/tests/unit/request-guard.test.ts',\n                       'apps/web/tests/unit/credential-precedence.test.ts'), root),\n```\n.checks/full/latest.json records exactly that argv and 33 tests (14 plus 19), none of them from schema-value.test.ts. The US-16.2 record cites this test as the evidence for a passing scenario.",
+      "impact": "Any web unit test added beyond these two passes when run by hand but is skipped by every profile. The US-16.2 evidence reads as if the profile ran it, and contributors have no package script that runs the folder.",
+      "recommendation": "Add a test:unit script to apps/web/package.json that runs node --test over tests/unit/**/*.test.ts, and have the verify step call that script so new files are picked up. Propose the verify.py change to the scripts owners. Put packages/api-client/tests under a type-checked tsconfig, for example a tsconfig.test.json that api_client_typecheck includes.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "AGENTS.md: skipped tests never count as passing implementation evidence. verify.py belongs to the scripts area, so this review only proposes the change.",
+      "verdict": "confirmed",
+      "verifierNote": "verify.py:161-162 names two files; .checks/full/latest.json records that argv and 33 passing tests, none from schema-value.test.ts, while the US-16.2 record says fast passed web unit tests."
+    },
+    {
+      "id": "WSHL-09",
+      "title": "Lint and format enforce only the Next.js presets, and packages/api-client is outside both",
+      "dimension": "standards",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/eslint.config.mjs",
+          "line": 4,
+          "endLine": 8
+        },
+        {
+          "file": "apps/web/package.json",
+          "line": 6,
+          "endLine": 7,
+          "note": "lint and format:check cover apps/web only."
+        },
+        {
+          "file": "packages/api-client/src/runtime.ts",
+          "line": 59,
+          "note": "125 characters. 15 lines here exceed Prettier's 80."
+        },
+        {
+          "file": "packages/api-client/tsconfig.json",
+          "line": 15,
+          "note": "erasableSyntaxOnly is set here but not in apps/web/tsconfig.json, although web unit tests also run under Node type stripping."
+        },
+        {
+          "file": "apps/web/tsconfig.json",
+          "line": 2,
+          "endLine": 28
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "```js\nconst config = [\n  { ignores: [\".next/**\", \"next-env.d.ts\"] },\n  ...nextCoreWebVitals,\n  ...nextTypescript,\n];\n```\nThe measurement found 94 type assertions, 83 functions over 60 lines and 31 functions over complexity 10, and no rule holds any of these at their current level. I ran ESLint read-only on this area with projectService plus no-floating-promises, no-misused-promises, switch-exhaustiveness-check and no-unnecessary-type-assertion. It found no violation in production code, only node:test calls.",
+      "impact": "DH-06's rules against blanket assertions and for small functions depend on review alone, and the hand-written contract validator has no lint or format gate at all. Lint runs with --max-warnings=0, so any rule added at warn level fails the check immediately, which means there is no way to ratchet today.",
+      "recommendation": "Add the type-aware promise and exhaustiveness rules as errors now, since they have no production hits, and turn no-floating-promises off for tests/unit. Report size, complexity and assertion rules from a separate non-blocking ESLint run, as the measurement step did. Then record per-file baselines as overrides, then make the rules errors. Extend lint and format:check to packages/api-client, and add erasableSyntaxOnly to apps/web/tsconfig.json.",
+      "sketch": "// apps/web/eslint.config.mjs, after the Next presets\n{\n  files: [\"**/*.ts\", \"**/*.tsx\"],\n  languageOptions: { parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname } },\n  rules: { \"@typescript-eslint/no-floating-promises\": \"error\", \"@typescript-eslint/no-misused-promises\": \"error\",\n           \"@typescript-eslint/switch-exhaustiveness-check\": \"error\" },\n},\n{ files: [\"tests/unit/**\"], rules: { \"@typescript-eslint/no-floating-promises\": \"off\" } },",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-06: pinned ESLint with Next.js, React and TypeScript rules, Prettier, and lint run explicitly. nextjs.md: lint separately from Next.js 16 builds. Nothing here touches next build.",
+      "verdict": "confirmed",
+      "verifierNote": "Re-ran the four type-aware rules read-only on all of apps/web: no-floating-promises, no-misused-promises and switch-exhaustiveness-check have no production hit (7 hits in tests/unit), while no-unnecessary-type-assertion has 3 at home-activity.tsx:79-81 and needs a baseline."
+    },
+    {
+      "id": "WSHL-10",
+      "title": "DH-06's Vitest and Testing Library layer is missing without a recorded decision, and BFF policy has no fast test",
+      "dimension": "standards",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "PRD-Development-Harness.md",
+          "line": 141
+        },
+        {
+          "file": "apps/web/package.json",
+          "line": 25,
+          "endLine": 37,
+          "note": "Playwright and axe only"
+        },
+        {
+          "file": "apps/web/lib/bff.ts",
+          "line": 15,
+          "endLine": 19,
+          "note": "Body limits. No test asserts 413 or request_too_large."
+        },
+        {
+          "file": "apps/web/lib/workspace-choice.ts",
+          "line": 24,
+          "endLine": 32,
+          "note": "currentWorkspace has no unit test."
+        },
+        {
+          "file": "apps/web/lib/csrf-fetch.ts",
+          "line": 2,
+          "endLine": 16,
+          "note": "No test"
+        },
+        {
+          "file": "apps/web/tests/unit/request-guard.test.ts",
+          "line": 4,
+          "note": "Relative .ts import, because node:test cannot resolve @/ aliases or server-only"
+        },
+        {
+          "file": "openspec/changes/archive/2026-11-05-us-1-3-h0-locked-toolchains-minimal/proposal.md",
+          "line": 28,
+          "note": "US-1.3 deferred Vitest and Testing Library to the first story with behavior to test"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "DH-06: \"Use Vitest/React Testing Library for relevant pure/client behavior\". apps/web has three node:test files covering 3 of its 13 lib modules, and no component tests. git grep for 413, request_too_large and \"too large\" under apps/web/tests finds nothing. The US-1.3 proposal deferred Vitest and Testing Library to the story that first had behavior to test, and no decision under docs/engineering/decisions mentions Vitest or node:test since. boundary.spec.ts covers the Host, CSRF, internal-token and unavailable cases, but runs only in the db and full profiles.",
+      "impact": "The fast profile cannot exercise BFF policy, csrfFetch, workspace selection or any client component, so each such change waits for the browser suites. The run body limit from PRD-Tool-Catalog FI-01 is not tested at any level.",
+      "recommendation": "Choose one of two paths. Either record a decision that node:test replaces Vitest for pure modules, or adopt Vitest and Testing Library with path-alias resolution under an authorized story, since that is a dependency install. Either way, keep fast-testable logic in modules with no server-only or '@/' imports, as request-guard.ts is: plain Node cannot resolve server-only from apps/web, whatever condition is passed. Then extract bff.ts's pure policy and test the body limits, header allowlists and relay first.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-06 names Vitest and React Testing Library, so a deviation needs a recorded decision. AGENTS.md: install dependencies only when a story requires them, pinned and recorded.",
+      "verdict": "revised",
+      "verifierNote": "Line 141, the missing 413 test and the absent decision confirmed, and the US-1.3 deferral added. Revised: server-only is not resolvable by plain Node from apps/web (Next resolves it internally), so --conditions=react-server cannot load those modules."
+    },
+    {
+      "id": "WSHL-12",
+      "title": "The primitive set stops short: no Label or Dialog, Card is fixed to <section>, Separator is unused",
+      "dimension": "modules",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/ui/field.tsx",
+          "line": 10,
+          "endLine": 67,
+          "note": "Controls only, no Label"
+        },
+        {
+          "file": "apps/web/components/account-form.tsx",
+          "line": 50,
+          "note": "Raw label"
+        },
+        {
+          "file": "apps/web/components/sign-in-form.tsx",
+          "line": 41,
+          "note": "Raw label"
+        },
+        {
+          "file": "apps/web/components/about-services.tsx",
+          "line": 19,
+          "endLine": 23,
+          "note": "Dialog chrome restated"
+        },
+        {
+          "file": "apps/web/components/search-palette.tsx",
+          "line": 128,
+          "endLine": 132,
+          "note": "Dialog chrome restated"
+        },
+        {
+          "file": "apps/web/components/tool-catalog.tsx",
+          "line": 452,
+          "endLine": 461,
+          "note": "Background pair instead of popover, backdrop /60, and the only one that closes on an outside click"
+        },
+        {
+          "file": "apps/web/components/ui/card.tsx",
+          "line": 6,
+          "endLine": 16,
+          "note": "Always renders <section>"
+        },
+        {
+          "file": "apps/web/components/ui/separator.tsx",
+          "line": 6,
+          "endLine": 15,
+          "note": "Nothing imports it"
+        }
+      ],
+      "occurrences": 4,
+      "evidence": "field.tsx provides Input, Textarea, Select and Choice but no Label. Screens contain 49 raw <label> elements in 20 files, and 12 of them restate text-sm font-medium. Three native dialogs restate their chrome. about-services.tsx:22 and search-palette.tsx:132 use the popover pair with backdrop:bg-black/50. tool-catalog.tsx:461 uses bg-background with /60, and it alone closes on an outside click. Card always renders <section>, so 8 bg-card surfaces copy its classes instead of using it: 3 li, 1 ul, 1 form, 1 div and 2 section. Nothing imports Separator.",
+      "impact": "DS-03 maps dialogs to popover and popover-foreground, and one dialog already departs from that. Label styling and dialog behavior drift from screen to screen, and Card's fixed element forces copies.",
+      "recommendation": "Add Label to field.tsx. Add a Dialog primitive on the native <dialog> with the popover pair, Escape, outside-click close and focus return, as Decision 0026 G2–G3 describe for the tool guide. Give Card an `as` prop, as SectionLabel already has. Delete Separator or start using it. Check both themes, as DS-05 requires, when screens move to the new primitives.",
+      "sketch": "// components/ui/field.tsx\nexport function Label({ className, ...props }: ComponentProps<\"label\">); // data-slot=\"label\", text-sm font-medium\n// components/ui/dialog.tsx (native <dialog>)\nexport function Dialog(props: { open: boolean; onClose(): void; labelledBy: string; size?: \"md\" | \"xl\" | \"3xl\"; children: ReactNode });\n// components/ui/card.tsx\nexport function Card(props: { as?: \"section\" | \"li\" | \"div\" | \"form\" } & ComponentProps<\"section\">);",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DS-03: menus, selects and dialogs use popover and popover-foreground, built from real accessible components. Decision 0026 G2–G3: a native dialog with the browser's focus trap, which the primitive keeps.",
+      "verdict": "revised",
+      "verifierNote": "49 raw labels in 20 files confirmed, with 12 (not 11) restating text-sm font-medium; the 8 copied bg-card surfaces, the three dialogs and the unused Separator confirmed."
+    },
+    {
+      "id": "WSHL-13",
+      "title": "Font sizes and some radii are pixel literals, not tokens",
+      "dimension": "naming",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/app/globals.css",
+          "line": 31,
+          "endLine": 77,
+          "note": "@theme maps colors, fonts and radii, but no type scale."
+        },
+        {
+          "file": "apps/web/components/ui/page-header.tsx",
+          "line": 28,
+          "endLine": 32
+        },
+        {
+          "file": "apps/web/components/ui/button.tsx",
+          "line": 22
+        },
+        {
+          "file": "apps/web/app/sign-in/page.tsx",
+          "line": 8,
+          "note": "Restates PageHeader's title size"
+        },
+        {
+          "file": "apps/web/components/sidebar-nav.tsx",
+          "line": 117
+        },
+        {
+          "file": "apps/web/components/notifications-control.tsx",
+          "line": 65
+        },
+        {
+          "file": "apps/web/components/appearance-control.tsx",
+          "line": 78,
+          "note": "rounded-[10px], which equals rounded-lg"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 344,
+          "note": "rounded-[10px]"
+        }
+      ],
+      "occurrences": 217,
+      "evidence": "git grep counts 212 text-[Npx] classes in 39 files across app/ and components/, in 13 distinct sizes: 75 at 12.5px, 63 at 13px and 19 at 13.5px, among others. It also counts rounded-[10px] four times and rounded-[7px] once. The primitives add their own literals: PageHeader's title is text-[32px] and its description text-[14.5px], and Button's sm size is text-[13px]. The sign-in page restates the title size without using PageHeader.",
+      "impact": "DS-03 asks for consistent typography and a radius scale mapped to the canonical base, and rounded-[10px] just restates --radius. Restyling text means editing 39 files, and new screens keep inventing sizes.",
+      "recommendation": "Add role-named --text-* tokens to the @theme block (title, lead, row, meta, badge and so on), collapsing the 13 sizes, and never reuse a --color-* name: text-control already means the control border color. Use them in components/ui first, then replace literals as files are touched, and replace rounded-[10px] with rounded-lg. Add a grep ratchet that fails on any new text-[Npx] or rounded-[Npx] class.",
+      "sketch": "@theme inline {\n  --text-title: 2rem;        /* PageHeader and sign-in, 32px */\n  --text-lead: 0.90625rem;   /* PageHeader description, 14.5px */\n  --text-row: 0.8125rem;     /* small buttons and nav items, 13px; not \"control\": --color-control owns text-control */\n  --text-meta: 0.78125rem;   /* hints and permissions, 12.5px */\n  --text-badge: 0.71875rem;  /* counts, 11.5px */\n}",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DS-03: map the radius scale to the canonical base and keep typography consistent. DS-01: the color tokens and --radius stay untouched; the new names are a type scale, not a palette change.",
+      "verdict": "revised",
+      "verifierNote": "Counts reproduced (212 text-[Npx] in 39 files, 13 sizes; rounded-[10px] 4, rounded-[7px] 1), and Button's size moved to line 22. Sketch revised: a Tailwind 4.3.4 compile resolved text-control to --color-control's color and dropped the size, so no size token may reuse a --color-* name."
+    },
+    {
+      "id": "WSHL-20",
+      "title": "Missing server configuration becomes empty strings and fails far from its cause",
+      "dimension": "errors",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/lib/server-config.ts",
+          "line": 12,
+          "endLine": 21
+        },
+        {
+          "file": "apps/web/lib/session.ts",
+          "line": 11,
+          "endLine": 14,
+          "note": "createServerClient throws on an empty key."
+        },
+        {
+          "file": "apps/web/lib/bff.ts",
+          "line": 55,
+          "note": "accessToken() runs outside forward()'s try."
+        },
+        {
+          "file": "apps/web/lib/request-guard.ts",
+          "line": 38,
+          "note": "new URL() throws on a malformed origin."
+        },
+        {
+          "file": "apps/web/app/api/workspace/route.ts",
+          "line": 55,
+          "note": "new URL() again"
+        },
+        {
+          "file": "services/agent/src/autobots/api/security.py",
+          "line": 42,
+          "endLine": 45,
+          "note": "The API refuses an empty internal token (fails closed)."
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "```ts\ninternalToken: process.env.AUTOBOTS_INTERNAL_TOKEN ?? \"\",\n...\nsupabaseAnonKey: process.env.AUTOBOTS_SUPABASE_ANON_KEY ?? \"\",\n```\nWith the anon key unset, @supabase/ssr's createServerClient throws \"Your project's URL and Key are required\" (node_modules/@supabase/ssr/dist/main/createServerClient.js:12-13). Because accessToken() runs before forward()'s try (bff.ts:55, 76), every BFF route and the session route answer a bare 500, and service-status turns the same error into signed out. With the internal token unset, the API refuses every call, and the shell again shows Sign in. A malformed AUTOBOTS_ALLOWED_ORIGIN makes new URL() throw in guardRequest and in the workspace route.",
+      "impact": "A misconfigured local start looks like a signed-out session or a wrong password, and no log names the missing variable. Failing closed is the right outcome; what is missing is a way to tell why.",
+      "recommendation": "Validate in serverConfig(): require both secrets to be non-empty and the origin to parse as an http(s) origin, and throw a ConfigurationError that names the missing variables but never their values. Catch it in forward(), streamFrom() and the session and workspace routes as 503 server_misconfigured with one log line, and have service-status report unavailable rather than signed out. Keep reading the environment on each call, so nothing is compiled into a build.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "DH-06: validate data at trust boundaries and expose safe typed errors. nextjs.md: server keys never reach props or bundles, so the error names variables, never values. The API's fail-closed check stays.",
+      "verdict": "confirmed",
+      "verifierNote": "Empty-string defaults, createServerClient's throw on an empty key (@supabase/ssr createServerClient.js:12-13), accessToken() before forward()'s try and both new URL() calls confirmed. WSHL-02 owns the logging half."
+    },
+    {
+      "id": "WSHL-11",
+      "title": "Browser preferences are defined in several places, one of them a hand-minified script",
+      "dimension": "duplication",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/app/layout.tsx",
+          "line": 13,
+          "endLine": 17
+        },
+        {
+          "file": "apps/web/components/appearance-control.tsx",
+          "line": 84,
+          "endLine": 96,
+          "note": "Keys and attribute values (outside this area)"
+        },
+        {
+          "file": "apps/web/components/appearance-control.tsx",
+          "line": 71,
+          "endLine": 75,
+          "note": "The theme choices again"
+        },
+        {
+          "file": "apps/web/components/theme-provider.tsx",
+          "line": 10,
+          "endLine": 16,
+          "note": "Theme list and storage key"
+        },
+        {
+          "file": "apps/web/components/notifications-control.tsx",
+          "line": 12,
+          "note": "A no-op subscribe, also in appearance-control.tsx:8 and goal-composer.tsx:36"
+        },
+        {
+          "file": "apps/web/components/notifications-control.tsx",
+          "line": 30,
+          "endLine": 34,
+          "note": "The mounted idiom, repeated in appearance-control.tsx:144-148"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "```js\ntry{var s=localStorage,k=\"autobots.theme\",v=s.getItem(k);if(v!==null&&v!==\"dark\"&&v!==\"light\"&&v!==\"system\")s.removeItem(k);\n...if(s.getItem(\"autobots.serif\")===\"off\")d.dataset.serif=\"off\";if(s.getItem(\"autobots.density\")===\"compact\")...\n```\nappearance-control.tsx builds the same keys as `autobots.${preference}`, with the values in ATTRIBUTE_VALUE (serif off, density compact, motion reduce, stream off). The theme values appear in layout.tsx, theme-provider.tsx and appearance-control.tsx.",
+      "impact": "Adding or renaming a preference means editing a minified string that no unit test executes. A mismatch shows up as a flash of the wrong presentation at first paint (DS-02), and only the browser specs would catch it.",
+      "recommendation": "Define the keys and values once in a shared module, build the before-paint script from them, and run that script in a node:test against a fake localStorage and dataset. Move the hydration idiom into one useHydrated() hook. Behavior does not change.",
+      "sketch": "// lib/preferences.ts (no React; imported by the layout, the theme provider and the Settings controls)\nexport const THEME_KEY = \"autobots.theme\";\nexport const THEMES = [\"dark\", \"light\", \"system\"] as const;\nexport const PRESENTATION = { serif: \"off\", density: \"compact\", motion: \"reduce\", stream: \"off\" } as const;\nexport function beforePaintScript(): string; // built with JSON.stringify of the constants\n// lib/use-hydrated.ts\nexport function useHydrated(): boolean; // useSyncExternalStore(noop, () => true, () => false)",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "DS-02 and Decision 0022 D2: dark by default, System only when chosen, and the preference applied before paint. The PRD-Studio SE-03 presentation keys are unchanged. This is a single definition, not new behavior.",
+      "verdict": "revised",
+      "verifierNote": "Keys, values and idioms confirmed (the no-op subscribe in three files). Lowered to low, as XDUP-19: db-profile suites restore all four presentation keys through the script (appearance.spec.ts:422-490, stream-result.spec.ts:124-134). One change with WSYS-11."
+    },
+    {
+      "id": "WSHL-14",
+      "title": "Each render repeats the same session and readiness reads",
+      "dimension": "approach",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/app-shell.tsx",
+          "line": 14,
+          "endLine": 19
+        },
+        {
+          "file": "apps/web/components/account-footer.tsx",
+          "line": 24
+        },
+        {
+          "file": "apps/web/app/page.tsx",
+          "line": 33,
+          "endLine": 38
+        },
+        {
+          "file": "apps/web/lib/service-status.ts",
+          "line": 52,
+          "endLine": 85
+        },
+        {
+          "file": "apps/web/lib/session.ts",
+          "line": 38,
+          "endLine": 42
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "On Home, the shell calls fetchPendingApprovals and fetchReadiness (app-shell.tsx:15, 19), and AccountFooter calls fetchSession (account-footer.tsx:24). The page then calls fetchServiceStatus, fetchSession and fetchReadiness again (app/page.tsx:33-38). That makes six API reads, two of them duplicates, and five accessToken() calls, each of which builds a Supabase server client. Nothing is wrapped in React cache().",
+      "impact": "Every navigation makes duplicate local requests, and two readiness reads a moment apart can disagree between the sidebar line and the page's service chips.",
+      "recommendation": "Wrap accessToken, fetchSession, fetchReadiness and fetchPendingApprovals in React's cache(), which memoizes per server request only.",
+      "sketch": "import { cache } from \"react\";\nexport const fetchSession = cache(async (): Promise<SessionSummary | null> => { /* unchanged body */ });",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: prevent workspace data from leaking through shared caches. React cache() is scoped to one server request for one user, so it adds no shared cache.",
+      "verdict": "confirmed",
+      "verifierNote": "Traced Home: six API reads with session and readiness read twice, and five accessToken() calls; nothing in apps/web uses React cache()."
+    },
+    {
+      "id": "WSHL-15",
+      "title": "forward() mixes header policy, body limits, relay and error mapping, and hides one route's limit behind a path string",
+      "dimension": "functions",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/lib/bff.ts",
+          "line": 15,
+          "endLine": 19,
+          "note": "Run-creation limit keyed on a path string"
+        },
+        {
+          "file": "apps/web/lib/bff.ts",
+          "line": 71,
+          "endLine": 126,
+          "note": "forward(), complexity 13"
+        },
+        {
+          "file": "apps/web/lib/bff.ts",
+          "line": 80,
+          "endLine": 89,
+          "note": "Request header allowlist, inline"
+        },
+        {
+          "file": "apps/web/lib/bff.ts",
+          "line": 141,
+          "endLine": 144,
+          "note": "A second header copy using a literal header name"
+        },
+        {
+          "file": "apps/web/lib/bff.ts",
+          "line": 105,
+          "endLine": 118,
+          "note": "Relay"
+        },
+        {
+          "file": "apps/web/lib/bff.ts",
+          "line": 151,
+          "endLine": 160,
+          "note": "The relay again"
+        },
+        {
+          "file": "apps/web/lib/bff.ts",
+          "line": 76,
+          "note": "authorized() runs before the try"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "```ts\nfunction bodyLimit(method: string, apiPath: string): number {\n  return method === \"POST\" && apiPath.split(\"?\")[0] === \"/v1/runs\"\n    ? RUN_BODY_BYTES\n    : MAX_BODY_BYTES;\n}\n```\nforward() copies request headers from an inline list, reads and limits the body, fetches with a 30-second timeout, rebuilds the response headers and maps every failure to 503. streamFrom repeats the header copy with the literal \"x-autobots-workspace\" and repeats the non-stream relay. authorized() runs before the try, so its exceptions escape the error envelope.",
+      "impact": "The generic forwarder carries one route's policy, the two relay copies can drift apart, and none of it can be unit-tested as written.",
+      "recommendation": "Split forward() into pure helpers shared with streamFrom: copying the header allowlist, building relay headers, and reading the body against a limit. Pass the limit in from the route, with a dedicated app/api/v1/runs/route.ts for run creation. Move authorized() inside the error handling, and unit-test the helpers.",
+      "sketch": "const REQUEST_HEADERS = [\"content-type\", WORKSPACE_HEADER, \"idempotency-key\"] as const;\nconst RESPONSE_HEADERS = [\"content-disposition\", \"x-content-type-options\"] as const;\nexport function upstreamHeaders(request: NextRequest, base: Headers): Headers; // pure allowlist copy\nexport function relayHeaders(reply: Response): Headers;                        // no-store plus allowlist\nasync function readBody(request: NextRequest, limit: number): Promise<ArrayBuffer | null | \"too_large\">;\nexport async function forward(request: NextRequest, apiPath: string, limit = MAX_BODY_BYTES): Promise<NextResponse>;\n// app/api/v1/runs/route.ts: POST passes RUN_BODY_BYTES; GET forwards the list with its query",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "nextjs.md: the per-operation session and workspace checks and the mutation guards stay, in the same order. PRD-Tool-Catalog FI-01's 12 MiB allowance for run creation stays, now stated by the route that needs it.",
+      "verdict": "revised",
+      "verifierNote": "Mixed concerns, the literal header name and authorized() before the try confirmed. The trailing-slash claim was removed: with Next's default trailingSlash, /api/v1/runs/ redirects to /api/v1/runs, so the run limit still applies."
+    },
+    {
+      "id": "WSHL-16",
+      "title": "Alias routes duplicate the v1 catch-all, and the settings alias drops the query string",
+      "dimension": "structure",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/app/api/settings/[...path]/route.ts",
+          "line": 11,
+          "endLine": 15,
+          "note": "No request.nextUrl.search"
+        },
+        {
+          "file": "apps/web/app/api/v1/[...path]/route.ts",
+          "line": 11,
+          "endLine": 16,
+          "note": "Forwards the query"
+        },
+        {
+          "file": "apps/web/app/api/models/route.ts",
+          "line": 5,
+          "endLine": 7
+        },
+        {
+          "file": "apps/web/app/api/runs/intent/route.ts",
+          "line": 5,
+          "endLine": 7
+        },
+        {
+          "file": "apps/web/components/model-policy-panel.tsx",
+          "line": 136,
+          "endLine": 137,
+          "note": "App callers use the aliases."
+        },
+        {
+          "file": "apps/web/tests/browser/saved-choice.spec.ts",
+          "line": 56,
+          "note": "The only caller of /api/runs/intent, next to /api/v1/runs at line 52"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "```ts\n// app/api/settings/[...path]/route.ts\nreturn forward(request, `/v1/settings/${path.map(encodeURIComponent).join(\"/\")}`);\n// app/api/v1/[...path]/route.ts\nreturn forward(request, `/v1/${path.map(encodeURIComponent).join(\"/\")}${request.nextUrl.search}`);\n```\n(Reflowed.) /api/models and /api/runs/intent forward to /v1/models and /v1/runs/intent, which the catch-all already reaches. Components call /api/settings/* 12 times and /api/models 3 times, and never the /api/v1 forms. No app code calls /api/runs/intent.",
+      "impact": "Two URLs reach the same endpoints, a settings read with a query string would lose it silently, and the route list is longer than the surface it exposes.",
+      "recommendation": "Pick one scheme. Either move the 15 call sites and the spec to /api/v1/... and delete the three aliases, or keep them as documented aliases and have the settings alias forward request.nextUrl.search the way the catch-all does.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "nextjs.md: verify session and workspace on every BFF operation. Every alias already calls forward(), so consolidating them changes no check.",
+      "verdict": "confirmed",
+      "verifierNote": "The settings alias omits request.nextUrl.search; components call /api/settings/ 12 times in 4 files and /api/models 3 times, and only saved-choice.spec.ts calls /api/runs/intent. XMOD-16 reports the same from the lens."
+    },
+    {
+      "id": "WSHL-17",
+      "title": "Three comments mislead: an orphaned contrast note, an outdated focus-order reason and an incomplete workspace rule",
+      "dimension": "comments",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/app-shell.tsx",
+          "line": 11,
+          "endLine": 13,
+          "note": "Gives Decision 0021 R6's reason for Home being the first stop"
+        },
+        {
+          "file": "apps/web/components/app-shell.tsx",
+          "line": 42,
+          "note": "New run, then Search, come right after the skip link; both are buttons"
+        },
+        {
+          "file": "apps/web/app/globals.css",
+          "line": 102,
+          "endLine": 103,
+          "note": "Describes a rule that US-16.1 removed"
+        },
+        {
+          "file": "apps/web/lib/bff.ts",
+          "line": 63,
+          "endLine": 67,
+          "note": "Says the chosen workspace is what gets sent"
+        },
+        {
+          "file": "apps/web/lib/bff.ts",
+          "line": 80,
+          "endLine": 89,
+          "note": "A client-sent header then replaces it."
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "app-shell.tsx:12, a 152-character line, says Home holds the goal composer, \"so the first link after the skip link is Home\". That is still true of links, because New run and Search are buttons, but it is Decision 0021 R6's reason for Home being the first stop, and since Decision 0022 D3 and D16 the first stops are those two buttons (line 42, new-run.tsx:17, appearance.spec.ts:301-307). globals.css:102-103 describes an --input edge whose `.control-boundary` rule was removed by US-16.1 (747bc88), so the comment now sits above the reduced-motion block. bff.ts:63 says the workspace chosen in the cookie is sent. forward() and streamFrom (141-144) then replace it with any client-sent x-autobots-workspace header, which browser specs rely on (settings.spec.ts:266). No comment says which one wins, and the header name is spelled out as a literal three times instead of using WORKSPACE_HEADER.",
+      "impact": "Readers are given an outdated reason for the focus order and a contrast fix that no longer exists, and the workspace precedence at the BFF has to be worked out from the code.",
+      "recommendation": "Rewrite app-shell.tsx:11-13 to describe the current order (skip link, New run, Search, then Home, by Decision 0022 D3 and D16), and wrap it. Delete globals.css:102-103, or point it at Decision 0023 E1's --control-border. At bff.ts:63, say that an explicit request header wins over the cookie and that the API checks membership either way, and use WORKSPACE_HEADER.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Ground rule 2 keeps the practice of citing decisions and stories in comments. These edits keep the citations and correct the text. Decision 0023 E3 is unchanged.",
+      "verdict": "revised",
+      "verifierNote": "The orphaned globals.css note (rule removed in 747bc88) and the bff.ts precedence gap confirmed. The app-shell sentence is literally true, since New run and Search are buttons, so it is reworded as an outdated reason rather than a wrong fact."
+    },
+    {
+      "id": "WSHL-18",
+      "title": "AccountFooter and SidebarNav mix derived state and markup",
+      "dimension": "size",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/account-footer.tsx",
+          "line": 23,
+          "endLine": 97,
+          "note": "75 lines by ESLint's count"
+        },
+        {
+          "file": "apps/web/components/account-footer.tsx",
+          "line": 9,
+          "note": "ROLE map"
+        },
+        {
+          "file": "apps/web/app/settings/account/page.tsx",
+          "line": 10,
+          "note": "The same ROLE map, copied"
+        },
+        {
+          "file": "apps/web/components/sidebar-nav.tsx",
+          "line": 70,
+          "endLine": 133,
+          "note": "64 lines"
+        },
+        {
+          "file": "apps/web/components/sidebar-nav.tsx",
+          "line": 110,
+          "endLine": 123,
+          "note": "Special case for /approvals inside the generic item loop"
+        },
+        {
+          "file": "apps/web/components/sidebar-nav.tsx",
+          "line": 62,
+          "endLine": 67,
+          "note": "Current link by longest prefix"
+        },
+        {
+          "file": "apps/web/components/settings-nav.tsx",
+          "line": 35,
+          "note": "Current link by exact match"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "AccountFooter fetches the session, works out the current workspace and whether to show the chooser (37-41), computes initials, and renders the sign-in prompt, the chooser and the account menu, all in one function. SidebarNav checks `href === \"/approvals\"` inside the generic item loop to draw the pending badge. The two navs decide the current link differently.",
+      "impact": "The workspace-choice rule from Decision 0023 E3 and the initials logic can only be tested through the browser, and every new nav count or menu entry grows the same function.",
+      "recommendation": "Move the pure parts out: workspace state, initials and the role labels go into a small module with unit tests. Split AccountFooter into SignInPrompt and AccountMenu. Give nav items an optional count key rendered by a PendingBadge, and share one isCurrent(pathname, href) between the two navs.",
+      "sketch": "// lib/account.ts (pure)\nexport const ROLE_LABEL = { owner: \"Owner\", member: \"Member\" } as const; // also used by settings/account\nexport function initials(name: string): string;\nexport function workspaceState(session: SessionSummary, chosen: string | null): { current: Workspace | null; choosing: boolean };\n// components/account-footer.tsx: session === null ? <SignInPrompt /> : <>{choosing && <WorkspaceChooser />}<AccountMenu /></>\n// components/sidebar-nav.tsx: items gain `count?: \"pending\"`; <NavItem />, <PendingBadge />; isCurrent() shared with SettingsNav",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Decision 0023 E3: the chooser still appears for a member of several workspaces or after a stale choice. The PRD-Studio SH-01 nav order is unchanged.",
+      "verdict": "confirmed",
+      "verifierNote": "AccountFooter 75 and SidebarNav 64 counted lines, the copied ROLE map, the /approvals special case and the two current-link rules confirmed."
+    },
+    {
+      "id": "WSHL-19",
+      "title": "Readiness maps each state three times through nested ternaries, with two different tones for unknown",
+      "dimension": "functions",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/readiness.tsx",
+          "line": 16,
+          "endLine": 29
+        },
+        {
+          "file": "apps/web/components/readiness.tsx",
+          "line": 44,
+          "endLine": 50,
+          "note": "HealthLine: bg-attention for any state that is not ready"
+        },
+        {
+          "file": "apps/web/components/readiness.tsx",
+          "line": 63,
+          "endLine": 68,
+          "note": "Icon chosen by state"
+        },
+        {
+          "file": "apps/web/components/readiness.tsx",
+          "line": 78,
+          "endLine": 85,
+          "note": "Tone chosen by state, muted for unknown"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "```tsx\nreturn service.state === \"ready\"\n  ? \"ready\"\n  : service.state === \"unknown\"\n    ? \"unknown\"\n    : \"not ready\";\n```\nThe same three-way test picks the icon and the tone. HealthLine colors every service that is not ready, unknown included, with bg-attention, while ServiceChips gives unknown text-muted-foreground.",
+      "impact": "A state added to the generated ServiceReadiness type compiles without touching any of these chains, and the sidebar and Home tone the same unknown service differently.",
+      "recommendation": "Use one table typed Record<ServiceReadiness[\"state\"], { words; openrouterWords; icon; tone }>, so a new state fails to compile until it is described, and use that table's tone in both views.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DS-03: never infer a state from color alone. The words remain what carries the meaning.",
+      "verdict": "confirmed",
+      "verifierNote": "The three chains (16-29, 63-68, 78-85) and HealthLine's bg-attention for unknown (48), against ServiceChips' muted tone, confirmed."
+    },
+    {
+      "id": "WSHL-21",
+      "title": "credential-precedence.ts has no caller in the app",
+      "dimension": "modules",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/lib/credential-precedence.ts",
+          "line": 1,
+          "endLine": 3,
+          "note": "The header implies server code uses it."
+        },
+        {
+          "file": "apps/web/tests/unit/credential-precedence.test.ts",
+          "line": 7,
+          "note": "Its only importer"
+        },
+        {
+          "file": "scripts/verify.py",
+          "line": 161,
+          "endLine": 162
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "The header says \"MP-03's source order, for server code\", but git grep finds no import outside its unit test. All inference goes through the Python gateway, which resolves OPENROUTER_API_KEY itself; services/agent/tests/test_credentials.py reads the same fixture. The module reads .env files with node:fs. Unlike the other server modules it has no server-only marker, because node:test cannot load one.",
+      "impact": "Someone reading lib/ will assume the web process resolves OpenRouter keys, and the next MP-03 change may be made here in the belief that this code is live.",
+      "recommendation": "Say in its header that no application code calls it and that it is the TypeScript half of the US-3.1 parity fixture. Alternatively, move it next to its test (for example tests/unit/support/), so lib/ holds only code the app runs. Keep the shared-fixture test unless its owner decides otherwise.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "MP-03 and US-3.1 (shared precedence in Python and TypeScript, driven by one fixture set): the parity test stays. model-gateway.md: OpenRouter credentials stay server-side.",
+      "verdict": "confirmed",
+      "verifierNote": "Its only importers are its unit test and verify.py's step, and services/agent/tests/test_credentials.py reads the same fixture."
+    }
+  ],
+  "rejected": [],
+  "notCovered": "This review is static. I did not start the app, the BFF, the API or the browser suites, and I did not run scripts/verify.py. I read its .checks/full/latest.json and .checks/fast/latest.json instead. I did not exercise whether Next.js 16 passes '..' segments into catch-all params. I judged that harmless, because every API router sits under /v1 with docs and OpenAPI disabled, so traversal reaches nothing the catch-all does not already expose. I did not measure the primitives' contrast or rendering in either theme. Files outside this area were read only at the cited lines, as evidence: other components, generated.ts (how its schemas and functions are consumed), scripts/verify.py, scripts/toolchain.py, services/agent/src/autobots/api/security.py, services/agent/tests/test_contracts.py, the US-16.2 openspec record and two installed Supabase packages. I read PRD-Development-Harness.md only for DH-03 and DH-06, and metrics.md only in its run, size, TypeScript, baseline, command and limitation sections. No command was refused. ESLint was run read-only with extra rules on the command line and no cache, and the git status afterwards matched the starting state."
+}

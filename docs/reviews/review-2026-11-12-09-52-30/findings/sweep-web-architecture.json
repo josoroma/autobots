@@ -1,0 +1,1255 @@
+{
+ "schema": "autobots.code-review/v1",
+ "area": "sweep-web-architecture",
+ "title": "Lens: web UI architecture",
+ "kind": "lens",
+ "timestamp": "2026-11-12-09-52-30",
+ "revision": "156534da0bd5b19417f05d313077d767804b175b",
+ "summary": "The web UI is a set of thin Server Component routes over 39 client components. There are 22 pages, and only 2 of them load data on the server. Each client component fetches, writes and renders on its own. The screens agree on the lowest layer: every form control comes from components/ui/field, the Luma tokens are imported once, and almost every read response is parsed with a generated validator. Above that layer they share almost nothing. In 23 component files, data is fetched inside effects that keep their own loading and error flags. The CSRF write path appears in 29 call sites across 19 files, with hand-built headers, untyped JSON bodies and, at 19 sites, cast error bodies. Only 8 of those 19 files stop a second press while a request is in flight, and the composer, the session screen and the workflow run are not among them. Loading, error and denied states, refusal texts, run-state words and tones, and money and time formats are each written per screen, and they visibly disagree. Two well-shaped hooks already exist, useLoaded in tool-catalog and useToolUses, and ContinueRun handles an unknown outcome correctly. These show the target patterns, but they stay private to their files. There are two root causes. First, there is no shared layer: no typed browser client, no resource or submit hooks, no view-state components and no lib vocabulary. Second, the generated client drops query parameters and refusal bodies, so screens cannot use it. Building that layer first would let the ten screen functions of 260 to 677 lines split along the same seams, and it would turn most findings below into mechanical migrations.",
+ "scores": [
+  {
+   "dimension": "standards",
+   "score": 3,
+   "why": "TypeScript is strict, lint passes and every form control comes from ui/field. DH-06's rules on duplicate submits, generated request types and Server Components are met only in part, and type sizes bypass the theme."
+  },
+  {
+   "dimension": "modules",
+   "score": 3,
+   "why": "The server-only lib boundary is clean. Shared vocabulary and hooks live inside feature components, which import each other sideways with one cycle, and there are no hooks or feature folders."
+  },
+  {
+   "dimension": "size",
+   "score": 2,
+   "why": "The ten longest functions are route screens of 260 to 677 lines, with complexity up to 39. Each one mixes data loading, writes and markup."
+  },
+  {
+   "dimension": "functions",
+   "score": 3,
+   "why": "The pure helpers are small and well named. The screen components interleave effects, writes and rendering, and the same write shape is repeated at 29 call sites."
+  },
+  {
+   "dimension": "structure",
+   "score": 3,
+   "why": "Routes are thin server pages over one client panel. The 43 feature components sit in one flat folder, recurring layout pieces are private to screens, and the run routes own their own headers."
+  },
+  {
+   "dimension": "approach",
+   "score": 2,
+   "why": "There is no shared data, submit or view-state layer. 23 files hand-roll fetch effects, live updates and URL state differ per screen, and only two pages load data on the server."
+  },
+  {
+   "dimension": "comments",
+   "score": 4,
+   "why": "Comments explain why and cite decisions. A few record manual sync duties that a shared module would remove, for example run-workspace.tsx:48 and lib/shortcuts.ts:1-2."
+  },
+  {
+   "dimension": "types",
+   "score": 3,
+   "why": "Read responses are parsed with generated validators. 28 request bodies, 19 error-body reads and 7 success-body reads bypass the generated types, and many label maps are keyed by string instead of the generated unions."
+  },
+  {
+   "dimension": "errors",
+   "score": 3,
+   "why": "Most failures are shown in words. States and announcement roles differ per screen, three loads stay on Loading after a failure, search shows an outage as no results, and refusal texts diverge."
+  },
+  {
+   "dimension": "tests",
+   "score": 3,
+   "why": "Playwright coverage is broad and uses data-* hooks. Pure UI helpers sit inside client components with no unit tests, and the unit runner names two of the three test files."
+  },
+  {
+   "dimension": "maintainability",
+   "score": 3,
+   "why": "The screens are careful and accessible, but their per-screen plumbing turns every cross-cutting change (contracts, states, formatting) into a many-file edit."
+  }
+ ],
+ "strengths": [
+  {
+   "title": "Read responses are validated at the browser boundary",
+   "evidence": "25 component files parse responses with generated parse* functions before use, for example run-list.tsx:193, approvals-panel.tsx:143 and tool-uses.tsx:133. Unknown event types are skipped on purpose rather than cast (run-workspace.tsx:143-150). The runtime validator checks formats and ranges (packages/api-client/src/runtime.ts:37-62, 81-140). Fixtures shared with Python test it (packages/api-client/tests/contract.test.ts:8-20). Write replies are the exception (XWEB-01)."
+  },
+  {
+   "title": "Every form control goes through one primitive set",
+   "evidence": "No raw input, select or textarea exists outside components/ui (grep over components and app). DS-03's control border, focus and dark fill are defined once, in components/ui/field.tsx:6-11 and app/globals.css:95-101."
+  },
+  {
+   "title": "One token source, imported unedited",
+   "evidence": "app/globals.css:1-5 imports docs/design/luma.css and the one documented extension, then maps the semantic tokens in @theme (globals.css:31-77). The only color literals are the theme preview swatches, and a comment explains them (appearance-control.tsx:10-26)."
+  },
+  {
+   "title": "An explicit server-only boundary",
+   "evidence": "lib/bff.ts:1, lib/server-config.ts:1, lib/session.ts:1, lib/service-status.ts:1 and lib/workspace-choice.ts:1 import server-only. The same-origin guard is a pure function with a unit test (lib/request-guard.ts:33-67). When the browser disconnects, only the stream ends, never the run (lib/bff.ts:128-131)."
+  },
+  {
+   "title": "Two well-shaped data hooks to spread",
+   "evidence": "useLoaded keeps loading, unavailable and ready as one discriminated union and aborts stale requests (tool-catalog.tsx:156-181). useToolUses pages through results, aborts, and reloads when a version changes; workflow-monitor.tsx:254 reuses it (tool-uses.tsx:101-147)."
+  },
+  {
+   "title": "Lost replies on a paid write are handled correctly",
+   "evidence": "ContinueRun keeps its idempotency key until the outcome is known, treats a 5xx response like a lost reply, and blocks re-entry with a pending flag (continue-run.tsx:20-21, 39, 47-50, 68-69, 102). It is the model for every run-creating screen."
+  },
+  {
+   "title": "State is told in words, with accessible interaction models",
+   "evidence": "The words carry the state and a dot only repeats it (badge.tsx:6-7, run-list.tsx:126-146). Tool uses are announced in a live region (tool-uses.tsx:257-261). Search is a combobox with a listbox (search-palette.tsx:139-166). Approvals has a J/K and press-twice keyboard model, and every shortcut ignores text fields through lib/keyboard.ts:2-8."
+  },
+  {
+   "title": "Label maps keyed by generated unions, where adopted",
+   "evidence": "provider-settings-panel.tsx:19-49, readiness.tsx:8-13, keys-and-vars-panel.tsx:20-35, search-palette.tsx:14-19 and run-panel.tsx:22-26 key their maps by generated union types. The compiler therefore flags a state the API adds."
+  }
+ ],
+ "findings": [
+  {
+   "id": "XWEB-01",
+   "title": "Write requests and error bodies bypass the generated contract",
+   "dimension": "types",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "apps/web/components/goal-composer.tsx",
+     "line": 288,
+     "endLine": 311,
+     "note": "The POST /api/v1/runs body is an untyped object literal, although RunRequest exists. Line 311 casts the reply to { run_id } instead of using parseRunAccepted."
+    },
+    {
+     "file": "apps/web/components/session-panel.tsx",
+     "line": 65,
+     "note": "Casts the admission reply although parseRunAccepted exists."
+    },
+    {
+     "file": "apps/web/components/experts-panel.tsx",
+     "line": 97,
+     "note": "Casts to { id } although parseSessionView exists. The same cast is at line 144, expert-editor.tsx:201 and goal-composer.tsx:273."
+    },
+    {
+     "file": "apps/web/components/workflow-editor.tsx",
+     "line": 220,
+     "endLine": 223,
+     "note": "One of 19 hand-cast error bodies. parseErrorResponse has no caller in apps/web; only the api-client contract test calls it."
+    },
+    {
+     "file": "apps/web/components/expert-editor.tsx",
+     "line": 116,
+     "endLine": 119,
+     "note": "role_bindings is cast to Record<string, string> because the contract types it as Record<string, unknown>. model-policy-panel.tsx:55 and 130 and experts-panel.tsx:331 cast it the same way, while run-disclosure.tsx:74-79 narrows it with typeof."
+    },
+    {
+     "file": "scripts/generate_contracts.py",
+     "line": 60,
+     "endLine": 78,
+     "note": "Emits path parameters and a JSON body only. Query parameters, such as group, q, profile and cursor on GET /v1/runs, are dropped."
+    },
+    {
+     "file": "packages/api-client/src/runtime.ts",
+     "line": 157,
+     "endLine": 171,
+     "note": "A failed request throws a ContractError with the status in the message and the body discarded. Per-call headers already fit ClientOptions.headers (line 154)."
+    }
+   ],
+   "occurrences": 54,
+   "evidence": "Counted with grep over apps/web/components: 28 bodies built with `body: JSON.stringify(`, none typed against a generated request type or with satisfies. 26 of them go to /api/v1 or /api/settings routes whose request schema is generated, such as RunRequest and SessionCreate; the other 2 go to the BFF's own /api/session and /api/workspace. There are 19 error-body casts in 15 files, and 7 success-body casts in 5 files where a generated parser exists. parseErrorResponse is never called in apps/web. Excerpt from goal-composer.tsx:294-321:\n  body: JSON.stringify({\n    goal_text: draft,\n    budget_micro_usd: budget,\n    ...(profile === \"\" ? {} : { run_profile: profile }),\n  ...\n  const accepted = (await reply.json()) as { run_id: string };\n  ...\n  const failure = (await reply?.json().catch(() => null)) as { code?: string; message?: string } | null;",
+   "impact": "Only half of each exchange is checked. Responses are validated, but requests and refusals are not. RunRequest forbids extra fields (services/agent/src/autobots/contracts/run_commands.py:16), so a renamed field compiles cleanly and fails as a 422 in the browser. The composer reports that 422 as 'That model or request isn't approved' (goal-composer.tsx:331-334). Because the generated functions cannot take query parameters or report a refusal, browser screens cannot use them. The server path (lib/service-status.ts) and the browser path (raw fetch) have therefore diverged.",
+   "recommendation": "First, type every body with the generated request types (`const body: RunRequest = {...}` or `satisfies`). Replace the 7 success casts with parseRunAccepted and parseSessionView. Read refusals through one readRefusal(reply) helper built on parseErrorResponse, which tolerates non-JSON bodies. Then extend scripts/generate_contracts.py to emit typed query parameters, make runtime.ts throw an ApiError that carries the status and the parsed ErrorResponse, and regenerate. Idempotency-Key can already travel in a per-call ClientOptions.headers; emitting the OpenAPI header parameter as a typed argument is optional. Finally, add lib/api/browser.ts, which binds the generated functions to the /api base, with csrfFetch for writes.",
+   "sketch": "// packages/api-client/src/runtime.ts (hand-written, not generated)\nexport class ApiError extends Error { status: number; error: ErrorResponse | null }\n// scripts/generate_contracts.py emits e.g.\nexport async function listRuns(options: ClientOptions, query?: { group?: string; q?: string; profile?: string; cursor?: string }): Promise<RunList>\n// apps/web/lib/api/browser.ts\nexport const reads: ClientOptions = { baseUrl: '/api', fetch: (u, i) => fetch(u, { ...i, cache: 'no-store' }) };\nexport const writes: ClientOptions = { baseUrl: '/api', fetch: csrfFetch };\n// screen: the per-press key rides on a per-call options object\nconst accepted = await admitRun({ ...writes, headers: { 'Idempotency-Key': key } }, body);",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "DH-06: 'Use generated API types ... No blanket type assertions to conceal contract mismatches'. contracts.md: 'generated TypeScript consumes them'. The fix changes the generator and runtime.ts and then regenerates generated.ts. It never hand-edits that file (ground rule 2).",
+   "verdict": "revised",
+   "verifierNote": "Every cited cast, the 28 untyped bodies and the generator's path-and-body-only emission are confirmed. Corrected the success casts to 5 files, noted that 2 bodies target BFF-owned routes, and noted that per-call headers already fit ClientOptions.headers."
+  },
+  {
+   "id": "XWEB-02",
+   "title": "No shared client data layer: 23 files hand-roll fetch-in-effect",
+   "dimension": "approach",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "apps/web/components/tool-catalog.tsx",
+     "line": 156,
+     "endLine": 181,
+     "note": "The only generic read hook, and it is private to this file."
+    },
+    {
+     "file": "apps/web/components/approvals-panel.tsx",
+     "line": 136,
+     "endLine": 187,
+     "note": "load() and the initial effect are two copies of the same read. setCounts runs twice at lines 170-171."
+    },
+    {
+     "file": "apps/web/components/operations-panel.tsx",
+     "line": 165,
+     "endLine": 206,
+     "note": "The same load-and-effect pair."
+    },
+    {
+     "file": "apps/web/components/provider-settings-panel.tsx",
+     "line": 161,
+     "endLine": 190,
+     "note": "The same pair. keys-and-vars-panel.tsx:168-197 repeats it again."
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 317,
+     "endLine": 331,
+     "note": "A refetch is triggered by a counter kept in state. run-list.tsx:167 and run-panel.tsx:60 do the same."
+    },
+    {
+     "file": "apps/web/components/goal-composer.tsx",
+     "line": 143,
+     "endLine": 166,
+     "note": "Fetches /api/models, and its child RunDisclosure fetches it again on the same mount (run-disclosure.tsx:44-67)."
+    },
+    {
+     "file": "apps/web/components/workflow-editor.tsx",
+     "line": 120,
+     "endLine": 171,
+     "note": "Three requests in one effect. Two of their failures are swallowed with .catch(() => undefined)."
+    }
+   ],
+   "occurrences": 28,
+   "evidence": "grep counts over apps/web/components: 28 effects guarded by `let active = true` or `let live = true` in 23 files, 45 GETs with cache: 'no-store', and 60 hand-built /api/v1 URL literals. Only 2 of the 23 files abort a stale request (tool-catalog, tool-uses), and 12 sites drain refused bodies while others don't. Excerpt from run-panel.tsx:62-77:\n  useEffect(() => {\n    let active = true;\n    fetch(`${base}/workspace`, { cache: \"no-store\" })\n      .then(async (reply) => {\n        if (!active) return;\n        if (reply.ok) { setView(parseRunWorkspace(await reply.json())); setFailed(false); }\n        else { await reply.text(); setFailed(true); }\n      }).catch(() => { if (active) setFailed(true); });",
+   "impact": "Each screen chooses its own flags, abort behavior, body draining and reload trigger. A fix such as aborting stale requests, showing a denied state or offering a retry has to be applied file by file. Sibling components request the same resource independently. Every new screen adds about 25 lines of plumbing, and this plumbing makes up most of the non-JSX code in the largest screens.",
+   "recommendation": "Generalize useLoaded into hooks/use-resource.ts. It should return one discriminated union (loading, ready with data, denied, or unavailable) plus reload(), with an AbortController and body draining built in. Add hooks for shared reads, such as use-models and use-tool-catalog. Let identical GETs that are in flight at the same time share one request, and keep nothing after it settles, so no data outlives a sign-out (which only calls router.refresh()) or a workspace switch. This needs no new dependency. Migrate panels one at a time and keep their data-* hooks. Pair this with the typed browser client from XWEB-01.",
+   "sketch": "// hooks/use-resource.ts\nexport type Resource<T> = { status: 'loading' } | { status: 'ready'; data: T }\n  | { status: 'denied' } | { status: 'unavailable' };\nexport function useResource<T>(url: string | null, parse: (v: unknown) => T): Resource<T> & { reload(): void }\n// hooks/use-models.ts: shared by GoalComposer, RunDisclosure and ModelPolicyPanel; a GET in flight is shared, nothing is kept after it settles\nexport const useModels = () => useResource('/api/models', parseModelList);\n// panel: const providers = useResource('/api/settings/model-providers', parseProviderStatus);\n//        replaces load() + the duplicate effect + loadFailed",
+   "effort": "L",
+   "risk": "medium",
+   "ruleCheck": "DH-06: 'Represent loading, empty, denied, unavailable and retryable states deliberately', 'Browser state is a view of durable state' and 'Prevent workspace data from leaking through shared caches'. nextjs.md: explicit error, empty and loading states. A read hook is a view only, and no business rule moves into Next.js.",
+   "verdict": "revised",
+   "verifierNote": "Recounted 28 guarded effects in 23 files, 45 no-store GETs, 60 /api/v1 literals, abort in 2 files and 12 body drains. Narrowed the shared-read cache to in-flight sharing, because sign-out keeps the tab's memory and DH-06 forbids workspace data in shared caches."
+  },
+  {
+   "id": "XWEB-03",
+   "title": "Writes have no shared submit path, and run admission isn't guarded against a second press",
+   "dimension": "approach",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "apps/web/components/goal-composer.tsx",
+     "line": 591,
+     "endLine": 599,
+     "note": "Run stays enabled while admission is in flight. run() at 276-341 keeps no pending state."
+    },
+    {
+     "file": "apps/web/components/goal-composer.tsx",
+     "line": 287,
+     "note": "Comment: one key per press. This is the US-4.1 choice."
+    },
+    {
+     "file": "apps/web/components/session-panel.tsx",
+     "line": 190,
+     "note": "The button is disabled only by !ready. run() at 45-80 has no pending flag."
+    },
+    {
+     "file": "apps/web/components/workflow-editor.tsx",
+     "line": 675,
+     "endLine": 678,
+     "note": "'Run this version' creates an execution with a new key on each press, and the button is never disabled."
+    },
+    {
+     "file": "apps/web/components/continue-run.tsx",
+     "line": 17,
+     "endLine": 21,
+     "note": "The model to follow: a pending flag, and a key kept until the outcome is known (lines 39, 47-50, 69, 102)."
+    },
+    {
+     "file": "apps/web/components/experts-panel.tsx",
+     "line": 84,
+     "endLine": 102,
+     "note": "Session creation is copied four times: here, at 131-149, at expert-editor.tsx:187-206 and at goal-composer.tsx:257-274."
+    },
+    {
+     "file": "apps/web/components/provider-settings-panel.tsx",
+     "line": 192,
+     "endLine": 219,
+     "note": "Its mutate() is copied in keys-and-vars-panel.tsx:203-226, with the same fallback text."
+    },
+    {
+     "file": "apps/web/components/operations-panel.tsx",
+     "line": 210,
+     "endLine": 217,
+     "note": "The only write without a catch. A network failure becomes an unhandled rejection, and no message appears."
+    }
+   ],
+   "occurrences": 29,
+   "evidence": "There are 29 csrfFetch call sites in 19 files, each building its headers by hand (28 Content-Type literals, 18 crypto.randomUUID calls). A busy or pending guard exists in 8 of the 19 files: provider-settings, run-controls, sign-in-form, model-policy, run-panel, account-form, continue-run and keys-and-vars. Excerpt from goal-composer.tsx:288-293 and 591-593:\n  const reply = await csrfFetch(\"/api/v1/runs\", {\n    method: \"POST\",\n    headers: { \"Content-Type\": \"application/json\", \"Idempotency-Key\": crypto.randomUUID() },\n  ...\n  <Button onClick={() => void run()} disabled={draft.trim() === \"\" || !budgetLeft}",
+   "impact": "A double click on Run in the composer, Run in a session, or Run this version sends two admissions with different keys. The API admits two runs and reserves two budgets, which is a paid path. Every write rebuilds headers, keys, its catch style and its refusal reading. A fix in one place, such as the missing catch in Operations, therefore reaches none of the others. Five screens with text inputs submit from onClick buttons without a <form>: goal-composer, session-panel, workflow-editor, the operations retention fields and unknown-effects.",
+   "recommendation": "Add hooks/use-submit.ts, which owns the following. Pending state that disables the trigger and ignores re-entry. The idempotency-key policy as an explicit option: per-press for the composer as US-4.1 chose, or until-known as ContinueRun does. Unknown-outcome handling for network failures and 5xx responses. A typed outcome union as its result. Route writes through the typed browser client, and add lib/api/sessions.ts with startSession(kind, experts) for the four copies. Wrap writes that have text inputs in a <form>. Start with the three run-creating screens, and add a browser test that double-clicks Run and expects one admission.",
+   "sketch": "// hooks/use-submit.ts\nexport function useSubmit<T>(send: (key: string) => Promise<T>, opts: { key: 'per-press' | 'until-known' }): {\n  submit(): void;\n  state: { status: 'idle' } | { status: 'pending' } | { status: 'done'; value: T }\n       | { status: 'refused'; error: ApiError } | { status: 'unknown' };\n}\n// goal-composer: const admission = useSubmit((key) => admitRun(writes, body, { headers: { 'Idempotency-Key': key } }), { key: 'per-press' });\n// <Button type='submit' disabled={admission.state.status === 'pending' || ...}>",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "DH-06: 'Disable duplicate submits with server idempotency as the correctness mechanism'. The composer keeps one key per press, as decided in openspec/changes/archive/2026-11-05-us-4-1-atomic-run-admission-canonical/proposal.md:10. The recommendation only adds the in-flight guard.",
+   "verdict": "revised",
+   "verifierNote": "Recounted 29 csrfFetch sites in 19 files, 28 Content-Type literals, 18 randomUUID calls and in-flight guards in 8 files. The three unguarded run buttons and Operations' missing catch are confirmed. Corrected the form count to five, since ContinueRun has no text input."
+  },
+  {
+   "id": "XWEB-05",
+   "title": "Screen components own data, stream protocol and markup in one function",
+   "dimension": "size",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 152,
+     "endLine": 844,
+     "note": "677 lines, complexity 39. Lines 152-331 are state, the EventSource protocol and refetches."
+    },
+    {
+     "file": "apps/web/components/workflow-editor.tsx",
+     "line": 106,
+     "endLine": 736,
+     "note": "617 lines. 11 states and 7 write functions come before the JSX at line 398."
+    },
+    {
+     "file": "apps/web/components/goal-composer.tsx",
+     "line": 113,
+     "endLine": 653,
+     "note": "527 lines, complexity 37. Data and writes occupy 113-341."
+    },
+    {
+     "file": "apps/web/components/expert-editor.tsx",
+     "line": 70,
+     "endLine": 472,
+     "note": "393 lines."
+    },
+    {
+     "file": "apps/web/components/operations-panel.tsx",
+     "line": 158,
+     "endLine": 539,
+     "note": "377 lines, complexity 28."
+    },
+    {
+     "file": "apps/web/components/model-policy-panel.tsx",
+     "line": 118,
+     "endLine": 475,
+     "note": "350 lines."
+    },
+    {
+     "file": "apps/web/components/workflows-panel.tsx",
+     "line": 83,
+     "endLine": 427,
+     "note": "341 lines."
+    },
+    {
+     "file": "apps/web/components/approvals-panel.tsx",
+     "line": 117,
+     "endLine": 434,
+     "note": "308 lines, with a keyboard handler of complexity 27 at 229."
+    }
+   ],
+   "occurrences": 10,
+   "evidence": "In metrics.md section 7, the ten longest non-test functions are all route-level screens: RunWorkspaceView 677, WorkflowEditor 617, GoalComposer 527, ExpertEditor 393, OperationsPanel 377, ModelPolicyPanel 350, WorkflowsPanel 341, ApprovalsPanel 308, RunInspectorView 263 and RunList 260. 83 functions are over 60 lines. In the three largest, state, effects and writes take about 180, 290 and 230 lines before the first JSX.",
+   "impact": "Changing any section's data or markup means editing a function of 300 to 700 lines. Most of the non-JSX code is the per-screen plumbing described in the two findings above, so every large screen has the same seams. Area reviewers can't fix this one screen at a time without first creating the shared hooks.",
+   "recommendation": "Split each large screen along three seams: a data hook built on useResource or a stream hook, an actions hook built on useSubmit, and presentational section components, which can be Server Components when they are read-only. Do the splits after the hooks exist, so that each split removes code instead of moving it. Keep every data-* hook the browser suites read.",
+   "sketch": "// components/runs/run-workspace/index.tsx\nexport function RunWorkspaceScreen({ runId }: { runId: string }) {\n  const run = useRunStream(runId); // hooks/use-run-stream.ts: snapshot, timeline, connection, gap, live, result, refresh\n  return <RunLayout header={<RunHeader run={run} />}\n    main={<><StatusSection run={run} /><ResultSection run={run} /><PlanSection plan={run.snapshot.plan} /><TimelineSection events={run.timeline} gap={run.gap} /></>}\n    aside={<><ModelsSection map={run.snapshot.role_map} /><BudgetSection run={run.snapshot} /></>} />;\n}\n// components/build/workflow-editor/: useWorkflowDraft(id) (load, save, publish, discard, describe), useWorkflowRun(workflow) (versions, budgetSteps, execute); GraphSection, RunVersionSection, BlocksTable\n// components/home/goal-composer/: useComposerOptions() (experts, models, preview, budgetSteps), useAdmission(); OptionChips, AttachmentsField, OutcomeMessage",
+   "effort": "L",
+   "risk": "medium",
+   "ruleCheck": "DH-06: 'small cohesive modules'. The splits must keep the data-* hooks and accessible names that the browser suites assert.",
+   "verdict": "confirmed",
+   "verifierNote": "The ten function spans, line counts and complexities match metrics.md section 7. The lines before the first JSX are 181, 292 and 230 in the three largest screens."
+  },
+  {
+   "id": "XWEB-04",
+   "title": "Model profile names and the offered set are hardcoded in three screens",
+   "dimension": "duplication",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "apps/web/components/expert-editor.tsx",
+     "line": 21,
+     "endLine": 25,
+     "note": "PROFILES lists Terra and Sol and doubles as the offered set."
+    },
+    {
+     "file": "apps/web/components/expert-editor.tsx",
+     "line": 116,
+     "endLine": 128,
+     "note": "Bindings outside the list are dropped on save. The UI says so at 424-432 and disables the option at 415-421."
+    },
+    {
+     "file": "apps/web/components/run-list.tsx",
+     "line": 75,
+     "endLine": 79,
+     "note": "PROFILE_NAMES maps profile IDs to names by hand."
+    },
+    {
+     "file": "apps/web/components/experts-panel.tsx",
+     "line": 295,
+     "endLine": 299,
+     "note": "An identical PROFILE_NAMES copy."
+    },
+    {
+     "file": "apps/web/components/run-disclosure.tsx",
+     "line": 87,
+     "endLine": 91,
+     "note": "Reads `offered` from /api/models instead. goal-composer.tsx:393-395 does the same."
+    },
+    {
+     "file": "apps/web/components/model-policy-panel.tsx",
+     "line": 234,
+     "endLine": 238,
+     "note": "Also reads offered from the server."
+    },
+    {
+     "file": "services/agent/src/autobots/domain/models.py",
+     "line": 72,
+     "note": "OFFERED_FOR_NEW_RUNS, which owns the rule."
+    }
+   ],
+   "occurrences": 3,
+   "evidence": "grep 'openrouter_terra' in apps/web/components finds three hardcoded copies. Only expert-editor's PROFILES encodes the offered rule. The two PROFILE_NAMES maps are display labels, which /api/models doesn't carry: it returns profile, canonical_id and offered. Excerpt from expert-editor.tsx:21-25 and 126-128:\n  const PROFILES = [\n    { id: \"\", label: \"Workspace setting\" },\n    { id: \"openrouter_terra\", label: \"Terra\" },\n    { id: \"openrouter_sol\", label: \"Sol\" },\n  ];\n  const dropped = others\n    .filter(([, profile]) => !PROFILES.some((item) => item.id === profile))",
+   "impact": "Which models new runs may use is a server rule, and /api/models already exposes it. Qualifying Sol (commit ada547a, US-14.15) required a manual edit to this list. The next qualification will need edits in three files. Until they are made, the Expert editor labels a qualified model as not offered and drops its bindings on save, while the composer offers that same model. The maps are typed Record<string, string>, so the compiler doesn't catch a missing profile even though the client exports ModelProfileId.",
+   "recommendation": "Read profiles from /api/models through one shared hook (useModels) in all three screens. Label them with the server's canonical_id, or keep short names in one lib map typed Record<ModelProfileId, string>. Derive 'not offered' from model.offered, never from a local list.",
+   "sketch": "// hooks/use-models.ts\nexport function useModels(): Resource<ModelList> & { label(p: ModelProfileId): string; offered(p: string): boolean }\n// expert-editor.tsx\nconst models = useModels();\nconst dropped = others.filter(([, p]) => !models.offered(p)).map(([role]) => role);\n// run-list.tsx and experts-panel.tsx: models.label(profile) replaces PROFILE_NAMES",
+   "effort": "S",
+   "risk": "medium",
+   "ruleCheck": "DH-06: 'Avoid ... duplicated business rules'. nextjs.md: 'Next.js owns UI/BFF, not Python business-state transitions'. The rule stays in the Python domain, and the screens only read it.",
+   "verdict": "revised",
+   "verifierNote": "Confirmed the three copies, OFFERED_FOR_NEW_RUNS at models.py:72 and the manual edit in ada547a. Lowered from high to medium: only one copy encodes the rule, the editor warns before a save drops a binding, and WBLD-07 and XDUP-10 rate the same issue medium."
+  },
+  {
+   "id": "XWEB-06",
+   "title": "Read view states are written per screen, and some failures never appear",
+   "dimension": "errors",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "apps/web/components/expert-editor.tsx",
+     "line": 273,
+     "endLine": 276,
+     "note": "Shows 'Loading the tool catalog.' indefinitely when the request fails, because lines 80-85 swallow the failure."
+    },
+    {
+     "file": "apps/web/components/workflows-panel.tsx",
+     "line": 552,
+     "endLine": 553,
+     "note": "'Loading its steps.' remains after a failed preview (472-481). Executions behave the same way at 608-609."
+    },
+    {
+     "file": "apps/web/components/search-palette.tsx",
+     "line": 75,
+     "endLine": 79,
+     "note": "A failed search becomes an empty result, so the status line says 'Nothing in this workspace matches.' (211-212)."
+    },
+    {
+     "file": "apps/web/components/run-list.tsx",
+     "line": 282,
+     "endLine": 290,
+     "note": "Load failure shown in a destructive bordered box."
+    },
+    {
+     "file": "apps/web/components/experts-panel.tsx",
+     "line": 160,
+     "endLine": 166,
+     "note": "The same state shown as plain text."
+    },
+    {
+     "file": "apps/web/components/model-policy-panel.tsx",
+     "line": 219,
+     "endLine": 231,
+     "note": "The same state inside a Card. The loading line has no role."
+    },
+    {
+     "file": "apps/web/components/operations-panel.tsx",
+     "line": 227,
+     "endLine": 228,
+     "note": "An unstyled alert and 'Loading…'. This is the only screen that names a denied (403) state (171-172)."
+    }
+   ],
+   "occurrences": 22,
+   "evidence": "22 component files render their own loading and failure markup. There are 30 loading lines, 14 of them with role=status, and 9 `.catch(() => undefined)` calls in 6 files swallow secondary loads. No shared view-state component exists. Excerpt from expert-editor.tsx:80-85 and 273-276:\n  fetch(\"/api/v1/tools\", { cache: \"no-store\" })\n    .then(async (reply) => {\n      if (active && reply.ok) setCatalog(parseToolCatalog(await reply.json()));\n    })\n    .catch(() => undefined);\n  ...\n  {catalog === null ? (<p className=\"text-muted-foreground text-sm\">Loading the tool catalog.</p>) : (",
+   "impact": "In three places a user cannot tell a load that is still running from one that failed. Search hides an outage as 'no match'. On most screens, denied cannot be told apart from unavailable. Tests can assert a view state only where the screen added data-state.",
+   "recommendation": "Add components/ui/view-state.tsx with Loading, Empty, Unavailable (with an optional retry) and Denied. Each sets its role and data-state the same way and is driven by the resource hook's status. Map 401 and 403 to Denied, and network failures and 5xx to Unavailable. Never swallow a secondary load; show a muted unavailable line instead.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "DH-06: 'Represent loading, empty, denied, unavailable and retryable states deliberately'. nextjs.md asks for explicit error, empty and loading states. DS-03 lists empty, loading and error states as design-system surfaces.",
+   "verdict": "confirmed",
+   "verifierNote": "Confirmed the three Loading lines that never clear, search's empty result on failure, four differently styled failure states, and 403 named only by Operations. Recounted 9 swallowed loads in 6 files and about 30 loading lines in 22 files."
+  },
+  {
+   "id": "XWEB-07",
+   "title": "Write outcomes: refusal texts and announcement roles differ per screen",
+   "dimension": "errors",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "apps/web/components/goal-composer.tsx",
+     "line": 601,
+     "endLine": 606,
+     "note": "Uses role=alert for every outcome, including the success 'Your goal is queued.' (637-645)."
+    },
+    {
+     "file": "apps/web/components/workflow-editor.tsx",
+     "line": 586,
+     "endLine": 590,
+     "note": "One role=status slot serves seven actions, including refusals such as the one at 225-227."
+    },
+    {
+     "file": "apps/web/components/expert-editor.tsx",
+     "line": 444,
+     "endLine": 448,
+     "note": "Refusals are announced with role=status."
+    },
+    {
+     "file": "apps/web/components/goal-composer.tsx",
+     "line": 318,
+     "endLine": 340,
+     "note": "Admission refusals are mapped one way."
+    },
+    {
+     "file": "apps/web/components/session-panel.tsx",
+     "line": 68,
+     "endLine": 79,
+     "note": "The same endpoint's refusals are mapped another way, with no credential_invalid, no budget case and no link to settings."
+    },
+    {
+     "file": "apps/web/components/continue-run.tsx",
+     "line": 65,
+     "endLine": 71,
+     "note": "A third way: it shows the server's message."
+    },
+    {
+     "file": "apps/web/components/run-controls.tsx",
+     "line": 195,
+     "endLine": 216,
+     "note": "The model to follow: refusals as an alert and confirmations as a status note."
+    }
+   ],
+   "occurrences": 11,
+   "evidence": "There are 3 different mappings for POST /api/v1/runs refusals, and owner_required is worded in 8 places across 6 files (grep owner_required in apps/web/components). Excerpt from session-panel.tsx:71-79:\n  setProblem(\n    failure?.code === \"credentials_required\"\n      ? \"Model-backed work needs an OpenRouter key.\"\n      : failure?.code === \"model_not_offered\"\n        ? \"A saved model choice isn't offered for new runs until it's qualified, ...\"\n        : reply?.status === 422\n          ? \"That request isn't approved, so no run started. Your goal is kept.\"\n          : \"That could not be started.\",",
+   "impact": "The same refusal from the same endpoint reads differently on Home, in a session and on a run. Screen readers interrupt for a success on Home, but announce refusals only politely in the editors and on Operations. Every new error code has to be added in several files.",
+   "recommendation": "Add lib/refusals.ts, which maps ErrorResponse.code (read with parseErrorResponse) to text and an optional action link for each context: admission, owner and version conflict. Add an Outcome component that renders refusals with role=alert and confirmations with role=status, as RunControls already does. Keep the existing wording that the browser suites read.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "DH-06: 'centralize error handling ... and expose safe typed errors'.",
+   "verdict": "confirmed",
+   "verifierNote": "Confirmed the three admission refusal mappings, role=alert on the composer's success, role=status for refusals in the editors and Operations, and owner_required worded at 8 sites in 6 files."
+  },
+  {
+   "id": "XWEB-08",
+   "title": "Run state vocabulary, tones and commands are defined per screen",
+   "dimension": "duplication",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "apps/web/components/run-list.tsx",
+     "line": 16,
+     "endLine": 64,
+     "note": "STATUS_TEXT, which is exported, plus a Tone mapping with its own text and dot classes."
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 36,
+     "endLine": 72,
+     "note": "STATUS_LABEL repeats run-list's words, and the comment at line 48 says so. STATUS_TONE maps the same states to Badge variants instead."
+    },
+    {
+     "file": "apps/web/components/workflow-monitor.tsx",
+     "line": 13,
+     "note": "TERMINAL is defined again. run_status is shown as raw text at line 106, and a third tone() is at 236-242."
+    },
+    {
+     "file": "apps/web/components/run-controls.tsx",
+     "line": 16,
+     "endLine": 36,
+     "note": "The TERMINAL and PAUSABLE sets decide which commands are offered."
+    },
+    {
+     "file": "apps/web/components/run-panel.tsx",
+     "line": 17,
+     "endLine": 21,
+     "note": "LABELS and the command buttons at 246-260 copy run-controls.tsx:25-29 and 138-152. Their version policies are opposite: the panel sends the loaded version (83-110), while RunControls re-reads it before each press (65-71)."
+    },
+    {
+     "file": "apps/web/components/waiting-notifier.tsx",
+     "line": 14,
+     "endLine": 17,
+     "note": "WAITING, another state map."
+    },
+    {
+     "file": "apps/web/components/model-policy-panel.tsx",
+     "line": 24,
+     "endLine": 29,
+     "note": "SOURCE_LABEL. run-workspace.tsx:83-88 (ROLE_SOURCE) restates the same four words in lower case, in a second map keyed by string."
+    }
+   ],
+   "occurrences": 7,
+   "evidence": "7 definitions in 7 files, all keyed by string although the client exports RunStatus and BindingSource. The contract also types ExecutionView.run_status as plain string. Excerpts:\n  // run-list.tsx:16\n  export const STATUS_TEXT: Record<string, string> = { queued: \"Queued\", running: \"Running\", ...\n  // run-workspace.tsx:48-49\n  // Decision 0021: the header's short state words, as the run list says them, ...\n  const STATUS_LABEL: Record<string, string> = { queued: \"Queued\", running: \"Running\", ...\n  // workflow-monitor.tsx:13\n  const TERMINAL = new Set([\"succeeded\", \"failed\", \"cancelled\"]);",
+   "impact": "A new run status compiles everywhere but renders as raw text on some screens. The same state gets different tones on the list and on the run page. The hand-written TERMINAL and PAUSABLE sets are a second state enum that can drift from the server's transition table. The opposite version policies of RunPanel and RunControls are recorded in US-15.17's design, and each file explains only its own (run-panel.tsx:82, run-controls.tsx:64), so the copied buttons hide that the two differ.",
+   "recommendation": "Add lib/run-status.ts with labels, sentences and tones typed Record<RunStatus, ...>, and one RunStateBadge used by the list, the panel, the run page, Home and Workflows. Have the API send the allowed commands, as it already sends can_continue (run-workspace.tsx:425), instead of commandsFor's sets. Add one RunCommandButtons component with an explicit versionPolicy prop.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06: 'do not invent a second state enum for the UI'. contracts.md: canonical states are shared. Having the API expose allowed commands keeps the transitions in Python.",
+   "verdict": "revised",
+   "verifierNote": "Confirmed the seven definitions, the string-typed ExecutionView.run_status and the opposite version policies (US-15.17 design.md:14). Corrected two notes: SOURCE_LABEL and ROLE_SOURCE differ only in capitalization, and each command file does state its own policy in a comment."
+  },
+  {
+   "id": "XWEB-09",
+   "title": "Money, time and duration formatting is re-implemented and disagrees",
+   "dimension": "duplication",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "apps/web/components/run-list.tsx",
+     "line": 87,
+     "endLine": 89,
+     "note": "dollars() with toFixed(2). It is identical in run-panel.tsx:30, goal-composer.tsx:74, workflows-panel.tsx:50 and home-activity.tsx:34."
+    },
+    {
+     "file": "apps/web/components/run-inspector.tsx",
+     "line": 10,
+     "endLine": 12,
+     "note": "A dollars() of the same name without toFixed."
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 802,
+     "endLine": 822,
+     "note": "Inline formatting shows US$1.00, US$0.5 and $0.5 for one run's figures."
+    },
+    {
+     "file": "apps/web/components/approvals-panel.tsx",
+     "line": 88,
+     "endLine": 98,
+     "note": "Relative time computed by hand."
+    },
+    {
+     "file": "apps/web/components/workflows-panel.tsx",
+     "line": 36,
+     "endLine": 48,
+     "note": "Relative time with Intl. home-activity.tsx:24-32 is the same function, and experts-panel.tsx:310-315 is a third style."
+    },
+    {
+     "file": "apps/web/components/run-panel.tsx",
+     "line": 34,
+     "endLine": 42,
+     "note": "wallTime(). workflows-panel.tsx:63-70 formats the same kind of value differently."
+    },
+    {
+     "file": "apps/web/components/goal-composer.tsx",
+     "line": 197,
+     "endLine": 206,
+     "note": "The budget-steps loop, copied at workflow-editor.tsx:150-157."
+    }
+   ],
+   "occurrences": 17,
+   "evidence": "grep for 'function dollars', '1_000_000' and 'RelativeTimeFormat' finds 6 dollars() definitions plus inline money formatting in 3 files, 4 relative-time helpers, 2 duration helpers and 2 budget-step loops. Excerpts:\n  // run-list.tsx:87-89\n  function dollars(micro: number): string { return `US$${(micro / 1_000_000).toFixed(2)}`; }\n  // run-inspector.tsx:10-12\n  function dollars(micro: number): string { return `US$${micro / 1_000_000}`; }\n  // run-workspace.tsx:819-821\n  {snapshot.usage.repairs} repairs. Spent ${snapshot.run.budget.spent_micro_usd / 1_000_000} of $",
+   "impact": "The same micro-USD value reads US$0.50 on the list and US$0.5 in the inspector, and one run page shows three styles. Each copy also decides for itself how to mark an estimate (≈), which DS-04 requires to stay distinct from a reported cost.",
+   "recommendation": "Add lib/format.ts with formatUsd(micro, { estimated }), formatRelative(iso, now), formatDuration(seconds) and budgetSteps(range), cover it with node:test, and replace every copy.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DS-04: 'Estimated versus reported costs ... remain distinct'. One formatter keeps the estimate marking consistent.",
+   "verdict": "confirmed",
+   "verifierNote": "Recounted 6 dollars() definitions, inline money in 3 files, 4 relative-time helpers, 2 duration helpers and 2 budget-step loops. The estimate rule (reserved above zero or unreported) is also restated in run-list, run-panel, home-activity and workflows-panel."
+  },
+  {
+   "id": "XWEB-10",
+   "title": "Shared vocabulary and hooks live inside feature components, imported sideways and in a cycle",
+   "dimension": "modules",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "apps/web/components/run-list.tsx",
+     "line": 8,
+     "note": "Imports RunPanel ..."
+    },
+    {
+     "file": "apps/web/components/run-panel.tsx",
+     "line": 9,
+     "note": "... and run-panel imports StateLine back from run-list, which makes an import cycle."
+    },
+    {
+     "file": "apps/web/components/expert-editor.tsx",
+     "line": 17,
+     "note": "A Build screen imports AVAILABILITY and repair() from the 853-line tool catalog."
+    },
+    {
+     "file": "apps/web/components/workflows-panel.tsx",
+     "line": 17,
+     "note": "Imports STATUS_TEXT from run-list. home-activity.tsx:13 does the same."
+    },
+    {
+     "file": "apps/web/components/workflow-monitor.tsx",
+     "line": 7,
+     "note": "useToolUses is exported from a component file."
+    },
+    {
+     "file": "apps/web/components/goal-composer.tsx",
+     "line": 17,
+     "endLine": 20,
+     "note": "Takes DEFAULT_BUDGET_MICRO_USD from run-disclosure, and focusGoal and NEW_RUN_PARAM from new-run (line 29)."
+    },
+    {
+     "file": "apps/web/app/tools/[toolId]/page.tsx",
+     "line": 5,
+     "note": "A route imports its screen from another route's module. tool-catalog.tsx holds 8 components."
+    },
+    {
+     "file": "apps/web/components.json",
+     "line": 18,
+     "note": "Declares a hooks alias, but no hooks folder exists."
+    }
+   ],
+   "occurrences": 24,
+   "evidence": "grep for imports from '@/components/<non-ui>' inside apps/web/components finds 24 import edges between feature components. 7 of them carry helpers, constants or a hook rather than a component. Excerpts:\n  // run-list.tsx:8\n  import { RunPanel } from \"@/components/run-panel\";\n  // run-panel.tsx:8-9\n  import { commandsFor } from \"@/components/run-controls\";\n  import { StateLine } from \"@/components/run-list\";\n  // expert-editor.tsx:17\n  import { AVAILABILITY, repair } from \"@/components/tool-catalog\";",
+   "impact": "Pure helpers can only be reached through 'use client' modules, so they cannot be unit-tested without pulling in JSX and the React graph. A change to a list component ripples into Home, Workflows and the Expert editor. The run-list cycle works only because both imports are used inside functions.",
+   "recommendation": "Move pure vocabulary and formatting into lib/ (run-status, tool-labels, format, refusals) with no React. Put hooks in hooks/ (use-resource, use-submit, use-tool-uses, use-models, use-mounted). Group screens in feature folders (components/runs, home, build, tools, approvals, settings, shell). Add a no-restricted-imports rule that forbids importing another feature folder's internals, allowing only its public entry module, and keep server-only code out of any entry module that client components import.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "DH-06: 'explicit ownership, narrow interfaces ... small cohesive modules'. DH-03 places only apps/web/ itself, so folders inside it don't conflict with it.",
+   "verdict": "revised",
+   "verifierNote": "Recounted 24 feature-to-feature import edges, 7 of them carrying helpers, constants or a hook, and the run-list and run-panel cycle. Reworded the lint rule so a shared entry module can't pull server-only code into a client bundle."
+  },
+  {
+   "id": "XWEB-11",
+   "title": "Recurring layout pieces are private to screens instead of in components/ui",
+   "dimension": "structure",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 846,
+     "endLine": 864,
+     "note": "Section. run-inspector.tsx:284-309 has a second copy, and tool-uses.tsx:250-256 an inline third."
+    },
+    {
+     "file": "apps/web/components/approvals-panel.tsx",
+     "line": 744,
+     "endLine": 773,
+     "note": "Fact. tool-catalog.tsx:756-776 has a different Fact with a different API."
+    },
+    {
+     "file": "apps/web/components/experts-panel.tsx",
+     "line": 179,
+     "endLine": 200,
+     "note": "A segmented control, copied with identical classes in run-list.tsx:230-253 and approvals-panel.tsx:319-351."
+    },
+    {
+     "file": "apps/web/components/session-panel.tsx",
+     "line": 164,
+     "note": "A serif card title written by hand, one of 7 copies. CardTitle is used once (goal-composer.tsx:350), and Separator is never imported."
+    },
+    {
+     "file": "apps/web/components/tool-catalog.tsx",
+     "line": 461,
+     "note": "A dialog on background tokens with a black/60 backdrop. about-services.tsx:22 and search-palette.tsx:132 use popover tokens with black/50."
+    },
+    {
+     "file": "apps/web/app/settings/account/page.tsx",
+     "line": 29,
+     "note": "A settings row with a 260px label column. The other rows use 240px (app/settings/page.tsx:12, app/settings/notifications/page.tsx:14, data-summary.tsx:58)."
+    },
+    {
+     "file": "apps/web/components/expert-editor.tsx",
+     "line": 227,
+     "endLine": 232,
+     "note": "An initial tile, also at experts-panel.tsx:342-347 and session-panel.tsx:113-118."
+    }
+   ],
+   "occurrences": 26,
+   "evidence": "Grepping each class string finds 7 recurring pieces with 26 copies in total: Section 3, Fact 2, segmented control 3, serif title 7, dialog shell 3, settings row 5 and initial tile 3. Excerpt, from run-workspace.tsx:857 and run-inspector.tsx:297:\n  <section aria-labelledby={id} className=\"space-y-3 border-t pt-6\">\n  <section aria-labelledby={id} className=\"space-y-3 border-t pt-6\">",
+   "impact": "The copies drift already: there are two settings column widths, two dialog surfaces and two backdrops. DS-03's rule that dialogs use popover tokens holds in two of three dialogs, and every screen re-decides the markup of a section heading.",
+   "recommendation": "Add to components/ui: SectionBlock, Fact or FactList, SegmentedControl (aria-pressed buttons, or Links when the state is in the URL), a Dialog that wraps a native <dialog> with popover tokens and one backdrop, SettingsRow, a serif CardTitle variant and InitialTile. Remove Separator or adopt it.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "DS-01: 'Use shadcn/ui components'. DS-03: menus, selects and dialogs use popover and popover-foreground. Decision 0021's hairline sections.",
+   "verdict": "confirmed",
+   "verifierNote": "Recounted the 26 copies by class string. The bg-background dialog in tool-catalog, the two backdrops and the 260px versus 240px settings rows are confirmed."
+  },
+  {
+   "id": "XWEB-12",
+   "title": "Type sizes and many spacings are arbitrary values outside the theme",
+   "dimension": "standards",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "apps/web/app/globals.css",
+     "line": 22,
+     "endLine": 25,
+     "note": "Compact density tightens spacing only through --spacing, yet the comment says every spacing utility derives from it."
+    },
+    {
+     "file": "apps/web/components/provider-settings-panel.tsx",
+     "line": 83,
+     "note": "px-[18px] is fixed, so compact density doesn't tighten it. It also appears at lines 108 and 255 and at model-policy-panel.tsx:267."
+    },
+    {
+     "file": "apps/web/components/run-list.tsx",
+     "line": 233,
+     "note": "p-[3px] in the segmented control, which has three copies."
+    },
+    {
+     "file": "apps/web/components/model-policy-panel.tsx",
+     "line": 65,
+     "note": "py-[7px] on every row."
+    },
+    {
+     "file": "apps/web/components/tool-catalog.tsx",
+     "line": 621,
+     "note": "text-[22px] with tracking-[-0.015em], while the other serif titles use tracking-tight."
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 584,
+     "note": "The dark-only tint rule from Decision 0021 is written on the element. There are 26 dark: class overrides in 12 feature files."
+    }
+   ],
+   "occurrences": 212,
+   "evidence": "grep over components and app finds 212 arbitrary font sizes in 39 files, with 13 distinct values (12.5px ×75, 13px ×63, 13.5px ×19, 15px ×16, ...). It also finds 15 arbitrary pixel paddings, margins and gaps, 5 hard-coded radii (rounded-[10px] ×4, rounded-[7px] ×1), and 26 dark: class overrides in 12 files outside components/ui. @theme defines font families but no type scale (globals.css:31-77).",
+   "impact": "The Studio type scale exists only as repeated numbers, so changing a size means searching 39 files. The compact density setting (SE-03) skips fixed paddings, although the stylesheet's comment says otherwise. Each screen restates the light/dark contrast rule, which only INNER_BOX and Badge encode centrally.",
+   "recommendation": "Define the type scale in @theme, for example --text-meta 12.5px, --text-ui 13px, --text-body 13.5px, --text-lead 15px, --text-title 22px and --text-page 32px. Express paddings as spacing steps and radii as the radius scale, and replace the arbitrary values. Encode the dark-only tints as ui variants. Add a verify check that sets a baseline for arbitrary px classes and then ratchets it down.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "DS-03: 'Keep layout spacing and typography consistent' and 'Map the radius scale to the canonical base'. The DS-01 palette is untouched, since a type scale is not a color token.",
+   "verdict": "revised",
+   "verifierNote": "Recounted 212 arbitrary font sizes in 39 files with 13 values, and 15 arbitrary pixel spacings. Corrected the dark: count to 26 in 12 feature files, since 8 more are inside components/ui, and added the 5 hard-coded radii that the cited DS-03 rule covers."
+  },
+  {
+   "id": "XWEB-13",
+   "title": "List filters and selection live in the URL on some screens and in state on others",
+   "dimension": "approach",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "apps/web/components/tool-catalog.tsx",
+     "line": 184,
+     "endLine": 200,
+     "note": "All filters and the open tool live in the URL."
+    },
+    {
+     "file": "apps/web/components/workflows-panel.tsx",
+     "line": 86,
+     "endLine": 89,
+     "note": "tab, q, workflow and version live in the URL. ?tab= is cast to Tab without validation."
+    },
+    {
+     "file": "apps/web/components/run-list.tsx",
+     "line": 161,
+     "endLine": 170,
+     "note": "group, query and profile live in state. Only the selected run is in the URL."
+    },
+    {
+     "file": "apps/web/components/approvals-panel.tsx",
+     "line": 123,
+     "endLine": 126,
+     "note": "The tab and the selection live in state. Only the first selection comes from ?approval=."
+    },
+    {
+     "file": "apps/web/components/experts-panel.tsx",
+     "line": 32,
+     "endLine": 33,
+     "note": "The filter and search live in state."
+    },
+    {
+     "file": "apps/web/components/workflows-panel.tsx",
+     "line": 214,
+     "endLine": 218,
+     "note": "Search writes the URL on every keystroke, as tool-catalog.tsx:254 does, while run-list debounces by 150 ms (188-203)."
+    }
+   ],
+   "occurrences": 5,
+   "evidence": "Five list screens use two models. Excerpt from workflows-panel.tsx:87 and run-list.tsx:161-169:\n  const tab = (params.get(\"tab\") as Tab | null) ?? \"all\";\n  ...\n  const [group, setGroup] = useState<Group>(\"all\");\n  const [query, setQuery] = useState(\"\");\n  const [profile, setProfile] = useState(\"\");\n  ...\n  const selected = useSearchParams().get(\"run\");",
+   "impact": "Reload, Back and shared links keep the filters on Tools and Workflows but reset them on Runs, Approvals and Experts. Three segmented controls repeat state handling that a URL-backed control would provide. Values read from the URL are cast without validation.",
+   "recommendation": "Add hooks/use-url-state.ts with a typed parse and serialize per key, a fallback, validation against the generated unions, and a debounced replace. Record per list screen which filters belong in the URL, and keep the existing ones (?run=, ?tool=, ?workflow=).",
+   "sketch": "",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "No product rule requires list filters in the URL. RN-04 keeps the selected run there and HM-04 links to ?approval=, so moving other filters into the URL is a per-screen product choice to record, not a requirement to infer from code. Validating URL values against the generated unions follows DH-06's validation at trust boundaries.",
+   "verdict": "revised",
+   "verifierNote": "Confirmed the two models, the unvalidated ?tab= cast and the per-keystroke URL writes. Replaced the empty rule check: no source requires filters in the URL."
+  },
+  {
+   "id": "XWEB-14",
+   "title": "Only two pages load data on the server, and client writes don't refresh server-rendered shell data",
+   "dimension": "approach",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "apps/web/app/page.tsx",
+     "line": 32,
+     "endLine": 38,
+     "note": "Reads on the server through lib/service-status."
+    },
+    {
+     "file": "apps/web/app/settings/account/page.tsx",
+     "line": 13,
+     "endLine": 14,
+     "note": "The only other page that loads data on the server."
+    },
+    {
+     "file": "apps/web/components/run-inspector.tsx",
+     "line": 18,
+     "endLine": 48,
+     "note": "A read-only page rendered as a client fetch after hydration."
+    },
+    {
+     "file": "apps/web/components/data-summary.tsx",
+     "line": 18,
+     "endLine": 39,
+     "note": "Read-only, and fetched on the client."
+    },
+    {
+     "file": "apps/web/components/app-shell.tsx",
+     "line": 14,
+     "endLine": 16,
+     "note": "The shell renders the approvals badge count on the server."
+    },
+    {
+     "file": "apps/web/components/approvals-panel.tsx",
+     "line": 192,
+     "endLine": 226,
+     "note": "A decision reloads only the list. Nothing refreshes the shell."
+    },
+    {
+     "file": "apps/web/components/account-form.tsx",
+     "line": 28,
+     "endLine": 31,
+     "note": "Calls router.refresh() after a write that changes shell data. sign-in-form.tsx:31-32 does too."
+    },
+    {
+     "file": "apps/web/components/account-footer.tsx",
+     "line": 24,
+     "note": "fetchSession runs here and again in the Home and Account pages within one request. Every server read passes AbortSignal.timeout (lib/service-status.ts:26), which opts out of Next.js fetch memoization, and nothing wraps the reads in React cache()."
+    }
+   ],
+   "occurrences": 16,
+   "evidence": "grep for service-status or a server fetch in apps/web/app finds 2 pages. 16 other pages load their data only in client panels that fetch inside an effect; Appearance, Notifications, Keyboard and Sign in load none. Every server read passes a timeout signal, and the installed next/dist/server/lib/dedupe-fetch.js skips memoization for a request with a signal, so Home reads the session and readiness twice per request. Excerpt from approvals-panel.tsx:209-224 and account-form.tsx:28-31:\n  if (reply?.ok === true) {\n    setMessage(decision === \"approve\" ? \"Approved. ...\" : \"Rejected. ...\");\n  } else { ... }\n  await load(tab);\n  ...\n  if (reply.ok) { setMessage(\"Saved.\"); router.refresh(); return; }",
+   "impact": "Read-only screens paint a loading line first and need client JavaScript before they show anything, and screen code repeats access logic the server helper already has. Next.js does not re-render layouts on client navigation. So after an approval, the sidebar badge keeps its old count until something refreshes the page, whereas the display name updates after an account edit. Server reads also repeat within one request.",
+   "recommendation": "Turn the read-only screens into async Server Components: the run inspector, the data summary, the tool detail facts and the first page of the run list. Have them read through a server-only typed client: extend lib/service-status into lib/server-api.ts with ApiError status mapping and a per-request React cache(), never a cache shared between requests. Keep interactive leaves such as version selects, copy buttons and filters as client components. Call router.refresh() after writes that change shell-rendered data, such as approval decisions.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "DH-06: 'Prefer Server Components; use Client Components for actual interaction'. nextjs.md: 'Server Components by default'. Server reads keep the BFF's checks: the per-request session, the workspace header and the server-only config (lib/service-status.ts:33-39).",
+   "verdict": "revised",
+   "verifierNote": "Corrected the client-only page count to 16. Confirmed the repeated server reads in the installed Next.js 16.4.5 dedupe-fetch, which never dedupes a request carrying a signal. The stale badge follows from layout partial rendering and was not observed in a browser."
+  },
+  {
+   "id": "XWEB-15",
+   "title": "UI logic sits where unit tests can't reach it, and the unit runner lists test files by name",
+   "dimension": "tests",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "scripts/verify.py",
+     "line": 161,
+     "endLine": 162,
+     "note": "Runs two named files, so schema-value.test.ts is never run."
+    },
+    {
+     "file": "apps/web/tests/unit/schema-value.test.ts",
+     "line": 1,
+     "note": "Cited as evidence in US-16.2's verification record."
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 125,
+     "endLine": 141,
+     "note": "withDelta merges streamed text across reconnects and has no unit test."
+    },
+    {
+     "file": "apps/web/components/approvals-panel.tsx",
+     "line": 686,
+     "endLine": 742,
+     "note": "parsedFields and the Markdown reader, which builds React nodes from model-written text."
+    },
+    {
+     "file": "apps/web/components/goal-composer.tsx",
+     "line": 88,
+     "endLine": 100,
+     "note": "inputPath, which resolves attachment name collisions."
+    },
+    {
+     "file": "apps/web/components/workflow-editor.tsx",
+     "line": 78,
+     "endLine": 104,
+     "note": "tidy and withLabel, which decide the IR version and the graph hash."
+    },
+    {
+     "file": "apps/web/components/tool-catalog.tsx",
+     "line": 79,
+     "endLine": 114,
+     "note": "keySource and repair."
+    },
+    {
+     "file": "apps/web/components/run-controls.tsx",
+     "line": 32,
+     "endLine": 36,
+     "note": "commandsFor."
+    }
+   ],
+   "occurrences": 7,
+   "evidence": "apps/web/tests/unit has 3 files, all for lib/, and the 7 helper groups above, found by reading the component files, have no unit test. Excerpt from scripts/verify.py:161-162:\n  Step('web_unit_tests', (str(Path(tools.node_dir) / 'node'), '--test', 'apps/web/tests/unit/request-guard.test.ts',\n                         'apps/web/tests/unit/credential-precedence.test.ts'), root),",
+   "impact": "Edge cases are checked only by Playwright suites that need the db profile: joining a stream partway, integer-like JSON keys, IR version bumps and path collisions. As schema-value.test.ts shows, a new unit test file silently does not run unless someone also edits verify.py.",
+   "recommendation": "Move the pure helpers into lib/*.ts with no 'use client' and no JSX, and cover them with node:test as request-guard already is. Change the web_unit_tests step to discover apps/web/tests/unit/*.test.ts. Keep the moved modules free of runtime @/ alias imports so node --test can load them, as lib/schema-value.ts is.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06 asks for unit tests of relevant pure and client behavior and names Vitest and React Testing Library. The repository runs node:test instead, a departure the tooling lens records (XTOL-10). Moving pure helpers into lib/ works under either runner and adds no dependency.",
+   "verdict": "revised",
+   "verifierNote": "Confirmed that verify.py:161-162 names two of the three unit files, so schema-value.test.ts never runs although US-16.2's verification.md:22 credits the web unit tests. All seven helper groups sit in client .tsx modules. Corrected the rule check: DH-06 names Vitest, not node:test."
+  },
+  {
+   "id": "XWEB-16",
+   "title": "Screen state is spread across independent flags where one union belongs",
+   "dimension": "approach",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "apps/web/components/continue-run.tsx",
+     "line": 13,
+     "endLine": 21,
+     "note": "Seven pieces of state for one submission: open, pending, started, already, lost, problem and the key."
+    },
+    {
+     "file": "apps/web/components/goal-composer.tsx",
+     "line": 128,
+     "endLine": 140,
+     "note": "13 states. outcome, refusal and runId describe one admission result, and they are reset together at 277-278 and 313-316."
+    },
+    {
+     "file": "apps/web/components/workflow-editor.tsx",
+     "line": 108,
+     "endLine": 118,
+     "note": "11 states, with one message slot shared by seven actions."
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 153,
+     "endLine": 166,
+     "note": "snapshot, connection, unavailable, gap, refreshes, live and result. unavailable can coexist with a live connection."
+    },
+    {
+     "file": "apps/web/components/approvals-panel.tsx",
+     "line": 123,
+     "endLine": 134,
+     "note": "10 states, including armed, announcement and message."
+    },
+    {
+     "file": "apps/web/components/tool-catalog.tsx",
+     "line": 157,
+     "endLine": 159,
+     "note": "The counterexample: one discriminated union."
+    }
+   ],
+   "occurrences": 5,
+   "evidence": "Counting useState calls per file (grep -c, minus the import line): goal-composer 13, workflow-editor 11, approvals-panel 10, run-workspace 8, continue-run 7. Excerpt from continue-run.tsx:13-21:\n  const [open, setOpen] = useState(false);\n  const [profile, setProfile] = useState(\"\");\n  const [started, setStarted] = useState<string | null>(null);\n  const [problem, setProblem] = useState<string | null>(null);\n  const [pending, setPending] = useState(false);\n  const [lost, setLost] = useState(false);\n  const [already, setAlready] = useState(false);",
+   "impact": "Impossible combinations can be represented, and every handler must reset several flags in the right order. A reader has to reconstruct each state machine from its setters.",
+   "recommendation": "Model each screen's request state as a discriminated union, as useLoaded already does, or with useReducer. For example, admission is idle, pending, queued(runId), refused(code, message) or unknown, and connection is loading, live, reconnecting, ended or unavailable. Have the resource and submit hooks return these unions.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "DH-06: 'Browser state is a view of durable state, not a second scheduler'. The unions describe request state only.",
+   "verdict": "confirmed",
+   "verifierNote": "Recounted useState per file: 13, 11, 10, 8 and 7. The combinations named in the impact can be represented in the current code."
+  },
+  {
+   "id": "XWEB-17",
+   "title": "Live updates differ per screen, and the run page refetches whole resources on every event",
+   "dimension": "approach",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 206,
+     "endLine": 211,
+     "note": "Every stored event triggers a full GET of /workspace."
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 573,
+     "endLine": 580,
+     "note": "The count of tool events becomes ToolsUsed's version ..."
+    },
+    {
+     "file": "apps/web/components/tool-uses.tsx",
+     "line": 110,
+     "endLine": 145,
+     "note": "... so each tool event re-reads every page of tool uses."
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 198,
+     "endLine": 201,
+     "note": "Reconnects after a fixed 1 s, with no backoff."
+    },
+    {
+     "file": "apps/web/components/workflow-monitor.tsx",
+     "line": 44,
+     "endLine": 64,
+     "note": "Polls every 1 s, and keeps polling through 5xx responses."
+    },
+    {
+     "file": "apps/web/components/waiting-notifier.tsx",
+     "line": 13,
+     "note": "Polls every 4 s on every page while browser notifications are on and permitted. Otherwise it doesn't poll."
+    },
+    {
+     "file": "apps/web/components/run-list.tsx",
+     "line": 186,
+     "endLine": 208,
+     "note": "The run list never refreshes, and neither do approvals (approvals-panel.tsx:158-187) or Home (home-activity.tsx:63-90)."
+    }
+   ],
+   "occurrences": 7,
+   "evidence": "7 components use 4 live-update strategies: a server event stream, 1 s polling, 4 s polling while notifications are on, and none. Excerpt from run-workspace.tsx:206-211:\n  source.addEventListener(\"run\", (message) => {\n    const event = known(JSON.parse(message.data as string));\n    if (event === null || event.sequence <= cursor) return;\n    add([event]);\n    void refresh();\n  });",
+   "impact": "The run page's request count grows with run length: one workspace read per event, and tool-use reads that grow quadratically over a run. When the API stops, every open run or execution tab retries it once a second. Lists that show running work go stale while the run page is live.",
+   "recommendation": "Add hooks/use-live-resource.ts that refreshes by polling or by event, with backoff and coalescing: at most one refresh in flight, plus one trailing refresh. On the run page, coalesce refreshes and request only tool uses after a cursor. Document for each screen whether it is live.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "nextjs.md: 'handle reconnect/deduplication'. Reading more or less often changes no run (DH-06: browser state is a view).",
+   "verdict": "revised",
+   "verifierNote": "Confirmed the workspace read per event, the reread of every tool-use page, the fixed 1 s reconnect and the monitor polling through 5xx. Corrected the notifier: it polls only while notifications are enabled and permitted."
+  },
+  {
+   "id": "XWEB-18",
+   "title": "Browser preferences and the shortcut list are kept in sync by comments",
+   "dimension": "duplication",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "apps/web/app/layout.tsx",
+     "line": 17,
+     "note": "The before-paint script hardcodes the five storage keys and their values."
+    },
+    {
+     "file": "apps/web/components/appearance-control.tsx",
+     "line": 84,
+     "endLine": 124,
+     "note": "A second definition of the same keys and values."
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 117,
+     "endLine": 121,
+     "note": "Reads the data-stream attribute directly."
+    },
+    {
+     "file": "apps/web/components/appearance-control.tsx",
+     "line": 144,
+     "endLine": 148,
+     "note": "Detects mount through useSyncExternalStore. notifications-control.tsx:30-34 copies it."
+    },
+    {
+     "file": "apps/web/lib/shortcuts.ts",
+     "line": 1,
+     "endLine": 6,
+     "note": "The shortcut table for Settings. Its handlers live in new-run.tsx:28-39, search-palette.tsx:50-62 and approvals-panel.tsx:228-286."
+    }
+   ],
+   "occurrences": 7,
+   "evidence": "The preference keys have 2 definitions and are read in a third file, the mount check exists twice, and 3 key handlers sit outside the shortcut table. Excerpt from lib/shortcuts.ts:1-2:\n  // PRD-Studio SE-07: every keyboard shortcut the app offers, in one place. Settings → Keyboard lists\n  // these, so a shortcut added elsewhere is added here too.",
+   "impact": "Renaming a preference or adding a shortcut needs coordinated edits that no check enforces.",
+   "recommendation": "Add lib/preferences.ts, which exports the keys and allowed values and builds the before-paint script from them. Add hooks/use-mounted.ts. Export each shortcut's key test from lib/shortcuts.ts beside its Settings text, and have new-run, search-palette and approvals-panel match on it, so one table serves the list and the handlers. Three handlers don't need a registration hook.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DS-02: the storage keys and the dark default stay as specified. Only their definition is shared.",
+   "verdict": "revised",
+   "verifierNote": "Confirmed the two key definitions, the direct data-stream read, the copied mount check and the three handlers outside the table. Replaced the useShortcut registration hook with shared key tests, which three handlers need, to avoid a speculative framework."
+  },
+  {
+   "id": "XWEB-19",
+   "title": "Page title and width belong to the page on most routes but to the client screen on run routes",
+   "dimension": "structure",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "apps/web/app/approvals/page.tsx",
+     "line": 15,
+     "endLine": 16,
+     "note": "The server page renders the container and the PageHeader."
+    },
+    {
+     "file": "apps/web/app/tools/page.tsx",
+     "line": 11,
+     "endLine": 21,
+     "note": "The same, with Suspense below the header."
+    },
+    {
+     "file": "apps/web/components/run-list.tsx",
+     "line": 224,
+     "endLine": 228,
+     "note": "The client list renders the page title and width itself."
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 333,
+     "endLine": 372,
+     "note": "Two heading forms: a PageHeader in the loading and unavailable states, and a custom h1 with a badge once loaded."
+    },
+    {
+     "file": "apps/web/components/run-inspector.tsx",
+     "line": 50,
+     "endLine": 72,
+     "note": "The same split."
+    },
+    {
+     "file": "apps/web/components/app-shell.tsx",
+     "line": 13,
+     "note": "States the convention: 'Pages own their width and padding inside <main>.'"
+    }
+   ],
+   "occurrences": 3,
+   "evidence": "Of the 22 pages, the 3 run routes (/runs, /runs/[id] and /runs/[id]/inspector) render only a client component, which sets the container width and builds the heading. 17 of the other 19 pages render PageHeader themselves; Home and Sign in write their own h1 by design.",
+   "impact": "On the run screens, the heading's structure changes between states, and container widths are set in two places, against the shell's stated convention.",
+   "recommendation": "Keep the PageHeader and the container in the server page for every route. Let client screens render only the body, and pass adornments such as the status badge through PageHeader's actions slot or a small client leaf.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "Decision 0021: every section opens the same way (components/ui/page-header.tsx:5).",
+   "verdict": "revised",
+   "verifierNote": "Confirmed the three run routes and the two heading forms in RunWorkspaceView and RunInspectorView. Corrected 'every other page': Home and Sign in use their own h1."
+  },
+  {
+   "id": "XWEB-20",
+   "title": "Route components use ten suffixes, and one constant name means three things",
+   "dimension": "naming",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "apps/web/components/approvals-panel.tsx",
+     "line": 117,
+     "note": "Route components named *Panel; ExpertsPanel, WorkflowsPanel, ToolCatalogPanel, OperationsPanel, SessionPanel and KeysAndVarsPanel follow the same pattern."
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 152,
+     "note": "*View for two run routes. RunInspectorView is the other."
+    },
+    {
+     "file": "apps/web/components/run-panel.tsx",
+     "line": 47,
+     "note": "RunPanel is a side panel inside the list, not a route's component. WorkflowPreviewPanel is the same kind."
+    },
+    {
+     "file": "apps/web/components/run-list.tsx",
+     "line": 16,
+     "note": "STATUS_TEXT holds short labels here ..."
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 36,
+     "note": "... and sentences here, beside STATUS_LABEL. workflow-monitor.tsx:14 uses the same name for node states."
+    }
+   ],
+   "occurrences": 21,
+   "evidence": "The 21 routes that have a client component use ten suffixes: Composer, Panel, Editor, List, View, Control, Form, Summary, Detail and Monitor. STATUS_TEXT is defined three times with three meanings.",
+   "impact": "Nothing in a name tells a route's component apart from a sub-panel, and an import of STATUS_TEXT picks up whichever meaning the source file chose.",
+   "recommendation": "Name the client component that renders a route <Feature>Screen, and keep Panel for side panels. Name the vocabularies by content in lib/run-status.ts: RUN_STATUS_LABEL, RUN_STATUS_SENTENCE and NODE_STATUS_LABEL.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06: 'readable names'.",
+   "verdict": "confirmed",
+   "verifierNote": "Confirmed ten suffixes across the 21 routes with a client component (Keyboard has none) and three meanings of STATUS_TEXT. Adopt the convention with the folder move in XWEB-10 rather than as a standalone rename."
+  }
+ ],
+ "rejected": [],
+ "notCovered": "The browser specs under apps/web/tests/browser were not read in full, because they belong to the web-tests area. Only lines 295-345 of approvals.spec.ts were read, to see whether the sidebar badge is tested after a decision. playwright.config.ts, postcss.config.mjs and the two other unit tests were not read. The generated client was only searched with grep, since generated files are out of scope. From PRD-Development-Harness.md, only DH-03 and DH-06 were read. scripts/verify.py was read only at lines 150-175, scripts/generate_contracts.py only at lines 55-100, and services/agent/src/autobots/domain/models.py only at lines 60-110. PRD-Studio.md, SPECS.md and CODEBASE.md were not read beyond grep, so screen-level product rules such as HM-02 and RN-04 were judged only from code comments and archived OpenSpec records. The review is static: ESLint, tsc and the app were not run, and the counts come from grep and metrics.md. Two claims rest on Next.js behavior that was not observed: that the server-rendered approvals badge stays stale after a decision (layouts don't re-render on client navigation), and that the repeated server reads in one request are not deduplicated by fetch memoization."
+}

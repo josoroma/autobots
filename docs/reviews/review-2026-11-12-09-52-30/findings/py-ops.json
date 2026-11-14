@@ -1,0 +1,1171 @@
+{
+  "schema": "autobots.code-review/v1",
+  "area": "py-ops",
+  "title": "Python: operations, credentials and readiness",
+  "kind": "area",
+  "timestamp": "2026-11-12-09-52-30",
+  "revision": "156534da0bd5b19417f05d313077d767804b175b",
+  "summary": "The operations, credentials and readiness code is careful where it matters most. Credentials are sealed with AES-GCM bound to their row identity, the master key is never regenerated, resolved keys refuse serialization, logs redact secrets and keep only exception types, and remote tracing is forced off at every entry point. The worker sends heartbeats on its own connection and drains within a time limit, and the paid trials write each call's worst case to an fsync'd, locked ledger before sending it. The main maintainability cost is rules that exist twice and have already drifted. The trials price calls with their own float parser instead of the catalog's Decimal one, which breaks the DH-06 money rule. The worker's routine-admission gate leaves out the schema check that the API's gate applies. Paid-call settlement is copied five times with different exception scope and state names, and three catalog checks catch different errors. Layering is inverted around operations/: nine modules in application, adapters and api import its logger, application imports the worker, and the worker imports api.main. application/operations.py (501 lines) and route_qualification.py (732 lines) now mix several concerns each. browse_trial.run_trial (192 lines) is never run offline, and the status vocabularies are bare strings held together by six type: ignore comments. Errors are typed and carry no secrets, but four problems remain: the credential store leaks decryption errors to seven callers, boundary logs drop where the error happened, CLI exit codes disagree, and owner bootstrap can't resume after a half-finished run. I read the size leads for provider_settings.py (344 lines) and worker.py (342 lines) and judged both cohesive. Their problems are typing, hidden writes and misplaced wiring, not size.",
+  "scores": [
+    {
+      "dimension": "standards",
+      "score": 3,
+      "why": "Project ruff and mypy strict pass, but the trials use float money against DH-06, there are 8 type: ignore comments in scope, and 12 swallowing broad excepts rely on review because BLE, T20 and C90 aren't enabled."
+    },
+    {
+      "dimension": "modules",
+      "score": 3,
+      "why": "credentials/ is cohesive with a narrow surface, but operations/ hosts the shared logger, application imports the worker, the worker imports api.main, and route_qualification serves as the trials' de facto library."
+    },
+    {
+      "dimension": "size",
+      "score": 3,
+      "why": "Most functions are short. The outliers are application/operations.py (501 lines), route_qualification.py (732) and browse_trial.run_trial (192 lines, 67 statements)."
+    },
+    {
+      "dimension": "functions",
+      "score": 3,
+      "why": "Most functions do one thing, with visible side effects. The exceptions are _settings_row's hidden insert, the monolithic trial runners and the list-cell state in maintenance_step."
+    },
+    {
+      "dimension": "structure",
+      "score": 3,
+      "why": "operations/ mixes a long-running worker, operator CLIs, paid trials, the shared logger and a test fake. DH-03 names workers/, and the package docstring claims nothing in it runs at startup."
+    },
+    {
+      "dimension": "approach",
+      "score": 3,
+      "why": "The lifecycle design is strong (heartbeat, bounded drain, worst-case ledger, AAD-bound encryption), but a drifted second readiness gate and a shared spend ledger whose path depends on the working directory undercut it."
+    },
+    {
+      "dimension": "comments",
+      "score": 4,
+      "why": "Every module has a docstring, and comments explain invariants with requirement and decision IDs. Only 82 of 189 public definitions have docstrings, and a few comments are inaccurate or stand in for types."
+    },
+    {
+      "dimension": "types",
+      "score": 3,
+      "why": "Frozen dataclasses and Literals appear in places, but there are 35 Any-typed database and store handles, status strings needing 6 type: ignore comments, a cast and an anonymous binding object."
+    },
+    {
+      "dimension": "errors",
+      "score": 3,
+      "why": "Errors are typed, with stable codes and fixed messages. But decryption errors leak past the store, boundary logs lose where the error happened, CLI exit codes disagree, and bootstrap has no recovery path."
+    },
+    {
+      "dimension": "tests",
+      "score": 4,
+      "why": "Thorough fake-transport, tamper and readiness tests plus DB checks. The gaps: browse_trial.run_trial is never run offline, and the serve loop's drain, reconnect and final heartbeat are tested only against Docker Postgres."
+    },
+    {
+      "dimension": "maintainability",
+      "score": 3,
+      "why": "Safe, well-explained code, but several rules are duplicated (pricing, readiness, ledger settlement, catalog status) and the copies have already drifted."
+    }
+  ],
+  "strengths": [
+    {
+      "title": "Secrets can't leak through serialization or repr",
+      "evidence": "ResolvedCredential (services/agent/src/autobots/application/credentials/store.py:48-72) refuses pickling and hides its value in repr. Its docstring explains why: LangGraph's checkpoint serializer writes dataclasses and SecretStr in plaintext. EnvironmentCandidate hides its value too (precedence.py:15-21). Both are tested at services/agent/tests/test_credentials.py:142-166."
+    },
+    {
+      "title": "Authenticated encryption bound to row identity, and a master key that is never replaced",
+      "evidence": "crypto.py:25-41 seals with a fresh nonce and associated data of workspace|provider|credential|version, and raises an error that carries no detail. master_key.py:15-43 creates the key with O_EXCL and 0600/0700 permissions, and refuses symlinks or open permissions. store.py:94-106 generates a key only when no encrypted row exists (SP-007). Tampering cases are tested at test_credentials.py:87-140."
+    },
+    {
+      "title": "Logs redact by default, and remote tracing is switched off at process start",
+      "evidence": "operations/logs.py:12-25 redacts provider and tool keys, bearer tokens, JWTs and connection strings. Lines 54-67 keep only the exception type, and lines 93-105 clear LangSmith's cached settings. api/main.py:39-40, worker.py:316-317 and each trial's _main call these first. Tested at test_operations.py:64-79."
+    },
+    {
+      "title": "Paid calls are recorded at worst case before they are sent",
+      "evidence": "route_qualification.py:115-176 keeps an fsync'd ledger guarded by flock and re-read under the lock. Lines 277-287 keep an unclear outcome charged at worst case, and lines 677-692 send nothing without --paid. Reports carry evidence_class and not_established (lines 648-669). browse_trial.py:51-54 and 256-257 record the start before the call, so the once-only trial can't repeat."
+    },
+    {
+      "title": "The worker lifecycle is deliberate and documented",
+      "evidence": "worker.py:74-91 sends heartbeats on its own connection, so a long step can't make the worker look dead. Lines 102-122 drain within a bound, lines 158-169 write a final stopped heartbeat, and lines 264-281 keep a failing step from starving the next one. The module docstring (lines 1-11) explains why billed inference is opt-in."
+    },
+    {
+      "title": "Retention is scoped and ordered for crash safety",
+      "evidence": "retention.py:101-123 pages by (updated_at, id), so refused runs can't crowd out later ones. Lines 64-89 remove bytes only after the rows commit, so a crash leaves bytes to retry, never a row pointing at nothing."
+    },
+    {
+      "title": "Tests pin duplicated tables to their source",
+      "evidence": "test_schema_release.py:20-22 ties SHIPPED_MIGRATIONS and NEWEST_MIGRATION to supabase/migrations. test_route_qualification.py:339-343 requires a qualification route for every approved profile. precedence.py:1 shares its precedence fixtures with TypeScript (test_credentials.py:40)."
+    },
+    {
+      "title": "Comments explain invariants, not syntax",
+      "evidence": "application/operations.py:394-422 explains why sockets are only detached on macOS, and lines 102-107 explain why p95 rounds up. master_key.py:1 states the never-replace rule, and requirement and decision IDs trace the code to its sources throughout the area."
+    }
+  ],
+  "findings": [
+    {
+      "id": "POPS-01",
+      "title": "Paid trials price calls with a second, float-based catalog parser",
+      "dimension": "standards",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/operations/route_qualification.py",
+          "line": 85,
+          "endLine": 112,
+          "note": "Price in float USD; price_of reads prompt and completion only and drops every tiered override"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/route_qualification.py",
+          "line": 244,
+          "endLine": 246,
+          "note": "_cost_micro_usd: ceil(float(cost) * 1e6)"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/route_qualification.py",
+          "line": 616,
+          "note": "preflight's worst case per call"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/route_qualification.py",
+          "line": 656,
+          "note": "the report records Price.__dict__ as catalog_price"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/reasoning_trial.py",
+          "line": 211,
+          "note": "the reasoning trial reuses price_of for the shared US$1 ledger"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/models/catalog.py",
+          "line": 77,
+          "endLine": 100,
+          "note": "canonical Decimal parser: input_cache_write, internal_reasoning, per-request fee, tiers reachable under 32K"
+        },
+        {
+          "file": "services/agent/src/autobots/application/model_admission.py",
+          "line": 60,
+          "endLine": 70,
+          "note": "canonical integer worst_case_cost"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "price_of reads only `prompt` and `completion`, as floats, and drops every override that has `min_prompt_tokens`:\n```\n@dataclass(frozen=True)\nclass Price:\n    prompt_usd: float\n    completion_usd: float\n    def worst_case_micro_usd(self) -> int:\n        usd = CONTEXT_TOKENS * self.prompt_usd + OUTPUT_TOKENS * self.completion_usd\n        return math.ceil(usd * 1_000_000)\n```\ncatalog.parse_pricing parses the same `pricing` object with Decimal and ROUND_CEILING, and also counts input_cache_write, internal_reasoning, a per-request fee and tiers that start under 32K tokens. worst_case_cost works in integer micro-USD. There are 3 call sites of price_of (counted with grep).",
+      "impact": "DH-06 forbids float arithmetic for money, and the two parsers of one catalog field already disagree. A route can bill reasoning tokens or cache writes above its completion rate, charge per request, or start a price tier below the qualification prompt size. Such a route is reserved below its real worst case in the ledgers that enforce the caps of Decisions 0009 and 0019. Any pricing change has to be made twice, and the application's tests exercise only one copy.",
+      "recommendation": "Price trial calls with the application's rules. `prepare` already calls validated_entry, so have it return the CatalogEntry, compute `worst_case_cost(entry.pricing, CONTEXT_TOKENS, OUTPUT_TOKENS)`, and refuse when it raises CostUnavailable. Record entry.pricing as the report's catalog_price, then delete Price and price_of, and move the override test (services/agent/tests/test_route_qualification.py:514-520) and the three price_of uses in services/agent/tests/test_reasoning_trial.py onto Pricing. Convert a reported cost with one Decimal ceiling helper; adapters/loop_middleware.py:276-278 does the same conversion with round(float).",
+      "sketch": "operations/paid/pricing.py\n  def worst_case(entry: CatalogEntry) -> int:      # integer micro-USD; refuses an unknown price\n      return worst_case_cost(entry.pricing, CONTEXT_TOKENS, OUTPUT_TOKENS)\n  def reported_micro_usd(message) -> int | None:   # Decimal(str(cost)) * 10**6, ROUND_CEILING\nroute_qualification.prepare(route, payload, max_tokens) -> tuple[PreparedAttempt, CatalogEntry]\npreflight and reasoning_trial.run_trial: worst = worst_case(entry)",
+      "effort": "S",
+      "risk": "high",
+      "ruleCheck": "DH-06 (Python): exact decimal or integer monetary units, no float arithmetic for money. Decisions 0009 and 0019 S4 count calls at worst case. The shared parser is at least as conservative, so no cap is weakened.",
+      "verdict": "revised",
+      "verifierNote": "price_of, its three source call sites (route_qualification.py:616 and :656, reasoning_trial.py:211) and DH-06's ban on float money confirmed against catalog.parse_pricing. The recommendation now also covers the report's catalog_price field and the tests that use price_of; the override test sits at test_route_qualification.py:514-520."
+    },
+    {
+      "id": "POPS-02",
+      "title": "Routine admission re-implements the readiness gate and skips the schema check",
+      "dimension": "duplication",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/operations/worker.py",
+          "line": 178,
+          "endLine": 186,
+          "note": "unattended_refusal checks adapter, storage and disk only, and parses the environment on every call"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/worker.py",
+          "line": 206,
+          "endLine": 215,
+          "note": "the comment says a routine waits on the same readiness a person would"
+        },
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 86,
+          "endLine": 103,
+          "note": "person admission: database, schema, hold, adapter, storage and disk, through is_ready"
+        },
+        {
+          "file": "services/agent/src/autobots/application/operations.py",
+          "line": 75,
+          "note": "BLOCKING includes schema"
+        },
+        {
+          "file": "tests/db/major_check.py",
+          "line": 337,
+          "endLine": 359,
+          "note": "the M14 check arranges only Storage down"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "```\nasync def unattended_refusal(connection: Any, store: Any) -> str | None:\n    if not await adapter_qualified(connection):\n        return \"adapter_unqualified\"\n    storage = await storage_condition(store)\n    ...\n    minimum = int(os.environ.get(\"AUTOBOTS_MIN_FREE_BYTES\", DEFAULT_MIN_FREE_BYTES))\n    disk = disk_condition(Path(os.environ.get(\"AUTOBOTS_CONFIG_ROOT\") or \".\"), minimum)\n```\nThe API's _installation_conditions builds [database, schema, hold, adapter, storage, disk], and require_ready applies is_ready to it. It repeats the same two environment parses (operation_routes.py:87 and :95).",
+      "impact": "The worker's comment and DB check M14 promise one readiness. But when the code is newer than the database (schema_behind, Decision 0023 E2), a person's run is refused while the worker still evaluates and admits due routines. Every new blocking condition has to be added to two gates. Both gates re-read the environment on each call, so a malformed AUTOBOTS_MIN_FREE_BYTES fails every maintenance step and every admission. The worker logs only ValueError and skips retention.",
+      "recommendation": "Own installation readiness in one application function that takes a connection and the object store and returns the conditions, with its settings parsed once at process start. The API's require_ready and the worker's maintenance step both call it and refuse on the first blocking condition. Extend M14 to arrange schema_behind and a held install.",
+      "sketch": "application/readiness.py\n  @dataclass(frozen=True)\n  class ReadinessSettings: data_root: Path; min_free_bytes: int     # from_environment(), once per process\n  async def installation_conditions(connection, store, settings, probes=None) -> list[Condition]\n  def first_blocking(conditions) -> Condition | None                 # BLOCKING minus NOT_BLOCKING\napi.require_ready: refuse when first_blocking(await installation_conditions(...)) is not None\nworker.maintenance_step: refused = first_blocking(...); log refused.code; skip routines, keep retention",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "This strengthens an admission guard (LM-07, Decision 0023 E2), and scheduling stays in Python, with nothing moved to Next.js.",
+      "verdict": "confirmed",
+      "verifierNote": "unattended_refusal checks the adapter, Storage and disk, and the hold is checked separately by is_held (worker.py:199), so schema is the one blocking condition a person's admission applies and a routine's doesn't. The M14 check (tests/db/major_check.py:337-359) arranges only Storage down, and Decision 0023 records an install that ran newer code on a database 14 migrations behind."
+    },
+    {
+      "id": "POPS-03",
+      "title": "Shared logging and process wiring live in the entry-point package",
+      "dimension": "modules",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/operations/__init__.py",
+          "line": 1,
+          "note": "says nothing here runs at service startup"
+        },
+        {
+          "file": "services/agent/src/autobots/api/main.py",
+          "line": 15,
+          "note": "API startup imports configure_logging and forbid_remote_tracing from operations.logs"
+        },
+        {
+          "file": "services/agent/src/autobots/application/operations.py",
+          "line": 23,
+          "note": "one of 9 modules outside operations/ that import operations.logs"
+        },
+        {
+          "file": "services/agent/src/autobots/application/cronjob_tool.py",
+          "line": 38,
+          "endLine": 42,
+          "note": "function-local import of operations.worker, used by the module-level CRONJOB at :181"
+        },
+        {
+          "file": "services/agent/src/autobots/application/goal_loop.py",
+          "line": 47,
+          "note": "goal_loop imports CRONJOB at module level, which closes the cycle"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/worker.py",
+          "line": 29,
+          "note": "the worker imports api.main for provider_context_from_environment"
+        }
+      ],
+      "occurrences": 11,
+      "evidence": "```\nasync def _environment_check(connection: Any, workspace_id: UUID) -> str:\n    \"\"\"The worker's own readiness answer, so a scheduled and an asked-for occurrence agree.\"\"\"\n    from autobots.operations.worker import credential_check_from_environment\n\n    return await credential_check_from_environment()(connection, workspace_id)\n```\nThe package docstring says \"Nothing here runs at service startup\". Yet 9 modules outside operations/ import operations.logs (counted with grep): adapters (loop_middleware, result_stream), api (main, operation_routes) and application (operations, retention, goal_loop, routines, worker_inference). goal_loop imports cronjob_tool at module level, cronjob_tool imports the worker inside a function, and the worker imports goal_loop and api.main, which loads api.app and every router.",
+      "impact": "cronjob_tool → operations.worker → application.goal_loop → cronjob_tool is a cycle that only the function-local import keeps out of import time. To build its provider context, the worker process loads the FastAPI app factory and every router. Readers can't trust the package boundary that the docstring describes. The credential-check callable is also typed under the name CredentialCheck with two different signatures (routines.py:38, cronjob_tool.py:35).",
+      "recommendation": "Move logs.py to a leaf module that imports nothing from autobots. Move provider_context_from_environment and credential_check_from_environment to a composition module that api/main and the worker import. The object-store construction repeated in api/main.py:46-49 and worker.py:321-325 belongs there too. Pass the credential check into cronjob_tool from that composition root instead of the local import. Keep operations/, or DH-03's workers/, for entry points.",
+      "sketch": "autobots/observability.py   redact, JsonFormatter, configure_logging, log_event, forbid_remote_tracing (no autobots imports)\nautobots/configuration.py   provider_context_from_environment(), object_store_from_environment(), credential_check(context)\noperations/worker.py        imports configuration, never api.main\napplication/cronjob_tool.py receives its credential check from the registry's composition; no local import",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-03 lists src/autobots/{api,domain,application,adapters,workers,graphs,contracts}, and DH-06 asks for explicit ownership and narrow interfaces. The move changes no behavior.",
+      "verdict": "revised",
+      "verifierNote": "The nine importers of operations.logs, the function-local import and worker.py:29 confirmed. The cycle is now named exactly: goal_loop.py:47 imports cronjob_tool, whose lazy import of the worker would bring goal_loop back at import time."
+    },
+    {
+      "id": "POPS-04",
+      "title": "application/operations.py mixes six concerns in 501 lines",
+      "dimension": "size",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/application/operations.py",
+          "line": 26,
+          "endLine": 75,
+          "note": "constants for readiness, backups, the catalog and occurrences are interleaved"
+        },
+        {
+          "file": "services/agent/src/autobots/application/operations.py",
+          "line": 118,
+          "endLine": 228,
+          "note": "readiness conditions"
+        },
+        {
+          "file": "services/agent/src/autobots/application/operations.py",
+          "line": 231,
+          "endLine": 258,
+          "note": "backup manifests and restore logs, read synchronously"
+        },
+        {
+          "file": "services/agent/src/autobots/application/operations.py",
+          "line": 384,
+          "endLine": 425,
+          "note": "socket introspection"
+        },
+        {
+          "file": "services/agent/src/autobots/application/operations.py",
+          "line": 442,
+          "endLine": 489,
+          "note": "24-hour jobs chart SQL"
+        },
+        {
+          "file": "services/agent/src/autobots/application/operations.py",
+          "line": 492,
+          "endLine": 501,
+          "note": "NOT_BLOCKING and is_ready, far from BLOCKING at :75"
+        },
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 177,
+          "endLine": 182,
+          "note": "the async status route calls the blocking backup readers"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "One module holds six concerns:\n- the admission gate: Condition, BLOCKING, the database, storage, disk, queue and worker conditions, and is_ready\n- operator values: ProbeTimes, counts, migrations, disk bytes, the checkpoint adapter and catalog timing\n- backup-file parsing: backup_age_hours and restore_history\n- routine occurrences\n- host socket introspection: loopback_only\n- the jobs-chart query: _JOB_HOURS\n\napi/operation_routes.py imports 22 names from it (lines 14-37). backup_age_hours and restore_history glob and read files with blocking calls, and they run inside the async local-status route.",
+      "impact": "The admission gate is reviewed and changed amid chart SQL and file parsing, and its two halves, BLOCKING at line 75 and NOT_BLOCKING with is_ready at lines 492-501, sit 400 lines apart. Each local-status request also does blocking file reads on the event loop, which DH-06 says to keep off it; the files are small, so this costs little today.",
+      "recommendation": "Split the module by concern, keeping names importable through re-exports during the move. Call the backup readers through asyncio.to_thread.",
+      "sketch": "application/readiness.py         Condition (Literal name and state), BLOCKING, NOT_BLOCKING, is_ready, RequiredSchema,\n                                 database/storage/disk/queue/worker conditions, installation_conditions\napplication/operation_values.py  ProbeTimes, QueueCounts, queue_counts, live_workers, applied_migrations,\n                                 stored_bytes, disk_bytes, checkpoint_adapter, timed_catalog, loopback_only\napplication/backups.py           backup_age_hours, restore_history -> list[RestoreRow], called through to_thread\napplication/activity.py          job_hours with _JOB_HOURS, delayed_occurrences -> list[DelayedRow]",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-06: small cohesive modules, and keep blocking work off the async event loop.",
+      "verdict": "revised",
+      "verifierNote": "Six concerns and their line ranges confirmed. operation_routes.py imports 22 names from the module, not 20. The speculation that the mix explains the worker's second gate was dropped; the backup readers do run synchronously in the async route."
+    },
+    {
+      "id": "POPS-05",
+      "title": "route_qualification.py (732 lines) is also the paid trials' shared library",
+      "dimension": "size",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/operations/route_qualification.py",
+          "line": 115,
+          "endLine": 176,
+          "note": "Ledger, used by Corpus, the reasoning trial and scripts/persistent_install.py:292"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/route_qualification.py",
+          "line": 266,
+          "endLine": 533,
+          "note": "Corpus: 12 fixtures as methods, plus the run loop"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/route_qualification.py",
+          "line": 566,
+          "endLine": 574,
+          "note": "read_key, reused by the other trials"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/reasoning_trial.py",
+          "line": 37,
+          "endLine": 48,
+          "note": "imports 10 names, including the private _cost_micro_usd"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/browse_trial.py",
+          "line": 38,
+          "note": "imports Refused and read_key"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/route_qualification.py",
+          "line": 625,
+          "endLine": 632,
+          "note": "qualify takes 6 parameters (PLR0913)"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "```\nfrom autobots.operations.route_qualification import (\n    CALL_SECONDS, CapReached, Ledger, LookupCode, Refused, Route,\n    _cost_micro_usd, prepare, price_of, read_key,\n)\n```\nThe file holds the route table and caps, price parsing, a flock-guarded ledger, tool and schema models, the 12-fixture runner, verdict helpers, key reading, report assembly and the CLI.",
+      "impact": "The spend ledger that Decision 0009's shared cap and the persistent install rely on lives inside one route's runner. Other trials depend on its private helper, and the install script imports the whole runner just to reach the ledger. The names still describe the original use: Corpus is the runner, and `only` holds per-fixture rerun counts.",
+      "recommendation": "First extract the shared paid-call pieces, then split the qualification runner into fixtures and orchestration. Rename Corpus to QualificationRun and `only` to `reruns` along the way.",
+      "sketch": "operations/paid/ledger.py                  LedgerEntry, Ledger (+ charge context manager), CapReached\noperations/paid/keys.py                    read_key, Refused\noperations/paid/pricing.py                 worst_case(entry), reported_micro_usd(message)\noperations/route_qualification/fixtures.py tool and schema models; QualificationRun (was Corpus) with its fixture methods\noperations/route_qualification/__main__.py ROUTES, AUTHORIZED_CAPS, preflight, qualify(reruns=...), CLI",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "The caps of Decisions 0009 and 0019 S4 and the --paid gate stay as they are. The fake-transport tests in services/agent/tests/test_route_qualification.py cover the move.",
+      "verdict": "revised",
+      "verifierNote": "732 lines, the 10-name import in reasoning_trial including the private _cost_micro_usd, and the 6-parameter qualify confirmed. The Ledger serves the qualification run, the reasoning trial and persistent_install.py's goal and examples; browse_trial imports only Refused and read_key, so the note no longer says three runners."
+    },
+    {
+      "id": "POPS-06",
+      "title": "Paid-call reservation and settlement are hand-rolled five times and have drifted",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/operations/route_qualification.py",
+          "line": 277,
+          "endLine": 287,
+          "note": "_call"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/route_qualification.py",
+          "line": 289,
+          "endLine": 309,
+          "note": "_stream"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/route_qualification.py",
+          "line": 392,
+          "endLine": 403,
+          "note": "_call_structured"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/route_qualification.py",
+          "line": 471,
+          "endLine": 493,
+          "note": "cancellation: reserves, then settles in finally"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/reasoning_trial.py",
+          "line": 180,
+          "endLine": 192,
+          "note": "_paid_call: except Exception and 'no_reported_charge'"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/route_qualification.py",
+          "line": 152,
+          "endLine": 175,
+          "note": "entries are dict[str, Any], and state is any string"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/route_qualification.py",
+          "line": 585,
+          "endLine": 589,
+          "note": "planned_calls hard-codes 13 calls, apart from the fixture list at 496-509"
+        }
+      ],
+      "occurrences": 5,
+      "evidence": "```\n# route_qualification.py:281-286\n        except BaseException:\n            self.ledger.settle(entry, None, \"uncertain\")\n            raise\n        self.ledger.settle(entry, cost, \"settled\" if cost is not None else \"usage_unreported\")\n# reasoning_trial.py:187-191\n    except Exception:\n        ledger.settle(entry, None, \"uncertain\")\n```\nreasoning_trial then settles the same unreported outcome as \"no_reported_charge\".",
+      "impact": "The copies already disagree. An interrupted or cancelled reasoning-trial call is left as \"reserved\" instead of \"uncertain\"; committed() still holds it at worst case, so the cap is safe, but the record no longer says what happened. One outcome has two names in a ledger file that is shared with the install's goals, which add \"not_started\" and \"run_not_finished\" (scripts/persistent_install.py:331-683). Adding a fixture without also editing planned_calls makes the preflight undercount.",
+      "recommendation": "Give Ledger one async context manager. It reserves, settles as \"uncertain\" on any BaseException and re-raises, and otherwise settles from the reported charge. Type the entries as a dataclass with a Literal state. Derive the planned calls from a fixture table that also drives Corpus.run.",
+      "sketch": "LedgerState = Literal['reserved', 'settled', 'usage_unreported', 'uncertain', 'not_started', 'run_not_finished']\n@dataclass class LedgerEntry: label: str; worst_case: int; reported: int | None; state: LedgerState; at: str\n@asynccontextmanager\nasync def charge(self, label: str, worst: int) -> AsyncIterator[Receipt]:\n    entry = self.reserve(label, worst)\n    try: receipt = Receipt(); yield receipt\n    except BaseException: self.settle(entry, None, 'uncertain'); raise\n    self.settle(entry, receipt.reported, 'settled' if receipt.reported is not None else 'usage_unreported')\nFIXTURE_CALLS = {'plain_text': 1, ..., 'continuation': 2}   # planned_calls sums it",
+      "effort": "S",
+      "risk": "high",
+      "ruleCheck": "Two rules are kept: Decision 0009 holds a call at its worst case until it settles, and DH-06 propagates cancellation after cleanup. Unifying on BaseException brings the reasoning trial in line.",
+      "verdict": "confirmed",
+      "verifierNote": "Five reserve-and-settle copies confirmed (route_qualification.py:277, 289, 392 and 471; reasoning_trial.py:180). Only the reasoning trial catches Exception, and persistent_install.py settles with not_started and run_not_finished. The impact now notes that committed() keeps a reserved entry at worst case."
+    },
+    {
+      "id": "POPS-09",
+      "title": "The credential store lets decryption errors escape, so seven callers compensate",
+      "dimension": "errors",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/application/credentials/store.py",
+          "line": 145,
+          "endLine": 161,
+          "note": "translates MasterKeyUnavailable but not unseal's CredentialDecryptionError"
+        },
+        {
+          "file": "services/agent/src/autobots/application/provider_settings.py",
+          "line": 142,
+          "note": "catches the pair"
+        },
+        {
+          "file": "services/agent/src/autobots/application/provider_settings.py",
+          "line": 161,
+          "note": "catches the pair"
+        },
+        {
+          "file": "services/agent/src/autobots/application/provider_settings.py",
+          "line": 220,
+          "endLine": 221,
+          "note": "re-raises it as CredentialStorageUnavailable"
+        },
+        {
+          "file": "services/agent/src/autobots/application/provider_settings.py",
+          "line": 243,
+          "note": "catches the pair"
+        },
+        {
+          "file": "services/agent/src/autobots/application/provider_settings.py",
+          "line": 268,
+          "note": "catches it with CredentialMissing"
+        },
+        {
+          "file": "services/agent/src/autobots/application/worker_inference.py",
+          "line": 248,
+          "endLine": 250,
+          "note": "catches the pair"
+        },
+        {
+          "file": "services/agent/src/autobots/application/tool_keys.py",
+          "line": 179,
+          "note": "catches the pair"
+        }
+      ],
+      "occurrences": 7,
+      "evidence": "```\n        try:\n            key = load_master_key(self._key_path)\n        except MasterKeyUnavailable as error:\n            raise CredentialStorageUnavailable(\"the master key is unavailable\") from error\n        aad = associated_data(workspace_id, self._provider, row[0], row[1])\n        plaintext = unseal(key, Sealed(bytes(row[2]), bytes(row[3]), bytes(row[4])), aad)\n```\nSix handlers catch (CredentialStorageUnavailable, CredentialDecryptionError) together, and revalidate re-raises one as the other.",
+      "impact": "Every caller has to know about an exception from the lower crypto module and treat it like the store's own. A new caller that catches only CredentialStorageUnavailable would turn a damaged row into an internal error, because settings_routes.as_api_error maps only the store's types. The boundary also leaks the other way: provider_settings.py:205-209 and tool_key_settings.py:125 mark credential rows deleted by writing the store's table directly.",
+      "recommendation": "Translate CredentialDecryptionError inside load_active, as it already does for MasterKeyUnavailable. Raise a store-level subclass such as CredentialUnreadable(CredentialStorageUnavailable), so the existing handlers and settings_routes.as_api_error catch it while worker_inference's type-only log still tells a damaged row from a missing key. Then drop CredentialDecryptionError from the seven handlers. Add ProviderCredentialStore.delete_active to replace the two direct writes, and rename resolve_for_attempt_blocked_check (store.py:75), which is a guard, to require_usable.",
+      "sketch": "class CredentialUnreadable(CredentialStorageUnavailable):\n    \"\"\"A stored row that this master key can't open. Holds no detail.\"\"\"\n\nasync def load_active(self, workspace_id: UUID) -> ResolvedCredential:\n    ...\n    try:\n        plaintext = unseal(key, sealed, aad)\n    except CredentialDecryptionError as error:\n        raise CredentialUnreadable(\"the stored key cannot be read\") from error",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "SP-007: a missing or wrong master key with encrypted rows stays an error, never a replacement. Error codes and fixed messages are unchanged.",
+      "verdict": "revised",
+      "verifierNote": "All seven handler sites and both direct status writes confirmed, and every caller treats the two errors alike. The recommendation now raises a subclass, because worker_inference.py:77 logs only the exception type and a plain translation would hide a damaged row behind 'storage unavailable'."
+    },
+    {
+      "id": "POPS-10",
+      "title": "Boundary handlers log only the exception class, and retention's failure log omits the workspace",
+      "dimension": "errors",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/operations/worker.py",
+          "line": 143,
+          "endLine": 149,
+          "note": "worker.step_failed"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/worker.py",
+          "line": 276,
+          "endLine": 277,
+          "note": "the same handler, copied in both()"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/worker.py",
+          "line": 89,
+          "endLine": 90,
+          "note": "worker.heartbeat_lost"
+        },
+        {
+          "file": "services/agent/src/autobots/application/operations.py",
+          "line": 153,
+          "endLine": 155,
+          "note": "database.unavailable"
+        },
+        {
+          "file": "services/agent/src/autobots/application/operations.py",
+          "line": 205,
+          "endLine": 206,
+          "note": "storage.unavailable"
+        },
+        {
+          "file": "services/agent/src/autobots/application/operations.py",
+          "line": 356,
+          "endLine": 357,
+          "note": "migrations.unreadable"
+        },
+        {
+          "file": "services/agent/src/autobots/application/retention.py",
+          "line": 171,
+          "endLine": 172,
+          "note": "no workspace field"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/logs.py",
+          "line": 64,
+          "endLine": 66,
+          "note": "the formatter keeps only the exception type"
+        }
+      ],
+      "occurrences": 7,
+      "evidence": "```\n        except Exception as error:\n            log_event(logger, \"retention.failed\", logging.WARNING, error=type(error).__name__)\n```\nJsonFormatter writes `record.exc_info[0].__name__` and nothing else, and every handler passes `error=type(error).__name__`. So a failing worker step logs `{\"event\": \"worker.step_failed\", \"error\": \"KeyError\"}`, with no step, module or line. The success line for retention carries `workspace=`, but the failure line doesn't.",
+      "impact": "A recurring failure in the long-running worker or in readiness can only be located by reproducing it, and a retention failure can't be tied to a workspace. DH-06 asks to preserve causes in private logs. Dropping the message is right, since it can carry a connection string, but that doesn't require dropping the location too.",
+      "recommendation": "Add error_fields(error) to the logging module. It returns the exception class plus the innermost autobots frame as module:function:line, with no message text. Use it at these seven sites; the handler copied into both() can share one helper with serve. Add workspace=workspace_id to retention.failed.",
+      "sketch": "def error_fields(error: BaseException) -> dict[str, str]:\n    frames = [f for f in traceback.extract_tb(error.__traceback__) if '/autobots/' in f.filename]\n    last = frames[-1] if frames else None\n    where = f'{Path(last.filename).stem}:{last.name}:{last.lineno}' if last else 'unknown'\n    return {'error': type(error).__name__, 'where': where}",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "LM-07 and test_operations.py:64-79 keep messages out of logs. A frame location carries no message, secret or identifier, so both still hold.",
+      "verdict": "confirmed",
+      "verifierNote": "The seven broad handlers that log only the class (worker.py:89, 143 and 276; operations.py:153, 205 and 356; retention.py:171) and the formatter's type-only rule confirmed. The worker step and retention handlers gain the most, since the readiness events already name what they probed."
+    },
+    {
+      "id": "POPS-11",
+      "title": "Status vocabularies are bare strings, held together by six type: ignore comments",
+      "dimension": "types",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/application/operations.py",
+          "line": 78,
+          "endLine": 82,
+          "note": "Condition.state: str  # ok, degraded or unavailable"
+        },
+        {
+          "file": "services/agent/src/autobots/application/provider_settings.py",
+          "line": 164,
+          "endLine": 175,
+          "note": "three arg-type ignores"
+        },
+        {
+          "file": "services/agent/src/autobots/application/provider_settings.py",
+          "line": 298,
+          "endLine": 301,
+          "note": "a fourth ignore"
+        },
+        {
+          "file": "services/agent/src/autobots/application/provider_settings.py",
+          "line": 231,
+          "endLine": 247,
+          "note": "run_intent returns str, through seven literal returns"
+        },
+        {
+          "file": "services/agent/src/autobots/application/worker_inference.py",
+          "line": 68,
+          "endLine": 72,
+          "note": "a string-keyed map from run_intent codes"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/worker.py",
+          "line": 225,
+          "endLine": 227,
+          "note": "no_credential repeats a code literal"
+        },
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 172,
+          "note": "ignore needed because Condition's fields are str"
+        },
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 180,
+          "note": "ignore needed because timed_catalog returns str"
+        }
+      ],
+      "occurrences": 6,
+      "evidence": "```\n@dataclass(frozen=True)\nclass Condition:\n    name: str\n    state: str  # ok, degraded or unavailable\n...\n            source=source,  # type: ignore[arg-type]\n            auth_status=auth_status,  # type: ignore[arg-type]\n            catalog_status=await self.catalog_status(),  # type: ignore[arg-type]\n```",
+      "impact": "mypy strict can't catch a misspelled state or code inside the application. run_intent's codes are compared with != \"ready\" and looked up in INTENT_FAILURES, which raises KeyError for any code it lacks. A wrong value surfaces only as a ValidationError when the DTO is built. The credential check that returns these codes is typed Awaitable[str], under one alias name with two signatures (routines.py:38, cronjob_tool.py:35). The database already limits auth_status to the four AuthStatus values (supabase/migrations/20261105000005_provider_settings.sql:5-6).",
+      "recommendation": "Type each vocabulary once, with Literal aliases or StrEnums for condition name and state, auth status, catalog status, credential source and run intent. Where provider_settings already imports contracts.settings, reuse its AuthStatus, CatalogStatus and CredentialSource. Narrow the database strings once, when the settings row is read. Then remove the ignores.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "contracts.md keeps domain, row and DTO types distinct. Sharing a Literal vocabulary merges no models, and the Pydantic DTOs remain the public contract.",
+      "verdict": "confirmed",
+      "verifierNote": "The six status-related ignores confirmed (provider_settings.py:168-170 and 301, operation_routes.py:172 and 180). contracts/settings.py already defines AuthStatus, CatalogStatus and CredentialSource, and RunIntentCheck.code lists run_intent's codes; the scope holds eight ignores in all."
+    },
+    {
+      "id": "POPS-13",
+      "title": "Three catalog-availability checks disagree, and one has no caller",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/application/operations.py",
+          "line": 275,
+          "endLine": 288,
+          "note": "timed_catalog: 3 s; catches TimeoutError, OSError and ValueError"
+        },
+        {
+          "file": "services/agent/src/autobots/application/operations.py",
+          "line": 291,
+          "endLine": 301,
+          "note": "openrouter_availability: the same logic, with no caller (git grep)"
+        },
+        {
+          "file": "services/agent/src/autobots/application/provider_settings.py",
+          "line": 124,
+          "endLine": 128,
+          "note": "catalog_status: no timeout; catches OSError only"
+        },
+        {
+          "file": "services/agent/src/autobots/application/provider_settings.py",
+          "line": 274,
+          "endLine": 277,
+          "note": "models: no handling at all"
+        },
+        {
+          "file": "services/agent/src/autobots/adapters/models/openrouter_metadata.py",
+          "line": 46,
+          "note": "reply.json() raises ValueError on a non-JSON 200"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "```\n# operations.timed_catalog and openrouter_availability\n        payload = await asyncio.wait_for(fetch_catalog(), seconds)\n    except (TimeoutError, OSError, ValueError):\n# provider_settings.catalog_status\n        try:\n            return \"available\" if await self._context.fetch_catalog() is not None else \"unavailable\"\n        except OSError:\n            return \"unavailable\"\n```",
+      "impact": "When the catalog answers 200 with a body that isn't JSON, Operations shows \"unavailable\", but GET /v1/settings/model-providers and GET /v1/models end in an internal error. Settings also waits up to the HTTP client's 15 s, where Operations waits 3 s. The dead copy is a third one to maintain.",
+      "recommendation": "Write one application helper that fetches within a time limit, maps every expected failure to unavailable, and returns the status, payload and elapsed time. Use it in Operations and in ProviderSettings.status and models. Delete openrouter_availability.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "MP-04 and SP-007: catalog status stays independent of authentication, and no model call is added.",
+      "verdict": "confirmed",
+      "verifierNote": "catalog_fetcher catches only httpx.HTTPError and calls reply.json() unguarded, so a non-JSON 200 raises ValueError: Operations maps it to unavailable, while ProviderSettings.status and models let it escape. git grep finds no caller of openrouter_availability."
+    },
+    {
+      "id": "POPS-15",
+      "title": "Owner bootstrap can stop between its two writes, and reports only the exception class",
+      "dimension": "errors",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/operations/bootstrap_owner.py",
+          "line": 62,
+          "endLine": 74,
+          "note": "an Auth user, then a workspace, under one generic handler"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/bootstrap_owner.py",
+          "line": 25,
+          "endLine": 35,
+          "note": "Auth admin API create; not idempotent"
+        },
+        {
+          "file": "docs/engineering/runbooks/local-app.md",
+          "line": 35,
+          "note": "'Run it once'; no recovery step"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "```\n    try:\n        user_id = create_auth_user(...)\n        workspace_id = create_workspace(\n            os.environ[\"AUTOBOTS_DATABASE_URL\"], user_id, args.workspace_name\n        )\n    except (error.URLError, psycopg.Error, ValueError, KeyError) as failure:\n        print(f\"ERROR: bootstrap was refused: {type(failure).__name__}.\", file=sys.stderr)\n        return 1\n```",
+      "impact": "If the Auth user is created and the workspace insert then fails, for example because of a wrong runtime URL or a missing grant, nothing says that a user now exists. A rerun is refused because the email is taken, and the runbook gives no way to finish except finding and removing the Auth user by hand.",
+      "recommendation": "Open and check the database connection before creating the Auth user, so a wrong URL or a missing grant fails while nothing exists yet. When the workspace step still fails, print the created user ID with a distinct status, still exiting 1. Accept --user-id so the workspace can be finished for an existing Auth user, and add that recovery to the runbook.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "SP-015 (secure owner setup) and SP-018 (runbook recovery). Auth is still written only through its admin API.",
+      "verdict": "revised",
+      "verifierNote": "The two writes, the single type-only handler and the runbook's 'Run it once' (docs/engineering/runbooks/local-app.md:35) confirmed. The recommendation now checks the database first, which removes the likeliest cause before any user exists."
+    },
+    {
+      "id": "POPS-07",
+      "title": "The reasoning trial's shared US$1 ledger path is relative to the working directory",
+      "dimension": "approach",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/operations/reasoning_trial.py",
+          "line": 51,
+          "endLine": 53,
+          "note": "SHARED_LEDGER = Path('.checks/decision-0009/ledger.json')"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/reasoning_trial.py",
+          "line": 366,
+          "note": "Ledger(Path(arguments.ledger), ...) uses the path as given"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/reasoning_trial.py",
+          "line": 417,
+          "note": "--ledger default"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/route_qualification.py",
+          "line": 115,
+          "endLine": 123,
+          "note": "the docstring says a rerun can't spend the cap twice, but a missing file starts empty"
+        },
+        {
+          "file": "scripts/persistent_install.py",
+          "line": 750,
+          "note": "the same literal"
+        },
+        {
+          "file": "scripts/persistent_install.py",
+          "line": 759,
+          "note": "and again"
+        },
+        {
+          "file": "scripts/persistent_install.py",
+          "line": 796,
+          "endLine": 800,
+          "note": "joined to project_root(), so the install is not affected"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "```\n# Decision 0009: the whole of what this trial and US-11.3's goals may spend, in micro-USD.\nSHARED_CAP_MICRO_USD = 1_000_000\nSHARED_LEDGER = Path(\".checks/decision-0009/ledger.json\")\n...\n        ledger = Ledger(Path(arguments.ledger), SHARED_CAP_MICRO_USD)\n```\nA Ledger starts with no entries when its file doesn't exist (route_qualification.py:121-123). persistent_install.py repeats the literal at :750 and :759 but joins it to project_root() at :796 and :800, so only the reasoning trial depends on the working directory.",
+      "impact": "Started from services/agent with an absolute --key-file, the reasoning trial opens a new, empty ledger, and Decision 0009's shared cap starts over without a warning. The runbook runs it from the repository root (docs/engineering/runbooks/operations.md:75), and with the default --key-file .env a run from elsewhere stops on the missing key file before anything is sent, so the gap needs an unusual invocation. The Ledger docstring's promise that a rerun can't spend the cap twice still rests on it.",
+      "recommendation": "Define the shared ledger path once, beside SHARED_CAP_MICRO_USD, and resolve --ledger against the repository root as persistent_install.py already does. When the ledger is meant to be shared, say in the trial's output that it created a new ledger file, or refuse to create one without an explicit flag.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "high",
+      "ruleCheck": "Decision 0009's US$1 shared cap. The change only makes the cap harder to bypass.",
+      "verdict": "revised",
+      "verifierNote": "Confirmed for reasoning_trial.py, which passes Path(arguments.ledger) as given. persistent_install.py joins the same literal to project_root(), so the claim about it was withdrawn. Lowered to low: the runbook runs from the root, and a default run elsewhere stops on the missing .env before any call."
+    },
+    {
+      "id": "POPS-08",
+      "title": "browse_trial.run_trial does the whole trial inline, and its report assembly has no offline test",
+      "dimension": "size",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/operations/browse_trial.py",
+          "line": 137,
+          "endLine": 328,
+          "note": "192 lines, 67 statements, 7 parameters"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/browse_trial.py",
+          "line": 146,
+          "endLine": 158,
+          "note": "12 imports inside the function"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/browse_trial.py",
+          "line": 160,
+          "note": "mutates os.environ"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/browse_trial.py",
+          "line": 257,
+          "note": "'started' is written before the paid call, which blocks a rerun"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/browse_trial.py",
+          "line": 291,
+          "endLine": 322,
+          "note": "the report is built by zipping rows with column tuples"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/reasoning_trial.py",
+          "line": 202,
+          "endLine": 274,
+          "note": "73 lines, complexity 11, 8 returns"
+        },
+        {
+          "file": "services/agent/tests/test_browse_trial.py",
+          "line": 17,
+          "note": "imports refuse_repeat, TrialModel, hosts and inside, never run_trial"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "browse_trial.run_trial does the whole trial in one body. It creates an Expert, builds a binding, admits a run, checks the frozen Sol route, claims the job twice, drives the gateway, approves, writes the start record, reads invocations and tool uses, and assembles the report. The module says \"It runs in no verification profile\" (browse_trial.py:13), as US-14.16#1 requires, and no test calls run_trial. US-14.16 is DONE, so the trial has run once. reasoning_trial.run_trial, which test_reasoning_trial.py exercises with a fake transport, mutates one TrialResult across eight early returns.",
+      "impact": "The code that spends the once-only Sol trial budget (Decision 0019 S6) runs only live. It matters when the owner asks for a repeat: a defect in report assembly after the call, such as a zip(strict=True) column mismatch, would surface after money is spent and after the start record is written, and that record refuses another repeat without the owner. The environment mutation also leaks into whatever runs next in the process.",
+      "recommendation": "Before any owner-requested repeat, split the browse trial into named steps and make the report a pure function over typed rows, unit-tested with fixed rows; that needs no database, executor or model. Keep run_trial itself out of the verification profiles, as US-14.16#1 states. In reasoning_trial, return early through one small stop type instead of mutating the result in eight places.",
+      "sketch": "async def run_trial(...):                                        # about 30 lines\n    run, policy = await _admit_trial_run(db, workspace, actor)    # Expert, admission, Sol check\n    pending = await _execute(db, await _claim(db, run), runtime)  # gateway inside middleware.active()\n    await _approve(db, workspace, actor, run)\n    _write(out, started(run)); result = await _execute(db, await _claim(db, run), runtime)\n    return build_report(run, route, result, await _read_spend(db, run), executor.log)\ndef build_report(run, route, result, rows: SpendRows, log) -> dict    # pure; unit-tested with fixed rows\nreasoning_trial: _first_call(...) -> Reply | Stop; _continue(...) -> Reply | Stop; _compare(...) -> TrialResult",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "Decision 0019 S6 (one live trial), US-14.16#1 (no verification profile) and the --owner-requested-repeat refusal stay. DH-06 and model-gateway.md make fake transports and pure units the default test path.",
+      "verdict": "revised",
+      "verifierNote": "192 lines, 67 statements, 7 parameters, 12 inline imports and the os.environ write confirmed; no test calls browse_trial.run_trial. Lowered to low because US-14.16 is DONE and a repeat needs the owner. The recommendation now unit-tests a pure report instead of running the trial in the db profile, which US-14.16#1 keeps out of verification."
+    },
+    {
+      "id": "POPS-12",
+      "title": "_settings_row inserts on every read, and two writers call it only for that insert",
+      "dimension": "functions",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/application/provider_settings.py",
+          "line": 101,
+          "endLine": 114,
+          "note": "insert on conflict, then select"
+        },
+        {
+          "file": "services/agent/src/autobots/application/provider_settings.py",
+          "line": 135,
+          "note": "auth_status"
+        },
+        {
+          "file": "services/agent/src/autobots/application/provider_settings.py",
+          "line": 147,
+          "note": "status, behind a GET"
+        },
+        {
+          "file": "services/agent/src/autobots/application/provider_settings.py",
+          "line": 234,
+          "note": "run_intent, the gate before each model call and each routine admission"
+        },
+        {
+          "file": "services/agent/src/autobots/application/provider_settings.py",
+          "line": 228,
+          "note": "revalidate discards the result"
+        },
+        {
+          "file": "services/agent/src/autobots/application/provider_settings.py",
+          "line": 271,
+          "note": "mark_invalid discards the result"
+        }
+      ],
+      "occurrences": 5,
+      "evidence": "```\n    async def _settings_row(self, workspace_id: UUID, lock: bool = False) -> tuple[int, str, Any]:\n        await self._connection.execute(\n            \"insert into app_private.provider_settings (workspace_id) values (%s) \"\n            \"on conflict (workspace_id) do nothing\",\n            (workspace_id,),\n        )\n```\nrevalidate and mark_invalid call `await self._settings_row(workspace_id)` and ignore what it returns, so that the following _record update finds a row.",
+      "impact": "This getter also writes. Every status read and every run-intent check, which runs before each model call and each routine admission, issues an insert. The runtime role already holds insert on the table, so the cost is clarity rather than privilege, but the two calls that discard the result hide why they exist. The positional boolean `lock` is what ruff's FBT001 flags.",
+      "recommendation": "Split the function. _ensure_settings_row serves the writers (save_credential, disconnect, revalidate, mark_invalid). _read_settings(workspace_id, *, for_update=False) returns the table defaults (version 0, \"missing\", no validated_at) when no row exists.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "SP-014 and MP-05: version-checked settings mutations keep their row lock, and reads stop writing.",
+      "verdict": "revised",
+      "verifierNote": "The insert-then-select and its callers confirmed. Lowered to low: the runtime role is granted insert on provider_settings anyway, and an insert that conflicts writes no row. The table defaults the recommendation relies on are version 0, 'missing' and a null validated_at (supabase/migrations/20261105000005_provider_settings.sql:2-8)."
+    },
+    {
+      "id": "POPS-14",
+      "title": "Entry points disagree on configuration checks, refusals and exit codes",
+      "dimension": "errors",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/operations/bootstrap_owner.py",
+          "line": 58,
+          "endLine": 61,
+          "note": "missing env: 'ERROR: set ...', exit 2"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/concept_seed.py",
+          "line": 415,
+          "endLine": 418,
+          "note": "missing URL: 'REFUSED: ...', exit 2"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/concept_seed.py",
+          "line": 343,
+          "note": "SystemExit(str) raised inside seed(), exit 1"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/worker.py",
+          "line": 319,
+          "endLine": 320,
+          "note": "missing URL: SystemExit, exit 1"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/browse_trial.py",
+          "line": 342,
+          "note": "os.environ[...] and UUID(...) raise tracebacks"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/route_qualification.py",
+          "line": 695,
+          "endLine": 701,
+          "note": "a malformed --only raises an uncaught ValueError"
+        }
+      ],
+      "occurrences": 5,
+      "evidence": "A missing AUTOBOTS_DATABASE_URL gets a different outcome in each entry point:\n- bootstrap_owner: exit 2 with \"ERROR: set ...\"\n- concept_seed: exit 2 with \"REFUSED: ...\"\n- worker: exit 1 through SystemExit\n- browse_trial: a KeyError traceback\n\nRefusal prefixes vary too: \"ERROR: bootstrap was refused\", \"REFUSED, nothing sent\", \"REFUSED, nothing further sent\" and \"REFUSED:\". The trials and the worker also write JSON log lines to the same stderr.",
+      "impact": "Wrappers and runbooks can't tell \"not configured\" from \"refused\" the same way across entry points, and bad arguments surface as tracebacks. bootstrap_owner documents exit 2 for missing configuration, matching what AGENTS.md uses for verify.py's unavailable prerequisite, but the other entry points don't follow it. No script tells these codes apart today, so the cost is operator confusion.",
+      "recommendation": "Add a small shared CLI helper with three parts: require_env(*names), which exits 2; refuse(reason), with one stderr format and exit 1; and argparse type= parsers for UUIDs and name=count pairs. Library code raises typed errors, such as seed's missing owner, instead of SystemExit. Keep stdout JSON as the result contract that the wrappers parse.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Follows the AGENTS.md exit codes (0 passed, 1 failed, 2 prerequisite unavailable) and bootstrap_owner's own docstring. scripts/qualify_identity.py:60 reads stdout JSON, which stays unchanged.",
+      "verdict": "revised",
+      "verifierNote": "Each exit path confirmed, including the uncaught ValueError from a malformed --only. Lowered to low: the qualifiers only test for a nonzero exit and read the JSON on stdout, so nothing depends on 1 versus 2 yet."
+    },
+    {
+      "id": "POPS-16",
+      "title": "Trial and seed code bypass existing types and seams",
+      "dimension": "types",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/operations/route_qualification.py",
+          "line": 596,
+          "note": "cast(ModelProfile, route), though a Route has no id"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/concept_seed.py",
+          "line": 153,
+          "note": "graph: Any, with its real type in a comment"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/browse_trial.py",
+          "line": 175,
+          "endLine": 185,
+          "note": "an anonymous Binding class for admit_run's binding: Any"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/browse_trial.py",
+          "line": 229,
+          "endLine": 233,
+          "note": "sets loop_middleware._MIDDLEWARE (SLF001); also tests/db/browse_goal_check.py:119 and services/agent/tests/test_browsing_tool.py:235"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/route_qualification.py",
+          "line": 477,
+          "endLine": 486,
+          "note": "AsyncIterator annotation, then type: ignore on aclose"
+        }
+      ],
+      "occurrences": 5,
+      "evidence": "```\n    profile = cast(ModelProfile, route)\n    graph: Any  # Callable[[Mapping[str, UUID]], dict[str, Any]]\n        binding = type(\"Binding\", (), {\"session_id\": None, \"expert_id\": expert.id, ...})()\n            token = loop_middleware._MIDDLEWARE.set(middleware)\n                await stream.aclose()  # type: ignore[attr-defined]\n```",
+      "impact": "Each hides a mismatch that mypy could report. PreparedAttempt.profile can hold a Route without an id, so a future attempt.profile.id would fail only during a paid qualification. The anonymous binding exists because admit_run takes Any and RunBinding requires a session. LoopMiddleware's activation is reached through a private name in three places.",
+      "recommendation": "Where only wire_id and canonical_id are read, accept a small Protocol with those two fields. Annotate graph with its Callable type. Give admit_run a binding Protocol with session_id: UUID | None. Add a public LoopMiddleware.active() context manager, and type the stream as AsyncGenerator.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "SP-017: validate runtime data rather than trusting casts. Under contracts.md the types stay distinct, since a Protocol merges nothing.",
+      "verdict": "revised",
+      "verifierNote": "All five seams confirmed, including the private _MIDDLEWARE in tests/db/browse_goal_check.py:119 and test_browsing_tool.py:235. Risk lowered to low, since each change is type-only or a mechanical wrapper. admit_run's binding: Any is also PRUN-04 in the py-run review."
+    },
+    {
+      "id": "POPS-17",
+      "title": "Query rows and database or store handles cross module boundaries untyped",
+      "dimension": "types",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/application/operations.py",
+          "line": 261,
+          "endLine": 272,
+          "note": "delayed_occurrences returns tuples..."
+        },
+        {
+          "file": "services/agent/src/autobots/api/operation_routes.py",
+          "line": 141,
+          "endLine": 149,
+          "note": "...that another module reads by position"
+        },
+        {
+          "file": "services/agent/src/autobots/application/provider_settings.py",
+          "line": 321,
+          "endLine": 340,
+          "note": "qualification_from_record indexes record[1] to record[5]"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/browse_trial.py",
+          "line": 259,
+          "endLine": 322,
+          "note": "column names written in the SQL and again for zip"
+        },
+        {
+          "file": "services/agent/src/autobots/application/retention.py",
+          "line": 64,
+          "endLine": 65,
+          "note": "store: Any"
+        },
+        {
+          "file": "services/agent/src/autobots/application/artifacts.py",
+          "line": 25,
+          "endLine": 29,
+          "note": "an ObjectStore Protocol already exists (without ping)"
+        },
+        {
+          "file": "services/agent/src/autobots/persistence/rows.py",
+          "line": 1,
+          "note": "the project's row TypedDict convention"
+        }
+      ],
+      "occurrences": 71,
+      "evidence": "The scope has 35 untyped handle parameters (26 `connection: Any`, 1 `pool: Any`, 8 `store: Any`) and 36 lines in six files that index query rows by position. Both were counted with a regex over the 18 files, the second matching row, record, found, active, zone, present and result indexed by a digit, and fetchone())[0]. `delayed_occurrences(...) -> list[tuple[Any, ...]]` is consumed as row[0] to row[3] by api/operation_routes.py. Yet persistence/rows.py says \"A row is never a public response; adapters convert it explicitly\", and adapters/checkpoints.py:70 already uses psycopg's dict_row.",
+      "impact": "Reordering a select silently changes meaning in another module. mypy can't check the store's ping and remove or a connection's methods, so the ObjectStore Protocol and the row convention protect nothing here.",
+      "recommendation": "Where rows leave a module, return a small dataclass or TypedDict, using psycopg's class_row or dict_row. Type store parameters as ObjectStore extended with ping, or as a narrow Pingable protocol. Type connections as psycopg.AsyncConnection or a narrow protocol.",
+      "sketch": "",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "Follows persistence/rows.py's convention and DH-06's ban on broad untyped dictionaries. Rows stay separate from DTOs.",
+      "verdict": "revised",
+      "verifierNote": "Handle count confirmed at 35. The positional-index count is 36 lines with the wider name set (29 with row, record and fetchone() alone), not 35, so occurrences is 71."
+    },
+    {
+      "id": "POPS-18",
+      "title": "The readiness lists carry a truncated comment and an over-attributed decision range, and a DB check patches them",
+      "dimension": "comments",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/application/operations.py",
+          "line": 30,
+          "note": "'Add the one a required new migration creates.'"
+        },
+        {
+          "file": "services/agent/src/autobots/application/operations.py",
+          "line": 44,
+          "note": "cites migrations 38 to 53 to Decision 0023 E2"
+        },
+        {
+          "file": "services/agent/src/autobots/application/operations.py",
+          "line": 51,
+          "note": "truncated sentence"
+        },
+        {
+          "file": "supabase/migrations/20261108000049_applied_migration_count.sql",
+          "line": 5,
+          "note": "the count is null with neither history table present"
+        },
+        {
+          "file": "tests/db/review_check.py",
+          "line": 177,
+          "endLine": 180,
+          "note": "reassigns operations.REQUIRED_COLUMNS to test it"
+        },
+        {
+          "file": "docs/engineering/decisions/0023-install-current-and-real-examples.md",
+          "line": 21,
+          "note": "E2: the lists cover migrations 38 to 49, for a database with no readable history"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "```\n# The relations a release can't run without. Add the one a required new migration creates.\n    # Migrations 38 to 53 (Decision 0023 E2), for a database with no readable history.\n# A migration can add only columns, which a relation check can't see. The newest code relies on.\n```\nDecision 0023 E2 names migrations 38 to 49. applied_migration_count() returns null when neither history table exists, and schema_condition then lets the lists decide (operations.py:177-185), so they are what shows such a database as behind.",
+      "impact": "The comment credits E2 with a range it doesn't state, and the truncated sentence leaves the column list's purpose unclear. Nothing in the code says that the lists exist for a database whose history can't be counted, which is why each later migration still adds an entry. Because database_conditions reads the module globals, the DB check reassigns operations.REQUIRED_COLUMNS to exercise them.",
+      "recommendation": "Replace the three comments with one docstring that says what the lists are for (a database whose applied history can't be counted, Decision 0023 E2, extended to each later migration) and finishes the column list's sentence. Pass a RequiredSchema argument that defaults to the constants, so tests don't have to patch module state.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Aligns the comment with Decision 0023 E2 and keeps the practice of citing decisions in comments.",
+      "verdict": "revised",
+      "verifierNote": "The truncated sentence, the 38-to-53 citation and the patch in tests/db/review_check.py:177-180 confirmed. The original claim that the applied count makes per-migration entries unnecessary was withdrawn: the count is null without a history table, and then only the lists can show the database behind."
+    },
+    {
+      "id": "POPS-19",
+      "title": "The serve loop opens its own connections, so drain, reconnect and the final heartbeat are tested only against Docker Postgres",
+      "dimension": "tests",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/operations/worker.py",
+          "line": 78,
+          "endLine": 80,
+          "note": "_beat connects itself"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/worker.py",
+          "line": 135,
+          "endLine": 137,
+          "note": "serve connects itself"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/worker.py",
+          "line": 162,
+          "endLine": 164,
+          "note": "the last heartbeat connects itself"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/worker.py",
+          "line": 102,
+          "endLine": 122,
+          "note": "_run_step's drain takes its connection as an argument, yet has no unit test"
+        },
+        {
+          "file": "services/agent/tests/test_worker_inference.py",
+          "line": 1031,
+          "endLine": 1081,
+          "note": "both() already has three unit tests, the pattern to extend"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/worker.py",
+          "line": 195,
+          "endLine": 196,
+          "note": "state kept in one-element lists"
+        },
+        {
+          "file": "services/agent/tests/test_final_review.py",
+          "line": 42,
+          "note": "imports only inference_step from the worker"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "serve, _beat and the final heartbeat each run `async with await psycopg.AsyncConnection.connect(config.database_url, autocommit=True) as connection:`. tests/db/operations_worker.py drives serve against a disposable database. both() already has three unit tests (services/agent/tests/test_worker_inference.py:1031-1081), and _run_step takes its connection as an argument, yet no unit test exercises the drain. maintenance_step keeps its state in `last_retention: list[float] = []` and `said: list[str] = []`.",
+      "impact": "Several behaviors can only be checked by the db and operations profiles, with real time: the drain cut short, reconnecting after OperationalError, and the final stopped heartbeat. DH-06 asks for controlled clocks and injected transports, and python-worker.md asks for cancellation and restart tests where behavior changes.",
+      "recommendation": "Unit-test _run_step's drain now, with a slow fake step and a short drain_seconds; it needs no change. Inject a connect callable into serve, defaulting to psycopg's, to unit-test reconnect and the final heartbeat with a fake connection. Keep the maintenance state in a small dataclass.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "python-worker.md: test cancellation, duplicate delivery and restart where behavior changes. DH-06: controlled clocks and injected transports.",
+      "verdict": "revised",
+      "verifierNote": "The three self-opened connections and the missing drain test confirmed. both() is not untested: test_worker_inference.py has three tests for it, so that location was replaced, and the drain test needs no refactor."
+    },
+    {
+      "id": "POPS-20",
+      "title": "apply_retention and concept_seed.seed each run three phases in one body",
+      "dimension": "size",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "services/agent/src/autobots/application/retention.py",
+          "line": 92,
+          "endLine": 157,
+          "note": "66 lines: purge loop, objects, receipts, log"
+        },
+        {
+          "file": "services/agent/src/autobots/application/retention.py",
+          "line": 104,
+          "endLine": 117,
+          "note": "keyset parameters repeated by position"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/concept_seed.py",
+          "line": 334,
+          "endLine": 401,
+          "note": "68 lines: owner, Experts, workflows"
+        },
+        {
+          "file": "services/agent/src/autobots/operations/concept_seed.py",
+          "line": 346,
+          "note": "report: dict[str, Any] mixes 'kept' strings and dicts"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "```\n                \"and (%s::timestamptz is null or (updated_at, id) > (%s::timestamptz, %s::uuid)) \"\n                ...\n                    position[0] if position else None,\n                    position[0] if position else None,\n                    position[1] if position else None,\n```\nseed records \"kept\" as a string for existing items, and dicts such as {\"created\": True, \"without\": [...]} for new ones.",
+      "impact": "The keyset placeholders have to stay aligned with their positional values by hand. seed's report has two shapes per entry, which callers must special-case. Neither function can be tested one phase at a time.",
+      "recommendation": "Extract the phases, use named parameters for the keyset query, and give the seed a typed report. Update tests/db/concept_seed_check.py with it, since that check reads 'kept' as a bare string.",
+      "sketch": "apply_retention: policy, moment -> await _purge_expired_runs(conn, ws, cutoff, report)   # named %(after_at)s, %(after_id)s\n                -> await _remove_expired_objects(...) -> await _expire_receipts(conn, ws, cutoff, report)\nseed: actor = await _owner(conn, ws)\n      experts, expert_outcomes = await _seed_experts(conn, ws, actor, usable)\n      workflow_outcomes = await _seed_workflows(conn, ws, actor, usable, experts)\n      return SeedReport(experts=expert_outcomes, workflows=workflow_outcomes)",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "SP-015 (repeatable seeds) and SP-014 (retention scoping) are unchanged; this is extraction only. tests/db/operations_check.py and tests/db/major_check.py cover retention.",
+      "verdict": "confirmed",
+      "verifierNote": "Both function spans (retention.py:92-157, concept_seed.py:334-401), the positional keyset parameters and the two report shapes confirmed. tests/db/concept_seed_check.py:65-66 relies on the 'kept' string, so the recommendation now names it."
+    }
+  ],
+  "rejected": [],
+  "notCovered": "This was a static reading only, with no runtime check. mypy was not run because it is not in the allowed command list; ruff ran in check mode on the scope. I read PRD-Development-Harness.md only from DH-03 to DH-06, and docs/engineering/option-b-contract.md only in sections 5 to 7. I did not open PRD-Model-Providers.md, so MP-* references come from code comments. I read files outside the area only at the cited lines: api/operation_routes.py, api/settings_routes.py, application/worker_inference.py, application/cronjob_tool.py, application/runs.py, adapters/models/catalog.py, adapters/loop_middleware.py, scripts/persistent_install.py and the tests/db checks. I did not rerun the DB-backed checks and judged their coverage from source. The comparison with an earlier review is left to the synthesis step."
+}

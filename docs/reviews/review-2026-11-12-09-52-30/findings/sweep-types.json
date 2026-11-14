@@ -1,0 +1,1048 @@
+{
+ "schema": "autobots.code-review/v1",
+ "area": "sweep-types",
+ "title": "Lens: types and contracts at boundaries",
+ "kind": "lens",
+ "timestamp": "2026-11-12-09-52-30",
+ "revision": "156534da0bd5b19417f05d313077d767804b175b",
+ "summary": "The HTTP contract is the best-defended boundary in the repository. All 247 Pydantic contract models refuse unknown fields. The contract primitives match JavaScript's integer and timestamp limits. The generated TypeScript parsers really validate, 25 component files parse their GET replies with them, and the web code has no explicit any, no ts-ignore and no eslint-disable. Types stop protecting the code at the other boundaries. In the browser, writes bypass the generated client because its runtime discards the error envelope and status. As a result, 29 fetched-JSON replies are cast and 28 request bodies are built without the generated request types. The generator also drops the value types of 10 map fields, and the runtime never checks those values. In the service, the SQL boundary is Any: 225 `connection: Any` annotations, 178 positional row reads and one row type. Persisted JSON (events, role-policy snapshots and idempotency receipts) is written and read as untyped dicts with silent fallbacks. State vocabularies travel as str and are bridged by 12 `type: ignore[arg-type]` and 2 casts. Provider replies, the LangChain model hooks and three of the five SSE frame kinds are read as Any. Another 42% of the in-scope Python (scripts, repository tests and hooks) is never type-checked, though most of it is annotated. Pydantic models suit JSON that crosses a process or release boundary (persisted documents, provider replies). TypedDict rows suit SQL reads. Frozen dataclasses suit parsed domain values such as routine triggers and workflow block configs. This is a static review, so it establishes no runtime behavior and no H1 or product acceptance.",
+ "scores": [
+  {
+   "dimension": "standards",
+   "score": 3,
+   "why": "DH-06's explicit parsing holds for GET reads and every API request body, but 29 cast replies, untyped SQL rows and 42% of Python outside mypy miss it, and no lint rule covers assertions or explicit Any."
+  },
+  {
+   "dimension": "modules",
+   "score": 3,
+   "why": "The contracts, domain and application split is clear. But the generated client is bypassed for writes, and vocabularies are re-declared in each layer."
+  },
+  {
+   "dimension": "approach",
+   "score": 3,
+   "why": "Generate, then parse, is the right approach and reads use it. Writes, SSE frames, persisted JSON and provider replies fall back to dicts and casts."
+  },
+  {
+   "dimension": "comments",
+   "score": 4,
+   "why": "Boundary comments explain intent well (runtime.ts, primitives.py, adapters.py). A few comments stand in for types, and the 18 src suppressions give no reason."
+  },
+  {
+   "dimension": "types",
+   "score": 3,
+   "why": "The HTTP contract pipeline is a model to copy. SQL rows, persisted JSON, provider replies, browser writes and typed maps fall outside it."
+  },
+  {
+   "dimension": "errors",
+   "score": 3,
+   "why": "The API has one safe error envelope. On the web it is cast in 19 places, and the generated runtime turns every non-2xx reply into a ContractError, so contract drift looks like an outage."
+  },
+  {
+   "dimension": "tests",
+   "score": 3,
+   "why": "The shared cross-language fixtures are exemplary but cover 4 of 170 schemas. Browser specs read API JSON through casts, and test doubles need 21 arg-type suppressions."
+  },
+  {
+   "dimension": "maintainability",
+   "score": 3,
+   "why": "Changing a contract is safe for reads but risky for writes, SQL row shapes, persisted documents and string vocabularies, where nothing fails at compile time."
+  }
+ ],
+ "strengths": [
+  {
+   "title": "Reads are parsed with the generated validators",
+   "evidence": "25 component files call 32 distinct generated parsers on fetched replies, GET replies among them, for example `parseRunWorkspace(await reply.json())` at apps/web/components/run-workspace.tsx:194. apps/web/components/tool-catalog.tsx:156 `useLoaded(path, parse)` couples fetch, parser and a `loading | unavailable | ready` union. apps/web/components/tool-uses.tsx:127 types the body `unknown` before parsing it."
+  },
+  {
+   "title": "A real runtime validator behind the generated types",
+   "evidence": "packages/api-client/src/runtime.ts checks UUID and offset date-time formats, safe integers, enums, anyOf and `additionalProperties: false`. packages/api-client/tests/contract.test.ts:22 asserts that a cast cannot stand in for validation, and scripts/generate_contracts.py `check` detects drift between the Pydantic models and the generated client."
+  },
+  {
+   "title": "Cross-language boundary fixtures",
+   "evidence": "contracts/fixtures/boundary-cases.json (29 cases) runs in both services/agent/tests/test_contracts.py:30-36 and packages/api-client/tests/contract.test.ts:8-20. contracts/fixtures/credential-precedence.json does the same for key precedence (apps/web/tests/unit/credential-precedence.test.ts:9)."
+  },
+  {
+   "title": "Contract primitives aligned with JavaScript",
+   "evidence": "services/agent/src/autobots/contracts/primitives.py:10-32 defines STRICT_CONTRACT, MAX_SAFE_INTEGER, MicroUsd and UtcTimestamp, whose JSON Schema pattern the TypeScript validator then enforces. Every one of the 247 contract models sets extra=\"forbid\", so a private field cannot leak through a DTO."
+  },
+  {
+   "title": "Explicit row, domain and DTO mapping",
+   "evidence": "services/agent/src/autobots/contracts/adapters.py:8-42 has `run_from_row` (an unknown stored status raises) and `run_summary_from_domain`, which names each public field so a new domain field stays private by default. This is the pattern to spread to the 178 positional row reads."
+  },
+  {
+   "title": "One safe error envelope on the API",
+   "evidence": "services/agent/src/autobots/api/errors.py:24-40 maps ApiError, request validation, HTTP and unexpected errors to ErrorResponse without echoing input. 78 of 80 routes declare a response_model, and no route reads `request.json()` by hand."
+  },
+  {
+   "title": "No escape hatches, strict compilers",
+   "evidence": "apps/web has 0 explicit `any`, 0 `@ts-ignore` or `@ts-expect-error` and 0 `eslint-disable`. apps/web/tsconfig.json:7-9 and packages/api-client/tsconfig.json enable strict, noUncheckedIndexedAccess and exactOptionalPropertyTypes. mypy strict covers services/agent src and tests (services/agent/pyproject.toml:49-52), and all 18 `type: ignore` in src name an error code."
+  },
+  {
+   "title": "Untrusted input typed as object or unknown, then narrowed",
+   "evidence": ".claude/hooks/dispatch.py:46-55 `resolve_path(root, raw: object)` checks type, length and NUL bytes before use. apps/web/app/api/workspace/route.ts:35-38 reads the body as `unknown` and narrows it with the `isWorkspaceId` type guard (apps/web/lib/workspace-choice.ts:13)."
+  }
+ ],
+ "findings": [
+  {
+   "id": "XTYP-01",
+   "title": "Browser writes bypass the generated client: request bodies are hand-built and replies are cast",
+   "dimension": "types",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "apps/web/components/goal-composer.tsx",
+     "line": 311,
+     "note": "RunAccepted cast to { run_id: string }; parseRunAccepted exists"
+    },
+    {
+     "file": "apps/web/components/experts-panel.tsx",
+     "line": 97,
+     "note": "SessionView cast to { id: string } and pushed to /sessions/${id}; same cast at :144, expert-editor.tsx:201 and goal-composer.tsx:273"
+    },
+    {
+     "file": "apps/web/components/session-panel.tsx",
+     "line": 65,
+     "note": "third hand-built POST /v1/runs, with its own cast"
+    },
+    {
+     "file": "apps/web/components/continue-run.tsx",
+     "line": 53,
+     "note": "RunAccepted cast with replayed?: boolean"
+    },
+    {
+     "file": "apps/web/components/workflow-editor.tsx",
+     "line": 254,
+     "endLine": 258,
+     "note": "unvalidated error body spread into a typed result: return { view: null, ...failure }"
+    },
+    {
+     "file": "apps/web/components/run-controls.tsx",
+     "line": 39,
+     "endLine": 42,
+     "note": "cast error message returned for display"
+    },
+    {
+     "file": "packages/api-client/src/runtime.ts",
+     "line": 168,
+     "endLine": 170,
+     "note": "non-2xx throws ContractError and never reads the ErrorResponse body"
+    },
+    {
+     "file": "apps/web/lib/csrf-fetch.ts",
+     "line": 6,
+     "note": "the BFF's own CSRF reply is cast"
+    }
+   ],
+   "occurrences": 29,
+   "evidence": "ESLint with assertionStyle never reports 44 type assertions in non-test web code. 29 of them sit on fetched JSON: 19 error envelopes in 15 files, 7 success bodies, 2 on the run event stream and page, and the CSRF reply. The other 15 are 5 casts that compensate for weak generated map types, 4 DOM, event or URL narrowings, 5 safe narrowings of unknown input and 1 fetch-wrapper type; the 4 non-null assertions are harmless. 28 request bodies in 18 files are `body: JSON.stringify({...})`. grep finds 0 references to the generated RunRequest, SessionCreate, ApprovalDecision, ExpectedVersion or ModelPolicyUpdate types. Only 4 of the 78 generated operations are used, all server-side in lib/service-status.ts.\n```\nconst accepted = (await reply.json()) as { run_id: string };      // goal-composer.tsx:311\nconst failure = (await reply?.json().catch(() => null)) as {      // goal-composer.tsx:318\n  code?: string; message?: string; } | null;\nif (!response.ok) {                                               // runtime.ts:168-170\n  throw new ContractError(path, `request failed with status ${response.status}`);\n```",
+   "impact": "A renamed or removed response field compiles and fails late. A SessionView without `id` sends the user to /sessions/undefined from 4 call sites, a non-string `message` reaches React as a child, and workflow-editor spreads arbitrary keys over `view`. Request drift is invisible to tsc. It surfaces as a 422 `invalid_request`, which goal-composer.tsx:331 reports as a refused model or request. The cause is structural: the generated runtime discards the error envelope and the status and takes no per-call headers such as Idempotency-Key. So every component re-implements the write path: three times for POST /v1/runs and four times for POST /v1/sessions.",
+   "recommendation": "Make the generated client the only path to the API. (1) In runtime.ts, read the body of a non-2xx reply, parse it as ErrorResponse and throw a typed ApiError {status, code, message}. Keep ContractError for shape mismatches only, and accept per-call headers and a signal. (2) Have scripts/generate_contracts.py pass those options through, then regenerate. (3) Add a browser client in apps/web/lib with baseUrl \"/api\" and the CSRF header on mutations. Move the 3 run-admission and 4 session-creation calls first, then the rest. Type BFF-only bodies and envelopes (/api/session, /api/workspace, /api/csrf, bff.ts safeError) with a small parser or `satisfies ErrorResponse`. (4) Ratchet with `@typescript-eslint/consistent-type-assertions: [error, {assertionStyle: never}]` for components and lib, using a per-file baseline, and add a ts-reset-style declaration so `Response.json()` returns `Promise<unknown>`.",
+   "sketch": "// packages/api-client/src/runtime.ts\nexport class ApiError extends Error { status: number; code: string }   // a refusal: the parsed ErrorResponse\nexport class ContractError extends Error { path: string }               // a shape mismatch only\nexport interface CallOptions { headers?: Record<string, string>; signal?: AbortSignal }\nexport async function requestJson(options, method, path, body?, call?: CallOptions): Promise<unknown>\n// apps/web/lib/api.ts: browserClient(): ClientOptions with baseUrl \"/api\" and a CSRF-aware fetch\n// goal-composer.tsx\nconst accepted = await admitRun(browserClient(), body satisfies RunRequest, { headers: { \"Idempotency-Key\": key } });\n// catch (error) { if (error instanceof ApiError) setOutcome(OUTCOMES[error.code] ?? \"error\"); }",
+   "effort": "L",
+   "risk": "medium",
+   "ruleCheck": "nextjs.md and DH-06 require generated API types with runtime parsing at untrusted boundaries and forbid blanket type assertions that conceal contract mismatches. contracts.md says generated TypeScript consumes the Pydantic contract. generated.ts is regenerated by scripts/generate_contracts.py, never edited by hand. BFF CSRF checks stay, and server idempotency remains the correctness mechanism. continue-run's handling of 5xx as an unknown outcome is kept through ApiError.status.",
+   "verdict": "confirmed",
+   "verifierNote": "Recounted from the saved ESLint report: 44 non-test assertions, 29 of them on fetched JSON (19 error envelopes in 15 files, 7 success bodies, 2 on the stream and event page, 1 CSRF reply). 28 `body: JSON.stringify` in 18 files, and no web reference to RunRequest, SessionCreate, ApprovalDecision, ExpectedVersion, ModelPolicyUpdate or parseRunAccepted. Only lib/service-status.ts calls generated operations (4 of 78). XWEB-01 and XMOD-03 report the same gap from their lenses."
+  },
+  {
+   "id": "XTYP-02",
+   "title": "Generated map types and runtime checks drop value schemas",
+   "dimension": "types",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "scripts/generate_contracts.py",
+     "line": 46,
+     "endLine": 47,
+     "note": "any object without properties becomes Record<string, unknown>"
+    },
+    {
+     "file": "packages/api-client/src/runtime.ts",
+     "line": 71,
+     "endLine": 78,
+     "note": "extra keys are refused only when additionalProperties is false; a value schema is never checked"
+    },
+    {
+     "file": "apps/web/components/model-policy-panel.tsx",
+     "line": 130,
+     "note": "role_overrides cast to Record<string, string>; also :55, and :251 casts a value"
+    },
+    {
+     "file": "apps/web/components/expert-editor.tsx",
+     "line": 116,
+     "note": "role_bindings cast"
+    },
+    {
+     "file": "apps/web/components/experts-panel.tsx",
+     "line": 331,
+     "note": "role_bindings cast"
+    },
+    {
+     "file": "apps/web/components/workflow-monitor.tsx",
+     "line": 175,
+     "note": "String(view.block_versions[...]) coerces unknown"
+    },
+    {
+     "file": "apps/web/components/approvals-panel.tsx",
+     "line": 70,
+     "endLine": 72,
+     "note": "approval scope tool versions interpolated as unknown in the review text"
+    }
+   ],
+   "occurrences": 10,
+   "evidence": "Walking `schemas` in generated.ts finds 10 object fields whose values have a schema. ApprovalScope.tools and RetentionApplied.refused have integer values. ExecutionBinding, ExecutionView and WorkflowVersionView.block_versions, ExpertBinding.role_bindings and RouteOption.role_bindings have string values. ExpertConfig.role_bindings and ModelPolicyState and ModelPolicyUpdate.role_overrides have ModelProfileId values. All 10 generate as Record<string, unknown>, and no value is validated. runtime.ts also ignores minItems (4 uses) and maxItems (15 uses).\n```\nif kind == 'object' and 'properties' not in schema:          # generate_contracts.py:46-47\n    return 'Record<string, unknown>'\n} else if (schema.additionalProperties === false) {         // runtime.ts:75\nsetOverrides(next.role_overrides as Record<string, string>);  // model-policy-panel.tsx:130\n```",
+   "impact": "The generator's docstring promises that every parse function checks at runtime, but for these fields it does not. Five casts and two String or template coercions paper over the gap. If role_overrides values changed shape, parseModelPolicyState would accept them. The policy form would then post them back and fail with a 422 far from the cause, and the approval review text would print \"[object Object]\" for a tool version.",
+   "recommendation": "Emit Record<string, T> from additionalProperties schemas and validate each extra value against that schema in checkObject. Enforce minItems and maxItems. Make `generate_contracts.py check` fail when the schema uses a keyword that runtime.ts does not enforce, with annotation keywords allow-listed. Regenerate, then delete the 5 casts and 2 coercions. Add a valid:false boundary case with a non-profile role override.",
+   "sketch": "# scripts/generate_contracts.py\nif kind == 'object' and 'properties' not in schema:\n    extra = schema.get('additionalProperties', True)\n    return f'Record<string, {typescript_type(extra)}>' if isinstance(extra, Mapping) else 'Record<string, unknown>'\nENFORCED = {...}  # keywords runtime.ts implements; `check` fails on any other\n// packages/api-client/src/runtime.ts, checkObject\nelse if (typeof schema.additionalProperties === \"object\") check(schemas, schema.additionalProperties, item, `${path}.${name}`);",
+   "effort": "S",
+   "risk": "medium",
+   "ruleCheck": "contracts.md: generated TypeScript consumes the Pydantic contract, and TypeScript types do not validate JSON. The fix changes the generator and the hand-written runtime, then regenerates generated.ts. Decision 0015's immutable approval scope snapshot is only validated more strictly; its content does not change.",
+   "verdict": "confirmed",
+   "verifierNote": "openapi.json has exactly 10 schema-valued additionalProperties, 4 minItems and 15 maxItems, and runtime.ts checks additionalProperties only when it is false and has no array-bound check. All 7 cited casts and coercions reproduce. Kept high, consistent with WSHL-01, which reports the validator gap from the web-shell area."
+  },
+  {
+   "id": "XTYP-03",
+   "title": "Persisted JSON documents have no schema shared by writer and reader",
+   "dimension": "types",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 80,
+     "note": "append_event takes payload: dict[str, Any]; 12 call sites in 6 files build dict literals"
+    },
+    {
+     "file": "services/agent/src/autobots/application/tool_uses.py",
+     "line": 147,
+     "endLine": 157,
+     "note": "tool.use.started written as a dict, though ToolUseStarted exists (contracts/runs.py:88)"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 107,
+     "note": "a payload that fails RunEvent is dropped, with nothing logged"
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 144,
+     "endLine": 150,
+     "note": "the browser drops any event that fails parseRunEvent, whether its type is known or not"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 136,
+     "endLine": 153,
+     "note": "role-policy snapshot written as a hand-built dict"
+    },
+    {
+     "file": "services/agent/src/autobots/application/worker_inference.py",
+     "line": 114,
+     "note": "a snapshot without 'routes' skips the frozen wire-identity check"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 119,
+     "note": "idempotency receipt returned as dict[str, Any] and replayed by key"
+    }
+   ],
+   "occurrences": 34,
+   "evidence": "The count: 12 append_event call sites in 6 files, 11 policy_snapshot reads outside runs.py in 5 modules (frozen_policy and SQL JSON paths), and 11 existing_receipt replays that read the stored receipt by key, in 8 modules (14 calls in 9 modules in all).\n```\nasync def append_event(connection: Any, run_id: UUID, payload: dict[str, Any]) -> int:  # runs.py:80\n    except ValidationError:                       # run_projection.py:107-108, project_event\n        return None\n    for name, route in ((snapshot or {}).get(\"routes\") or {}).items():   # worker_inference.py:114\n    result: dict[str, Any] = row[1]               # runs.py:119\n    return AdmissionResult(UUID(existing[\"run_id\"]), existing[\"version\"], existing[\"status\"], True)\n```",
+   "impact": "These three durable formats are contracts between modules and across releases, but only string keys connect each writer to its reader. A misspelled key in an event dict is stored durably. It is then filtered silently by project_event and again by known() in the browser, so the timeline loses an entry with nothing logged. Renaming \"routes\" in _snapshot would make frozen_policy skip the check that keeps an admitted run on its frozen model, on the paid path. A receipt written by an earlier release and replayed after a lost reply raises KeyError, a 500 at exactly the moment the client retries.",
+   "recommendation": "Give each persisted document one versioned model that writer and reader share. Build public event payloads with their contract models, for example ToolUseStarted(...).model_dump(mode=\"json\"); project_event already validates the stored payload as RunEvent, so this moves that check to the writer. Give private payloads their own models, and keep the snapshot and receipt models in a persisted module of their own, apart from the DTOs. Add a PolicySnapshot model whose legacy omissions, such as `sources` before MD-02, are explicit per version instead of `.get(...) or {}`. Add one receipt model per operation, returned by existing_receipt(..., kind). Keep project_event's filter, but log the type and sequence (never the content) when it drops a known type. In the browser, skip unknown types quietly and report known types that fail. Add a test that runs every append_event producer through RunEvent, and stored-document fixtures for each snapshot version.",
+   "sketch": "# contracts/persisted.py: persisted documents, distinct from domain types and DTOs\nclass FrozenRoute(BaseModel): wire_id: str; canonical_id: str\nclass PolicySnapshot(BaseModel): version: int; bindings: dict[ModelRole, ModelProfileId]; sources: dict[ModelRole, BindingSource] = {}; routes: dict[ModelProfileId, FrozenRoute]\nclass AdmissionReceipt(BaseModel): run_id: UUID; version: int; status: RunStatus\nDurablePayload = RunStatusChanged | ApprovalRequested | ToolUseStarted | ... | PrivatePayload\n# application/runs.py\nasync def append_event(connection: SqlConnection, run_id: UUID, payload: DurablePayload) -> int\nasync def existing_receipt[T: BaseModel](connection, scope, fingerprint, kind: type[T]) -> T | None\n# application/run_projection.py: on a dropped known type, log_event(\"event_not_projected\", type=..., sequence=...)",
+   "effort": "M",
+   "risk": "high",
+   "ruleCheck": "contracts.md: version event envelopes and immutable model-policy snapshots. python-worker.md: persist outbox events and operation receipts. model-gateway.md: freeze wire identities at admission. Stored rows are read as they are, with legacy shapes accepted explicitly, and no migration is edited. Persisted, domain (RolePolicy) and public (EffectiveRolePolicy, RunEvent) types stay separate, and project_event remains the one mapping to the public stream.",
+   "verdict": "revised",
+   "verifierNote": "Counts redone: 12 append_event calls in 6 files, 11 policy_snapshot reads outside runs.py in 5 modules, and 14 existing_receipt calls of which 11 index the receipt by key, so 34 sites, not 32. project_event drops a ValidationError with nothing logged (run_projection.py:107-108), and frozen_policy skips the route check when 'routes' is absent (worker_inference.py:114). The browser change keeps Decision 0017 Q13: unknown types are still skipped. XDUP-04 reports the snapshot readers from the duplication lens."
+  },
+  {
+   "id": "XTYP-04",
+   "title": "The SQL boundary is untyped: Any connections and positional rows",
+   "dimension": "types",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/api/app.py",
+     "line": 30,
+     "endLine": 32,
+     "note": "the Pool Protocol has open() and close() but no connection()"
+    },
+    {
+     "file": "services/agent/src/autobots/api/run_routes.py",
+     "line": 66,
+     "endLine": 70,
+     "note": "_pool(request) -> Any, copied in 10 route modules"
+    },
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 316,
+     "note": "record_transition(connection: Any, ..., previous: str, following: str, ...)"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 519,
+     "endLine": 520,
+     "note": "16 unnamed columns mapped by index; tasks_complete is row[10] and tasks_total is row[9]"
+    },
+    {
+     "file": "services/agent/src/autobots/application/approvals.py",
+     "line": 68,
+     "note": "fetchone() indexed without a None check; 42 such sites in src"
+    },
+    {
+     "file": "services/agent/src/autobots/application/goal_loop.py",
+     "line": 554,
+     "note": "run status read back as a str"
+    },
+    {
+     "file": "services/agent/src/autobots/persistence/rows.py",
+     "line": 8,
+     "note": "RunRow, the only row type in the service"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 120,
+     "note": "RunRow's one consumer needs # type: ignore[arg-type] to build it"
+    }
+   ],
+   "occurrences": 225,
+   "evidence": "`grep -rn 'connection: Any' services/agent/src` finds 225 annotations in 42 files, which are 221 of ruff's 398 ANN401 hits. 339 lines in application/ call connection.execute on them. 178 lines in 41 application, api and operations files read rows by position, 42 sites index fetchone() directly, and persistence/rows.py holds one TypedDict.\n```\nclass Pool(Protocol):                       # api/app.py:30-32\n    async def open(self) -> None: ...\n    async def close(self) -> None: ...\ndef _pool(request: Request) -> Any:         # run_routes.py:66, one of 10 copies\n                tasks_complete=int(row[10]),  # run_projection.py:519-520\n                tasks_total=int(row[9]),\n```",
+   "impact": "mypy strict passes the service while checking none of its SQL reads. Adding a column to _LIST_SELECT shifts 16 positional reads without an error. fetchone() on a missing row raises TypeError, which becomes a 500. Statuses come back as str and feed the arg-type suppressions in the finding on state vocabularies. Reviewers must count SELECT columns to check a mapping. Generated row types for the public schema already exist (packages/db-types), but only in TypeScript, and nothing consumes them.",
+   "recommendation": "Type the boundary in three steps. (1) Define one narrow SqlConnection and SqlCursor Protocol in application, with no psycopg import, whose fetchone() returns `tuple[Any, ...] | None`. Add a `one()` helper that raises a typed not-found. Replace the 10 `_pool` copies with one typed dependency, and add connection() to the Pool Protocol. (2) Alias the columns of multi-column SELECTs and read them through per-query TypedDict rows in persistence/rows.py with psycopg's dict_row or class_row. Map each row explicitly, the way contracts/adapters.py maps RunRow. (3) Ratchet ruff ANN401 with per-file ignores for today's files, starting with api (16 hits) and domain (5).",
+   "sketch": "# application/sql.py\nclass SqlCursor(Protocol):\n    async def fetchone(self) -> tuple[Any, ...] | None: ...\n    async def fetchall(self) -> list[tuple[Any, ...]]: ...\nclass SqlConnection(Protocol):\n    async def execute(self, query: str, params: Sequence[object] | Mapping[str, object] = ...) -> SqlCursor: ...\n    def transaction(self) -> AbstractAsyncContextManager[object]: ...\nasync def one(connection: SqlConnection, query: str, params: ...) -> tuple[Any, ...]  # raises NotFound, never None[0]\n# persistence/rows.py: RunListRow(TypedDict), ApprovalListRow(TypedDict), ... read via dict_row, mapped like run_from_row\n# api/dependencies.py: DbPool = Annotated[ConnectionPool, Depends(database_pool)]",
+   "effort": "L",
+   "risk": "medium",
+   "ruleCheck": "python-worker.md and DH-06: keep application types separate from persistence and DTOs, and avoid broad Any and untyped dictionaries. Rows stay in persistence/rows.py and are mapped explicitly. SQL migrations keep owning the schema, and none is edited. Leases and fences are untouched.",
+   "verdict": "confirmed",
+   "verifierNote": "225 `connection: Any` in 42 files; a ruff ANN401 rerun gives 398 hits, 221 on parameters named connection, 16 in api/ and 5 in domain/. 339 connection.execute lines in application/, 178 positional row reads in 41 files, 42 `(await cursor.fetchone())[n]` sites and 10 _pool copies; persistence/rows.py holds the one TypedDict. _LIST_SELECT has 16 columns read by index (run_projection.py:510-525)."
+  },
+  {
+   "id": "XTYP-14",
+   "title": "A contract mismatch on a read looks like an outage",
+   "dimension": "errors",
+   "severity": "high",
+   "locations": [
+    {
+     "file": "packages/api-client/src/runtime.ts",
+     "line": 168,
+     "endLine": 170,
+     "note": "an HTTP status failure is also thrown as ContractError"
+    },
+    {
+     "file": "apps/web/components/workflow-monitor.tsx",
+     "line": 50,
+     "endLine": 57,
+     "note": "parseExecutionView failure becomes \"reconnecting\" and polling continues"
+    },
+    {
+     "file": "apps/web/components/home-activity.tsx",
+     "line": 79,
+     "note": "parse inside a catch-all that sets failed"
+    },
+    {
+     "file": "apps/web/components/model-policy-panel.tsx",
+     "line": 147,
+     "note": "parse inside a catch-all that sets failed"
+    },
+    {
+     "file": "apps/web/components/tool-catalog.tsx",
+     "line": 170,
+     "note": "parse failure becomes the unavailable state"
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 194,
+     "note": "refresh() lets a ContractError escape as an unhandled rejection"
+    },
+    {
+     "file": "apps/web/lib/service-status.ts",
+     "line": 46,
+     "note": "any failure becomes unavailable"
+    }
+   ],
+   "occurrences": 25,
+   "evidence": "In the 25 component files that call generated parsers, the parse runs inside catch-all handlers (89 `.catch(() =>` in components). These map any failure to the screen's unavailable or reconnecting state; this was checked in run-list, home-activity, model-policy-panel, workflow-monitor and tool-catalog. No web file references ContractError.\n```\nconst next = await reply.json().then(parseExecutionView).catch(() => null);  // workflow-monitor.tsx:50-53\nif (next === null) { setState(\"reconnecting\"); }                           // :56-57\nthrow new ContractError(path, `request failed with status ${response.status}`);  // runtime.ts:169\n```",
+   "impact": "The parsers detect drift, and the screens throw the detection away. The workflow monitor polls as \"reconnecting\" forever, and lists show their unavailable state. Nothing reaches the console, and runtime.ts names a 503 a ContractError. So neither a developer nor a browser test can tell drift from downtime.",
+   "recommendation": "Split ApiError from ContractError in runtime.ts, as in the write-path finding. Give screens one helper that returns ready, unavailable or out_of_date. It logs a ContractError's schema and path (never values) with console.error, and the screen shows a distinct \"out of date with the API\" state. Start from tool-catalog.tsx's useLoaded.",
+   "sketch": "// packages/api-client/src/runtime.ts\nexport class ApiError extends Error { status: number; code: string }   // a non-2xx reply, parsed as ErrorResponse\nexport class ContractError extends Error { path: string }               // a shape mismatch only\n// apps/web/lib/load.ts (useLoaded moved here from tool-catalog.tsx)\nexport type Loaded<T> = { kind: \"loading\" } | { kind: \"ready\"; value: T } | { kind: \"unavailable\" } | { kind: \"out_of_date\" };\nexport function useLoaded<T>(path: string, parse: (value: unknown) => T): Loaded<T>;\n// a ContractError sets out_of_date and logs console.error(schema, path), never the values\n// run-workspace.tsx refresh() and workflow-monitor.tsx poll() use the same mapping instead of catch-alls",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "nextjs.md requires explicit error, empty and loading states. service-status.ts keeps details on the server, and the browser log carries only a schema name and path, no response values.",
+   "verdict": "revised",
+   "verifierNote": "Raised to high: the parsers detect drift and each screen checked discards it (catch-alls at home-activity.tsx:84, model-policy-panel.tsx:150, tool-catalog.tsx:172 and workflow-monitor.tsx:53), which is the rubric's 'hides contract drift at a trust boundary'; XERR-03 reports the same root at high. 25 component files call generated parsers, not 23; components hold 89 `.catch(() =>` handlers, and no web file references ContractError. Risk set to medium, since each screen's failure state changes and the contract test that pins ContractError for a failed status (contract.test.ts:33-36) changes with it. Added the target-shape sketch a high finding needs."
+  },
+  {
+   "id": "XTYP-05",
+   "title": "State vocabularies travel as plain str and are bridged with suppressions",
+   "dimension": "types",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/runs.py",
+     "line": 70,
+     "note": "AdmissionResult.status: str; TransitionResult at :311 is the same"
+    },
+    {
+     "file": "services/agent/src/autobots/api/run_routes.py",
+     "line": 275,
+     "note": "status=result.status  # type: ignore[arg-type]; again at :328"
+    },
+    {
+     "file": "services/agent/src/autobots/application/provider_settings.py",
+     "line": 168,
+     "endLine": 170,
+     "note": "source, auth_status and catalog_status suppressed, though CredentialSource, AuthStatus and CatalogStatus exist"
+    },
+    {
+     "file": "services/agent/src/autobots/application/operations.py",
+     "line": 81,
+     "note": "state: str  # ok, degraded or unavailable"
+    },
+    {
+     "file": "services/agent/src/autobots/api/operation_routes.py",
+     "line": 172,
+     "note": "that state needs an arg-type suppression at the DTO"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/tools.py",
+     "line": 263,
+     "note": "ToolGroupName re-declares domain ToolGroup; 4 more aliases follow, plus an inline cost_class Literal"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/workflows.py",
+     "line": 233,
+     "note": "ExecutionView.run_status: str although RunStatus exists"
+    },
+    {
+     "file": "services/agent/src/autobots/application/run_projection.py",
+     "line": 386,
+     "note": "terminal states re-typed as strings"
+    }
+   ],
+   "occurrences": 14,
+   "evidence": "12 of the 18 `type: ignore` in services/agent/src are [arg-type] on a str passed into a Literal or Enum DTO field: remote_files 1, run_routes 2, search_routes 1, settings_routes 1, operation_routes 2, provider_settings 4 and tool_catalog 1. Two cast() calls do the same (api/routes.py:61, application/tool_catalog.py:217). 23 contract fields named status, state, outcome, kind, role or profile are str (a grep over contracts/), for example ApprovalView.status, ModelCallView.status, role and profile, and ToolAttemptView.status. Six domain StrEnums are re-declared as Literals in contracts/tools.py. They are equal today, but no test ties them, while RunStatus and ModelProfileId are reused directly. The workflow domain keeps its states as bare strings (domain/workflow_execution.py:12). The TERMINAL set from domain/runs.py:22 is re-typed in 6 places in application/, 3 of them inside SQL text.\n```\nclass AdmissionResult:        # application/runs.py:67-71\n    status: str\n        status=result.status,  # type: ignore[arg-type]    api/run_routes.py:275\n    state: str  # ok, degraded or unavailable             application/operations.py:81\n    \"finished\": (\"succeeded\", \"failed\", \"cancelled\"),     application/run_projection.py:386\n```",
+   "impact": "mypy cannot see a misspelled or new state anywhere between the row and the DTO. The lax VIEW config coerces at response time, so a bad value becomes a 500 internal_error instead of a type error. The str-typed public fields generate TypeScript `string`, which is why the web keys its label maps by string. If a tool group is added to the domain enum but not to ToolGroupName, building ToolDescriptor raises, and the whole catalog request fails, with no test to catch it first.",
+   "recommendation": "Annotate application results and locals with the vocabularies that already exist: RunStatus, AuthStatus, CredentialSource, CatalogStatus, SearchKind and Literal['input', 'output']. Convert once where the row is read, as run_from_row does with RunStatus(row[\"status\"]). Then delete the 12 suppressions and 2 casts. Give the 23 public state fields Literal or Enum types, and regenerate. For the six re-declared vocabularies, either reuse the StrEnums, as the contracts already do for RunStatus, or add a test that set(get_args(alias)) equals the enum's values. Pass list(TERMINAL) as a SQL parameter instead of quoting states in query text.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "DH-06 asks for explicit enums and unions and forbids a second state enum for the UI. contracts.md says canonical states and guards are shared. Only types change, not values, and the contract change regenerates the client. Reusing a domain StrEnum in a DTO follows the existing RunStatus precedent: it shares a vocabulary and does not merge types.",
+   "verdict": "revised",
+   "verifierNote": "All 18 src suppressions were listed: 13 are arg-type, and 12 of them pass a str into a Literal or Enum field (the 13th, run_projection.py:120, passes a dict into RunRow). The casts at api/routes.py:61 and tool_catalog.py:217 reproduce. Five Literal aliases and the inline cost_class Literal restate six domain StrEnums, and no test ties them. TERMINAL is re-typed in 6 application places, 3 inside SQL. Revised: the str-typed state fields number 23, not 25. XDUP-09 and XERR-08 report related vocabulary drift."
+  },
+  {
+   "id": "XTYP-06",
+   "title": "Web label maps are keyed by string and duplicated; the generated enum types go unused",
+   "dimension": "types",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "apps/web/components/run-list.tsx",
+     "line": 16,
+     "note": "STATUS_TEXT: Record<string, string>, ten run states"
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 49,
+     "note": "STATUS_LABEL: the same ten entries"
+    },
+    {
+     "file": "apps/web/components/run-list.tsx",
+     "line": 75,
+     "note": "PROFILE_NAMES; the same map at experts-panel.tsx:295"
+    },
+    {
+     "file": "apps/web/components/tool-catalog.tsx",
+     "line": 45,
+     "note": "PROVIDERS, used with `?? tool.provider` fallbacks"
+    },
+    {
+     "file": "apps/web/components/run-controls.tsx",
+     "line": 16,
+     "note": "TERMINAL set; again at workflow-monitor.tsx:13"
+    },
+    {
+     "file": "apps/web/components/run-list.tsx",
+     "line": 68,
+     "note": "type Group re-declares the API's RunListGroup"
+    },
+    {
+     "file": "apps/web/components/model-policy-panel.tsx",
+     "line": 24,
+     "note": "SOURCE_LABEL keyed by BindingSource; ROLE_SOURCE at run-workspace.tsx:83"
+    }
+   ],
+   "occurrences": 28,
+   "evidence": "There are 28 `const X: Record<string, ...>` maps in 12 component files. Most are keyed by contract vocabularies: run status, profile, binding source, provider, operation class, availability, tool-use outcome and condition name. generated.ts exports RunStatus, ModelProfileId, BindingSource and ModelRole, and grep finds no web file that imports any of them.\n```\nexport const STATUS_TEXT: Record<string, string> = {   // run-list.tsx:16\n  queued: \"Queued\", running: \"Running\", ...\nconst STATUS_LABEL: Record<string, string> = {          // run-workspace.tsx:49\n  queued: \"Queued\", running: \"Running\", ...\nconst TERMINAL = new Set([\"succeeded\", \"failed\", \"cancelled\"]);  // run-controls.tsx:16\n```",
+   "impact": "A new state, profile or provider compiles everywhere and then falls through to a raw code or to nothing, as in `PROVIDERS[tool.provider] ?? tool.provider`. The same vocabulary is edited in two or three copies, and the web's terminal set can drift from TERMINAL in domain/runs.py.",
+   "recommendation": "Key every vocabulary map by its generated type so that tsc checks exhaustiveness: `const STATUS_LABEL = {...} satisfies Record<RunStatus, string>`. Where the contract inlines a union, use indexed access, such as `Record<ToolDescriptor[\"provider\"], string>`. Move the shared run-status words and tones, profile names and terminal set into one module in apps/web/lib. Fields that are str in the contract need the Python change first. The run list's Group has no generated type, because the generator emits no query parameters; keyof RunGroupCounts gives the same four names.",
+   "sketch": "// apps/web/lib/run-vocabulary.ts\nimport type { ModelProfileId, RunStatus } from \"@autobots/api-client\";\nexport const RUN_STATUS_LABEL = { queued: \"Queued\", ... } satisfies Record<RunStatus, string>;\nexport const TERMINAL: ReadonlySet<RunStatus> = new Set([\"succeeded\", \"failed\", \"cancelled\"]);\nexport const PROFILE_NAME = { openrouter_terra: \"Terra\", ... } satisfies Record<ModelProfileId, string>;",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06 forbids inventing a second state enum for the UI, and nextjs.md requires generated API types. Display words stay in UI modules; they are only keyed by the generated types and are not merged with DTOs.",
+   "verdict": "revised",
+   "verifierNote": "28 `const X: Record<string, ...>` maps in 12 component files. generated.ts exports RunStatus, ModelProfileId, BindingSource and ModelRole, and no web file imports them. STATUS_TEXT (run-list.tsx:16) and STATUS_LABEL (run-workspace.tsx:49) hold the same ten entries, and PROFILE_NAMES is copied verbatim. Revised: RunListGroup exists only in Python, since generate_contracts.py emits path parameters only, so the recommendation names keyof RunGroupCounts for Group. XWEB-08 and XDUP-10 cover the screen-level copies."
+  },
+  {
+   "id": "XTYP-07",
+   "title": "Event-stream frames are a contract that nothing declares",
+   "dimension": "types",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/api/event_routes.py",
+     "line": 226,
+     "note": "stream route excluded from the schema"
+    },
+    {
+     "file": "services/agent/src/autobots/api/event_routes.py",
+     "line": 208,
+     "note": "cursor frame is hand-written JSON"
+    },
+    {
+     "file": "services/agent/src/autobots/api/event_routes.py",
+     "line": 201,
+     "note": "gap frame is hand-written JSON"
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 224,
+     "note": "cursor frame cast to { cursor: number }"
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 207,
+     "note": "message.data as string; again at :214"
+    },
+    {
+     "file": "apps/web/components/run-workspace.tsx",
+     "line": 259,
+     "note": "event page cast to { events?: unknown[] } before a partial parse"
+    }
+   ],
+   "occurrences": 5,
+   "evidence": "The run and live frames carry a RunEvent parsed with parseRunEvent. The cursor, gap and end frames are matched by event name on both sides and have no model. grep finds no test that mentions a cursor frame. There are 5 assertions in the listener and page reader.\n```\n@router.get(\"/runs/{run_id}/events/stream\", include_in_schema=False)   # event_routes.py:226\n    yield f\"event: cursor\\ndata: {json.dumps({'cursor': cursor})}\\n\\n\"  # event_routes.py:208\nsource.addEventListener(\"cursor\", (message) => {                       // run-workspace.tsx:221-225\n  cursor = Math.max(cursor,\n    (JSON.parse(message.data as string) as { cursor: number }).cursor);\n```",
+   "impact": "A cursor frame without a numeric cursor makes the client's cursor NaN. start() then requests /events?after=NaN, the API refuses it with 422 because Cursor is an int of at least 0, and retry() keeps the page \"Reconnecting\" indefinitely. Renaming an event on either side breaks the stream silently.",
+   "recommendation": "Declare StreamCursor and StreamGap models, and the frame names as a Literal, in contracts. Add them to PUBLIC_MODELS in contracts/export.py so they are generated, and build the frames from them in event_routes.py. On the web, move the EventSource wiring into one lib module that parses each frame with its generated parser and accepts only a safe-integer cursor. The stream route itself can stay out of the OpenAPI paths.",
+   "sketch": "# contracts/runs.py\nStreamFrame = Literal[\"run\", \"live\", \"cursor\", \"gap\", \"end\"]\nclass StreamCursor(BaseModel): cursor: Sequence\nclass StreamGap(BaseModel): after: int\n// apps/web/lib/run-stream.ts\nexport function openRunStream(base: string, after: number, on: { event(e: RunEvent): void; cursor(n: number): void; gap(): void; end(): void }): () => void",
+   "effort": "S",
+   "risk": "medium",
+   "ruleCheck": "contracts.md requires versioned event envelopes, and nextjs.md requires handling reconnects and deduplication. The BFF stream stays a pass-through, and a browser disconnect still cancels nothing.",
+   "verdict": "confirmed",
+   "verifierNote": "The cursor (208), gap (201) and end (210) frames are hand-written, and the route is include_in_schema=False. The 5 assertions are at run-workspace.tsx:207, 214, 224 (two) and 259. No test checks a frame's shape; stream-result.spec.ts:112 exercises a reconnect end to end. PUBLIC_MODELS exists at contracts/export.py:14, so the frames can be generated as recommended."
+  },
+  {
+   "id": "XTYP-08",
+   "title": "Open dictionaries in public contracts are validated by hand and re-read by string keys",
+   "dimension": "types",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/contracts/routines.py",
+     "line": 25,
+     "note": "RoutineConfig.trigger: dict[str, Any]"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/routines.py",
+     "line": 17,
+     "note": "validate_trigger checks keys by hand"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/routines.py",
+     "line": 49,
+     "note": "occurrences() indexes trigger[\"kind\"] and trigger[\"minutes\"]"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/workflows.py",
+     "line": 19,
+     "note": "WorkflowNode.config: dict[str, Any]"
+    },
+    {
+     "file": "services/agent/src/autobots/domain/workflows.py",
+     "line": 104,
+     "note": "_config_errors checks each block's keys"
+    },
+    {
+     "file": "services/agent/src/autobots/application/workflow_runner.py",
+     "line": 171,
+     "note": "runner re-reads config[\"operation\"], [\"max_items\"], [\"path\"] and [\"expert_id\"]"
+    },
+    {
+     "file": "services/agent/src/autobots/application/workflow_overview.py",
+     "line": 89,
+     "note": "overview re-reads config expert_id"
+    },
+    {
+     "file": "services/agent/src/autobots/application/workflows.py",
+     "line": 310,
+     "note": "publisher re-reads node[\"config\"][\"expert_id\"]"
+    }
+   ],
+   "occurrences": 12,
+   "evidence": "Contracts declare 11 open dict fields. Most are open by design (JSON schemas, tool inputs and outputs, workflow inputs); RoutineConfig.trigger and WorkflowNode.config are the 2 whose shape is closed and checked by hand. Outside the validator, 10 raw reads of node config sit in 3 application files: 6 in workflow_runner, 3 in workflow_overview and 1 in workflows.\n```\nclass RoutineConfig(BaseModel):     # contracts/routines.py:21-25\n    target: RoutineTarget\n    trigger: dict[str, Any]\n    block, config = node[\"block\"], node.get(\"config\", {})   # workflow_runner.py:171\n        if len(items) > config[\"max_items\"]:               # workflow_runner.py:187\n```",
+   "impact": "The generated client sees Record<string, unknown> for both fields, so the workflow editor and the cronjob tool get no shape, and extra trigger keys are accepted. Each block's keys are checked in _config_errors and then re-read by string in the runner, overview and publisher. Renaming a key therefore passes validation and fails with KeyError while a workflow runs.",
+   "recommendation": "Parse once into typed domain values. validate_trigger returns an IntervalTrigger | DailyTrigger dataclass that occurrences() consumes. validate_graph returns typed per-block configs (TransformConfig, ConditionConfig, ForeachConfig, ArtifactConfig, AgentConfig), which the runner, overview and publisher read instead of raw keys. Keep the node-level error codes. If the routine trigger becomes a discriminated union in the contract, map its validation errors to the same codes so the 422 responses do not change.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "contracts.md: the workflow IR is versioned (ir_version 1 and 2) and remains the stored format. DH-06: avoid untyped dictionaries. The typed configs are domain types, kept apart from the IR contract and from the web's editable drafts.",
+   "verdict": "revised",
+   "verifierNote": "The 10 raw node-config reads outside the validator reproduce (workflow_runner 6, workflow_overview 3, workflows 1), and validate_trigger ignores unknown keys. Revised: the contracts hold 11 open dict fields, not 2; the finding concerns the 2 with a closed shape. PDOM-02 reports the routine configuration's two definitions from the py-domain area."
+  },
+  {
+   "id": "XTYP-09",
+   "title": "External provider replies are read as Any and coerced field by field",
+   "dimension": "types",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/adapters/tavily.py",
+     "line": 47,
+     "note": "call() returns the raw reply as Any"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/tavily.py",
+     "line": 72,
+     "note": "str(item.get(\"title\", \"\")) turns null into \"None\""
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/github_reads.py",
+     "line": 53,
+     "note": "_checked() -> Any"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/github_pulls.py",
+     "line": 84,
+     "note": "reply.json()[\"object\"][\"sha\"] raises KeyError on another shape"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/browser_executor.py",
+     "line": 77,
+     "note": "reply.json()[\"webSocketDebuggerUrl\"]"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/market_data.py",
+     "line": 139,
+     "note": "the good pattern: explicit shape check mapped to provider_reply_malformed"
+    },
+    {
+     "file": "services/agent/src/autobots/application/tool_gateway.py",
+     "line": 422,
+     "note": "any other exception becomes a generic tool_failed"
+    }
+   ],
+   "occurrences": 33,
+   "evidence": "17 `.json()` reads in adapters, application and operations return Any, and 33 `str(x.get(...))` coercions sit in 7 adapter files.\n```\nasync def call(context: ToolContext, path: str, body: dict[str, Any]) -> Any:   # tavily.py:47\n                title=str(item.get(\"title\", \"\")),                                 # tavily.py:72\n        return str(reply.json()[\"object\"][\"sha\"])                                  # github_pulls.py:84\n        if not isinstance(body, list) or len(body) < 2 or not isinstance(body[1], list):  # market_data.py:139\n```",
+   "impact": "Provider JSON is untrusted input. A null title becomes the string \"None\" in what the model reads, and a missing URL becomes \"\". A reply of the wrong shape raises AttributeError or KeyError, which the gateway turns into a generic tool_failed instead of the provider_reply_malformed code that market_data.py already uses.",
+   "recommendation": "Give each provider a small reply model next to its adapter: Pydantic, extra=\"ignore\", with explicit optional fields. Validate `reply.json()` once and map ValidationError to provider_reply_malformed, treating market_data.py's explicit shape check as the minimum. Return typed values from `call` and `_checked`.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "medium",
+   "ruleCheck": "DH-06: validate data at trust boundaries. Decision 0017's URL guard and the tool output contracts stay as they are. The reply models are adapter types, kept apart from the tool output contracts.",
+   "verdict": "confirmed",
+   "verifierNote": "17 `.json()` reads in adapters, application and operations, and 33 `str(x.get(...))` coercions in 7 adapter files. A wrong-shaped reply also costs calls: ToolGateway._read (tool_gateway.py:410-433) treats the AttributeError or KeyError as a generic failure and retries it up to tool.retries."
+  },
+  {
+   "id": "XTYP-10",
+   "title": "Public timestamps come in three forms, and only one is checked for UTC",
+   "dimension": "types",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/contracts/primitives.py",
+     "line": 28,
+     "note": "UtcTimestamp, with the UTC pattern"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/approvals.py",
+     "line": 69,
+     "note": "ApprovalView.expires_at: str; decided_at at :81"
+    },
+    {
+     "file": "services/agent/src/autobots/api/approval_routes.py",
+     "line": 91,
+     "note": ".isoformat() without converting to UTC"
+    },
+    {
+     "file": "services/agent/src/autobots/application/workflows.py",
+     "line": 70,
+     "note": ".astimezone(UTC).isoformat() into WorkflowDraftView.saved_at: str"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/settings.py",
+     "line": 119,
+     "note": "ModelList.fetched_at: datetime | None, with no UTC pattern"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/operations.py",
+     "line": 71,
+     "note": "DelayedOccurrence.occurrence_time: datetime"
+    },
+    {
+     "file": "apps/web/components/approvals-panel.tsx",
+     "line": 489,
+     "note": "new Date(approval.expires_at) on an unvalidated string"
+    }
+   ],
+   "occurrences": 14,
+   "evidence": "Of the 17 date-time fields in the generated schema, 13 come from UtcTimestamp and carry the UTC pattern. Four are plain datetime: ProviderStatus.validated_at, ModelList.fetched_at, DelayedOccurrence.occurrence_time and RestoreRecord.at. Another 10 contract timestamps are str. Five are public (ApprovalView.expires_at and decided_at, WorkflowDraftView.saved_at, WorkflowExecutionSummary.started_at and OccurrenceView.occurrence_time), and five are in tool outputs.\n```\n    expires_at: str                                     # contracts/approvals.py:69\n                expires_at=row[\"expires_at\"].isoformat(),   # api/approval_routes.py:91\n        saved_at=row[1].astimezone(UTC).isoformat()     # application/workflows.py:70\n    fetched_at: datetime | None                         # contracts/settings.py:119\n```",
+   "impact": "Neither side validates the str timestamps, and plain datetime admits non-UTC offsets because its schema has no pattern. The browser formats whatever arrives, so a bad value shows as \"Invalid Date\" in the approval detail. UTC normalization also differs by call site.",
+   "recommendation": "Use UtcTimestamp for every public timestamp and let Pydantic serialize it. Use it in tool output contracts too, or document why a string is kept. Regenerate the client, and add a non-UTC boundary case for one of the converted fields.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "medium",
+   "ruleCheck": "DH-06 requires timezone-aware UTC dates, and python-worker.md requires explicit UTC. This is a contract change that regenerates the client; generated files are not edited.",
+   "verdict": "confirmed",
+   "verifierNote": "openapi.json has 17 date-time fields, 13 with the UTC pattern; the 4 without are ProviderStatus.validated_at, ModelList.fetched_at, DelayedOccurrence.occurrence_time and RestoreRecord.at. The contracts hold 10 str timestamps, 5 public and 5 in tool outputs."
+  },
+  {
+   "id": "XTYP-11",
+   "title": "The LangChain model hooks on the paid path are typed Any",
+   "dimension": "types",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+     "line": 629,
+     "note": "awrap_model_call(self, request: Any, handler: Callable[[Any], Awaitable[Any]]) -> Any"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+     "line": 641,
+     "note": "response.result[-1].response_metadata on Any"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+     "line": 491,
+     "note": "_admitted_call(request: Any, handler: Any) -> tuple[Any, bool]"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+     "line": 479,
+     "note": "str(response.result[-1].content)"
+    },
+    {
+     "file": "services/agent/src/autobots/adapters/loop_middleware.py",
+     "line": 400,
+     "note": "_bounded(handler: Any, request: Any) -> Any"
+    },
+    {
+     "file": "services/agent/src/autobots/application/worker_inference.py",
+     "line": 169,
+     "note": "ainvoke(messages: Any, stop: Any = None, **kwargs: Any) -> Any"
+    }
+   ],
+   "occurrences": 49,
+   "evidence": "ruff ANN401 finds 38 Any annotations in loop_middleware.py (request 9 times, handler 5, and 6 return types) and 16 in worker_inference.py. 5 of the 54 are SQL connection parameters, which XTYP-04 covers, so 49 are counted here. The pinned langchain 1.4.8 exports ModelRequest, ModelResponse and ModelCallResult from langchain/agents/middleware/types.py (lines 88, 273 and 315).\n```\nasync def awrap_model_call(self, request: Any, handler: Callable[[Any], Awaitable[Any]]) -> Any:  # :629\n    if response.result[-1].response_metadata.get(\"finish_reason\") != \"length\":                    # :641\n```",
+   "impact": "The middleware that admits, budgets and compacts every paid model call reaches into request.override(...), response.result[-1] and response_metadata on Any. A LangChain upgrade that renames them still type-checks and then fails during a model call. DH-06 asks for the combined dependency set to be qualified before it is frozen, and mypy cannot help with that here.",
+   "recommendation": "Annotate the hooks with the library's own types, as AgentMiddleware.awrap_model_call declares them (types.py:598-602): request: ModelRequest, handler: Callable[[ModelRequest], Awaitable[ModelResponse]], returning ModelCallResult. Where the library type is too loose, define a narrow Protocol in adapters/models with a comment that names the gap, and keep the list of such exceptions in one place.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06 asks for third-party typing exceptions to be narrow and documented. model-gateway.md keeps fake transports as the test path. Only types change; no call path or budget logic changes.",
+   "verdict": "revised",
+   "verifierNote": "langchain 1.4.8 is pinned in uv.lock, and its types.py defines ModelRequest at 88, ModelResponse at 273 and ModelCallResult at 315. Revised: 5 of the 54 ANN401 hits are connection parameters already counted in XTYP-04, so 49 remain, and the hook's return type is ModelCallResult, as the base class declares."
+  },
+  {
+   "id": "XTYP-12",
+   "title": "42% of the in-scope Python is never type-checked, though most of it is annotated",
+   "dimension": "standards",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "services/agent/pyproject.toml",
+     "line": 52,
+     "note": "mypy files = [\"src\", \"tests\"] only"
+    },
+    {
+     "file": "scripts/toolchain.py",
+     "line": 212,
+     "note": "the only mypy step runs in services/agent"
+    },
+    {
+     "file": "scripts/persistent_install.py",
+     "line": 288,
+     "note": "reserve_goal -> tuple[object, dict] hides the shared spend Ledger"
+    },
+    {
+     "file": "scripts/persistent_install.py",
+     "line": 446,
+     "note": "ledger.settle(...)  # type: ignore[attr-defined], one of 14 inert suppressions"
+    },
+    {
+     "file": "tests/db/keys_and_vars_check.py",
+     "line": 255,
+     "note": "calls a service API under an inert arg-type suppression"
+    },
+    {
+     "file": "tests/db/run_admission_check.py",
+     "line": 27,
+     "note": "inert no-untyped-def suppression"
+    },
+    {
+     "file": ".claude/hooks/dispatch.py",
+     "line": 96,
+     "note": "bare dict parameters, which strict mode would flag"
+    }
+   ],
+   "occurrences": 133,
+   "evidence": "scripts/, tests/ and .claude/hooks/ have no type-check step. They hold 133 files and 25,788 lines, 42% of the in-scope Python. 81% of their functions are fully annotated by an ast count (scripts 99%, tests/db 99%, tests/harness 39%), 68 of the files import the service package (autobots.*), and they carry 25 type: ignore comments that no checker reads.\n```\nfiles = [\"src\", \"tests\"]                                                  # services/agent/pyproject.toml:52\ndef reserve_goal(ledger_path: Path, limit: int) -> tuple[object, dict]:   # scripts/persistent_install.py:288\n                ledger.settle(entry, charged, 'settled')  # type: ignore[attr-defined]   # :446\n```",
+   "impact": "Annotations that nothing checks can be wrong. A signature change in autobots.application passes the service's mypy and surfaces only when the db profile runs the checks on Docker. In the paid install path, the shared spend ledger is typed object and called through 14 suppressed lines, so a renamed Ledger.settle would fail after the model call it settles and leave the reservation open.",
+   "recommendation": "Add a second mypy step to the fast profile over scripts, tests and .claude/hooks: strict mode, a mypy_path that covers scripts and services/agent/src, and warn_unused_ignores. Start from a baseline file of today's errors that may only shrink, kept by a small comparison script, since mypy has no baseline option. tests/harness, 39% annotated, will dominate that baseline. Fix the ledger first: import Ledger under TYPE_CHECKING and return tuple[Ledger, ReservationEntry].",
+   "sketch": "",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "DH-06 and SP-017 call for mypy strict on owned modules. The new step uses the prepared environment and installs nothing, as the harness rules require. It adds a check and weakens none.",
+   "verdict": "revised",
+   "verifierNote": "133 files and 25,788 of 61,654 Python lines (42%) sit outside mypy, whose only step (toolchain.py:212) and files list (pyproject.toml:52) cover services/agent. 68 of them import autobots, and 25 type: ignore comments are inert, 14 in persistent_install.py. Revised the title and evidence: tests/harness is only 39% annotated. Kept medium: the db profile still catches a broken service signature, though late. XTOL-01 and SCRP-04 report the wider lint, format and type gap at high."
+  },
+  {
+   "id": "XTYP-13",
+   "title": "Shared cross-language fixtures cover 4 of 170 schemas",
+   "dimension": "tests",
+   "severity": "medium",
+   "locations": [
+    {
+     "file": "contracts/fixtures/boundary-cases.json",
+     "line": 1,
+     "note": "29 cases: RunSummary 19, RunEvent 4, WorkflowGraph 4, ErrorResponse 2"
+    },
+    {
+     "file": "services/agent/tests/test_contracts.py",
+     "line": 31,
+     "note": "MODELS maps the same 4 schemas"
+    },
+    {
+     "file": "packages/api-client/tests/contract.test.ts",
+     "line": 9,
+     "note": "parsers maps the same 4 schemas"
+    }
+   ],
+   "occurrences": 4,
+   "evidence": "The generated client has 170 schemas, and the web calls 32 distinct generated parsers. Only 2 of those 32 (RunSummary and RunEvent) have shared cases.\n```\nMODELS: dict[str, type[BaseModel]] = {   # services/agent/tests/test_contracts.py:31\n    \"RunSummary\": RunSummary, \"RunEvent\": RunEvent, \"ErrorResponse\": ErrorResponse, \"WorkflowGraph\": WorkflowGraph,\nconst parsers = { RunSummary: parseRunSummary, RunEvent: parseRunEvent, ErrorResponse: parseErrorResponse, WorkflowGraph: parseWorkflowGraph };  // contract.test.ts:9\n```",
+   "impact": "Unknown enums, private fields and type shapes are compared across the two languages only for runs and events. One shared case each would have caught the unchecked map values and the timestamp fields that skip the UTC check.",
+   "recommendation": "Cover every schema the web parses: one valid case per schema, plus generated mutations (unknown enum value, extra field, wrong type, non-UTC timestamp, bad map value). Make the TypeScript test iterate the parsed schemas and fail when one has no case, so that new screens add cases.",
+   "sketch": "",
+   "effort": "M",
+   "risk": "low",
+   "ruleCheck": "contracts.md requires shared validation fixtures that cover both languages, unknown enums and private-field leakage.",
+   "verdict": "confirmed",
+   "verifierNote": "contracts/fixtures/boundary-cases.json holds 29 cases (RunSummary 19, RunEvent 4, WorkflowGraph 4, ErrorResponse 2), the same 4 schemas both test maps name. The generated client has 170 schemas, and the web calls 32 distinct generated parsers, of which only RunSummary and RunEvent have cases."
+  },
+  {
+   "id": "XTYP-15",
+   "title": "Comments stand in for types, and suppressions give no reason",
+   "dimension": "comments",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/operations.py",
+     "line": 81,
+     "note": "state: str  # ok, degraded or unavailable"
+    },
+    {
+     "file": "services/agent/src/autobots/operations/route_qualification.py",
+     "line": 239,
+     "note": "verdict: str  # passed, failed or unsupported"
+    },
+    {
+     "file": "services/agent/src/autobots/operations/concept_seed.py",
+     "line": 153,
+     "note": "graph: Any  # Callable[[Mapping[str, UUID]], dict[str, Any]]"
+    },
+    {
+     "file": "services/agent/src/autobots/operations/logs.py",
+     "line": 105,
+     "note": "suppression with a code but no reason"
+    },
+    {
+     "file": "services/agent/src/autobots/application/browsing_loop.py",
+     "line": 269,
+     "note": "attr-defined suppression with no reason"
+    },
+    {
+     "file": "services/agent/src/autobots/operations/route_qualification.py",
+     "line": 486,
+     "note": "attr-defined suppression with no reason"
+    },
+    {
+     "file": "services/agent/src/autobots/operations/route_qualification.py",
+     "line": 222,
+     "note": "assignment suppression with no reason; another at :232"
+    }
+   ],
+   "occurrences": 21,
+   "evidence": "3 fields carry their real type in a comment. All 18 `type: ignore` comments in services/agent/src name an error code, and none says why. 12 of them go away with XTYP-05; the other 6 (2 assignment, 3 attr-defined and the RunRow arg-type at run_projection.py:120) are the ones that need a reason.\n```\n    state: str  # ok, degraded or unavailable                     # application/operations.py:81\n    verdict: str  # passed, failed or unsupported                 # operations/route_qualification.py:239\n    graph: Any  # Callable[[Mapping[str, UUID]], dict[str, Any]]  # operations/concept_seed.py:153\n        utils.get_env_var.cache_clear()  # type: ignore[attr-defined]  # operations/logs.py:105\n```",
+   "impact": "The comments carry a closed vocabulary or a callable signature that mypy never checks; operations.py's state then needs a suppression at operation_routes.py:172. SP-017 asks for exceptions that are narrow and documented, and a code without a reason cannot be reviewed or retired.",
+   "recommendation": "Turn the three comments into types: Literal aliases and a Callable alias. Require a reason on every remaining suppression, for example `# type: ignore[attr-defined]  # langsmith's cached helper is untyped`, enforced by a small harness test that rejects a bare `type: ignore[...]`.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "SP-017 (docs/engineering/option-b-contract.md) says to keep exceptions narrow and documented, and DH-06 says to explain nonobvious invariants in code. Decision and story citations in comments stay.",
+   "verdict": "revised",
+   "verifierNote": "The 3 comment-typed fields and the 18 reasonless suppressions reproduce. Revised to avoid overlap with XTYP-05: the run_routes.py:275 and provider_settings.py:168 locations, whose suppressions XTYP-05 removes, were replaced with the remaining ones at route_qualification.py:486 and :222, and the evidence now says which 6 suppressions stay. The example reason now names langsmith, which logs.py:102 imports."
+  },
+  {
+   "id": "XTYP-16",
+   "title": "The lax contract config is copied into 18 places",
+   "dimension": "duplication",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/contracts/approvals.py",
+     "line": 9,
+     "note": "VIEW = ConfigDict(extra=\"forbid\", frozen=True)"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/workflows.py",
+     "line": 10,
+     "note": "the same VIEW"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/run_workspace.py",
+     "line": 12,
+     "note": "the same VIEW"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/operations.py",
+     "line": 11,
+     "note": "the same VIEW"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/run_commands.py",
+     "line": 44,
+     "note": "the same config inline, under 'Not strict, since it is built from database values'"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/primitives.py",
+     "line": 10,
+     "note": "STRICT_CONTRACT, defined once"
+    },
+    {
+     "file": "services/agent/src/autobots/contracts/tools.py",
+     "line": 12,
+     "note": "TOOL_CONTRACT, defined once, with allow_inf_nan=False"
+    }
+   ],
+   "occurrences": 18,
+   "evidence": "VIEW is defined in 9 contract modules and written inline 9 more times, configuring 113 models. STRICT_CONTRACT (49 models) and TOOL_CONTRACT (85 models) are each defined once.\n```\nVIEW = ConfigDict(extra=\"forbid\", frozen=True)                        # contracts/approvals.py:9, and 8 more modules\n    model_config = ConfigDict(extra=\"forbid\", frozen=True)            # contracts/run_commands.py:44, and 8 more\nSTRICT_CONTRACT = ConfigDict(strict=True, extra=\"forbid\", frozen=True)  # contracts/primitives.py:10\n```",
+   "impact": "The strictness policy for 113 response models lives in 18 copies. Changing it, for example to add the allow_inf_nan=False that TOOL_CONTRACT has, means 18 edits, and a copy can drift unnoticed. The lax copies are also what lets str values reach Enum fields at runtime.",
+   "recommendation": "Define VIEW once in contracts/primitives.py beside STRICT_CONTRACT, with a comment on when each applies, and import it everywhere. Add a test that every BaseModel in contracts uses one of the named configs.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06 asks for explicit coercion and strictness per field. No model's behavior changes: the existing lax and strict choices are kept and named once.",
+   "verdict": "confirmed",
+   "verifierNote": "VIEW is defined in 9 contract modules and written inline 9 more times; 104 models use VIEW and 9 the inline copy (113), 49 use STRICT_CONTRACT and 85 TOOL_CONTRACT, the 247 that forbid extra fields. XMOD-15 notes the same copies from the boundaries lens."
+  },
+  {
+   "id": "XTYP-17",
+   "title": "Test doubles need suppressions because collaborators are typed as concrete classes",
+   "dimension": "tests",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "services/agent/src/autobots/application/browsing_loop.py",
+     "line": 297,
+     "note": "admitted_steps(middleware: LoopMiddleware, model: Any, ...)"
+    },
+    {
+     "file": "services/agent/tests/test_browsing_loop.py",
+     "line": 223,
+     "note": "fake middleware passed under # type: ignore[arg-type]"
+    },
+    {
+     "file": "services/agent/tests/test_final_review.py",
+     "line": 93,
+     "note": "arg-type suppression on a fake"
+    },
+    {
+     "file": "services/agent/tests/test_browser_executor.py",
+     "line": 100,
+     "note": "arg-type suppression on a fake"
+    },
+    {
+     "file": "services/agent/tests/test_workflows.py",
+     "line": 318,
+     "note": "arg-type suppression on a fake"
+    },
+    {
+     "file": "services/agent/tests/test_code_tools.py",
+     "line": 16,
+     "note": "helper typed -> object forces 9 attr-defined suppressions"
+    }
+   ],
+   "occurrences": 30,
+   "evidence": "21 of the 44 suppressions in services/agent/tests are [arg-type] in 8 files. Most pass a fake, None or a bare route string where a concrete collaborator is declared (LoopMiddleware, ProviderContext, a stream writer, ModelRoute); test_plans.py:41 passes deliberately invalid input. 9 [attr-defined] come from one helper typed `-> object`.\n```\ndef admitted_steps(middleware: LoopMiddleware, model: Any, route: ModelRoute) -> Step:   # browsing_loop.py:297\n    step = admitted_steps(middleware, delegate, \"researcher-route\")  # type: ignore[arg-type]  # test_browsing_loop.py:223\ndef run(**arguments: object) -> object:                                                  # test_code_tools.py:16\n```",
+   "impact": "Each suppression hides every argument-type error on its line. A signature change in the code under test is then not reported in the test that exercises it, and nothing checks that a fake still matches the collaborator it replaces.",
+   "recommendation": "Type injected collaborators by the narrow Protocol they actually use, such as an admission port or a model step, so fakes type-check without suppressions. Return the real output type from test helpers.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "DH-06 asks for narrow interfaces, and python-worker.md says default model tests are fake. The fakes stay; they just satisfy a Protocol.",
+   "verdict": "revised",
+   "verifierNote": "44 suppressions in services/agent/tests: 21 arg-type in 8 files and 9 attr-defined from the helper at test_code_tools.py:16 (one line below the cited 15). Revised the wording: not every arg-type passes a fake (some pass None or a route string, and test_plans.py:41 is deliberate), and a line-level ignore hides argument errors on its line rather than all checking of the call. PTST-06 covers the same comments from the py-tests area."
+  },
+  {
+   "id": "XTYP-18",
+   "title": "Browser specs read API JSON through casts and local shapes",
+   "dimension": "tests",
+   "severity": "low",
+   "locations": [
+    {
+     "file": "apps/web/tests/browser/approvals.spec.ts",
+     "line": 346,
+     "note": "decided.approvals as { status: string }[]"
+    },
+    {
+     "file": "apps/web/tests/browser/experts.spec.ts",
+     "line": 492,
+     "note": "catalog.tools as Tool[]"
+    },
+    {
+     "file": "apps/web/tests/browser/identity.spec.ts",
+     "line": 120,
+     "note": "me.workspaces as { name: string }[]"
+    },
+    {
+     "file": "apps/web/tests/browser/readiness.spec.ts",
+     "line": 58,
+     "note": "body.services as Record<string, string>[]"
+    },
+    {
+     "file": "apps/web/tests/browser/search.spec.ts",
+     "line": 30,
+     "note": "body.results cast"
+    },
+    {
+     "file": "apps/web/tests/browser/settings-keys-and-vars.spec.ts",
+     "line": 45,
+     "note": "local Item type restates the generated KeyOrVar"
+    },
+    {
+     "file": "apps/web/tests/browser/workspace-choice.spec.ts",
+     "line": 103,
+     "note": "error body cast to { code: string }"
+    },
+    {
+     "file": "apps/web/tests/browser/release-latency.spec.ts",
+     "line": 33,
+     "note": "run_id read through a cast"
+    }
+   ],
+   "occurrences": 31,
+   "evidence": "31 of the 41 browser spec files read API JSON. None imports @autobots/api-client; 18 `as {` casts and local shapes stand in for the contract.\n```\nfor (const item of decided.approvals as { status: string }[])  // approvals.spec.ts:346\nconst tools = catalog.tools as Tool[];                          // experts.spec.ts:492\nconst body = (await reply.json()) as { code: string };          // workspace-choice.spec.ts:103\n```",
+   "impact": "When the API changes shape, these tests fail with a vague assertion, or pass on undefined, instead of a ContractError that names the field. Their local shapes also drift from the contract.",
+   "recommendation": "Parse API reads in specs with the generated parsers, for example parseApprovalList(await response.json()), and use generated types for fixtures. Keep casts only for the window globals that the tests install.",
+   "sketch": "",
+   "effort": "S",
+   "risk": "low",
+   "ruleCheck": "contracts.md: TypeScript types do not validate JSON. The browser flows stay in the db profile, as nextjs.md describes.",
+   "verdict": "confirmed",
+   "verifierNote": "41 spec files, 31 of which read API JSON; none imports @autobots/api-client, and 18 `as {` casts sit in 8 files. TWEB-04 reports the wider pattern (232 untyped reads) from the web-tests area."
+  }
+ ],
+ "rejected": [],
+ "notCovered": "I did not run mypy on scripts/, tests/ or .claude/hooks/, because mypy is not among the permitted commands. So the number of errors a new check would report there is unmeasured. The 398 ANN401 hits were grouped by parameter name and sampled, not opened one by one. Components and service modules were opened where a pattern led, not read in full; their single-file issues are left to the area reviews. The 56 browser-test assertions (50 type, 6 non-null) were classified from their source lines only. The NaN-cursor reconnect loop, the receipt KeyError and the skipped route check are reasoned from code, not executed. One read-only import of five contract and domain modules with the service's Python (python -I), used to confirm that the five Literal aliases match their StrEnums today, may have refreshed ignored __pycache__ files. git status was unchanged afterwards. PRD-Development-Harness.md was read only for DH-03 and DH-06."
+}

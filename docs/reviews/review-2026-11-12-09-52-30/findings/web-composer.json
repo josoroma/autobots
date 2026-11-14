@@ -1,0 +1,1148 @@
+{
+  "schema": "autobots.code-review/v1",
+  "area": "web-composer",
+  "title": "Web: composer, home and sessions",
+  "kind": "area",
+  "timestamp": "2026-11-12-09-52-30",
+  "revision": "156534da0bd5b19417f05d313077d767804b175b",
+  "summary": "The home, composer and session screens are readable. Their comments cite PRD and decision IDs, every GET is parsed with the generated runtime parsers, and loading and failure text is usually explicit. The jobs chart, search palette and greeting show careful accessibility and hydration work. Change cost and defect risk sit in two places. GoalComposer is one 541-line function (527 counted lines, complexity 37) with 13 state hooks, two fetch effects and its submission code inline. Run admission is written separately in goal-composer and session-panel, and both differ from continue-run. Both cast their POST responses instead of parsing them, mint a new Idempotency-Key on every press with no in-flight guard, and report a lost reply as a sign-in problem (the composer) or a plain failure (the session panel), so a double click or a retry after a timeout can admit two paid runs. Elsewhere in the area: failures read as empty or signed-out states (search, the home account section, the composer's option lists); the waiting notifier stops polling for good after a 401 or 403, which a client-side sign-in does not undo, or after a reply its parser rejects; read-only views fetch in client effects data that their dynamic Server Component pages could render; and every client read hand-writes the same effect. Pure logic such as budget steps, input paths, relative time, chart layout and the waiting diff sits inside .tsx files that the repository's node:test runner cannot load. It is tested only through browser suites, or not at all.",
+  "scores": [
+    {
+      "dimension": "standards",
+      "score": 3,
+      "why": "Strict TypeScript, Prettier and traceable comments hold, but DH-06 is missed on the admission path (five response casts, no duplicate-submit guard), read-only views are Client Components, and one avatar hard-codes a radius against DS-03."
+    },
+    {
+      "dimension": "modules",
+      "score": 3,
+      "why": "Imports point at the generated client and lib, but shared run view-models (status labels, the default budget, the goal field id) live in or are copied across feature components."
+    },
+    {
+      "dimension": "size",
+      "score": 2,
+      "why": "Eight of the ten files have a function over 60 lines: GoalComposer 527 at complexity 37, JobsPlot 252, SessionPanel 194, SearchPalette 189, HomeActivity 165."
+    },
+    {
+      "dimension": "functions",
+      "score": 2,
+      "why": "Components interleave data loading, derivation, submission and rendering; the riskiest logic (refusal mapping, budget steps, bar layout, waiting diff) is inline rather than in pure functions."
+    },
+    {
+      "dimension": "structure",
+      "score": 3,
+      "why": "Pages are thin and each feature has one file, but logic the repo's own lib/*.ts pattern would hold stays in client components, out of reach of unit tests."
+    },
+    {
+      "dimension": "approach",
+      "score": 3,
+      "why": "Hydration-safe reads, a native modal dialog and parallel server reads are sound, but read-only data is fetched client-side, each screen writes its own fetch effect, and the polling loop is fragile."
+    },
+    {
+      "dimension": "comments",
+      "score": 4,
+      "why": "Comments mostly explain why and cite PRD and decisions (tab order, nothing sent until Run, body draining); one composer comment is stale and one non-obvious pattern lacks its reason."
+    },
+    {
+      "dimension": "types",
+      "score": 3,
+      "why": "GET reads use generated parsers and the search kind map is keyed by the generated union, but admission responses are cast, request bodies are untyped against RunRequest, and status maps are keyed by string."
+    },
+    {
+      "dimension": "errors",
+      "score": 2,
+      "why": "Loading and failure text is usually explicit, but lost admission replies read as sign-in problems or plain failures, failures read as empty or signed out, option-list failures are swallowed, and polling stops silently."
+    },
+    {
+      "dimension": "tests",
+      "score": 3,
+      "why": "Browser specs cover the main flows with axe checks, but no unit test covers the area's pure logic, and double submits, lost replies, failure states and polling restarts are untested."
+    },
+    {
+      "dimension": "maintainability",
+      "score": 3,
+      "why": "Readable and traceable, with change cost concentrated in GoalComposer and in three diverging copies of run admission."
+    }
+  ],
+  "strengths": [
+    {
+      "title": "Every read is parsed with the generated runtime parsers",
+      "evidence": "Each GET in the area validates its JSON before use: apps/web/components/goal-composer.tsx:152, 157 and 185, home-activity.tsx:79-81, jobs-chart.tsx:90, data-summary.tsx:27, search-palette.tsx:76, session-panel.tsx:35 and waiting-notifier.tsx:47. jobs-chart.tsx:9 and search-palette.tsx:12 derive local types from the generated ones instead of restating them."
+    },
+    {
+      "title": "Hydration-safe browser-only values",
+      "evidence": "apps/web/components/home-greeting.tsx:26-43 reads the clock through useSyncExternalStore with a minute subscription and a null server snapshot, and line 38 says why. goal-composer.tsx:114 restores the draft from sessionStorage the same way, and unavailable storage degrades quietly (38-44, 249-253)."
+    },
+    {
+      "title": "A chart whose meaning never depends on colour",
+      "evidence": "apps/web/components/jobs-chart.tsx:12-46 gives each outcome a documented status token (Decision 0021 R4, 0022 D14) and textures two series. The SVG title carries the totals (186-188), the tooltip is aria-hidden (311-313), and an equivalent table follows (332-381)."
+    },
+    {
+      "title": "An accessible command palette on a native modal dialog",
+      "evidence": "apps/web/components/search-palette.tsx uses showModal and returns focus to the opener (35-47, 103-106). It implements a combobox over a listbox with aria-activedescendant (139-148, 168-200), keeps focus in the input on option mousedown (183), ignores out-of-order replies (65-94), and keys its kind labels by the generated union so a new kind fails to compile (14-19)."
+    },
+    {
+      "title": "Comments that state invariants and trace them",
+      "evidence": "apps/web/components/waiting-notifier.tsx:19-22 says what is read and that nothing leaves the Mac. goal-composer.tsx:46-47 and 358-359 tie the file limits and the Tab order to FI-01 and the layout. home-activity.tsx:73 explains why refused bodies are read, and apps/web/app/page.tsx:22 says why the page is dynamic."
+    },
+    {
+      "title": "Parallel, per-request server reads on Home",
+      "evidence": "apps/web/app/page.tsx:33-38 awaits four independent reads with Promise.all, and page.tsx:22-23 forces dynamic rendering with its reason, so service status is never baked into a build."
+    },
+    {
+      "title": "Stable data-field hooks for tests",
+      "evidence": "Components expose data-field and data-* attributes (goal-composer.tsx:378, 451 and 465; home-activity.tsx:110 and 200-206; jobs-chart.tsx:159, 313 and 332) that the browser specs select on instead of styling classes, for example apps/web/tests/browser/home.spec.ts:37."
+    }
+  ],
+  "findings": [
+    {
+      "id": "WCMP-01",
+      "title": "Run admission can start duplicate paid runs: no in-flight guard and a new Idempotency-Key on every press",
+      "dimension": "errors",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 287,
+          "endLine": 292,
+          "note": "new key per press; the comment states that intent"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 257,
+          "endLine": 262,
+          "note": "startSession mints its own key per press, so a press can also create a second session"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 591,
+          "endLine": 593,
+          "note": "Run is not disabled while a request is in flight"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 335,
+          "endLine": 340,
+          "note": "a null reply or any 5xx falls through to 'error'"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 647,
+          "note": "the 'error' copy tells the user to sign in"
+        },
+        {
+          "file": "apps/web/components/session-panel.tsx",
+          "line": 51,
+          "endLine": 55,
+          "note": "same per-press key"
+        },
+        {
+          "file": "apps/web/components/session-panel.tsx",
+          "line": 190,
+          "note": "disabled only by !ready"
+        },
+        {
+          "file": "apps/web/components/continue-run.tsx",
+          "line": 20,
+          "endLine": 21,
+          "note": "the app's own policy: key kept until the outcome is known; null reply and 5xx treated as unknown at 47-51"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "Three POSTs set Idempotency-Key to a fresh crypto.randomUUID() inside the click handler (goal-composer.tsx:262 and 292, session-panel.tsx:55; counted by grep in the area's files). Neither Run button tracks a pending request: goal-composer.tsx:593 disables only on an empty draft or no budget, and session-panel.tsx:190 only on !ready. csrfFetch first GETs /api/csrf (apps/web/lib/csrf-fetch.ts), so each press spans two round trips. A null reply or a 5xx ends in outcome 'error', whose copy is 'That could not be checked. Sign in, then try again.' (goal-composer.tsx:647). That includes the BFF's 503 after its 30 s upstream timeout (apps/web/lib/bff.ts:102 and 120). continue-run.tsx does the opposite: it keeps the key until the outcome is known (20-21, 39) and treats a null reply or 5xx as unknown (47-51).",
+      "impact": "A double click admits a second run, and so does a second press after an admission that the API committed but whose reply was lost or timed out. With an Expert, it also creates a second session. Each run reserves budget and calls models. The user is told to sign in when the real state is unknown. The app also now applies two contradictory idempotency policies to the same endpoint.",
+      "recommendation": "Adopt continue-run's policy in one shared admission hook: (1) disable Run while a request is in flight; (2) keep the Idempotency-Key, and on the Expert path the created session id, until the outcome is definite; (3) keep the request body fixed while the outcome is unknown, as ContinueRun locks its model choice (continue-run.tsx:94-97), because the API refuses a reused key with different content (application/runs.py:117-118); (4) clear the key only after acceptance or a 4xx refusal; (5) show a null reply or 5xx as 'not known yet, press Run again to check', and keep the sign-in copy for 401 not_signed_in. Share the unknown-outcome rule with the command helper WRUN-03 proposes. Add browser cases that double-click Run and that drop the admission reply, each asserting one run. Write those tests first.",
+      "sketch": "// lib/run-admission.ts (JSX-free) plus one hook used by GoalComposer, SessionPanel and ContinueRun\nexport function useRunAdmission() {\n  const key = useRef<string | null>(null);            // kept until the outcome is known (continue-run.tsx:20)\n  const [state, dispatch] = useReducer(admission, { status: 'idle' });\n  async function submit(body: RunRequest): Promise<void> {\n    if (state.status === 'submitting') return;          // Run is also disabled while submitting\n    dispatch({ type: 'submit' });\n    const result = await admitRun(body, (key.current ??= crypto.randomUUID()));\n    if (result.kind !== 'unknown') key.current = null;  // a null reply or 5xx keeps the key for the retry\n    dispatch({ type: 'settled', result });\n  }\n  return { state, submit };\n}\n// GoalComposer also keeps the session id it created, so a retry reuses it instead of starting another session.\n// While the outcome is unknown, the draft and chips stay locked, so the retry sends the same body.",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: 'Disable duplicate submits with server idempotency as the correctness mechanism.' The server key stays the correctness mechanism; the client stops minting a new one per press and adds the in-flight guard. No run state or scheduling moves into Next.js.",
+      "verdict": "revised",
+      "verifierNote": "Confirmed the three fresh-key POSTs, the missing in-flight guard and the sign-in copy for an unknown outcome. Added step (3): the admission fingerprint covers the goal, budget, files, Expert and model (application/runs.py:202-217), so a retry that sends an edited draft under the kept key is refused rather than replayed."
+    },
+    {
+      "id": "WCMP-02",
+      "title": "Admission replies are cast instead of parsed, and request bodies are untyped",
+      "dimension": "types",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 273,
+          "note": "POST /v1/sessions reply cast to { id: string }; it returns SessionView"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 311,
+          "note": "202 reply cast to { run_id: string } instead of parseRunAccepted"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 318,
+          "endLine": 321,
+          "note": "error body cast instead of parseErrorResponse"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 294,
+          "endLine": 308,
+          "note": "RunRequest body built as an untyped literal"
+        },
+        {
+          "file": "apps/web/components/session-panel.tsx",
+          "line": 65,
+          "note": "same RunAccepted cast"
+        },
+        {
+          "file": "apps/web/components/session-panel.tsx",
+          "line": 68,
+          "endLine": 70,
+          "note": "same error-body cast"
+        },
+        {
+          "file": "apps/web/components/session-panel.tsx",
+          "line": 57,
+          "endLine": 62,
+          "note": "untyped body; expert_id can be undefined (49-50)"
+        },
+        {
+          "file": "packages/api-client/src/generated.ts",
+          "line": 7693,
+          "note": "ErrorResponse and parseErrorResponse are generated, as are RunAccepted (8526), RunRequest (8673) and SessionCreate (8801)"
+        }
+      ],
+      "occurrences": 8,
+      "evidence": "Every GET in these two files is parsed, but the admission POSTs are not. goal-composer.tsx:273 uses `((await reply.json()) as { id: string }).id`. goal-composer.tsx:311 and session-panel.tsx:65 cast to `{ run_id: string }`. Refusals are cast to `{ code?: string; message?: string } | null` (goal-composer.tsx:318-321, session-panel.tsx:68-70). That makes five assertions, the ESLint consistent-type-assertions hits for these files. The three bodies go through JSON.stringify untyped, so session-panel.tsx:60 passes an expert_id typed string | null | undefined; JSON.stringify drops an undefined key, but `satisfies RunRequest` would reject it under exactOptionalPropertyTypes, since RunRequest declares `expert_id?: string | null`. The generated createWorkSession (generated.ts:9482-9483) shows that POST /v1/sessions returns SessionView.",
+      "impact": "This is the paid admission path. If run_id, id or code is renamed or retyped, the code still compiles and fails quietly: the success link becomes /runs/undefined, and refusals fall to the generic message. The project's ESLint config does not flag these casts, so nothing stops more of them.",
+      "recommendation": "Parse with the generated functions. Use parseSessionView for the session reply and parseRunAccepted for the 202. Call parseErrorResponse inside a readError(reply) helper that returns null for other bodies, such as an HTML error page; the API itself turns every validation failure into an ErrorResponse with status 422 (api/errors.py:29-32). Treat a ContractError on a 202 as an unknown outcome (the run may exist), not a refusal. Declare the bodies with `satisfies RunRequest` and `satisfies SessionCreate`. Consider publishing the refusal codes as an enum on ErrorResponse in Pydantic and regenerating, so the Outcome union stops mirroring them by hand. Enable @typescript-eslint/consistent-type-assertions for app code, with narrow, documented exceptions.",
+      "sketch": "async function readError(reply: Response): Promise<ErrorResponse | null> {\n  try { return parseErrorResponse(await reply.json()); } catch { return null; }  // not an ErrorResponse, e.g. an HTML error page -> null\n}\nconst body = { goal_text: draft, ...(sessionId === null ? {} : { session_id: sessionId }) } satisfies RunRequest;\nconst session = parseSessionView(await reply.json());    // POST /v1/sessions returns SessionView\nconst accepted = parseRunAccepted(await reply.json());   // ContractError on a 202 -> 'unknown', not 'refused'",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "DH-06 and rules/nextjs.md: generated API types plus explicit response parsing at untrusted boundaries, and no blanket type assertions; rules/contracts.md: TypeScript types do not validate JSON. The fix uses existing generated parsers and hand-edits nothing generated; any new enum is added in Pydantic and regenerated.",
+      "verdict": "revised",
+      "verifierNote": "The five casts match eslint.json, apps/web/eslint.config.mjs enables only the Next presets, and the generated parsers sit at the cited lines. Corrected two details: the API answers every validation failure with an ErrorResponse 422 (api/errors.py:29-32), so a FastAPI HTTPValidationError body never arrives; and an undefined expert_id is dropped by JSON.stringify, so the defect is the untyped body rather than a wrong value on the wire."
+    },
+    {
+      "id": "WCMP-03",
+      "title": "GoalComposer is a 541-line component with 13 state hooks, three effects and inline submission",
+      "dimension": "size",
+      "severity": "high",
+      "locations": [
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 113,
+          "endLine": 653,
+          "note": "one function: 527 counted lines, complexity 37, 32 statements"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 128,
+          "endLine": 140,
+          "note": "13 useState hooks"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 143,
+          "endLine": 194,
+          "note": "two fetch effects"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 196,
+          "endLine": 216,
+          "note": "budget math in render; unguarded loop at 199-205"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 218,
+          "endLine": 245,
+          "note": "file admission"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 276,
+          "endLine": 341,
+          "note": "run(): 65 lines, complexity 18"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 601,
+          "endLine": 649,
+          "note": "outcome as a nine-way nested ternary"
+        },
+        {
+          "file": "services/agent/src/autobots/contracts/settings.py",
+          "line": 152,
+          "note": "step_micro_usd is a plain int with no minimum"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "Lines 113-653 hold the whole composer. They contain 13 useState hooks (128-140) and a store read (114); effects for focus (116-127), the option lists (143-166) and the preview (169-194); budget math in render (196-216); file admission (218-245); session start and admission (256-341); and 310 lines of JSX ending in a nine-way nested ternary (607-648). outcome, runId and refusal are separate hooks updated in pairs (277-278, 312-313, 323-324), so the queued branch still has to check runId === null (640). Budget choices come from `for (value = min; value <= max; value += step)` over server values (199-205), and the contract sets no minimum on step_micro_usd.",
+      "impact": "Every change to a chip, a refusal or the attachments lands in one 37-branch function whose states must be kept consistent by hand. The admission and option-loading defects in this area are hidden inside it. Its pure parts can't be unit-tested where they are, and a zero step from the server would hang the render.",
+      "recommendation": "Split by responsibility. Give the draft, the option lists, the preview, the attachments and admission their own hooks. Make budget choices and file admission pure, JSX-free functions; budget choices should reject step <= 0 and cap the count. Move the markup into four presentational children. Use useReducer only for admission, where fields must change together; the rest of the state is independent. A form library would add little, because validation is one non-empty check plus the server's refusals. Fix admission first, with its tests, because composer.spec.ts pins the current behavior.",
+      "sketch": "GoalComposer (layout only, about 120 lines)\n  useDraft()                        sessionStorage draft (33-44, 114, 128, 141, 247-254)\n  useNewRunFocus()                  NEW_RUN_PARAM effect (116-127), beside focusGoal in new-run.tsx\n  useRunOptions()                   experts and models with a status (143-166)\n  useRunPreview(profile, expertId)  { status, preview } (169-194)\n  useAttachments()                  over lib/attachments.ts: admitFiles(), inputPath(), limits (46-100, 218-245)\n  useRunAdmission()                 shared reducer: idle | submitting | accepted | refused | unknown (256-341)\n  lib/budget.ts budgetChoices(range, chosen) -> { choices, budget, exhausted }, rejects step <= 0 (196-212)\n  <RunOptionChips/> 375-458   <PreviewChips/> 465-508   <AttachmentField/> 510-589   <AdmissionMessage/> 601-649",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06 asks for small cohesive modules and keeps UI view models distinct. The reducer models the admission request (idle, submitting, accepted, refused, unknown), not RunStatus, so it adds no second run-state enum; the run's state stays RunAccepted.status.",
+      "verdict": "confirmed",
+      "verifierNote": "Counted 13 useState hooks, the store read, three effects and the nine-way outcome chain at the cited lines; run() matches eslint.json (65 lines, complexity 18), and git log shows 14 commits on the file. The zero-step hang is defensive: the API sends a fixed US$0.25 step today (domain/budgets.py:7), though the contract does not forbid zero."
+    },
+    {
+      "id": "WCMP-04",
+      "title": "Run admission is implemented three times, with different refusal handling and announcements",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 322,
+          "endLine": 340,
+          "note": "maps budget_*, model_not_offered, 422 and three credential codes"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 601,
+          "endLine": 648,
+          "note": "copy with settings links; role=alert even for a queued run (603)"
+        },
+        {
+          "file": "apps/web/components/session-panel.tsx",
+          "line": 71,
+          "endLine": 79,
+          "note": "three cases in a nested ternary"
+        },
+        {
+          "file": "apps/web/components/session-panel.tsx",
+          "line": 195,
+          "endLine": 207,
+          "note": "role=status for success, role=alert for problems"
+        },
+        {
+          "file": "apps/web/components/continue-run.tsx",
+          "line": 65,
+          "endLine": 71,
+          "note": "shows the server's message instead"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "goal-composer.tsx:322-340 maps budget_* codes, model_not_offered, a 422 and three credential codes to nine outcomes, three of which link to settings (609-630). session-panel.tsx:71-79 handles credentials_required (without the link), model_not_offered and a 422. There, credential_invalid, credential_unavailable and budget refusals all read 'That could not be started.' continue-run.tsx:65-71 shows failure.message. The composer announces a queued run with role=alert (603); the session panel uses role=status (196).",
+      "impact": "The same server refusal reads differently, or loses its fix-it link, depending on which screen started the run, and a new refusal code needs three edits. Each copy also carries its own casts and key policy, which is how the duplicate-submit and parsing gaps spread.",
+      "recommendation": "Put the request, parsing and refusal mapping in a JSX-free lib/run-admission.ts that returns a discriminated result. Render that result with one AdmissionMessage component: role=status when accepted, role=alert for refusals, and the settings links in one place. GoalComposer, SessionPanel and ContinueRun then supply only their RunRequest body. Do this together with the duplicate-submit and parsing fixes, which need the same module.",
+      "sketch": "// lib/run-admission.ts\nexport type AdmissionResult =\n  | { kind: 'accepted'; accepted: RunAccepted }\n  | { kind: 'refused'; refusal: Refusal; message: string | null }  // the codes the screens map today\n  | { kind: 'unknown' };                                              // null reply or 5xx\nexport async function admitRun(body: RunRequest, key: string): Promise<AdmissionResult>\n// components/admission-message.tsx\n<AdmissionMessage result={result} />  // role=status when accepted, role=alert for refusals",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: centralize error handling and avoid duplicated business rules. The mapping still comes from the server's codes, so no client rule is invented and admission remains a server decision.",
+      "verdict": "confirmed",
+      "verifierNote": "Compared the three mappings side by side: only the composer links to settings, the session panel folds credential_invalid, credential_unavailable and budget refusals into one sentence, and the composer announces a queued run with role=alert."
+    },
+    {
+      "id": "WCMP-05",
+      "title": "Failures render as signed out, empty results or nothing",
+      "dimension": "errors",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/app/page.tsx",
+          "line": 71,
+          "endLine": 80,
+          "note": "a null session renders 'Signed out' and 'You are not signed in.'; Sign in link at 90-96"
+        },
+        {
+          "file": "apps/web/lib/service-status.ts",
+          "line": 52,
+          "endLine": 61,
+          "note": "fetchSession returns null when signed out and on any API failure"
+        },
+        {
+          "file": "apps/web/components/search-palette.tsx",
+          "line": 75,
+          "endLine": 79,
+          "note": "a refused reply becomes an empty result list"
+        },
+        {
+          "file": "apps/web/components/search-palette.tsx",
+          "line": 83,
+          "endLine": 87,
+          "note": "a network failure does too"
+        },
+        {
+          "file": "apps/web/components/search-palette.tsx",
+          "line": 211,
+          "endLine": 212,
+          "note": "which then reads 'Nothing in this workspace matches.'"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 151,
+          "endLine": 162,
+          "note": "option-list refusals are drained and dropped, and errors are swallowed"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "page.tsx branches six times on session === null (42, 59, 71, 75, 79, 90). fetchSession returns null from its catch (lib/service-status.ts:58-59) when the API is unreachable, so a signed-in user with the API down sees 'Signed out', 'You are not signed in.' and a Sign in button. In search, a refused reply yields an empty list through `reply.ok ? parseSearchResults(...).results : []` (search-palette.tsx:75-77), the catch does the same (83-87), and both show 'Nothing in this workspace matches.' (211-212). In the composer, a refused experts or models read is drained and nothing else happens, and `.catch(() => undefined)` (162) swallows network and ContractError failures. The selects then offer only their defaults, with no message.",
+      "impact": "When the local API is down, the app tells the user to sign in, says nothing matches, or says nothing at all, which sends the user to the wrong fix. These are the states DH-06 asks to keep apart.",
+      "recommendation": "Return a discriminated result from the session read (signed_out, signed_in or unavailable), and when it is unavailable, show that the account can't be checked instead of offering Sign in. Give search a failed status with its own message. Show one line under the chips when experts or models can't be read, so the user knows the lists are incomplete. The shared resource hook in the fetch-effect finding provides the failed state.",
+      "sketch": "// lib/service-status.ts\nexport type SessionState =\n  | { kind: 'signed_out' }\n  | { kind: 'signed_in'; session: SessionSummary }\n  | { kind: 'unavailable' };\n// search: useSearch(query) -> { status: 'idle' | 'searching' | 'ready' | 'failed'; results }\n// composer: useRunOptions() -> { status: 'loading' | 'ready' | 'failed'; experts; models }",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: represent loading, empty, denied, unavailable and retryable states deliberately; rules/nextjs.md: explicit error, empty and loading states. Error details stay on the server, as fetchServiceStatus already keeps them.",
+      "verdict": "confirmed",
+      "verifierNote": "fetchSession's catch returns null, so an unreachable API renders 'Signed out' and a Sign in link. The Services section on the same page does show 'Python API: unavailable', which softens the contradiction but does not remove it. The search and option-list paths behave as stated."
+    },
+    {
+      "id": "WCMP-06",
+      "title": "The waiting notifier stops polling for good after a 401 or a rejected reply",
+      "dimension": "errors",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/waiting-notifier.tsx",
+          "line": 66,
+          "endLine": 69,
+          "note": "a 401 or 403 returns without scheduling the next poll"
+        },
+        {
+          "file": "apps/web/app/layout.tsx",
+          "line": 30,
+          "note": "mounted once in the root layout, so client navigation never remounts it"
+        },
+        {
+          "file": "apps/web/components/sign-in-form.tsx",
+          "line": 31,
+          "endLine": 32,
+          "note": "sign-in is router.push plus router.refresh, not a page load"
+        },
+        {
+          "file": "apps/web/components/waiting-notifier.tsx",
+          "line": 47,
+          "endLine": 49,
+          "note": "bad JSON or a ContractError rejects poll(), so line 71 is never reached"
+        },
+        {
+          "file": "apps/web/components/waiting-notifier.tsx",
+          "line": 36,
+          "note": "timer is undefined while a request is in flight"
+        },
+        {
+          "file": "apps/web/components/waiting-notifier.tsx",
+          "line": 74,
+          "endLine": 78,
+          "note": "so restart() during a request starts a second loop"
+        },
+        {
+          "file": "apps/web/components/waiting-notifier.tsx",
+          "line": 71,
+          "note": "fixed 4 s interval and no backoff while the API is down"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "poll() sets timer = undefined (36), awaits the fetch, and reschedules only at its end (71). A 401 or 403 returns first (69). The comment at 68 expects the page to reload and restart it, but sign-in navigates client-side (sign-in-form.tsx:31-32), and the notifier lives in the root layout (layout.tsx:30) with an effect keyed on the stable router, so nothing restarts it. parseRunList(await reply.json()) (47) is outside any try, and poll runs as `void poll()`, so a rejected reply ends the loop with an unhandled rejection. restart() cannot cancel an in-flight poll, because the timer it checks at 75 is undefined then. Toggling the setting off and on within one request therefore leaves two loops. Failures retry every 4 s indefinitely.",
+      "impact": "With the setting on, notifications silently stop until a reload after the user signs out and back in, or opens the app on an expired session. That disables PRD-Studio SE-05. One reply the parser rejects has the same effect. The forked loop and the missing backoff are rarer and cheaper, but come from the same structure.",
+      "recommendation": "Make every exit path schedule the next poll: wrap each poll in try/finally, back off after failures (doubling from 4 s up to a cap, reset on success), and either retry slowly after a 401 or 403 (for example every 60 s) or remount the notifier when the signed-in user changes. Add a generation counter that restart() increments, so a stale poll never reschedules. Extract the newly-waiting diff as a pure function with unit tests, and cover the loop with fake timers instead of the fixed five-second waits in tests/browser/settings-sections.spec.ts.",
+      "sketch": "// lib/waiting.ts (pure, unit-tested)\nexport function newlyWaiting(seen: ReadonlySet<string> | null, runs: readonly RunListItem[]): { fresh: RunListItem[]; seen: Set<string> }\n// waiting-notifier.tsx\nlet generation = 0; let failures = 0;\nasync function tick(mine: number): Promise<void> {\n  let delay = EVERY_MS;\n  try { delay = await pollOnce(); failures = 0; }                 // EVERY_MS, or SIGNED_OUT_MS after 401/403\n  catch { failures += 1; delay = Math.min(EVERY_MS * 2 ** failures, MAX_MS); }\n  finally { if (!stopped && mine === generation) timer = setTimeout(() => void tick(mine), delay); }\n}\nfunction restart(): void { generation += 1; clearTimeout(timer); seen = null; void tick(generation); }",
+      "effort": "S",
+      "risk": "medium",
+      "ruleCheck": "PRD-Studio SE-05: read only the app's own API and raise one notification per newly waiting run; both stay. The loop only reads, so it schedules no business work in the browser (DH-06).",
+      "verdict": "confirmed",
+      "verifierNote": "Traced every exit path: a 401 or 403 returns before line 71, a parser rejection escapes `void poll()`, and restart() cannot clear a poll in flight, so a second loop starts. The effect depends only on the stable router, and sign-in is client-side, so the root-layout notifier is never restarted."
+    },
+    {
+      "id": "WCMP-07",
+      "title": "Read-only home, data and session views fetch in client effects data their dynamic pages could render",
+      "dimension": "approach",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/home-activity.tsx",
+          "line": 56,
+          "endLine": 90,
+          "note": "no interaction; three client reads in an effect"
+        },
+        {
+          "file": "apps/web/components/data-summary.tsx",
+          "line": 18,
+          "endLine": 39,
+          "note": "no interaction; one client read"
+        },
+        {
+          "file": "apps/web/components/session-panel.tsx",
+          "line": 24,
+          "endLine": 43,
+          "note": "the session the page could pass in"
+        },
+        {
+          "file": "apps/web/components/home-activity.tsx",
+          "line": 68,
+          "note": "/api/v1/runs at the default limit of 100 to show five (191)"
+        },
+        {
+          "file": "apps/web/app/page.tsx",
+          "line": 33,
+          "endLine": 38,
+          "note": "the page awaits four reads with no Suspense boundary"
+        },
+        {
+          "file": "apps/web/app/page.tsx",
+          "line": 36,
+          "note": "readiness is read again by the shell (app-shell.tsx:19) with no cache()"
+        },
+        {
+          "file": "apps/web/lib/service-status.ts",
+          "line": 33,
+          "note": "the server-only member client these reads would use"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "HomeActivity and DataSummary have no event handlers. They are Client Components only so they can fetch in an effect, so they render 'Loading.' first and carry their own failure branches. HomeActivity also needs three non-null assertions (79-81). The generated client already has server operations for these reads: getRetentionSummary, getWorkSession and listApprovals (packages/api-client/src/generated.ts:9386, 9486 and 9294). lib/service-status.ts already builds the member clients they need. Recent runs downloads up to 100 runs to show five (68, 191), although the endpoint accepts limit. On the server, page.tsx blocks on four reads before anything streams, and fetchReadiness runs twice per render (page.tsx:36, app-shell.tsx:19).",
+      "impact": "Each of these views adds a round trip through the BFF and a loading flash for data the server can read with a typed client, and each duplicates effect code. On Home, the slowest read delays the composer, which needs none of them.",
+      "recommendation": "Make HomeActivity and DataSummary async Server Components. Feed them from server-only helpers beside fetchReadiness: needs-you runs, five recent runs with limit=5 and pending approvals for Home, and the retention summary for the data page. Pass SessionPanel a server-read SessionView so it keeps only the form. Move the home page's own reads into Suspense-wrapped sections so the composer streams first. Wrap fetchReadiness and fetchSession in React cache() so the shell and the page share one read per request. The generated listRuns takes no query parameters, so its helper uses requestJson plus parseRunList until the generator supports them.",
+      "sketch": "// app/page.tsx (Server Component)\n<GoalComposer />\n<Suspense fallback={<ActivityLoading />}>\n  <HomeActivity />   // async: needs-you runs, five recent runs and approvals, parsed, via the member client\n</Suspense>\n// app/settings/data/page.tsx: <DataSummary summary={await fetchRetentionSummary()} />\n// app/sessions/[id]/page.tsx: <SessionPanel session={await fetchWorkSession(id)} />  // the panel keeps only the form\n// lib/service-status.ts: export const fetchReadiness = cache(async () => { ... })",
+      "effort": "M",
+      "risk": "medium",
+      "ruleCheck": "DH-06: prefer Server Components, use Client Components for actual interaction, and keep workspace data out of shared caches. The reads stay per request (the session cookie makes the pages dynamic, and the reads use no-store) and go through the existing server-only member client.",
+      "verdict": "confirmed",
+      "verifierNote": "HomeActivity and DataSummary have no handlers; getRetentionSummary, getWorkSession and listApprovals exist at the cited lines, and /api/v1/runs defaults to RUN_LIST_SIZE = 100 (run_projection.py:55). The second readiness read was inferred from the two call sites, not measured."
+    },
+    {
+      "id": "WCMP-08",
+      "title": "Every client read writes its own fetch effect, and the copies already disagree",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 143,
+          "endLine": 166,
+          "note": "option lists"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 169,
+          "endLine": 194,
+          "note": "preview"
+        },
+        {
+          "file": "apps/web/components/search-palette.tsx",
+          "line": 65,
+          "endLine": 94,
+          "note": "search"
+        },
+        {
+          "file": "apps/web/components/jobs-chart.tsx",
+          "line": 85,
+          "endLine": 102,
+          "note": "job counts"
+        },
+        {
+          "file": "apps/web/components/data-summary.tsx",
+          "line": 22,
+          "endLine": 39,
+          "note": "retention"
+        },
+        {
+          "file": "apps/web/components/session-panel.tsx",
+          "line": 31,
+          "endLine": 33,
+          "note": "the refused body is never read"
+        },
+        {
+          "file": "apps/web/components/home-activity.tsx",
+          "line": 73,
+          "note": "says why a refused body must be read"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 147,
+          "note": "/api/models, which the child RunDisclosure fetches again (run-disclosure.tsx:47)"
+        }
+      ],
+      "occurrences": 8,
+      "evidence": "Eight effects in this area repeat the same shape: a `let live = true`, `let active = true` or `let stopped = false` flag, a no-store fetch, parse on ok, drain on refusal, then a failed flag. They are at goal-composer.tsx:144 and 170, home-activity.tsx:64, jobs-chart.tsx:86, data-summary.tsx:23, search-palette.tsx:68, session-panel.tsx:25 and waiting-notifier.tsx:28. A grep for those flags finds 29 in 24 files under apps/web components, app and lib. home-activity.tsx:73 says an unread refusal keeps its connection open, yet session-panel.tsx:31-33 never reads the refused body, and every `if (!live) return` exits before reading. The composer and its RunDisclosure child each fetch /api/models on mount.",
+      "impact": "Each copy decides liveness, body handling, error typing and the failure state again. A fix like the ones in the failure-state finding must be repeated eight times in this area and 29 times across the app, and the copies have already drifted.",
+      "recommendation": "Add one hook, useApiResource(url, parse). It should abort with an AbortController on cleanup (which also releases the connection), cancel refused bodies, turn a ContractError into the failed state, and return a discriminated state. Use it for the reads that must stay client-side here: the composer's option lists and preview, search, and the jobs chart inside the client OperationsPanel. Pass the models list from GoalComposer to RunDisclosure instead of fetching it twice.",
+      "sketch": "// lib/use-api-resource.ts\nexport type Resource<T> =\n  | { status: 'loading' }\n  | { status: 'ready'; data: T }\n  | { status: 'failed'; httpStatus: number | null };\nexport function useApiResource<T>(url: string | null, parse: (value: unknown) => T): Resource<T>\n// one AbortController per url, aborted on cleanup; a refused body is cancelled; ContractError -> failed",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-06: centralize error handling; rules/nextjs.md: explicit error, empty and loading states. The hook only reads, and the generated parsers remain the validation step.",
+      "verdict": "confirmed",
+      "verifierNote": "Recounted 29 liveness flags in 24 files (grep for `let live = true`, `let active = true` and `let stopped = false`); session-panel.tsx:31-33 does not read the refused body, and both the composer and RunDisclosure request /api/models."
+    },
+    {
+      "id": "WCMP-10",
+      "title": "SearchPalette puts the shortcut, dialog, debounced search, key handling and status in one function",
+      "dimension": "functions",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/search-palette.tsx",
+          "line": 49,
+          "endLine": 63,
+          "note": "global ⌘K listener"
+        },
+        {
+          "file": "apps/web/components/search-palette.tsx",
+          "line": 65,
+          "endLine": 94,
+          "note": "debounced search, with a 150 ms literal at 89"
+        },
+        {
+          "file": "apps/web/components/search-palette.tsx",
+          "line": 151,
+          "endLine": 163,
+          "note": "arrow and Enter handling inline in JSX"
+        },
+        {
+          "file": "apps/web/components/search-palette.tsx",
+          "line": 207,
+          "endLine": 213,
+          "note": "four-way status ternary"
+        },
+        {
+          "file": "apps/web/components/search-palette.tsx",
+          "line": 108,
+          "note": "old results stay selectable while a new term is pending (Enter at 159-161)"
+        },
+        {
+          "file": "apps/web/components/search-palette.tsx",
+          "line": 115,
+          "note": "aria-keyshortcuts and the ⌘K label (121-126) are hard-coded"
+        },
+        {
+          "file": "apps/web/lib/shortcuts.ts",
+          "line": 15,
+          "note": "the Settings list repeats ⌘K by hand"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "SearchPalette (24-218, 189 counted lines) handles opening the dialog and returning focus (35-47, 103-106), the global shortcut (49-63), the debounced fetch (65-94), arrow wrap-around and Enter (151-163), and the status text (207-213). The shortcut is defined three times: in the key matcher (52-55), in aria-keyshortcuts and the kbd label (115, 121-126), and in the SE-07 registry entry (lib/shortcuts.ts:14-17). `shown` holds the current results whenever the query is non-empty (108), so while 'Searching.' is announced, Enter opens a result for the previous term.",
+      "impact": "The keyboard behavior is correct today, but none of it can be unit-tested inline. A shortcut change needs three coordinated edits, and typing quickly then pressing Enter opens a stale result.",
+      "recommendation": "Extract three pieces: a useSearch(query) hook returning { status, term, results }, with a failed status (see the failure-state finding); a pure moveActive(current, key, count) in lib/keyboard.ts; and a useShortcut(match, handler) hook shared with NewRun's ⇧⌘O. Give each SHORTCUTS entry its matcher and aria-keyshortcuts value. Let Enter act only when the results belong to the current term, and ignore keys during IME composition.",
+      "sketch": "useShortcut(SHORTCUTS.search, open)  // matcher and aria-keyshortcuts beside the label in lib/shortcuts.ts; NewRun reuses it for ⇧⌘O\nconst search = useSearch(query)       // { status: 'idle' | 'searching' | 'ready' | 'failed'; term; results }, debounced, aborted on change\nmoveActive(current, key, count)       // pure, lib/keyboard.ts\n<SearchResults search={search} active={active} />  <SearchStatus search={search} />\n// SearchPalette keeps the dialog, open/close and focus return",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Decision 0022 D3 (⌘K opens search, and no shortcut acts in a text field) and PRD-Studio SE-07 (every shortcut in one list) stay true; the registry becomes the single source instead of a manual copy.",
+      "verdict": "confirmed",
+      "verifierNote": "With the previous results still in `shown` while 'Searching.' is announced, Enter calls go(shown[active]) for the old term (108, 159-161). The ⌘K definition appears at 52-55, 115, 121-126 and lib/shortcuts.ts:14-17."
+    },
+    {
+      "id": "WCMP-11",
+      "title": "Pure logic lives in .tsx files the unit runner can't load, so it is untested or tested only in the browser",
+      "dimension": "tests",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 88,
+          "endLine": 100,
+          "note": "inputPath; also fileSize (68), budget steps (196-212) and refusal mapping (318-340)"
+        },
+        {
+          "file": "apps/web/components/home-activity.tsx",
+          "line": 24,
+          "endLine": 48,
+          "note": "relative and progressOrSpend"
+        },
+        {
+          "file": "apps/web/components/jobs-chart.tsx",
+          "line": 66,
+          "endLine": 70,
+          "note": "ticks"
+        },
+        {
+          "file": "apps/web/components/waiting-notifier.tsx",
+          "line": 50,
+          "endLine": 64,
+          "note": "the newly-waiting diff, inline"
+        },
+        {
+          "file": "apps/web/components/home-greeting.tsx",
+          "line": 7,
+          "endLine": 23,
+          "note": "greetingFor, exported but exercised only by browser page loads"
+        },
+        {
+          "file": "apps/web/tests/browser/home.spec.ts",
+          "line": 70,
+          "endLine": 84,
+          "note": "one sign-in, then six page loads test the greeting's hour boundaries"
+        },
+        {
+          "file": "apps/web/lib/schema-value.ts",
+          "line": 1,
+          "endLine": 2,
+          "note": "the repo's pattern: 'Pure, so it can be tested without a browser.'"
+        },
+        {
+          "file": "scripts/verify.py",
+          "line": 161,
+          "endLine": 162,
+          "note": "node --test runs two named files; tests/unit/schema-value.test.ts is not one of them"
+        }
+      ],
+      "occurrences": 10,
+      "evidence": "Ten pure helpers sit in client components, counted by reading the area's files: fileSize, inputPath, the budget-step loop and the refusal mapping (goal-composer); relative and progressOrSpend (home-activity); ticks and total (jobs-chart); the waiting diff (waiting-notifier); and greetingFor (home-greeting). The unit runner is `node --test` over listed .ts files (scripts/verify.py:161-162). It can load neither JSX nor the @/ alias, so none of these helpers can be imported. lib/schema-value.ts with tests/unit/schema-value.test.ts shows the intended shape. The greeting's boundaries are tested by one sign-in and six page loads under a fixed clock (home.spec.ts:70-84).",
+      "impact": "Edge cases that matter have no fast test: path collisions and the 180-character cut, a zero budget step, each refusal code, the hour boundaries, a run that waits again. The only way to cover them today is the db profile with seeded users.",
+      "recommendation": "Move each helper to a JSX-free lib/*.ts module with relative imports, and add node:test files beside tests/unit/schema-value.test.ts. Have the web_unit_tests step in scripts/verify.py glob tests/unit/*.test.ts, so a new file can't be skipped the way schema-value.test.ts is today. Keep the browser specs for the user flows.",
+      "sketch": "apps/web/lib/attachments.ts    admitFiles(kept, chosen), inputPath(), MEDIA_TYPES, limits\napps/web/lib/budget.ts         budgetChoices(range, chosen)\napps/web/lib/run-admission.ts  refusal mapping\napps/web/lib/format.ts         formatUsd, formatRelative, formatBytes, greetingFor\napps/web/lib/jobs-layout.ts    ticks, layoutJobs\napps/web/lib/waiting.ts        newlyWaiting\napps/web/tests/unit/*.test.ts  node:test, picked up by a glob in scripts/verify.py",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DH-06 asks for unit tests of pure and client behavior and names Vitest. This uses the node:test runner the repo already has, so no dependency is added. Changing scripts/verify.py is a separate authorized work item.",
+      "verdict": "revised",
+      "verifierNote": "The ten helpers, the two-file runner list and the unrun schema-value.test.ts are confirmed (no other script or Makefile target runs it). Corrected the greeting test: it signs in once and loads the page six times (home.spec.ts:70-84), not six sign-ins."
+    },
+    {
+      "id": "WCMP-12",
+      "title": "Money and relative-time formatting is copied per component and differs between screens",
+      "dimension": "duplication",
+      "severity": "medium",
+      "locations": [
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 74,
+          "endLine": 76,
+          "note": "dollars"
+        },
+        {
+          "file": "apps/web/components/home-activity.tsx",
+          "line": 34,
+          "endLine": 36,
+          "note": "dollars, identical"
+        },
+        {
+          "file": "apps/web/components/home-activity.tsx",
+          "line": 24,
+          "endLine": 32,
+          "note": "relative"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 87,
+          "note": "dollars, identical (also workflows-panel.tsx:50)"
+        },
+        {
+          "file": "apps/web/components/run-panel.tsx",
+          "line": 30,
+          "note": "dollars, identical"
+        },
+        {
+          "file": "apps/web/components/run-inspector.tsx",
+          "line": 10,
+          "endLine": 11,
+          "note": "dollars without rounding"
+        },
+        {
+          "file": "apps/web/components/workflows-panel.tsx",
+          "line": 36,
+          "endLine": 47,
+          "note": "relative, identical to Home's"
+        },
+        {
+          "file": "apps/web/components/approvals-panel.tsx",
+          "line": 88,
+          "endLine": 97,
+          "note": "relative in a shorter style ('5 min ago')"
+        }
+      ],
+      "occurrences": 13,
+      "evidence": "The same `function dollars(micro)`, returning US$ plus `(micro / 1_000_000).toFixed(2)`, is copied in goal-composer.tsx:74, home-activity.tsx:34, run-list.tsx:87, run-panel.tsx:30 and workflows-panel.tsx:50. run-inspector.tsx:10-11 prints the value unrounded. model-policy-panel.tsx:34, workflow-editor.tsx:658, run-workspace.tsx:803 and run-disclosure.tsx:97 format inline, for 10 sites in total. relative() is identical in home-activity.tsx:24-32 and workflows-panel.tsx:36-47, while approvals-panel.tsx:88-97 prints a shorter form, for 3 functions. Counted by grep under apps/web for 'function dollars', '/ 1_000_000' and 'function relative'.",
+      "impact": "Screens disagree on how a micro-dollar amount reads (cents on Home, unrounded in the inspector, locale-formatted in model policy) and how a time reads ('5 minutes ago' on Home, '5 min ago' on Approvals). A change to money or time display touches up to ten files.",
+      "recommendation": "Add lib/format.ts with formatUsd (and MICRO_USD), formatRelative and formatBytes, unit-test it, and replace the copies, starting with this area's two. Keep the '≈' estimate marker in the caller (home-activity.tsx:45-47), so estimated and reported costs stay distinct.",
+      "sketch": "// lib/format.ts\nexport const MICRO_USD = 1_000_000;\nexport function formatUsd(micro: number): string         // 'US$0.07'\nexport function formatRelative(iso: string, now: number): string\nexport function formatBytes(bytes: number): string",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DS-04: estimated and reported costs remain distinct. The formatter only formats a number; callers still decide when a value is an estimate.",
+      "verdict": "confirmed",
+      "verifierNote": "grep found the five identical dollars(), the unrounded inspector copy, four inline sites and three relative() functions, as stated. WRUN-10 proposes the same lib/format.ts for the run screens."
+    },
+    {
+      "id": "WCMP-09",
+      "title": "JobsPlot mixes scale math and SVG rendering in one 252-line function",
+      "dimension": "size",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/jobs-chart.tsx",
+          "line": 133,
+          "endLine": 385,
+          "note": "JobsPlot: 252 counted lines; the file is 366 counted lines"
+        },
+        {
+          "file": "apps/web/components/jobs-chart.tsx",
+          "line": 142,
+          "endLine": 151,
+          "note": "scale computed in render"
+        },
+        {
+          "file": "apps/web/components/jobs-chart.tsx",
+          "line": 214,
+          "note": "bar x, repeated at 252"
+        },
+        {
+          "file": "apps/web/components/jobs-chart.tsx",
+          "line": 253,
+          "endLine": 271,
+          "note": "segments stacked by mutating base inside map"
+        },
+        {
+          "file": "apps/web/components/jobs-chart.tsx",
+          "line": 230,
+          "note": "ticks(tallest) recomputed (first at 144)"
+        },
+        {
+          "file": "apps/web/components/jobs-chart.tsx",
+          "line": 194,
+          "note": "fixed SVG ids (also 186, 217 and 265)"
+        },
+        {
+          "file": "apps/web/components/jobs-chart.tsx",
+          "line": 83,
+          "note": "hover state owned by JobsChart but used only by JobsPlot (127)"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "After computing tallest, scaleTop, band, barWidth and y (142-151), JobsPlot repeats geometry inline. `LEFT + index * band + (band - barWidth) / 2` appears at 214 and 252, and `LEFT + index * band` at 258, 288, 299 and 316. ticks(tallest) runs at 144 and again at 230. Segment positions come from a `let base` mutated inside the SERIES map (253-271). Pattern and clip ids are fixed strings (jobs-${key}, jobs-bar-${index}, jobs-plot-title).",
+      "impact": "A change to padding, gaps or label spacing touches several places in the JSX, and the stacking and tick rules can be checked only through operations-jobs.spec.ts on the db profile. The fixed ids would collide if the chart ever rendered twice on one page.",
+      "recommendation": "Move the layout into a pure lib/jobs-layout.ts that returns ticks, bars and segments in plot coordinates. Unit-test it with no hours, all-zero counts and one tall hour, and render from it in small components. Keep the documented status tokens, textures and table unchanged. Prefix the SVG ids with useId(), and let JobsPlot own its hover state.",
+      "sketch": "// lib/jobs-layout.ts (pure, node:test)\nexport function layoutJobs(hours: readonly JobHour[], frame: Frame): {\n  ticks: { value: number; y: number }[];\n  bars: { index: number; bandX: number; x: number; width: number; top: number;\n          segments: { key: SeriesKey; y: number; height: number }[] }[];\n  sums: Record<SeriesKey, number>;\n}\n// jobs-chart.tsx: JobsChart (fetch, states) -> JobsPlot (owns hover, useId() prefix)\n//   -> JobsLegend 158-177, JobsBars 179-309, JobsTooltip 310-330, JobsTable 332-382",
+      "effort": "M",
+      "risk": "low",
+      "ruleCheck": "DS-03 and DS-04, with Decision 0021 R4 and Decision 0022 D14: the status tokens, textures and equivalent table stay; only where the math lives changes.",
+      "verdict": "revised",
+      "verifierNote": "The repeated geometry, the second ticks() call, the mutated base and the fixed ids are where stated. Lowered from medium to low: the file has one commit (US-15.19), renders once, and operations-jobs.spec.ts covers it, so this is polish until the chart next changes."
+    },
+    {
+      "id": "WCMP-13",
+      "title": "The composer copies the server's default budget and imports shared constants from other feature components",
+      "dimension": "modules",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 17,
+          "endLine": 20,
+          "note": "DEFAULT_BUDGET_MICRO_USD imported from run-disclosure.tsx:20"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 209,
+          "endLine": 212,
+          "note": "used whenever no range is known"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 296,
+          "note": "a budget is always sent"
+        },
+        {
+          "file": "services/agent/src/autobots/domain/budgets.py",
+          "line": 8,
+          "note": "the server's own default"
+        },
+        {
+          "file": "apps/web/components/home-activity.tsx",
+          "line": 13,
+          "note": "STATUS_TEXT imported from run-list.tsx:16"
+        },
+        {
+          "file": "apps/web/components/new-run.tsx",
+          "line": 12,
+          "note": "focusGoal finds the composer's textarea by the literal id 'goal' (goal-composer.tsx:362 and 368)"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "While there is no preview range (still loading, or failed), budget falls back to DEFAULT_BUDGET_MICRO_USD = 1_000_000 from run-disclosure.tsx:20. That is a copy of D11's default, BUDGET_DEFAULT_MICRO_USD in domain/budgets.py:8, and run() always sends it as budget_micro_usd (296). SessionPanel sends no budget, so the API applies RunRequest.limit_micro_usd's own default (contracts/run_commands.py:24, also US$1.00) and skips require_budget's range, step and daily-cap checks. Home imports its run labels from run-list.tsx, another feature component, and new-run.tsx:12 is coupled to goal-composer.tsx through the string 'goal'.",
+      "impact": "D11's US$1.00 default is written twice in the API and twice in the client (run-disclosure.tsx:20, workflow-editor.tsx:118), so a change must find every copy, and the two run forms already take different budget paths. Renaming the textarea id breaks ⇧⌘O without a type error.",
+      "recommendation": "Import the fallback from one module (lib/runs/budget.ts) that names its source, D11. Omitting budget_micro_usd is not a drop-in fix: the API would apply the limit default and skip the daily-cap check, as it does for SessionPanel, so whether the composer may start a run while no range is known is a product decision. Move run status labels and tones to lib/runs/run-status.ts (WRUN-08). Export a GOAL_FIELD_ID beside focusGoal and use it for the composer's label and textarea.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: avoid duplicated business rules. The server stays the owner of the default budget, and the client only displays it.",
+      "verdict": "revised",
+      "verifierNote": "The import, the fallback and the 'goal' coupling are as stated. Revised the recommendation: omitting the budget, as first proposed, makes the API fall back to limit_micro_usd's default (contracts/run_commands.py:24) and skip require_budget (run_routes.py:188-197). Aligned the status module with WRUN-08."
+    },
+    {
+      "id": "WCMP-14",
+      "title": "Status label maps are keyed by string instead of the generated RunStatus union",
+      "dimension": "types",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/waiting-notifier.tsx",
+          "line": 14,
+          "endLine": 17,
+          "note": "WAITING: Record<string, string>"
+        },
+        {
+          "file": "apps/web/components/waiting-notifier.tsx",
+          "line": 55,
+          "note": "?? '' covers a lookup that the filter at 48 already guarantees"
+        },
+        {
+          "file": "apps/web/components/home-activity.tsx",
+          "line": 201,
+          "note": "STATUS_TEXT[run.status] ?? run.status"
+        },
+        {
+          "file": "apps/web/components/run-list.tsx",
+          "line": 16,
+          "note": "STATUS_TEXT: Record<string, string>"
+        },
+        {
+          "file": "apps/web/components/search-palette.tsx",
+          "line": 14,
+          "endLine": 19,
+          "note": "the right shape: keyed by the generated kind union"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 102,
+          "endLine": 111,
+          "note": "Outcome restates server error codes by hand; ErrorResponse.code is a plain string"
+        },
+        {
+          "file": "packages/api-client/src/runtime.ts",
+          "line": 106,
+          "note": "the parser already rejects statuses outside the enum"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "RunStatus is generated (generated.ts:8691), and parseRunList rejects unknown values (runtime.ts:106). Even so, WAITING and STATUS_TEXT accept any string key, and readers add fallbacks (waiting-notifier.tsx:55, home-activity.tsx:201). search-palette.tsx:14 shows the exhaustive form, Record<Result['kind'], string>. The composer's Outcome union (102-111) restates server codes because ErrorResponse.code is typed string (generated.ts:7693-7696).",
+      "impact": "Adding or renaming a run status compiles cleanly while a label silently disappears or falls back to the raw snake_case value.",
+      "recommendation": "Type STATUS_TEXT as Record<RunStatus, string> and WAITING as Partial<Record<RunStatus, string>> with a type guard, then drop the fallbacks. For Outcome, see the enum suggested in the parsing finding.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: do not invent a second state enum for the UI. These maps label the generated RunStatus instead of redefining it, and the parser already handles unknown values.",
+      "verdict": "confirmed",
+      "verifierNote": "Maps and fallbacks confirmed; parseRunList rejects statuses outside the enum (runtime.ts:106), so the fallbacks guard only the type."
+    },
+    {
+      "id": "WCMP-15",
+      "title": "Home's hairline sections are assembled by hand four times",
+      "dimension": "duplication",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/app/page.tsx",
+          "line": 62,
+          "endLine": 77,
+          "note": "Account header"
+        },
+        {
+          "file": "apps/web/app/page.tsx",
+          "line": 103,
+          "endLine": 111,
+          "note": "Services header"
+        },
+        {
+          "file": "apps/web/components/home-activity.tsx",
+          "line": 113,
+          "endLine": 121,
+          "note": "Needs you header"
+        },
+        {
+          "file": "apps/web/components/home-activity.tsx",
+          "line": 176,
+          "endLine": 184,
+          "note": "Recent runs header"
+        },
+        {
+          "file": "apps/web/app/page.tsx",
+          "line": 27,
+          "endLine": 30,
+          "note": "LOWER_HEAD is the same string as HEAD in home-activity.tsx:50"
+        },
+        {
+          "file": "apps/web/app/page.tsx",
+          "line": 42,
+          "note": "one of six session === null branches (42, 59, 71, 75, 79, 90)"
+        }
+      ],
+      "occurrences": 4,
+      "evidence": "Each section header is an icon plus a SectionLabel with className text-[12.5px], inside 'mb-2 flex items-center gap-2'. It is written twice in page.tsx and twice in home-activity.tsx, under different constant names (LOWER_HEAD and HEAD). HomePage (96 counted lines, complexity 11) tests session === null six times.",
+      "impact": "A spacing, size or label change on Home needs four edits in two files, and repeating the same condition is what pushes HomePage over the complexity limit.",
+      "recommendation": "Add a HairlineSection component (icon, heading id and text, optional badge, body, action) and an AccountSection that receives the session once. HomePage then only composes sections and falls under 60 lines and complexity 10.",
+      "sketch": "// components/ui/hairline-section.tsx\n<HairlineSection icon={UserRound} labelId='account-heading' label='Account' badge={badge} action={action}>\n  {children}\n</HairlineSection>\n// app/page.tsx: <AccountSection session={session} />  <ServicesSection status={status} readiness={readiness} />",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "Decision 0021: quiet hairline lists that end in their one action at the same height, so Tab never climbs. The component keeps that order.",
+      "verdict": "confirmed",
+      "verifierNote": "Four hand-built headers with equal class strings, and the six session === null tests in HomePage, confirmed; eslint.json gives HomePage 96 lines and complexity 11."
+    },
+    {
+      "id": "WCMP-16",
+      "title": "The Expert initial avatar is copied three times with a hard-coded radius",
+      "dimension": "standards",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/session-panel.tsx",
+          "line": 113,
+          "endLine": 118,
+          "note": "rounded-[10px] at 115"
+        },
+        {
+          "file": "apps/web/components/experts-panel.tsx",
+          "line": 344,
+          "endLine": 346,
+          "note": "same markup"
+        },
+        {
+          "file": "apps/web/components/expert-editor.tsx",
+          "line": 229,
+          "endLine": 231,
+          "note": "same markup at size-10"
+        },
+        {
+          "file": "apps/web/app/globals.css",
+          "line": 72,
+          "note": "--radius-lg is var(--radius): the same 10px, as a token"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "A span with 'bg-background grid size-9 shrink-0 place-items-center rounded-[10px] border font-serif' around name.trim().charAt(0).toUpperCase() appears in session-panel.tsx:113-118 and experts-panel.tsx:344-346, and at size-10 in expert-editor.tsx:229-231. globals.css:72 maps rounded-lg to var(--radius) (0.625rem).",
+      "impact": "The avatar won't follow a change to --radius, and its three copies can drift; they already differ in size.",
+      "recommendation": "Add components/ui/expert-initial.tsx (taking name and size) that uses rounded-lg, and use it in all three places.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DS-03: map the radius scale to the canonical base rather than hardcoding component-specific values.",
+      "verdict": "confirmed",
+      "verifierNote": "Three avatar copies with rounded-[10px] confirmed; --radius is 0.625rem (docs/design/luma.css:25), so rounded-lg renders the same today."
+    },
+    {
+      "id": "WCMP-17",
+      "title": "Near-identical names for unrelated state",
+      "dimension": "naming",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 133,
+          "note": "refusals: attachment rejections"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 140,
+          "note": "refusal: the server's budget message"
+        },
+        {
+          "file": "apps/web/components/home-activity.tsx",
+          "line": 70,
+          "note": "replies: HTTP responses"
+        },
+        {
+          "file": "apps/web/components/home-activity.tsx",
+          "line": 100,
+          "note": "replies: runs waiting for input, in the same function"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 144,
+          "note": "active: effect liveness (also 170, home-activity.tsx:64, session-panel.tsx:25)"
+        },
+        {
+          "file": "apps/web/components/search-palette.tsx",
+          "line": 32,
+          "note": "active: the highlighted option (also jobs-chart.tsx:83); the liveness flag is called live at 68"
+        }
+      ],
+      "occurrences": 3,
+      "evidence": "refusals and refusal (goal-composer.tsx:133 and 140) hold unrelated things. In one function, replies first names Responses (home-activity.tsx:70-78) and then runs waiting for a reply (100-102, 124, 152). active means 'effect still mounted' in four effects and 'highlighted index' in two components, which name their liveness flag live instead.",
+      "impact": "Readers must work out which meaning applies line by line, which invites mistakes such as setting the wrong refusal state.",
+      "recommendation": "Rename to attachmentErrors and budgetMessage; use inputRequests (or waitingForInput) for the runs and highlighted for the index; use one liveness name until the shared fetch hook removes those flags.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "none",
+      "verdict": "confirmed",
+      "verifierNote": "Both double meanings confirmed at the cited lines."
+    },
+    {
+      "id": "WCMP-18",
+      "title": "A composer comment says the choices survive setup, but only the draft is stored",
+      "dimension": "comments",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 33,
+          "endLine": 35,
+          "note": "'The draft and choice survive setup in this tab only.'"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 131,
+          "note": "profile is plain state"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 134,
+          "endLine": 135,
+          "note": "so are expertId and chosenBudget"
+        },
+        {
+          "file": "apps/web/components/goal-composer.tsx",
+          "line": 36,
+          "note": "no-op subscribe with no reason given (used at 114)"
+        },
+        {
+          "file": "apps/web/components/home-greeting.tsx",
+          "line": 38,
+          "note": "the same pattern, with its reason"
+        }
+      ],
+      "occurrences": 2,
+      "evidence": "Only DRAFT_KEY is written (35, 247-254), so the model, Expert and budget choices reset when the user comes back. The no-op subscribe and the empty server snapshot (36, 114) keep the server render and hydration in agreement. home-greeting.tsx:38 explains that pattern; the composer does not. The comment dates from the first composer (commit fff9dd4), which also stored only the draft.",
+      "impact": "A reader looking for where the choices persist will search for code that doesn't exist, and the hydration reason for useSyncExternalStore isn't stated where it is used.",
+      "recommendation": "Say that the draft survives in this tab, or persist the choices if that is intended (a product decision, not one for this review). Add one line at 36 saying the store is read only in the browser so the server render and hydration agree.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DH-06: explain nonobvious invariants in code. The fix keeps the reasoning and its traceability, and removes only a claim the code doesn't make.",
+      "verdict": "confirmed",
+      "verifierNote": "Only DRAFT_KEY is written; git show fff9dd4 has the same comment over a composer that stored only the draft."
+    },
+    {
+      "id": "WCMP-19",
+      "title": "The coordinator's Expert choice has no group label, and Run is disabled without saying why",
+      "dimension": "standards",
+      "severity": "low",
+      "locations": [
+        {
+          "file": "apps/web/components/session-panel.tsx",
+          "line": 106,
+          "endLine": 132,
+          "note": "radios in list items, with no fieldset, legend or radiogroup"
+        },
+        {
+          "file": "apps/web/components/session-panel.tsx",
+          "line": 96,
+          "endLine": 97,
+          "note": "ready requires a choice"
+        },
+        {
+          "file": "apps/web/components/session-panel.tsx",
+          "line": 190,
+          "note": "a disabled Run with no hint"
+        },
+        {
+          "file": "apps/web/components/notifications-control.tsx",
+          "line": 52,
+          "endLine": 53,
+          "note": "fieldset and legend are already used elsewhere"
+        }
+      ],
+      "occurrences": 1,
+      "evidence": "For a coordinator session, each option is a radio named expert inside an li (120-132). The group's question lives only in the section heading (101-105), which labels the region, not the radio group. Until an Expert is chosen, Run is disabled (96-97, 190), and nothing on screen says why.",
+      "impact": "Screen-reader users hear each radio without the question it answers, and the disabled Run, which Tab skips, never says that an Expert must be chosen first.",
+      "recommendation": "Wrap the coordinator list in a fieldset whose legend is the section label, or use role=radiogroup with aria-labelledby='options-heading'. While nothing is chosen, link a short hint to Run with aria-describedby.",
+      "sketch": "",
+      "effort": "S",
+      "risk": "low",
+      "ruleCheck": "DS-04: check labels and disabled controls in both themes.",
+      "verdict": "revised",
+      "verifierNote": "No fieldset or radiogroup wraps the coordinator's radios. Corrected the impact: Button renders a native disabled button, which Tab skips rather than reaches, so the missing reason is a hint problem, not a focus stop."
+    }
+  ],
+  "rejected": [],
+  "notCovered": "The review is static. I ran no browser and no type check, because tsc is not among the allowed commands. Two claims are therefore inferred from the code, not compiled: that the three non-null assertions in home-activity.tsx:79-81 are redundant, and that typing session-panel's body against RunRequest would fail under exactOptionalPropertyTypes. I did not re-run ESLint; per-file lint messages come from the run's raw eslint.json. Some neighbouring files were read only where they touch this area: PRD-Development-Harness.md (DH-03 to DH-06), continue-run.tsx, run-disclosure.tsx, run-list.tsx, new-run.tsx, notifications-control.tsx, lib/bff.ts, lib/session.ts, lib/workspace-choice.ts, sign-in-form.tsx, parts of the home, composer and settings-sections browser specs, scripts/verify.py:150-175, services/agent contracts/settings.py and domain/budgets.py, and selected lines of the generated API client and OpenAPI document. Their own quality belongs to other areas. The accessibility observations (radio grouping, role=alert on success) come from reading markup, not from an axe or screen-reader run. The duplicate-submit and polling defects follow from the control flow and have not been reproduced at runtime."
+}
