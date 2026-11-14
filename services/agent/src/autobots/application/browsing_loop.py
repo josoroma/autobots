@@ -214,7 +214,7 @@ def _outcome(state: _State, stopped: Stopped, summary: str | None = None) -> Bro
     )
 
 
-async def browse(
+async def browse(  # noqa: PLR0911 - baseline 2026-11-14, shrink only (STD-06)
     page: Page,
     step: Step,
     *,

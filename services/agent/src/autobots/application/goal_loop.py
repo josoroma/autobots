@@ -205,7 +205,7 @@ class SummarizationOff(AgentMiddleware[Any, Any]):
         return "SummarizationMiddleware"
 
 
-def build_stage(
+def build_stage(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (STD-06)
     connection: Any,
     model: Any,
     saver: Any,
@@ -532,7 +532,7 @@ async def _keep_lease(
                         await discount_sleep(connection, lease, undiscounted)
                         undiscounted = 0.0
                     failures = 0
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - a dropped connection or any other failure is counted and retried
             # A sleep can drop this connection, among other things.
             failures += 1
             if failures == 1 or failures % 30 == 0:

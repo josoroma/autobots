@@ -20,7 +20,7 @@ class BlockFailed(Exception):
         self.code = code
 
 
-def run_transform(operation: str, value: Any) -> Any:
+def run_transform(operation: str, value: Any) -> Any:  # noqa: ANN401 - workflow values are untyped JSON, and these operations rely on TypeError becoming BlockFailed
     try:
         if operation == "identity":
             return value
@@ -39,13 +39,13 @@ def run_transform(operation: str, value: Any) -> Any:
     raise BlockFailed("transform_operation_unknown")
 
 
-def _text(value: Any) -> str:
+def _text(value: Any) -> str:  # noqa: ANN401 - workflow values are untyped JSON, and these operations rely on TypeError becoming BlockFailed
     if not isinstance(value, str):
         raise BlockFailed("transform_input_invalid")
     return value
 
 
-def run_predicate(predicate: str, value: Any, operand: Any) -> bool:
+def run_predicate(predicate: str, value: Any, operand: Any) -> bool:  # noqa: ANN401 - workflow values are untyped JSON, and these operations rely on TypeError becoming BlockFailed
     try:
         if predicate == "equals":
             return bool(value == operand)

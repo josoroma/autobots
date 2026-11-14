@@ -65,7 +65,7 @@ def _unified(path: str, before: str | None, after: str) -> tuple[str, str]:
     return ("added" if before is None else "modified"), "".join(lines)
 
 
-def github_pull_request_tool(
+def github_pull_request_tool(  # noqa: C901, PLR0915 - baseline 2026-11-14, shrink only (STD-06)
     transport: httpx.AsyncBaseTransport | None = None,
     environ: Mapping[str, str] = os.environ,
 ) -> ToolDefinition:

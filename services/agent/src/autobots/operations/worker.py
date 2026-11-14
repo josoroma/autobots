@@ -86,7 +86,7 @@ async def _beat(config: WorkerConfig, status: _Status) -> None:
                             await status.changed.wait()
                     except TimeoutError:
                         pass
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - a lost heartbeat is logged by type and retried
             log_event(logger, "worker.heartbeat_lost", logging.WARNING, error=type(error).__name__)
             await asyncio.sleep(min(config.beat_seconds, 2.0))
 
@@ -140,7 +140,7 @@ async def serve(config: WorkerConfig, step: Step, stop: asyncio.Event) -> None:
                             worked = await _run_step(step, connection, stop, config, status)
                         except psycopg.OperationalError:
                             raise
-                        except Exception as error:
+                        except Exception as error:  # noqa: BLE001 - a failed step is logged by type, and the worker keeps serving
                             log_event(
                                 logger,
                                 "worker.step_failed",
@@ -273,7 +273,7 @@ def both(first: Step, second: Step) -> Step:
             worked = await first(connection)
         except psycopg.OperationalError:
             raise
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - a failed step is logged by type, and the worker keeps serving
             log_event(logger, "worker.step_failed", logging.ERROR, error=type(error).__name__)
             worked = False
         return await second(connection) or worked

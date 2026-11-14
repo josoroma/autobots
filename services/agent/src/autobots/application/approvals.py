@@ -84,7 +84,7 @@ async def _enter_wait(
     )
 
 
-async def approval_gate(
+async def approval_gate(  # noqa: PLR0911, PLR0913 - baseline 2026-11-14, shrink only (STD-06)
     connection: Any,
     *,
     workspace_id: UUID,

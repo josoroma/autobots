@@ -10,9 +10,11 @@ from uuid import UUID
 import psycopg
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
+from psycopg import AsyncConnection
 
 from autobots.adapters.result_stream import CHANNEL as RESULT_CHANNEL
 from autobots.api.errors import ApiError
+from autobots.api.pool import ConnectionPool, request_pool
 from autobots.api.security import require_internal
 from autobots.api.settings_routes import current_workspace
 from autobots.application.run_projection import (
@@ -45,13 +47,6 @@ DEFAULT_STREAM_SECONDS = 60.0
 KEEPALIVE_SECONDS = 15.0
 
 
-def _pool(request: Request) -> Any:
-    pool = request.app.state.pool
-    if pool is None:
-        raise ApiError(503, "service_unavailable", "The database is unavailable.")
-    return pool
-
-
 def _not_found() -> ApiError:
     return ApiError(404, "run_not_found", "That run is not available.")
 
@@ -60,7 +55,7 @@ def _not_found() -> ApiError:
 async def get_events(
     run_id: UUID, request: Request, workspace_id: Workspace, after: Cursor = 0
 ) -> EventPage:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await read_events(connection, workspace_id, run_id, after=after)
         except RunNotFound:
@@ -69,7 +64,7 @@ async def get_events(
 
 @router.get("/runs/{run_id}/workspace", operation_id="getRunWorkspace", response_model=RunWorkspace)
 async def get_workspace(run_id: UUID, request: Request, workspace_id: Workspace) -> RunWorkspace:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await read_workspace(connection, workspace_id, run_id)
         except RunNotFound:
@@ -87,7 +82,7 @@ async def get_runs(
     limit: Annotated[int, Query(ge=1, le=RUN_LIST_SIZE)] = RUN_LIST_SIZE,
 ) -> RunList:
     """PRD-Studio RN-01 and RN-02: status groups with server counts, filters and a keyset cursor."""
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await read_run_list(
                 connection,
@@ -104,7 +99,7 @@ async def get_runs(
 
 @router.get("/runs/{run_id}/inspector", operation_id="getRunInspector", response_model=RunInspector)
 async def get_inspector(run_id: UUID, request: Request, workspace_id: Workspace) -> RunInspector:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await read_inspector(connection, workspace_id, run_id)
         except RunNotFound:
@@ -120,14 +115,14 @@ async def get_tool_uses(
     limit: Annotated[int, Query(ge=1, le=200)] = 100,
 ) -> ToolUseList:
     """PRD-Tool-Catalog TU-07: the run's tree when it's a root, in order. Public fields only."""
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         found = await list_tool_uses(connection, workspace_id, run_id, after=after, limit=limit)
     if found is None:
         raise _not_found()
     return found
 
 
-async def _listener(request: Request) -> Any:
+async def _listener(request: Request) -> AsyncConnection[Any] | None:
     """US-15.24: this stream's own connection, listening for live result text. None when the API
     has no database address, as under a test client; then only durable events flow."""
     settings = getattr(request.app.state, "settings", None)
@@ -171,7 +166,7 @@ def _live_frame(run_id: UUID, cursor: int, payload: str) -> str | None:
 
 
 async def _frames(
-    request: Request, pool: Any, workspace_id: UUID, run_id: UUID, after: int
+    request: Request, pool: ConnectionPool, workspace_id: UUID, run_id: UUID, after: int
 ) -> AsyncIterator[str]:
     listener = await _listener(request)
     try:
@@ -183,7 +178,12 @@ async def _frames(
 
 
 async def _durable_and_live(
-    request: Request, pool: Any, workspace_id: UUID, run_id: UUID, after: int, listener: Any
+    request: Request,
+    pool: ConnectionPool,
+    workspace_id: UUID,
+    run_id: UUID,
+    after: int,
+    listener: AsyncConnection[Any] | None,
 ) -> AsyncIterator[str]:
     cursor = after
     loop = asyncio.get_running_loop()
@@ -228,7 +228,7 @@ async def stream_events(
     run_id: UUID, request: Request, workspace_id: Workspace, after: Cursor = 0
 ) -> StreamingResponse:
     """Authorized before the first byte, so a refusal is a status and not an empty stream."""
-    pool = _pool(request)
+    pool = request_pool(request)
     async with pool.connection() as connection:
         try:
             await read_events(connection, workspace_id, run_id, after=after, limit=1)

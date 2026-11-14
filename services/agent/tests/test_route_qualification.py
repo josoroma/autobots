@@ -58,7 +58,7 @@ class Fake:
         self.fail_with = fail_with
         self.authorization: set[str] = set()
 
-    def _message(self, body: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    def _message(self, body: dict[str, Any]) -> tuple[dict[str, Any], str]:  # noqa: PLR0911 - baseline 2026-11-14, shrink only (STD-06)
         text = json.dumps(body["messages"])
         tools = [tool["function"]["name"] for tool in body.get("tools") or []]
         choice = body.get("tool_choice")

@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Query, Request
 
 from autobots.api.errors import ApiError
+from autobots.api.pool import request_pool
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, require_owner
 from autobots.application.approvals import (
@@ -35,13 +36,6 @@ router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 Key = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)]
 
 
-def _pool(request: Request) -> Any:
-    pool = request.app.state.pool
-    if pool is None:
-        raise ApiError(503, "service_unavailable", "The database is unavailable.")
-    return pool
-
-
 def _requester(row: dict[str, Any], viewer: UUID) -> ApprovalRequester | None:
     """None only for a request saved before US-13.1, which always stores the agent now."""
     agent = row["requested_by_agent"]
@@ -69,7 +63,7 @@ async def get_approvals(
 ) -> ApprovalList:
     """`decided` lists approved, rejected, expired and withdrawn requests together (AP-01)."""
     statuses = DECIDED if status == "decided" else (status,)
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         rows = await list_approvals(connection, workspace, statuses)
         waiting, decided = await approval_counts(connection, workspace)
     return ApprovalList(
@@ -121,7 +115,7 @@ async def get_approvals(
 async def get_pending_count(
     request: Request, workspace: Annotated[UUID, Depends(current_workspace)]
 ) -> PendingApprovals:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         waiting, _decided = await approval_counts(connection, workspace)
     return PendingApprovals(schema_version=1, pending=waiting)
 
@@ -139,7 +133,7 @@ async def post_decision(
     workspace: Annotated[UUID, Depends(require_owner)],
     user: Annotated[UUID, Depends(current_user)],
 ) -> ApprovalResult:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             result = await decide(
                 connection,

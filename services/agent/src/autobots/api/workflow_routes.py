@@ -1,12 +1,13 @@
 """Workflow validation, publication and execution binding. Publishing changes what can run."""
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Request, status
 
 from autobots.api.errors import ApiError
 from autobots.api.operation_routes import require_ready
+from autobots.api.pool import request_pool
 from autobots.api.run_routes import budget_error
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, provider_settings, require_owner
@@ -65,13 +66,6 @@ Owner = Annotated[UUID, Depends(require_owner)]
 User = Annotated[UUID, Depends(current_user)]
 
 
-def _pool(request: Request) -> Any:
-    pool = request.app.state.pool
-    if pool is None:
-        raise ApiError(503, "service_unavailable", "The database is unavailable.")
-    return pool
-
-
 def _views(errors: list[GraphError]) -> list[WorkflowErrorView]:
     return [WorkflowErrorView(code=e.code, node=e.node, port=e.port) for e in errors]
 
@@ -122,7 +116,7 @@ async def get_blocks(_: Member) -> BlockCatalog:
     response_model=ExecutionView,
 )
 async def get_execution(execution_id: UUID, request: Request, workspace: Member) -> ExecutionView:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await read_execution(connection, workspace, execution_id)
         except WorkflowRefused as error:
@@ -145,7 +139,7 @@ async def post_validate(graph: WorkflowGraph, _: Member) -> WorkflowValidation:
 
 @router.get("/workflows", operation_id="listWorkflows", response_model=WorkflowList)
 async def get_workflows(request: Request, workspace: Member) -> WorkflowList:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         return WorkflowList(schema_version=1, workflows=await list_workflows(connection, workspace))
 
 
@@ -158,7 +152,7 @@ async def get_workflows(request: Request, workspace: Member) -> WorkflowList:
 async def post_workflow(
     body: WorkflowCreate, request: Request, key: Key, workspace: Owner, user: User
 ) -> WorkflowView:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await create_workflow(
                 connection,
@@ -181,7 +175,7 @@ async def get_executions(
     workflow_id: UUID, request: Request, workspace: Member
 ) -> WorkflowExecutionList:
     """WF-04: the ten newest executions, with version, state, spend and duration."""
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             await get_workflow(connection, workspace, workflow_id)
         except WorkflowRefused as error:
@@ -199,7 +193,7 @@ async def get_preview(
     workflow_id: UUID, version: str, request: Request, workspace: Member
 ) -> WorkflowPreview:
     """WF-03: a published version's steps, or the draft's, with `version=draft`."""
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             view = await get_workflow(connection, workspace, workflow_id)
         except WorkflowRefused as error:
@@ -227,7 +221,7 @@ async def put_draft(
     workflow_id: UUID, body: WorkflowDraftSave, request: Request, workspace: Owner, user: User
 ) -> WorkflowView:
     """WF-02: an owner keeps one draft, replaced by each save."""
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await save_draft(connection, workspace, user, workflow_id, body.graph)
         except WorkflowRefused as error:
@@ -240,7 +234,7 @@ async def put_draft(
     response_model=WorkflowView,
 )
 async def delete_draft(workflow_id: UUID, request: Request, workspace: Owner) -> WorkflowView:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await discard_draft(connection, workspace, workflow_id)
         except WorkflowRefused as error:
@@ -261,7 +255,7 @@ async def post_draft_publish(
     workspace: Owner,
     user: User,
 ) -> WorkflowView:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await publish_draft(
                 connection,
@@ -283,7 +277,7 @@ async def post_draft_publish(
 async def put_description(
     workflow_id: UUID, body: WorkflowDescription, request: Request, workspace: Owner
 ) -> WorkflowView:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await set_description(connection, workspace, workflow_id, body.description)
         except WorkflowRefused as error:
@@ -292,7 +286,7 @@ async def put_description(
 
 @router.get("/workflows/{workflow_id}", operation_id="getWorkflow", response_model=WorkflowView)
 async def read_workflow(workflow_id: UUID, request: Request, workspace: Member) -> WorkflowView:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await get_workflow(connection, workspace, workflow_id)
         except WorkflowRefused as error:
@@ -313,7 +307,7 @@ async def post_version(
     workspace: Owner,
     user: User,
 ) -> WorkflowView:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await publish_version(
                 connection,
@@ -348,7 +342,7 @@ async def post_execution(
     if body.version == "draft":
         raise ApiError(409, DRAFT_NOT_RUNNABLE, "Only a published version can run.")
     limit = DEFAULT_LIMIT_MICRO_USD
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         if body.budget_micro_usd is not None:
             # WF-05: the same budget rules as a goal run (Decision 0022 D11).
             try:

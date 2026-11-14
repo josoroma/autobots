@@ -322,7 +322,7 @@ async def _agent_session(
     return session.id
 
 
-async def create_execution(
+async def create_execution(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (STD-06)
     connection: Any,
     *,
     workspace_id: UUID,

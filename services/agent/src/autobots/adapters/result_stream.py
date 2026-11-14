@@ -193,14 +193,14 @@ class ResultTap:
                     call.changed = True
             if time.monotonic() - self._last_flush >= FLUSH_SECONDS:
                 await self.flush()
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - live text is a courtesy, so a tap failure never stops the run (Decision 0022 D4)
             self._stop(error)
 
     async def finish(self) -> None:
         try:
             if not self._broken:
                 await self.flush()
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - live text is a courtesy, so a tap failure never stops the run (Decision 0022 D4)
             self._stop(error)
         finally:
             self._calls = {}
@@ -269,7 +269,7 @@ class ResultTap:
             await self._connection.execute(
                 "select pg_notify(%s, %s)", (CHANNEL, json.dumps(payload))
             )
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - live text is a courtesy, so a send failure never stops the run (Decision 0022 D4)
             # Live text is a courtesy. The stored artifact is the record, so the run goes on.
             self._broken = True
             log_event(
@@ -282,7 +282,7 @@ class ResultTap:
             return
         try:
             await connection.close()
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - in the run's cleanup, a close failure must not replace the run's outcome
             # Called from the run's own cleanup, where a failure would replace the run's outcome.
             log_event(
                 logger, "result_text.close_failed", logging.WARNING, error=type(error).__name__

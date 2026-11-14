@@ -107,7 +107,7 @@ class TrialExecutor(BrowserExecutor):
         if not self.log:
             try:
                 self.log = await self.proxy_log(session)
-            except Exception:  # The record is best effort; removal isn't.
+            except Exception:  # noqa: BLE001 - the record is best effort; removal isn't
                 self.log = [{"event": "log_unavailable"}]
         await super().stop(session)
 
@@ -134,7 +134,7 @@ def inside(host: str) -> bool:
     return any(host == domain or host.endswith("." + domain) for domain in DOMAINS)
 
 
-async def run_trial(
+async def run_trial(  # noqa: PLR0915 - baseline 2026-11-14, shrink only (STD-06)
     database_url: str,
     workspace: UUID,
     key: SecretStr,

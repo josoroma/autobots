@@ -523,7 +523,7 @@ class Corpus:
                     self.results.append(Trial(name, trial, "not_run", {"reason": "cap"}))
                     log_event(logger, "qualification.cap_reached", fixture=label)
                     return self.results
-                except Exception as error:
+                except Exception as error:  # noqa: BLE001 - a failed qualification records the type and status, never the message
                     # The type, and a status if it has one. A message could echo a request.
                     verdict, observed = _failure(error)
                 self.results.append(

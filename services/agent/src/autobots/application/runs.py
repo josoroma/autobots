@@ -169,7 +169,7 @@ async def _goal_to_repeat(connection: Any, workspace_id: UUID, run_id: UUID | No
     return str(row[0])
 
 
-async def admit_run(
+async def admit_run(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (STD-06)
     connection: Any,
     *,
     workspace_id: UUID,
@@ -387,7 +387,7 @@ def _require_owner(job: Any, generation: int | None) -> None:
         raise LeaseLost("this worker no longer owns the run")
 
 
-async def apply_command(
+async def apply_command(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (STD-06)
     connection: Any,
     *,
     workspace_id: UUID,

@@ -9,9 +9,9 @@ from uuid import UUID
 import pytest
 from pydantic import BaseModel, ValidationError
 
+from autobots.api.openapi_export import openapi_document
 from autobots.contracts.adapters import run_from_row, run_summary_from_domain
 from autobots.contracts.experts import SessionCreate
-from autobots.contracts.export import openapi_document
 from autobots.contracts.operations import JobsChart
 from autobots.contracts.run_commands import RunRequest
 from autobots.contracts.runs import ErrorResponse, RunEvent, RunSummary

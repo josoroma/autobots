@@ -100,7 +100,7 @@ async def begin_use(
     if tool is not None:
         try:
             parsed = tool.redact(tool.input_model.model_validate(arguments).model_dump(mode="json"))
-        except Exception:
+        except Exception:  # noqa: BLE001 - arguments that fail their model stay out of the public record
             parsed = None
     plan_version, task_id = await served_task(connection, scope.run_id, name, arguments)
     try:

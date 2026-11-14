@@ -1,12 +1,13 @@
 """Authorized artifact metadata and downloads. A request never names a storage path."""
 
-from typing import Annotated, Any
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Response
 
 from autobots.adapters.object_storage import StorageUnavailable
 from autobots.api.errors import ApiError
+from autobots.api.pool import request_pool
 from autobots.api.security import require_internal
 from autobots.api.settings_routes import current_workspace
 from autobots.application.artifacts import ArtifactUnavailable, list_artifacts, read_artifact
@@ -16,18 +17,11 @@ router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 Workspace = Annotated[UUID, Depends(current_workspace)]
 
 
-def _pool(request: Request) -> Any:
-    pool = request.app.state.pool
-    if pool is None:
-        raise ApiError(503, "service_unavailable", "The database is unavailable.")
-    return pool
-
-
 @router.get(
     "/runs/{run_id}/artifacts", operation_id="listRunArtifacts", response_model=ArtifactList
 )
 async def get_artifacts(run_id: UUID, request: Request, workspace_id: Workspace) -> ArtifactList:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         rows = await list_artifacts(connection, workspace_id, run_id)
     return ArtifactList(
         schema_version=1, artifacts=[ArtifactSummary.model_validate(row) for row in rows]
@@ -41,7 +35,7 @@ async def download(artifact_id: UUID, request: Request, workspace_id: Workspace)
     if store is None:
         raise ApiError(503, "storage_unavailable", "Artifact storage is unavailable.")
     try:
-        async with _pool(request).connection() as connection:
+        async with request_pool(request).connection() as connection:
             name, media_type, content = await read_artifact(
                 connection, store, workspace_id, artifact_id
             )

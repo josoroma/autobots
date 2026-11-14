@@ -174,7 +174,7 @@ async def _claim_child(connection: Any, child: UUID, delegation: Delegation) -> 
     raise ToolFailed("assignment_busy")
 
 
-def assign_tool(delegation: Delegation) -> ToolDefinition:
+def assign_tool(delegation: Delegation) -> ToolDefinition:  # noqa: C901 - baseline 2026-11-14, shrink only (STD-06)
     async def run(arguments: AssignSpecialist, context: ToolContext) -> AssignmentResult:
         connection = context.connection
         cursor = await connection.execute(

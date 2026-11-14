@@ -5,9 +5,11 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Request, status
+from psycopg import AsyncConnection
 
 from autobots.api.errors import ApiError
 from autobots.api.operation_routes import require_ready
+from autobots.api.pool import request_pool
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, provider_settings, require_owner
 from autobots.application.experts import ExpertRefused, resolve_binding
@@ -63,13 +65,6 @@ router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 Key = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)]
 
 
-def _pool(request: Request) -> Any:
-    pool = request.app.state.pool
-    if pool is None:
-        raise ApiError(503, "service_unavailable", "The database is unavailable.")
-    return pool
-
-
 def as_api_error(error: Exception) -> ApiError:
     if isinstance(error, IdempotencyConflict):
         return ApiError(409, error.code, "This key was already used with different content.")
@@ -117,7 +112,7 @@ async def preview_run(
 ) -> RunPreview:
     """HM-03: the profiles each role would resolve to, the tools and the budgets, as admission
     would see them now. It creates nothing and calls no model."""
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         row = await (
             await connection.execute(
                 "select default_profile, role_overrides from app_private.model_policies "
@@ -188,7 +183,7 @@ async def post_run(
     if body.budget_micro_usd is not None:
         if "limit_micro_usd" in body.model_fields_set:
             raise ApiError(422, "budget_conflict", "Choose a budget or a limit, not both.")
-        async with _pool(request).connection() as connection:
+        async with request_pool(request).connection() as connection:
             remaining = await remaining_daily_micro_usd(connection, workspace_id)
         try:
             require_budget(body.budget_micro_usd, remaining)
@@ -198,7 +193,7 @@ async def post_run(
     code = await settings.run_intent(workspace_id)
     if code != "ready":
         raise ApiError(409, code, "Model-backed work needs a usable OpenRouter key.")
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         row = await (
             await connection.execute(
                 "select default_profile, role_overrides from app_private.model_policies "
@@ -281,14 +276,14 @@ async def post_run(
 async def get_run(
     run_id: UUID, request: Request, workspace_id: Annotated[UUID, Depends(current_workspace)]
 ) -> RunSummary:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         summary = await read_summary(connection, workspace_id, run_id)
     if summary is None:
         raise ApiError(404, "run_not_found", "That run is not available.")
     return summary
 
 
-async def _require_run(connection: Any, workspace_id: UUID, run_id: UUID) -> None:
+async def _require_run(connection: AsyncConnection[Any], workspace_id: UUID, run_id: UUID) -> None:
     cursor = await connection.execute(
         "select 1 from public.runs where id = %s and workspace_id = %s", (run_id, workspace_id)
     )
@@ -306,7 +301,7 @@ async def _command(
     key: str,
     response: str | None = None,
 ) -> RunCommandResult:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             result = await apply_command(
                 connection,
@@ -374,7 +369,7 @@ async def post_resume(
     code = await settings.run_intent(workspace)
     if code != "ready":
         raise ApiError(409, code, "Model-backed work needs a usable OpenRouter key.")
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         await _require_run(connection, workspace, run_id)
         left = await outstanding(connection, run_id)
         # A tool with a readback resolves itself on replay. Otherwise a person has to say.
@@ -408,7 +403,7 @@ async def post_effect_evidence(
     workspace: Annotated[UUID, Depends(require_owner)],
 ) -> ReconciliationResult:
     """An owner reports what the destination's own records show."""
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         await _require_run(connection, workspace, run_id)
         try:
             await record_evidence(
@@ -444,7 +439,7 @@ async def post_reconcile(
     workspace: Annotated[UUID, Depends(require_owner)],
 ) -> ReconciliationResult:
     """An owner records a charge seen in the provider's own account, for the oldest open call."""
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         await _require_run(connection, workspace, run_id)
         scope = (workspace, user, "reconcile_model_call", str(run_id), key)
         fingerprint = request_hash({"charged": body.charged_micro_usd})

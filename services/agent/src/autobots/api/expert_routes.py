@@ -1,11 +1,12 @@
 """Experts and sessions. Revisions change grants, so only an owner saves them."""
 
-from typing import Annotated, Any
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Request, status
 
 from autobots.api.errors import ApiError
+from autobots.api.pool import request_pool
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, require_owner
 from autobots.application.experts import (
@@ -38,13 +39,6 @@ NOT_FOUND = {"expert_not_found", "session_not_found"}
 CONFLICT = {"expert_name_taken", "expert_version_conflict"}
 
 
-def _pool(request: Request) -> Any:
-    pool = request.app.state.pool
-    if pool is None:
-        raise ApiError(503, "service_unavailable", "The database is unavailable.")
-    return pool
-
-
 def _error(error: ExpertRefused | IdempotencyConflict) -> ApiError:
     if isinstance(error, IdempotencyConflict):
         return ApiError(409, error.code, "This key was already used with different content.")
@@ -57,7 +51,7 @@ def _error(error: ExpertRefused | IdempotencyConflict) -> ApiError:
 
 @router.get("/experts", operation_id="listExperts", response_model=ExpertList)
 async def get_experts(request: Request, workspace: Member) -> ExpertList:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         return ExpertList(schema_version=1, experts=await list_experts(connection, workspace))
 
 
@@ -78,7 +72,7 @@ async def post_expert(
     body: ExpertCreate, request: Request, key: Key, workspace: Owner, user: User
 ) -> ExpertView:
     _bindings_offered(body.config)
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await create_expert(
                 connection,
@@ -94,7 +88,7 @@ async def post_expert(
 
 @router.get("/experts/{expert_id}", operation_id="getExpert", response_model=ExpertView)
 async def read_expert(expert_id: UUID, request: Request, workspace: Member) -> ExpertView:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await get_expert(connection, workspace, expert_id)
         except ExpertRefused as error:
@@ -111,7 +105,7 @@ async def post_version(
     expert_id: UUID, body: ExpertRevision, request: Request, key: Key, workspace: Owner, user: User
 ) -> ExpertView:
     _bindings_offered(body.config)
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await add_version(
                 connection,
@@ -141,7 +135,7 @@ async def post_session(
     ):
         # An earlier version could hold tools an owner has since removed, Decision 0011.
         raise ApiError(403, "owner_required", "Only an owner can choose an Expert version.")
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await create_session(
                 connection,
@@ -157,7 +151,7 @@ async def post_session(
 
 @router.get("/sessions/{session_id}", operation_id="getWorkSession", response_model=SessionView)
 async def read_session(session_id: UUID, request: Request, workspace: Member) -> SessionView:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await get_session(connection, workspace, session_id)
         except ExpertRefused as error:

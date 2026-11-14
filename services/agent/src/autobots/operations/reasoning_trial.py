@@ -232,7 +232,7 @@ async def run_trial(
         result.outcome = "not_run"
         result.reason = "the shared cap was reached before the first call"
         return result
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - a paid trial's result names the failure's type
         result.reason = f"the first call failed: {type(error).__name__}"
         return result
     result.reported_micro_usd.append(reported)
@@ -255,7 +255,7 @@ async def run_trial(
         result.outcome = "not_run"
         result.reason = "the shared cap was reached before the continuation"
         return result
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - a paid trial's result names the failure's type
         # What was sent can still be compared, since the request left before it failed.
         result.reason = f"the continuation failed: {type(error).__name__}"
         second, reported = None, None

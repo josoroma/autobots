@@ -1,11 +1,12 @@
 """Memory search and notes, scoped by the verified workspace, PRD 8.4."""
 
-from typing import Annotated, Any
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, status
 
 from autobots.api.errors import ApiError
+from autobots.api.pool import request_pool
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, require_owner
 from autobots.application.memory import MemoryRefused, search, store_memory
@@ -14,20 +15,13 @@ from autobots.contracts.memory import MemoryCreate, MemoryCreated, MemorySearchV
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 
 
-def _pool(request: Request) -> Any:
-    pool = request.app.state.pool
-    if pool is None:
-        raise ApiError(503, "service_unavailable", "The database is unavailable.")
-    return pool
-
-
 @router.get("/memory/search", operation_id="searchMemory", response_model=MemorySearchView)
 async def get_search(
     request: Request,
     workspace: Annotated[UUID, Depends(current_workspace)],
     q: Annotated[str, Query(min_length=1, max_length=500)],
 ) -> MemorySearchView:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         return MemorySearchView(schema_version=1, hits=await search(connection, workspace, q))
 
 
@@ -44,7 +38,7 @@ async def post_memory(
     user: Annotated[UUID, Depends(current_user)],
 ) -> MemoryCreated:
     """A person's own note. Anything a run learned goes through review, in US-8.2."""
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             memory_id = await store_memory(
                 connection,

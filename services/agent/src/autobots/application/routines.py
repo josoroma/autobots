@@ -477,7 +477,7 @@ async def evaluate_routines(
     for (routine_id,) in await cursor.fetchall():
         try:
             admitted += await _evaluate_one(connection, routine_id, credential_check, now)
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - one routine's failure leaves it due and never stops the others
             # Rolled back on its own. This one stays due, and every other routine still runs.
             log_event(
                 logger,

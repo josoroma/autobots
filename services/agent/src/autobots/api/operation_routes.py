@@ -3,12 +3,13 @@
 import os
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Request
 
 from autobots.api.errors import ApiError
+from autobots.api.pool import request_pool
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, require_owner
 from autobots.application.operations import (
@@ -65,13 +66,6 @@ from autobots.operations.logs import remote_tracing_disabled
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 Owner = Annotated[UUID, Depends(require_owner)]
 User = Annotated[UUID, Depends(current_user)]
-
-
-def _pool(request: Request) -> Any:
-    pool = request.app.state.pool
-    if pool is None:
-        raise ApiError(503, "service_unavailable", "The database is unavailable.")
-    return pool
 
 
 def probe_times(request: Request) -> ProbeTimes:
@@ -133,7 +127,7 @@ async def get_local_status(
         workspace_id = await current_workspace(request, user_id, x_autobots_workspace)
         if await request.app.state.membership.role_in(user_id, workspace_id) != "owner":
             raise ApiError(403, "owner_required", "Only the workspace owner can see this.")
-        async with _pool(request).connection() as connection:
+        async with request_pool(request).connection() as connection:
             counts = await queue_counts(connection, workspace_id)
             conditions.append(queue_condition(counts))
             conditions.append(await worker_condition(connection, counts))
@@ -202,7 +196,7 @@ async def get_local_status(
 @router.get("/operations/jobs", operation_id="getJobsChart", response_model=JobsChart)
 async def get_jobs_chart(request: Request, workspace_id: Owner) -> JobsChart:
     """PRD-Studio OP-03: the workspace's jobs per hour over 24 hours, by outcome. Counts only."""
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         zone, hours = await job_hours(connection, workspace_id)
     return JobsChart(
         schema_version=1,
@@ -229,7 +223,7 @@ async def get_retention_summary(
 ) -> RetentionSummary:
     """PRD-Studio SE-06: read-only for any member. Only the owner changes it, on Operations."""
     role = await request.app.state.membership.role_in(user_id, workspace_id)
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         policy = await read_policy(connection, workspace_id)
     return RetentionSummary(
         schema_version=1,
@@ -243,7 +237,7 @@ async def get_retention_summary(
 async def put_retention(
     body: RetentionSettings, request: Request, workspace_id: Owner, user_id: User
 ) -> RetentionSettings:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         await write_policy(
             connection,
             workspace_id,
@@ -260,7 +254,7 @@ async def put_retention(
     response_model=RetentionApplied,
 )
 async def post_retention_apply(request: Request, workspace_id: Owner) -> RetentionApplied:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         report = await apply_retention(
             connection, getattr(request.app.state, "object_store", None), workspace_id
         )
@@ -303,7 +297,7 @@ async def get_readiness(
             ServiceReadiness(name="openrouter", state="unknown", code="database_unready")
         )
         return MemberReadiness(schema_version=1, ready=False, services=services)
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         worker = await worker_condition(connection, QueueCounts(0, 0, 0, 0))
         context = request.app.state.provider_context
         auth = (

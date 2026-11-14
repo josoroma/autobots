@@ -319,7 +319,7 @@ class ToolGateway:
             )
         return result
 
-    async def _dispatch(
+    async def _dispatch(  # noqa: C901, PLR0911, PLR0912 - baseline 2026-11-14, shrink only (STD-06)
         self, connection: Any, scope: ToolScope, name: str, arguments: Any, use: int | None
     ) -> ToolResult:
         """Refused before any effect: ungranted, unqualified, invalid, out of scope or unowned."""
@@ -369,7 +369,7 @@ class ToolGateway:
                     )
                 except ToolFailed as error:
                     return _denied(str(error) or "review_unavailable")
-                except Exception:
+                except Exception:  # noqa: BLE001 - a review that can't be built denies the call, so nothing runs
                     return _denied("review_unavailable")
             code = await approval_gate(
                 connection,
@@ -419,7 +419,7 @@ class ToolGateway:
                 code = "tool_timeout"
             except ToolFailed as error:
                 return ToolResult(ToolOutcome.FAILED, str(error) or "tool_failed")
-            except Exception:
+            except Exception:  # noqa: BLE001 - any tool failure is recorded as tool_failed
                 code = "tool_failed"
             else:
                 visible, too_large = _visible(tool, output)
@@ -511,7 +511,7 @@ class ToolGateway:
                 )
             except NotDelivered:
                 return None
-            except Exception:
+            except Exception:  # noqa: BLE001 - a failed reconcile leaves the effect unknown, never assumed
                 found = None
             if found is not None:
                 visible, _ = _visible(tool, found)
@@ -539,7 +539,7 @@ class ToolGateway:
             # The write's transaction refused it, so nothing happened.
             await _record(context, operation_id, "failed", None)
             return ToolResult(ToolOutcome.DENIED, "lease_lost", operation_id=operation_id)
-        except Exception:
+        except Exception:  # noqa: BLE001 - an unexpected failure leaves the outcome unknown for reconciliation
             await _record(context, operation_id, "unknown", None)
             return ToolResult(ToolOutcome.UNKNOWN, "outcome_unknown", operation_id=operation_id)
         visible, too_large = _visible(tool, output)

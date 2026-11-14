@@ -78,7 +78,7 @@ async def _remove_expired_objects(
             continue
         try:
             await store.remove(path)
-        except Exception:
+        except Exception:  # noqa: BLE001 - any failure waits for the next pass
             # Any failure here waits for the next pass. Storage being down isn't a retention error.
             report.objects_pending += 1
             continue
@@ -168,5 +168,5 @@ async def apply_all(connection: Any, store: Any) -> None:
             await apply_retention(connection, store, workspace_id)
         except psycopg.OperationalError:
             raise
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - a failed pass is logged by type and retried at the next interval
             log_event(logger, "retention.failed", logging.WARNING, error=type(error).__name__)

@@ -1,4 +1,7 @@
-"""Print the OpenAPI document. Builds the pure application and opens nothing."""
+"""Print the OpenAPI document. Builds the pure application and opens nothing.
+
+It lives in api/ because it builds the app; contracts/ imports no other layer (STD-01).
+"""
 
 import json
 from typing import Any

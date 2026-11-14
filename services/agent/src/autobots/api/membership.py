@@ -1,13 +1,21 @@
 """Workspace membership from the database, through the restricted runtime role."""
 
-from typing import Any
+from typing import Protocol
 from uuid import UUID
+
+from autobots.api.pool import ConnectionPool
+
+
+class PoolHolder(Protocol):
+    """Application state, or anything else that holds the pool once the lifespan opens it."""
+
+    pool: ConnectionPool | None
 
 
 class PostgresMembership:
     """Reads the pool from application state, so nothing connects before the lifespan starts it."""
 
-    def __init__(self, state: Any) -> None:
+    def __init__(self, state: PoolHolder) -> None:
         self._state = state
 
     async def is_member(self, user_id: UUID, workspace_id: UUID) -> bool:

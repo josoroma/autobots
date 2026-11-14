@@ -150,7 +150,7 @@ async def database_conditions(
                 )
                 held = await cursor.fetchone() is not None
                 qualified = await adapter_qualified(connection)
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - any failure means the database didn't answer; the type is logged
         # Whatever it was, the database didn't answer. The type is logged, never its message.
         log_event(logger, "database.unavailable", logging.WARNING, error=type(error).__name__)
         return (
@@ -202,7 +202,7 @@ async def storage_condition(store: Any) -> Condition:
     try:
         async with asyncio.timeout(STORAGE_SECONDS):
             await store.ping()
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - any failure means Storage didn't answer; the type is logged
         log_event(logger, "storage.unavailable", logging.WARNING, error=type(error).__name__)
         return Condition("storage", "unavailable", "storage_unreachable")
     return Condition("storage", "ok", "storage_ready")
@@ -353,7 +353,7 @@ async def applied_migrations(connection: Any) -> int | None:
     try:
         cursor = await connection.execute("select app_private.applied_migration_count()")
         row = await cursor.fetchone()
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - an unreadable migration table is reported, not raised
         log_event(logger, "migrations.unreadable", logging.WARNING, error=type(error).__name__)
         return None
     return None if row is None or row[0] is None else int(row[0])

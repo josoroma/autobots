@@ -130,7 +130,7 @@ def typescript_client(document: Mapping) -> str:
 
 def export_document(root: Path) -> dict:
     env = {**reduced_env(), 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'}
-    result = subprocess.run([str(root / PYTHON), '-m', 'autobots.contracts.export'], env=env, cwd=root,
+    result = subprocess.run([str(root / PYTHON), '-m', 'autobots.api.openapi_export'], env=env, cwd=root,
                             capture_output=True, text=True, timeout=120, check=False)
     if result.returncode:
         raise ValueError(f'the contract export failed: {result.stderr[-400:]}')

@@ -2,7 +2,7 @@
 
 import json
 
-from autobots.contracts.export import openapi_document
+from autobots.api.openapi_export import openapi_document
 
 ENVELOPE = "#/components/schemas/ErrorResponse"
 DECLARED = ("401", "403", "404", "409", "422", "500", "503")

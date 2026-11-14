@@ -69,7 +69,7 @@ def validate_config(config: ExpertConfig, environ: Mapping[str, str] = os.enviro
     try:
         for role in config.role_bindings:
             approved_role(role)
-    except Exception:
+    except Exception:  # noqa: BLE001 - any role that fails approval makes the Expert refused
         raise ExpertRefused("expert_role_unknown") from None
 
 

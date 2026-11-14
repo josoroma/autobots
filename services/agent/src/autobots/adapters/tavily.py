@@ -145,7 +145,7 @@ def tavily_tools(
             truncated=truncated,
         )
 
-    def tool(
+    def tool(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (STD-06)
         tool_id: str,
         title: str,
         description: str,

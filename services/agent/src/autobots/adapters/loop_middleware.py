@@ -347,7 +347,7 @@ def _log_uncertain(
 
 
 class LoopMiddleware(AgentMiddleware[Any, Any]):
-    def __init__(
+    def __init__(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (STD-06)
         self,
         connection: Any,
         scope: ToolScope,
@@ -488,7 +488,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             route.profile,
         )
 
-    async def _admitted_call(
+    async def _admitted_call(  # noqa: PLR0915 - baseline 2026-11-14, shrink only (STD-06)
         self, request: Any, handler: Any, remaining: float, route: ModelRoute | None = None
     ) -> tuple[Any, bool]:
         chosen = route or self._route
@@ -527,7 +527,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
                         provider_failure.reason,
                     )
                 raise
-            except Exception as error:
+            except Exception as error:  # noqa: BLE001 - every provider failure is classified and re-raised as ProviderFailure
                 status = getattr(error, "status_code", None)
                 failure = (
                     classify_status(status)

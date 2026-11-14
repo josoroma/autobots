@@ -15,7 +15,12 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
 import toolchain  # noqa: E402
 
-RUFF_RULES = {'E', 'F', 'W', 'I', 'B', 'UP', 'ASYNC', 'RUF'}
+RUFF_RULES = {'E', 'F', 'W', 'I', 'B', 'UP', 'ASYNC', 'RUF',
+              # R-05's ratchets: size, complexity, Any and broad catches.
+              'C90', 'PLR0911', 'PLR0912', 'PLR0913', 'PLR0915', 'ANN401', 'BLE001', 'S110', 'S112'}
+# Upper limits. A refactor may lower one; raising it fails here.
+RUFF_LIMITS = {('mccabe', 'max-complexity'): 15, ('pylint', 'max-branches'): 15, ('pylint', 'max-returns'): 8,
+               ('pylint', 'max-statements'): 60, ('pylint', 'max-args'): 8}
 TS_FLAGS = ('strict', 'noUncheckedIndexedAccess', 'exactOptionalPropertyTypes')
 TSCONFIGS = ('apps/web/tsconfig.json', 'packages/api-client/tsconfig.json')
 ESLINT_PRESETS = ('eslint-config-next/core-web-vitals', 'eslint-config-next/typescript')
@@ -32,8 +37,12 @@ def python_errors(pyproject: dict) -> list[str]:
         errors.append('mypy no longer checks src and tests')
     missing = RUFF_RULES - set(tool.get('ruff', {}).get('lint', {}).get('select', []))
     errors += [f'ruff no longer selects {rule}' for rule in sorted(missing)]
-    if tool.get('ruff', {}).get('lint', {}).get('ignore'):
+    lint = tool.get('ruff', {}).get('lint', {})
+    if lint.get('ignore'):
         errors.append('ruff ignores rules')
+    for (section, name), limit in RUFF_LIMITS.items():
+        if not lint.get(section, {}).get(name, limit + 1) <= limit:
+            errors.append(f'ruff {section} {name} is above {limit}')
     return errors
 
 
@@ -79,7 +88,10 @@ class GateSettings(unittest.TestCase):
         for weaken in (lambda d: d['tool']['mypy'].__setitem__('strict', False),
                        lambda d: d['tool']['mypy'].__setitem__('files', ['src']),
                        lambda d: d['tool']['ruff']['lint']['select'].remove('B'),
-                       lambda d: d['tool']['ruff']['lint'].__setitem__('ignore', ['E501'])):
+                       lambda d: d['tool']['ruff']['lint'].__setitem__('ignore', ['E501']),
+                       lambda d: d['tool']['ruff']['lint']['mccabe'].__setitem__('max-complexity', 20),
+                       lambda d: d['tool']['ruff']['lint']['pylint'].pop('max-args'),
+                       lambda d: d['tool']['ruff']['lint']['select'].remove('ANN401')):
             altered = copy.deepcopy(self.pyproject)
             weaken(altered)
             self.assertTrue(python_errors(altered))

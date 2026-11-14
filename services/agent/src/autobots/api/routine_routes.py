@@ -1,11 +1,12 @@
 """Routines. Creating or changing one changes what can start unattended, so only an owner can."""
 
-from typing import Annotated, Any
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Request, status
 
 from autobots.api.errors import ApiError
+from autobots.api.pool import request_pool
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, require_owner
 from autobots.application.routines import (
@@ -32,13 +33,6 @@ Owner = Annotated[UUID, Depends(require_owner)]
 User = Annotated[UUID, Depends(current_user)]
 
 
-def _pool(request: Request) -> Any:
-    pool = request.app.state.pool
-    if pool is None:
-        raise ApiError(503, "service_unavailable", "The database is unavailable.")
-    return pool
-
-
 def _error(error: RoutineRefused | IdempotencyConflict) -> ApiError:
     if isinstance(error, IdempotencyConflict):
         return ApiError(409, error.code, "This key was already used with different content.")
@@ -53,7 +47,7 @@ def _error(error: RoutineRefused | IdempotencyConflict) -> ApiError:
 
 @router.get("/routines", operation_id="listRoutines", response_model=RoutineList)
 async def get_routines(request: Request, workspace: Member) -> RoutineList:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         return RoutineList(schema_version=1, routines=await list_routines(connection, workspace))
 
 
@@ -66,7 +60,7 @@ async def get_routines(request: Request, workspace: Member) -> RoutineList:
 async def post_routine(
     body: RoutineCreate, request: Request, key: Key, workspace: Owner, user: User
 ) -> RoutineView:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await create_routine(
                 connection,
@@ -82,7 +76,7 @@ async def post_routine(
 
 @router.get("/routines/{routine_id}", operation_id="getRoutine", response_model=RoutineView)
 async def read_routine(routine_id: UUID, request: Request, workspace: Member) -> RoutineView:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await get_routine(connection, workspace, routine_id)
         except RoutineRefused as error:
@@ -103,7 +97,7 @@ async def post_version(
     workspace: Owner,
     user: User,
 ) -> RoutineView:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await add_routine_version(
                 connection,
@@ -124,7 +118,7 @@ async def post_version(
 async def post_enabled(
     routine_id: UUID, body: RoutineEnabled, request: Request, workspace: Owner
 ) -> RoutineView:
-    async with _pool(request).connection() as connection:
+    async with request_pool(request).connection() as connection:
         try:
             return await set_enabled(connection, workspace, routine_id, body.enabled)
         except RoutineRefused as error:

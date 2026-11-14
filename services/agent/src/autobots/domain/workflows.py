@@ -101,7 +101,7 @@ def _output_type(node: Mapping[str, Any], port: str, spec: BlockSpec) -> str:
     return str(config.get("item_type", "json")) if declared == "config_item" else declared
 
 
-def _config_errors(node: Mapping[str, Any]) -> list[GraphError]:
+def _config_errors(node: Mapping[str, Any]) -> list[GraphError]:  # noqa: PLR0911 - baseline 2026-11-14, shrink only (STD-06)
     block, config, name = node["block"], node.get("config", {}), node["id"]
     if block == "input" and config.get("type") not in INPUT_TYPES:
         return [GraphError("input_type_invalid", name)]
@@ -211,7 +211,7 @@ def ir_normalized(graph: Mapping[str, Any]) -> dict[str, Any]:
     return plain
 
 
-def validate_graph(graph: Mapping[str, Any]) -> list[GraphError]:
+def validate_graph(graph: Mapping[str, Any]) -> list[GraphError]:  # noqa: C901, PLR0912 - baseline 2026-11-14, shrink only (STD-06)
     """Typed errors, all at once where they can be found. An empty list means publishable."""
     errors: list[GraphError] = []
     version = graph.get("ir_version", 1)

@@ -160,7 +160,7 @@ async def _tool(
     return result.output or {}
 
 
-async def _run_block(
+async def _run_block(  # noqa: PLR0911 - baseline 2026-11-14, shrink only (STD-06)
     gateway: ToolGateway,
     connection: Any,
     scope: ToolScope,

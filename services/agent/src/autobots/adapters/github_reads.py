@@ -58,7 +58,7 @@ def _checked(reply: httpx.Response) -> Any:
     return reply.json()
 
 
-def github_read_tools(
+def github_read_tools(  # noqa: C901 - baseline 2026-11-14, shrink only (STD-06)
     transport: httpx.AsyncBaseTransport | None = None,
     environ: Mapping[str, str] = os.environ,
 ) -> tuple[ToolDefinition, ...]:

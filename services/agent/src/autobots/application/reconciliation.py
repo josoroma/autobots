@@ -53,7 +53,7 @@ async def has_unresolvable_effect(connection: Any, run_id: UUID) -> bool:
     return bool((await cursor.fetchone())[0])
 
 
-async def record_evidence(
+async def record_evidence(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (STD-06)
     connection: Any,
     *,
     workspace_id: UUID,
