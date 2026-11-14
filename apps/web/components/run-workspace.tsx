@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  parseRunWorkspace,
-  type RunEvent,
-  type RunWorkspace,
-} from "@autobots/api-client";
+import type { RunEvent, RunWorkspace } from "@autobots/api-client";
 import {
   CircleAlert,
   CircleCheck,
@@ -23,17 +19,21 @@ import {
 
 import { ContinueRun } from "@/components/continue-run";
 import { RunControls } from "@/components/run-controls";
+import { useRunWorkspace } from "@/components/runs/workspace/use-run-workspace";
 import { ToolsUsed } from "@/components/tool-uses";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { LoadState } from "@/components/ui/load-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { UnknownEffects } from "@/components/unknown-effects";
-import { cn } from "@/lib/utils";
 import {
-  parseCursorFrame,
-  parseEventFrame,
-  splitEventPage,
-} from "@/lib/stream-frames";
+  RUN_NOT_FOUND,
+  retryWords,
+  shownState,
+  type Connection,
+  type WorkspaceLoad,
+} from "@/lib/run-workspace-load";
+import { cn } from "@/lib/utils";
 
 // Reasons are kept apart from status, so "paused" and "failed" can say why.
 const STATUS_TEXT: Record<string, string> = {
@@ -73,14 +73,12 @@ const STATUS_TONE: Record<string, ComponentProps<typeof Badge>["variant"]> = {
   failed: "danger",
   cancelled: "muted",
 };
-const CONNECTION_TEXT = {
+const CONNECTION_TEXT: Record<Connection, string> = {
   loading: "Loading",
   live: "Live",
   reconnecting: "Reconnecting. Showing the last known state.",
   ended: "Finished. No more activity is expected.",
-} as const;
-type Connection = keyof typeof CONNECTION_TEXT;
-const RECONNECT_MS = 1000;
+};
 
 // PRD-Studio MD-02: which step of MP-01's order chose the binding when this run was admitted.
 const ROLE_SOURCE: Record<string, string> = {
@@ -117,163 +115,13 @@ function describe(event: RunEvent): string {
     : `Artifact ${payload.name} is missing`;
 }
 
-// US-15.24, PRD-Studio SE-03: "Stream text as it's written", on unless turned off in this browser.
-// The Appearance control and the before-paint script both set this root attribute.
-function streamWanted(): boolean {
-  return document.documentElement.dataset.stream !== "off";
-}
-
-type LiveText = { segment: number; text: string; joined: boolean };
-
-// A live piece extends the text only where it continues it. One that starts later, after a reconnect,
-// is shown as joined partway, and the stored artifact replaces it all once it's published.
-function withDelta(
-  current: LiveText | null,
-  delta: { segment: number; offset: number; text: string },
-): LiveText {
-  if (current === null || current.segment !== delta.segment)
-    return {
-      segment: delta.segment,
-      text: delta.text,
-      joined: delta.offset > 0,
-    };
-  if (delta.offset + delta.text.length <= current.text.length) return current;
-  if (delta.offset === current.text.length)
-    return { ...current, text: current.text + delta.text };
-  return { ...current, text: current.text + delta.text, joined: true };
-}
-
 export function RunWorkspaceView({ runId }: { runId: string }) {
-  const [snapshot, setSnapshot] = useState<RunWorkspace | null>(null);
-  const [events, setEvents] = useState<ReadonlyMap<number, RunEvent>>(
-    () => new Map(),
-  );
-  const [connection, setConnection] = useState<Connection>("loading");
-  const [unavailable, setUnavailable] = useState(false);
-  const [gap, setGap] = useState(false);
-  const [refreshes, setRefreshes] = useState(0);
-  const [live, setLive] = useState<LiveText | null>(null);
+  const { load, events, gap, live, refresh, retry } = useRunWorkspace(runId);
   const [result, setResult] = useState<{
     id: string;
     name: string;
     text: string;
   } | null>(null);
-
-  useEffect(() => {
-    let closed = false;
-    let source: EventSource | null = null;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let cursor = 0;
-    const base = `/api/v1/runs/${encodeURIComponent(runId)}`;
-
-    const add = (incoming: readonly RunEvent[]): void => {
-      setEvents((current) => {
-        const next = new Map(current);
-        for (const event of incoming) next.set(event.sequence, event);
-        return next;
-      });
-    };
-
-    const refresh = async (): Promise<boolean> => {
-      const reply = await fetch(`${base}/workspace`, {
-        cache: "no-store",
-      }).catch(() => null);
-      if (closed) return false;
-      if (reply?.ok !== true) {
-        if (reply?.status === 404 || reply?.status === 401) {
-          setUnavailable(true);
-        }
-        return false;
-      }
-      setSnapshot(parseRunWorkspace(await reply.json()));
-      return true;
-    };
-
-    const retry = (): void => {
-      setConnection("reconnecting");
-      timer = setTimeout(() => void start(), RECONNECT_MS);
-    };
-
-    const connect = (): void => {
-      source = new EventSource(`${base}/events/stream?after=${cursor}`);
-      source.onopen = () => setConnection("live");
-      source.addEventListener("run", (message) => {
-        const event = parseEventFrame(message.data);
-        if (event === null || event.sequence <= cursor) return;
-        add([event]);
-        void refresh();
-      });
-      // US-15.24: result text while it's written. Never stored, so never part of the timeline.
-      source.addEventListener("live", (message) => {
-        const event = parseEventFrame(message.data);
-        if (event === null || event.payload.type !== "result.text.delta")
-          return;
-        if (!streamWanted()) return;
-        const delta = event.payload;
-        setLive((current) => withDelta(current, delta));
-      });
-      // WRUN-06: a frame without a usable number is ignored, so the cursor never becomes NaN.
-      source.addEventListener("cursor", (message) => {
-        const next = parseCursorFrame(message.data);
-        if (next !== null) cursor = Math.max(cursor, next);
-      });
-      source.addEventListener("gap", () => {
-        setGap(true);
-        void refresh();
-      });
-      source.addEventListener("end", () => {
-        source?.close();
-        setConnection("ended");
-      });
-      source.onerror = () => {
-        // The browser's own retry would resume from a stale URL, so this uses the current cursor.
-        source?.close();
-        if (!closed) retry();
-      };
-    };
-
-    // Replays everything after the cursor, so nothing missed while disconnected stays missing.
-    const start = async (): Promise<void> => {
-      const loaded = await refresh();
-      if (closed) return;
-      if (!loaded) {
-        retry();
-        return;
-      }
-      for (;;) {
-        const reply = await fetch(`${base}/events?after=${cursor}`, {
-          cache: "no-store",
-        }).catch(() => null);
-        if (closed) return;
-        if (reply?.ok !== true) {
-          retry();
-          return;
-        }
-        // A page that doesn't parse retries, rather than leaving the stream stopped.
-        const split = await reply
-          .json()
-          .then(splitEventPage)
-          .catch(() => null);
-        if (closed) return;
-        if (split === null) {
-          retry();
-          return;
-        }
-        if (split.page.gap) setGap(true);
-        add(split.events);
-        if (split.page.next_cursor === cursor) break;
-        cursor = split.page.next_cursor;
-      }
-      connect();
-    };
-
-    void start();
-    return () => {
-      closed = true;
-      clearTimeout(timer);
-      source?.close();
-    };
-  }, [runId]);
 
   // The stored artifact is the result: the newest published one replaces any live text.
   const published = [...events.values()]
@@ -301,7 +149,6 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
         const text = await reply.text();
         if (!active) return;
         setResult({ id: publishedId, name: publishedName, text });
-        setLive(null);
       })
       .catch(() => undefined);
     return () => {
@@ -309,46 +156,9 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
     };
   }, [publishedId, publishedName]);
 
-  // After a page's own action, without waiting for the next event.
-  useEffect(() => {
-    if (refreshes === 0) return;
-    let active = true;
-    fetch(`/api/v1/runs/${encodeURIComponent(runId)}/workspace`, {
-      cache: "no-store",
-    })
-      .then(async (reply) => {
-        if (active && reply.ok)
-          setSnapshot(parseRunWorkspace(await reply.json()));
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, [refreshes, runId]);
-
-  if (unavailable) {
-    return (
-      <div className="mx-auto max-w-6xl space-y-4">
-        <PageHeader title="Run" />
-        <p role="alert" data-state="unavailable" className="text-sm">
-          That run is not available. Sign in with access to it, or check the
-          link.
-        </p>
-      </div>
-    );
-  }
-  if (snapshot === null) {
-    return (
-      <div className="mx-auto max-w-6xl space-y-4">
-        <PageHeader title="Run" />
-        <p role="status" data-state="loading" className="text-sm">
-          {connection === "reconnecting"
-            ? CONNECTION_TEXT.reconnecting
-            : "Loading this run."}
-        </p>
-      </div>
-    );
-  }
+  if (load.kind !== "ready")
+    return <RunLoadState load={load} onRetry={retry} />;
+  const { snapshot, connection } = load;
   const timeline = [...events.values()].sort((a, b) => a.sequence - b.sequence);
   const label = STATUS_LABEL[snapshot.run.status];
   return (
@@ -403,21 +213,7 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
                 </Link>
               </p>
             ) : null}
-            <p
-              data-connection={connection}
-              className="text-muted-foreground flex items-center gap-2 text-xs"
-            >
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "size-1.5 shrink-0 rounded-full",
-                  connection === "live"
-                    ? "bg-live-text"
-                    : "bg-muted-foreground",
-                )}
-              />
-              {CONNECTION_TEXT[connection]}
-            </p>
+            <ConnectionLine connection={connection} onRetry={retry} />
             {snapshot.can_continue ? <ContinueRun runId={runId} /> : null}
             <RunControls
               runId={runId}
@@ -427,7 +223,7 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
                 snapshot.outstanding.uncertain_calls +
                 snapshot.outstanding.unreported_charges
               }
-              onChanged={() => setRefreshes((count) => count + 1)}
+              onChanged={refresh}
             />
           </Section>
           {snapshot.verification === null ? null : (
@@ -592,7 +388,7 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
               <UnknownEffects
                 runId={runId}
                 operations={snapshot.unknown_operations}
-                onResolved={() => setRefreshes((count) => count + 1)}
+                onResolved={refresh}
               />
             </section>
           )}
@@ -836,6 +632,72 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// PRD-Development-Harness DH-06: loading, a refusal, a missing run, an outage being retried and a
+// mismatch each read differently, and only an outage offers Retry (WRUN-02).
+function RunLoadState({
+  load,
+  onRetry,
+}: {
+  load: Exclude<WorkspaceLoad<RunWorkspace>, { kind: "ready" }>;
+  onRetry: () => void;
+}) {
+  const state = shownState(load);
+  return (
+    <div className="mx-auto max-w-6xl space-y-4">
+      <PageHeader title="Run" />
+      {state === null ? null : (
+        <LoadState
+          state={state}
+          what="this run"
+          onRetry={onRetry}
+          notFound={RUN_NOT_FOUND}
+        />
+      )}
+      {load.kind === "retrying" ? (
+        <p
+          data-field="retry-in"
+          data-attempt={load.attempt}
+          className="text-muted-foreground text-sm"
+        >
+          {retryWords(load.delayMs)}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+// The stream's state under the status. While reconnecting, Retry tries now rather than after the wait.
+function ConnectionLine({
+  connection,
+  onRetry,
+}: {
+  connection: Connection;
+  onRetry: () => void;
+}) {
+  return (
+    <>
+      <p
+        data-connection={connection}
+        className="text-muted-foreground flex items-center gap-2 text-xs"
+      >
+        <span
+          aria-hidden="true"
+          className={cn(
+            "size-1.5 shrink-0 rounded-full",
+            connection === "live" ? "bg-live-text" : "bg-muted-foreground",
+          )}
+        />
+        {CONNECTION_TEXT[connection]}
+      </p>
+      {connection === "reconnecting" ? (
+        <Button variant="outline" size="sm" onClick={onRetry}>
+          Retry
+        </Button>
+      ) : null}
+    </>
   );
 }
 

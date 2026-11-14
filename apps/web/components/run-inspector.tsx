@@ -1,11 +1,14 @@
 "use client";
 
-import { parseRunInspector, type RunInspector } from "@autobots/api-client";
+import { parseRunInspector } from "@autobots/api-client";
 import { CircleAlert } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
+import { LoadState } from "@/components/ui/load-state";
 import { PageHeader } from "@/components/ui/page-header";
+import { RUN_NOT_FOUND } from "@/lib/run-workspace-load";
+import { useResource } from "@/lib/use-resource";
 
 function dollars(micro: number): string {
   return `US$${micro / 1_000_000}`;
@@ -15,56 +18,28 @@ function tokens(value: number | null): string {
   return value === null ? "not reported" : String(value);
 }
 
+// The run page's classification: a refusal, a missing run and a mismatch each say so, and only an
+// outage offers Retry (WRUN-02, PRD-Development-Harness DH-06). It reads once; Retry reads again.
 export function RunInspectorView({ runId }: { runId: string }) {
-  const [view, setView] = useState<RunInspector | null>(null);
-  const [state, setState] = useState<"loading" | "unavailable" | "error">(
-    "loading",
+  const { state, pending, reload } = useResource(
+    `/api/v1/runs/${encodeURIComponent(runId)}/inspector`,
+    parseRunInspector,
   );
-
-  useEffect(() => {
-    let active = true;
-    fetch(`/api/v1/runs/${encodeURIComponent(runId)}/inspector`, {
-      cache: "no-store",
-    })
-      .then(async (reply) => {
-        if (!active) return;
-        if (reply.ok) {
-          setView(parseRunInspector(await reply.json()));
-          return;
-        }
-        await reply.text();
-        setState(
-          reply.status === 404 || reply.status === 401
-            ? "unavailable"
-            : "error",
-        );
-      })
-      .catch(() => {
-        if (active) setState("error");
-      });
-    return () => {
-      active = false;
-    };
-  }, [runId]);
-
-  if (view === null) {
+  if (state.kind !== "ready") {
     return (
       <div className="mx-auto max-w-4xl space-y-4">
         <PageHeader title="Run inspector" />
-        {state === "loading" ? (
-          <p role="status" data-state="loading" className="text-sm">
-            Loading this run.
-          </p>
-        ) : (
-          <p role="alert" data-state={state} className="text-sm">
-            {state === "unavailable"
-              ? "That run is not available. Sign in with access to it, or check the link."
-              : "This run could not be read. Check that the local API is running."}
-          </p>
-        )}
+        <LoadState
+          state={state}
+          what="this run"
+          onRetry={reload}
+          pending={pending}
+          notFound={RUN_NOT_FOUND}
+        />
       </div>
     );
   }
+  const view = state.value;
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <header className="space-y-2">

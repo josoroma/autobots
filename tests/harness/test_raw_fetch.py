@@ -27,7 +27,6 @@ BASELINE = frozenset({
     'components/provider-settings-panel.tsx',
     'components/run-controls.tsx',
     'components/run-disclosure.tsx',
-    'components/run-inspector.tsx',
     'components/run-panel.tsx',
     'components/run-workspace.tsx',
     'components/session-panel.tsx',

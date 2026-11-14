@@ -1,0 +1,342 @@
+/**
+ * The run page's reads and event stream, without React (WRUN-02, WRUN-04). It reads the snapshot,
+ * replays the events after its cursor, then follows the stream; it stops on a refusal or a contract
+ * mismatch, and backs off on an outage. Snapshot reads run one at a time, every refresh shares that
+ * queue, and an older snapshot never replaces a newer one. It only reads: closing it, as a browser
+ * going away does, never changes the run (PRD-Development-Harness DH-06). The stream, the clock and
+ * fetch are passed in, so it also runs under `node --test`.
+ */
+import {
+  parseRunWorkspace,
+  type RunEvent,
+  type RunWorkspace,
+} from "@autobots/api-client";
+
+import { coalesce } from "./coalesce.ts";
+import { loadJson, type Loaded, type LoadFailure } from "./load.ts";
+import {
+  retryDelay,
+  stops,
+  withConnection,
+  withFailure,
+  withSnapshot,
+  type Connection,
+  type WorkspaceLoad,
+} from "./run-workspace-load.ts";
+import {
+  parseCursorFrame,
+  parseEventFrame,
+  splitEventPage,
+} from "./stream-frames.ts";
+
+/** The stream's named frames (event_routes.py). */
+export type FrameType = "run" | "live" | "cursor" | "gap" | "end";
+export const FRAME_TYPES: readonly FrameType[] = [
+  "run",
+  "live",
+  "cursor",
+  "gap",
+  "end",
+];
+
+export interface StreamHandlers {
+  open(): void;
+  error(): void;
+  frame(type: FrameType, data: unknown): void;
+}
+
+export interface Stream {
+  close(): void;
+}
+
+/** Result text while it's written (US-15.24). Never stored, so never part of the timeline. */
+export interface LiveText {
+  segment: number;
+  text: string;
+  joined: boolean;
+}
+
+/**
+ * A live piece extends the text only where it continues it. One that starts later, after a
+ * reconnect, is shown as joined partway, and the stored artifact replaces it all once published.
+ */
+export function withDelta(
+  current: LiveText | null,
+  delta: { segment: number; offset: number; text: string },
+): LiveText {
+  if (current === null || current.segment !== delta.segment)
+    return {
+      segment: delta.segment,
+      text: delta.text,
+      joined: delta.offset > 0,
+    };
+  if (delta.offset + delta.text.length <= current.text.length) return current;
+  if (delta.offset === current.text.length)
+    return { ...current, text: current.text + delta.text };
+  return { ...current, text: current.text + delta.text, joined: true };
+}
+
+export interface RunView {
+  load: WorkspaceLoad<RunWorkspace>;
+  /** Stored events by sequence, so a replayed one replaces itself rather than repeating. */
+  events: ReadonlyMap<number, RunEvent>;
+  /** Retained events couldn't fill the range, so the timeline starts later. */
+  gap: boolean;
+  live: LiveText | null;
+}
+
+export const EMPTY_VIEW: RunView = {
+  load: { kind: "loading" },
+  events: new Map(),
+  gap: false,
+  live: null,
+};
+
+export interface RunConnectionOptions {
+  runId: string;
+  open: (url: string, on: StreamHandlers) => Stream;
+  /** Runs `run` after `ms`, and returns what cancels it. */
+  later: (run: () => void, ms: number) => () => void;
+  onChange: (view: RunView) => void;
+  /** Whether live result text is wanted in this browser (PRD-Studio SE-03). Yes by default. */
+  streamWanted?: () => boolean;
+  /** For tests. The browser's own fetch otherwise. */
+  fetch?: typeof globalThis.fetch;
+  /** Records an unexpected failure by its name, never its message or a value. */
+  report?: (record: { event: string; name: string }) => void;
+}
+
+export class RunConnection {
+  readonly #options: RunConnectionOptions;
+  readonly #base: string;
+  readonly #controller = new AbortController();
+  readonly #refresh: () => Promise<Loaded<RunWorkspace>>;
+  #view: RunView = EMPTY_VIEW;
+  /** The newest event sequence the stream and replays have covered. */
+  #cursor = 0;
+  /** Failed attempts in a row. The stream opening resets it. */
+  #failures = 0;
+  #stream: Stream | null = null;
+  /** Counts streams opened, so frames from a replaced one are ignored. */
+  #generation = 0;
+  #cancelWait: (() => void) | null = null;
+  #starting = false;
+  #closed = false;
+  #stopped = false;
+
+  constructor(options: RunConnectionOptions) {
+    this.#options = options;
+    this.#base = `/api/v1/runs/${encodeURIComponent(options.runId)}`;
+    this.#refresh = coalesce(() => this.#readSnapshot());
+  }
+
+  get view(): RunView {
+    return this.#view;
+  }
+
+  /** Reads the snapshot, replays what was missed and follows the stream. */
+  start(): void {
+    this.#begin();
+  }
+
+  /** Reads the snapshot again, in turn with every other refresh, such as after the page's own action. */
+  refresh(): void {
+    if (this.#halted) return;
+    this.#refresh().catch((error: unknown) => this.#lost(error));
+  }
+
+  /** The visible Retry: the next attempt now, rather than after its wait. */
+  retry(): void {
+    if (this.#halted) return;
+    this.#clearWait();
+    this.#begin();
+  }
+
+  /** Stops reading and listening. The run itself is untouched. */
+  close(): void {
+    this.#closed = true;
+    this.#clearWait();
+    this.#closeStream();
+    this.#controller.abort();
+  }
+
+  get #halted(): boolean {
+    return this.#closed || this.#stopped;
+  }
+
+  #begin(): void {
+    this.#start().catch((error: unknown) => this.#lost(error));
+  }
+
+  async #start(): Promise<void> {
+    if (this.#starting || this.#halted) return;
+    this.#starting = true;
+    try {
+      const loaded = await this.#refresh();
+      if (loaded.kind !== "ready" || this.#halted) return;
+      if (await this.#replay()) this.#connect();
+    } finally {
+      this.#starting = false;
+    }
+  }
+
+  /** Replays everything after the cursor, so nothing missed while disconnected stays missing. */
+  async #replay(): Promise<boolean> {
+    for (;;) {
+      const loaded = await this.#read(
+        `${this.#base}/events?after=${this.#cursor}`,
+        splitEventPage,
+      );
+      if (this.#halted) return false;
+      if (loaded.kind !== "ready") {
+        this.#fail(loaded);
+        return false;
+      }
+      const { page, events } = loaded.value;
+      this.#add(events, page.gap);
+      if (page.next_cursor <= this.#cursor) return true;
+      this.#cursor = page.next_cursor;
+    }
+  }
+
+  async #readSnapshot(): Promise<Loaded<RunWorkspace>> {
+    const loaded = await this.#read(
+      `${this.#base}/workspace`,
+      parseRunWorkspace,
+    );
+    if (this.#halted) return loaded;
+    if (loaded.kind === "ready") {
+      this.#update({ load: withSnapshot(this.#view.load, loaded.value) });
+    } else {
+      this.#fail(loaded);
+    }
+    return loaded;
+  }
+
+  #read<T>(path: string, parse: (value: unknown) => T): Promise<Loaded<T>> {
+    const { fetch } = this.#options;
+    return loadJson(path, parse, {
+      signal: this.#controller.signal,
+      ...(fetch === undefined ? {} : { fetch }),
+    });
+  }
+
+  /** A refusal or a mismatch stops everything; an outage waits, then starts again. */
+  #fail(failure: LoadFailure): void {
+    if (this.#halted) return;
+    this.#closeStream();
+    this.#clearWait();
+    if (stops(failure)) {
+      this.#stopped = true;
+      this.#update({
+        load: withFailure(this.#view.load, failure, { attempt: 0, delayMs: 0 }),
+      });
+      return;
+    }
+    this.#failures += 1;
+    const delayMs = retryDelay(this.#failures);
+    this.#update({
+      load: withFailure(this.#view.load, failure, {
+        attempt: this.#failures,
+        delayMs,
+      }),
+    });
+    this.#cancelWait = this.#options.later(() => {
+      this.#cancelWait = null;
+      this.#begin();
+    }, delayMs);
+  }
+
+  /** A failure no read classified, such as a bug: recorded by name and treated as an outage. */
+  #lost(error: unknown): void {
+    this.#options.report?.({
+      event: "web.run_workspace_error",
+      name: error instanceof Error ? error.name : typeof error,
+    });
+    this.#fail({ kind: "unavailable", status: null });
+  }
+
+  #connect(): void {
+    this.#closeStream();
+    this.#generation += 1;
+    const generation = this.#generation;
+    const current = () => generation === this.#generation && !this.#halted;
+    this.#stream = this.#options.open(
+      `${this.#base}/events/stream?after=${this.#cursor}`,
+      {
+        open: () => {
+          if (!current()) return;
+          this.#failures = 0;
+          this.#setConnection("live");
+        },
+        // The browser's own retry would resume from a stale URL, so this uses the current cursor.
+        error: () => {
+          if (current()) this.#fail({ kind: "unavailable", status: null });
+        },
+        frame: (type, data) => {
+          if (current()) this.#frame(type, data);
+        },
+      },
+    );
+  }
+
+  #frame(type: FrameType, data: unknown): void {
+    switch (type) {
+      case "run": {
+        const event = parseEventFrame(data);
+        if (event === null || event.sequence <= this.#cursor) return;
+        this.#add([event], false);
+        this.refresh();
+        return;
+      }
+      case "live": {
+        const event = parseEventFrame(data);
+        const wanted = this.#options.streamWanted?.() ?? true;
+        if (event?.payload.type !== "result.text.delta" || !wanted) return;
+        this.#update({ live: withDelta(this.#view.live, event.payload) });
+        return;
+      }
+      case "cursor": {
+        // WRUN-06: a frame without a usable number is ignored, so the cursor never becomes NaN.
+        const next = parseCursorFrame(data);
+        if (next !== null) this.#cursor = Math.max(this.#cursor, next);
+        return;
+      }
+      case "gap":
+        this.#update({ gap: true });
+        this.refresh();
+        return;
+      case "end":
+        this.#closeStream();
+        this.#setConnection("ended");
+        return;
+    }
+  }
+
+  #add(incoming: readonly RunEvent[], gap: boolean): void {
+    if (incoming.length === 0 && (!gap || this.#view.gap)) return;
+    const events = new Map(this.#view.events);
+    for (const event of incoming) events.set(event.sequence, event);
+    this.#update({ events, gap: this.#view.gap || gap });
+  }
+
+  #setConnection(connection: Connection): void {
+    this.#update({ load: withConnection(this.#view.load, connection) });
+  }
+
+  #closeStream(): void {
+    this.#stream?.close();
+    this.#stream = null;
+  }
+
+  #clearWait(): void {
+    this.#cancelWait?.();
+    this.#cancelWait = null;
+  }
+
+  #update(patch: Partial<RunView>): void {
+    if (this.#closed) return;
+    this.#view = { ...this.#view, ...patch };
+    this.#options.onChange(this.#view);
+  }
+}
