@@ -13,23 +13,29 @@ import asyncio
 import fcntl
 import json
 import logging
-import math
 import os
 import sys
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Mapping
-from contextlib import contextmanager
-from dataclasses import dataclass, field
+from contextlib import asynccontextmanager, contextmanager
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal, TypedDict, cast
 
 from langchain_core.messages import AIMessageChunk, HumanMessage, SystemMessage, ToolMessage
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError
 
-from autobots.adapters.models.catalog import ModelUnavailable, parse_catalog, validated_entry
+from autobots.adapters.models.catalog import (
+    CatalogEntry,
+    ModelUnavailable,
+    micro_usd,
+    parse_catalog,
+    validated_entry,
+)
 from autobots.adapters.models.factory import PreparedAttempt, chat_model, checked_options
 from autobots.adapters.models.openrouter_metadata import catalog_fetcher
+from autobots.application.model_admission import CostUnavailable, worst_case_cost
 from autobots.application.run_projection import public_text
 from autobots.domain.models import ModelProfile, ModelRole
 from autobots.operations.logs import configure_logging, forbid_remote_tracing, log_event
@@ -67,6 +73,7 @@ AUTHORIZED_CAPS = {
     # Decision 0019 S4.
     "openai_gpt_6_1_sol": 1_200_000,
 }
+# What each call is reserved for, in prompt and output tokens. Every prompt here is far shorter.
 CONTEXT_TOKENS = 8_192
 OUTPUT_TOKENS = 512
 TRIALS = 3
@@ -82,43 +89,62 @@ class CapReached(Exception):
     """The next call's worst case wouldn't fit."""
 
 
-@dataclass(frozen=True)
-class Price:
-    prompt_usd: float
-    completion_usd: float
+def trial_worst_case(entry: CatalogEntry) -> int:
+    """The most one call can cost, in micro-USD, priced by admission's rules (MP-07, POPS-01).
 
-    def worst_case_micro_usd(self) -> int:
-        usd = CONTEXT_TOKENS * self.prompt_usd + OUTPUT_TOKENS * self.completion_usd
-        return math.ceil(usd * 1_000_000)
+    Cache writes, reasoning tokens, a per-request fee and every rate a prompt of CONTEXT_TOKENS
+    could reach all count, since Decisions 0009 and 0019 S4 hold a call at its worst case. An
+    unknown or unbounded price, or a higher rate that starts within that prompt, is refused.
+    """
+    unpriced = Refused("the catalog gives no usable price for this route")
+    tier = entry.pricing.tier_from_tokens if entry.pricing else None
+    if tier is not None and tier <= CONTEXT_TOKENS:
+        raise unpriced
+    try:
+        return worst_case_cost(entry.pricing, CONTEXT_TOKENS, OUTPUT_TOKENS)
+    except CostUnavailable:
+        raise unpriced from None
 
 
-def price_of(payload: Mapping[str, Any], wire_id: str) -> Price:
-    for item in payload.get("data", ()):
-        if item.get("id") == wire_id:
-            pricing = item.get("pricing") or {}
-            try:
-                # Rates can rise by time of day. Long-prompt rates start far above these prompts.
-                rates = [pricing] + [
-                    override
-                    for override in pricing.get("overrides") or []
-                    if "min_prompt_tokens" not in override
-                ]
-                return Price(
-                    max(float(rate["prompt"]) for rate in rates),
-                    max(float(rate["completion"]) for rate in rates),
-                )
-            except (KeyError, TypeError, ValueError):
-                break
-    raise Refused("the catalog gives no usable price for this route")
+def reported_micro_usd(message: object) -> int | None:
+    """The reply's own charge, converted as the worker converts it (PADP-12)."""
+    return micro_usd((getattr(message, "response_metadata", None) or {}).get("cost"))
+
+
+# What a ledger entry records. scripts/persistent_install.py settles its goals with the last two.
+LedgerState = Literal[
+    "reserved", "settled", "usage_unreported", "uncertain", "not_started", "run_not_finished"
+]
+
+
+class LedgerEntry(TypedDict):
+    """One held call, as stored. A dict, as scripts/persistent_install.py reads its state."""
+
+    label: str
+    worst_case: int
+    reported: int | None
+    state: LedgerState
+    at: str
+
+
+@dataclass
+class Charge:
+    """What a held call settles to: the reply's reported charge, unless its outcome is unknown."""
+
+    reported: int | None = None
+    known: bool = True
 
 
 class Ledger:
-    """On disk and across runs, so a rerun can't spend the cap a second time."""
+    """On disk and across runs, so a rerun against the same file can't spend its cap twice.
+
+    A missing file starts empty.
+    """
 
     def __init__(self, path: Path, cap_micro_usd: int) -> None:
         self.path = path
         self.cap = cap_micro_usd
-        self.entries: list[dict[str, Any]] = (
+        self.entries: list[LedgerEntry] = (
             json.loads(path.read_text())["entries"] if path.exists() else []
         )
 
@@ -149,11 +175,11 @@ class Ledger:
                 self.entries = json.loads(self.path.read_text())["entries"]
             yield
 
-    def reserve(self, label: str, worst_case: int) -> dict[str, Any]:
+    def reserve(self, label: str, worst_case: int) -> LedgerEntry:
         with self._locked():
             if self.committed() + worst_case > self.cap:
                 raise CapReached(label)
-            entry = {
+            entry: LedgerEntry = {
                 "label": label,
                 "worst_case": worst_case,
                 "reported": None,
@@ -164,7 +190,7 @@ class Ledger:
             self._save()
             return entry
 
-    def settle(self, entry: dict[str, Any], reported: int | None, state: str) -> None:
+    def settle(self, entry: LedgerEntry, reported: int | None, state: LedgerState) -> None:
         with self._locked():
             for held in self.entries:
                 if held["label"] == entry["label"] and held["at"] == entry["at"]:
@@ -173,6 +199,28 @@ class Ledger:
             self._save()
         entry["reported"] = reported
         entry["state"] = state
+
+    @asynccontextmanager
+    async def charge(self, label: str, worst_case: int) -> AsyncIterator[Charge]:
+        """Holds one call at its worst case while it runs (Decision 0009, POPS-06).
+
+        Anything that stops it, cancellation included, settles it as uncertain and propagates
+        (DH-06). Otherwise it settles from what the caller recorded on the yielded `Charge`.
+        """
+        entry = self.reserve(label, worst_case)
+        charge = Charge()
+        try:
+            yield charge
+        except BaseException:
+            # Sent, and its outcome isn't known. It stays charged at the worst case.
+            self.settle(entry, None, "uncertain")
+            raise
+        if not charge.known:
+            self.settle(entry, None, "uncertain")
+        elif charge.reported is None:
+            self.settle(entry, None, "usage_unreported")
+        else:
+            self.settle(entry, charge.reported, "settled")
 
 
 class Weather(BaseModel):
@@ -241,11 +289,6 @@ class Trial:
     seconds: float = 0.0
 
 
-def _cost_micro_usd(message: Any) -> int | None:
-    cost = (getattr(message, "response_metadata", None) or {}).get("cost")
-    return None if cost is None else math.ceil(float(cost) * 1_000_000)
-
-
 def _facts(message: Any) -> dict[str, Any]:
     metadata = getattr(message, "response_metadata", None) or {}
     usage = getattr(message, "usage_metadata", None) or {}
@@ -275,20 +318,13 @@ class Corpus:
     prefix: str = ""
 
     async def _call(self, label: str, send: Callable[[], Awaitable[Any]]) -> Any:
-        entry = self.ledger.reserve(label, self.worst_case)
-        try:
+        async with self.ledger.charge(label, self.worst_case) as charge:
             message = await asyncio.wait_for(send(), CALL_SECONDS)
-        except BaseException:
-            # Sent, and its outcome isn't known. It stays charged at the worst case.
-            self.ledger.settle(entry, None, "uncertain")
-            raise
-        cost = _cost_micro_usd(message)
-        self.ledger.settle(entry, cost, "settled" if cost is not None else "usage_unreported")
+            charge.reported = reported_micro_usd(message)
         return message
 
     async def _stream(self, label: str, model: Any, messages: Any) -> tuple[Any, int, int]:
         """The assembled message, plus how many chunks carried content and tool arguments."""
-        entry = self.ledger.reserve(label, self.worst_case)
         assembled: AIMessageChunk | None = None
         text_chunks = tool_chunks = 0
 
@@ -299,13 +335,9 @@ class Corpus:
                 text_chunks += 1 if chunk.content else 0
                 tool_chunks += 1 if chunk.tool_call_chunks else 0
 
-        try:
+        async with self.ledger.charge(label, self.worst_case) as charge:
             await asyncio.wait_for(run(), CALL_SECONDS)
-        except BaseException:
-            self.ledger.settle(entry, None, "uncertain")
-            raise
-        cost = _cost_micro_usd(assembled)
-        self.ledger.settle(entry, cost, "settled" if cost is not None else "usage_unreported")
+            charge.reported = reported_micro_usd(assembled)
         return assembled, text_chunks, tool_chunks
 
     async def plain_text(self, label: str) -> tuple[str, dict[str, Any]]:
@@ -390,16 +422,11 @@ class Corpus:
         return verdict, observed
 
     async def _call_structured(self, label: str, model: Any, prompt: str) -> dict[str, Any]:
-        entry = self.ledger.reserve(label, self.worst_case)
-        try:
+        async with self.ledger.charge(label, self.worst_case) as charge:
             reply: dict[str, Any] = await asyncio.wait_for(
                 model.ainvoke([HumanMessage(prompt)]), CALL_SECONDS
             )
-        except BaseException:
-            self.ledger.settle(entry, None, "uncertain")
-            raise
-        cost = _cost_micro_usd(reply.get("raw"))
-        self.ledger.settle(entry, cost, "settled" if cost is not None else "usage_unreported")
+            charge.reported = reported_micro_usd(reply.get("raw"))
         return reply
 
     async def stream_text(self, label: str) -> tuple[str, dict[str, Any]]:
@@ -471,21 +498,19 @@ class Corpus:
     async def cancellation(self, label: str) -> tuple[str, dict[str, Any]]:
         """Stopping our side proves only that. The charge stays at the worst case."""
         model = self.build()
-        entry = self.ledger.reserve(label, self.worst_case)
         chunks = 0
         started = time.monotonic()
-        stream: AsyncIterator[Any] = model.astream(
-            [HumanMessage("Write a 400 word description of volcanoes in Costa Rica.")]
-        )
-        try:
+        async with self.ledger.charge(label, self.worst_case) as charge:
+            charge.known = False
+            stream: AsyncIterator[Any] = model.astream(
+                [HumanMessage("Write a 400 word description of volcanoes in Costa Rica.")]
+            )
             async with asyncio.timeout(CALL_SECONDS):
                 async for _ in stream:
                     chunks += 1
                     if chunks >= 3:
                         break
                 await stream.aclose()  # type: ignore[attr-defined]  # the SDK types it as an iterator; it is an async generator
-        finally:
-            self.ledger.settle(entry, None, "uncertain")
         return ("passed" if chunks >= 3 else "failed"), {
             "chunks_read": chunks,
             "stopped_after_seconds": round(time.monotonic() - started, 2),
@@ -589,8 +614,13 @@ def planned_calls(only: Mapping[str, int] | None = None) -> int:
     return sum(count * (2 if name == "continuation" else 1) for name, count in only.items())
 
 
-def prepare(route: Route, payload: Mapping[str, Any], max_tokens: int = OUTPUT_TOKENS) -> Any:
-    """The checks a real attempt gets: this exact identity, and only options the catalog lists."""
+def prepare(
+    route: Route, payload: Mapping[str, Any], max_tokens: int = OUTPUT_TOKENS
+) -> tuple[PreparedAttempt, CatalogEntry]:
+    """The checks a real attempt gets: this exact identity, and only options the catalog lists.
+
+    The validated entry comes back with the attempt, so a call is priced from it.
+    """
     now = datetime.now(UTC)
     catalog = parse_catalog(payload, retrieved_at=now, revision="qualification")
     profile = cast(ModelProfile, route)
@@ -598,7 +628,7 @@ def prepare(route: Route, payload: Mapping[str, Any], max_tokens: int = OUTPUT_T
     options = checked_options(
         {"max_tokens": max_tokens, **route.options}, entry.supported_parameters
     )
-    return PreparedAttempt(profile, ModelRole.EXECUTOR, catalog.revision, options)
+    return PreparedAttempt(profile, ModelRole.EXECUTOR, catalog.revision, options), entry
 
 
 def preflight(
@@ -606,20 +636,20 @@ def preflight(
     payload: Mapping[str, Any],
     ledger: Ledger,
     only: Mapping[str, int] | None = None,
-) -> tuple[Any, int]:
+) -> tuple[CatalogEntry, int]:
     """Refuses before any model call, including when the plan can't fit what's left of the cap."""
     if profile not in AUTHORIZED_CAPS or profile not in ROUTES:
         raise Refused(f"{profile} isn't authorized for paid qualification")
     if ledger.cap != AUTHORIZED_CAPS[profile]:
         raise Refused("this ledger's cap isn't the authorized one")
-    attempt = prepare(ROUTES[profile], payload)
-    worst = price_of(payload, attempt.profile.wire_id).worst_case_micro_usd()
+    _, entry = prepare(ROUTES[profile], payload)
+    worst = trial_worst_case(entry)
     calls = planned_calls(only)
     if ledger.committed() + worst * calls > ledger.cap:
         raise Refused(
             f"{calls} calls at {worst} micro-USD each won't fit in what's left of the cap"
         )
-    return attempt, worst
+    return entry, worst
 
 
 async def qualify(
@@ -634,12 +664,12 @@ async def qualify(
     payload = await fetch_catalog()
     if payload is None:
         raise Refused("the catalog couldn't be read, so nothing was sent")
-    attempt, worst = preflight(profile, payload, ledger, only)
+    entry, worst = preflight(profile, payload, ledger, only)
     built_at = time.monotonic()
     route = ROUTES[profile]
 
     def build(max_tokens: int = OUTPUT_TOKENS) -> Any:
-        prepared = prepare(route, payload, max_tokens)
+        prepared, _ = prepare(route, payload, max_tokens)
         return chat_model(prepared, key, client_factory=make_client)
 
     prefix = "" if profile == "openrouter_deepseek_flash" else f"{profile}:"
@@ -650,17 +680,18 @@ async def qualify(
         "completed_at_utc": datetime.now(UTC).isoformat(),
         "evidence_class": "live" if make_client is None else "fake_transport",
         "profile": profile,
-        "wire_id": attempt.profile.wire_id,
-        "canonical_id": attempt.profile.canonical_id,
+        "wire_id": route.wire_id,
+        "canonical_id": route.canonical_id,
         "options": dict(route.options),
-        "catalog_price": price_of(payload, attempt.profile.wire_id).__dict__,
+        # The rates each call was reserved at, in micro-USD per 1M tokens and per request.
+        "catalog_price": asdict(entry.pricing) if entry.pricing else None,
         "worst_case_micro_usd_per_call": worst,
         "cap_micro_usd": ledger.cap,
         "committed_micro_usd": ledger.committed(),
-        "reported_micro_usd": sum(entry["reported"] or 0 for entry in ledger.entries),
+        "reported_micro_usd": sum(held["reported"] or 0 for held in ledger.entries),
         "calls": len(ledger.entries),
         "calls_without_a_reported_charge": sum(
-            1 for entry in ledger.entries if entry["reported"] is None
+            1 for held in ledger.entries if held["reported"] is None
         ),
         "seconds": round(time.monotonic() - built_at, 1),
         "summary": summarize(results),

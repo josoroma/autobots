@@ -3,6 +3,7 @@
 import asyncio
 import json
 import re
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,7 @@ from pydantic import SecretStr
 
 from autobots.adapters.models.catalog import ModelUnavailable
 from autobots.adapters.models.factory import default_sdk_client
+from autobots.application.model_admission import Pricing, worst_case_cost
 from autobots.domain.models import PROFILES
 from autobots.operations import route_qualification as rq
 
@@ -511,11 +513,148 @@ def test_the_closed_schema_closes_every_object(tmp_path: Path) -> None:
     assert schema["properties"]["tasks"]["items"]["additionalProperties"] is False
 
 
-def test_the_worst_case_uses_the_highest_rate_a_time_window_can_charge() -> None:
+def _trial_worst(pricing: Pricing) -> int:
+    return worst_case_cost(pricing, rq.CONTEXT_TOKENS, rq.OUTPUT_TOKENS)
+
+
+def test_the_worst_case_uses_the_highest_rate_a_time_window_can_charge(tmp_path: Path) -> None:
     payload = catalog()
     payload["data"][0]["pricing"]["overrides"] = [
         {"utc_days": ["monday"], "prompt": "0.0000003", "completion": "0.0000012"},
         {"min_prompt_tokens": 272000, "prompt": "0.01", "completion": "0.01"},
     ]
-    price = rq.price_of(payload, WIRE_ID)
-    assert (price.prompt_usd, price.completion_usd) == (0.0000003, 0.0000012)
+    expected = Pricing(300_000, 1_200_000, tier_from_tokens=272_000)
+    report = run(tmp_path, Fake(), payload)
+    assert report["catalog_price"] == asdict(expected)
+    assert report["worst_case_micro_usd_per_call"] == _trial_worst(expected)
+
+
+@pytest.mark.parametrize(
+    ("listed", "expected"),
+    [
+        pytest.param({"input_cache_write": "0.0000004"}, Pricing(400_000, 600_000), id="cache"),
+        pytest.param({"internal_reasoning": "0.000002"}, Pricing(150_000, 2_000_000), id="reason"),
+        pytest.param({"request": "0.0005"}, Pricing(150_000, 600_000, 500), id="per-request"),
+        pytest.param(
+            {
+                "overrides": [
+                    {"min_prompt_tokens": 4096, "prompt": "0.0000009", "completion": "0.0000036"}
+                ]
+            },
+            Pricing(900_000, 3_600_000),
+            id="tier-below-the-trial-prompt",
+        ),
+    ],
+)
+def test_every_charge_the_catalog_lists_is_in_each_calls_worst_case(
+    tmp_path: Path, listed: dict[str, Any], expected: Pricing
+) -> None:
+    """A trial prices a call as admission does, so Decisions 0009 and 0019 cap it (POPS-01)."""
+    payload = catalog()
+    payload["data"][0]["pricing"].update(listed)
+    worst = _trial_worst(expected)
+    report = run(tmp_path, Fake(cost=None), payload)
+    assert report["worst_case_micro_usd_per_call"] == worst
+    assert report["catalog_price"] == asdict(expected)
+    entries = json.loads((tmp_path / "ledger.json").read_text())["entries"]
+    assert {entry["worst_case"] for entry in entries} == {worst}
+    assert report["committed_micro_usd"] == worst * rq.planned_calls()
+
+
+@pytest.mark.parametrize(
+    "listed",
+    [
+        pytest.param({"prompt": "-1", "completion": "-1"}, id="variable"),
+        pytest.param(
+            {
+                "prompt": "0.00000015",
+                "completion": "0.0000006",
+                "overrides": [{"utc_days": ["monday"], "prompt": "-1", "completion": "0.0000012"}],
+            },
+            id="variable-window",
+        ),
+        pytest.param({"prompt": "0.00000015"}, id="no-completion-rate"),
+        pytest.param({"prompt": "0.00000015", "completion": "free"}, id="unreadable"),
+    ],
+)
+def test_an_unknown_or_unbounded_price_is_refused_before_anything_is_sent(
+    tmp_path: Path, listed: dict[str, Any]
+) -> None:
+    payload = catalog()
+    payload["data"][0]["pricing"] = listed
+    fake = Fake()
+    with pytest.raises(rq.Refused, match="no usable price"):
+        run(tmp_path, fake, payload)
+    assert fake.bodies == []
+    assert not (tmp_path / "ledger.json").exists()
+
+
+def test_a_rate_the_trials_prompt_could_reach_unpriced_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    payload = catalog()
+    payload["data"][0]["pricing"]["overrides"] = [
+        {"min_prompt_tokens": 40_000, "prompt": "0.01", "completion": "0.01"}
+    ]
+    monkeypatch.setattr(rq, "CONTEXT_TOKENS", 64_000)
+    ledger = rq.Ledger(tmp_path / "ledger.json", 500_000)
+    with pytest.raises(rq.Refused, match="no usable price"):
+        rq.preflight("openrouter_deepseek_flash", payload, ledger)
+
+
+def test_a_charge_settles_from_the_reported_cost(tmp_path: Path) -> None:
+    ledger = rq.Ledger(tmp_path / "ledger.json", 100)
+
+    async def calls() -> None:
+        async with ledger.charge("reported", 40) as charge:
+            assert ledger.entries[-1]["state"] == "reserved"
+            charge.reported = 7
+        async with ledger.charge("unreported", 40):
+            pass
+        async with ledger.charge("unknown", 40) as charge:
+            charge.known = False
+
+    asyncio.run(calls())
+    entries = json.loads((tmp_path / "ledger.json").read_text())["entries"]
+    assert [(e["label"], e["reported"], e["state"]) for e in entries] == [
+        ("reported", 7, "settled"),
+        ("unreported", None, "usage_unreported"),
+        ("unknown", None, "uncertain"),
+    ]
+    assert rq.Ledger(tmp_path / "ledger.json", 100).committed() == 87
+
+
+class Interrupted(BaseException):
+    """Stands for anything that isn't an Exception, such as a signal."""
+
+
+@pytest.mark.parametrize("interruption", [asyncio.CancelledError, Interrupted, RuntimeError])
+def test_an_interrupted_charge_stays_held_as_uncertain_and_the_interruption_propagates(
+    tmp_path: Path, interruption: type[BaseException]
+) -> None:
+    ledger = rq.Ledger(tmp_path / "ledger.json", 100)
+
+    async def call() -> None:
+        async with ledger.charge("interrupted", 40) as charge:
+            charge.reported = 7
+            raise interruption
+
+    with pytest.raises(interruption):
+        asyncio.run(call())
+    reread = rq.Ledger(tmp_path / "ledger.json", 100)
+    assert [(e["state"], e["reported"]) for e in reread.entries] == [("uncertain", None)]
+    assert reread.committed() == 40
+
+
+def test_a_charge_past_the_cap_holds_nothing_and_never_runs(tmp_path: Path) -> None:
+    ledger = rq.Ledger(tmp_path / "ledger.json", 100)
+    ran: list[str] = []
+
+    async def call() -> None:
+        async with ledger.charge("too much", 101):
+            ran.append("sent")
+
+    with pytest.raises(rq.CapReached):
+        asyncio.run(call())
+    assert ran == []
+    assert ledger.entries == []

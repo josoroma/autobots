@@ -29,7 +29,7 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.utils.function_calling import convert_to_openai_tool
 from pydantic import ConfigDict
 
-from autobots.adapters.models.catalog import RESERVED_PROMPT_TOKENS
+from autobots.adapters.models.catalog import RESERVED_PROMPT_TOKENS, micro_usd
 from autobots.adapters.result_stream import current_tap
 from autobots.application.compaction import (
     CompactionPolicy,
@@ -274,8 +274,8 @@ def _retry_after(error: Exception) -> float | None:
 
 
 def _charged(message: AIMessage) -> int | None:
-    cost = message.response_metadata.get("cost")
-    return None if cost is None else round(float(cost) * 1_000_000)
+    """Rounded up, as the paid trials round the same reply. Unreadable is unreported (PADP-12)."""
+    return micro_usd(message.response_metadata.get("cost"))
 
 
 def _count(value: Any) -> int | None:

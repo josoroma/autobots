@@ -10,12 +10,16 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
+from autobots.application.model_admission import Pricing, worst_case_cost
 from autobots.domain.models import PROFILES, ModelProfileId
 from autobots.operations import reasoning_trial as trial
-from autobots.operations.route_qualification import Ledger, price_of
+from autobots.operations.route_qualification import CONTEXT_TOKENS, OUTPUT_TOKENS, Ledger
 
 KEY = SecretStr("sk-or-arranged-not-a-real-key")
 TERRA = PROFILES[ModelProfileId.TERRA]
+# The catalog's rates below, in micro-USD per million tokens, and one call's worst case at them.
+LISTED = Pricing(1_000_000, 5_000_000)
+WORST = worst_case_cost(LISTED, CONTEXT_TOKENS, OUTPUT_TOKENS)
 MARKER = "ARRANGED-METADATA"
 DETAILS = [
     {
@@ -28,14 +32,19 @@ DETAILS = [
 ]
 
 
-def catalog() -> dict[str, Any]:
+def catalog(**terra: str) -> dict[str, Any]:
+    """Every profile at LISTED's rates. Terra's pricing takes `terra` on top."""
     return {
         "data": [
             {
                 "id": profile.wire_id,
                 "canonical_slug": profile.canonical_id,
                 "supported_parameters": ["max_tokens", "tools", "tool_choice"],
-                "pricing": {"prompt": "0.000001", "completion": "0.000005"},
+                "pricing": {
+                    "prompt": "0.000001",
+                    "completion": "0.000005",
+                    **(terra if profile == TERRA else {}),
+                },
             }
             for profile in PROFILES.values()
         ]
@@ -93,9 +102,15 @@ def test_nothing_returned_is_not_survived() -> None:
 class FakeRoute:
     """Replies with a tool call, then an answer, and logs the requests it was sent."""
 
-    def __init__(self, reply_extra: dict[str, Any] | None = None, tool_call: bool = True) -> None:
+    def __init__(
+        self,
+        reply_extra: dict[str, Any] | None = None,
+        tool_call: bool = True,
+        cost: float | None = 0.0001,
+    ) -> None:
         self.reply_extra = reply_extra or {}
         self.tool_call = tool_call
+        self.cost = cost
         self.sent: list[dict[str, Any]] = []
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
@@ -113,7 +128,9 @@ class FakeRoute:
             call = choice["message"]["tool_calls"][0]
             call["function"]["name"] = "LookupCode"
             call["function"]["arguments"] = '{"item": "alpha"}'
-        usage = {"prompt_tokens": 5, "completion_tokens": 7, "total_tokens": 12, "cost": 0.0001}
+        usage: dict[str, Any] = {"prompt_tokens": 5, "completion_tokens": 7, "total_tokens": 12}
+        if self.cost is not None:
+            usage["cost"] = self.cost
         return httpx.Response(
             200,
             json={
@@ -177,8 +194,7 @@ def test_no_tool_call_is_not_exercised(tmp_path: Path) -> None:
 
 def test_the_cap_stops_the_trial_before_any_request(tmp_path: Path) -> None:
     route = FakeRoute({"reasoning_details": DETAILS})
-    worst = price_of(catalog(), TERRA.wire_id).worst_case_micro_usd()
-    book = ledger(tmp_path, cap=worst * trial.CALLS_PER_TRIAL - 1)
+    book = ledger(tmp_path, cap=WORST * trial.CALLS_PER_TRIAL - 1)
     result = run(route, book)
     assert result.outcome == "not_run"
     assert route.sent == []
@@ -186,12 +202,100 @@ def test_the_cap_stops_the_trial_before_any_request(tmp_path: Path) -> None:
 
 
 def test_earlier_spend_counts_against_the_shared_cap(tmp_path: Path) -> None:
-    worst = price_of(catalog(), TERRA.wire_id).worst_case_micro_usd()
-    book = ledger(tmp_path, cap=worst * trial.CALLS_PER_TRIAL)
+    book = ledger(tmp_path, cap=WORST * trial.CALLS_PER_TRIAL)
     book.reserve("earlier", 1)
     route = FakeRoute({"reasoning_details": DETAILS})
     assert run(route, book).outcome == "not_run"
     assert route.sent == []
+
+
+def test_the_shared_cap_counts_the_reasoning_rate(tmp_path: Path) -> None:
+    """A route can bill reasoning above its completion rate (POPS-01, Decision 0009)."""
+    worst = worst_case_cost(Pricing(1_000_000, 20_000_000), CONTEXT_TOKENS, OUTPUT_TOKENS)
+    route = FakeRoute({"reasoning_details": DETAILS})
+    book = ledger(tmp_path, cap=worst * trial.CALLS_PER_TRIAL - 1)
+    payload = catalog(internal_reasoning="0.00002")
+    result = asyncio.run(trial.run_trial(TERRA, 1, KEY, payload, book, route.http))
+    assert result.outcome == "not_run"
+    assert route.sent == []
+    assert book.entries == []
+
+
+@pytest.mark.parametrize(
+    "terra",
+    [
+        pytest.param({"prompt": "-1", "completion": "-1"}, id="variable"),
+        pytest.param({"request": "-1"}, id="variable-request-fee"),
+    ],
+)
+def test_a_route_with_no_bounded_price_is_not_run(tmp_path: Path, terra: dict[str, str]) -> None:
+    route = FakeRoute({"reasoning_details": DETAILS})
+    book = ledger(tmp_path)
+    results = asyncio.run(
+        trial.run_all(KEY, catalog(**terra), book, 1, route.http, [ModelProfileId.TERRA])
+    )
+    assert [(result.outcome, result.reason) for result in results] == [("not_run", "Refused")]
+    assert route.sent == []
+    assert book.entries == []
+
+
+def test_a_call_with_no_reported_charge_stays_held_under_one_name(tmp_path: Path) -> None:
+    """The shared ledger names this outcome as the route qualification does (POPS-06)."""
+    book = ledger(tmp_path)
+    result = run(FakeRoute({"reasoning_details": DETAILS}, cost=None), book)
+    assert result.reported_micro_usd == [None, None]
+    assert [entry["state"] for entry in book.entries] == ["usage_unreported"] * 2
+    assert book.committed() == WORST * trial.CALLS_PER_TRIAL
+
+
+def test_a_cancelled_call_stays_held_as_uncertain_and_the_cancellation_propagates(
+    tmp_path: Path,
+) -> None:
+    book = ledger(tmp_path)
+
+    async def send() -> Any:
+        raise asyncio.CancelledError
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(trial._paid_call(book, "arranged", WORST, send))
+    assert [(entry["state"], entry["reported"]) for entry in book.entries] == [("uncertain", None)]
+    assert book.committed() == WORST
+
+
+@pytest.mark.parametrize("given", ["absolute", "default"])
+def test_the_shared_ledger_does_not_depend_on_the_working_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, given: str
+) -> None:
+    """Decision 0009's cap is counted in one file wherever the trial starts (POPS-07)."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "keys.env").write_text(f"OPENROUTER_API_KEY={KEY.get_secret_value()}\n")
+    opened: list[Path] = []
+
+    def record(path: Path, cap: int) -> Ledger:
+        opened.append(path)
+        return Ledger(tmp_path / "arranged-ledger.json", cap)
+
+    async def fetch() -> dict[str, Any]:
+        return catalog()
+
+    async def no_usage(_: SecretStr) -> None:
+        return None
+
+    async def nothing_sent(*_: Any, **__: Any) -> list[trial.TrialResult]:
+        return []
+
+    monkeypatch.setattr(trial, "catalog_fetcher", lambda: fetch)
+    monkeypatch.setattr(trial, "Ledger", record)
+    monkeypatch.setattr(trial, "key_usage", no_usage)
+    monkeypatch.setattr(trial, "run_all", nothing_sent)
+    elsewhere = tmp_path / "elsewhere/ledger.json"
+    chosen = ["--ledger", str(elsewhere)] if given == "absolute" else []
+    arguments = ["--paid", "--key-file", "keys.env", "--out", str(tmp_path / "out"), *chosen]
+    monkeypatch.setattr("sys.argv", ["reasoning_trial", *arguments])
+    assert trial.main() == 0
+    repository = Path(__file__).resolve().parents[3]
+    shared = repository / ".checks/decision-0009/ledger.json"
+    assert opened == [elsewhere if given == "absolute" else shared]
 
 
 def test_a_failed_call_stays_held_at_its_worst_case(tmp_path: Path) -> None:
@@ -207,7 +311,7 @@ def test_a_failed_call_stays_held_at_its_worst_case(tmp_path: Path) -> None:
     book = ledger(tmp_path)
     result = asyncio.run(trial.run_trial(TERRA, 1, KEY, catalog(), book, http))
     assert result.outcome == "not_exercised"
-    assert book.committed() == price_of(catalog(), TERRA.wire_id).worst_case_micro_usd()
+    assert book.committed() == WORST
     assert book.entries[0]["state"] == "uncertain"
 
 

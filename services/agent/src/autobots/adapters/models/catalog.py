@@ -53,6 +53,16 @@ def _scaled(value: object, factor: int) -> int | None:
     return int((number * factor).to_integral_value(rounding=ROUND_CEILING))
 
 
+def micro_usd(reported: object) -> int | None:
+    """A reply's reported USD charge in micro-USD, rounded up as every price here is (DH-06).
+
+    A missing, unreadable, non-finite or negative charge is None, so the call's estimate stays
+    open for reconciliation and no charge is invented (PADP-12).
+    """
+    charge = _scaled(reported, 1_000_000)
+    return charge if charge is not None and charge >= 0 else None
+
+
 def _highest(rates: Sequence[Mapping[str, Any]], names: tuple[str, ...], factor: int) -> int | None:
     """The most any listed rate could charge. A negative one has no bound, so it stays negative."""
     found = [_scaled(rate[name], factor) for rate in rates for name in names if name in rate]

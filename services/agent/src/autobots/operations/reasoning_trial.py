@@ -41,14 +41,16 @@ from autobots.operations.route_qualification import (
     LookupCode,
     Refused,
     Route,
-    _cost_micro_usd,
     prepare,
-    price_of,
     read_key,
+    reported_micro_usd,
+    trial_worst_case,
 )
 
 logger = logging.getLogger("autobots.reasoning_trial")
-# Decision 0009: the whole of what this trial and US-11.3's goals may spend, in micro-USD.
+REPOSITORY = Path(__file__).resolve().parents[5]
+# Decision 0009: the whole of what this trial and US-11.3's goals may spend, in micro-USD, and the
+# ledger that counts it, relative to the repository root as scripts/persistent_install.py reads it.
 SHARED_CAP_MICRO_USD = 1_000_000
 SHARED_LEDGER = Path(".checks/decision-0009/ledger.json")
 TRIALS = 2
@@ -177,19 +179,21 @@ class TrialResult:
     reported_micro_usd: list[int | None] = field(default_factory=list)
 
 
+def ledger_path(argument: str) -> Path:
+    """`--ledger` from the repository root, so the shared cap's ledger is the same file wherever
+    the trial starts (POPS-07). An absolute path stays as given."""
+    return REPOSITORY / argument
+
+
 async def _paid_call(
     ledger: Ledger, label: str, worst: int, send: Callable[[], Awaitable[Any]]
 ) -> tuple[Any, int | None]:
-    """Written down at its worst case first. A failed or unreported call stays held there."""
-    entry = ledger.reserve(label, worst)
-    try:
+    """Written down at its worst case first. A failed, cancelled or unreported call stays held
+    there (Decision 0009)."""
+    async with ledger.charge(label, worst) as charge:
         message = await asyncio.wait_for(send(), timeout=CALL_SECONDS)
-    except Exception:
-        ledger.settle(entry, None, "uncertain")
-        raise
-    reported = _cost_micro_usd(message)
-    ledger.settle(entry, reported, "settled" if reported is not None else "no_reported_charge")
-    return message, reported
+        charge.reported = reported_micro_usd(message)
+    return message, charge.reported
 
 
 def _reasoning_tokens(message: Any) -> int | None:
@@ -208,13 +212,13 @@ async def run_trial(
     make_http: HttpFactory = real_http,
 ) -> TrialResult:
     result = TrialResult(profile.id, profile.wire_id, profile.canonical_id, number, "not_exercised")
-    worst = price_of(payload, profile.wire_id).worst_case_micro_usd()
+    attempt, entry = prepare(Route(profile.wire_id, profile.canonical_id), payload)
+    worst = trial_worst_case(entry)
     if ledger.committed() + worst * CALLS_PER_TRIAL > ledger.cap:
         result.outcome = "not_run"
         result.reason = "the worst case would pass the shared cap, so nothing was sent"
         return result
     exchanges = Exchanges()
-    attempt = prepare(Route(profile.wire_id, profile.canonical_id), payload)
 
     def make_client(api_key: str) -> Any:
         return default_sdk_client(api_key, async_http=make_http(exchanges))
@@ -363,7 +367,7 @@ async def _main(arguments: argparse.Namespace) -> int:
         payload = await catalog_fetcher()()
         if payload is None:
             raise Refused("the catalog couldn't be read, so nothing was sent")
-        ledger = Ledger(Path(arguments.ledger), SHARED_CAP_MICRO_USD)
+        ledger = Ledger(ledger_path(arguments.ledger), SHARED_CAP_MICRO_USD)
         before = await key_usage(key)
         results = await run_all(
             key,
