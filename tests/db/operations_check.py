@@ -5,21 +5,17 @@ import asyncio
 import json
 import os
 import sys
-from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-from pydantic import SecretStr
-
-sys.path.insert(0, str(Path(__file__).parent))
-
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.artifacts import ArtifactUnavailable, object_path, read_artifact
 from autobots.application.retention import RetentionPolicy, apply_retention, write_policy
 from autobots.application.runs import admit_run, apply_command
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import Actor, RunCommand
+from pydantic import SecretStr
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 cases: list[dict[str, Any]] = []

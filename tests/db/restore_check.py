@@ -20,12 +20,10 @@ from autobots.application.credentials.store import (
 )
 from autobots.application.goal_loop import LoopConfig, process_next
 from autobots.application.worker_leases import claim_next
+from goal_loop_script import ROUTE
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg.rows import dict_row
 from pydantic import SecretStr
-
-sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import ROUTE
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 cases: list[dict[str, Any]] = []

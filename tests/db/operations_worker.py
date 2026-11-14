@@ -9,15 +9,13 @@ import time
 from pathlib import Path
 from typing import Any
 
-from pydantic import SecretStr
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.goal_loop import LoopConfig, process_next
 from autobots.operations.logs import configure_logging, forbid_remote_tracing, log_event
 from autobots.operations.worker import WorkerConfig, install_signal_handlers, serve
 from goal_loop_script import DONE_A, ROUTE, SAVE, TASK_A, Script, calls, say
+from pydantic import SecretStr
 
 URL = sys.argv[1]
 NAME = sys.argv[2]

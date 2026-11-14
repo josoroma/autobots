@@ -14,9 +14,6 @@ from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import psycopg
-from pydantic import SecretStr
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.experts import create_expert, create_session
 from autobots.application.goal_loop import LoopConfig, _drive
@@ -28,6 +25,7 @@ from autobots.domain.tools import LOOP_TOOL_GRANTS, PLAN_TOOLS
 from effect_tools import tools
 from goal_loop_script import ROUTE, Script, calls, say
 from mock_sink import Sink
+from pydantic import SecretStr
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 BASE = os.environ['AUTOBOTS_STORAGE_BASE']

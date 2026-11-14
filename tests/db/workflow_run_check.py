@@ -10,9 +10,6 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-from pydantic import SecretStr
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application import workflow_runner
 from autobots.application.approvals import decide
@@ -33,6 +30,7 @@ from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.runs import Actor, RunCommand
 from autobots.domain.workflows import block_versions, graph_hash
 from goal_loop_script import ROUTE, Script, say
+from pydantic import SecretStr
 
 URL, BASE = os.environ['AUTOBOTS_DATABASE_URL'], os.environ['AUTOBOTS_STORAGE_BASE']
 SERVICE = SecretStr(os.environ['AUTOBOTS_STORAGE_SERVICE'])

@@ -3,11 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from pathlib import Path
 
 import psycopg
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.application.goal_loop import LoopConfig, process_next
 from effect_tools import tools
 from goal_loop_script import ROUTE, Script

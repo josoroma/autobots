@@ -11,9 +11,6 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-from pydantic import SecretStr
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.goal_loop import LoopConfig, process_next
 from autobots.application.runs import admit_run
@@ -26,6 +23,7 @@ from autobots.contracts.plans import InputDocument
 from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.models import resolve_role_policy
 from goal_loop_script import ROUTE
+from pydantic import SecretStr
 
 URL, BASE = os.environ['AUTOBOTS_DATABASE_URL'], os.environ['AUTOBOTS_STORAGE_BASE']
 SERVICE = SecretStr(os.environ['AUTOBOTS_STORAGE_SERVICE'])

@@ -5,11 +5,8 @@ import asyncio
 import os
 import signal
 import sys
-from pathlib import Path
 
 import psycopg
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.adapters.checkpoints import DURABILITY, fenced_checkpointer, graph_config
 from autobots.application.worker_leases import claim_next
 from worker_graph import build

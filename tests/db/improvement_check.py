@@ -5,14 +5,10 @@ import asyncio
 import json
 import os
 import sys
-from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-from pydantic import SecretStr
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.experts import create_expert, create_session, resolve_binding
 from autobots.application.goal_loop import LoopConfig, process_next
@@ -31,6 +27,7 @@ from autobots.contracts.experts import ExpertConfig, SessionExpert
 from autobots.contracts.improvements import EvidenceRef, ImprovementProposal, RegressionCase
 from autobots.domain.models import resolve_role_policy
 from goal_loop_script import ROUTE, Script, calls, say
+from pydantic import SecretStr
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 # A replay run is verified like any other, which reads its artifacts back from Storage.

@@ -5,15 +5,10 @@ import asyncio
 import json
 import os
 import sys
-from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-from langchain_core.messages import ToolMessage
-from pydantic import BaseModel
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.application.approvals import (
     ARGUMENT_LIMIT,
     ApprovalRefused,
@@ -41,6 +36,8 @@ from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import Actor, RunCommand
 from autobots.domain.tools import LOOP_TOOL_GRANTS, OperationClass
 from goal_loop_script import ROUTE
+from langchain_core.messages import ToolMessage
+from pydantic import BaseModel
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = UUID(sys.argv[1])

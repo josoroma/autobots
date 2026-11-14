@@ -3,16 +3,12 @@ from __future__ import annotations
 
 import os
 import signal
-import sys
-from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.application.tool_gateway import NotDelivered, ToolContext, ToolDefinition, ToolFailed
 from autobots.domain.tools import OperationClass
 from mock_sink import Sink
+from pydantic import BaseModel, ConfigDict
 
 
 class SendInput(BaseModel):

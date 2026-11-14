@@ -5,13 +5,10 @@ import asyncio
 import json
 import os
 import sys
-from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.application.experts import (
     ExpertRefused,

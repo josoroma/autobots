@@ -17,9 +17,6 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-from pydantic import SecretStr
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.adapters.result_stream import CHANNEL
 from autobots.api.event_routes import _live_frame
@@ -30,6 +27,7 @@ from autobots.contracts.runs import RunEvent
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.tools import LOOP_TOOL_GRANTS
 from goal_loop_script import ROUTE, calls, say
+from pydantic import SecretStr
 from stream_script import FRAMEWORK_MARKER, REASONING_MARKER, StreamScript
 
 URL, BASE = os.environ['AUTOBOTS_DATABASE_URL'], os.environ['AUTOBOTS_STORAGE_BASE']

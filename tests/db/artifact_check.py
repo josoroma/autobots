@@ -8,14 +8,10 @@ import os
 import sys
 import urllib.error
 import urllib.request
-from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-from pydantic import SecretStr
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.adapters.object_storage import BUCKET, SupabaseObjectStore
 from autobots.application.artifacts import (
     ArtifactUnavailable,
@@ -31,6 +27,7 @@ from autobots.application.tools import SAVE_ARTIFACT
 from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy
 from goal_loop_script import PLAN, ROUTE, calls, say
+from pydantic import SecretStr
 
 URL, BASE, ANON = os.environ['AUTOBOTS_DATABASE_URL'], os.environ['AUTOBOTS_STORAGE_BASE'], os.environ['AUTOBOTS_STORAGE_ANON']
 SERVICE = SecretStr(os.environ['AUTOBOTS_STORAGE_SERVICE'])

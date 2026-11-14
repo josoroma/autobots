@@ -5,11 +5,8 @@ import asyncio
 import os
 import signal
 import sys
-from pathlib import Path
 
 import psycopg
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.application.goal_loop import LoopConfig, run_goal
 from autobots.application.worker_leases import claim_next
 from goal_loop_script import PLAN, ROUTE, SAVE, Script, calls

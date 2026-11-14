@@ -6,14 +6,10 @@ import json
 import os
 import sys
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-from pydantic import BaseModel
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.adapters.loop_middleware import LoopMiddleware, LoopStopped
 from autobots.application import routines as routines_module
 from autobots.application.approvals import decide, list_approvals
@@ -59,6 +55,7 @@ from autobots.domain.runs import Actor, RunCommand
 from autobots.domain.tools import DELEGATION_TOOL, OperationClass
 from autobots.operations import worker as worker_module
 from goal_loop_script import ROUTE
+from pydantic import BaseModel
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = UUID(sys.argv[1])

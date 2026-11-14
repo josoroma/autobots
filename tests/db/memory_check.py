@@ -10,10 +10,6 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-from langchain_core.messages import AIMessage
-from langchain_core.outputs import ChatResult
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.application.compaction import (
     SUMMARY_MARKER,
     CompactionPolicy,
@@ -35,6 +31,8 @@ from autobots.application.worker_leases import claim_next
 from autobots.contracts.plans import InputDocument
 from autobots.domain.models import resolve_role_policy
 from goal_loop_script import PLAN, ROUTE, Script, calls, say
+from langchain_core.messages import AIMessage
+from langchain_core.outputs import ChatResult
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE, OTHER = UUID(sys.argv[1]), UUID(sys.argv[2])

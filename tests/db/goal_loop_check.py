@@ -10,9 +10,6 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-from langchain_core.outputs import ChatResult
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.adapters.loop_middleware import AdmittedModel, ModelRoute, UnadmittedModelCall
 from autobots.application.goal_loop import LoopConfig, run_goal
 from autobots.application.model_admission import ModelAdmission
@@ -24,6 +21,7 @@ from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import Actor, RunCommand
 from goal_loop_script import DONE_A, PLAN, ROUTE, SAVE, TASK_A, TASK_B, Script, calls, say
+from langchain_core.outputs import ChatResult
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE, OTHER, PYTHON = UUID(sys.argv[1]), UUID(sys.argv[2]), sys.argv[3]

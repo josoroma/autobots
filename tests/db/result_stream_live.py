@@ -9,14 +9,10 @@ import asyncio
 import json
 import os
 import sys
-from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import psycopg
-from pydantic import SecretStr
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.goal_loop import LoopConfig, _drive
 from autobots.application.runs import admit_run
@@ -24,6 +20,7 @@ from autobots.application.worker_leases import claim_run
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.tools import LOOP_TOOL_GRANTS
 from goal_loop_script import ROUTE, calls, say
+from pydantic import SecretStr
 from stream_script import StreamScript
 
 CONTENT = '# Live report\n\n' + ''.join(f'Paragraph {n}: the running total is {n * 11}, written as it goes.\n' for n in range(1, 41))

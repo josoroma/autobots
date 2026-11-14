@@ -5,15 +5,14 @@ Argument: equal, behind, ahead, no-history or no-history-missing. JSON cases out
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import sys
-from typing import Any
 
 import psycopg
 from autobots.application.operations import applied_migrations, database_conditions, is_ready
 from autobots.application.schema_release import SHIPPED_MIGRATIONS
+from checklib import Cases, OnePool, run_check
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 STATE = sys.argv[1]
@@ -33,24 +32,7 @@ WORDS = {
 }
 
 
-class OnePool:
-    def __init__(self, connection: Any) -> None:
-        self._connection = connection
-
-    def connection(self) -> Any:
-        connection = self._connection
-
-        class Held:
-            async def __aenter__(self) -> Any:
-                return connection
-
-            async def __aexit__(self, *_: Any) -> None:
-                return None
-
-        return Held()
-
-
-async def main() -> None:
+async def main(cases: Cases) -> None:
     state, code, ready, applied = EXPECTED[STATE]
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         conditions = await database_conditions(OnePool(db))
@@ -61,10 +43,8 @@ async def main() -> None:
                 'shipped': SHIPPED_MIGRATIONS, 'other_blocking': [f'{item.name} {item.code}' for item in conditions if item.name != 'schema' and item.state != 'ok']}
     # Admission is is_ready over the blocking checks; only the schema's effect on it is judged here.
     admission = is_ready([schema])
-    passed = (schema.state, schema.code) == (state, code) and admission == ready and counted == applied
-    cases = [{'id': f'schema readiness, {WORDS[STATE]}', 'expected': f'{state} {code}, admission {"open" if ready else "stopped"} by it, applied {applied}',
-              'observed': json.dumps(observed), 'passed': passed}]
-    print(json.dumps({'cases': cases}))
+    cases.check(f'schema readiness, {WORDS[STATE]}', f'{state} {code}, admission {"open" if ready else "stopped"} by it, applied {applied}',
+                json.dumps(observed), (schema.state, schema.code) == (state, code) and admission == ready and counted == applied)
 
 
-asyncio.run(main())
+run_check(main)

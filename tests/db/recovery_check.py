@@ -11,8 +11,6 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.application.goal_loop import LoopConfig, process_next, run_goal
 from autobots.application.model_admission import ModelAdmission

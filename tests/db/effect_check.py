@@ -12,8 +12,6 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.application.approvals import decide
 from autobots.application.goal_loop import LoopConfig, process_next
 from autobots.application.reconciliation import (

@@ -8,15 +8,10 @@ import logging
 import os
 import sys
 import time
-from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-from langchain_core.messages import AIMessage
-from pydantic import SecretStr
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.artifacts import publish
@@ -41,6 +36,8 @@ from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import Actor, RunCommand
 from autobots.operations.logs import JsonFormatter, redact
 from goal_loop_script import PLAN, ROUTE, SAVE, Script, calls, say
+from langchain_core.messages import AIMessage
+from pydantic import SecretStr
 
 URL, BASE = os.environ['AUTOBOTS_DATABASE_URL'], os.environ['AUTOBOTS_STORAGE_BASE']
 SERVICE = SecretStr(os.environ['AUTOBOTS_STORAGE_SERVICE'])

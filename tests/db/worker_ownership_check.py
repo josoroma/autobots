@@ -11,9 +11,6 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import psycopg
-from langgraph.checkpoint.postgres import PostgresSaver
-
-sys.path.insert(0, str(Path(__file__).parent))
 from autobots.adapters.checkpoints import (
     DURABILITY,
     fenced_checkpointer,
@@ -25,6 +22,7 @@ from autobots.application.tool_gateway import ToolScope, ownership_refusal
 from autobots.application.worker_leases import claim_next, heartbeat
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import Actor, RunCommand
+from langgraph.checkpoint.postgres import PostgresSaver
 from worker_graph import build
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']

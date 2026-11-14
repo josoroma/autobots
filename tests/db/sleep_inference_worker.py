@@ -9,14 +9,10 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import sys
 import time
-from pathlib import Path
 from typing import Any
 
 import httpx
-
-sys.path.insert(0, str(Path(__file__).parent))
 from product_inference_worker import EVIDENCE, TASK, default_sdk_client, fetch_catalog, main, record
 
 STEP_FILES = 16
