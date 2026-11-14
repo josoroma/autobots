@@ -13,6 +13,7 @@ from typing import Any
 
 import httpx
 
+from autobots.application.approvals import approved_request
 from autobots.application.tool_gateway import (
     NotDelivered,
     ToolContext,
@@ -90,13 +91,9 @@ async def attempt_target(
 
 
 async def approved_repository(connection: Any, operation_id: str) -> str | None:
-    cursor = await connection.execute(
-        "select resource_target from public.approval_requests "
-        "where operation_id = %s and status = 'approved'",
-        (operation_id,),
-    )
-    row = await cursor.fetchone()
-    target = str(row[0]) if row is not None and row[0] else ""
+    """The repository the operation's approval recorded, or None without one (Decision 0025 V7)."""
+    approved = await approved_request(connection, operation_id)
+    target = (approved.resource_target if approved is not None else None) or ""
     return target.removeprefix(TARGET_PREFIX) if target.startswith(TARGET_PREFIX) else None
 
 

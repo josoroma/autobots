@@ -3,7 +3,7 @@
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 from uuid import UUID
 
 from autobots.application.runs import LeaseLost, record_transition
@@ -59,6 +59,27 @@ class Lease:
     @property
     def thread_id(self) -> str:
         return str(self.run_id)
+
+
+class LeaseHolder(Protocol):
+    """A claim on one run at one generation, such as a `Lease` or a tool call's scope."""
+
+    @property
+    def run_id(self) -> UUID: ...
+
+    @property
+    def generation(self) -> int: ...
+
+
+async def hold_lease(connection: Any, holder: LeaseHolder) -> None:
+    """Inside a write's transaction. The share lock serializes it against a new claim."""
+    cursor = await connection.execute(
+        "select 1 from app_private.run_jobs where run_id = %s and generation = %s "
+        "and status = 'claimed' and lease_expires_at > clock_timestamp() for share",
+        (holder.run_id, holder.generation),
+    )
+    if await cursor.fetchone() is None:
+        raise LeaseLost("this worker no longer owns the run")
 
 
 async def is_held(connection: Any) -> bool:

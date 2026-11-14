@@ -224,7 +224,8 @@ def test_saving_seals_the_key_and_opens_no_connection(
 
 
 class Approvals:
-    """A receipt table and an approval table, as `_target_unchanged` reads them."""
+    """A receipt table and an approval table, as `_target_unchanged` reads them: the receipt's
+    status, and the approved request's target and review detail (`approvals.approved_request`)."""
 
     def __init__(self, receipt: str | None, recorded: str | None) -> None:
         self.receipt, self.recorded = receipt, recorded
@@ -233,7 +234,7 @@ class Approvals:
         row = (
             (self.receipt,)
             if "tool_receipts" in query and self.receipt
-            else ((self.recorded,) if "approval_requests" in query else None)
+            else ((self.recorded, None) if "approval_requests" in query else None)
         )
 
         class One:

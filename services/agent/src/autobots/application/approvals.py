@@ -20,6 +20,7 @@ from autobots.application.runs import (
     request_hash,
     store_receipt,
 )
+from autobots.application.worker_leases import LeaseHolder, hold_lease
 from autobots.domain.runs import RunCommand, RunStatus
 
 DEFAULT_TTL_SECONDS = 86_400
@@ -46,6 +47,32 @@ class DecisionResult:
     replayed: bool
 
 
+@dataclass(frozen=True)
+class ApprovedRequest:
+    """What a person approved for one operation: the target the request recorded (Decision 0025
+    V7) and the detail they were shown, such as a pull request's diffs (PRD-Studio GH-06)."""
+
+    resource_target: str | None
+    review_detail: dict[str, Any] | None
+
+
+def receipt_may_have_sent(status: str | None) -> bool:
+    """A receipt that exists and hasn't failed means the effect was sent, or may have been, so the
+    receipt and its reconciliation answer for it (Decision 0025 V8). None is no receipt at all."""
+    return status is not None and status != "failed"
+
+
+async def approved_request(connection: Any, operation_id: str) -> ApprovedRequest | None:
+    """The operation's request while it is approved, and None otherwise."""
+    cursor = await connection.execute(
+        "select resource_target, review_detail from public.approval_requests "
+        "where operation_id = %s and status = 'approved'",
+        (operation_id,),
+    )
+    row = await cursor.fetchone()
+    return None if row is None else ApprovedRequest(row[0], row[1])
+
+
 def scope_snapshot(tools: Any, paths: Any) -> dict[str, Any]:
     """The grants a request was made under, stored whole with it, Decision 0015."""
     return {"tools": dict(tools), "paths": list(paths)}
@@ -67,6 +94,29 @@ async def _version(connection: Any, run_id: UUID) -> int:
     cursor = await connection.execute("select version from public.runs where id = %s", (run_id,))
     version: int = (await cursor.fetchone())[0]
     return version
+
+
+def _requested(approval_id: UUID, tool_id: str) -> dict[str, Any]:
+    return {"type": "approval.requested", "approval_id": str(approval_id), "tool_id": tool_id}
+
+
+async def _reopen(
+    connection: Any,
+    run_id: UUID,
+    approval_id: UUID,
+    tool_id: str,
+    ttl_seconds: int,
+    review_detail: dict[str, Any] | None = None,
+) -> None:
+    """Pending again with nobody's decision on it and a fresh expiry, and announced. A new review
+    detail replaces the stored one, and None keeps it."""
+    await connection.execute(
+        "update public.approval_requests set status = 'pending', decided_by = null, "
+        "decided_at = null, expires_at = clock_timestamp() + make_interval(secs => %s), "
+        "review_detail = coalesce(%s::jsonb, review_detail) where id = %s",
+        (ttl_seconds, None if review_detail is None else json.dumps(review_detail), approval_id),
+    )
+    await append_event(connection, run_id, _requested(approval_id, tool_id))
 
 
 async def _enter_wait(
@@ -150,11 +200,7 @@ async def approval_gate(  # noqa: PLR0911, PLR0913 - baseline 2026-11-14, shrink
                     ttl_seconds,
                 ),
             )
-            await append_event(
-                connection,
-                run_id,
-                {"type": "approval.requested", "approval_id": str(approval_id), "tool_id": tool_id},
-            )
+            await append_event(connection, run_id, _requested(approval_id, tool_id))
             await _enter_wait(connection, workspace_id, run_id, generation, str(approval_id))
             return "approval_pending"
         approval_id, status, stored_scope, expired = row
@@ -172,7 +218,7 @@ async def approval_gate(  # noqa: PLR0911, PLR0913 - baseline 2026-11-14, shrink
                 (operation_id,),
             )
             receipt = await cursor.fetchone()
-            if receipt is not None and receipt[0] != "failed":
+            if receipt_may_have_sent(None if receipt is None else receipt[0]):
                 # It was already sent, or may have been. Its receipt answers that, whatever the
                 # date, and refusing here would report an effect that happened as not happening.
                 return None
@@ -181,25 +227,48 @@ async def approval_gate(  # noqa: PLR0911, PLR0913 - baseline 2026-11-14, shrink
                 return "approval_consumed"
             if expired:
                 # Nothing was sent, so this is only stale. A person can look at it again.
-                await connection.execute(
-                    "update public.approval_requests set status = 'pending', decided_by = null, "
-                    "decided_at = null, expires_at = clock_timestamp() + make_interval(secs => %s) "
-                    "where id = %s",
-                    (ttl_seconds, approval_id),
-                )
-                await append_event(
-                    connection,
-                    run_id,
-                    {
-                        "type": "approval.requested",
-                        "approval_id": str(approval_id),
-                        "tool_id": tool_id,
-                    },
-                )
+                await _reopen(connection, run_id, approval_id, tool_id, ttl_seconds)
                 await _enter_wait(connection, workspace_id, run_id, generation, str(approval_id))
                 return "approval_pending"
             return None
         return "approval_rejected" if status == "rejected" else "approval_expired"
+
+
+async def return_to_review(
+    connection: Any,
+    holder: LeaseHolder,
+    *,
+    operation_id: str,
+    tool_id: str,
+    detail: dict[str, Any],
+) -> UUID | None:
+    """Nothing was sent, so the approved request goes back to a person with `detail`, and this
+    attempt's receipt is settled, so its next approval can send (Decision 0022 D15). Returns the
+    request, or None when the operation has no approved request and nothing changed.
+
+    One transaction under the lease: a worker that lost the run leaves the decision as it was, and
+    the receipt, the request and its event commit together (SP-010, SP-012). The run makes no
+    transition here and keeps running; it enters the decision wait when the call is tried again
+    (Decision 0028 E1).
+    """
+    async with connection.transaction():
+        await hold_lease(connection, holder)
+        cursor = await connection.execute(
+            "select id from public.approval_requests "
+            "where operation_id = %s and run_id = %s and status = 'approved' for update",
+            (operation_id, holder.run_id),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        approval_id: UUID = row[0]
+        await connection.execute(
+            "update app_private.tool_receipts set reconciled_at = now() "
+            "where operation_id = %s and run_id = %s",
+            (operation_id, holder.run_id),
+        )
+        await _reopen(connection, holder.run_id, approval_id, tool_id, DEFAULT_TTL_SECONDS, detail)
+    return approval_id
 
 
 async def _expire(connection: Any, approval_id: UUID, run_id: UUID, workspace_id: UUID) -> None:

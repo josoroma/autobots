@@ -10,8 +10,17 @@ from uuid import UUID
 
 from pydantic import BaseModel, ValidationError
 
-from autobots.application.approvals import approval_gate, scope_hash, scope_snapshot
+from autobots.application.approvals import (
+    approval_gate,
+    approved_request,
+    receipt_may_have_sent,
+    scope_hash,
+    scope_snapshot,
+)
 from autobots.application.runs import LeaseLost
+
+# The gateway's own fenced writes use it, and so do the writers that import it from this module.
+from autobots.application.worker_leases import hold_lease as hold_lease
 from autobots.domain.runs import RunStatus
 from autobots.domain.tool_catalog import CostClass, KeyRequirement, ToolGroup, ToolProvider
 from autobots.domain.tools import EFFECTFUL, OperationClass, ToolOutcome, path_granted
@@ -221,15 +230,11 @@ async def _target_unchanged(connection: Any, operation_id: str, target: str | No
         "select status from app_private.tool_receipts where operation_id = %s", (operation_id,)
     )
     receipt = await cursor.fetchone()
-    if receipt is not None and receipt[0] != "failed":
+    if receipt_may_have_sent(None if receipt is None else receipt[0]):
         return True
-    cursor = await connection.execute(
-        "select resource_target from public.approval_requests "
-        "where operation_id = %s and status = 'approved'",
-        (operation_id,),
-    )
-    row = await cursor.fetchone()
-    return row is not None and bool(row[0]) and row[0] == target
+    approved = await approved_request(connection, operation_id)
+    recorded = approved.resource_target if approved is not None else None
+    return bool(recorded) and recorded == target
 
 
 async def _has_approval(connection: Any, operation_id: str) -> bool:
@@ -270,17 +275,6 @@ async def ownership_refusal(connection: Any, scope: ToolScope) -> str | None:
     if run_status != RunStatus.RUNNING.value:
         return "run_not_running"
     return None
-
-
-async def hold_lease(connection: Any, scope: ToolScope) -> None:
-    """Inside a write's transaction. The share lock serializes it against a new claim."""
-    cursor = await connection.execute(
-        "select 1 from app_private.run_jobs where run_id = %s and generation = %s "
-        "and status = 'claimed' and lease_expires_at > clock_timestamp() for share",
-        (scope.run_id, scope.generation),
-    )
-    if await cursor.fetchone() is None:
-        raise LeaseLost("this worker no longer owns the run")
 
 
 class NotRunning(Exception):

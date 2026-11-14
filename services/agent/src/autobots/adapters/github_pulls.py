@@ -10,7 +10,6 @@ Merging is not offered.
 
 import base64
 import difflib
-import json
 import os
 from collections.abc import Mapping
 from typing import Any
@@ -26,7 +25,7 @@ from autobots.adapters.github_issues import (
     github_client,
     marker,
 )
-from autobots.application.runs import append_event
+from autobots.application.approvals import approved_request, return_to_review
 from autobots.application.tool_gateway import (
     NotDelivered,
     ToolContext,
@@ -119,39 +118,15 @@ def github_pull_request_tool(  # noqa: C901, PLR0915 - baseline 2026-11-14, shri
         async with github_client(token, transport) as http:
             return await detail_against(http, repository, arguments)
 
-    async def approved_detail(context: ToolContext) -> dict[str, Any]:
-        cursor = await context.connection.execute(
-            "select review_detail from public.approval_requests where operation_id = %s "
-            "and status = 'approved'",
-            (context.operation_id,),
-        )
-        row = await cursor.fetchone()
-        if row is None or row[0] is None:
+    async def approved_detail(context: ToolContext) -> tuple[str, dict[str, Any]]:
+        """This attempt's operation and the diffs its approval bound (PRD-Studio GH-06)."""
+        operation_id = context.operation_id
+        approved = None
+        if operation_id is not None:
+            approved = await approved_request(context.connection, operation_id)
+        if operation_id is None or approved is None or approved.review_detail is None:
             raise ToolFailed("review_detail_missing")
-        detail: dict[str, Any] = row[0]
-        return detail
-
-    async def return_to_review(context: ToolContext, detail: dict[str, Any]) -> None:
-        """D15: nothing was sent, so this attempt is settled, and the request goes back to a person
-        with the diff against the new head. Its next approval sends against that head."""
-        await context.connection.execute(
-            "update app_private.tool_receipts set reconciled_at = now() where operation_id = %s",
-            (context.operation_id,),
-        )
-        cursor = await context.connection.execute(
-            "update public.approval_requests set status = 'pending', decided_by = null, "
-            "decided_at = null, review_detail = %s, "
-            "expires_at = clock_timestamp() + interval '1 day' "
-            "where operation_id = %s returning id, run_id",
-            (json.dumps(detail), context.operation_id),
-        )
-        row = await cursor.fetchone()
-        if row is not None:
-            await append_event(
-                context.connection,
-                row[1],
-                {"type": "approval.requested", "approval_id": str(row[0]), "tool_id": TOOL_ID},
-            )
+        return operation_id, approved.review_detail
 
     async def existing(
         http: httpx.AsyncClient, repository: str, branch: str
@@ -187,14 +162,20 @@ def github_pull_request_tool(  # noqa: C901, PLR0915 - baseline 2026-11-14, shri
         arguments: GithubOpenPullRequestInput, context: ToolContext
     ) -> GithubOpenPullRequestOutput:
         repository, token = await attempt_target(context, environ)
-        approved = await approved_detail(context)
-        branch = branch_for(context.operation_id)
+        operation_id, approved = await approved_detail(context)
+        branch = branch_for(operation_id)
         async with github_client(token, transport) as http:
             head = await head_of(http, repository, arguments.base)
             if head != approved["base_sha"]:
                 if head is not None:
+                    # A person approves again, against the new head (Decision 0022 D15). The run
+                    # keeps running and waits once the call is tried again (Decision 0028 E1).
                     await return_to_review(
-                        context, await detail_against(http, repository, arguments)
+                        context.connection,
+                        context.scope,
+                        operation_id=operation_id,
+                        tool_id=TOOL_ID,
+                        detail=await detail_against(http, repository, arguments),
                     )
                 raise ToolFailed("base_moved")
             commit = await head_of(http, repository, branch)
