@@ -41,8 +41,10 @@ class Generation(unittest.TestCase):
 
     def test_an_operation_validates_its_response(self):
         text = generate.typescript_client(DOCUMENT)
-        self.assertIn('export async function get_item(options: ClientOptions, id: string): Promise<Item> {', text)
-        self.assertIn('return parseItem(await requestJson(options, "GET", `/v1/items/${encodeURIComponent(id)}`));', text)
+        self.assertIn('export async function get_item(options: ClientOptions, id: string, request?: RequestOptions): Promise<Item> {', text)
+        # No ErrorResponse in this contract, so no envelope parser is referenced (R-02).
+        self.assertIn(', undefined, request, undefined));', text)
+        self.assertIn('return parseItem(await requestJson(options, "GET", `/v1/items/${encodeURIComponent(id)}`, undefined, request, undefined));', text)
 
     def test_a_route_without_a_response_model_is_refused(self):
         bad = {'responses': {'200': {'content': {}}}, 'operationId': 'x'}
@@ -55,6 +57,25 @@ class Generation(unittest.TestCase):
     def test_versioned_artifacts_exist_and_are_marked_generated(self):
         self.assertTrue((ROOT / generate.CLIENT).read_text().startswith(generate.HEADER))
         self.assertIn('RunSummary', json.loads((ROOT / generate.OPENAPI).read_text())['components']['schemas'])
+
+    def test_a_map_is_typed_by_its_value_schema(self):
+        # R-03: a role's profile is a ModelProfileId, not unknown.
+        schema = {'type': 'object', 'additionalProperties': {'$ref': '#/components/schemas/ModelProfileId'}}
+        self.assertEqual(generate.typescript_type(schema), 'Record<string, ModelProfileId>')
+        self.assertEqual(generate.typescript_type({'type': 'object'}), 'Record<string, unknown>')
+
+    def test_the_runtime_lists_every_keyword_the_contract_uses(self):
+        known = generate.runtime_keywords(ROOT)
+        self.assertTrue({'minItems', 'maxItems', 'additionalProperties', 'title'} <= known)
+        document = json.loads((ROOT / 'contracts/generated/openapi.json').read_text())
+        self.assertEqual(generate.unknown_keywords(document, known), [])
+
+    def test_a_keyword_the_runtime_does_not_enforce_is_refused(self):
+        document = {'components': {'schemas': {'Tags': {
+            'type': 'object', 'properties': {'tags': {'type': 'array', 'uniqueItems': True,
+                                                      'items': {'type': 'string', 'multipleOf': 2}}}}}}}
+        self.assertEqual(generate.unknown_keywords(document, generate.runtime_keywords(ROOT)),
+                         ['multipleOf', 'uniqueItems'])
 
     def test_a_missing_environment_is_a_prerequisite_error(self):
         with tempfile.TemporaryDirectory() as directory:

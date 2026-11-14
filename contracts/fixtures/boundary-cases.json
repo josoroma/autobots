@@ -594,5 +594,1975 @@
       ],
       "ir_version": 2
     }
+  },
+  {
+    "name": "model policy state with a role override",
+    "model": "ModelPolicyState",
+    "valid": true,
+    "value": {
+      "schema_version": 1,
+      "version": 3,
+      "default_profile": "openrouter_terra",
+      "role_overrides": {
+        "coordinator": "openrouter_sol"
+      },
+      "policy": {
+        "schema_version": 1,
+        "role_policy_version": 1,
+        "bindings": [
+          {
+            "role": "coordinator",
+            "profile": "openrouter_sol",
+            "canonical_id": "openai/gpt-6.1-sol-20260929",
+            "wire_id": "openai/gpt-6.1-sol",
+            "source": "workspace_override"
+          },
+          {
+            "role": "router",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "planner",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "executor",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "researcher",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "coder",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "reviewer",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "evaluator",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "summarizer",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "memory_curator",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "skill_learner",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "tool_repair",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "workflow_generator",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "general_purpose",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "model policy state whose role override names an unapproved profile (enum)",
+    "model": "ModelPolicyState",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "version": 3,
+      "default_profile": "openrouter_terra",
+      "role_overrides": {
+        "coordinator": "openrouter_unapproved"
+      },
+      "policy": {
+        "schema_version": 1,
+        "role_policy_version": 1,
+        "bindings": [
+          {
+            "role": "coordinator",
+            "profile": "openrouter_sol",
+            "canonical_id": "openai/gpt-6.1-sol-20260929",
+            "wire_id": "openai/gpt-6.1-sol",
+            "source": "workspace_override"
+          },
+          {
+            "role": "router",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "planner",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "executor",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "researcher",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "coder",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "reviewer",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "evaluator",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "summarizer",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "memory_curator",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "skill_learner",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "tool_repair",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "workflow_generator",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          },
+          {
+            "role": "general_purpose",
+            "profile": "openrouter_terra",
+            "canonical_id": "openai/gpt-6.1-terra-20261026",
+            "wire_id": "openai/gpt-6.1-terra",
+            "source": "workspace_default"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "jobs chart with one hour",
+    "model": "JobsChart",
+    "valid": true,
+    "value": {
+      "schema_version": 1,
+      "timezone": "America/Costa_Rica",
+      "hours": [
+        {
+          "starts_at": "2026-11-05T13:00:00Z",
+          "hour": "14:00",
+          "succeeded": 2,
+          "waited": 0,
+          "failed": 1,
+          "in_progress": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "jobs chart with no hours (too few items)",
+    "model": "JobsChart",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "timezone": "America/Costa_Rica",
+      "hours": []
+    }
+  },
+  {
+    "name": "workflow graph with 201 nodes (too many items)",
+    "model": "WorkflowGraph",
+    "valid": false,
+    "value": {
+      "nodes": [
+        {
+          "id": "n0",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n1",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n2",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n3",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n4",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n5",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n6",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n7",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n8",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n9",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n10",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n11",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n12",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n13",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n14",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n15",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n16",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n17",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n18",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n19",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n20",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n21",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n22",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n23",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n24",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n25",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n26",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n27",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n28",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n29",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n30",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n31",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n32",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n33",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n34",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n35",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n36",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n37",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n38",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n39",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n40",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n41",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n42",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n43",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n44",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n45",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n46",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n47",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n48",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n49",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n50",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n51",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n52",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n53",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n54",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n55",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n56",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n57",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n58",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n59",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n60",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n61",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n62",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n63",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n64",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n65",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n66",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n67",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n68",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n69",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n70",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n71",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n72",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n73",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n74",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n75",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n76",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n77",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n78",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n79",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n80",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n81",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n82",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n83",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n84",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n85",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n86",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n87",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n88",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n89",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n90",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n91",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n92",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n93",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n94",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n95",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n96",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n97",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n98",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n99",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n100",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n101",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n102",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n103",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n104",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n105",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n106",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n107",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n108",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n109",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n110",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n111",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n112",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n113",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n114",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n115",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n116",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n117",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n118",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n119",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n120",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n121",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n122",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n123",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n124",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n125",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n126",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n127",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n128",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n129",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n130",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n131",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n132",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n133",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n134",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n135",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n136",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n137",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n138",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n139",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n140",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n141",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n142",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n143",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n144",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n145",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n146",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n147",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n148",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n149",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n150",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n151",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n152",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n153",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n154",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n155",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n156",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n157",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n158",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n159",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n160",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n161",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n162",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n163",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n164",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n165",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n166",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n167",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n168",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n169",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n170",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n171",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n172",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n173",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n174",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n175",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n176",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n177",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n178",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n179",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n180",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n181",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n182",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n183",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n184",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n185",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n186",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n187",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n188",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n189",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n190",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n191",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n192",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n193",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n194",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n195",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n196",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n197",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n198",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n199",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "n200",
+          "block": "input",
+          "version": 1,
+          "config": {
+            "type": "string"
+          }
+        }
+      ],
+      "links": []
+    }
+  },
+  {
+    "name": "run request with a goal",
+    "model": "RunRequest",
+    "valid": true,
+    "value": {
+      "goal_text": "Summarize the notes.",
+      "acceptance_criteria": [
+        "It cites a source."
+      ]
+    }
+  },
+  {
+    "name": "run request with 21 acceptance criteria (too many items)",
+    "model": "RunRequest",
+    "valid": false,
+    "value": {
+      "goal_text": "Summarize the notes.",
+      "acceptance_criteria": [
+        "One more.",
+        "One more.",
+        "One more.",
+        "One more.",
+        "One more.",
+        "One more.",
+        "One more.",
+        "One more.",
+        "One more.",
+        "One more.",
+        "One more.",
+        "One more.",
+        "One more.",
+        "One more.",
+        "One more.",
+        "One more.",
+        "One more.",
+        "One more.",
+        "One more.",
+        "One more.",
+        "One more."
+      ]
+    }
+  },
+  {
+    "name": "session with one expert",
+    "model": "SessionCreate",
+    "valid": true,
+    "value": {
+      "kind": "direct",
+      "experts": [
+        {
+          "expert_id": "33333333-3333-4333-8333-333333333333",
+          "version": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "session with no experts (too few items)",
+    "model": "SessionCreate",
+    "valid": false,
+    "value": {
+      "kind": "direct",
+      "experts": []
+    }
+  },
+  {
+    "name": "model policy update with a role override",
+    "model": "ModelPolicyUpdate",
+    "valid": true,
+    "value": {
+      "expected_version": 3,
+      "default_profile": null,
+      "role_overrides": {
+        "coordinator": "openrouter_sol"
+      }
+    }
+  },
+  {
+    "name": "model policy update whose role override names an unapproved profile (enum)",
+    "model": "ModelPolicyUpdate",
+    "valid": false,
+    "value": {
+      "expected_version": 3,
+      "default_profile": null,
+      "role_overrides": {
+        "coordinator": "openrouter_unapproved"
+      }
+    }
   }
 ]

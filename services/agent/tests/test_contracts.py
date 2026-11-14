@@ -10,8 +10,12 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from autobots.contracts.adapters import run_from_row, run_summary_from_domain
+from autobots.contracts.experts import SessionCreate
 from autobots.contracts.export import openapi_document
+from autobots.contracts.operations import JobsChart
+from autobots.contracts.run_commands import RunRequest
 from autobots.contracts.runs import ErrorResponse, RunEvent, RunSummary
+from autobots.contracts.settings import ModelPolicyState, ModelPolicyUpdate
 from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.runs import (
     NORMAL_EXITS,
@@ -33,6 +37,11 @@ MODELS: dict[str, type[BaseModel]] = {
     "RunEvent": RunEvent,
     "ErrorResponse": ErrorResponse,
     "WorkflowGraph": WorkflowGraph,
+    "ModelPolicyState": ModelPolicyState,
+    "ModelPolicyUpdate": ModelPolicyUpdate,
+    "JobsChart": JobsChart,
+    "RunRequest": RunRequest,
+    "SessionCreate": SessionCreate,
 }
 RUN_ID = UUID("11111111-1111-4111-8111-111111111111")
 WORKSPACE_ID = UUID("22222222-2222-4222-8222-222222222222")

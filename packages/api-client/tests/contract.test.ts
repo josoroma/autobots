@@ -2,11 +2,32 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { getRun, parseErrorResponse, parseRunEvent, parseRunSummary, parseWorkflowGraph } from "../src/generated.ts";
+import {
+  getRun,
+  parseErrorResponse,
+  parseJobsChart,
+  parseModelPolicyState,
+  parseModelPolicyUpdate,
+  parseRunEvent,
+  parseRunRequest,
+  parseRunSummary,
+  parseSessionCreate,
+  parseWorkflowGraph,
+} from "../src/generated.ts";
 import { ContractError, HttpFailure, parseWith, requestJson } from "../src/runtime.ts";
 
 const cases = JSON.parse(readFileSync(new URL("../../../contracts/fixtures/boundary-cases.json", import.meta.url), "utf8"));
-const parsers = { RunSummary: parseRunSummary, RunEvent: parseRunEvent, ErrorResponse: parseErrorResponse, WorkflowGraph: parseWorkflowGraph };
+const parsers = {
+  RunSummary: parseRunSummary,
+  RunEvent: parseRunEvent,
+  ErrorResponse: parseErrorResponse,
+  WorkflowGraph: parseWorkflowGraph,
+  ModelPolicyState: parseModelPolicyState,
+  ModelPolicyUpdate: parseModelPolicyUpdate,
+  JobsChart: parseJobsChart,
+  RunRequest: parseRunRequest,
+  SessionCreate: parseSessionCreate,
+};
 
 for (const item of cases) {
   test(`shared boundary case: ${item.name}`, () => {

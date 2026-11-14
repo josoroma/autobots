@@ -126,6 +126,9 @@ class ContractDrift(unittest.TestCase):
             document = json.loads((ROOT / generate_contracts.OPENAPI).read_text())
             (root / generate_contracts.PYTHON).parent.mkdir(parents=True)
             (root / generate_contracts.PYTHON).write_text('')
+            # The runtime lists the schema keywords it enforces, which `check` reads (R-03).
+            (root / generate_contracts.RUNTIME).parent.mkdir(parents=True, exist_ok=True)
+            (root / generate_contracts.RUNTIME).write_text((ROOT / generate_contracts.RUNTIME).read_text())
             for path, content in ((generate_contracts.OPENAPI, json.dumps(document, indent=2, sort_keys=True) + '\n'),
                                   (generate_contracts.CLIENT, generate_contracts.typescript_client(document))):
                 (root / path).parent.mkdir(parents=True, exist_ok=True)

@@ -1,5 +1,31 @@
 // Runtime validation for values crossing a trust boundary. A TypeScript type checks nothing at runtime.
 
+/**
+ * Every validation keyword `check` enforces, and the annotations it may ignore (R-03). The generator
+ * reads both lists, and its `check` fails on a schema keyword in neither, so a keyword Pydantic
+ * starts emitting can't pass silently.
+ */
+export const IMPLEMENTED_KEYWORDS = [
+  "$ref",
+  "additionalProperties",
+  "anyOf",
+  "const",
+  "enum",
+  "format",
+  "items",
+  "maxItems",
+  "maxLength",
+  "maximum",
+  "minItems",
+  "minLength",
+  "minimum",
+  "pattern",
+  "properties",
+  "required",
+  "type",
+] as const;
+export const ANNOTATIONS = ["default", "description", "examples", "title"] as const;
+
 export interface Schema {
   $ref?: string;
   anyOf?: readonly Schema[];
@@ -12,6 +38,8 @@ export interface Schema {
   maximum?: number;
   minLength?: number;
   maxLength?: number;
+  minItems?: number;
+  maxItems?: number;
   items?: Schema;
   properties?: Readonly<Record<string, Schema>>;
   required?: readonly string[];
@@ -74,6 +102,9 @@ function checkObject(schemas: Schemas, schema: Schema, value: object, path: stri
       check(schemas, property, item, `${path}.${name}`);
     } else if (schema.additionalProperties === false) {
       throw new ContractError(`${path}.${name}`, "not part of the contract");
+    } else if (typeof schema.additionalProperties === "object") {
+      // A map's values, such as a role's profile, are checked like any other field.
+      check(schemas, schema.additionalProperties, item, `${path}.${name}`);
     }
   }
 }
@@ -124,6 +155,12 @@ function check(schemas: Schemas, schema: Schema, value: unknown, path: string): 
       return;
     case "array":
       if (!Array.isArray(value)) throw new ContractError(path, "not an array");
+      if (schema.minItems !== undefined && value.length < schema.minItems) {
+        throw new ContractError(path, "too few items");
+      }
+      if (schema.maxItems !== undefined && value.length > schema.maxItems) {
+        throw new ContractError(path, "too many items");
+      }
       value.forEach((item, index) => {
         if (schema.items !== undefined) check(schemas, schema.items, item, `${path}[${index}]`);
       });

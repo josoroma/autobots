@@ -172,7 +172,7 @@ export function WorkflowMonitor({ executionId }: { executionId: string }) {
                   {instance.key}
                 </td>
                 <td className="px-3 py-2.5 font-mono text-[12.5px]">
-                  {String(view.block_versions[instance.node_id])}
+                  {view.block_versions[instance.node_id]}
                 </td>
                 <td className="py-2.5 pl-3">
                   <span className="inline-flex items-baseline gap-2">

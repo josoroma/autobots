@@ -7384,7 +7384,7 @@ export function parseApprovalReviewDetail(value: unknown): ApprovalReviewDetail 
 
 export interface ApprovalScope {
   paths: string[];
-  tools: Record<string, unknown>;
+  tools: Record<string, number>;
 }
 
 export function parseApprovalScope(value: unknown): ApprovalScope {
@@ -7671,7 +7671,7 @@ export function parseEvidenceView(value: unknown): EvidenceView {
 }
 
 export interface ExecutionBinding {
-  block_versions: Record<string, unknown>;
+  block_versions: Record<string, string>;
   graph_hash: string;
   id: string;
   run_id: string;
@@ -7696,7 +7696,7 @@ export function parseExecutionCreate(value: unknown): ExecutionCreate {
 }
 
 export interface ExecutionView {
-  block_versions: Record<string, unknown>;
+  block_versions: Record<string, string>;
   emissions: EmissionView[];
   graph_hash: string;
   id: string;
@@ -7723,7 +7723,7 @@ export function parseExpectedVersion(value: unknown): ExpectedVersion {
 
 export interface ExpertBinding {
   name: string;
-  role_bindings: Record<string, unknown>;
+  role_bindings: Record<string, string>;
   tools: string[];
   version: number;
 }
@@ -7735,7 +7735,7 @@ export function parseExpertBinding(value: unknown): ExpertBinding {
 export interface ExpertConfig {
   instructions?: string;
   purpose?: string;
-  role_bindings?: Record<string, unknown>;
+  role_bindings?: Record<string, ModelProfileId>;
   skills?: string[];
   tool_groups?: ("planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning" | "automation")[];
   tools?: string[];
@@ -8061,7 +8061,7 @@ export function parseModelList(value: unknown): ModelList {
 export interface ModelPolicyState {
   default_profile: ModelProfileId | null;
   policy: EffectiveRolePolicy;
-  role_overrides: Record<string, unknown>;
+  role_overrides: Record<string, ModelProfileId>;
   schema_version: 1;
   version: number;
 }
@@ -8073,7 +8073,7 @@ export function parseModelPolicyState(value: unknown): ModelPolicyState {
 export interface ModelPolicyUpdate {
   default_profile: ModelProfileId | null;
   expected_version: number;
-  role_overrides: Record<string, unknown>;
+  role_overrides: Record<string, ModelProfileId>;
 }
 
 export function parseModelPolicyUpdate(value: unknown): ModelPolicyUpdate {
@@ -8312,7 +8312,7 @@ export interface RetentionApplied {
   objects_pending: number;
   objects_removed: number;
   purged_runs: number;
-  refused: Record<string, unknown>;
+  refused: Record<string, number>;
   schema_version: 1;
 }
 
@@ -8366,7 +8366,7 @@ export interface RouteOption {
   expert_id: string;
   name: string;
   purpose: string;
-  role_bindings: Record<string, unknown>;
+  role_bindings: Record<string, string>;
   tools: string[];
   version: number;
 }
@@ -9180,7 +9180,7 @@ export function parseWorkflowValidation(value: unknown): WorkflowValidation {
 }
 
 export interface WorkflowVersionView {
-  block_versions: Record<string, unknown>;
+  block_versions: Record<string, string>;
   graph: WorkflowGraph;
   graph_hash: string;
   source: string;

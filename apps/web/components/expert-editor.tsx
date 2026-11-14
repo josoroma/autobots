@@ -63,7 +63,7 @@ function draftOf(expert: ExpertView): Draft {
     instructions: latest?.instructions ?? "",
     tools: latest?.tools ?? [],
     groups: latest?.tool_groups ?? [],
-    executor: String(latest?.role_bindings?.executor ?? ""),
+    executor: latest?.role_bindings?.executor ?? "",
   };
 }
 
@@ -113,10 +113,8 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
 
   // This form edits only the executor. Other offered bindings stay, and one naming a model that
   // isn't offered goes with this save, which the form says, since it would otherwise refuse it.
-  const saved = (expert?.versions.at(-1)?.config.role_bindings ?? {}) as Record<
-    string,
-    string
-  >;
+  const saved: Record<string, string> =
+    expert?.versions.at(-1)?.config.role_bindings ?? {};
   const others = Object.entries(saved).filter(([role]) => role !== "executor");
   const kept = Object.fromEntries(
     others.filter(([, profile]) =>

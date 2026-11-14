@@ -52,7 +52,7 @@ function sameForm(
   defaultProfile: string,
   overrides: Record<string, string>,
 ): boolean {
-  const saved = state.role_overrides as Record<string, string>;
+  const saved: Record<string, string> = state.role_overrides;
   const keys = new Set([...Object.keys(saved), ...Object.keys(overrides)]);
   return (
     (state.default_profile ?? BUILTIN_DEFAULT) === defaultProfile &&
@@ -127,7 +127,7 @@ export function ModelPolicyPanel() {
   const adopt = useCallback((next: ModelPolicyState) => {
     setState(next);
     setDefaultProfile(next.default_profile ?? BUILTIN_DEFAULT);
-    setOverrides(next.role_overrides as Record<string, string>);
+    setOverrides(next.role_overrides);
   }, []);
 
   useEffect(() => {

@@ -328,8 +328,7 @@ function ExpertCard({
   onStart: () => void;
 }) {
   const latest = expert.versions.at(-1)?.config;
-  const executor = (latest?.role_bindings as Record<string, string> | undefined)
-    ?.executor;
+  const executor = latest?.role_bindings?.executor;
   const approvals = (latest?.tools ?? []).filter(
     (tool) => catalog.get(tool)?.approval === "always",
   );
