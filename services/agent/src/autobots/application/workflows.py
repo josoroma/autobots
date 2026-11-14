@@ -28,6 +28,7 @@ from autobots.domain.models import (
     require_offered,
     resolve_role_policy,
 )
+from autobots.domain.runs import TERMINAL
 from autobots.domain.tools import DELEGATION_TOOL, LOOP_TOOL_GRANTS, PLAN_TOOLS
 from autobots.domain.workflows import (
     GraphError,
@@ -489,7 +490,7 @@ async def read_execution(connection: Any, workspace_id: UUID, execution_id: UUID
 
     def _unsaved_status(key: str) -> str:
         if key != current:
-            return "not_run" if run_status in {"succeeded", "failed", "cancelled"} else "waiting"
+            return "not_run" if run_status in TERMINAL else "waiting"
         # This node started. On a finished run its effect may have happened, so it can't be
         # reported as never run.
         if run_status == "waiting_approval" or approval_pending:

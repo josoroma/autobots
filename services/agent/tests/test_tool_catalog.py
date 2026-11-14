@@ -221,21 +221,15 @@ def test_availability_with_a_real_looking_key_makes_no_request() -> None:
 async def test_a_provider_client_reads_its_key_per_attempt_and_only_uses_its_transport() -> None:
     import httpx
 
-    from autobots.adapters.provider_http import provider_client, provider_key
-    from autobots.application.tool_gateway import ToolFailed
-    from autobots.domain.tool_catalog import KeyRequirement
+    from autobots.adapters.provider_http import provider_client
 
-    requirement = KeyRequirement("tavily", ("TAVILY_API_KEY",))
-    with pytest.raises(ToolFailed) as missing:
-        provider_key(requirement, {"TAVILY_API_KEY": "  "})
-    assert str(missing.value) == "tavily_key_missing"
     seen: list[str] = []
 
     def answer(request: httpx.Request) -> httpx.Response:
         seen.append(request.headers["authorization"])
         return httpx.Response(200, json={})
 
-    key = provider_key(requirement, {"TAVILY_API_KEY": "tvly-fixture"})["TAVILY_API_KEY"]
+    key = "tvly-fixture"
     async with provider_client(
         "https://api.tavily.invalid",
         {"Authorization": f"Bearer {key}"},

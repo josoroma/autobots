@@ -48,6 +48,7 @@ from autobots.domain.models import (
     UnknownModelProfile,
     approved_profile,
 )
+from autobots.domain.runs import IN_PROGRESS, NEEDS_YOU, TERMINAL
 from autobots.domain.secret_patterns import redact_shown
 from autobots.domain.tools import PLAN_TOOLS
 
@@ -333,9 +334,7 @@ async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> R
         schema_version=1,
         run=summary,
         can_continue=(
-            summary.status in ("succeeded", "failed", "cancelled")
-            and summary.parent_run_id is None
-            and not is_workflow
+            summary.status in TERMINAL and summary.parent_run_id is None and not is_workflow
         ),
         objective=objective,
         criteria=criteria,
@@ -377,10 +376,11 @@ async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> R
     )
 
 
+# Plain values, since these go to SQL as parameters.
 GROUPS: dict[str, tuple[str, ...]] = {
-    "active": ("queued", "running", "verifying", "paused", "cancelling"),
-    "needs_you": ("waiting_approval", "waiting_input"),
-    "finished": ("succeeded", "failed", "cancelled"),
+    "active": tuple(sorted(status.value for status in IN_PROGRESS)),
+    "needs_you": tuple(sorted(status.value for status in NEEDS_YOU)),
+    "finished": tuple(sorted(status.value for status in TERMINAL)),
 }
 MAX_QUERY = 200
 

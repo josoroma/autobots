@@ -9,12 +9,13 @@ import logging
 import os
 import pickle
 import sys
+from collections.abc import Mapping
 from typing import Any
 from uuid import UUID, uuid4
 
 import httpx
 import psycopg
-from autobots.adapters.provider_http import provider_client, provider_key
+from autobots.adapters.provider_http import provider_client
 from autobots.adapters.tool_middleware import GatewayMiddleware, visible_tools
 from autobots.application.experts import create_expert, create_session
 from autobots.application.runs import admit_run
@@ -22,6 +23,7 @@ from autobots.application.tool_catalog import tool_catalog
 from autobots.application.tool_gateway import (
     ToolContext,
     ToolDefinition,
+    ToolFailed,
     ToolGateway,
     ToolRegistry,
     ToolScope,
@@ -79,9 +81,18 @@ def answer(request: httpx.Request) -> httpx.Response:
     return httpx.Response(200, json={'results': [{'title': 'One'}, {'title': 'Two'}]})
 
 
+def fixture_key(environ: Mapping[str, str]) -> str:
+    """This attempt's key, or a typed failure naming the credential, never the value. A local copy of
+    the shape the retired provider_key helper had (R-11), since this fixture tool reads the environment."""
+    value = environ.get('FIXTURE_PROVIDER_KEY', '').strip()
+    if not value:
+        raise ToolFailed('fixture_key_missing')
+    return value
+
+
 async def search(arguments: Query, _: ToolContext) -> Found:
     """The shape every provider adapter takes: the key read in this attempt, for this client only."""
-    key = provider_key(KEY, os.environ)['FIXTURE_PROVIDER_KEY']
+    key = fixture_key(os.environ)
     async with provider_client('https://provider.invalid', {'Authorization': f'Bearer {key}'}, httpx.MockTransport(answer)) as client:
         reply = await client.post('/search', json={'query': arguments.query})
     return Found(titles=[item['title'] for item in reply.json()['results']])

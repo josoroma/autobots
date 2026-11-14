@@ -63,13 +63,13 @@ from autobots.application.plans import PLAN_REJECTIONS
 from autobots.application.run_usage import LimitReached, RootLimits, active_seconds_used, consume
 from autobots.application.tool_gateway import ToolScope, ownership_refusal
 from autobots.contracts.plans import GoalSpec
+from autobots.domain.runs import INTERRUPTING
 from autobots.operations.logs import log_event
 
 logger = logging.getLogger("autobots.worker")
 
 CHECK_SECONDS = 1.0
 INCOMPLETE_FINISHES = frozenset({"length", "error", "content_filter"})
-INTERRUPTING = frozenset({"cancelling", "cancelled", "failed", "succeeded"})
 MAX_FACT_CHARS = 100
 MAX_FACT_NAMES = 20
 

@@ -60,15 +60,6 @@ def marker(operation_id: str | None) -> str:
     return f"<!-- autobots-operation:{operation_id} -->"
 
 
-def configured_target(environ: Mapping[str, str]) -> tuple[str, str]:
-    """The one repository and the token from an environment alone, for callers with no workspace."""
-    repository = environ.get(REPOSITORY_VARIABLE, "")
-    token = environ.get(TOKEN_VARIABLE, "")
-    if not token or not _REPOSITORY.fullmatch(repository):
-        raise ToolFailed("connector_not_configured")
-    return repository, token
-
-
 TARGET_PREFIX = "GitHub repository "
 
 

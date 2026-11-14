@@ -8,7 +8,7 @@ is granted only through an Expert, and each action stays in the run's workspace.
 """
 
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, assert_never
 from uuid import UUID
 
 from autobots.application.routines import (
@@ -73,6 +73,14 @@ async def _creator(connection: Any, context: ToolContext) -> UUID:
     return UUID(str(row[0]))
 
 
+def _required[T](value: T | None) -> T:
+    """Each action's fields, which CronjobInput's validator already requires, narrowed for the
+    type checker. A missing one is refused rather than asserted (R-11)."""
+    if value is None:
+        raise ToolFailed("cronjob_arguments_invalid")
+    return value
+
+
 def _target(arguments: CronjobInput) -> str:
     """What the approval names: the action and the routine. The schedule is in the arguments."""
     subject = arguments.name or (str(arguments.routine_id) if arguments.routine_id else "")
@@ -88,65 +96,80 @@ def cronjob_tool(credential_check: CredentialCheck | None = None) -> ToolDefinit
         key = context.operation_id or f"cronjob:{context.scope.run_id}"
         action = arguments.action
         try:
-            if action == "list":
-                listed = await list_routines(connection, workspace)
-                return CronjobOutput(
-                    action=action,
-                    status="listed",
-                    routines=[
-                        CronjobRoutine(
-                            routine_id=item.id,
-                            name=item.name,
-                            enabled=item.enabled,
-                            latest_version=item.latest_version,
-                        )
-                        for item in listed
-                    ],
-                )
-            if action == "create":
-                assert arguments.name is not None and arguments.task is not None
-                view = await create_routine(
-                    connection,
-                    workspace_id=workspace,
-                    actor_id=await _creator(connection, context),
-                    idempotency_key=key,
-                    name=arguments.name,
-                    config=routine_config(arguments.task),
-                )
-                return CronjobOutput(
-                    action=action, status="saved", routine_id=view.id, version=view.latest_version
-                )
-            assert arguments.routine_id is not None
-            routine = arguments.routine_id
-            if action == "update":
-                assert arguments.task is not None and arguments.expected_version is not None
-                view = await add_routine_version(
-                    connection,
-                    workspace_id=workspace,
-                    actor_id=await _creator(connection, context),
-                    routine_id=routine,
-                    idempotency_key=key,
-                    expected_version=arguments.expected_version,
-                    config=routine_config(arguments.task),
-                )
-                return CronjobOutput(
-                    action=action, status="saved", routine_id=view.id, version=view.latest_version
-                )
-            if action in ("pause", "resume"):
-                view = await set_enabled(connection, workspace, routine, action == "resume")
-                status = "resumed" if view.enabled else "paused"
-                return CronjobOutput(action=action, status=status, routine_id=routine)
-            if action == "remove":
-                await remove_routine(connection, workspace, routine)
-                return CronjobOutput(action=action, status="removed", routine_id=routine)
+            match action:
+                case "list":
+                    listed = await list_routines(connection, workspace)
+                    return CronjobOutput(
+                        action=action,
+                        status="listed",
+                        routines=[
+                            CronjobRoutine(
+                                routine_id=item.id,
+                                name=item.name,
+                                enabled=item.enabled,
+                                latest_version=item.latest_version,
+                            )
+                            for item in listed
+                        ],
+                    )
+                case "create":
+                    view = await create_routine(
+                        connection,
+                        workspace_id=workspace,
+                        actor_id=await _creator(connection, context),
+                        idempotency_key=key,
+                        name=_required(arguments.name),
+                        config=routine_config(_required(arguments.task)),
+                    )
+                    return CronjobOutput(
+                        action=action,
+                        status="saved",
+                        routine_id=view.id,
+                        version=view.latest_version,
+                    )
+                case "update":
+                    view = await add_routine_version(
+                        connection,
+                        workspace_id=workspace,
+                        actor_id=await _creator(connection, context),
+                        routine_id=_required(arguments.routine_id),
+                        idempotency_key=key,
+                        expected_version=_required(arguments.expected_version),
+                        config=routine_config(_required(arguments.task)),
+                    )
+                    return CronjobOutput(
+                        action=action,
+                        status="saved",
+                        routine_id=view.id,
+                        version=view.latest_version,
+                    )
+                case "pause" | "resume":
+                    routine = _required(arguments.routine_id)
+                    view = await set_enabled(connection, workspace, routine, action == "resume")
+                    status = "resumed" if view.enabled else "paused"
+                    return CronjobOutput(action=action, status=status, routine_id=routine)
+                case "remove":
+                    routine = _required(arguments.routine_id)
+                    await remove_routine(connection, workspace, routine)
+                    return CronjobOutput(action=action, status="removed", routine_id=routine)
+                case "run":
+                    routine = _required(arguments.routine_id)
 
-            async def ready(workspace_id: UUID) -> str:
-                return await check(connection, workspace_id)
+                    async def ready(workspace_id: UUID) -> str:
+                        return await check(connection, workspace_id)
 
-            status, reason, run_id = await run_routine_now(connection, workspace, routine, ready)
-            return CronjobOutput(
-                action=action, status=status, routine_id=routine, run_id=run_id, reason=reason
-            )
+                    status, reason, run_id = await run_routine_now(
+                        connection, workspace, routine, ready
+                    )
+                    return CronjobOutput(
+                        action=action,
+                        status=status,
+                        routine_id=routine,
+                        run_id=run_id,
+                        reason=reason,
+                    )
+                case _:
+                    assert_never(action)
         except (RoutineRefused, WorkflowRefused) as refused:
             raise ToolFailed(refused.code) from None
 

@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Request
 
 from autobots.api.errors import ApiError
+from autobots.api.pool import request_pool
 from autobots.api.security import current_user, require_internal
 from autobots.application.credentials.store import (
     CredentialMissing,
@@ -385,10 +386,11 @@ async def check_run_intent(
     settings: Settings,
     workspace_id: Annotated[UUID, Depends(current_workspace)],
 ) -> RunIntentCheck:
-    """Only a user's Run click reaches this. It admits nothing: run admission is a later story."""
+    """A user's Run click checks readiness here. It admits nothing: POST /v1/runs admits (US-4.1).
+    current_workspace needs the database, so the pool is always open by now (R-11)."""
     code = await settings.run_intent(workspace_id)
-    pool: Any = request.app.state.pool
-    if code == "ready" and pool is not None:
+    pool = request_pool(request)
+    if code == "ready":
         # Kept here, as a resume and the worker read `run_intent` for the key alone.
         async with pool.connection() as connection:
             cursor = await connection.execute(
@@ -405,10 +407,8 @@ async def check_run_intent(
             require_offered(policy.bindings.values())
         except ProfileNotOffered as refused:
             code = refused.code
-    budget = None
-    if pool is not None:
-        async with pool.connection() as connection:
-            budget = budget_range(await remaining_daily_micro_usd(connection, workspace_id))
+    async with pool.connection() as connection:
+        budget = budget_range(await remaining_daily_micro_usd(connection, workspace_id))
     return RunIntentCheck(
         schema_version=1,
         ready=code == "ready",

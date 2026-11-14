@@ -20,6 +20,11 @@ class RunStatus(StrEnum):
 
 
 TERMINAL = frozenset({RunStatus.SUCCEEDED, RunStatus.FAILED, RunStatus.CANCELLED})
+# R-11: the other sets derive from RunStatus and TERMINAL, so a new status changes one place.
+NEEDS_YOU = frozenset({RunStatus.WAITING_APPROVAL, RunStatus.WAITING_INPUT})
+IN_PROGRESS = frozenset(RunStatus) - TERMINAL - NEEDS_YOU
+# A run in one of these has stopped, or is stopping, so a model call in it ends early.
+INTERRUPTING = TERMINAL | {RunStatus.CANCELLING}
 
 NORMAL_EXITS: dict[RunStatus, frozenset[RunStatus]] = {
     RunStatus.QUEUED: frozenset({RunStatus.RUNNING, RunStatus.PAUSED}),

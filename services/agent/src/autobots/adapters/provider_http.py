@@ -17,14 +17,6 @@ from autobots.domain.tool_catalog import KeyRequirement
 DEFAULT_SECONDS = 20.0
 
 
-def provider_key(requirement: KeyRequirement, environ: Mapping[str, str]) -> dict[str, str]:
-    """This attempt's values, or a typed failure naming the credential, never the value."""
-    values = {name: environ.get(name, "").strip() for name in requirement.variables}
-    if not all(values.values()):
-        raise ToolFailed(f"{requirement.credential}_key_missing")
-    return values
-
-
 async def attempt_key(
     context: ToolContext, requirement: KeyRequirement, environ: Mapping[str, str]
 ) -> str:
