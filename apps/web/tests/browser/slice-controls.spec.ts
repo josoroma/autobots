@@ -118,7 +118,7 @@ test("a person pauses, resumes and cancels a running run from its page, and the 
   await expectNoControls(page);
 });
 
-test("after a lost Pause, Resume sends nothing until a reload shows the Pause applied", async ({
+test("after a lost Pause, Resume sends nothing, and Cancel still stops the run", async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -127,12 +127,15 @@ test("after a lost Pause, Resume sends nothing until a reload shows the Pause ap
   const id = await admit(page, "slice-slow");
   await page.goto(`/runs/${id}`);
   await expectState(page, id, "running", "Running.");
-  // Decision 0027 D2: the Pause reaches the API and applies, but its reply is lost. The run is the
-  // commands' target, so Resume can't send until a reload shows what the Pause did.
+  // Decision 0027 D2: the Pause reaches the API and applies, but its reply is lost. Pause and Resume
+  // share the run as their target, so Resume can't send until a reload shows what the Pause did.
+  // Cancel has its own target, so the lost Pause never holds back stopping the run.
   const pauses = `**/api/v1/runs/${id}/pause`;
   const resumes = `**/api/v1/runs/${id}/resume`;
+  const cancels = `**/api/v1/runs/${id}/cancel`;
   const paused: string[] = [];
   const resumed: string[] = [];
+  const cancelled: string[] = [];
   await page.route(pauses, async (route) => {
     paused.push(route.request().headers()["idempotency-key"] ?? "");
     await route.fetch();
@@ -140,6 +143,10 @@ test("after a lost Pause, Resume sends nothing until a reload shows the Pause ap
   });
   await page.route(resumes, (route) => {
     resumed.push(route.request().headers()["idempotency-key"] ?? "");
+    return route.continue();
+  });
+  await page.route(cancels, (route) => {
+    cancelled.push(route.request().headers()["idempotency-key"] ?? "");
     return route.continue();
   });
   await button(page, "Pause").click();
@@ -150,15 +157,15 @@ test("after a lost Pause, Resume sends nothing until a reload shows the Pause ap
   ).toBeVisible();
   expect(resumed).toHaveLength(0);
   expect(paused).toHaveLength(1);
-  await page.unroute(pauses);
-  await page.reload();
-  await expectState(page, id, "paused", "Paused.");
-  await button(page, "Resume").click();
-  await expectState(page, id, "running", "Running.");
-  expect(resumed).toHaveLength(1);
-  await page.unroute(resumes);
   await button(page, "Cancel run").click();
   await expectState(page, id, "cancelled", "Cancelled.");
+  expect(cancelled).toHaveLength(1);
+  await page.unroute(pauses);
+  await page.unroute(resumes);
+  await page.unroute(cancels);
+  await page.reload();
+  await expectState(page, id, "cancelled", "Cancelled.");
+  await expectNoControls(page);
 });
 
 test("a finished run offers no control, whichever way it ended", async ({

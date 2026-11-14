@@ -9,7 +9,7 @@ import { CircleAlert, Pause, Play, RotateCw } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { commandsFor } from "@/components/run-controls";
+import { commandTarget, commandsFor } from "@/components/run-controls";
 import { StateLine } from "@/components/run-list";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/csrf-fetch";
@@ -88,8 +88,8 @@ export function RunPanel({
   }, [base, loads]);
 
   // The version the panel loaded, never a fresh one: a stale press is refused, not retried. One key
-  // per press until its outcome is known (Decision 0027 D2), so a lost reply applies it once. The
-  // run is the target, so another command after a lost one sends nothing until a reload.
+  // per press until its outcome is known (Decision 0027 D2), so a lost reply applies it once. Pause
+  // and Resume share the run as their target, and Cancel has its own (see commandTarget).
   async function send(command: Command, version: number): Promise<void> {
     setRefusal(null);
     const result = await writes.submit({
@@ -104,6 +104,7 @@ export function RunPanel({
           body,
         }),
       parse: parseRunCommandResult,
+      scope: commandTarget(command),
       choice: command,
     });
     if (result === null) return;

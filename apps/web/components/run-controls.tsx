@@ -34,6 +34,11 @@ const LABELS: Record<Command, string> = {
 };
 const MICRO_USD = 1_000_000;
 
+/** A command's target for the submit hook: the run for Pause and Resume, its own for Cancel. */
+export function commandTarget(command: Command): string {
+  return command === "cancel" ? "cancel" : "";
+}
+
 export function commandsFor(status: string): Command[] {
   if (TERMINAL.has(status) || status === "cancelling") return [];
   if (status === "paused") return ["resume", "cancel"];
@@ -80,9 +85,10 @@ export function RunControls({
   }
 
   // One key per press until its outcome is known (Decision 0027 D2): a lost reply resends the
-  // same request, so a command applies once and a charge is never recorded twice (WRUN-03). The
-  // run is the target, so after a lost Pause, Resume or Cancel sends nothing until a reload shows
-  // whether the Pause applied.
+  // same request, so a command applies once and a charge is never recorded twice (WRUN-03). Pause
+  // and Resume share the run as their target, so after a lost Pause, Resume sends nothing until a
+  // reload shows whether it applied. Cancel has its own: a repeated cancellation changes nothing, so
+  // it can't contradict either, and a lost Pause never holds back stopping the run.
   async function send(command: Command): Promise<void> {
     setRefusal(null);
     setNote(null);
@@ -99,6 +105,7 @@ export function RunControls({
           body,
         }),
       parse: parseRunCommandResult,
+      scope: commandTarget(command),
       choice: command,
     });
     if (result === null) return;

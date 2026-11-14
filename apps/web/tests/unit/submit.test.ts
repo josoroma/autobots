@@ -122,7 +122,7 @@ test("the hook's holds: one per target, settled only by an accepted reply, and u
   let minted = 0;
   const mint = () => `key-${++minted}`;
   let holds: Holds = new Map();
-  // A lost Pause holds the run.
+  // A lost Pause holds the run. Cancel has its own target, so it isn't held back.
   const pause = nextAttempt(null, '{"expected_version":3}', mint, "", "pause");
   assert.ok(pause !== null);
   holds = settle(holds, pause, "unknown", false, true);
@@ -130,6 +130,10 @@ test("the hook's holds: one per target, settled only by an accepted reply, and u
   assert.deepEqual(heldFor(holds, "", "resume", true), {
     changed: true,
     held: pause,
+  });
+  assert.deepEqual(heldFor(holds, "cancel", "cancel", true), {
+    changed: false,
+    held: null,
   });
   // Pause again resends the same key, and a refusal of that resend keeps it.
   const again = heldFor(holds, "", "pause", true);

@@ -18,12 +18,13 @@ from pathlib import Path
 # put it on the parent's path.
 SOURCE_ROOT = str(Path(__file__).resolve().parents[2])
 # The child also caps its own CPU time, so the kernel stops it even if the parent is killed first.
-# It never raises an inherited hard limit, which only a lower value may replace.
+# The soft limit sends SIGXCPU, which ends the child; it sits a second under the hard limit, since
+# Linux kills outright when both are reached together. An inherited hard limit is never raised.
 BOOTSTRAP = (
     "import resource, runpy, sys; "
-    "hard = resource.getrlimit(resource.RLIMIT_CPU)[1]; "
-    "cap = int(sys.argv[3]) if hard == resource.RLIM_INFINITY else min(int(sys.argv[3]), hard); "
-    "resource.setrlimit(resource.RLIMIT_CPU, (cap, cap)); "
+    "soft = int(sys.argv[3]); inherited = resource.getrlimit(resource.RLIMIT_CPU)[1]; "
+    "hard = soft + 1 if inherited == resource.RLIM_INFINITY else min(soft + 1, inherited); "
+    "resource.setrlimit(resource.RLIMIT_CPU, (min(soft, hard), hard)); "
     "sys.path.insert(0, sys.argv[1]); "
     "runpy.run_module(sys.argv[2], run_name='__main__', alter_sys=True)"
 )

@@ -241,7 +241,8 @@ def test_the_child_limits_its_own_cpu_time() -> None:
 
     from autobots.application.bounded import BOOTSTRAP, SOURCE_ROOT
 
-    # A one-second cap, under the wait, so the kernel ends the match even with no parent to kill it.
+    # A one-second soft limit, under the wait, so the kernel ends the match with SIGXCPU even
+    # with no parent to kill it.
     request = (
         b'{"files": {"inputs/slow.txt": "' + b"a" * 40 + b'b"}, '
         b'"arguments": {"pattern": "(a+)+$", "path": "inputs/"}}'
