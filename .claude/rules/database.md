@@ -2,14 +2,14 @@
 paths:
   - "supabase/**/*"
   - "packages/db-types/**/*"
-  - "services/agent/src/autobots/adapters/persistence/**/*"
+  - "services/agent/src/autobots/persistence/**/*"
 ---
 
 # Database ownership
 
 Follow [DH-07](../../PRD-Development-Harness.md#dh-07-supabase-migrations-seeds-and-database-quality) and `autobots-supabase`.
 
-- SQL migrations own application schema; never edit applied migrations or introduce competing history. Document locks/backfills and forward recovery.
+- SQL migrations own application schema; never edit applied migrations or introduce competing history. Document locks/backfills and forward recovery in the `-- Locks:`, `-- Data:` and `-- Recovery:` header lines that [comments-and-names.md](comments-and-names.md) defines.
 - Public domain tables require RLS. `app_private` and `agent_runtime` remain private direct-SQL schemas, outside PostgREST/Realtime/browser grants.
 - Separate repeatable reference data, disposable fixtures and secure Auth bootstrap. No DDL, real credentials or pending inference jobs in seeds.
 - Verify actual anonymous/owner/other-workspace roles and private Storage; service-role success does not prove RLS. Prove repeatable seeds and schema/type compatibility on a qualified disposable target.

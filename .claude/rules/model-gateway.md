@@ -2,9 +2,8 @@
 paths:
   - "services/agent/src/autobots/adapters/models/**/*"
   - "services/agent/src/autobots/application/**/*"
-  - "services/agent/src/autobots/graphs/**/*"
+  - "services/agent/src/autobots/adapters/loop_middleware.py"
   - "apps/web/app/api/settings/**/*"
-  - "apps/web/src/app/api/settings/**/*"
 ---
 
 # OpenRouter application inference

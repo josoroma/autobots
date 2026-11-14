@@ -1,10 +1,13 @@
 ---
 paths:
   - "infra/**/*"
-  - "**/Dockerfile*"
+  - "**/*Dockerfile*"
   - "**/*compose*.yml"
   - "**/*compose*.yaml"
-  - "scripts/operations/**/*"
+  - "scripts/qualify_operations.py"
+  - "scripts/qualify_backup.py"
+  - "scripts/qualify_upgrade.py"
+  - "Makefile"
   - "scripts/persistent_install.py"
   - "scripts/local_backup.py"
 ---
