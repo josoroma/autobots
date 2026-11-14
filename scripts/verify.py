@@ -135,12 +135,16 @@ def judge_unittest(check: Mapping[str, Any]) -> dict[str, Any]:
 
 def judge_node(record: Mapping[str, Any]) -> dict[str, Any]:
     """Node's runner passes a glob that matched nothing, so its own count is read (R-01)."""
-    found = re.search(r'^# tests (\d+)$', record.get('output', ''), re.M)
+    output = record.get('output', '')
+    found = re.search(r'^# tests (\d+)$', output, re.M)
     executed = int(found.group(1)) if found else 0
-    if record['status'] == 'passed' and executed < 1:
-        return {'tests_executed': 0, 'status': 'failed',
-                'output': record.get('output', '') + '\nNode ran no tests; an empty suite is not a pass.'}
-    return {'tests_executed': executed}
+    # A skipped or todo test is not a pass, as for unittest and pytest.
+    skipped = sum(int(count) for count in re.findall(r'^# (?:skip|todo) (\d+)$', output, re.M))
+    if record['status'] == 'passed' and (executed < 1 or skipped):
+        return {'tests_executed': executed, 'tests_skipped': skipped, 'status': 'failed',
+                'output': output + f'\nNode ran {executed} tests and skipped {skipped}; neither an empty suite nor a '
+                                   'skip is a pass.'}
+    return {'tests_executed': executed, 'tests_skipped': skipped}
 
 
 def judge_pytest(record: Mapping[str, Any]) -> dict[str, Any]:

@@ -342,8 +342,8 @@ These evidence classes aren't interchangeable, and later code doesn't inherit ea
 
 - **`harness`:** configuration, backlog validation, deterministic harness tests.
 - **`fast`:** adds the Python and web steps for what changed. Since R-07, after the analyzed revision, it also runs `repo_ruff_check` (root `ruff.toml`) and `repo_mypy` (strict, root `mypy.ini`, over the hook's six trust-boundary modules) when scripts, tests or hooks change.
-- **`full`:** every static and unit step, `next build`, `contract_drift`, `qualify_faults.py`, the offline `tests/toolchain` modules (scope, manifest pins and launchers), and `qualify_web.py`. Per-story records report 41 browser tests.
-- **Selections:** `scripts/suites.py` (R-01) names every step's tests: web and API-client unit tests by glob, the db and operations qualifiers, the Playwright filters, and the manual files with their reasons. `tests/harness/test_suite_claims.py` fails on a test file nothing runs. `make check-fast` and `make check-full` run those profiles; `.githooks/pre-commit` is opt-in.
+- **`full`:** every static and unit step, `next build`, `contract_drift`, `qualify_faults.py`, the offline `tests/toolchain` modules (since R-01, after the analyzed revision) (scope, manifest pins and launchers), and `qualify_web.py`. Per-story records report 41 browser tests.
+- **Selections:** since R-01, after the analyzed revision, `scripts/suites.py` names every step's tests: web and API-client unit tests by glob, the db and operations qualifiers, the Playwright filters, and the manual files with their reasons. `tests/harness/test_suite_claims.py` fails on a test file nothing runs. `make check-fast` and `make check-full` run those profiles; `.githooks/pre-commit` is opt-in.
 - **`db`:** disposable targets for `disposable_db`, `supabase_stack`, `app_db`, `qualify_identity` (including `tests/db/*_check.py` such as `result_stream_check`, `task_timing_check`, `pull_request_check`, `concept_seed_check`) and `qualify_persistent_apply`.
 - **`operations`:** `qualify_operations`, `qualify_backup`, `qualify_upgrade`, on disposable projects with a scripted model.
 

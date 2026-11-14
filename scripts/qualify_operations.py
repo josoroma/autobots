@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import secrets
 import signal
 import subprocess
@@ -202,9 +203,13 @@ def qualify(root: Path) -> int:
         cases.check('no worker reads as visibly absent', 'worker_absent', conditions(body).get('worker'), conditions(body).get('worker') == 'worker_absent')
         cases.check('inherited tracing settings are turned off at bootstrap', 'disabled', json.loads(body)['remote_tracing'], json.loads(body)['remote_tracing'] == 'disabled')
         # The declared checkpoint adapter (Decision 0022 D5) names its package, langgraph-checkpoint-postgres.
-        # Only that one value is set aside; 'postgres' anywhere else, such as in an address, still fails.
-        adapter = str(json.loads(body).get('values', {}).get('checkpoint_adapter', '')).lower()
-        lowered = body.lower().replace(adapter, '') if adapter else body.lower()
+        # It must be exactly that package and a release, checked on its own; only then is that one value set
+        # aside, so 'postgres' anywhere else, such as in an address, still fails (Decision 0027 D10).
+        adapter = str(json.loads(body).get('values', {}).get('checkpoint_adapter', ''))
+        expected = re.fullmatch(r'langgraph-checkpoint-postgres \d+\.\d+\.\d+', adapter) is not None
+        cases.check('the status names the checkpoint adapter package and its release', 'langgraph-checkpoint-postgres x.y.z',
+                    adapter, expected)
+        lowered = body.lower().replace(f'"{adapter.lower()}"', '""') if expected else body.lower()
         leaked = [word for word in ('127.0.0.1', 'postgres', stack.runtime_password.lower(), 'service_role', 'langsmith', 'jwt', workspace_a) if word in lowered]
         cases.check('the status body has no address, secret or identifier', 'none', leaked or 'none', not leaked)
         code, reply = api_call(api_port, ops.internal, token_a, 'POST', '/v1/runs', goal, {'Idempotency-Key': secrets.token_hex(8)})

@@ -23,8 +23,85 @@ RUFF_RULES = {'E', 'F', 'W', 'I', 'B', 'UP', 'ASYNC', 'RUF',
 # Repository Python (R-07): the shared families, broad catches, the subprocess and time rules, and the SDK ban.
 REPO_RUFF_RULES = {'E', 'F', 'W', 'I', 'B', 'UP', 'ASYNC', 'RUF', 'BLE001', 'S110', 'S112', 'DTZ', 'S602', 'S604',
                    'S605', 'TID251'}
-# R-05's Any baseline: files may only leave it, and it ignores nothing but ANN401.
-ANN401_BASELINE_FILES = 75
+# R-05's Any baseline: files may only leave it, it ignores nothing but ANN401, and api/ and domain/ stay out.
+ANN401_BASELINE = frozenset({
+    'src/autobots/adapters/browser_executor.py',
+    'src/autobots/adapters/checkpoints.py',
+    'src/autobots/adapters/github_issues.py',
+    'src/autobots/adapters/github_pulls.py',
+    'src/autobots/adapters/github_reads.py',
+    'src/autobots/adapters/jina.py',
+    'src/autobots/adapters/loop_middleware.py',
+    'src/autobots/adapters/models/openrouter_metadata.py',
+    'src/autobots/adapters/object_storage.py',
+    'src/autobots/adapters/result_stream.py',
+    'src/autobots/adapters/tavily.py',
+    'src/autobots/adapters/tool_middleware.py',
+    'src/autobots/application/approvals.py',
+    'src/autobots/application/artifacts.py',
+    'src/autobots/application/assignments.py',
+    'src/autobots/application/browsing_loop.py',
+    'src/autobots/application/compaction.py',
+    'src/autobots/application/credentials/store.py',
+    'src/autobots/application/cronjob_tool.py',
+    'src/autobots/application/experts.py',
+    'src/autobots/application/goal_loop.py',
+    'src/autobots/application/improvements.py',
+    'src/autobots/application/memory.py',
+    'src/autobots/application/model_admission.py',
+    'src/autobots/application/operations.py',
+    'src/autobots/application/plans.py',
+    'src/autobots/application/profiles.py',
+    'src/autobots/application/provider_settings.py',
+    'src/autobots/application/reconciliation.py',
+    'src/autobots/application/recovery.py',
+    'src/autobots/application/retention.py',
+    'src/autobots/application/routines.py',
+    'src/autobots/application/run_projection.py',
+    'src/autobots/application/run_usage.py',
+    'src/autobots/application/runs.py',
+    'src/autobots/application/search.py',
+    'src/autobots/application/tool_catalog.py',
+    'src/autobots/application/tool_gateway.py',
+    'src/autobots/application/tool_grants.py',
+    'src/autobots/application/tool_key_settings.py',
+    'src/autobots/application/tool_keys.py',
+    'src/autobots/application/tool_uses.py',
+    'src/autobots/application/verification.py',
+    'src/autobots/application/worker_inference.py',
+    'src/autobots/application/worker_leases.py',
+    'src/autobots/application/workflow_overview.py',
+    'src/autobots/application/workflow_runner.py',
+    'src/autobots/application/workflows.py',
+    'src/autobots/operations/browse_trial.py',
+    'src/autobots/operations/concept_seed.py',
+    'src/autobots/operations/logs.py',
+    'src/autobots/operations/reasoning_trial.py',
+    'src/autobots/operations/route_qualification.py',
+    'src/autobots/operations/worker.py',
+    'tests/test_browse_trial.py',
+    'tests/test_browsing_loop.py',
+    'tests/test_browsing_tool.py',
+    'tests/test_contracts.py',
+    'tests/test_execution_contract.py',
+    'tests/test_final_review.py',
+    'tests/test_github_issues.py',
+    'tests/test_github_reads.py',
+    'tests/test_model_attempts.py',
+    'tests/test_operation_values.py',
+    'tests/test_operations.py',
+    'tests/test_readiness.py',
+    'tests/test_reasoning_trial.py',
+    'tests/test_result_stream.py',
+    'tests/test_route_qualification.py',
+    'tests/test_schema_release.py',
+    'tests/test_tavily.py',
+    'tests/test_tool_keys.py',
+    'tests/test_worker_inference.py',
+    'tests/test_workflow_execution.py',
+    'tests/test_workflows.py',
+})
+REPO_EXCLUDED = {'services', 'research', 'apps', 'packages', 'docs', 'openspec', '.checks', 'node_modules'}
 BANNED_SDKS = {'anthropic', 'langchain_anthropic', 'google', 'langchain_google_genai', 'openai', 'langchain_openai'}
 # R-06's ESLint ratchets, as their configuration states them.
 ESLINT_RULES = (r'complexity:\s*\[\s*"error",\s*15\s*\]', r'"max-depth":\s*\[\s*"error",\s*4\s*\]',
@@ -60,7 +137,8 @@ def python_errors(pyproject: dict) -> list[str]:
     if lint.get('ignore') or lint.get('extend-ignore') or ruff.get('exclude') or ruff.get('extend-exclude'):
         errors.append('ruff ignores rules or excludes files')
     ignores = lint.get('per-file-ignores', {})
-    if any(codes != ['ANN401'] for codes in ignores.values()) or len(ignores) > ANN401_BASELINE_FILES:
+    if (any(codes != ['ANN401'] for codes in ignores.values()) or not set(ignores) <= ANN401_BASELINE
+            or any(path.startswith(('src/autobots/api/', 'src/autobots/domain/')) for path in ignores)):
         errors.append('the per-file ignores reach beyond the shrinking ANN401 baseline')
     if set(lint.get('flake8-tidy-imports', {}).get('banned-api', {})) != BANNED_SDKS:
         errors.append('the provider SDK ban changed')
@@ -90,6 +168,8 @@ def repo_ruff_errors(config: dict) -> list[str]:
         errors.append('ruff.toml ignores more than the fault fixtures and, until reformatting, long lines')
     if lint.get('ignore') or lint.get('extend-ignore'):
         errors.append('ruff.toml ignores rules')
+    if set(config.get('extend-exclude', [])) != REPO_EXCLUDED:
+        errors.append('ruff.toml excludes more than the folders other gates own')
     if set(lint.get('flake8-tidy-imports', {}).get('banned-api', {})) != BANNED_SDKS:
         errors.append('ruff.toml changed the provider SDK ban')
     return errors
@@ -137,6 +217,9 @@ class GateSettings(unittest.TestCase):
                        lambda d: d['tool']['ruff']['lint'].__setitem__('extend-ignore', ['B']),
                        lambda d: d['tool']['ruff'].__setitem__('extend-exclude', ['src/autobots/api']),
                        lambda d: d['tool']['ruff']['lint']['per-file-ignores'].__setitem__('src/new.py', ['ANN401', 'B']),
+                       lambda d: d['tool']['ruff']['lint']['per-file-ignores'].__setitem__('src/new.py', ['ANN401']),
+                       lambda d: d['tool']['ruff']['lint']['per-file-ignores'].__setitem__(
+                           'src/autobots/api/app.py', ['ANN401']),
                        lambda d: d['tool']['ruff']['lint']['flake8-tidy-imports']['banned-api'].pop('openai')):
             altered = copy.deepcopy(self.pyproject)
             weaken(altered)

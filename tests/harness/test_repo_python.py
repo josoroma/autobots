@@ -36,8 +36,9 @@ class RepositoryPython(unittest.TestCase):
             with self.subTest(path):
                 self.assertIn(path, manifest)
                 self.assertEqual(harness_lib.check_domains(path), domains)
-                self.assertTrue(harness_lib.REPO_PYTHON_STEPS & verify.selected_steps('fast', sorted(harness_lib.FULL_CHECKS), [path])
-                                or 'web' in domains)
+                chosen = verify.selected_steps('fast', sorted(harness_lib.FULL_CHECKS), [path])
+                expected = harness_lib.WEB_STEPS if 'web' in domains else harness_lib.REPO_PYTHON_STEPS
+                self.assertTrue(expected <= chosen)
 
     def test_fast_runs_the_repository_steps_for_those_files(self) -> None:
         step_ids = sorted(harness_lib.FULL_CHECKS)

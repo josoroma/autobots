@@ -106,8 +106,10 @@ class Profiles(unittest.TestCase):
         passed = {'id': 'web_unit_tests', 'status': 'passed', 'output': '# tests 0\n# pass 0\n'}
         self.assertEqual(verify.judge_node(passed)['status'], 'failed')
         self.assertEqual(verify.judge_node({**passed, 'output': ''})['status'], 'failed')
-        counted = verify.judge_node({**passed, 'output': '# tests 55\n# pass 55\n'})
-        self.assertEqual(counted, {'tests_executed': 55})
+        counted = verify.judge_node({**passed, 'output': '# tests 55\n# pass 55\n# skip 0\n# todo 0\n'})
+        self.assertEqual(counted, {'tests_executed': 55, 'tests_skipped': 0})
+        skipped = verify.judge_node({**passed, 'output': '# tests 55\n# pass 54\n# skip 1\n# todo 0\n'})
+        self.assertEqual(skipped['status'], 'failed')
 
     def test_fast_scope_selection(self):
         step_ids = sorted(verify.PYTHON_STEPS | verify.WEB_STEPS | {'build'})
