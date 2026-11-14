@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-LAST_UNHEADED = '20261108000053_routine_removal.sql'
+LAST_UNHEADED = '20261108000053_routine_removal.sql'  # applied files keep their bytes
 HEADER = ('-- Locks:', '-- Data:', '-- Recovery:')
 
 

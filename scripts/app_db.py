@@ -234,6 +234,16 @@ def access_cases(stack: AppStack, cases: Cases) -> None:
                  stack.as_role('authenticated', USER_A, 'select checkpoint_thread_id from public.runs'), denied)
     cases.denied('authenticated cannot read the checkpoint schema',
                  stack.as_role('authenticated', USER_A, 'select * from agent_runtime.anything'), denied)
+    # R-17: the runtime role deletes only workflow drafts. `where false` keeps a failed case harmless.
+    cases.denied('the runtime role cannot delete a run', stack.runtime('delete from public.runs where false;\n'), denied)
+    cases.denied('the runtime role cannot delete a run event',
+                 stack.runtime('delete from public.run_events where false;\n'), denied)
+    deletable = rows(stack, "select string_agg(n.nspname || '.' || c.relname, ',' order by 1) from pg_class c "
+                            "join pg_namespace n on n.oid = c.relnamespace where c.relkind in ('r', 'p') "
+                            "and n.nspname not in ('pg_catalog', 'information_schema') "
+                            "and has_table_privilege('autobots_runtime', c.oid, 'DELETE');")
+    cases.check('the catalog grants the runtime role DELETE on workflow drafts only', 'public.workflow_drafts', deletable,
+                deletable == 'public.workflow_drafts')
     cases.denied('authenticated cannot write runs',
                  stack.as_role('authenticated', USER_A, f"update public.runs set status = 'failed' where id = '{RUN_A}'"), denied)
     own = last_line(stack.as_role('authenticated', USER_A, 'select count(id) from public.runs'))

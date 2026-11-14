@@ -260,8 +260,10 @@ def artifact_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port
         f"insert into app_private.plan_evidence (run_id, task_id, evidence, summary) values ('{loop_run}', 'a', '[]', 'used sk-or-leaked-value-here');\n"
         f"update public.runs set event_sequence = event_sequence + 1 where id = '{loop_run}';\n"
         f"insert into public.run_events (run_id, sequence, schema_version, payload, occurred_at) select '{loop_run}', event_sequence, 1, "
-        f"""'{{"type": "model.reasoning", "text": "PROTECTED-REASONING"}}', now() from public.runs where id = '{loop_run}';\n"""
-        f"delete from public.run_events where run_id = '{gap_run}' and sequence < 3;\n")
+        f"""'{{"type": "model.reasoning", "text": "PROTECTED-REASONING"}}', now() from public.runs where id = '{loop_run}';\n""")
+    # The gap is arranged as the admin: the runtime role can't delete run events (R-17).
+    if arranged.returncode == 0:
+        arranged = stack.sql(f"delete from public.run_events where run_id = '{gap_run}' and sequence < 3;\n")
     cases.check('the run workspace fixtures are arranged', 'exit 0', f'exit {arranged.returncode}: {arranged.stderr[-200:]}', arranged.returncode == 0)
     return {**extra_env, 'AUTOBOTS_TEST_LOOP_RUN': loop_run, 'AUTOBOTS_TEST_ARTIFACT_RUN': report.get('run_id', ''), 'AUTOBOTS_TEST_ARTIFACT_ID': report.get('artifact_id', ''),
             'AUTOBOTS_TEST_ARTIFACT_TEXT': report.get('expected_text', ''), 'AUTOBOTS_TEST_ARTIFACT_GONE': report.get('gone_id', ''),
@@ -487,8 +489,9 @@ def qualify(root: Path) -> int:
         # US-15.3, arranged: a member of workspace A only, who isn't its owner.
         email_f, password_f = 'reader-f@example.invalid', secrets.token_urlsafe(24)
         reader = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_f, password_f)
-        stack.runtime(f"insert into public.workspace_members (workspace_id, user_id, role) values ('{owner_a['workspace_id']}', '{reader['user_id']}', 'member');\n"
-                      f"delete from public.workspace_members where workspace_id = '{reader['workspace_id']}' and user_id = '{reader['user_id']}';\n")
+        stack.runtime(f"insert into public.workspace_members (workspace_id, user_id, role) values ('{owner_a['workspace_id']}', '{reader['user_id']}', 'member');\n")
+        # As the admin: the runtime role can't delete members (R-17).
+        stack.sql(f"delete from public.workspace_members where workspace_id = '{reader['workspace_id']}' and user_id = '{reader['user_id']}';\n")
         artifacts = {**artifacts, 'AUTOBOTS_TEST_READER_EMAIL': email_f, 'AUTOBOTS_TEST_READER_PASSWORD': password_f}
         # US-15.4, arranged: an owner whose workspace holds 101 runs, so a second page exists, and three
         # with spend: one reserved, one with an unreported charge and one fully reported.
