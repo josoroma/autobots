@@ -13,7 +13,7 @@ import { HeldNote } from "@/components/held-note";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
-import { withHeld } from "@/lib/submit";
+import { changedChoice, labelOf, withHeld } from "@/lib/submit";
 import { useSubmit } from "@/lib/use-submit";
 
 type Command = "pause" | "resume" | "cancel";
@@ -80,7 +80,9 @@ export function RunControls({
   }
 
   // One key per press until its outcome is known (Decision 0027 D2): a lost reply resends the
-  // same request, so a command applies once and a charge is never recorded twice (WRUN-03).
+  // same request, so a command applies once and a charge is never recorded twice (WRUN-03). The
+  // run is the target, so after a lost Pause, Resume or Cancel sends nothing until a reload shows
+  // whether the Pause applied.
   async function send(command: Command): Promise<void> {
     setRefusal(null);
     setNote(null);
@@ -97,9 +99,13 @@ export function RunControls({
           body,
         }),
       parse: parseRunCommandResult,
-      scope: command,
+      choice: command,
     });
     if (result === null) return;
+    if (result.outcome === "changed") {
+      setRefusal(changedChoice(labelOf(LABELS, result.heldChoice)));
+      return;
+    }
     if (result.outcome === "unknown") setRefusal(UNKNOWN);
     else if (result.outcome === "refused")
       setRefusal(withHeld(refusalOf(result.refusal), result.held));

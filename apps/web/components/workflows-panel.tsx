@@ -14,6 +14,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
+import { HeldNote } from "@/components/held-note";
 import { STATUS_TEXT } from "@/components/run-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -423,7 +424,9 @@ export function WorkflowsPanel() {
               value={name}
               onChange={(event) => setName(event.target.value)}
               maxLength={100}
+              readOnly={creates.holding()}
             />
+            {creates.holding() ? <HeldNote /> : null}
           </div>
           <Button
             type="submit"

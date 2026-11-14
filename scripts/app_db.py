@@ -262,7 +262,7 @@ def access_cases(stack: AppStack, cases: Cases) -> None:
     deletable = rows(stack, held_privileges('autobots_runtime', APP_SCHEMAS, ('DELETE', 'TRUNCATE')))
     cases.check('the catalog grants the runtime role DELETE on workflow drafts only', 'public.workflow_drafts:DELETE', deletable,
                 deletable == 'public.workflow_drafts:DELETE')
-    # R-17: the RLS and grant conventions of every table, from the catalog rather than case by case.
+    # R-17: the RLS and grant conventions of every table, from the catalog, beside the per-case denials above.
     unguarded = rows(stack, "select coalesce(string_agg(c.relname, ',' order by c.relname), '') from pg_class c "
                             "join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' "
                             "and c.relkind in ('r', 'p') and not c.relrowsecurity;")

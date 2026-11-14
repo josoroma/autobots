@@ -60,6 +60,40 @@ export function changesChoice(held: Attempt | null, choice = ""): boolean {
   return held !== null && held.choice !== choice;
 }
 
+export type Holds = ReadonlyMap<string, Attempt>;
+
+/**
+ * The held attempt a press resends for its target, or `changed` when it chose otherwise for a held
+ * target. An unkeyed write never resends.
+ */
+export function heldFor(
+  holds: Holds,
+  scope: string,
+  choice: string,
+  keyed: boolean,
+): { changed: boolean; held: Attempt | null } {
+  const held = keyed ? (holds.get(scope) ?? null) : null;
+  return { changed: changesChoice(held, choice), held };
+}
+
+/**
+ * The holds after a reply. Each target holds its own write, so a reply settles only its own, and an
+ * unkeyed write holds nothing and clears nothing.
+ */
+export function settle(
+  holds: Holds,
+  attempt: Attempt,
+  outcome: Outcome,
+  retried: boolean,
+  keyed: boolean,
+): Holds {
+  if (!keyed) return holds;
+  const next = new Map(holds);
+  if (keeps(outcome, retried)) next.set(attempt.scope, attempt);
+  else next.delete(attempt.scope);
+  return next;
+}
+
 /** Said with a refusal of a resent write, which doesn't show the first press failed. */
 export const HELD_NOTE =
   "Your first press may still have gone through, so pressing again resends it rather than doing it twice.";
@@ -75,6 +109,14 @@ export function withHeld(text: string, held: boolean): string {
  */
 export const HELD_INPUTS =
   "These stay as sent, since the first request may already have gone through. A reload shows what happened.";
+
+/** A held choice in the words of its button, from a screen's labels. */
+export function labelOf(
+  labels: Readonly<Record<string, string>>,
+  choice: string | null,
+): string {
+  return (choice === null ? undefined : labels[choice]) ?? "your first choice";
+}
 
 /** Said for a `changed` press: nothing was sent, and the held choice may already be recorded. */
 export function changedChoice(held: string): string {

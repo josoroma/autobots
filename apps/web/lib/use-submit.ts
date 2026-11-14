@@ -7,11 +7,12 @@ import { useCallback, useRef, useState } from "react";
 
 import { readErrorResponse, readReply } from "@/lib/replies";
 import {
-  changesChoice,
-  keeps,
+  heldFor,
   nextAttempt,
   outcomeOf,
+  settle,
   type Attempt,
+  type Holds,
   type Outcome,
 } from "@/lib/submit";
 
@@ -86,7 +87,7 @@ function changed<T>(held: Attempt | null): Submitted<T> {
 export function useSubmit() {
   const [pending, setPending] = useState(false);
   const busy = useRef(false);
-  const unknown = useRef(new Map<string, Attempt>());
+  const holds = useRef<Holds>(new Map());
   // The held targets, as state, so a screen can show its inputs as sent while one is held.
   const [heldScopes, setHeldScopes] = useState<ReadonlySet<string>>(
     () => new Set(),
@@ -96,8 +97,13 @@ export function useSubmit() {
     async <T>(steps: SubmitSteps<T>): Promise<Submitted<T> | null> => {
       if (busy.current) return null;
       const { scope = "", choice = "", keyed = true } = steps;
-      const held = keyed ? (unknown.current.get(scope) ?? null) : null;
-      if (changesChoice(held, choice)) return changed<T>(held);
+      const { changed: other, held } = heldFor(
+        holds.current,
+        scope,
+        choice,
+        keyed,
+      );
+      if (other) return changed<T>(held);
       busy.current = true;
       setPending(true);
       try {
@@ -111,11 +117,15 @@ export function useSubmit() {
         );
         if (attempt === null) return null;
         const reply = await sendOnce(attempt, steps);
-        const kept = keyed && keeps(reply.outcome, retried);
-        if (kept) unknown.current.set(scope, attempt);
-        // An unkeyed write holds nothing, so it never clears a keyed write's hold.
-        else if (keyed) unknown.current.delete(scope);
-        setHeldScopes(new Set(unknown.current.keys()));
+        holds.current = settle(
+          holds.current,
+          attempt,
+          reply.outcome,
+          retried,
+          keyed,
+        );
+        const kept = keyed && holds.current.has(scope);
+        setHeldScopes(new Set(holds.current.keys()));
         return {
           ...reply,
           retried,

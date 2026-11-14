@@ -316,7 +316,9 @@ export function ExpertsPanel() {
               value={name}
               onChange={(event) => setName(event.target.value)}
               maxLength={100}
+              readOnly={creates.holding()}
             />
+            {creates.holding() ? <HeldNote /> : null}
           </div>
           <Button
             type="submit"

@@ -68,7 +68,7 @@ def run_grants(files: list[Path]) -> list[tuple[str, list[Privilege], bool]]:
             grant, default = GRANT.fullmatch(statement), DEFAULT_GRANT.fullmatch(statement)
             if grant and covers_runs(grant['objects']):
                 match = grant
-            elif default and (' in schema ' not in default['scope'] or 'public' in default['scope'].split()):
+            elif default and (' in schema ' not in default['scope'] or 'public' in re.split(r'[\s,]+', default['scope'])):
                 match = default
             else:
                 continue
@@ -145,6 +145,8 @@ class Migrations(unittest.TestCase):
             'grant select on all tables in schema public to authenticated;': ['every column'],
             'alter default privileges in schema public grant select on tables to authenticated;': ['every column'],
             'alter default privileges grant all on tables to public;': ['every column'],
+            'alter default privileges in schema public, app_private grant select on tables to authenticated;': ['every column'],
+            'alter default privileges in schema app_private,public grant select on tables to authenticated;': ['every column'],
             'grant select, update (status) on public.runs to authenticated;': ['every column'],
             'grant select (id) on public.runs to authenticated with grant option;': ['with grant option'],
             'grant select on runs to authenticated;': ['every column'],

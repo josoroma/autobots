@@ -14,7 +14,7 @@ import { StateLine } from "@/components/run-list";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
-import { withHeld } from "@/lib/submit";
+import { changedChoice, labelOf, withHeld } from "@/lib/submit";
 import { useSubmit } from "@/lib/use-submit";
 
 type Command = "pause" | "resume" | "cancel";
@@ -88,7 +88,8 @@ export function RunPanel({
   }, [base, loads]);
 
   // The version the panel loaded, never a fresh one: a stale press is refused, not retried. One key
-  // per press until its outcome is known (Decision 0027 D2), so a lost reply applies it once.
+  // per press until its outcome is known (Decision 0027 D2), so a lost reply applies it once. The
+  // run is the target, so another command after a lost one sends nothing until a reload.
   async function send(command: Command, version: number): Promise<void> {
     setRefusal(null);
     const result = await writes.submit({
@@ -103,9 +104,13 @@ export function RunPanel({
           body,
         }),
       parse: parseRunCommandResult,
-      scope: command,
+      choice: command,
     });
     if (result === null) return;
+    if (result.outcome === "changed") {
+      setRefusal(changedChoice(labelOf(LABELS, result.heldChoice)));
+      return;
+    }
     if (result.outcome === "accepted") {
       setLoads((value) => value + 1);
       onChanged();

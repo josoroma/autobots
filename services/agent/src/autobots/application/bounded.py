@@ -4,12 +4,13 @@ A regular expression holds the lock while it matches, so `asyncio.to_thread` can
 event loop, the lease keeper and the status beat stall until it ends (PTOL-01). A child interpreter
 is killed when its time runs out. It starts isolated (`-I`) and runs only the named module, so it
 never re-imports the parent's main module, and the event loop writes and reads its pipes without
-blocking (Decision 0017 C7).
+blocking (Decision 0027 D9).
 """
 
 import asyncio
 import contextlib
 import math
+import signal
 import sys
 from pathlib import Path
 
@@ -17,9 +18,12 @@ from pathlib import Path
 # put it on the parent's path.
 SOURCE_ROOT = str(Path(__file__).resolve().parents[2])
 # The child also caps its own CPU time, so the kernel stops it even if the parent is killed first.
-_BOOTSTRAP = (
+# It never raises an inherited hard limit, which only a lower value may replace.
+BOOTSTRAP = (
     "import resource, runpy, sys; "
-    "resource.setrlimit(resource.RLIMIT_CPU, (int(sys.argv[3]), int(sys.argv[3]))); "
+    "hard = resource.getrlimit(resource.RLIMIT_CPU)[1]; "
+    "cap = int(sys.argv[3]) if hard == resource.RLIM_INFINITY else min(int(sys.argv[3]), hard); "
+    "resource.setrlimit(resource.RLIMIT_CPU, (cap, cap)); "
     "sys.path.insert(0, sys.argv[1]); "
     "runpy.run_module(sys.argv[2], run_name='__main__', alter_sys=True)"
 )
@@ -39,8 +43,9 @@ async def run_module(module: str, payload: bytes, seconds: float) -> bytes:
     process = await asyncio.create_subprocess_exec(
         sys.executable,
         "-I",
+        "-B",
         "-c",
-        _BOOTSTRAP,
+        BOOTSTRAP,
         SOURCE_ROOT,
         module,
         str(math.ceil(seconds) + 1),
@@ -58,6 +63,9 @@ async def run_module(module: str, payload: bytes, seconds: float) -> bytes:
             with contextlib.suppress(ProcessLookupError):
                 process.kill()
             await process.wait()
+    # The kernel's CPU limit ends a runaway match with SIGXCPU: that is running out of time too.
+    if process.returncode == -signal.SIGXCPU:
+        raise BoundExceeded
     if process.returncode != 0:
         raise ChildFailed(process.returncode)
     return output

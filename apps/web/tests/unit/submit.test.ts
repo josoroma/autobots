@@ -5,11 +5,15 @@ import {
   changedChoice,
   changesChoice,
   HELD_NOTE,
+  heldFor,
   keeps,
+  labelOf,
   nextAttempt,
   outcomeOf,
   refusalText,
+  settle,
   withHeld,
+  type Holds,
 } from "../../lib/submit.ts";
 
 test("a parsed 2xx is accepted, and a 4xx with the envelope is refused", () => {
@@ -112,4 +116,59 @@ test("a refusal reads from the screen's table, then the service, and no refusal 
     "The service's words.",
   );
   assert.equal(refusalText(table, null, lost), lost);
+});
+
+test("the hook's holds: one per target, settled only by an accepted reply, and untouched by unkeyed writes", () => {
+  let minted = 0;
+  const mint = () => `key-${++minted}`;
+  let holds: Holds = new Map();
+  // A lost Pause holds the run.
+  const pause = nextAttempt(null, '{"expected_version":3}', mint, "", "pause");
+  assert.ok(pause !== null);
+  holds = settle(holds, pause, "unknown", false, true);
+  // Resume on the same run sends nothing.
+  assert.deepEqual(heldFor(holds, "", "resume", true), {
+    changed: true,
+    held: pause,
+  });
+  // Pause again resends the same key, and a refusal of that resend keeps it.
+  const again = heldFor(holds, "", "pause", true);
+  assert.equal(again.changed, false);
+  assert.equal(nextAttempt(again.held, "{}", mint, "", "pause")?.key, "key-1");
+  holds = settle(holds, pause, "refused", true, true);
+  assert.equal(holds.get("")?.key, "key-1");
+  // Another target's reply leaves this hold alone.
+  const other = nextAttempt(null, "{}", mint, "approval-2", "approve");
+  assert.ok(other !== null);
+  holds = settle(holds, other, "accepted", false, true);
+  assert.equal(holds.get("")?.key, "key-1");
+  // An unkeyed write on the same target neither resends nor clears it.
+  assert.deepEqual(heldFor(holds, "", "", false), {
+    changed: false,
+    held: null,
+  });
+  const save = nextAttempt(null, '{"graph":{}}', mint, "", "");
+  assert.ok(save !== null);
+  assert.equal(settle(holds, save, "accepted", false, false), holds);
+  // Only an accepted reply settles it.
+  holds = settle(holds, pause, "accepted", true, true);
+  assert.equal(holds.size, 0);
+});
+
+test("an unkeyed write sends the latest body after a lost reply", () => {
+  let minted = 0;
+  const mint = () => `key-${++minted}`;
+  let holds: Holds = new Map();
+  const first = nextAttempt(null, '{"graph":"a"}', mint);
+  assert.ok(first !== null);
+  holds = settle(holds, first, "unknown", false, false);
+  const { held } = heldFor(holds, "", "", false);
+  assert.equal(nextAttempt(held, '{"graph":"b"}', mint)?.body, '{"graph":"b"}');
+});
+
+test("a held choice is named by its button, or generically", () => {
+  const labels = { pause: "Pause", cancel: "Cancel run" };
+  assert.equal(labelOf(labels, "cancel"), "Cancel run");
+  assert.equal(labelOf(labels, "other"), "your first choice");
+  assert.equal(labelOf(labels, null), "your first choice");
 });

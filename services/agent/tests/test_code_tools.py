@@ -200,3 +200,66 @@ def test_a_child_that_ends_without_an_answer_fails_the_search_with_no_effect() -
 
     with pytest.raises(ChildFailed):
         asyncio.run(run_module("autobots.application.no_such_module", b"{}", seconds=8.0))
+
+
+def test_a_cancelled_search_kills_and_reaps_its_child(monkeypatch: pytest.MonkeyPatch) -> None:
+    import asyncio
+
+    from autobots.application.code_tools import bounded_search
+
+    started: list[asyncio.subprocess.Process] = []
+    spawn = asyncio.create_subprocess_exec
+
+    async def recorded(*args: object, **kwargs: object) -> asyncio.subprocess.Process:
+        process = await spawn(*args, **kwargs)  # type: ignore[arg-type]  # forwarded unchanged
+        started.append(process)
+        return process
+
+    # bounded.py looks it up on the asyncio module at each call.
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", recorded)
+    files = {"inputs/slow.txt": "a" * 40 + "b"}
+    arguments = SearchFilesInput.model_validate({"pattern": "(a+)+$", "path": "inputs/"})
+
+    async def run() -> None:
+        task = asyncio.create_task(bounded_search(files, arguments, seconds=30.0))
+        await asyncio.sleep(1.0)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(run())
+    assert len(started) == 1
+    # Reaped: the exit status was collected, here from the kill.
+    assert started[0].returncode is not None
+    assert started[0].returncode < 0
+
+
+def test_the_child_limits_its_own_cpu_time() -> None:
+    import signal
+    import subprocess
+    import sys
+
+    from autobots.application.bounded import BOOTSTRAP, SOURCE_ROOT
+
+    # A one-second cap, under the wait, so the kernel ends the match even with no parent to kill it.
+    request = (
+        b'{"files": {"inputs/slow.txt": "' + b"a" * 40 + b'b"}, '
+        b'"arguments": {"pattern": "(a+)+$", "path": "inputs/"}}'
+    )
+    finished = subprocess.run(
+        [
+            sys.executable,
+            "-I",
+            "-B",
+            "-c",
+            BOOTSTRAP,
+            SOURCE_ROOT,
+            "autobots.application.code_search",
+            "1",
+        ],
+        input=request,
+        capture_output=True,
+        timeout=30,
+        check=False,
+    )
+    assert finished.returncode == -signal.SIGXCPU

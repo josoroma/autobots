@@ -29,7 +29,6 @@ import { Input, Select, Textarea } from "@/components/ui/field";
 import { SectionLabel } from "@/components/ui/page-header";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
-import { readErrorResponse } from "@/lib/replies";
 import { withHeld } from "@/lib/submit";
 import { useSubmit } from "@/lib/use-submit";
 
@@ -108,6 +107,9 @@ function withLabel(text: string, nodeId: string, label: string): string {
 }
 
 // The draft writes' refusals, in this screen's words (R-19 step 4).
+const DESCRIPTION_REFUSALS: Readonly<Record<string, string>> = {
+  owner_required: "Only the workspace owner can describe a workflow.",
+};
 const DRAFT_REFUSALS: Readonly<Record<string, string>> = {
   owner_required: "Only the workspace owner can change the draft.",
   workflow_version_conflict:
@@ -128,6 +130,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
   const draftSaves = useSubmit();
   const draftDiscards = useSubmit();
   const draftPublishes = useSubmit();
+  const descriptionSaves = useSubmit();
   const router = useRouter();
   const [workflow, setWorkflow] = useState<WorkflowView | null>(null);
   const [catalog, setCatalog] = useState<BlockCatalog | null>(null);
@@ -297,7 +300,9 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
       return {
         view: null,
         message:
-          "The reply was lost, so this may have applied. Pressing again won't repeat it.",
+          method === "POST"
+            ? "The reply was lost, so this may have applied. Pressing again won't repeat it."
+            : "The reply was lost, so this may have applied. Pressing again sends what's on screen, which replaces the draft as a whole.",
       };
     }
     return { view: null, ...result.refusal, held: result.held };
@@ -370,20 +375,29 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
     setMessage("Draft discarded. The published versions are unchanged.");
   }
 
+  // It replaces the description whole and carries no key, so each press sends what's on screen
+  // (Decision 0027 D2), one at a time.
   async function saveDescription(): Promise<void> {
     if (workflow === null) return;
     setMessage(null);
     const text = description.trim();
-    const reply = await csrfFetch(
-      `/api/v1/workflows/${encodeURIComponent(workflow.id)}/description`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: text === "" ? null : text }),
-      },
-    ).catch(() => null);
-    if (reply?.ok === true) {
-      const saved = parseWorkflowView(await reply.json());
+    const result = await descriptionSaves.submit({
+      body: () => JSON.stringify({ description: text === "" ? null : text }),
+      send: ({ body }) =>
+        csrfFetch(
+          `/api/v1/workflows/${encodeURIComponent(workflow.id)}/description`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body,
+          },
+        ),
+      parse: parseWorkflowView,
+      keyed: false,
+    });
+    if (result === null) return;
+    if (result.outcome === "accepted" && result.value !== null) {
+      const saved = result.value;
       setWorkflow(saved);
       setDescription(saved.description ?? "");
       setMessage(
@@ -393,11 +407,11 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
       );
       return;
     }
-    const failure = await readErrorResponse(reply);
     setMessage(
-      failure?.code === "owner_required"
-        ? "Only the workspace owner can describe a workflow."
-        : "The description could not be saved.",
+      result.outcome === "unknown"
+        ? "The reply was lost, so it may have been saved. Pressing again sends what's on screen."
+        : (DESCRIPTION_REFUSALS[result.refusal?.code ?? ""] ??
+            "The description could not be saved."),
     );
   }
 
@@ -513,6 +527,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
           <Button
             variant="outline"
             size="sm"
+            disabled={descriptionSaves.pending}
             onClick={() => void saveDescription()}
           >
             Save description

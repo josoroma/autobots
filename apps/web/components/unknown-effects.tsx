@@ -3,6 +3,7 @@
 import { parseReconciliationResult } from "@autobots/api-client";
 import { useState } from "react";
 
+import { HeldNote } from "@/components/held-note";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
@@ -96,6 +97,11 @@ export function UnknownEffects({
     );
   }
 
+  // The evidence is part of each held record's body, so it stays as sent (Decision 0027 D2).
+  const evidenceHeld = operations.some((operation) =>
+    writes.holding(operation.operation_id),
+  );
+
   return (
     <div data-unknown-effects="true" className="space-y-3 text-sm">
       <p className="leading-relaxed">
@@ -112,7 +118,9 @@ export function UnknownEffects({
           rows={2}
           value={evidence}
           onChange={(event) => setEvidence(event.target.value)}
+          readOnly={evidenceHeld}
         />
+        {evidenceHeld ? <HeldNote /> : null}
       </div>
       <ul className="divide-y border-y">
         {operations.map((operation) => (
