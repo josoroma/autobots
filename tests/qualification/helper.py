@@ -9,7 +9,6 @@ from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import psycopg
-
 from autobots.application.runs import admit_run
 from autobots.contracts.plans import InputDocument, RequiredArtifact
 from autobots.domain.models import resolve_role_policy

@@ -6,10 +6,10 @@ from __future__ import annotations
 
 import copy
 import json
-from pathlib import Path
 import re
 import tomllib
 import unittest
+from pathlib import Path
 
 from support import REPO_ROOT, toolchain
 

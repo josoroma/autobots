@@ -8,7 +8,6 @@ import sys
 from uuid import UUID
 
 import psycopg
-
 from autobots.application.tool_gateway import ToolGateway, ToolScope
 from autobots.application.tools import default_registry
 

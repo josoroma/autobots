@@ -5,24 +5,23 @@ import asyncio
 import hashlib
 import json
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 import psycopg
-from psycopg.rows import dict_row
-from pydantic import SecretStr
-
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.artifacts import read_artifact
 from autobots.application.credentials.store import ProviderCredentialStore
 from autobots.application.goal_loop import LoopConfig, process_next
 from autobots.application.worker_leases import claim_next
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from psycopg.rows import dict_row
+from pydantic import SecretStr
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import ROUTE  # noqa: E402
+from goal_loop_script import ROUTE
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 cases: list[dict[str, Any]] = []
@@ -42,7 +41,7 @@ def never() -> Any:
 
 
 async def verify(workspace: UUID, key_path: Path, manifest_path: Path, expected_sha: str, wrong_key: Path) -> None:
-    manifest = json.loads(manifest_path.read_text())
+    manifest = json.loads(manifest_path.read_text())  # noqa: ASYNC240 - a test helper reading one small local file
     facts = manifest['facts']
     store = SupabaseObjectStore(os.environ['AUTOBOTS_STORAGE_BASE'], SecretStr(os.environ['AUTOBOTS_STORAGE_SERVICE']))
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:

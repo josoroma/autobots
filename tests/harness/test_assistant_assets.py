@@ -13,7 +13,6 @@ import importlib.util
 import io
 import json
 import os
-from pathlib import Path
 import re
 import shutil
 import subprocess
@@ -21,14 +20,22 @@ import sys
 import tempfile
 import time
 import unittest
+from pathlib import Path
 from unittest import mock
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
 import harness_lib  # noqa: E402
-from harness_lib import activation_errors, adapter_status, config_errors, line_links, report_state, unfenced_lines  # noqa: E402
 import verify  # noqa: E402
+from harness_lib import (  # noqa: E402
+    activation_errors,
+    adapter_status,
+    config_errors,
+    line_links,
+    report_state,
+    unfenced_lines,
+)
 
 
 def load_module(name: str, path: Path):
@@ -250,7 +257,7 @@ class RuleLinkTests(unittest.TestCase):
         self.assertEqual(config_errors(self.root), [])
 
     def test_each_allowed_target_counts(self):
-        for target in ('../../scripts/verify.py', '../../scripts/specs.py', 
+        for target in ('../../scripts/verify.py', '../../scripts/specs.py',
                        '../skills/autobots-verify-change/SKILL.md', '../skills/autobots-review-change/SKILL.md',
                        '../agents/autobots-reviewer.md',
                        '../../PRD-Development-Harness.md#dh-091-work-item-evidence-contract'):
@@ -370,7 +377,7 @@ class AdapterStatusTests(unittest.TestCase):
         self.assert_status(adapter_status(self.root, lookup=lambda name: None), 'inactive', 'unavailable')
 
     def test_process_path_decides_availability(self):
-        stub, record = version_stub(self.bin)
+        _stub, record = version_stub(self.bin)
         with mock.patch.dict(os.environ, {'PATH': str(self.bin)}):
             status = adapter_status(self.root)
         self.assert_status(status, 'configured_unqualified', 'delivery_unverified')

@@ -13,7 +13,6 @@ import sys
 from uuid import UUID, uuid4
 
 import psycopg
-
 from autobots.application.experts import create_expert, create_session, resolve_binding
 from autobots.application.runs import admit_run
 from autobots.contracts.experts import ExpertConfig, SessionExpert

@@ -7,13 +7,12 @@ import signal
 import sys
 
 import psycopg
-from pydantic import SecretStr
-
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.goal_loop import LoopConfig
 from autobots.application.worker_leases import claim_next
 from autobots.application.workflow_runner import run_workflow
+from pydantic import SecretStr
 
 URL, BASE, DIE_AFTER = sys.argv[1], sys.argv[2], sys.argv[3]
 ROUTE = ModelRoute('executor', 'openrouter_terra', 'fixture/model', 1000)

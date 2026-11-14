@@ -8,20 +8,31 @@ prerequisite is missing.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import hashlib
 import json
-from pathlib import Path
 import secrets
 import signal
 import subprocess
 import sys
 import tempfile
 import time
+from datetime import UTC, datetime
+from itertools import pairwise
+from pathlib import Path
 
 from app_db import AppStack, apply_migrations, bootstrap, seed
-from disposable_db import (PROJECT_PREFIX, Refused, Target, Unavailable, free_port, other_resources,
-                           remove_stack, require_identity, run, tool_env)
+from disposable_db import (
+    PROJECT_PREFIX,
+    Refused,
+    Target,
+    Unavailable,
+    free_port,
+    other_resources,
+    remove_stack,
+    require_identity,
+    run,
+    tool_env,
+)
 from harness_lib import fingerprint, project_root
 from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner, password_token
 from qualify_operations import Checks, Ops, api_call, conditions, exited, wait
@@ -151,7 +162,7 @@ def qualify(root: Path) -> int:
         if started.returncode:
             raise Unavailable(f'the stack did not start: {started.stderr[-300:]}')
         bootstrap(stack, root)
-        applied, problem = apply_migrations(stack, root / 'supabase/migrations')
+        _applied, problem = apply_migrations(stack, root / 'supabase/migrations')
         if problem or seed(stack, root).returncode:
             raise Unavailable(f'migrations failed: {problem}')
         if stack.sql((root / STORAGE_SQL).read_text()).returncode:
@@ -285,7 +296,7 @@ def qualify(root: Path) -> int:
                     settled_child and row == 'succeeded/succeeded' and billed.startswith('2/'))
         tree_roles = ops.sql(f"select string_agg(distinct role || '/' || profile || '/' || wire_id, ' ') from app_private.model_invocations where root_run_id = '{lead}';")
         tree_requests = len([call for tag in ('parent', 'child-part') for call in sent(tag) if 'fields' in call])
-        cases.check("the tree's dispatches are on the root's ledger by role and frozen route, with none off it", f'executor on Terra, as many requests as rows', f'{tree_roles}; {tree_requests} requests, {billed}',
+        cases.check("the tree's dispatches are on the root's ledger by role and frozen route, with none off it", 'executor on Terra, as many requests as rows', f'{tree_roles}; {tree_requests} requests, {billed}',
                     tree_roles == f'executor/{TERRA}/{TERRA_WIRE}' and billed == f'2/{tree_requests}' and {call['model'] for tag in ('parent', 'child-part') for call in sent(tag) if 'fields' in call} == {TERRA_WIRE})
         cases.check('its parent, which stops with no evidence of its own, fails', 'failed', status(lead), parent_failed)
 
@@ -369,7 +380,7 @@ def qualify(root: Path) -> int:
         limited = admit(workspace_a, 'limited')
         finished = settled(limited, 'failed')
         calls = sent('limited')
-        gaps = [round(after['at'] - before_call['at'], 1) for before_call, after in zip(calls, calls[1:])]
+        gaps = [round(after['at'] - before_call['at'], 1) for before_call, after in pairwise(calls)]
         cases.check('a 429 is retried twice, each after the time it asked for', f'failed, rate_limited, 3 requests, gaps of at least {RETRY_AFTER}s',
                     f'{status(limited)}, {stop_reason(limited)}, {len(calls)}, {gaps}',
                     finished and stop_reason(limited) == 'rate_limited' and len(calls) == 3 and all(gap >= RETRY_AFTER for gap in gaps))
@@ -463,7 +474,7 @@ def qualify(root: Path) -> int:
     passed_all = all(record['status'] == 'passed' for record in cases.records)
     report = root / REPORT
     report.parent.mkdir(parents=True, exist_ok=True)
-    report.write_text(json.dumps({'schema_version': 'autobots.worker-inference-qualification/v1', 'completed_at_utc': datetime.now(timezone.utc).isoformat(),
+    report.write_text(json.dumps({'schema_version': 'autobots.worker-inference-qualification/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
                                   'duration_seconds': round(time.monotonic() - started_at, 1), 'input_fingerprint': input_fingerprint,
                                   'status': 'passed' if passed_all else 'failed', 'target_class': 'disposable', 'model_transport': 'fake', 'project': project, 'cases': cases.records,
                                   'not_established': ['H1', 'product acceptance', 'US-3.4', 'a live OpenRouter route', 'real response shapes or billing', 'the persistent stack']}, indent=2))

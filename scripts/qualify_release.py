@@ -12,11 +12,9 @@ finished, whatever it measured, 1 it stopped early, 2 a prerequisite is missing.
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 import hashlib
 import json
 import os
-from pathlib import Path
 import secrets
 import shutil
 import signal
@@ -25,16 +23,38 @@ import subprocess
 import tempfile
 import threading
 import time
-from urllib import error as urlerror, request as urlrequest
+from datetime import UTC, datetime
+from pathlib import Path
+from urllib import error as urlerror
+from urllib import request as urlrequest
 
 from app_db import AppStack, apply_migrations, bootstrap, seed
-from disposable_db import PROJECT_PREFIX, Target, Unavailable, free_port, other_resources, remove_stack, require_identity, run, tool_env
+from disposable_db import (
+    PROJECT_PREFIX,
+    Target,
+    Unavailable,
+    free_port,
+    other_resources,
+    remove_stack,
+    require_identity,
+    run,
+    tool_env,
+)
 from harness_lib import fingerprint, project_root
 from live_goal import HELPER, TRACING, rows
 from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner, password_token
 from qualify_operations import Ops, api_call, exited, wait
-from qualify_web import BROWSERS, free_port as any_port, start, stop, wait_until_up
-from release_scoring import docker_totals, percentile, process_totals, safety_failures, score, summarize, summarize_resources
+from qualify_web import BROWSERS, start, stop, wait_until_up
+from qualify_web import free_port as any_port
+from release_scoring import (
+    docker_totals,
+    percentile,
+    process_totals,
+    safety_failures,
+    score,
+    summarize,
+    summarize_resources,
+)
 from supabase_stack import generated_values, require_images, require_rendered
 from toolchain import child_env, find_tools
 
@@ -102,7 +122,7 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
             raise Unavailable(f'{argv[0]} failed: {done.stderr.strip().splitlines()[-1][:300] if done.stderr.strip() else "no detail"}')
         return done.stdout.strip()
 
-    report: dict = {'schema_version': 'autobots.release-qualification/v1', 'started_at_utc': datetime.now(timezone.utc).isoformat(), 'evidence_class': 'live, on a disposable stack',
+    report: dict = {'schema_version': 'autobots.release-qualification/v1', 'started_at_utc': datetime.now(UTC).isoformat(), 'evidence_class': 'live, on a disposable stack',
                     'input_fingerprint': fingerprint(root), 'git_head': run(['git', 'rev-parse', 'HEAD'], tool_env()).stdout.strip(),
                     'corpus': arguments.tasks, 'corpus_sha256': hashlib.sha256(corpus).hexdigest(), 'tasks': len(tasks), 'trials': arguments.trials,
                     'authorized_total_micro_usd': arguments.authorized_micro_usd, 'load_average_at_start': os.getloadavg(),
@@ -200,7 +220,7 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
                     raise Unavailable(f'admission failed: {admitted.stderr.strip()[-300:]}')
                 run_id = admitted.stdout.strip().splitlines()[-1]
             else:
-                code_, reply = call('POST', '/v1/runs', {'goal_text': task['goal'], 'limit_micro_usd': GOAL_LIMIT_MICRO_USD, 'required_artifacts': [{'name': task['artifact']}],
+                _code, reply = call('POST', '/v1/runs', {'goal_text': task['goal'], 'limit_micro_usd': GOAL_LIMIT_MICRO_USD, 'required_artifacts': [{'name': task['artifact']}],
                                                          'input_documents': [{'path': path, 'content': content} for path, content in task['documents'].items()]})
                 if code_ != 202:
                     raise Unavailable(f'the API refused a goal: {code_} {reply[:200]}')
@@ -376,7 +396,7 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
         label = f'label=com.docker.compose.project={project}'
         report['left_behind'] = (run(['docker', 'volume', 'ls', '--filter', label, '--format', '{{.Name}}'], tool_env()).stdout + run(['docker', 'ps', '-a', '--filter', label, '--format', '{{.Names}}'], tool_env()).stdout).strip() or 'none'
         report['other_docker_unchanged'] = before_resources == other_resources(project)
-        report['finished_at_utc'] = datetime.now(timezone.utc).isoformat()
+        report['finished_at_utc'] = datetime.now(UTC).isoformat()
         try:
             time.sleep(60)
             report['key_usage_after_usd'] = float(helper('usage', str(key_file)))

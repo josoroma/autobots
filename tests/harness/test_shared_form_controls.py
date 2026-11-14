@@ -1,9 +1,9 @@
 """US-11.11: a form control comes from the shared components, including on screens only a state reaches."""
 from __future__ import annotations
 
-from pathlib import Path
 import re
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 RAW = re.compile(r'<(input|select|textarea)\b')

@@ -16,17 +16,21 @@ import psycopg
 from pydantic import SecretStr
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import PLAN, ROUTE, calls, say  # noqa: E402
-
-from autobots.adapters.object_storage import BUCKET, SupabaseObjectStore  # noqa: E402
-from autobots.application.artifacts import ArtifactUnavailable, publish, read_artifact, reconcile_run  # noqa: E402
-from autobots.application.goal_loop import LoopConfig, run_goal  # noqa: E402
-from autobots.application.runs import LeaseLost, admit_run  # noqa: E402
-from autobots.application.tool_gateway import ToolFailed, ToolGateway, ToolRegistry, ToolScope  # noqa: E402
-from autobots.application.tools import SAVE_ARTIFACT  # noqa: E402
-from autobots.application.artifacts import publish_tool  # noqa: E402
-from autobots.application.worker_leases import claim_next  # noqa: E402
-from autobots.domain.models import resolve_role_policy  # noqa: E402
+from autobots.adapters.object_storage import BUCKET, SupabaseObjectStore
+from autobots.application.artifacts import (
+    ArtifactUnavailable,
+    publish,
+    publish_tool,
+    read_artifact,
+    reconcile_run,
+)
+from autobots.application.goal_loop import LoopConfig, run_goal
+from autobots.application.runs import LeaseLost, admit_run
+from autobots.application.tool_gateway import ToolFailed, ToolGateway, ToolRegistry, ToolScope
+from autobots.application.tools import SAVE_ARTIFACT
+from autobots.application.worker_leases import claim_next
+from autobots.domain.models import resolve_role_policy
+from goal_loop_script import PLAN, ROUTE, calls, say
 
 URL, BASE, ANON = os.environ['AUTOBOTS_DATABASE_URL'], os.environ['AUTOBOTS_STORAGE_BASE'], os.environ['AUTOBOTS_STORAGE_ANON']
 SERVICE = SecretStr(os.environ['AUTOBOTS_STORAGE_SERVICE'])
@@ -228,7 +232,7 @@ async def main() -> dict[str, Any]:
         await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
         await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='Write the report', limit_micro_usd=1_000_000, policy=resolve_role_policy(), acceptance_criteria=('Has a summary', 'Has figures'))
         lease = await claim_next(db, worker_id='loop', lease_seconds=300)
-        from goal_loop_script import Script  # noqa: PLC0415
+        from goal_loop_script import Script
         model = Script(items=[calls(PLAN), calls(('save_artifact', {'path': 'outputs/loop.md', 'content': 'from the loop'})), calls(('publish_artifact', {'path': 'outputs/loop.md', 'version': 1})), say('stop')], seen=[], bound=[])
         await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE, object_store=store))
         name = await value("select name from public.artifacts where run_id = %s and status = 'published'", lease.run_id)

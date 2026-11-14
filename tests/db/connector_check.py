@@ -12,13 +12,18 @@ from uuid import UUID, uuid4
 
 import httpx
 import psycopg
-
-from autobots.adapters.github_issues import REPOSITORY_VARIABLE, TOKEN_VARIABLE, TOOL_ID, github_issue_tool, marker
+from autobots.adapters.github_issues import (
+    REPOSITORY_VARIABLE,
+    TOKEN_VARIABLE,
+    TOOL_ID,
+    github_issue_tool,
+    marker,
+)
 from autobots.adapters.github_reads import github_read_tools
-from autobots.application.tool_uses import list_tool_uses
 from autobots.application.approvals import decide
 from autobots.application.runs import admit_run
 from autobots.application.tool_gateway import ToolGateway, ToolRegistry, ToolScope
+from autobots.application.tool_uses import list_tool_uses
 from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.tools import EXPERT_TOOLS, PLAN_TOOLS

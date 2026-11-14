@@ -5,15 +5,16 @@
 """
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Iterator
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import shutil
 import signal
 import subprocess
+from collections.abc import Callable, Iterable, Iterator
+from pathlib import Path
+from typing import Any
 from urllib.parse import unquote, urlsplit
 
 # Tests and the version probe receive no inherited API keys, credentials or assistant configuration.
@@ -60,8 +61,11 @@ APPLICATION_PROFILES = ('fast', 'full')
 PYTHON_STEPS = frozenset({'python_lock', 'python_env', 'ruff_check', 'ruff_format', 'mypy', 'pytest', 'contract_drift'})
 WEB_STEPS = frozenset({'node_lock', 'node_version', 'lint', 'format_check', 'typegen', 'typecheck', 'contract_drift',
                        'api_client_typecheck', 'api_client_tests', 'web_unit_tests'})
+# R-07: repository Python (scripts, tests and the hooks) under the shared ruff and a strict mypy.
+REPO_PYTHON_STEPS = frozenset({'repo_ruff_check', 'repo_mypy'})
+REPO_PYTHON_PREFIXES = ('scripts/', 'tests/', '.claude/hooks/')
 FULL_ONLY_CHECKS = frozenset({'build', 'fault_qualification', 'toolchain_scope_tests', 'browser_qualification'})
-FULL_CHECKS = PYTHON_STEPS | WEB_STEPS | FULL_ONLY_CHECKS
+FULL_CHECKS = PYTHON_STEPS | WEB_STEPS | REPO_PYTHON_STEPS | FULL_ONLY_CHECKS
 DB_CHECKS = frozenset({'disposable_qualification', 'supabase_stack_qualification', 'app_db_qualification', 'identity_qualification',
                        'persistent_apply_qualification'})
 OPERATIONS_CHECKS = frozenset({'operations_qualification', 'backup_qualification', 'upgrade_qualification'})
@@ -144,6 +148,14 @@ def fingerprint(root: Path) -> str:
 
 def check_domains(relative: str) -> set[str]:
     """The check domains a repository-relative path affects."""
+    domains = _base_domains(relative)
+    if (relative.endswith('.py') and relative.startswith(REPO_PYTHON_PREFIXES)
+            and not relative.startswith('tests/faults/')):
+        domains.add('repo_python')
+    return domains
+
+
+def _base_domains(relative: str) -> set[str]:
     if relative.startswith('services/agent/'):
         return {'python'}
     if relative.startswith(DB_CHECK_PREFIXES) or relative in DB_CHECK_FILES:
@@ -157,7 +169,7 @@ def check_domains(relative: str) -> set[str]:
     return {'harness'}
 
 
-def read_report(root: Path, profile: str) -> dict | None:
+def read_report(root: Path, profile: str) -> dict[str, Any] | None:
     try:
         data = json.loads((root / '.checks' / profile / 'latest.json').read_text())
     except (OSError, ValueError):
@@ -235,8 +247,8 @@ def report_state(root: Path, profile: str = 'harness') -> tuple[bool, str]:
 
 def evidence_state(root: Path) -> tuple[bool, str]:
     """Whether current reports cover what changed since each profile last passed."""
-    groups = []
-    if needs_profile(root, APPLICATION_PROFILES, {'python', 'web'}):
+    groups: list[tuple[str, ...]] = []
+    if needs_profile(root, APPLICATION_PROFILES, {'python', 'web', 'repo_python'}):
         groups.append(APPLICATION_PROFILES)
     if needs_profile(root, ('db',), {'db'}):
         groups.append(('db',))
@@ -277,7 +289,7 @@ def config_errors(root: Path) -> list[str]:
         errors.append('Baseline settings permit only the reviewed hooks; disabling hooks or changing model/env/permissions is unsupported.')
     hooks = settings.get('hooks', {})
     if not isinstance(hooks, dict):
-        return errors + ['Hook configuration must be an object.']
+        return [*errors, 'Hook configuration must be an object.']
     expected = {'SessionStart', 'PreToolUse', 'PostToolUse', 'Stop', 'SubagentStop'}
     if set(hooks) != expected:
         errors.append('Unexpected or missing baseline hook events.')
@@ -340,7 +352,7 @@ def config_errors(root: Path) -> list[str]:
     return errors
 
 
-def activation_errors(config: dict) -> list[str]:
+def activation_errors(config: dict[str, Any]) -> list[str]:
     """Refuse an activation claim. Allowlisted exactly, because a prefix would accept `not_tested_but_active`.
 
     Recording real qualification later needs evidence and a deliberate change here.
@@ -492,7 +504,7 @@ def configured_minimum(root: Path) -> str | None:
 
 
 def adapter_status(root: Path, *, lookup: Callable[[str], str | None] = shutil.which,
-                   timeout: float = VERSION_TIMEOUT_SECONDS) -> dict:
+                   timeout: float = VERSION_TIMEOUT_SECONDS) -> dict[str, Any]:
     """Derive the optional Claude adapter's state; the first matching condition wins.
 
     Covers one observation: the CLI's presence and version, and the validity of this
@@ -515,6 +527,9 @@ def adapter_status(root: Path, *, lookup: Callable[[str], str | None] = shutil.w
     if observed is None:
         return status | {'reason': 'version_unknown'}
     status['observed_version'] = observed
-    if parse_version(observed) < parse_version(minimum):
+    observed_parts, minimum_parts = parse_version(observed), parse_version(minimum)
+    if observed_parts is None or minimum_parts is None:
+        return status | {'reason': 'version_unknown'}
+    if observed_parts < minimum_parts:
         return status | {'reason': 'version_below_minimum'}
     return status | {'state': 'configured_unqualified', 'reason': 'delivery_unverified'}

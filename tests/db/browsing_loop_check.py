@@ -16,9 +16,13 @@ from uuid import UUID, uuid4
 import psycopg
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import ROUTE, Script, calls  # noqa: E402
-
-from autobots.adapters.loop_middleware import AdmittedModel, LoopMiddleware, LoopStopped, ModelRoute, UnadmittedModelCall
+from autobots.adapters.loop_middleware import (
+    AdmittedModel,
+    LoopMiddleware,
+    LoopStopped,
+    ModelRoute,
+    UnadmittedModelCall,
+)
 from autobots.application.browsing_loop import ACTION_TOOLS, Link, PageView, admitted_steps, browse
 from autobots.application.model_attempts import FailureClass, ProviderFailure
 from autobots.application.run_usage import RootLimits, ensure_usage
@@ -26,6 +30,7 @@ from autobots.application.runs import admit_run
 from autobots.application.tool_gateway import ToolScope
 from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy
+from goal_loop_script import ROUTE, Script, calls
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = UUID(sys.argv[1])

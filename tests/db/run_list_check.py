@@ -12,11 +12,10 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-from psycopg.types.json import Jsonb
-
 from autobots.application.experts import create_expert, create_session
 from autobots.application.run_projection import InvalidCursor, read_run_list
 from autobots.contracts.experts import ExpertConfig, SessionExpert
+from psycopg.types.json import Jsonb
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 cases: list[dict[str, Any]] = []

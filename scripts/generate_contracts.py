@@ -9,12 +9,12 @@ Exit codes: 0 current or written, 1 drift, 2 the prepared Python environment is 
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
 import json
-from pathlib import Path
 import re
 import subprocess
 import sys
+from collections.abc import Mapping
+from pathlib import Path
 
 from harness_lib import project_root, reduced_env
 

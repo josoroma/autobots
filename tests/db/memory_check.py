@@ -14,19 +14,27 @@ from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatResult
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import PLAN, ROUTE, Script, calls, say  # noqa: E402
-
-from autobots.application.compaction import SUMMARY_MARKER, CompactionPolicy, pairing_is_valid, state_block  # noqa: E402
-from autobots.application.goal_loop import LoopConfig, process_next, run_goal  # noqa: E402
-from autobots.application.memory import search, store_memory  # noqa: E402
-from autobots.application.plans import load_goal  # noqa: E402
-from autobots.application.runs import admit_run  # noqa: E402
-from autobots.application.tool_gateway import ToolGateway, ToolScope  # noqa: E402
-from autobots.application.goal_loop import loop_registry  # noqa: E402
-from autobots.application.run_usage import RootLimits  # noqa: E402
-from autobots.application.worker_leases import claim_next  # noqa: E402
-from autobots.contracts.plans import InputDocument  # noqa: E402
-from autobots.domain.models import resolve_role_policy  # noqa: E402
+from autobots.application.compaction import (
+    SUMMARY_MARKER,
+    CompactionPolicy,
+    pairing_is_valid,
+    state_block,
+)
+from autobots.application.goal_loop import (
+    LoopConfig,
+    loop_registry,
+    process_next,
+    run_goal,
+)
+from autobots.application.memory import search, store_memory
+from autobots.application.plans import load_goal
+from autobots.application.run_usage import RootLimits
+from autobots.application.runs import admit_run
+from autobots.application.tool_gateway import ToolGateway, ToolScope
+from autobots.application.worker_leases import claim_next
+from autobots.contracts.plans import InputDocument
+from autobots.domain.models import resolve_role_policy
+from goal_loop_script import PLAN, ROUTE, Script, calls, say
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE, OTHER = UUID(sys.argv[1]), UUID(sys.argv[2])
@@ -43,7 +51,7 @@ def check(name: str, expected: str, observed: object, passed: bool) -> None:
 class Aware(Script):
     """Answers a summary request itself, so the working script only holds the work."""
 
-    summaries: list[list[Any]] = []
+    summaries: list[list[Any]] = []  # noqa: RUF012 - a pydantic field, whose default pydantic copies for each instance
     truncate_summary: bool = False
 
     def _generate(self, messages: Any, stop: Any = None, run_manager: Any = None, **options: Any) -> ChatResult:
@@ -53,7 +61,7 @@ class Aware(Script):
             self.items.insert(0, say('Read the document. The figure is noted.', finish='length' if self.truncate_summary else 'stop'))
             item = self.items.pop(0)
             self.seen.pop()
-            from langchain_core.outputs import ChatGeneration  # noqa: PLC0415
+            from langchain_core.outputs import ChatGeneration
             return ChatResult(generations=[ChatGeneration(message=item)])
         return super()._generate(messages, stop, run_manager, **options)
 
@@ -125,7 +133,7 @@ async def main() -> None:
         check('and nothing was stored from it', '0', rows, rows == 0)
 
         # A short run stays untouched.
-        run4 = await admit(documents=())
+        await admit(documents=())
         model = Aware(items=[calls(PLAN), say('stop')], seen=[], bound=[], summaries=[])
         await process_next(db, URL, 'worker', lambda: model, LoopConfig(route=ROUTE))
         check('a short conversation isn\'t summarized', 'no summary call', len(model.summaries), not model.summaries and 'Current state' not in str(model.seen[-1]))
@@ -153,7 +161,7 @@ async def main() -> None:
 
         # No extra inference endpoint exists.
         words = ('embedding', 'rerank', 'pgvector', 'vectorstore')
-        found_words = sorted({word for path in SERVICE_SOURCE.rglob('*.py') for word in words if word in path.read_text().lower().replace('no embedding or reranking', '')})
+        found_words = sorted({word for path in SERVICE_SOURCE.rglob('*.py') for word in words if word in path.read_text().lower().replace('no embedding or reranking', '')})  # noqa: ASYNC240 - a test helper reading one small local file
         check('the service code has no embedding or reranking client', 'none', found_words, found_words == [])
         assert run_goal and AIMessage
     print(json.dumps({'cases': cases}))

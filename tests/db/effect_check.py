@@ -14,18 +14,22 @@ from uuid import UUID, uuid4
 import psycopg
 
 sys.path.insert(0, str(Path(__file__).parent))
-from effect_tools import tools  # noqa: E402
-from goal_loop_script import ROUTE, Script, calls, say  # noqa: E402
-from mock_sink import Sink  # noqa: E402
-
-from autobots.application.approvals import decide  # noqa: E402
-from autobots.application.goal_loop import LoopConfig, process_next  # noqa: E402
-from autobots.application.reconciliation import ReconciliationRefused, has_unresolvable_effect, record_evidence, unknown_operations  # noqa: E402
-from autobots.application.run_projection import read_workspace  # noqa: E402
-from autobots.application.runs import admit_run, apply_command  # noqa: E402
-from autobots.domain.models import resolve_role_policy  # noqa: E402
-from autobots.domain.runs import Actor, RunCommand  # noqa: E402
-from autobots.domain.tools import PLAN_TOOLS  # noqa: E402
+from autobots.application.approvals import decide
+from autobots.application.goal_loop import LoopConfig, process_next
+from autobots.application.reconciliation import (
+    ReconciliationRefused,
+    has_unresolvable_effect,
+    record_evidence,
+    unknown_operations,
+)
+from autobots.application.run_projection import read_workspace
+from autobots.application.runs import admit_run, apply_command
+from autobots.domain.models import resolve_role_policy
+from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.tools import PLAN_TOOLS
+from effect_tools import tools
+from goal_loop_script import ROUTE, Script, calls, say
+from mock_sink import Sink
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE, OTHER, PYTHON = UUID(sys.argv[1]), UUID(sys.argv[2]), sys.argv[3]

@@ -11,17 +11,16 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-from pydantic import BaseModel, ConfigDict
-
 from autobots.application.runs import admit_run
 from autobots.application.tool_gateway import ToolDefinition, ToolGateway, ToolRegistry, ToolScope
 from autobots.application.tool_uses import METERED_TOOL_CALLS, list_tool_uses
 from autobots.application.tools import CALCULATE, READ_RUN_FILE, SAVE_ARTIFACT
+from autobots.application.worker_leases import claim_next
 from autobots.contracts.runs import RunEvent
 from autobots.domain.models import resolve_role_policy
-from autobots.application.worker_leases import claim_next
 from autobots.domain.tool_catalog import CostClass, ToolGroup, ToolProvider
 from autobots.domain.tools import OperationClass
+from pydantic import BaseModel, ConfigDict
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = UUID(sys.argv[1])

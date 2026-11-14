@@ -13,17 +13,24 @@ import psycopg
 from pydantic import SecretStr
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import ROUTE, Script, calls, say  # noqa: E402
-
-from autobots.adapters.object_storage import SupabaseObjectStore  # noqa: E402
-from autobots.application.experts import create_expert, create_session, resolve_binding  # noqa: E402
-from autobots.application.goal_loop import LoopConfig, process_next  # noqa: E402
-from autobots.application.improvements import ImprovementRefused, decide, propose, replay_state, request_replay, rollback, run_regression  # noqa: E402
-from autobots.application.memory import search  # noqa: E402
-from autobots.application.runs import admit_run  # noqa: E402
-from autobots.contracts.experts import ExpertConfig, SessionExpert  # noqa: E402
-from autobots.contracts.improvements import EvidenceRef, ImprovementProposal, RegressionCase  # noqa: E402
-from autobots.domain.models import resolve_role_policy  # noqa: E402
+from autobots.adapters.object_storage import SupabaseObjectStore
+from autobots.application.experts import create_expert, create_session, resolve_binding
+from autobots.application.goal_loop import LoopConfig, process_next
+from autobots.application.improvements import (
+    ImprovementRefused,
+    decide,
+    propose,
+    replay_state,
+    request_replay,
+    rollback,
+    run_regression,
+)
+from autobots.application.memory import search
+from autobots.application.runs import admit_run
+from autobots.contracts.experts import ExpertConfig, SessionExpert
+from autobots.contracts.improvements import EvidenceRef, ImprovementProposal, RegressionCase
+from autobots.domain.models import resolve_role_policy
+from goal_loop_script import ROUTE, Script, calls, say
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 # A replay run is verified like any other, which reads its artifacts back from Storage.

@@ -14,21 +14,33 @@ from langchain_core.messages import ToolMessage
 from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import ROUTE  # noqa: E402
-
-from autobots.application.approvals import ApprovalRefused, ARGUMENT_LIMIT, decide, exceeds_review_limit, list_approvals  # noqa: E402
-from autobots.application.compaction import CompactionPolicy, offload_large  # noqa: E402
-from autobots.application.goal_loop import LoopConfig, _finish, process_next  # noqa: E402
-from autobots.application.memory import READ_OFFLOAD  # noqa: E402
-from autobots.application.plans import load_goal  # noqa: E402
-from autobots.application.reconciliation import record_evidence  # noqa: E402
-from autobots.application.runs import admit_run, apply_command  # noqa: E402
-from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolGateway, ToolRegistry, ToolScope, _record  # noqa: E402
-from autobots.application.worker_leases import claim_next  # noqa: E402
-from autobots.application.workflow_runner import _Stop, _tool  # noqa: E402
-from autobots.domain.models import resolve_role_policy  # noqa: E402
-from autobots.domain.runs import Actor, RunCommand  # noqa: E402
-from autobots.domain.tools import LOOP_TOOL_GRANTS, OperationClass  # noqa: E402
+from autobots.application.approvals import (
+    ARGUMENT_LIMIT,
+    ApprovalRefused,
+    decide,
+    exceeds_review_limit,
+    list_approvals,
+)
+from autobots.application.compaction import CompactionPolicy, offload_large
+from autobots.application.goal_loop import LoopConfig, _finish, process_next
+from autobots.application.memory import READ_OFFLOAD
+from autobots.application.plans import load_goal
+from autobots.application.reconciliation import record_evidence
+from autobots.application.runs import admit_run, apply_command
+from autobots.application.tool_gateway import (
+    ToolContext,
+    ToolDefinition,
+    ToolGateway,
+    ToolRegistry,
+    ToolScope,
+    _record,
+)
+from autobots.application.worker_leases import claim_next
+from autobots.application.workflow_runner import _Stop, _tool
+from autobots.domain.models import resolve_role_policy
+from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.tools import LOOP_TOOL_GRANTS, OperationClass
+from goal_loop_script import ROUTE
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = UUID(sys.argv[1])
@@ -262,7 +274,7 @@ async def main() -> None:
         rows_after = await value('select count(*) from app_private.run_offloads where run_id = %s', run)
         check('a long result reads back whole, a page at a time', f'{len(long_text)} characters, in pages', f'{len(collected)} characters, {pages} pages', collected == long_text and pages > 1)
         check('and reading it stores nothing new', str(rows_before), rows_after, rows_after == rows_before)
-        import hashlib  # noqa: PLC0415
+        import hashlib
         check('its hash matches what was stored', 'equal', hashlib.sha256(collected.encode()).hexdigest() == page.output['sha256'], hashlib.sha256(collected.encode()).hexdigest() == page.output['sha256'])
 
         # Finding 5: a long read can't resend every page.

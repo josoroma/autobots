@@ -10,9 +10,14 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-
 from autobots.application.experts import create_expert
-from autobots.application.routines import RoutineRefused, add_routine_version, create_routine, evaluate_routines, set_enabled
+from autobots.application.routines import (
+    RoutineRefused,
+    add_routine_version,
+    create_routine,
+    evaluate_routines,
+    set_enabled,
+)
 from autobots.application.runs import apply_command
 from autobots.application.workflows import create_workflow, publish_version
 from autobots.contracts.experts import ExpertConfig

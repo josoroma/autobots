@@ -12,21 +12,22 @@ from __future__ import annotations
 
 import argparse
 import base64
-from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 import hashlib
 import hmac
 import json
 import os
-from pathlib import Path
 import re
 import secrets
 import socket
 import subprocess
 import sys
 import time
-from urllib import error as urlerror, request as urlrequest
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
+from urllib import error as urlerror
+from urllib import request as urlrequest
 from urllib.parse import urlsplit
 
 from harness_lib import fingerprint, project_root, reduced_env
@@ -601,7 +602,7 @@ def qualify(root: Path) -> int:
     path = root / REPORT
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({'schema_version': 'autobots.disposable-qualification/v1',
-                                'completed_at_utc': datetime.now(timezone.utc).isoformat(),
+                                'completed_at_utc': datetime.now(UTC).isoformat(),
                                 'duration_seconds': round(time.monotonic() - started_at, 1),
                                 'input_fingerprint': fingerprint(root),
                                 'status': 'passed' if passed else 'failed', 'target_class': 'disposable',

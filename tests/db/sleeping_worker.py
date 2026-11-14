@@ -11,10 +11,9 @@ import psycopg
 from langchain_core.messages import AIMessage
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import PLAN, ROUTE, SAVE, Script, calls, say  # noqa: E402
-
-from autobots.application.goal_loop import LoopConfig, run_goal  # noqa: E402
-from autobots.application.worker_leases import claim_next  # noqa: E402
+from autobots.application.goal_loop import LoopConfig, run_goal
+from autobots.application.worker_leases import claim_next
+from goal_loop_script import PLAN, ROUTE, SAVE, Script, calls, say
 
 URL = sys.argv[1]
 

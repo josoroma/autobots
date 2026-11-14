@@ -12,13 +12,12 @@ from typing import Any
 from pydantic import SecretStr
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import DONE_A, ROUTE, SAVE, TASK_A, Script, calls, say  # noqa: E402
-
-from autobots.adapters.loop_middleware import ModelRoute  # noqa: E402
-from autobots.adapters.object_storage import SupabaseObjectStore  # noqa: E402
-from autobots.application.goal_loop import LoopConfig, process_next  # noqa: E402
-from autobots.operations.logs import configure_logging, forbid_remote_tracing, log_event  # noqa: E402
-from autobots.operations.worker import WorkerConfig, install_signal_handlers, serve  # noqa: E402
+from autobots.adapters.loop_middleware import ModelRoute
+from autobots.adapters.object_storage import SupabaseObjectStore
+from autobots.application.goal_loop import LoopConfig, process_next
+from autobots.operations.logs import configure_logging, forbid_remote_tracing, log_event
+from autobots.operations.worker import WorkerConfig, install_signal_handlers, serve
+from goal_loop_script import DONE_A, ROUTE, SAVE, TASK_A, Script, calls, say
 
 URL = sys.argv[1]
 NAME = sys.argv[2]

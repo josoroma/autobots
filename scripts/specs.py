@@ -10,17 +10,16 @@ whether an implementation/evidence claim is true.
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass, field
 import html
 import os
-from pathlib import Path
 import re
 import stat
 import sys
 import tempfile
 import unicodedata
+from dataclasses import dataclass, field
+from pathlib import Path
 from urllib.parse import unquote, urlsplit
-
 
 STATUSES = {"READY", "NEEDS CLARIFICATION", "BLOCKED", "IN PROGRESS", "DONE"}
 NAVIGATION = ("Table of Contents", "Work Item Status", "Dependency Diagram")
@@ -245,8 +244,8 @@ def validate_gherkin(entries: list[tuple[int, str]], issues: list[Issue], story_
         seen: list[str] = []
 
         def finish() -> None:
-            if current is not None and seen != ["Given", "When", "Then"]:
-                issues.append(Issue(current[0], f"Scenario '{current[1]}' requires ordered Given, When, Then"))
+            if current is not None and seen != ["Given", "When", "Then"]:  # noqa: B023 - called within this iteration, so it reads this iteration's values
+                issues.append(Issue(current[0], f"Scenario '{current[1]}' requires ordered Given, When, Then"))  # noqa: B023 - called within this iteration, so it reads this iteration's values
 
         for offset, line in enumerate(content, start=1):
             stripped = line.strip()
@@ -393,9 +392,9 @@ def parse_document(text: str, root: Path, path: Path) -> Document:
     document = Document(epics, issues)
     if not epics:
         issues.append(Issue(1, "no EPIC-N headings found"))
-    for item in epics:
-        if not item.stories:
-            issues.append(Issue(item.line, f"{item.id} has no stories"))
+    for epic in epics:
+        if not epic.stories:
+            issues.append(Issue(epic.line, f"{epic.id} has no stories"))
     for item in document.stories:
         validate_story(item, path.parent, root, issues)
     by_id = {item.id: item for item in document.stories}
@@ -413,14 +412,14 @@ def parse_document(text: str, root: Path, path: Path) -> Document:
 
     def visit(identifier: str, chain: list[str]) -> None:
         if identifier in visiting:
-            issues.append(Issue(by_id[identifier].line, "dependency cycle: " + " -> ".join(chain + [identifier])))
+            issues.append(Issue(by_id[identifier].line, "dependency cycle: " + " -> ".join([*chain, identifier])))
             return
         if identifier in visited:
             return
         visiting.add(identifier)
         for dependency in by_id[identifier].dependencies:
             if dependency in by_id:
-                visit(dependency, chain + [identifier])
+                visit(dependency, [*chain, identifier])
         visiting.remove(identifier)
         visited.add(identifier)
 
@@ -583,7 +582,7 @@ def write_if_unchanged(path: Path, original: bytes, updated: bytes) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    if sys.version_info < (3, 12):
+    if sys.version_info < (3, 12):  # noqa: UP036 - a guard for an older interpreter running this script
         print('ERROR: Python 3.12+ is required; use the qualified python3.12 interpreter.', file=sys.stderr)
         return 2
     parser = argparse.ArgumentParser(description=__doc__)

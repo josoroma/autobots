@@ -14,14 +14,18 @@ import psycopg
 from langgraph.checkpoint.postgres import PostgresSaver
 
 sys.path.insert(0, str(Path(__file__).parent))
-from worker_graph import build  # noqa: E402
-
-from autobots.adapters.checkpoints import DURABILITY, fenced_checkpointer, graph_config, is_stale_owner  # noqa: E402
-from autobots.application.runs import LeaseLost, admit_run, apply_command  # noqa: E402
-from autobots.application.tool_gateway import ToolScope, ownership_refusal  # noqa: E402
-from autobots.application.worker_leases import claim_next, heartbeat  # noqa: E402
-from autobots.domain.models import resolve_role_policy  # noqa: E402
-from autobots.domain.runs import Actor, RunCommand  # noqa: E402
+from autobots.adapters.checkpoints import (
+    DURABILITY,
+    fenced_checkpointer,
+    graph_config,
+    is_stale_owner,
+)
+from autobots.application.runs import LeaseLost, admit_run, apply_command
+from autobots.application.tool_gateway import ToolScope, ownership_refusal
+from autobots.application.worker_leases import claim_next, heartbeat
+from autobots.domain.models import resolve_role_policy
+from autobots.domain.runs import Actor, RunCommand
+from worker_graph import build
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = UUID(sys.argv[1])
@@ -220,7 +224,7 @@ async def main() -> None:
             timings = {}
             for mode in ('sync', 'exit'):
                 started = time.perf_counter()
-                for index in range(10):
+                for _index in range(10):
                     await graph.ainvoke({'seen': []}, {'configurable': {'thread_id': lease.thread_id, 'checkpoint_ns': ''}}, durability=mode)
                 timings[mode] = round((time.perf_counter() - started) * 100, 1)
         check('sync durability overhead was measured', 'ms per three-step run', timings, all(t > 0 for t in timings.values()))

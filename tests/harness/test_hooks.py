@@ -4,18 +4,18 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
+from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
-from harness_lib import config_errors, fingerprint, input_manifest, reduced_env, report_state
+from harness_lib import config_errors, fingerprint, input_manifest, reduced_env, report_state  # noqa: E402 - imported after the scripts path is added
 
 spec = importlib.util.spec_from_file_location('autobots_hook', ROOT / '.claude/hooks/dispatch.py')
 hook = importlib.util.module_from_spec(spec)
@@ -549,7 +549,7 @@ class HookTests(unittest.TestCase):
         result = subprocess.run([sys.executable, str(script)], input=raw, env=env, capture_output=True, timeout=15)
         return result, time.monotonic() - start
 
-    EDIT_EVENT = {'hook_event_name': 'PreToolUse', 'tool_name': 'Edit', 'tool_input': {'file_path': '/outside/SPECS.md'}}
+    EDIT_EVENT = {'hook_event_name': 'PreToolUse', 'tool_name': 'Edit', 'tool_input': {'file_path': '/outside/SPECS.md'}}  # noqa: RUF012 - a constant the tests only read
 
     def test_when_git_cannot_answer_no_event_loops_or_passes(self):
         for body in ('exit 128', 'echo PRIVATE_VALUE >&2; exit 1'):
@@ -683,7 +683,7 @@ class HookTests(unittest.TestCase):
             self.assertEqual(respond('PreToolUse', parent / 'forged', parent / 'forged/file')['permissionDecision'], 'deny')
             # The path is classified from the worktree, not as a file under `.claude/worktrees`.
             context = respond('PostToolUse', one, one / 'scripts/harness_lib.py')['additionalContext']
-            self.assertIn('Affected check domains: db, python, web.', context)
+            self.assertIn('Affected check domains: db, python, repo_python, web.', context)
             self.assertIn('--profile fast', context)
             (one / '.checks/harness').mkdir(parents=True)
             (one / '.checks/harness/latest.json').write_text(json.dumps(self.valid_report(one)))

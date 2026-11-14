@@ -14,7 +14,6 @@ from uuid import UUID, uuid4
 
 import httpx
 import psycopg
-
 from autobots.adapters.browser_executor import (
     BrowserExecutor,
     BrowserSession,
@@ -55,7 +54,7 @@ class Page:
         self.cdp, self.session = cdp, session
 
     @classmethod
-    async def open(cls, cdp: Cdp) -> 'Page':
+    async def open(cls, cdp: Cdp) -> Page:
         targets = (await cdp.send('Target.getTargets'))['result']['targetInfos']
         page = next(target for target in targets if target['type'] == 'page')
         attached = await cdp.send('Target.attachToTarget', {'targetId': page['targetId'], 'flatten': True})
@@ -137,7 +136,7 @@ async def containment(executor: BrowserExecutor) -> None:
             w.onopen = () => done('open'); w.onerror = () => done('refused'); } catch (e) { done('refused'); } });
           out.plain = await new Promise((done) => { try { const w = new WebSocket('ws://127.0.0.1:%d/');
             w.onopen = () => done('open'); w.onerror = () => done('refused'); } catch (e) { done('refused'); } });
-          return out; })()""" % GATEWAY_PORT)
+          return out; })()""" % GATEWAY_PORT)  # noqa: UP031 - a JavaScript template, whose braces an f-string would need escaped
         check('subresources and a WebSocket to private addresses are refused', 'fetch, image and sockets refused', sub,
               sub == {'fetch': 'refused', 'image': 'refused', 'socket': 'refused', 'plain': 'refused'})
 

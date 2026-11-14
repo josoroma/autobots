@@ -6,10 +6,8 @@ and the credential is an arranged fake. Exit 0 passed, 1 a case failed, 2 a prer
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import hashlib
 import json
-from pathlib import Path
 import secrets
 import shutil
 import signal
@@ -17,10 +15,22 @@ import subprocess
 import sys
 import tempfile
 import time
+from datetime import UTC, datetime
+from pathlib import Path
 
 from app_db import AppStack, apply_migrations, bootstrap, seed
-from disposable_db import (PROJECT_PREFIX, Refused, Target, Unavailable, free_port, other_resources, remove_stack,
-                           require_identity, run, tool_env)
+from disposable_db import (
+    PROJECT_PREFIX,
+    Refused,
+    Target,
+    Unavailable,
+    free_port,
+    other_resources,
+    remove_stack,
+    require_identity,
+    run,
+    tool_env,
+)
 from harness_lib import fingerprint, project_root
 from local_backup import restored_values
 from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner, http, password_token
@@ -85,8 +95,8 @@ def qualify(root: Path) -> int:
         if problem or seed(stack, root).returncode or stack.sql((root / STORAGE_SQL).read_text()).returncode:
             raise Unavailable(f'migrations failed: {problem}')
         owner_a = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], ops.url, email_a, password_a)
-        owner_b = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], ops.url, email_b, password_b)
-        workspace_a, workspace_b = owner_a['workspace_id'], owner_b['workspace_id']
+        bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], ops.url, email_b, password_b)
+        workspace_a = owner_a['workspace_id']
 
         # Real content, from the real loop: finished, interrupted and pending work, and a credential.
         marker = work / 'in-call'
@@ -241,14 +251,14 @@ def qualify(root: Path) -> int:
         config_root.mkdir(mode=0o700)
         restored_ops.api(api_port, config_root)
         wait(lambda: api_call(api_port, restored_ops.internal, token_a)[0] == 200, 40)
-        code, body = api_call(api_port, restored_ops.internal, token_a)
+        _code, body = api_call(api_port, restored_ops.internal, token_a)
         goal = json.dumps({'goal_text': 'Write the report', 'limit_micro_usd': 1000000}).encode()
         admit_code, _ = api_call(api_port, restored_ops.internal, token_a, 'POST', '/v1/runs', goal, {'Idempotency-Key': secrets.token_hex(8)})
         cases.check('the hold is visible and refuses admission', 'restore_hold, not ready, 503', f"{conditions(body).get('hold')}, {json.loads(body).get('ready')}, {admit_code}", conditions(body).get('hold') == 'restore_hold' and json.loads(body).get('ready') is False and admit_code == 503)
 
         # Released by a person: the restored checkpoint really can continue, with the scripted model.
         released = restored_stack.sql('delete from app_private.installation_holds;')
-        reconciled, reply = api_call(api_port, restored_ops.internal, token_a, 'POST', f'/v1/runs/{interrupted}/model-calls/reconcile', json.dumps({'charged_micro_usd': 100}).encode(), {'Idempotency-Key': secrets.token_hex(8)})
+        reconciled, _reply = api_call(api_port, restored_ops.internal, token_a, 'POST', f'/v1/runs/{interrupted}/model-calls/reconcile', json.dumps({'charged_micro_usd': 100}).encode(), {'Idempotency-Key': secrets.token_hex(8)})
         cancel = subprocess.run([str(root / PYTHON), str(root / 'tests/db/operations_check.py'), 'cancel', workspace_a, pending], env=restored_ops.env, capture_output=True, text=True, timeout=60, check=False)
         resume = subprocess.run([str(root / PYTHON), str(root / 'tests/db/operations_check.py'), 'resume', workspace_a, interrupted], env=restored_ops.env, capture_output=True, text=True, timeout=60, check=False)
         marker.unlink(missing_ok=True)
@@ -284,7 +294,7 @@ def qualify(root: Path) -> int:
     passed = all(record['status'] == 'passed' for record in cases.records)
     path_report = root / REPORT
     path_report.parent.mkdir(parents=True, exist_ok=True)
-    path_report.write_text(json.dumps({'schema_version': 'autobots.backup-qualification/v1', 'completed_at_utc': datetime.now(timezone.utc).isoformat(),
+    path_report.write_text(json.dumps({'schema_version': 'autobots.backup-qualification/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
                                        'duration_seconds': round(time.monotonic() - started_at, 1), 'input_fingerprint': fingerprint(root),
                                        'status': 'passed' if passed else 'failed', 'target_class': 'disposable', 'cases': cases.records,
                                        'not_established': ['H1', 'product acceptance', 'the persistent stack', 'a real model call', 'a real credential', 'protection from losing this Mac']}, indent=2))

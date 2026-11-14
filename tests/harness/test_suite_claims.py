@@ -5,11 +5,11 @@ how schema-value.test.ts and the offline toolchain pins went unrun before.
 """
 from __future__ import annotations
 
-from pathlib import Path
 import sys
 import tempfile
 import tomllib
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))

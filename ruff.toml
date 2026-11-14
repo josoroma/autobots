@@ -1,0 +1,16 @@
+# R-07: the shared Python standard. services/agent/pyproject.toml extends it and adds the service's
+# own ratchets; scripts/, tests/ and .claude/hooks/ are checked against it from the repository root.
+target-version = "py312"
+line-length = 100
+extend-exclude = ["services", "research", "apps", "packages", "docs", "openspec", ".checks", "node_modules"]
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "RUF", "BLE001", "S110", "S112"]
+
+[lint.per-file-ignores]
+# Deliberately broken fixtures that the fault qualification expects to fail.
+"tests/faults/**" = ["ALL"]
+# Repository Python isn't reformatted yet (Decision 0027 D8), so long lines wait for that.
+"scripts/**" = ["E501"]
+"tests/**" = ["E501"]
+".claude/hooks/**" = ["E501"]

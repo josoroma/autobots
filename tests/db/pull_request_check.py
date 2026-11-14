@@ -14,7 +14,6 @@ from uuid import UUID, uuid4
 
 import httpx
 import psycopg
-
 from autobots.adapters.github_issues import marker
 from autobots.adapters.github_pulls import TOOL_ID, branch_for, github_pull_request_tool
 from autobots.application.approvals import decide, list_approvals

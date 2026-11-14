@@ -10,10 +10,9 @@ import asyncio
 import json
 from typing import Any
 
+from goal_loop_script import Script
 from langchain_core.messages import AIMessage, AIMessageChunk
 from langchain_core.outputs import ChatGenerationChunk
-
-from goal_loop_script import Script
 
 REASONING_MARKER = 'PRIVATE-REASONING-MARKER'
 FRAMEWORK_MARKER = 'RAW-FRAMEWORK-VALUE-MARKER'
@@ -37,7 +36,7 @@ class StreamScript(Script):
     delay: float = 0.0
     piece: int = 9
     # Each reply's chunk count, so a check can show deltas were coalesced.
-    chunked: list[int] = []
+    chunked: list[int] = []  # noqa: RUF012 - a pydantic field, whose default pydantic copies for each instance
 
     async def _astream(self, messages: Any, stop: Any = None, run_manager: Any = None, **_: Any) -> Any:
         self.seen.append(list(messages))

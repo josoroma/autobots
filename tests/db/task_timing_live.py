@@ -11,7 +11,6 @@ import sys
 from uuid import UUID
 
 import psycopg
-
 from autobots.application.runs import apply_command
 from autobots.domain.runs import Actor, RunCommand
 

@@ -7,11 +7,9 @@ change is arranged, not observed. Exit 0 passed, 1 a case failed, 2 a prerequisi
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import hashlib
 import io
 import json
-from pathlib import Path
 import secrets
 import shutil
 import signal
@@ -20,10 +18,22 @@ import sys
 import tarfile
 import tempfile
 import time
+from datetime import UTC, datetime
+from pathlib import Path
 
 from app_db import AppStack, apply_migrations, bootstrap, seed
-from disposable_db import (PROJECT_PREFIX, Refused, Target, Unavailable, free_port, other_resources, remove_stack,
-                           require_identity, run, tool_env)
+from disposable_db import (
+    PROJECT_PREFIX,
+    Refused,
+    Target,
+    Unavailable,
+    free_port,
+    other_resources,
+    remove_stack,
+    require_identity,
+    run,
+    tool_env,
+)
 from harness_lib import fingerprint, project_root
 from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner, password_token
 from qualify_operations import Checks, Ops, api_call, conditions, exited, wait
@@ -252,7 +262,7 @@ print(hashlib.sha256(json.dumps(rows, default=str, sort_keys=True).encode()).hex
     passed = all(record['status'] == 'passed' for record in cases.records)
     path_report = root / REPORT
     path_report.parent.mkdir(parents=True, exist_ok=True)
-    path_report.write_text(json.dumps({'schema_version': 'autobots.upgrade-qualification/v1', 'completed_at_utc': datetime.now(timezone.utc).isoformat(),
+    path_report.write_text(json.dumps({'schema_version': 'autobots.upgrade-qualification/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
                                        'duration_seconds': round(time.monotonic() - started_at, 1), 'input_fingerprint': fingerprint(root), 'prior_revision': PRIOR_REVISION,
                                        'digest': hashlib.sha256(json.dumps(cases.records).encode()).hexdigest(),
                                        'status': 'passed' if passed else 'failed', 'target_class': 'disposable', 'cases': cases.records,

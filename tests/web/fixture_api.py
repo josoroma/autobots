@@ -6,7 +6,6 @@ import sys
 from uuid import UUID
 
 import uvicorn
-
 from autobots.api.app import create_app
 from autobots.api.settings import load_settings
 

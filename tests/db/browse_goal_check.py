@@ -21,8 +21,6 @@ import psycopg
 from langchain_core.messages import AIMessage
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import ROUTE, Script, calls, say  # noqa: E402
-
 from autobots.adapters import loop_middleware
 from autobots.adapters.browser_executor import BrowserExecutor
 from autobots.adapters.loop_middleware import LoopMiddleware, ModelRoute
@@ -37,6 +35,7 @@ from autobots.application.worker_leases import claim_next
 from autobots.contracts.experts import ExpertConfig
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.tools import PLAN_TOOLS
+from goal_loop_script import ROUTE, Script, calls, say
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = UUID(sys.argv[1])

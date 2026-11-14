@@ -17,15 +17,14 @@ import psycopg
 from pydantic import SecretStr
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import ROUTE, calls, say  # noqa: E402
-from stream_script import StreamScript  # noqa: E402
-
-from autobots.adapters.object_storage import SupabaseObjectStore  # noqa: E402
-from autobots.application.goal_loop import LoopConfig, _drive  # noqa: E402, PLC2701
-from autobots.application.runs import admit_run  # noqa: E402
-from autobots.application.worker_leases import claim_run  # noqa: E402
-from autobots.domain.models import resolve_role_policy  # noqa: E402
-from autobots.domain.tools import LOOP_TOOL_GRANTS  # noqa: E402
+from autobots.adapters.object_storage import SupabaseObjectStore
+from autobots.application.goal_loop import LoopConfig, _drive
+from autobots.application.runs import admit_run
+from autobots.application.worker_leases import claim_run
+from autobots.domain.models import resolve_role_policy
+from autobots.domain.tools import LOOP_TOOL_GRANTS
+from goal_loop_script import ROUTE, calls, say
+from stream_script import StreamScript
 
 CONTENT = '# Live report\n\n' + ''.join(f'Paragraph {n}: the running total is {n * 11}, written as it goes.\n' for n in range(1, 41))
 TASK = {'id': 'report', 'title': 'Write the report', 'criteria': ['c1'], 'expected_evidence': 'the published report'}

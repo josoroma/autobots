@@ -2,13 +2,22 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import sys
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
-from release_scoring import docker_totals, mebibytes, percentile, process_totals, safety_failures, score, summarize, summarize_resources  # noqa: E402
+from release_scoring import (  # noqa: E402
+    docker_totals,
+    mebibytes,
+    percentile,
+    process_totals,
+    safety_failures,
+    score,
+    summarize,
+    summarize_resources,
+)
 
 TASKS = json.loads((ROOT / 'tests/qualification/tasks.json').read_text())
 

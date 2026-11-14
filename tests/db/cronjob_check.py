@@ -11,7 +11,6 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-
 from autobots.application.approvals import decide
 from autobots.application.cronjob_tool import cronjob_tool
 from autobots.application.experts import create_expert

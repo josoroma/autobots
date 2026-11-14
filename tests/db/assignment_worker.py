@@ -10,9 +10,8 @@ from pathlib import Path
 import psycopg
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import ROUTE, Script, calls  # noqa: E402
-
-from autobots.application.goal_loop import LoopConfig, process_next  # noqa: E402
+from autobots.application.goal_loop import LoopConfig, process_next
+from goal_loop_script import ROUTE, Script, calls
 
 URL, EXPERT = sys.argv[1], sys.argv[2]
 TASK = {'id': 'p', 'title': 'Delegate', 'criteria': ['c1'], 'expected_evidence': 'a result'}

@@ -6,16 +6,16 @@ test that needs it, and is never a skip.
 """
 from __future__ import annotations
 
-from collections.abc import Sequence
 import hashlib
 import os
-from pathlib import Path
 import re
 import shutil
 import stat
 import subprocess
 import sys
 import tempfile
+from collections.abc import Sequence
+from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / 'scripts'))

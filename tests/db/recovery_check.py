@@ -13,20 +13,18 @@ from uuid import UUID, uuid4
 import psycopg
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import DONE_A, PLAN, ROUTE, SAVE, Script, calls, say  # noqa: E402
-
-from autobots.adapters.loop_middleware import ModelRoute  # noqa: E402
-from autobots.application.goal_loop import LoopConfig, process_next, run_goal  # noqa: E402
-from autobots.application.model_admission import ModelAdmission  # noqa: E402
-from autobots.application.recovery import outstanding  # noqa: E402
-from autobots.application.runs import LinkRefused, admit_run, apply_command  # noqa: E402
-from autobots.application.tool_gateway import ToolDefinition, ToolGateway, ToolRegistry, ToolScope  # noqa: E402
-from autobots.application.worker_leases import claim_next  # noqa: E402
-from autobots.contracts.tools import CalculateOutput  # noqa: E402
-from autobots.domain.models import resolve_role_policy  # noqa: E402
-from autobots.domain.runs import Actor, CommandRefused, RunCommand  # noqa: E402
-from autobots.domain.tools import OperationClass  # noqa: E402
-from pydantic import BaseModel  # noqa: E402
+from autobots.adapters.loop_middleware import ModelRoute
+from autobots.application.goal_loop import LoopConfig, process_next, run_goal
+from autobots.application.model_admission import ModelAdmission
+from autobots.application.recovery import outstanding
+from autobots.application.runs import LinkRefused, admit_run, apply_command
+from autobots.application.tool_gateway import ToolDefinition, ToolGateway, ToolRegistry, ToolScope
+from autobots.application.worker_leases import claim_next
+from autobots.domain.models import resolve_role_policy
+from autobots.domain.runs import Actor, CommandRefused, RunCommand
+from autobots.domain.tools import OperationClass
+from goal_loop_script import DONE_A, PLAN, ROUTE, SAVE, Script, calls, say
+from pydantic import BaseModel
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE, OTHER, PYTHON = UUID(sys.argv[1]), UUID(sys.argv[2]), sys.argv[3]
@@ -181,14 +179,14 @@ async def main() -> None:
             async def complete() -> str:
                 async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as other:
                     try:
-                        return (await apply_command(other, workspace_id=WORKSPACE, run_id=run, command=RunCommand.COMPLETE, actor=Actor.WORKER, expected_version=version, generation=lease.generation)).status
+                        return (await apply_command(other, workspace_id=WORKSPACE, run_id=run, command=RunCommand.COMPLETE, actor=Actor.WORKER, expected_version=version, generation=lease.generation)).status  # noqa: B023 - called within this iteration, so it reads this iteration's values
                     except Exception as error:  # noqa: BLE001
                         return type(error).__name__
 
             async def cancel() -> str:
                 async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as other:
                     try:
-                        return (await apply_command(other, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)).status
+                        return (await apply_command(other, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)).status  # noqa: B023 - called within this iteration, so it reads this iteration's values
                     except Exception as error:  # noqa: BLE001
                         return type(error).__name__
 

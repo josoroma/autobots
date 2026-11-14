@@ -10,20 +10,18 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-from deepagents import create_deep_agent
-from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
-from langchain_core.messages import AIMessage
-from pydantic import BaseModel
-
 from autobots.adapters.tool_middleware import GatewayMiddleware, visible_tools
 from autobots.application.runs import admit_run, apply_command
 from autobots.application.tool_gateway import ToolDefinition, ToolFailed, ToolGateway, ToolScope
 from autobots.application.tools import default_registry, first_grants
 from autobots.application.worker_leases import claim_next
-from autobots.contracts.tools import SaveArtifactInput, SaveArtifactOutput
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import Actor, RunCommand
 from autobots.domain.tools import OperationClass
+from deepagents import create_deep_agent
+from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
+from langchain_core.messages import AIMessage
+from pydantic import BaseModel
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = UUID(sys.argv[1])
@@ -40,7 +38,7 @@ class Nothing(BaseModel):
 
 
 class Recording(GenericFakeChatModel):
-    bound: list[list[str]] = []
+    bound: list[list[str]] = []  # noqa: RUF012 - a pydantic field, whose default pydantic copies for each instance
 
     def bind_tools(self, tools: Any, **_: Any) -> Any:
         self.bound.append([getattr(tool, 'name', str(tool)) for tool in tools])

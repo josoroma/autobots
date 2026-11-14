@@ -9,8 +9,12 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-
-from autobots.application.workflows import WorkflowRefused, create_execution, create_workflow, publish_version
+from autobots.application.workflows import (
+    WorkflowRefused,
+    create_execution,
+    create_workflow,
+    publish_version,
+)
 from autobots.contracts.workflows import WorkflowGraph
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']

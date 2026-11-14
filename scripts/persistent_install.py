@@ -12,25 +12,40 @@ Run with services/agent/.venv/bin/python, so `goal` can use the shared ledger. E
 from __future__ import annotations
 
 import argparse
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import hashlib
 import json
 import os
-from pathlib import Path
 import secrets
 import signal
 import subprocess
 import sys
 import time
-from urllib import error, request
 import uuid
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from urllib import error, request
 
 from app_db import MIGRATION_NAME, MIGRATIONS, ROLES, SEEDS, AppStack
-from disposable_db import PROJECT_PREFIX, Refused, Target, Unavailable, jwt, other_resources, run, tool_env
+from disposable_db import (
+    PROJECT_PREFIX,
+    Refused,
+    Target,
+    Unavailable,
+    jwt,
+    run,
+    tool_env,
+)
 from harness_lib import project_root
-from supabase_stack import UPSTREAM, example_defaults, generated_values, listener_addresses, port_conflict, rendered_refusals
+from supabase_stack import (
+    UPSTREAM,
+    example_defaults,
+    generated_values,
+    listener_addresses,
+    port_conflict,
+    rendered_refusals,
+)
 
 DEFAULT_DIR = Path.home() / '.local/share/autobots-install'
 PERSISTENT_FILES = (UPSTREAM / 'docker-compose.yml', Path('infra/supabase/compose.overlay.yaml'))
@@ -202,7 +217,7 @@ def write_install(directory: Path, project: str, gateway_port: int, db_port: int
     private_write(record.app_env, ''.join(f'{name}={value}\n' for name, value in application.items()))
     private_write(directory / 'owner.env', f'OWNER_EMAIL={OWNER_EMAIL}\nOWNER_PASSWORD={secrets.token_urlsafe(24)}\n')
     public = {'project': project, 'install_id': record.install_id, 'gateway_port': gateway_port, 'db_port': db_port, 'api_port': api_port, 'web_port': web_port,
-              'created_at': datetime.now(timezone.utc).isoformat()}
+              'created_at': datetime.now(UTC).isoformat()}
     private_write(directory / 'install.json', json.dumps(public, indent=2) + '\n')
     return record
 
@@ -288,11 +303,11 @@ def status(root: Path, record: Record) -> dict:
 def reserve_goal(ledger_path: Path, limit: int) -> tuple[object, dict]:
     """Before any request: the goal's whole budget has to fit what's left of the shared cap."""
     sys.path.insert(0, str(project_root() / 'services/agent/src'))
-    from autobots.operations.reasoning_trial import SHARED_CAP_MICRO_USD  # noqa: PLC0415
-    from autobots.operations.route_qualification import CapReached, Ledger  # noqa: PLC0415
+    from autobots.operations.reasoning_trial import SHARED_CAP_MICRO_USD
+    from autobots.operations.route_qualification import CapReached, Ledger
     ledger = Ledger(ledger_path, SHARED_CAP_MICRO_USD)
     try:
-        return ledger, ledger.reserve(f'install-goal:{datetime.now(timezone.utc).isoformat()}', limit)
+        return ledger, ledger.reserve(f'install-goal:{datetime.now(UTC).isoformat()}', limit)
     except CapReached:
         raise Refused(f'a goal limited to {limit} micro-USD would take the shared ledger, at {ledger.committed()}, past {ledger.cap}. Nothing was sent') from None
 
@@ -344,7 +359,7 @@ def goal(root: Path, record: Record, requested: str, key_file: Path, limit: int,
         result = stack.runtime(statement)
         return result.stdout.strip().splitlines()[0] if result.returncode == 0 and result.stdout.strip() else ''
 
-    report: dict = {'schema_version': 'autobots.install-goal/v1', 'started_at_utc': datetime.now(timezone.utc).isoformat(), 'project': record.project, 'model_transport': 'live OpenRouter',
+    report: dict = {'schema_version': 'autobots.install-goal/v1', 'started_at_utc': datetime.now(UTC).isoformat(), 'project': record.project, 'model_transport': 'live OpenRouter',
                     'limit_micro_usd': limit, 'goal': goal_text, 'required_artifacts': required, 'not_established': ['H1', 'product acceptance', 'task quality beyond this goal']}
     charged: int | None = None
     worker = None
@@ -361,7 +376,7 @@ def goal(root: Path, record: Record, requested: str, key_file: Path, limit: int,
                 report['worker_exit'] = 'killed after 60 seconds'
 
     def write_report() -> None:
-        out = record.directory / 'reports' / f'goal-{datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")}.json'
+        out = record.directory / 'reports' / f'goal-{datetime.now(UTC).strftime("%Y%m%dT%H%M%S")}.json'
         private_write(out, json.dumps(report, indent=2))
         print(json.dumps(report, indent=2))
 
@@ -556,7 +571,7 @@ def examples(root: Path, record: Record, requested: str, key_file: Path, ledger_
         result = stack.runtime(statement)
         return result.stdout.strip().splitlines()[0] if result.returncode == 0 and result.stdout.strip() else ''
 
-    report: dict = {'schema_version': 'autobots.install-examples/v1', 'started_at_utc': datetime.now(timezone.utc).isoformat(), 'project': record.project,
+    report: dict = {'schema_version': 'autobots.install-examples/v1', 'started_at_utc': datetime.now(UTC).isoformat(), 'project': record.project,
                     'model_transport': 'live OpenRouter', 'limit_micro_usd': EXAMPLES_LIMIT,
                     'not_established': ['H1', 'product acceptance', 'task quality']}
     worker = None
@@ -690,7 +705,7 @@ def examples(root: Path, record: Record, requested: str, key_file: Path, ledger_
             report['key_found'] = {'durable_rows': int(durable), 'log_files': int(logged)}
         except (Unavailable, ValueError, subprocess.SubprocessError, OSError) as problem:
             note_failed(report, str(problem) if isinstance(problem, Unavailable) else type(problem).__name__)
-    out = record.directory / 'reports' / f'examples-{datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")}.json'
+    out = record.directory / 'reports' / f'examples-{datetime.now(UTC).strftime("%Y%m%dT%H%M%S")}.json'
     private_write(out, json.dumps(report, indent=2))
     print(json.dumps(report, indent=2))
     found = report.get('key_found')
@@ -704,8 +719,8 @@ def screens(root: Path, record: Record, requested: str, grep: str) -> int:
     stack = install_stack(root, record)
     require_install(stack, record, requested)
     sys.path.insert(0, str(root / 'scripts'))
-    from qualify_web import BROWSERS  # noqa: PLC0415
-    from toolchain import child_env, find_tools  # noqa: PLC0415
+    from qualify_web import BROWSERS
+    from toolchain import child_env, find_tools
     browsers = root / BROWSERS
     if not any(browsers.glob('chromium-*')):
         raise Unavailable(f'no browser under {BROWSERS}; install the pinned one deliberately')
@@ -796,7 +811,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return examples(root, record, arguments.project, (root / arguments.key_file).resolve(), root / arguments.ledger)
         if not arguments.paid:
             raise Refused('this makes billed calls, and needs --paid')
-        from live_goal import GOAL, REQUIRED  # noqa: PLC0415
+        from live_goal import GOAL, REQUIRED
         return goal(root, record, arguments.project, (root / arguments.key_file).resolve(), arguments.limit_micro_usd, root / arguments.ledger, GOAL, REQUIRED)
     except Refused as refusal:
         print(f'REFUSED before any change: {refusal}', file=sys.stderr)

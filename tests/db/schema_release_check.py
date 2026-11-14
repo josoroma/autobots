@@ -12,7 +12,6 @@ import sys
 from typing import Any
 
 import psycopg
-
 from autobots.application.operations import applied_migrations, database_conditions, is_ready
 from autobots.application.schema_release import SHIPPED_MIGRATIONS
 

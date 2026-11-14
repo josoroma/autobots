@@ -1,11 +1,11 @@
 """R-04: every path glob in a project rule matches a tracked file, so the rule loads for real code."""
 from __future__ import annotations
 
-from pathlib import Path
 import re
 import subprocess
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 FRONTMATTER = re.compile(r'\A---\n(.*?)\n---\n', re.S)

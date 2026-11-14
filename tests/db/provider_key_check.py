@@ -14,23 +14,28 @@ from uuid import UUID, uuid4
 
 import httpx
 import psycopg
-from deepagents import create_deep_agent
-from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
-from langchain_core.messages import AIMessage
-from langgraph.checkpoint.memory import InMemorySaver
-from pydantic import BaseModel, ConfigDict
-
 from autobots.adapters.provider_http import provider_client, provider_key
 from autobots.adapters.tool_middleware import GatewayMiddleware, visible_tools
 from autobots.application.experts import create_expert, create_session
 from autobots.application.runs import admit_run
 from autobots.application.tool_catalog import tool_catalog
-from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolGateway, ToolRegistry, ToolScope
+from autobots.application.tool_gateway import (
+    ToolContext,
+    ToolDefinition,
+    ToolGateway,
+    ToolRegistry,
+    ToolScope,
+)
 from autobots.application.worker_leases import claim_next
 from autobots.contracts.experts import ExpertConfig, SessionExpert
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.tool_catalog import CostClass, KeyRequirement, ToolGroup, ToolProvider
 from autobots.domain.tools import OperationClass
+from deepagents import create_deep_agent
+from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
+from langchain_core.messages import AIMessage
+from langgraph.checkpoint.memory import InMemorySaver
+from pydantic import BaseModel, ConfigDict
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = UUID(sys.argv[1])
@@ -59,7 +64,7 @@ KEY = KeyRequirement('fixture', ('FIXTURE_PROVIDER_KEY',))
 class Scripted(GenericFakeChatModel):
     """Records what it was shown, as a prompt, so the key's absence there is observed."""
 
-    shown: list[str] = []
+    shown: list[str] = []  # noqa: RUF012 - a pydantic field, whose default pydantic copies for each instance
 
     def bind_tools(self, tools: Any, **_: Any) -> Any:
         return self

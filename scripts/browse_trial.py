@@ -19,8 +19,19 @@ import subprocess
 import sys
 from pathlib import Path
 
-from app_db import AppStack, apply_migrations, bootstrap, seed, MIGRATIONS, WORKSPACE_A
-from disposable_db import PROJECT_PREFIX, Refused, Target, Unavailable, free_port, other_resources, remove_stack, require_identity, run, tool_env
+from app_db import MIGRATIONS, WORKSPACE_A, AppStack, apply_migrations, bootstrap, seed
+from disposable_db import (
+    PROJECT_PREFIX,
+    Refused,
+    Target,
+    Unavailable,
+    free_port,
+    other_resources,
+    remove_stack,
+    require_identity,
+    run,
+    tool_env,
+)
 from harness_lib import project_root
 from supabase_stack import generated_values, require_images, require_rendered
 

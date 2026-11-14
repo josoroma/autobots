@@ -17,15 +17,14 @@ from pathlib import Path
 from typing import Any
 
 import psycopg
-from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage
-from langchain_core.outputs import ChatGeneration, ChatResult
-from pydantic import SecretStr
-
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.compaction import SUMMARY_MARKER
 from autobots.application.goal_loop import LoopConfig, process_next
+from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import AIMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
+from pydantic import SecretStr
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 MARKER = Path(os.environ['AUTOBOTS_TEST_DIED_MARKER'])

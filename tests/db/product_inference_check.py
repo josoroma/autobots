@@ -8,8 +8,6 @@ from dataclasses import replace
 from uuid import UUID, uuid4
 
 import psycopg
-from pydantic import SecretStr
-
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.api.main import provider_context_from_environment
 from autobots.application.artifacts import read_artifact
@@ -23,6 +21,7 @@ from autobots.contracts.plans import RequiredArtifact
 from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import Actor, RunCommand
+from pydantic import SecretStr
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 

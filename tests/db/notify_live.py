@@ -12,7 +12,6 @@ import sys
 from uuid import UUID, uuid4
 
 import psycopg
-
 from autobots.application.runs import admit_run, apply_command
 from autobots.application.worker_leases import claim_run
 from autobots.domain.models import resolve_role_policy

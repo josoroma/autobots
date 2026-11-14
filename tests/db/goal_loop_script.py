@@ -3,12 +3,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from autobots.adapters.loop_middleware import ModelRoute
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from pydantic import SecretStr
-
-from autobots.adapters.loop_middleware import ModelRoute
 
 ROUTE = ModelRoute('executor', 'openrouter_terra', 'fixture/model', 1000)
 _ids = iter(range(1, 100000))
@@ -18,8 +17,8 @@ class Script(BaseChatModel):
     items: list[Any]
     # Held the way a real client holds a key, to show it stays out of checkpoints.
     api_key: SecretStr = SecretStr('sk-or-planted-secret-value')
-    seen: list[list[Any]] = []
-    bound: list[list[str]] = []
+    seen: list[list[Any]] = []  # noqa: RUF012 - a pydantic field, whose default pydantic copies for each instance
+    bound: list[list[str]] = []  # noqa: RUF012 - a pydantic field, whose default pydantic copies for each instance
 
     @property
     def _llm_type(self) -> str:

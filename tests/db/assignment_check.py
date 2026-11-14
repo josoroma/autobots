@@ -13,22 +13,21 @@ import psycopg
 from pydantic import SecretStr
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import ROUTE, Script, calls, say  # noqa: E402
-
-from autobots.adapters.loop_middleware import ModelRoute  # noqa: E402
-from autobots.adapters.object_storage import SupabaseObjectStore  # noqa: E402
-from autobots.application.experts import create_expert, create_session, resolve_binding  # noqa: E402
-from autobots.application.goal_loop import LoopConfig, _finish, process_next  # noqa: E402
-from autobots.application.model_admission import ModelAdmission  # noqa: E402
-from autobots.application.plans import load_goal  # noqa: E402
-from autobots.application.run_projection import read_workspace  # noqa: E402
-from autobots.application.run_usage import RootLimits  # noqa: E402
-from autobots.application.worker_leases import claim_run  # noqa: E402
-from autobots.application.runs import Inheritance, admit_run, apply_command  # noqa: E402
-from autobots.contracts.experts import ExpertConfig, SessionExpert  # noqa: E402
-from autobots.domain.models import resolve_role_policy  # noqa: E402
-from autobots.domain.runs import Actor, RunCommand  # noqa: E402
-from autobots.domain.tools import DELEGATION_TOOL  # noqa: E402
+from autobots.adapters.loop_middleware import ModelRoute
+from autobots.adapters.object_storage import SupabaseObjectStore
+from autobots.application.experts import create_expert, create_session, resolve_binding
+from autobots.application.goal_loop import LoopConfig, _finish, process_next
+from autobots.application.model_admission import ModelAdmission
+from autobots.application.plans import load_goal
+from autobots.application.run_projection import read_workspace
+from autobots.application.run_usage import RootLimits
+from autobots.application.runs import Inheritance, admit_run, apply_command
+from autobots.application.worker_leases import claim_run
+from autobots.contracts.experts import ExpertConfig, SessionExpert
+from autobots.domain.models import resolve_role_policy
+from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.tools import DELEGATION_TOOL
+from goal_loop_script import ROUTE, Script, calls, say
 
 URL, BASE = os.environ['AUTOBOTS_DATABASE_URL'], os.environ['AUTOBOTS_STORAGE_BASE']
 SERVICE = SecretStr(os.environ['AUTOBOTS_STORAGE_SERVICE'])

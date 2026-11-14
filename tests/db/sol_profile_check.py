@@ -9,12 +9,16 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-
 from autobots.application.experts import create_expert, create_session
 from autobots.application.runs import Inheritance, admit_run
-from autobots.contracts.experts import ExpertConfig, SessionExpert
 from autobots.application.worker_inference import frozen_policy
-from autobots.domain.models import ModelRole, UnknownModelProfile, require_offered, resolve_role_policy
+from autobots.contracts.experts import ExpertConfig, SessionExpert
+from autobots.domain.models import (
+    ModelRole,
+    UnknownModelProfile,
+    require_offered,
+    resolve_role_policy,
+)
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = UUID(sys.argv[1])

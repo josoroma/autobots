@@ -21,7 +21,6 @@ from uuid import UUID, uuid4
 
 import httpx
 import psycopg
-
 from autobots.adapters.jina import jina_tools
 from autobots.adapters.tavily import tavily_tools
 from autobots.application.credentials.master_key import create_master_key
@@ -268,7 +267,7 @@ async def main() -> None:
             and catalog_a.get("search_web") == ("key_missing", None),
         )
         admitted: list[str] = []
-        for workspace, view in ((WORKSPACE_A, view_a), (other, view_other)):
+        for _workspace, view in ((WORKSPACE_A, view_a), (other, view_other)):
             try:
                 require_available(["tavily_search"], view)
                 admitted.append("admitted")

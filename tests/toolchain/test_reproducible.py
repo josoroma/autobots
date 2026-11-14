@@ -5,8 +5,8 @@ reachable for the copy. Neither absence is a skip: each fails the test.
 """
 from __future__ import annotations
 
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 import support
 from support import REPO_ROOT, toolchain

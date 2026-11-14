@@ -5,10 +5,10 @@ baseline, which only shrinks: a file that stops calling fetch must leave the lis
 """
 from __future__ import annotations
 
-from pathlib import Path
 import re
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 RAW = re.compile(r'\b(?:csrfFetch|fetch)\(')

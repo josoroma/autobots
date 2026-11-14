@@ -10,7 +10,6 @@ import os
 from pathlib import Path
 
 import httpx
-
 from autobots.adapters.github_issues import REPOSITORY_VARIABLE, TOKEN_VARIABLE, github_issue_tool
 from autobots.application import goal_loop
 from autobots.operations.worker import main

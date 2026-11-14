@@ -20,18 +20,17 @@ import psycopg
 from pydantic import SecretStr
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import ROUTE, calls, say  # noqa: E402
-from stream_script import FRAMEWORK_MARKER, REASONING_MARKER, StreamScript  # noqa: E402
-
-from autobots.adapters.object_storage import SupabaseObjectStore  # noqa: E402
-from autobots.adapters.result_stream import CHANNEL  # noqa: E402
-from autobots.api.event_routes import _live_frame  # noqa: E402, PLC2701
-from autobots.application.goal_loop import LoopConfig, _drive  # noqa: E402, PLC2701
-from autobots.application.runs import admit_run  # noqa: E402
-from autobots.application.worker_leases import claim_run  # noqa: E402
-from autobots.contracts.runs import RunEvent  # noqa: E402
-from autobots.domain.models import resolve_role_policy  # noqa: E402
-from autobots.domain.tools import LOOP_TOOL_GRANTS  # noqa: E402
+from autobots.adapters.object_storage import SupabaseObjectStore
+from autobots.adapters.result_stream import CHANNEL
+from autobots.api.event_routes import _live_frame
+from autobots.application.goal_loop import LoopConfig, _drive
+from autobots.application.runs import admit_run
+from autobots.application.worker_leases import claim_run
+from autobots.contracts.runs import RunEvent
+from autobots.domain.models import resolve_role_policy
+from autobots.domain.tools import LOOP_TOOL_GRANTS
+from goal_loop_script import ROUTE, calls, say
+from stream_script import FRAMEWORK_MARKER, REASONING_MARKER, StreamScript
 
 URL, BASE = os.environ['AUTOBOTS_DATABASE_URL'], os.environ['AUTOBOTS_STORAGE_BASE']
 SERVICE = SecretStr(os.environ['AUTOBOTS_STORAGE_SERVICE'])

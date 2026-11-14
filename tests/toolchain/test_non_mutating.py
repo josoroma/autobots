@@ -7,10 +7,10 @@ Bytes in `.next`, caches and bytecode may change. The scenario concerns dependen
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import re
 import sys
 import unittest
+from pathlib import Path
 
 import support
 from support import REPO_ROOT, toolchain

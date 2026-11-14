@@ -5,15 +5,14 @@ Keys starting `sk-or-valid` pass, `sk-or-reject` get 401, and anything starting 
 """
 from __future__ import annotations
 
-from dataclasses import replace
 import json
 import os
-from pathlib import Path
 import sys
+from dataclasses import replace
+from pathlib import Path
 
 import httpx
 import uvicorn
-
 from autobots.adapters.models.factory import OPENROUTER_BASE_URL
 from autobots.adapters.models.openrouter_metadata import catalog_fetcher, key_validator
 from autobots.api.main import create_configured_app

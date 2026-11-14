@@ -16,12 +16,23 @@ import secrets
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-from app_db import AppStack, apply_migrations, bootstrap, seed, MIGRATIONS, WORKSPACE_A
-from disposable_db import (PROJECT_PREFIX, Cases, Refused, Target, Unavailable, free_port, other_resources,
-                           remove_stack, require_identity, run, tool_env)
+from app_db import MIGRATIONS, WORKSPACE_A, AppStack, apply_migrations, bootstrap, seed
+from disposable_db import (
+    PROJECT_PREFIX,
+    Cases,
+    Refused,
+    Target,
+    Unavailable,
+    free_port,
+    other_resources,
+    remove_stack,
+    require_identity,
+    run,
+    tool_env,
+)
 from harness_lib import project_root
 from supabase_stack import generated_values, require_images, require_rendered
 
@@ -98,7 +109,7 @@ def qualify(root: Path) -> int:
     path = root / REPORT
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({
-        'schema_version': 'autobots.browse-goal-check/v1', 'completed_at_utc': datetime.now(timezone.utc).isoformat(),
+        'schema_version': 'autobots.browse-goal-check/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
         'duration_seconds': round(time.monotonic() - started_at, 1), 'status': 'passed' if passed else 'failed',
         'executor_fingerprint': executor_fingerprint(root), 'target_class': 'disposable', 'driver': 'scripted',
         'network': 'outbound to https://example.com/ only', 'model': 'scripted, no provider', 'cases': cases.records,

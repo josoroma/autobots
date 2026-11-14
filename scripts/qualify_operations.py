@@ -7,22 +7,33 @@ stands in for one. Exit 0 passed, 1 a case failed, 2 a prerequisite is missing.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import json
 import os
-from pathlib import Path
 import secrets
 import signal
 import subprocess
 import sys
 import tempfile
 import time
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import IO
 from urllib import error, request
 
 from app_db import AppStack, apply_migrations, bootstrap, seed
-from disposable_db import (PROJECT_PREFIX, Cases, Refused, Target, Unavailable, free_port, other_resources,
-                           remove_stack, require_identity, run, tool_env)
+from disposable_db import (
+    PROJECT_PREFIX,
+    Cases,
+    Refused,
+    Target,
+    Unavailable,
+    free_port,
+    other_resources,
+    remove_stack,
+    require_identity,
+    run,
+    tool_env,
+)
 from harness_lib import fingerprint, project_root
 from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner, http, password_token
 from supabase_stack import generated_values, require_images, require_rendered
@@ -246,7 +257,7 @@ def qualify(root: Path) -> int:
         # Readiness failures, each observed through the API a person would use.
         stopped = stack.compose('stop', 'storage', timeout=120)
         down = wait(lambda: conditions(api_call(api_port, ops.internal, token_a)[1]).get('storage') == 'storage_unreachable', 30)
-        code_status, body = api_call(api_port, ops.internal, token_a)
+        _code_status, body = api_call(api_port, ops.internal, token_a)
         cases.check('Storage down is visible and not ready', 'storage_unreachable, ready false', f"{stopped.returncode}, {down}, {json.loads(body)['ready']}", down and json.loads(body)['ready'] is False)
         jobs = ops.sql('select count(*) from app_private.run_jobs;')
         code, reply = api_call(api_port, ops.internal, token_a, 'POST', '/v1/runs', goal, {'Idempotency-Key': secrets.token_hex(8)})
@@ -367,7 +378,7 @@ def qualify(root: Path) -> int:
     passed = all(record['status'] == 'passed' for record in cases.records)
     path_report = root / REPORT
     path_report.parent.mkdir(parents=True, exist_ok=True)
-    path_report.write_text(json.dumps({'schema_version': 'autobots.operations-qualification/v1', 'completed_at_utc': datetime.now(timezone.utc).isoformat(),
+    path_report.write_text(json.dumps({'schema_version': 'autobots.operations-qualification/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
                                        'duration_seconds': round(time.monotonic() - started_at, 1), 'input_fingerprint': fingerprint(root),
                                        'status': 'passed' if passed else 'failed', 'target_class': 'disposable', 'project': project, 'cases': cases.records,
                                        'not_established': ['H1', 'product acceptance', 'the persistent stack', 'a real model call', 'Mac sleep', 'resource use under load']}, indent=2))

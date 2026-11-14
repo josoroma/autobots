@@ -5,8 +5,8 @@ import asyncio
 import json
 import os
 import sys
-from pathlib import Path
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -14,34 +14,51 @@ import psycopg
 from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import ROUTE  # noqa: E402
-
-from autobots.adapters.loop_middleware import LoopMiddleware, LoopStopped  # noqa: E402
-from autobots.application.approvals import decide, list_approvals  # noqa: E402
-from autobots.application.assignments import Delegation, assign_tool  # noqa: E402
-from autobots.application.experts import create_expert, create_session, resolve_binding  # noqa: E402
-from autobots.application.goal_loop import LoopResult, _scope_guidance  # noqa: E402
-from autobots.application.memory import SEARCH_MEMORY, MemoryRefused, search, store_memory  # noqa: E402
-from autobots.application.plans import load_goal  # noqa: E402
-from autobots.application import routines as routines_module  # noqa: E402
-from autobots.application.routines import _admit as routine_admit, create_routine, evaluate_routines  # noqa: E402
-from autobots.application.workflows import create_execution, create_workflow, read_execution, publish_version  # noqa: E402
-from autobots.contracts.routines import RoutineConfig, RoutineTarget  # noqa: E402
-from autobots.contracts.workflows import WorkflowGraph  # noqa: E402
-from autobots.application.reconciliation import has_unresolvable_effect, record_evidence, unknown_operations  # noqa: E402
-from autobots.application.recovery import outstanding  # noqa: E402
-from autobots.application.retention import RetentionPolicy, apply_retention, write_policy  # noqa: E402
-from autobots.application.run_usage import RootLimits  # noqa: E402
-from autobots.application.runs import Inheritance, admit_run, apply_command  # noqa: E402
-from autobots.application.tool_gateway import NotDelivered, ToolContext, ToolDefinition, ToolFailed, ToolGateway, ToolRegistry, ToolScope  # noqa: E402
-from autobots.application.worker_leases import claim_next, claim_run  # noqa: E402
-from autobots.contracts.assignments import AssignSpecialist  # noqa: E402
-from autobots.contracts.experts import ExpertConfig, SessionExpert  # noqa: E402
-from autobots.contracts.operations import RetentionSettings  # noqa: E402
-from autobots.operations import worker as worker_module  # noqa: E402
-from autobots.domain.models import resolve_role_policy  # noqa: E402
-from autobots.domain.runs import Actor, RunCommand  # noqa: E402
-from autobots.domain.tools import DELEGATION_TOOL, OperationClass  # noqa: E402
+from autobots.adapters.loop_middleware import LoopMiddleware, LoopStopped
+from autobots.application import routines as routines_module
+from autobots.application.approvals import decide, list_approvals
+from autobots.application.assignments import Delegation, assign_tool
+from autobots.application.experts import create_expert, create_session, resolve_binding
+from autobots.application.goal_loop import LoopResult, _scope_guidance
+from autobots.application.memory import SEARCH_MEMORY, MemoryRefused, search, store_memory
+from autobots.application.plans import load_goal
+from autobots.application.reconciliation import (
+    has_unresolvable_effect,
+    record_evidence,
+    unknown_operations,
+)
+from autobots.application.recovery import outstanding
+from autobots.application.retention import RetentionPolicy, apply_retention, write_policy
+from autobots.application.routines import _admit as routine_admit
+from autobots.application.routines import create_routine, evaluate_routines
+from autobots.application.run_usage import RootLimits
+from autobots.application.runs import Inheritance, admit_run, apply_command
+from autobots.application.tool_gateway import (
+    NotDelivered,
+    ToolContext,
+    ToolDefinition,
+    ToolFailed,
+    ToolGateway,
+    ToolRegistry,
+    ToolScope,
+)
+from autobots.application.worker_leases import claim_next, claim_run
+from autobots.application.workflows import (
+    create_execution,
+    create_workflow,
+    publish_version,
+    read_execution,
+)
+from autobots.contracts.assignments import AssignSpecialist
+from autobots.contracts.experts import ExpertConfig, SessionExpert
+from autobots.contracts.operations import RetentionSettings
+from autobots.contracts.routines import RoutineConfig, RoutineTarget
+from autobots.contracts.workflows import WorkflowGraph
+from autobots.domain.models import resolve_role_policy
+from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.tools import DELEGATION_TOOL, OperationClass
+from autobots.operations import worker as worker_module
+from goal_loop_script import ROUTE
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = UUID(sys.argv[1])
@@ -136,7 +153,7 @@ async def effects_and_assignments(db: Any) -> None:
         lease = await claim_next(db, worker_id='m2')
         asked = await gateway.execute(db, scope_of(lease, {'gated': 1}), 'gated', {'text': text})
         assert asked.code == 'approval_pending', asked.code
-        row = [item for item in await list_approvals(db, WORKSPACE, 'pending') if item['run_id'] == run][0]
+        row = next(item for item in await list_approvals(db, WORKSPACE, 'pending') if item['run_id'] == run)
         await decide(db, workspace_id=WORKSPACE, actor_id=ACTOR, approval_id=row['id'], idempotency_key=str(uuid4()), decision='approve', argument_hash=row['argument_hash'])
         await db.execute("update app_private.run_jobs set status = 'queued', available_at = clock_timestamp() where run_id = %s", (run,))
         lease = await claim_run(db, run, worker_id='m2-after')
@@ -161,7 +178,7 @@ async def effects_and_assignments(db: Any) -> None:
     run = await admit()
     lease = await claim_next(db, worker_id='replay')
     await gateway.execute(db, scope_of(lease, {'gated_ok': 1}), 'gated_ok', {'text': 'sent once'})
-    row = [item for item in await list_approvals(db, WORKSPACE, 'pending') if item['run_id'] == run][0]
+    row = next(item for item in await list_approvals(db, WORKSPACE, 'pending') if item['run_id'] == run)
     await decide(db, workspace_id=WORKSPACE, actor_id=ACTOR, approval_id=row['id'], idempotency_key=str(uuid4()), decision='approve', argument_hash=row['argument_hash'])
     await db.execute("update app_private.run_jobs set status = 'queued', available_at = clock_timestamp() where run_id = %s", (run,))
     lease = await claim_run(db, run, worker_id='replay-2')

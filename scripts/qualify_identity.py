@@ -11,24 +11,42 @@ Passing establishes neither H1 nor product acceptance.
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
-from datetime import datetime, timezone
 import json
-from pathlib import Path
 import secrets
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Mapping
+from datetime import UTC, datetime
+from pathlib import Path
 from urllib import error, request
 
 from app_db import AppStack, apply_migrations, bootstrap, seed
-from disposable_db import (PROJECT_PREFIX, Cases, Refused, Target, Unavailable, free_port, other_resources,
-                           remove_stack, require_identity, rows, run, tool_env)
+from disposable_db import (
+    PROJECT_PREFIX,
+    Cases,
+    Refused,
+    Target,
+    Unavailable,
+    free_port,
+    other_resources,
+    remove_stack,
+    require_identity,
+    rows,
+    run,
+    tool_env,
+)
 from harness_lib import fingerprint, project_root
 from qualify_web import BROWSERS, run_problems, start, stop, summarize, wait_until_up
-from suites import IDENTITY_SUITES, QUALIFICATION_SUITE, READINESS_SUITE, SAVED_CHOICE_SUITE, SLICE_SUITES
+from suites import (
+    IDENTITY_SUITES,
+    QUALIFICATION_SUITE,
+    READINESS_SUITE,
+    SAVED_CHOICE_SUITE,
+    SLICE_SUITES,
+)
 from supabase_stack import generated_values, require_images, require_rendered
 from toolchain import child_env, find_tools
 
@@ -323,7 +341,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
         wait_until_up(f'{api_url}/v1/health', processes[0])
         qualification_reports = [root / '.checks/identity/playwright-qualification-1.json', root / '.checks/identity/playwright-qualification-2.json']
         qualification_codes = []
-        for report_path, title in zip(qualification_reports, ('after an API restart', 'a route with no record')):
+        for report_path, title in zip(qualification_reports, ('after an API restart', 'a route with no record'), strict=False):
             report_path.unlink(missing_ok=True)
             if title == 'a route with no record':
                 stack.sql("create table public.arranged_route_rows as select * from agent_runtime.route_qualifications;\ndelete from agent_runtime.route_qualifications where profile = 'openrouter_terra';\n")
@@ -399,7 +417,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
     for case in found:
         cases.check(f"browser: {case['id']}", 'passed', case['status'], case['status'] == 'passed')
     runs = [('main suite', report, result.returncode), ('slice suite', slice_report, slice_result.returncode),
-            *((f'qualification suite {index + 1}', path, code) for index, (path, code) in enumerate(zip(qualification_reports, qualification_codes)))]
+            *((f'qualification suite {index + 1}', path, code) for index, (path, code) in enumerate(zip(qualification_reports, qualification_codes, strict=False)))]
     for label, path, code in runs:
         problems = run_problems(path, code)
         cases.check(f'the {label} ran to a clean exit', 'exit 0, with tests', ', '.join(problems) or 'exit 0', not problems)
@@ -658,7 +676,7 @@ def qualify(root: Path) -> int:
                     f"('{run}', '{ops_ws}', '{'running' if job == 'claimed' else 'queued'}', 'Operations job {index + 1}', 1000000, '{{}}');\n"
                     f"insert into app_private.run_jobs (run_id, workspace_id, status, available_at, generation, lease_owner, lease_expires_at) values "
                     f"('{run}', '{ops_ws}', '{job}', now() + interval '30 days', 1, {'null' if job == 'queued' else repr('arranged-ops')}, {expires});\n"
-                    for index, (run, (job, expires)) in enumerate(zip(ops_runs, ops_jobs)))
+                    for index, (run, (job, expires)) in enumerate(zip(ops_runs, ops_jobs, strict=False)))
             + "insert into public.artifacts (id, workspace_id, run_id, operation_id, name, object_path, media_type, size_bytes, sha256, status) values "
             + ', '.join(f"(gen_random_uuid(), '{ops_ws}', '{ops_runs[0]}', 'ops-n-{index}', 'file-{index}.md', 'ops-n/{index}', 'text/markdown', {size}, "
                         f"'{format(index, '064x')}', '{state}')" for index, (size, state) in enumerate(((1000, 'published'), (2345, 'published'), (999, 'staged'))))
@@ -733,7 +751,7 @@ def qualify(root: Path) -> int:
     passed = all(record['status'] == 'passed' for record in cases.records)
     path = root / REPORT
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({'schema_version': 'autobots.identity-qualification/v1', 'completed_at_utc': datetime.now(timezone.utc).isoformat(),
+    path.write_text(json.dumps({'schema_version': 'autobots.identity-qualification/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
                                 'duration_seconds': round(time.monotonic() - started_at, 1), 'input_fingerprint': fingerprint(root),
                                 'status': 'passed' if passed else 'failed', 'target_class': 'disposable', 'project': project, 'cases': cases.records,
                                 'not_established': ['H1', 'product acceptance', 'the persistent stack', 'a running Realtime service']}, indent=2) + '\n')

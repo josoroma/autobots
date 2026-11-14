@@ -11,9 +11,7 @@ sleep happened, 2 prerequisite unavailable. Passing establishes neither H1 nor p
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import json
-from pathlib import Path
 import re
 import secrets
 import signal
@@ -21,9 +19,21 @@ import subprocess
 import sys
 import tempfile
 import time
+from datetime import UTC, datetime
+from pathlib import Path
 
 from app_db import AppStack, apply_migrations, bootstrap, seed
-from disposable_db import PROJECT_PREFIX, Target, Unavailable, free_port, other_resources, remove_stack, require_identity, run, tool_env
+from disposable_db import (
+    PROJECT_PREFIX,
+    Target,
+    Unavailable,
+    free_port,
+    other_resources,
+    remove_stack,
+    require_identity,
+    run,
+    tool_env,
+)
 from harness_lib import project_root
 from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner, password_token
 from qualify_operations import Ops, api_call, wait
@@ -60,17 +70,17 @@ class Run:
     def __init__(self, root: Path) -> None:
         self.root, self.out = root, root / OUT
         self.out.mkdir(parents=True, exist_ok=True)
-        self.report: dict = {'schema_version': 'autobots.mac-sleep/v1', 'started_at_utc': datetime.now(timezone.utc).isoformat(), 'target_class': 'disposable',
+        self.report: dict = {'schema_version': 'autobots.mac-sleep/v1', 'started_at_utc': datetime.now(UTC).isoformat(), 'target_class': 'disposable',
                              'model_transport': 'scripted, over a fake HTTP transport', 'used_sigstop': False, 'timeline': [],
                              'not_established': ['H1', 'product acceptance', 'a real provider across sleep', 'a persistent stack across sleep', 'Docker Desktop restarting']}
 
     def state(self, phase: str, **extra: object) -> None:
-        (self.out / 'state.json').write_text(json.dumps({'phase': phase, 'at': datetime.now(timezone.utc).isoformat(), **extra}) + '\n')
+        (self.out / 'state.json').write_text(json.dumps({'phase': phase, 'at': datetime.now(UTC).isoformat(), **extra}) + '\n')
         print(f'{phase} {extra}', flush=True)
 
     def finish(self, verdict: str) -> None:
         self.report['verdict'] = verdict
-        self.report['finished_at_utc'] = datetime.now(timezone.utc).isoformat()
+        self.report['finished_at_utc'] = datetime.now(UTC).isoformat()
         (self.out / 'report.json').write_text(json.dumps(self.report, indent=2, default=str) + '\n')
         self.state('done', verdict=verdict)
 
@@ -165,7 +175,7 @@ def observe(root: Path) -> int:
 
         def note(label: str) -> dict:
             current = snapshot()
-            run_state.report['timeline'].append({'label': label, 'at': datetime.now(timezone.utc).isoformat(), 'api': api_status(), **current})
+            run_state.report['timeline'].append({'label': label, 'at': datetime.now(UTC).isoformat(), 'api': api_status(), **current})
             return current
 
         if not wait(lambda: snapshot().get('status') == 'running', 60):
@@ -195,7 +205,7 @@ def observe(root: Path) -> int:
             run_state.report['slept'] = False
             run_state.finish('no_sleep_during_the_run')
             return 1
-        woke_at = datetime.now(timezone.utc).isoformat()
+        woke_at = datetime.now(UTC).isoformat()
         run_state.report.update({'slept': True, 'sleep_seconds_by_clocks': round(gap, 1), 'woke_at_utc': woke_at, 'before_sleep': last_seen})
         run_state.state('observing_after_wake', sleep_seconds=round(gap, 1))
         note('first read after waking')

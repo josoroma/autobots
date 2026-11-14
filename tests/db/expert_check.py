@@ -12,15 +12,20 @@ from uuid import UUID, uuid4
 import psycopg
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import ROUTE, Script, calls, say  # noqa: E402
-
-from autobots.adapters.loop_middleware import ModelRoute  # noqa: E402
-from autobots.application.experts import ExpertRefused, add_version, create_expert, create_session, resolve_binding  # noqa: E402
-from autobots.application.goal_loop import LoopConfig, run_goal  # noqa: E402
-from autobots.application.runs import admit_run  # noqa: E402
-from autobots.application.worker_leases import claim_next  # noqa: E402
-from autobots.contracts.experts import ExpertConfig, SessionExpert  # noqa: E402
-from autobots.domain.models import ModelRole, resolve_role_policy  # noqa: E402
+from autobots.adapters.loop_middleware import ModelRoute
+from autobots.application.experts import (
+    ExpertRefused,
+    add_version,
+    create_expert,
+    create_session,
+    resolve_binding,
+)
+from autobots.application.goal_loop import LoopConfig, run_goal
+from autobots.application.runs import admit_run
+from autobots.application.worker_leases import claim_next
+from autobots.contracts.experts import ExpertConfig, SessionExpert
+from autobots.domain.models import ModelRole, resolve_role_policy
+from goal_loop_script import ROUTE, Script, calls, say
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE, OTHER = UUID(sys.argv[1]), UUID(sys.argv[2])

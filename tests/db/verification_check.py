@@ -17,25 +17,30 @@ from langchain_core.messages import AIMessage
 from pydantic import SecretStr
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import PLAN, ROUTE, SAVE, Script, calls, say  # noqa: E402
-
-from autobots.adapters.loop_middleware import ModelRoute  # noqa: E402
-from autobots.adapters.object_storage import SupabaseObjectStore  # noqa: E402
-from autobots.application.artifacts import publish  # noqa: E402
-from autobots.application.goal_loop import LoopConfig, _settle_candidate, loop_registry, process_next, run_goal  # noqa: E402
-from autobots.application.model_admission import AdmissionRequest, ModelAdmission  # noqa: E402
-from autobots.application.model_attempts import FailureClass, ProviderFailure  # noqa: E402
-from autobots.application.recovery import classify_interrupted  # noqa: E402
-from autobots.application.run_projection import read_workspace  # noqa: E402
-from autobots.application.run_usage import RootLimits  # noqa: E402
-from autobots.application.runs import IdempotencyConflict, admit_run, apply_command  # noqa: E402
-from autobots.application.tool_gateway import ToolFailed, ToolGateway, ToolScope  # noqa: E402
-from autobots.application.tools import default_registry  # noqa: E402
-from autobots.application.worker_leases import claim_next  # noqa: E402
-from autobots.contracts.plans import InputDocument, RequiredArtifact  # noqa: E402
-from autobots.domain.models import resolve_role_policy  # noqa: E402
-from autobots.domain.runs import Actor, RunCommand  # noqa: E402
-from autobots.operations.logs import JsonFormatter, redact  # noqa: E402
+from autobots.adapters.loop_middleware import ModelRoute
+from autobots.adapters.object_storage import SupabaseObjectStore
+from autobots.application.artifacts import publish
+from autobots.application.goal_loop import (
+    LoopConfig,
+    _settle_candidate,
+    loop_registry,
+    process_next,
+    run_goal,
+)
+from autobots.application.model_admission import AdmissionRequest, ModelAdmission
+from autobots.application.model_attempts import FailureClass, ProviderFailure
+from autobots.application.recovery import classify_interrupted
+from autobots.application.run_projection import read_workspace
+from autobots.application.run_usage import RootLimits
+from autobots.application.runs import IdempotencyConflict, admit_run, apply_command
+from autobots.application.tool_gateway import ToolFailed, ToolGateway, ToolScope
+from autobots.application.tools import default_registry
+from autobots.application.worker_leases import claim_next
+from autobots.contracts.plans import InputDocument, RequiredArtifact
+from autobots.domain.models import resolve_role_policy
+from autobots.domain.runs import Actor, RunCommand
+from autobots.operations.logs import JsonFormatter, redact
+from goal_loop_script import PLAN, ROUTE, SAVE, Script, calls, say
 
 URL, BASE = os.environ['AUTOBOTS_DATABASE_URL'], os.environ['AUTOBOTS_STORAGE_BASE']
 SERVICE = SecretStr(os.environ['AUTOBOTS_STORAGE_SERVICE'])
@@ -358,7 +363,7 @@ async def main() -> None:
         check('and can\'t change it', 'inputs_read_only', write.code, write.code == 'inputs_read_only')
         again = await gateway.execute(db, scope, 'read_run_file', {'path': 'inputs/data.md'})
         check('so it still holds the original', 'apples: 4', again.output['content'], again.output['content'] == 'apples: 4')
-        from autobots.application.artifacts import publish_tool  # noqa: PLC0415
+        from autobots.application.artifacts import publish_tool
         registry = default_registry()
         registry.register(publish_tool(store))
         publishing = await ToolGateway(registry).execute(db, ToolScope(WORKSPACE, run, lease.generation, {'publish_artifact': 1}, ('inputs', 'outputs')), 'publish_artifact', {'path': 'inputs/data.md', 'version': 1})

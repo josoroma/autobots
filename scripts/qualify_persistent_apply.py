@@ -7,21 +7,41 @@ can do that to a real install. It removes only its own project. Exit codes: 0 pa
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import hashlib
 import json
-from pathlib import Path
 import secrets
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
+from datetime import UTC, datetime
+from pathlib import Path
 
-from app_db import AppStack, MIGRATIONS
-from disposable_db import PROJECT_PREFIX, Cases, Refused, Target, Unavailable, free_port, other_resources, remove_stack, require_identity, rows, run, tool_env
+from app_db import MIGRATIONS, AppStack
+from disposable_db import (
+    PROJECT_PREFIX,
+    Cases,
+    Refused,
+    Target,
+    Unavailable,
+    free_port,
+    other_resources,
+    remove_stack,
+    require_identity,
+    rows,
+    run,
+    tool_env,
+)
 from harness_lib import fingerprint, project_root
-from persistent_install import STORAGE_SQL, Record, first_setup, guarded_apply, read_record, write_install
+from persistent_install import (
+    STORAGE_SQL,
+    Record,
+    first_setup,
+    guarded_apply,
+    read_record,
+    write_install,
+)
 from supabase_stack import generated_values, require_images, require_rendered
 
 REPORT = Path('.checks/persistent-apply/qualification.json')
@@ -175,7 +195,7 @@ def qualify(root: Path) -> int:
     passed = all(case['status'] == 'passed' for case in cases.records)
     path = root / REPORT
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({'schema_version': 'autobots.persistent-apply/v1', 'completed_at_utc': datetime.now(timezone.utc).isoformat(), 'duration_seconds': round(time.monotonic() - started_at, 1),
+    path.write_text(json.dumps({'schema_version': 'autobots.persistent-apply/v1', 'completed_at_utc': datetime.now(UTC).isoformat(), 'duration_seconds': round(time.monotonic() - started_at, 1),
                                 'input_fingerprint': fingerprint(root), 'status': 'passed' if passed else 'failed', 'target_class': 'disposable', 'cases': cases.records,
                                 'not_established': ['the real install', 'H1', 'product acceptance']}, indent=2) + '\n')
     return 0 if passed else 1

@@ -12,13 +12,14 @@ a recorded assertion was correct, so review and meaningful tests remain necessar
 from __future__ import annotations
 
 import argparse
-from collections.abc import Mapping, Sequence
 import hashlib
 import json
-from pathlib import Path
 import re
 import subprocess
 import sys
+from collections.abc import Mapping, Sequence
+from pathlib import Path
+from typing import Any
 
 from harness_lib import input_manifest, project_root, read_report
 
@@ -56,7 +57,7 @@ def source_inputs(manifest: Mapping[str, str]) -> dict[str, str]:
             if path not in RECORD_FILES and not path.startswith(RECORD_PREFIXES)}
 
 
-def fingerprints(root: Path) -> dict:
+def fingerprints(root: Path) -> dict[str, Any]:
     manifest = input_manifest(root)
     source = source_inputs(manifest)
     def chosen(*prefixes: str, names: frozenset[str] | set[str] = frozenset()) -> dict[str, str]:
@@ -154,7 +155,7 @@ def relative_inside(root: Path, value: object, base: str) -> Path | None:
     return path if path.is_relative_to((root / base).resolve()) else None
 
 
-def runbook_errors(root: Path, runbook: object, evidence_id: object, checks: Sequence) -> list[str]:
+def runbook_errors(root: Path, runbook: object, evidence_id: object, checks: Sequence[Mapping[str, Any]]) -> list[str]:
     if not isinstance(runbook, dict):
         return ['runbook: missing.']
     path = relative_inside(root, runbook.get('path'), 'docs/engineering/runbooks')
@@ -175,7 +176,7 @@ def runbook_errors(root: Path, runbook: object, evidence_id: object, checks: Seq
     return errors
 
 
-def raw_errors(root: Path, raw: object, checks: Sequence, work_item: str, evidence_id: object) -> list[str]:
+def raw_errors(root: Path, raw: object, checks: Sequence[Mapping[str, Any]], work_item: str, evidence_id: object) -> list[str]:
     if not isinstance(raw, dict):
         return ['raw_artifacts: missing.']
     errors = []
@@ -218,15 +219,16 @@ def report_problem(root: Path, report: object, profile: str) -> str | None:
     return None
 
 
-def provenance_errors(root: Path, checks: Sequence, availability: object = None) -> list[str]:
+def provenance_errors(root: Path, checks: Sequence[Mapping[str, Any]], availability: object = None) -> list[str]:
     """Each check must trace to a run: a matching passing report, or a labeled manual run with a verified artifact."""
     errors = []
     for check in checks:
         if not isinstance(check, dict):
             continue
         label = f"check {check.get('id', '(unnamed)')}"
-        source = check.get('source')
-        kind = source.get('kind') if isinstance(source, dict) else None
+        raw_source = check.get('source')
+        source: Mapping[str, Any] = raw_source if isinstance(raw_source, dict) else {}
+        kind = source.get('kind')
         if kind == 'manual':
             if not check.get('artifacts'):
                 errors.append(f'{label}: a manual check retains no artifact of its run.')
@@ -238,7 +240,7 @@ def provenance_errors(root: Path, checks: Sequence, availability: object = None)
             profile = str(source.get('profile'))
             report = read_report(root, profile)
             problem = report_problem(root, report, profile)
-            if problem:
+            if problem or report is None:
                 errors.append(f'{label}: {problem}')
                 continue
             if report.get('status') != 'passed':
@@ -268,10 +270,10 @@ def manifest_errors(root: Path, work_item: str, evidence_id: str, manifest: obje
         errors.append('manifest: names a different work item.')
     if manifest.get('evidence_id') != evidence_id:
         errors.append('manifest: names a different evidence id.')
-    requirements = manifest.get('requirement_ids')
-    if not nonempty_texts(requirements):
+    named = manifest.get('requirement_ids')
+    requirements: list[Any] = named if isinstance(named, list) and nonempty_texts(named) else []
+    if not requirements:
         errors.append('manifest: names no requirement.')
-        requirements = []
     current = fingerprints(root)
     recorded = manifest.get('fingerprint')
     recorded = recorded if isinstance(recorded, dict) else {}
@@ -350,7 +352,7 @@ def completion_errors(root: Path, work_item: str) -> list[str]:
     return errors
 
 
-def report_check(profile: str, check: Mapping, report: Mapping, plan: Mapping) -> dict:
+def report_check(profile: str, check: Mapping[str, Any], report: Mapping[str, Any], plan: Mapping[str, Any]) -> dict[str, Any]:
     """One manifest check, copied from a captured verifier record. Class and transport come from the verifier."""
     name = f"{profile}.{check['id']}"
     status = check['status']
@@ -375,7 +377,7 @@ def report_check(profile: str, check: Mapping, report: Mapping, plan: Mapping) -
             'exit_code': code, 'artifacts': []}
 
 
-def tool_versions(root: Path) -> dict:
+def tool_versions(root: Path) -> dict[str, Any]:
     """What actually runs, from the toolchain script. Absent when it cannot say, not hand-supplied."""
     result = subprocess.run([sys.executable, str(Path(__file__).with_name('toolchain.py')), 'versions', '--project-root', str(root)],
                             capture_output=True, text=True, timeout=60, check=False)
@@ -385,15 +387,17 @@ def tool_versions(root: Path) -> dict:
         return {}
 
 
-def record_manifest(root: Path, work_item: str, evidence_id: str, plan: Mapping) -> list[str]:
+def record_manifest(root: Path, work_item: str, evidence_id: str, plan: Mapping[str, Any]) -> list[str]:
     """Write a manifest from verifier reports, or return why not. It records; `validate` still judges it."""
     current = fingerprints(root)
-    checks, reports, python_version = [], {}, None
+    checks: list[dict[str, Any]] = []
+    reports: dict[str, Any] = {}
+    python_version: object = None
     for profile in plan['profiles']:
         report = read_report(root, profile)
         problem = report_problem(root, report, profile)
-        if problem:
-            return [problem]
+        if problem or report is None:
+            return [problem or f'{profile}: no valid verifier report.']
         python_version = report.get('python_version')
         reports[profile] = {key: report.get(key) for key in ('status', 'input_fingerprint', 'completed_at_utc',
                                                              'assistant_adapter', 'not_tested', 'scope')}

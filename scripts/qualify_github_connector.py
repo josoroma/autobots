@@ -19,11 +19,11 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from datetime import datetime, timezone
 import json
-from pathlib import Path
 import sys
 import time
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -45,7 +45,13 @@ def unsafe_target(scopes: str | None, private: bool) -> str:
 
 async def qualify(repository: str, token: str) -> tuple[int, dict]:
     import httpx
-    from autobots.adapters.github_issues import API_URL, REPOSITORY_VARIABLE, TOKEN_VARIABLE, github_issue_tool, marker
+    from autobots.adapters.github_issues import (
+        API_URL,
+        REPOSITORY_VARIABLE,
+        TOKEN_VARIABLE,
+        github_issue_tool,
+        marker,
+    )
     from autobots.application.tool_gateway import NotDelivered, ToolContext, ToolScope
     from autobots.contracts.tools import CreateGithubIssueInput
 
@@ -96,9 +102,9 @@ async def qualify(repository: str, token: str) -> tuple[int, dict]:
             try:
                 await refused_tool.handler(arguments, context)
                 check('a rejected credential creates nothing', 'github_refused_401', 'created', False)
-            except Exception as error:
+            except Exception as error:  # noqa: BLE001 - a refused credential is judged by its typed code
                 check('a rejected credential creates nothing', 'github_refused_401', error, str(error) == 'github_refused_401')
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - only the type is reported, since a message could hold anything
             # Only the type: a report is saved, and a message could hold anything.
             check('the qualification ran to its end', 'no error', type(error).__name__, False)
         finally:
@@ -106,7 +112,7 @@ async def qualify(repository: str, token: str) -> tuple[int, dict]:
                 closed = await http.patch(f'/repos/{repository}/issues/{number}', json={'state': 'closed', 'state_reason': 'not_planned'})
                 check('the qualification closes what it opened', '200', closed.status_code, closed.status_code == 200)
     failed = [case['id'] for case in cases if not case['passed']]
-    report = {'schema_version': 'autobots.github-connector/v1', 'completed_at_utc': datetime.now(timezone.utc).isoformat(), 'evidence_class': 'live',
+    report = {'schema_version': 'autobots.github-connector/v1', 'completed_at_utc': datetime.now(UTC).isoformat(), 'evidence_class': 'live',
               'repository': repository, 'issue': number, 'cases': cases, 'failed': failed,
               'not_established': ['H1', 'product acceptance', 'a real lost acknowledgment, which only the fake transport arranges', 'the gateway, in tests/db/connector_check.py']}
     return (1 if failed else 0), report
@@ -274,7 +280,13 @@ async def studio_review(repository: str, token: str, authorization: dict, ledger
 
 async def studio_apply(repository: str, token: str, authorization: dict, review: dict, ledger: dict) -> tuple[int, dict]:
     import httpx
-    from autobots.adapters.github_issues import API_URL, REPOSITORY_VARIABLE, TOKEN_VARIABLE, github_issue_tool, marker
+    from autobots.adapters.github_issues import (
+        API_URL,
+        REPOSITORY_VARIABLE,
+        TOKEN_VARIABLE,
+        github_issue_tool,
+        marker,
+    )
     from autobots.adapters.github_pulls import branch_for, github_pull_request_tool
     from autobots.adapters.github_reads import github_read_tools
     from autobots.application.tool_gateway import ToolContext, ToolFailed, ToolScope
@@ -364,7 +376,7 @@ async def studio_apply(repository: str, token: str, authorization: dict, review:
         except ToolFailed as error:
             # A typed code, never a message from GitHub.
             check('the qualification ran to its end', 'no error', f'ToolFailed {error}', False)
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - only the type is reported, since a message could hold anything
             check('the qualification ran to its end', 'no error', type(error).__name__, False)
         finally:
             transport.cleaning = True
@@ -381,7 +393,7 @@ async def studio_apply(repository: str, token: str, authorization: dict, review:
                 check('the qualification closes its issue', '200', closed.status_code, closed.status_code == 200)
     check('the pass stays inside the authorized cap', f'at most {cap} requests', f'{transport.used} of {cap}', transport.used <= cap)
     failed = [case['id'] for case in cases if not case['passed']]
-    report = {'schema_version': 'autobots.github-studio/v1', 'story': STUDIO_STORY, 'completed_at_utc': datetime.now(timezone.utc).isoformat(),
+    report = {'schema_version': 'autobots.github-studio/v1', 'story': STUDIO_STORY, 'completed_at_utc': datetime.now(UTC).isoformat(),
               'evidence_class': 'live', 'repository': repository, 'authorization': authorization.get('source'),
               'issue': issue_number, 'pull_request': pull_number, 'branch': branch, 'outputs': outputs,
               'requests_used': transport.used, 'request_cap': cap, 'requests': list(ledger['requests']),

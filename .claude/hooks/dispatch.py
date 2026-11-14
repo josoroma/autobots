@@ -5,18 +5,19 @@ from __future__ import annotations
 import ast
 import json
 import os
-from pathlib import Path
 import re
 import signal
 import subprocess
 import sys
+from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 FAILURE = 'Autobots hook input/configuration failed validation; no sensitive input was logged.'
 sys.path.insert(0, str(ROOT / 'scripts'))
 try:
     from harness_lib import check_domains, evidence_state, reduced_env
-except Exception:  # A broken or missing library must block, not print a traceback and exit 1.
+except Exception:  # noqa: BLE001 - a broken or missing library must block, not print a traceback and exit 1
     print(FAILURE, file=sys.stderr)
     raise SystemExit(2) from None
 
@@ -93,11 +94,11 @@ def session_root(home: Path, raw_cwd: object) -> Path | None:
     return max(held_by, key=lambda path: len(path.parts), default=home)
 
 
-def guard(root: Path, tool: str, value: dict) -> str | None:
+def guard(root: Path, tool: str, value: dict[str, Any]) -> str | None:
     if tool in {'Read', 'Write', 'Edit', 'MultiEdit'}:
         raw = value.get('file_path')
         path = resolve_path(root, raw)
-        if path is None:
+        if path is None or not isinstance(raw, str):
             return 'A supported file tool needs a concrete, bounded and resolvable file_path.'
         # The link's own name counts too: `.env` pointing elsewhere is still treated as a secret.
         # The install's whole record is private, wherever `--install-dir` isn't pointed elsewhere.
@@ -165,7 +166,7 @@ def post_edit_diagnostic(root: Path, raw: object) -> str:
     return diagnostic
 
 
-def handle(home: Path, payload: dict) -> dict:
+def handle(home: Path, payload: dict[str, Any]) -> dict[str, Any]:
     """Only events that judge a checkout ask Git, and none exits 2 for it: `Bash` must stay usable, and `Stop` must end."""
     event = payload.get('hook_event_name')
     if event == 'SessionStart':
@@ -218,7 +219,7 @@ def expire(_signal: int, _frame: object) -> None:
 
 
 def main() -> int:
-    if sys.version_info < (3, 12):
+    if sys.version_info < (3, 12):  # noqa: UP036 - a guard for an older interpreter running this script
         print('Autobots hooks require the configured Python 3.12+ interpreter.', file=sys.stderr)
         return 2
     try:
@@ -232,7 +233,7 @@ def main() -> int:
             raise ValueError('Expected object')
         output = handle(ROOT, payload)
         signal.setitimer(signal.ITIMER_REAL, 0)
-    except Exception:  # Exit 2 is the documented block; any other exit would let a tool proceed.
+    except Exception:  # noqa: BLE001 - exit 2 is the documented block; any other exit would let a tool proceed
         print(FAILURE, file=sys.stderr)
         return 2
     print(json.dumps(output))

@@ -11,20 +11,35 @@ Passing establishes neither H1 nor product acceptance.
 """
 from __future__ import annotations
 
-from collections.abc import Sequence
-from datetime import datetime, timezone
 import hashlib
 import json
-from pathlib import Path
 import re
 import secrets
 import subprocess
-import tempfile
 import sys
+import tempfile
 import time
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from pathlib import Path
 
-from disposable_db import (PROJECT_PREFIX, Cases, Refused, Target, Unavailable, free_port, last_line, other_resources,
-                           remove_stack, require_identity, require_marker, rows, run, tool_env, write_marker)
+from disposable_db import (
+    PROJECT_PREFIX,
+    Cases,
+    Refused,
+    Target,
+    Unavailable,
+    free_port,
+    last_line,
+    other_resources,
+    remove_stack,
+    require_identity,
+    require_marker,
+    rows,
+    run,
+    tool_env,
+    write_marker,
+)
 from harness_lib import fingerprint, project_root
 from supabase_stack import SupabaseStack, generated_values, require_images, require_rendered
 
@@ -695,7 +710,7 @@ def qualify(root: Path, write_types: bool = False) -> int:
     passed = all(record['status'] == 'passed' for record in cases.records)
     path = root / REPORT
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({'schema_version': 'autobots.app-db-qualification/v1', 'completed_at_utc': datetime.now(timezone.utc).isoformat(),
+    path.write_text(json.dumps({'schema_version': 'autobots.app-db-qualification/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
                                 'duration_seconds': round(time.monotonic() - started_at, 1), 'input_fingerprint': fingerprint(root),
                                 'status': 'passed' if passed else 'failed', 'target_class': 'disposable', 'project': project, 'cases': cases.records,
                                 'not_established': ['H1', 'product acceptance', 'the persistent database', 'Storage authorization']}, indent=2) + '\n')

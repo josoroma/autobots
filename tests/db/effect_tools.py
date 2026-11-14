@@ -10,10 +10,9 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 sys.path.insert(0, str(Path(__file__).parent))
-from mock_sink import Sink  # noqa: E402
-
-from autobots.application.tool_gateway import NotDelivered, ToolContext, ToolDefinition, ToolFailed  # noqa: E402
-from autobots.domain.tools import OperationClass  # noqa: E402
+from autobots.application.tool_gateway import NotDelivered, ToolContext, ToolDefinition, ToolFailed
+from autobots.domain.tools import OperationClass
+from mock_sink import Sink
 
 
 class SendInput(BaseModel):

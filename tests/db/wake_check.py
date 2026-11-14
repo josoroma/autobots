@@ -12,12 +12,11 @@ import sys
 from uuid import UUID, uuid4
 
 import psycopg
-
-from autobots.application.goal_loop import LoopConfig, _keep_lease  # noqa: PLC2701
 from autobots.adapters.loop_middleware import ModelRoute
+from autobots.application import goal_loop
+from autobots.application.goal_loop import LoopConfig, _keep_lease
 from autobots.application.run_usage import active_seconds_used, begin_segment, discount_sleep
 from autobots.application.runs import LeaseLost, admit_run
-from autobots.application import goal_loop  # noqa: E402
 from autobots.application.worker_leases import WakeClock, claim_run, heartbeat, revive_lease
 from autobots.domain.models import resolve_role_policy
 

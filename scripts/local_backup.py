@@ -11,24 +11,32 @@ Exit codes: 0 done, 1 refused before any change, 2 a prerequisite is unavailable
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 import hashlib
 import hmac
 import io
 import json
 import os
-from pathlib import Path
 import secrets
 import shutil
 import struct
 import subprocess
 import sys
 import time
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import IO
 from urllib import request as urlrequest
 
 from app_db import AppStack
-from disposable_db import PROJECT_PREFIX, Refused, Target, Unavailable, free_port, require_identity, tool_env
+from disposable_db import (
+    PROJECT_PREFIX,
+    Refused,
+    Target,
+    Unavailable,
+    free_port,
+    require_identity,
+    tool_env,
+)
 from harness_lib import project_root
 
 MANIFEST_VERSION = 'autobots.backup/v1'
@@ -191,7 +199,7 @@ def backup(project: str, env_file: Path, out: Path, backup_key: Path, key_dir: P
     out.mkdir(parents=True, mode=0o700)
     key_dir.mkdir(parents=True, mode=0o700, exist_ok=True)
     os.chmod(key_dir, 0o700)
-    manifest: dict = {'schema_version': MANIFEST_VERSION, 'created_at': datetime.now(timezone.utc).isoformat(), 'source_project': project,
+    manifest: dict = {'schema_version': MANIFEST_VERSION, 'created_at': datetime.now(UTC).isoformat(), 'source_project': project,
                       'images': images, 'tool_image': tool_image, 'facts': facts, 'components': {}, 'compose_files': compose_hashes(project_root())}
     with env_file.open('rb') as source:
         digest, size = seal_stream(source, out / 'configuration.sealed', key, 'configuration')
@@ -282,7 +290,7 @@ def verify_backup(backup_dir: Path, key: bytes) -> dict:
 
 def record_restore(backup_dir: Path, result: str, passed: int | None = None, total: int | None = None) -> None:
     """Beside the backup, where Operations reads it. A date and a result, and nothing about the instance."""
-    entry = {'at': datetime.now(timezone.utc).isoformat(), 'result': result, 'checks_passed': passed, 'checks_total': total}
+    entry = {'at': datetime.now(UTC).isoformat(), 'result': result, 'checks_passed': passed, 'checks_total': total}
     descriptor = os.open(backup_dir / 'restores.jsonl', os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
     with os.fdopen(descriptor, 'a') as handle:
         handle.write(json.dumps(entry) + '\n')

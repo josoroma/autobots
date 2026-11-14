@@ -2,36 +2,41 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
 import json
 import os
-from pathlib import Path
 import sys
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import Script, calls, say  # noqa: E402
-
-from autobots.adapters import loop_middleware  # noqa: E402
-from autobots.adapters.loop_middleware import ModelRoute  # noqa: E402
-from autobots.application.compaction import SUMMARY_MARKER, CompactionPolicy  # noqa: E402
-from autobots.application.goal_loop import LoopConfig, _drive, _settle_children  # noqa: E402, PLC2701
-from autobots.application.model_admission import ModelAdmission  # noqa: E402
-from autobots.application.operations import REQUIRED_COLUMNS, database_conditions  # noqa: E402
-from autobots.application.plans import load_goal  # noqa: E402
-from autobots.application.run_projection import read_inspector, read_summary, read_workspace  # noqa: E402
-from autobots.application.runs import LinkRefused, admit_run  # noqa: E402
-from autobots.application.experts import create_expert  # noqa: E402
-from autobots.application.routines import RoutineRefused, _admit as routine_admit  # noqa: E402, PLC2701
-from autobots.application.workflows import WorkflowRefused, create_execution, create_workflow, publish_version  # noqa: E402
-from autobots.contracts.experts import ExpertConfig  # noqa: E402
-from autobots.contracts.routines import RoutineConfig, RoutineTarget  # noqa: E402
-from autobots.contracts.workflows import WorkflowGraph  # noqa: E402
+from autobots.adapters import loop_middleware
+from autobots.adapters.loop_middleware import ModelRoute
+from autobots.application.compaction import SUMMARY_MARKER, CompactionPolicy
+from autobots.application.experts import create_expert
+from autobots.application.goal_loop import LoopConfig, _drive, _settle_children
+from autobots.application.model_admission import ModelAdmission
+from autobots.application.operations import REQUIRED_COLUMNS, database_conditions
+from autobots.application.plans import load_goal
+from autobots.application.routines import RoutineRefused
+from autobots.application.routines import _admit as routine_admit
+from autobots.application.run_projection import read_inspector, read_summary, read_workspace
+from autobots.application.runs import LinkRefused, admit_run
 from autobots.application.worker_leases import claim_run
+from autobots.application.workflows import (
+    WorkflowRefused,
+    create_execution,
+    create_workflow,
+    publish_version,
+)
+from autobots.contracts.experts import ExpertConfig
+from autobots.contracts.routines import RoutineConfig, RoutineTarget
+from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.models import resolve_role_policy
+from goal_loop_script import Script, calls, say
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = UUID(sys.argv[1])
@@ -174,7 +179,7 @@ async def main() -> None:
         # E-4, on real catalogs: a column that isn't there reads as behind, and the real ones don't.
         conditions = await database_conditions(OnePool(db))
         check('the columns a migration added are all present', 'no schema_behind', [item.code for item in conditions], 'schema_behind' not in [item.code for item in conditions])
-        from autobots.application import operations  # noqa: PLC0415
+        from autobots.application import operations
         operations.REQUIRED_COLUMNS = (*REQUIRED_COLUMNS, ('public.runs', 'no_such_column'))
         conditions = await database_conditions(OnePool(db))
         operations.REQUIRED_COLUMNS = REQUIRED_COLUMNS

@@ -9,14 +9,14 @@ Passing shows these checkers catch these faults. It establishes neither H1 nor p
 """
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import json
 import os
-from pathlib import Path
 import re
 import sys
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
 
 from harness_lib import fingerprint, project_root
 from toolchain import Step, Unavailable, child_env, find_tools, missing_prepared_paths, run_step
@@ -114,7 +114,7 @@ def run_cases(root: Path, selected: Sequence[Case], env: Mapping[str, str]) -> l
 
 
 def main() -> int:
-    if sys.version_info < (3, 12):
+    if sys.version_info < (3, 12):  # noqa: UP036 - a guard for an older interpreter running this script
         print('ERROR: Python 3.12+ is required.', file=sys.stderr)
         return 2
     root = project_root()
@@ -133,7 +133,7 @@ def main() -> int:
     path = root / REPORT
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({'schema_version': 'autobots.fault-qualification/v1',
-                                'completed_at_utc': datetime.now(timezone.utc).isoformat(),
+                                'completed_at_utc': datetime.now(UTC).isoformat(),
                                 'input_fingerprint': fingerprint(root),
                                 'status': 'passed' if passed else 'failed', 'cases': results,
                                 'not_established': ['H1', 'product acceptance', 'live inference']}, indent=2) + '\n')

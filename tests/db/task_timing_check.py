@@ -17,12 +17,11 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-
 from autobots.application.experts import create_expert
 from autobots.application.plans import plan_tools
 from autobots.application.run_projection import read_workspace
 from autobots.application.run_usage import RootLimits
-from autobots.application.runs import apply_command, admit_run
+from autobots.application.runs import admit_run, apply_command
 from autobots.application.tool_gateway import ToolGateway, ToolScope
 from autobots.application.tool_uses import admit_metered
 from autobots.application.tools import default_registry

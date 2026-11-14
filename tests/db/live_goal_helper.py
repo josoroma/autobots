@@ -7,13 +7,12 @@ from __future__ import annotations
 
 import asyncio
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 from uuid import UUID
 
 import httpx
 import psycopg
-
 from autobots.api.main import provider_context_from_environment
 from autobots.application.provider_settings import ProviderSettings
 from autobots.operations.route_qualification import read_key
@@ -53,7 +52,7 @@ async def leaks(key_file: str, logs: str) -> None:
             for (value,) in await cursor.fetchall():
                 text = bytes(value).decode(errors='replace') if isinstance(value, (bytes, memoryview)) else str(value)
                 found += secret in text
-    written = sum(secret in path.read_text(errors='replace') for path in Path(logs).glob('*.log'))
+    written = sum(secret in path.read_text(errors='replace') for path in Path(logs).glob('*.log'))  # noqa: ASYNC240 - a test helper reading one small local file
     print(f'{found} {written}')
 
 

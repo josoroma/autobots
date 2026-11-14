@@ -8,11 +8,10 @@ from pathlib import Path
 import psycopg
 
 sys.path.insert(0, str(Path(__file__).parent))
-from effect_tools import tools  # noqa: E402
-from goal_loop_script import ROUTE, Script  # noqa: E402
-from mock_sink import Sink  # noqa: E402
-
-from autobots.application.goal_loop import LoopConfig, process_next  # noqa: E402
+from autobots.application.goal_loop import LoopConfig, process_next
+from effect_tools import tools
+from goal_loop_script import ROUTE, Script
+from mock_sink import Sink
 
 URL, SINK, BODY = sys.argv[1], sys.argv[2], sys.argv[3]
 

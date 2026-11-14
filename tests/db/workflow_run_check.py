@@ -13,22 +13,26 @@ import psycopg
 from pydantic import SecretStr
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import ROUTE, Script, calls, say  # noqa: E402
-
-from autobots.adapters.object_storage import SupabaseObjectStore  # noqa: E402
-from autobots.application.approvals import decide  # noqa: E402
-from autobots.application.experts import create_expert  # noqa: E402
-from autobots.application import workflow_runner  # noqa: E402
-from autobots.application.goal_loop import LoopConfig, process_next  # noqa: E402
-from autobots.application.plans import load_goal  # noqa: E402
-from autobots.application.runs import apply_command  # noqa: E402
-from autobots.application.worker_leases import claim_next  # noqa: E402
-from autobots.application.workflows import create_execution, create_workflow, publish_version, set_description  # noqa: E402
-from autobots.domain.workflows import block_versions, graph_hash  # noqa: E402
-from autobots.contracts.experts import ExpertConfig  # noqa: E402
-from autobots.contracts.plans import InputDocument  # noqa: E402
-from autobots.contracts.workflows import WorkflowGraph  # noqa: E402
-from autobots.domain.runs import Actor, RunCommand  # noqa: E402
+from autobots.adapters.object_storage import SupabaseObjectStore
+from autobots.application import workflow_runner
+from autobots.application.approvals import decide
+from autobots.application.experts import create_expert
+from autobots.application.goal_loop import LoopConfig, process_next
+from autobots.application.plans import load_goal
+from autobots.application.runs import apply_command
+from autobots.application.worker_leases import claim_next
+from autobots.application.workflows import (
+    create_execution,
+    create_workflow,
+    publish_version,
+    set_description,
+)
+from autobots.contracts.experts import ExpertConfig
+from autobots.contracts.plans import InputDocument
+from autobots.contracts.workflows import WorkflowGraph
+from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.workflows import block_versions, graph_hash
+from goal_loop_script import ROUTE, Script, say
 
 URL, BASE = os.environ['AUTOBOTS_DATABASE_URL'], os.environ['AUTOBOTS_STORAGE_BASE']
 SERVICE = SecretStr(os.environ['AUTOBOTS_STORAGE_SERVICE'])
@@ -154,15 +158,15 @@ async def main() -> None:
         execution = await start('Stale', LOOP, {'in': ['a']})
         lease = await claim_next(db, worker_id='stale', lease_seconds=60)
         await db.execute("update app_private.run_jobs set generation = generation + 1 where run_id = %s", (execution.run_id,))
-        from autobots.application.workflow_runner import run_workflow  # noqa: PLC0415
+        from autobots.application.workflow_runner import run_workflow
         result = await run_workflow(db, URL, lease, None, config)
         rows = await value('select count(*) from public.workflow_node_instances where execution_id = %s', execution.id)
         check('a stale worker commits nothing', 'lost, 0 instances', (result.outcome, rows), result.outcome == 'lost' and rows == 0)
 
         # _commit's own fence, with a scope whose generation has moved on.
-        from autobots.application.tool_gateway import LeaseLost, ToolScope  # noqa: PLC0415
-        from autobots.application.workflow_runner import _commit  # noqa: PLC0415
-        from autobots.domain.workflow_execution import Step  # noqa: PLC0415
+        from autobots.application.tool_gateway import LeaseLost, ToolScope
+        from autobots.application.workflow_runner import _commit
+        from autobots.domain.workflow_execution import Step
         stale_scope = ToolScope(WORKSPACE, execution.run_id, lease.generation, {})
         step = Step('up', 'up', None, 'run', {})
         try:

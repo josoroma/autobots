@@ -1,10 +1,10 @@
 """Static guards for the application schema. Real replay runs in the `db` profile on a disposable target."""
 from __future__ import annotations
 
-from pathlib import Path
 import re
 import sys
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))

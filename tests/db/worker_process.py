@@ -10,10 +10,9 @@ from pathlib import Path
 import psycopg
 
 sys.path.insert(0, str(Path(__file__).parent))
-from worker_graph import build  # noqa: E402
-
-from autobots.adapters.checkpoints import DURABILITY, fenced_checkpointer, graph_config  # noqa: E402
-from autobots.application.worker_leases import claim_next  # noqa: E402
+from autobots.adapters.checkpoints import DURABILITY, fenced_checkpointer, graph_config
+from autobots.application.worker_leases import claim_next
+from worker_graph import build
 
 URL, LOG, DIE_AT, LEASE_SECONDS = sys.argv[1], sys.argv[2], sys.argv[3], float(sys.argv[4])
 

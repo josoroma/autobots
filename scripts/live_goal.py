@@ -9,19 +9,28 @@ The stack, its copy of the key and its master key are removed at the end. Exit 0
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 import json
-from pathlib import Path
 import secrets
 import signal
 import subprocess
 import sys
 import tempfile
 import time
+from datetime import UTC, datetime
+from pathlib import Path
 
 from app_db import AppStack, apply_migrations, bootstrap, seed
-from disposable_db import (PROJECT_PREFIX, Target, Unavailable, free_port, other_resources, remove_stack,
-                           require_identity, run, tool_env)
+from disposable_db import (
+    PROJECT_PREFIX,
+    Target,
+    Unavailable,
+    free_port,
+    other_resources,
+    remove_stack,
+    require_identity,
+    run,
+    tool_env,
+)
 from harness_lib import fingerprint, project_root
 from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner, password_token
 from qualify_operations import Ops, api_call, exited, wait
@@ -80,7 +89,7 @@ def attempt(root: Path, key_file: Path, limit: int, profile: str | None = None) 
         return done.stdout.strip()
 
     before_resources = other_resources(project)
-    report: dict = {'schema_version': 'autobots.live-goal/v1', 'started_at_utc': datetime.now(timezone.utc).isoformat(),
+    report: dict = {'schema_version': 'autobots.live-goal/v1', 'started_at_utc': datetime.now(UTC).isoformat(),
                     'input_fingerprint': fingerprint(root), 'target_class': 'disposable', 'model_transport': 'live OpenRouter',
                     'limit_micro_usd': limit, 'goal': GOAL, 'required_artifacts': REQUIRED, 'timeline': [], 'watchdog_fired': False,
                     'not_established': ['H1', 'product acceptance', 'US-3.4', 'task quality beyond this one goal', 'the persistent stack']}
@@ -181,7 +190,7 @@ def attempt(root: Path, key_file: Path, limit: int, profile: str | None = None) 
         except Unavailable as error:
             report['key_usage_after_usd'] = f'unread: {error}'
         out.mkdir(parents=True, exist_ok=True)
-        (out / f'result-{datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")}.json').write_text(json.dumps(report, indent=2, default=str))
+        (out / f'result-{datetime.now(UTC).strftime("%Y%m%dT%H%M%S")}.json').write_text(json.dumps(report, indent=2, default=str))
     final = (report.get('run') or [{}])[0].get('status')
     print(json.dumps({key: report.get(key) for key in ('run_id', 'goal_seconds', 'timeline', 'watchdog_fired', 'key_usage_before_usd', 'key_usage_after_usd', 'key_found', 'left_behind', 'other_docker_unchanged')}, indent=2))
     print(f'FINAL: {final}')

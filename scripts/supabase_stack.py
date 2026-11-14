@@ -12,20 +12,36 @@ from __future__ import annotations
 
 import argparse
 import base64
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 import json
-from pathlib import Path
 import secrets
 import socket
 import subprocess
 import sys
 import time
-from urllib import error as urlerror, request as urlrequest
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
+from urllib import error as urlerror
+from urllib import request as urlrequest
 
-from disposable_db import (PROJECT_PREFIX, RUN_LABEL, TARGET_LABEL, Cases, Refused, Stack, Target, Unavailable, free_port, jwt,
-                           other_resources, remove_stack, require_identity, run, tool_env)
+from disposable_db import (
+    PROJECT_PREFIX,
+    RUN_LABEL,
+    TARGET_LABEL,
+    Cases,
+    Refused,
+    Stack,
+    Target,
+    Unavailable,
+    free_port,
+    jwt,
+    other_resources,
+    remove_stack,
+    require_identity,
+    run,
+    tool_env,
+)
 from harness_lib import fingerprint, project_root
 
 UPSTREAM = Path('infra/supabase/upstream')
@@ -319,7 +335,7 @@ def finish(root: Path, cases: Cases, stack: Stack, before: Sequence[str], starte
     path = root / REPORT
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({'schema_version': 'autobots.supabase-qualification/v1',
-                                'completed_at_utc': datetime.now(timezone.utc).isoformat(),
+                                'completed_at_utc': datetime.now(UTC).isoformat(),
                                 'duration_seconds': round(time.monotonic() - started_at, 1),
                                 'input_fingerprint': fingerprint(root), 'status': 'passed' if passed else 'failed',
                                 'target_class': 'disposable', 'project': project, 'images': list(images), 'cases': cases.records,

@@ -15,16 +15,21 @@ import psycopg
 from pydantic import BaseModel, ConfigDict
 
 sys.path.insert(0, str(Path(__file__).parent))
-from goal_loop_script import ROUTE, Script, calls, say  # noqa: E402
-
-from autobots.application.approvals import ApprovalRefused, decide, expire_due  # noqa: E402
-from autobots.application.goal_loop import LoopConfig, process_next  # noqa: E402
-from autobots.application.runs import Inheritance, admit_run, apply_command  # noqa: E402
-from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolGateway, ToolRegistry, ToolScope  # noqa: E402
-from autobots.application.worker_leases import claim_next  # noqa: E402
-from autobots.domain.models import resolve_role_policy  # noqa: E402
-from autobots.domain.runs import Actor, RunCommand  # noqa: E402
-from autobots.domain.tools import PLAN_TOOLS, OperationClass  # noqa: E402
+from autobots.application.approvals import ApprovalRefused, decide, expire_due
+from autobots.application.goal_loop import LoopConfig, process_next
+from autobots.application.runs import Inheritance, admit_run, apply_command
+from autobots.application.tool_gateway import (
+    ToolContext,
+    ToolDefinition,
+    ToolGateway,
+    ToolRegistry,
+    ToolScope,
+)
+from autobots.application.worker_leases import claim_next
+from autobots.domain.models import resolve_role_policy
+from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.tools import PLAN_TOOLS, OperationClass
+from goal_loop_script import ROUTE, Script, calls, say
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE, OTHER = UUID(sys.argv[1]), UUID(sys.argv[2])

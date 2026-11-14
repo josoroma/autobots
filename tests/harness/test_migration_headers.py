@@ -4,9 +4,9 @@ Applied migrations keep their bytes, so the files up to `LAST_UNHEADED` are exem
 """
 from __future__ import annotations
 
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 LAST_UNHEADED = '20261108000053_routine_removal.sql'

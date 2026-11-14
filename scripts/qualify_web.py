@@ -10,11 +10,11 @@ Passing establishes neither H1 nor product acceptance.
 """
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from datetime import datetime, timezone
+import base64
+import hashlib
+import hmac
 import json
 import os
-from pathlib import Path
 import secrets
 import shutil
 import signal
@@ -22,11 +22,11 @@ import socket
 import subprocess
 import sys
 import time
-from urllib import error as urlerror, request as urlrequest
-
-import base64
-import hashlib
-import hmac
+from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
+from pathlib import Path
+from urllib import error as urlerror
+from urllib import request as urlrequest
 
 from harness_lib import fingerprint, project_root, reduced_env
 from suites import WEB_SUITES
@@ -187,7 +187,7 @@ def qualify(root: Path, retain: Path | None) -> int:
         for name in shots:
             shutil.copy2(screenshots / name, retain / name)
     path = root / REPORT
-    path.write_text(json.dumps({'schema_version': 'autobots.web-qualification/v1', 'completed_at_utc': datetime.now(timezone.utc).isoformat(),
+    path.write_text(json.dumps({'schema_version': 'autobots.web-qualification/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
                                 'duration_seconds': round(time.monotonic() - started_at, 1), 'input_fingerprint': fingerprint(root),
                                 'status': 'passed' if passed else 'failed', 'target_class': 'local processes with an arranged membership',
                                 'stats': {'expected': stats.get('expected'), 'unexpected': stats.get('unexpected'), 'skipped': skipped},

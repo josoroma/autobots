@@ -8,22 +8,45 @@ is disposable evidence: it exercises runbooks on throwaway Compose projects with
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 import json
 import os
-from pathlib import Path
 import re
 import subprocess
 import sys
 import time
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
-from harness_lib import (FULL_CHECKS, PYTHON_STEPS, WEB_STEPS, adapter_status, check_domains, config_errors,
-                         fingerprint, input_manifest, project_root, reduced_env, scope_paths)
+from harness_lib import (
+    FULL_CHECKS,
+    PYTHON_STEPS,
+    REPO_PYTHON_STEPS,
+    WEB_STEPS,
+    adapter_status,
+    check_domains,
+    config_errors,
+    fingerprint,
+    input_manifest,
+    project_root,
+    reduced_env,
+    scope_paths,
+)
 from suites import API_CLIENT_TESTS, HARNESS_PATTERN, TOOLCHAIN_OFFLINE, WEB_UNIT_TESTS
-from toolchain import (LONG, Step, Unavailable, check_steps, child_env, find_tools, missing_prepared_paths,
-                       run_step, snapshot, snapshot_differences)
+from toolchain import (
+    LONG,
+    Step,
+    Unavailable,
+    check_steps,
+    child_env,
+    find_tools,
+    missing_prepared_paths,
+    run_step,
+    snapshot,
+    snapshot_differences,
+)
 
 EXIT_PASSED, EXIT_FAILED, EXIT_UNAVAILABLE = 0, 1, 2
 IMPLEMENTED_PROFILES = ('harness', 'fast', 'full', 'db', 'operations')
@@ -56,10 +79,10 @@ def classify(step_id: str) -> dict[str, str]:
 
 
 def utc() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
-def run_check(root: Path, name: str, argv: list[str]) -> dict:
+def run_check(root: Path, name: str, argv: list[str]) -> dict[str, Any]:
     start = utc()
     began = time.monotonic()
     # Tests receive no inherited API keys, credentials or assistant configuration.
@@ -77,7 +100,7 @@ def run_check(root: Path, name: str, argv: list[str]) -> dict:
             'exit_code': code, 'status': status, 'output': output}
 
 
-def harness_checks(root: Path) -> list[dict]:
+def harness_checks(root: Path) -> list[dict[str, Any]]:
     problems = config_errors(root)
     checks = [{'id': 'project_configuration', **classify('project_configuration'),
                'status': 'passed' if not problems else 'failed', 'errors': problems},
@@ -89,20 +112,20 @@ def harness_checks(root: Path) -> list[dict]:
     return checks
 
 
-def judge_unittest(check: Mapping) -> dict:
+def judge_unittest(check: Mapping[str, Any]) -> dict[str, Any]:
     """Counts from unittest's summary. An empty suite or a skipped test is not a pass."""
     output = check.get('output', '')
     ran = re.search(r'Ran (\d+) tests?', output)
     skipped = sum(int(count) for count in re.findall(r'(?:skipped|expected failures)=(\d+)', output))
     executed = int(ran.group(1)) - skipped if ran else 0
-    result = {'tests_executed': executed, 'tests_skipped': skipped}
+    result: dict[str, Any] = {'tests_executed': executed, 'tests_skipped': skipped}
     if check['status'] == 'passed' and (executed < 1 or skipped):
         result['status'] = 'failed'
         result['output'] = output + f'\nExecuted {executed} tests and skipped {skipped}; neither an empty suite nor a skip is a pass.'
     return result
 
 
-def judge_pytest(record: Mapping) -> dict:
+def judge_pytest(record: Mapping[str, Any]) -> dict[str, Any]:
     """A pytest skip exits 0, so its summary is read too."""
     skipped = sum(int(count) for count in re.findall(r'\b(\d+) (?:skipped|xfailed)\b', record.get('output', '')))
     return {'tests_skipped': skipped, **({'status': 'failed'} if skipped and record['status'] == 'passed' else {})}
@@ -112,9 +135,10 @@ def selected_steps(profile: str, step_ids: Sequence[str], changed: Sequence[str]
     """Which toolchain steps a profile runs. An unknown change set runs both application domains."""
     if profile == 'full':
         return set(step_ids)
-    domains = {'python', 'web'} if changed is None else {d for path in changed for d in check_domains(path)}
+    domains = {'python', 'web', 'repo_python'} if changed is None else {d for path in changed for d in check_domains(path)}
     return set(step_ids) & ((PYTHON_STEPS if 'python' in domains else frozenset())
-                            | (WEB_STEPS if 'web' in domains else frozenset()))
+                            | (WEB_STEPS if 'web' in domains else frozenset())
+                            | (REPO_PYTHON_STEPS if 'repo_python' in domains else frozenset()))
 
 
 @dataclass(frozen=True)
@@ -123,7 +147,7 @@ class ToolPlan:
     env: Mapping[str, str] = field(default_factory=dict)
 
 
-def tool_plan(root: Path, profile: str, changed: Sequence[str] | None) -> tuple[ToolPlan, list[dict]]:
+def tool_plan(root: Path, profile: str, changed: Sequence[str] | None) -> tuple[ToolPlan, list[dict[str, Any]]]:
     """The toolchain steps to run and the ones left out. Needs tools only when a step needs them."""
     docker_env = reduced_env() | ({'HOME': os.environ['HOME']} if 'HOME' in os.environ else {})
     if profile in ('db', 'operations'):
@@ -167,7 +191,7 @@ def tool_plan(root: Path, profile: str, changed: Sequence[str] | None) -> tuple[
     return ToolPlan(steps, child_env(root, tools, verifying=True)), left_out
 
 
-def toolchain_checks(root: Path, profile: str, plan: Callable = tool_plan) -> list[dict]:
+def toolchain_checks(root: Path, profile: str, plan: Callable[..., tuple[ToolPlan, list[dict[str, Any]]]] = tool_plan) -> list[dict[str, Any]]:
     """Toolchain step records plus a guard that nothing was installed or rewritten."""
     try:
         before = snapshot(root)
@@ -189,7 +213,7 @@ def toolchain_checks(root: Path, profile: str, plan: Callable = tool_plan) -> li
                                   'output': '\n'.join(differences)}]
 
 
-def exit_code_for(checks: Sequence[Mapping], stable: bool) -> int:
+def exit_code_for(checks: Sequence[Mapping[str, Any]], stable: bool) -> int:
     """A failed check outranks an unavailable one, so a known failure is never reported as missing tools."""
     statuses = {check['status'] for check in checks}
     if 'failed' in statuses or not stable:
@@ -199,8 +223,8 @@ def exit_code_for(checks: Sequence[Mapping], stable: bool) -> int:
     return EXIT_PASSED
 
 
-def run_profile(root: Path, profile: str, *, base_checks: Callable[[Path], list[dict]] = harness_checks,
-                plan: Callable = tool_plan) -> int:
+def run_profile(root: Path, profile: str, *, base_checks: Callable[[Path], list[dict[str, Any]]] = harness_checks,
+                plan: Callable[..., tuple[ToolPlan, list[dict[str, Any]]]] = tool_plan) -> int:
     directory = root / '.checks' / profile
     directory.mkdir(parents=True, exist_ok=True)
     lock = root / '.checks/verify.lock'
@@ -253,7 +277,7 @@ def run_profile(root: Path, profile: str, *, base_checks: Callable[[Path], list[
 
 
 def main() -> int:
-    if sys.version_info < (3, 12):
+    if sys.version_info < (3, 12):  # noqa: UP036 - a guard for an older interpreter running this script
         print('Python 3.12+ is required; use the qualified python3.12 interpreter.', file=sys.stderr)
         return EXIT_UNAVAILABLE
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)

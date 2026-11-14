@@ -12,18 +12,19 @@ establishes neither H0, H1 nor product acceptance.
 from __future__ import annotations
 
 import argparse
-from collections.abc import Iterable, Iterator, Mapping, Sequence
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import signal
 import subprocess
 import sys
 import tomllib
+from collections.abc import Iterable, Iterator, Mapping, Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 from harness_lib import project_root, reduced_env
 
@@ -211,6 +212,9 @@ def check_steps(root: Path, tools: Tools) -> list[Step]:
         Step('ruff_format', (str(venv_bin / 'ruff'), 'format', '--check'), agent),
         Step('mypy', (str(venv_bin / 'mypy'),), agent, LONG),
         Step('pytest', (str(venv_bin / 'pytest'),), agent, LONG),
+        # R-07: repository Python, from the root, under ruff.toml and mypy.ini.
+        Step('repo_ruff_check', (str(venv_bin / 'ruff'), 'check', 'scripts', 'tests', '.claude/hooks'), root),
+        Step('repo_mypy', (str(venv_bin / 'mypy'),), root, LONG),
         Step('node_lock', (tools.corepack, 'pnpm', 'install', '--frozen-lockfile', '--lockfile-only', '--offline'), root),
         Step('node_version', (tools.corepack, 'pnpm', 'run', '--silent', 'node:version'), root,
              expect_output=f'v{tools.pins.node}'),
@@ -223,12 +227,12 @@ def check_steps(root: Path, tools: Tools) -> list[Step]:
 
 
 def utc() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
-def run_step(step: Step, env: Mapping[str, str]) -> dict:
+def run_step(step: Step, env: Mapping[str, str]) -> dict[str, Any]:
     """Run one step in its own process group, so a timeout also ends what it started."""
-    record: dict = {'id': step.id, 'argv': [Path(step.argv[0]).name, *step.argv[1:]],
+    record: dict[str, Any] = {'id': step.id, 'argv': [Path(step.argv[0]).name, *step.argv[1:]],
                     'started_at_utc': utc(), 'exit_code': None, 'status': 'error', 'output': ''}
     try:
         process = subprocess.Popen(step.argv, cwd=step.cwd, env=dict(env), stdin=subprocess.DEVNULL,
@@ -268,7 +272,7 @@ def entry_names(directory: Path, pattern: str = '*') -> list[str]:
 DELIVERY_RECORD = 'openspec/delivery/goal.md'
 
 
-def snapshot(root: Path) -> dict:
+def snapshot(root: Path) -> dict[str, Any]:
     """What verification must not change. Names, not contents, so bytecode and builds do not trip it."""
     changed = {*git_paths(root, 'diff', '--no-renames', '--name-only', 'HEAD'),
                *git_paths(root, 'ls-files', '--others', '--exclude-standard')} - {DELIVERY_RECORD}
@@ -278,7 +282,7 @@ def snapshot(root: Path) -> dict:
             'pnpm_entries': entry_names(root / PNPM_VIRTUAL_STORE)}
 
 
-def snapshot_differences(before: Mapping, after: Mapping) -> list[str]:
+def snapshot_differences(before: Mapping[str, Any], after: Mapping[str, Any]) -> list[str]:
     differences = []
     for section in ('guarded', 'changed'):
         for path in sorted(before[section].keys() | after[section].keys()):
@@ -290,13 +294,13 @@ def snapshot_differences(before: Mapping, after: Mapping) -> list[str]:
     return sorted(set(differences))
 
 
-def write_report(root: Path, report: Mapping) -> None:
+def write_report(root: Path, report: Mapping[str, Any]) -> None:
     path = root / REPORT
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8')
 
 
-def run_guarded(root: Path, steps: Sequence[Step], env: Mapping[str, str]) -> tuple[int, dict]:
+def run_guarded(root: Path, steps: Sequence[Step], env: Mapping[str, str]) -> tuple[int, dict[str, Any]]:
     """Run steps in order, stopping at the first failure, then fail on any change even if all passed."""
     before = snapshot(root)
     records = []
@@ -443,7 +447,7 @@ def versions(root: Path) -> int:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    if sys.version_info < (3, 12):
+    if sys.version_info < (3, 12):  # noqa: UP036 - a guard for an older interpreter running this script
         print('ERROR: Python 3.12+ is required; use the qualified python3.12 interpreter.', file=sys.stderr)
         return EXIT_UNAVAILABLE
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)

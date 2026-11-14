@@ -21,7 +21,6 @@ from uuid import UUID, uuid4
 
 import httpx
 import psycopg
-
 from autobots.adapters.github_issues import github_issue_tool
 from autobots.adapters.github_pulls import github_pull_request_tool
 from autobots.adapters.github_reads import github_read_tools
@@ -141,7 +140,7 @@ async def main() -> None:
             scope = await start(workspace, {'github_list_pull_requests': 1})
             github.requests.clear()
             result = await gateway.execute(db, scope, 'github_list_pull_requests', {})
-            method, repository, token = github.requests[-1] if github.requests else ('', '', 'none')
+            _method, repository, token = github.requests[-1] if github.requests else ('', '', 'none')
             return repository, token, result.code
 
         # Settings, then the environment, then .env; checks without a provider request.

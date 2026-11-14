@@ -6,10 +6,10 @@ from __future__ import annotations
 
 import copy
 import json
-from pathlib import Path
 import sys
 import tomllib
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
@@ -26,7 +26,8 @@ TSCONFIGS = ('apps/web/tsconfig.json', 'packages/api-client/tsconfig.json')
 ESLINT_PRESETS = ('eslint-config-next/core-web-vitals', 'eslint-config-next/typescript')
 WEB_SCRIPTS = {'lint': 'eslint --max-warnings=0 .', 'typecheck': 'tsc --noEmit'}
 # Each step's arguments after its executable. Anything added could narrow what the step checks.
-STEP_ARGUMENTS = {'ruff_check': ('check',), 'ruff_format': ('format', '--check'), 'mypy': (), 'pytest': ()}
+STEP_ARGUMENTS = {'ruff_check': ('check',), 'ruff_format': ('format', '--check'), 'mypy': (), 'pytest': (),
+                  'repo_ruff_check': ('check', 'scripts', 'tests', '.claude/hooks'), 'repo_mypy': ()}
 
 
 def python_errors(pyproject: dict) -> list[str]:

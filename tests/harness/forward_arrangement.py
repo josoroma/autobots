@@ -10,11 +10,11 @@ from __future__ import annotations
 
 import argparse
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'docs/engineering/evidence/HARNESS-ADAPT-001/forward-fixture'
