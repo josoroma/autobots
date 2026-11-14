@@ -13,7 +13,11 @@ from uuid import UUID
 import psycopg
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.artifacts import read_artifact
-from autobots.application.credentials.store import ProviderCredentialStore
+from autobots.application.credentials.crypto import CredentialDecryptionError
+from autobots.application.credentials.store import (
+    CredentialStorageUnavailable,
+    ProviderCredentialStore,
+)
 from autobots.application.goal_loop import LoopConfig, process_next
 from autobots.application.worker_leases import claim_next
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -63,13 +67,15 @@ async def verify(workspace: UUID, key_path: Path, manifest_path: Path, expected_
         resolved = await ProviderCredentialStore(db, key_path).load_active(workspace)
         decrypted = hashlib.sha256(resolved.client_secret().get_secret_value().encode()).hexdigest()
         check('the credential decrypts with the separately kept key, without showing it', 'the same fingerprint', decrypted == expected_sha, decrypted == expected_sha)
-        for label, path in (('a different key', wrong_key), ('no key', key_path.parent / 'absent.key')):
+        # TDBC-07: only the store's own refusal counts. Anything else propagates and fails the check.
+        for label, path, refusal in (('a different key', wrong_key, CredentialDecryptionError),
+                                     ('no key', key_path.parent / 'absent.key', CredentialStorageUnavailable)):
             try:
                 await ProviderCredentialStore(db, path).load_active(workspace)
                 outcome = 'opened'
-            except Exception as error:  # noqa: BLE001 - only the type is reported, never a message.
+            except (CredentialDecryptionError, CredentialStorageUnavailable) as error:
                 outcome = type(error).__name__
-            check(f'the database alone cannot open it: {label}', 'refused', outcome, outcome != 'opened')
+            check(f'the database alone cannot open it: {label}', refusal.__name__, outcome, outcome == refusal.__name__)
 
         threads = facts['threads']
         check('the backup holds checkpoint history', 'at least one thread', len(threads), len(threads) >= 1)

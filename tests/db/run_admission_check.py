@@ -142,7 +142,8 @@ async def main() -> None:
             async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as other:
                 try:
                     return await command(other, target, RunCommand.PAUSE, 1)
-                except Exception as error:  # noqa: BLE001
+                except (VersionConflict, CommandRefused) as error:
+                    # TDBC-07: a loser is refused for the version or the state. Anything else fails.
                     return error
         raced = await asyncio.gather(*(race(i) for i in range(6)))
         wins = [r for r in raced if not isinstance(r, Exception)]

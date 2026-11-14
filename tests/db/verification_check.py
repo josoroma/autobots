@@ -99,7 +99,8 @@ async def main() -> None:
         lease = await candidate(run)
         await publish(db, store, scope_of(lease), operation_id=uuid4().hex, name='report.md', media_type='text/plain', content=b'Total: 9')
         result = await _settle_candidate(db, URL, lease, config)
-        check('the right bytes pass', 'succeeded, 1 check', (result.run_status, await value('select checks from app_private.run_verifications where run_id = %s', run)), result.run_status == 'succeeded')
+        judged = await value('select checks from app_private.run_verifications where run_id = %s', run)
+        check('the right bytes pass', 'succeeded, 1 check', (result.run_status, judged), result.run_status == 'succeeded' and judged == 1)
 
         run = await admit(required=required)
         lease = await candidate(run)

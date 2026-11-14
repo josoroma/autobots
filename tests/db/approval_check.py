@@ -187,7 +187,8 @@ async def main() -> dict[str, str]:
         await db.execute("update public.approval_requests set expires_at = clock_timestamp() - interval '1 second' where id = %s", (swept,))
         idle, _ = await advance([say('never')])
         check('expiry is also applied by the worker\'s own pass', 'paused, expired', (await state(run), await value('select status from public.approval_requests where id = %s', swept)), await state(run) == 'paused' and await value('select status from public.approval_requests where id = %s', swept) == 'expired')
-        check('with nothing left to expire', '0', await expire_due(db), await expire_due(db) == 0)
+        left = await expire_due(db)
+        check('with nothing left to expire', '0', left, left == 0)
 
         # A pause during the wait keeps the obligation, and a cancel withdraws the request.
         run = await admit()

@@ -17,7 +17,13 @@ from autobots.adapters.loop_middleware import ModelRoute
 from autobots.application.goal_loop import LoopConfig, process_next, run_goal
 from autobots.application.model_admission import ModelAdmission
 from autobots.application.recovery import outstanding
-from autobots.application.runs import LinkRefused, admit_run, apply_command
+from autobots.application.runs import (
+    LeaseLost,
+    LinkRefused,
+    VersionConflict,
+    admit_run,
+    apply_command,
+)
 from autobots.application.tool_gateway import ToolDefinition, ToolGateway, ToolRegistry, ToolScope
 from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy
@@ -180,14 +186,15 @@ async def main() -> None:
                 async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as other:
                     try:
                         return (await apply_command(other, workspace_id=WORKSPACE, run_id=run, command=RunCommand.COMPLETE, actor=Actor.WORKER, expected_version=version, generation=lease.generation)).status  # noqa: B023 - called within this iteration, so it reads this iteration's values
-                    except Exception as error:  # noqa: BLE001
+                    except (VersionConflict, CommandRefused, LeaseLost) as error:
+                        # TDBC-07: the loser is refused. Any other failure propagates and fails the check.
                         return type(error).__name__
 
             async def cancel() -> str:
                 async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as other:
                     try:
                         return (await apply_command(other, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)).status  # noqa: B023 - called within this iteration, so it reads this iteration's values
-                    except Exception as error:  # noqa: BLE001
+                    except (VersionConflict, CommandRefused, LeaseLost) as error:
                         return type(error).__name__
 
             first, second = await asyncio.gather(complete(), cancel())

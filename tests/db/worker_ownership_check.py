@@ -75,7 +75,8 @@ async def main() -> None:
         status, version = (await (await db.execute('select status, version from public.runs where id = %s', (run,))).fetchone())
         events = await value('select count(*) from public.run_events where run_id = %s and sequence = 2', run)
         check('the claim is a recorded transition', 'running, version 2, an event', (status, version, events), status == 'running' and version == 2 and events == 1)
-        check('a duplicate delivery of a held job gets nothing', 'no claim', await claim_next(db, worker_id='dup'), await claim_next(db, worker_id='dup') is None)
+        duplicate = await claim_next(db, worker_id='dup')
+        check('a duplicate delivery of a held job gets nothing', 'no claim', duplicate, duplicate is None)
         before = await value('select lease_expires_at from app_private.run_jobs where run_id = %s', run)
         await heartbeat(db, lease, lease_seconds=60)
         after = await value('select lease_expires_at from app_private.run_jobs where run_id = %s', run)
@@ -145,9 +146,13 @@ async def main() -> None:
         async with fenced_checkpointer(URL, lease) as saver:
             saved = await rejected(lambda: build(saver, os.devnull).ainvoke({'seen': []}, graph_config(lease), durability=DURABILITY))
             check('the owner can still save its step at that boundary', 'accepted', saved, saved == 'accepted')
-            check('a paused run is not claimable', 'no claim', await claim_next(db, worker_id='x') is None, await claim_next(db, worker_id='x') is None)
+            # Its owner is live, so the lease alone keeps it unclaimed here.
+            held = await claim_next(db, worker_id='x')
+            check('a paused run with a live owner is not claimable', 'no claim', held, held is None)
+            # Once the lease lapses, only the pause stands between the run and a claim (TDBC-01).
             await expire(run)
-            check('even once its owner dies', 'no claim', await claim_next(db, worker_id='x') is None, await claim_next(db, worker_id='x') is None)
+            orphaned = await claim_next(db, worker_id='x')
+            check('a paused run is not claimable even once its owner dies', 'no claim', orphaned, orphaned is None)
             await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.RESUME, actor=Actor.USER, expected_version=3)
             refused = await rejected(lambda: build(saver, os.devnull).ainvoke({'seen': []}, graph_config(lease), durability=DURABILITY))
             check('a resume ends the old owner', 'stale owner', refused, refused == 'stale owner')
@@ -165,7 +170,8 @@ async def main() -> None:
 
         run = await admit()
         await db.execute("update app_private.run_jobs set available_at = clock_timestamp() + interval '1 hour' where run_id = %s", (run,))
-        check('a job not yet available is not claimed', 'no claim', await claim_next(db, worker_id='x') is None, await claim_next(db, worker_id='x') is None)
+        early = await claim_next(db, worker_id='x')
+        check('a job not yet available is not claimed', 'no claim', early, early is None)
 
         # Bypassing the application: no generation at all, or a thread with no job.
         run = await admit()
