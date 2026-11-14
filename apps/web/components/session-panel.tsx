@@ -16,10 +16,13 @@ import { Card } from "@/components/ui/card";
 import { Choice, Textarea } from "@/components/ui/field";
 import { SectionLabel } from "@/components/ui/page-header";
 import { csrfFetch } from "@/lib/csrf-fetch";
-import { readErrorResponse, readReply } from "@/lib/replies";
 import { profileField } from "@/lib/model-profile";
+import { ADMISSION_UNKNOWN, admissionRefusal } from "@/lib/run-admission";
+import { useSubmit } from "@/lib/use-submit";
 
 export function SessionPanel({ sessionId }: { sessionId: string }) {
+  // One key until the outcome is known, and one press at a time (Decision 0027 D2).
+  const admission = useSubmit();
   const [session, setSession] = useState<SessionView | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const [goal, setGoal] = useState("");
@@ -55,40 +58,34 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
     setRunId(null);
     const expertId =
       session.kind === "direct" ? session.options[0]?.expert_id : chosen;
-    const reply = await csrfFetch("/api/v1/runs", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": crypto.randomUUID(),
-      },
-      body: JSON.stringify({
-        goal_text: goal,
-        session_id: session.id,
-        expert_id: expertId ?? null,
-        ...profileField(profile),
-      } satisfies RunRequest),
-    }).catch(() => null);
-    if (reply?.ok === true) {
-      // A reply that doesn't parse leaves the outcome unknown, not refused (R-09, Decision 0027 D2).
-      const accepted = await readReply(reply, parseRunAccepted);
-      if (accepted === null) {
-        setProblem(
-          "The reply was unclear, so it may have started. Check Runs before starting it again.",
-        );
-        return;
-      }
-      setRunId(accepted.run_id);
+    const result = await admission.submit({
+      body: () =>
+        JSON.stringify({
+          goal_text: goal,
+          session_id: session.id,
+          expert_id: expertId ?? null,
+          ...profileField(profile),
+        } satisfies RunRequest),
+      send: ({ key, body }) =>
+        csrfFetch("/api/v1/runs", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": key,
+          },
+          body,
+        }),
+      parse: parseRunAccepted,
+    });
+    if (result === null) return;
+    if (result.outcome === "accepted" && result.value !== null) {
+      setRunId(result.value.run_id);
       return;
     }
-    const failure = await readErrorResponse(reply);
     setProblem(
-      failure?.code === "credentials_required"
-        ? "Model-backed work needs an OpenRouter key."
-        : failure?.code === "model_not_offered"
-          ? "A saved model choice isn't offered for new runs until it's qualified, so no run started. Your goal is kept."
-          : reply?.status === 422
-            ? "That request isn't approved, so no run started. Your goal is kept."
-            : "That could not be started.",
+      result.outcome === "unknown"
+        ? ADMISSION_UNKNOWN
+        : admissionRefusal(result.refusal, result.status),
     );
   }
 
@@ -200,7 +197,10 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
           }
         />
         <div className="flex justify-end border-t pt-4">
-          <Button onClick={() => void run()} disabled={!ready}>
+          <Button
+            onClick={() => void run()}
+            disabled={!ready || admission.pending}
+          >
             <Play aria-hidden="true" />
             Run
           </Button>

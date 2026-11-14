@@ -34,8 +34,9 @@ import { Input, Select, Textarea } from "@/components/ui/field";
 import { focusGoal, NEW_RUN_PARAM } from "@/components/new-run";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
-import { readErrorResponse, readReply } from "@/lib/replies";
+import { readReply } from "@/lib/replies";
 import { profileField } from "@/lib/model-profile";
+import { useSubmit } from "@/lib/use-submit";
 
 // The draft survives setup in this tab only; the profile, Expert and budget choices are plain state.
 // Restoring the draft never starts anything: the one admission below happens only when Run is pressed.
@@ -123,6 +124,8 @@ type Outcome =
   | "unknown";
 
 export function GoalComposer() {
+  // One key until the outcome is known, and one press at a time (Decision 0027 D2).
+  const admission = useSubmit();
   const restored = useSyncExternalStore(subscribe, storedDraft, () => "");
   // Arrived from New run or ⇧⌘O (SH-02): focus the goal, then drop the marker from the address.
   useEffect(() => {
@@ -288,53 +291,64 @@ export function GoalComposer() {
   async function run(): Promise<void> {
     setOutcome(null);
     setRefusal(null);
-    let sessionId: string | null = null;
-    if (expertId !== NO_EXPERT) {
-      sessionId = await startSession();
-      if (sessionId === null) {
-        setOutcome("session_failed");
-        return;
-      }
-    }
-    // One key per press, so a retried request admits one run and each new press is a new intent.
-    const reply = await csrfFetch("/api/v1/runs", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": crypto.randomUUID(),
+    const session = { failed: false };
+    const result = await admission.submit({
+      // Skipped while an earlier outcome is unknown: that first request, session included, is resent.
+      body: async () => {
+        let sessionId: string | null = null;
+        if (expertId !== NO_EXPERT) {
+          sessionId = await startSession();
+          if (sessionId === null) {
+            session.failed = true;
+            return null;
+          }
+        }
+        return JSON.stringify({
+          goal_text: draft,
+          budget_micro_usd: budget,
+          ...(sessionId === null ? {} : { session_id: sessionId }),
+          ...profileField(profile),
+          ...(files.length === 0
+            ? {}
+            : {
+                input_documents: files.map(({ path, content, media_type }) => ({
+                  path,
+                  content,
+                  media_type,
+                })),
+              }),
+        } satisfies RunRequest);
       },
-      body: JSON.stringify({
-        goal_text: draft,
-        budget_micro_usd: budget,
-        ...(sessionId === null ? {} : { session_id: sessionId }),
-        ...profileField(profile),
-        ...(files.length === 0
-          ? {}
-          : {
-              input_documents: files.map(({ path, content, media_type }) => ({
-                path,
-                content,
-                media_type,
-              })),
-            }),
-      } satisfies RunRequest),
-    }).catch(() => null);
-    if (reply?.ok === true) {
-      // A reply that doesn't parse leaves the outcome unknown, not refused (R-09, Decision 0027 D2).
-      const accepted = await readReply(reply, parseRunAccepted);
-      if (accepted === null) {
-        setOutcome("unknown");
-        return;
-      }
-      setRunId(accepted.run_id);
+      send: ({ key, body }) =>
+        csrfFetch("/api/v1/runs", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": key,
+          },
+          body,
+        }),
+      parse: parseRunAccepted,
+    });
+    if (session.failed) {
+      setOutcome("session_failed");
+      return;
+    }
+    if (result === null) return;
+    if (result.outcome === "accepted" && result.value !== null) {
+      setRunId(result.value.run_id);
       setOutcome("queued");
       setFiles([]);
       setRefusals([]);
       return;
     }
-    const failure = await readErrorResponse(reply);
-    if (failure?.code?.startsWith("budget_") === true) {
-      setRefusal(failure.message ?? "That budget can't be used.");
+    if (result.outcome === "unknown") {
+      setOutcome("unknown");
+      return;
+    }
+    const failure = result.refusal;
+    if (failure?.code.startsWith("budget_") === true) {
+      setRefusal(failure.message);
       setOutcome("budget_refused");
       return;
     }
@@ -342,7 +356,7 @@ export function GoalComposer() {
       setOutcome("model_not_offered");
       return;
     }
-    if (reply?.status === 422) {
+    if (result.status === 422) {
       setOutcome("model_refused");
       return;
     }
@@ -604,7 +618,7 @@ export function GoalComposer() {
       <div className="flex justify-end px-5 pt-2 pb-4">
         <Button
           onClick={() => void run()}
-          disabled={draft.trim() === "" || !budgetLeft}
+          disabled={draft.trim() === "" || !budgetLeft || admission.pending}
           size="lg"
           className="rounded-full px-5"
         >
@@ -647,7 +661,7 @@ export function GoalComposer() {
           ) : outcome === "session_failed" ? (
             "The Expert's session could not be started, so no run started. Your draft is kept."
           ) : outcome === "unknown" ? (
-            "The reply was unclear, so the run may have started. Check Runs before starting it again. Your draft is kept."
+            "The reply was lost, so the run may have started. Pressing Run again won't start a second one. Your draft is kept."
           ) : outcome === "model_refused" ? (
             "That model or request isn't approved, so no run started. Your draft is kept."
           ) : outcome === "queued" ? (
@@ -660,7 +674,7 @@ export function GoalComposer() {
               )}
             </>
           ) : (
-            "That could not be checked. Sign in, then try again. Your draft is kept."
+            "That could not be started. Your draft is kept."
           )}
         </p>
       )}

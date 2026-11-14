@@ -3,13 +3,13 @@
 import { parseRunAccepted, type RunRequest } from "@autobots/api-client";
 import { CircleAlert, RotateCcw } from "lucide-react";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useState } from "react";
 
 import { RunDisclosure } from "@/components/run-disclosure";
 import { Button } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/csrf-fetch";
-import { readErrorResponse, readReply } from "@/lib/replies";
 import { profileField } from "@/lib/model-profile";
+import { useSubmit } from "@/lib/use-submit";
 
 // A finished run never reopens. This starts a new one linked to it, which is how failed work goes on.
 export function ContinueRun({ runId }: { runId: string }) {
@@ -17,11 +17,11 @@ export function ContinueRun({ runId }: { runId: string }) {
   const [profile, setProfile] = useState("");
   const [started, setStarted] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-  const [lost, setLost] = useState(false);
   const [already, setAlready] = useState(false);
-  // Kept until the outcome is known, so pressing again after a lost reply starts nothing new.
-  const key = useRef<string | null>(null);
+  // While the outcome is unknown, the first request is what gets resent, so its model stays.
+  const [lost, setLost] = useState(false);
+  // One key until the outcome is known, and one press at a time (Decision 0027 D2).
+  const admission = useSubmit();
 
   if (!open) {
     return (
@@ -34,46 +34,35 @@ export function ContinueRun({ runId }: { runId: string }) {
 
   async function run(): Promise<void> {
     setProblem(null);
-    setPending(true);
-    const reply = await csrfFetch("/api/v1/runs", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": (key.current ??= crypto.randomUUID()),
-      },
-      body: JSON.stringify({
-        // Left out on purpose: the server repeats the goal it stored, whole.
-        continues_run_id: runId,
-        ...profileField(profile),
-      } satisfies RunRequest),
-    }).catch(() => null);
-    // A 5xx can come after the API committed, so it proves no more than a lost reply.
-    if (reply === null || reply.status >= 500) {
-      unknownOutcome();
+    const result = await admission.submit({
+      body: () =>
+        JSON.stringify({
+          // Left out on purpose: the server repeats the goal it stored, whole.
+          continues_run_id: runId,
+          ...profileField(profile),
+        } satisfies RunRequest),
+      send: ({ key, body }) =>
+        csrfFetch("/api/v1/runs", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": key,
+          },
+          body,
+        }),
+      parse: parseRunAccepted,
+    });
+    if (result === null) return;
+    setLost(result.outcome === "unknown");
+    if (result.outcome === "accepted" && result.value !== null) {
+      setAlready(result.value.replayed);
+      setStarted(result.value.run_id);
       return;
     }
-    if (reply.ok) {
-      const accepted = await readReply(reply, parseRunAccepted);
-      if (accepted === null) {
-        unknownOutcome();
-        return;
-      }
-      setAlready(accepted.replayed === true);
-      setStarted(accepted.run_id);
-      return;
-    }
-    const failure = await readErrorResponse(reply);
-    // Only a refusal with no earlier unknown attempt proves nothing started under this key.
-    if (!lost) key.current = null;
-    setPending(false);
-    setProblem(failure?.message ?? "That could not be started.");
-  }
-
-  function unknownOutcome(): void {
-    setLost(true);
-    setPending(false);
     setProblem(
-      "The reply was lost, so it may have started. Running this again won't start a second one.",
+      result.outcome === "unknown"
+        ? "The reply was lost, so it may have started. Running this again won't start a second one."
+        : (result.refusal?.message ?? "That could not be started."),
     );
   }
 
@@ -97,8 +86,8 @@ export function ContinueRun({ runId }: { runId: string }) {
         <RunDisclosure chosen={profile} onChoose={setProfile} />
       )}
       {started === null ? (
-        <Button disabled={pending} onClick={() => void run()}>
-          {pending ? "Starting" : "Run"}
+        <Button disabled={admission.pending} onClick={() => void run()}>
+          {admission.pending ? "Starting" : "Run"}
         </Button>
       ) : (
         <p role="status">

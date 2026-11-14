@@ -288,3 +288,60 @@ test("attached files show as chips with their name, type and size", async ({
   await expect(rates.locator('[data-field="file-size"]')).toHaveText("2.0 KB");
   await noViolations(page);
 });
+
+// R-18, Decision 0027 D2. The route answers for the API, so these cases admit nothing and spend no budget.
+const ACCEPTED = {
+  schema_version: 1,
+  run_id: "11111111-1111-4111-8111-111111111111",
+  status: "queued",
+  version: 1,
+  replayed: false,
+};
+
+test("a double click on Run sends one admission", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/");
+  let posts = 0;
+  await page.route("**/api/v1/runs", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    posts += 1;
+    await new Promise((settle) => setTimeout(settle, 400));
+    await route.fulfill({ status: 202, json: ACCEPTED });
+  });
+  await page
+    .getByLabel("Goal", { exact: true })
+    .fill("Pressed twice, admitted once");
+  await page.getByRole("button", { name: "Run", exact: true }).dblclick();
+  await expect(page.getByText(/Your goal is queued/)).toBeVisible();
+  expect(posts).toBe(1);
+  await page.unroute("**/api/v1/runs");
+});
+
+test("after a lost reply, Run resends the same request under the same key", async ({
+  page,
+}) => {
+  await signIn(page);
+  await page.goto("/");
+  const sent: { key: string | null; body: string | null }[] = [];
+  await page.route("**/api/v1/runs", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    sent.push({
+      key: await route.request().headerValue("idempotency-key"),
+      body: route.request().postData(),
+    });
+    if (sent.length === 1) return route.abort("connectionreset");
+    await route.fulfill({ status: 202, json: ACCEPTED });
+  });
+  const goal = page.getByLabel("Goal", { exact: true });
+  await goal.fill("A reply that never arrives");
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.getByText(/won't start a second one/)).toBeVisible();
+  // An edit after an unknown outcome doesn't change what's resent.
+  await goal.fill("An edited goal");
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.getByText(/Your goal is queued/)).toBeVisible();
+  expect(sent).toHaveLength(2);
+  expect(sent[1]?.key).toBe(sent[0]?.key);
+  expect(sent[1]?.body).toBe(sent[0]?.body);
+  await page.unroute("**/api/v1/runs");
+});

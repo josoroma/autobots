@@ -42,7 +42,7 @@
   },
   "components/goal-composer.tsx": {
     "complexity": {
-      "count": 2
+      "count": 1
     },
     "max-lines": {
       "count": 1

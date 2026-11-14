@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  type ErrorResponse,
   parseReconciliationResult,
+  parseRunCommandResult,
   parseRunSummary,
 } from "@autobots/api-client";
 import { CircleAlert, CircleDollarSign, Pause, Play } from "lucide-react";
@@ -10,7 +12,7 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
-import { readErrorResponse } from "@/lib/replies";
+import { useSubmit } from "@/lib/use-submit";
 
 type Command = "pause" | "resume" | "cancel";
 
@@ -36,10 +38,12 @@ export function commandsFor(status: string): Command[] {
   return PAUSABLE.has(status) ? ["pause", "cancel"] : ["cancel"];
 }
 
-async function refusalOf(reply: Response | null): Promise<string> {
-  const failure = await readErrorResponse(reply);
+function refusalOf(failure: ErrorResponse | null): string {
   return failure?.message ?? "That could not be done. Nothing changed.";
 }
+
+const UNKNOWN =
+  "This may have been recorded. The reply was lost, so pressing again won't record it twice.";
 
 export function RunControls({
   runId,
@@ -56,7 +60,9 @@ export function RunControls({
 }) {
   const [refusal, setRefusal] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const commandWrites = useSubmit();
+  const charges = useSubmit();
+  const busy = commandWrites.pending || charges.pending;
   const [charge, setCharge] = useState("");
   const base = `/api/v1/runs/${encodeURIComponent(runId)}`;
   const commands = commandsFor(status);
@@ -69,20 +75,29 @@ export function RunControls({
       : version;
   }
 
+  // One key per press until its outcome is known (Decision 0027 D2): a lost reply resends the
+  // same request, so a command applies once and a charge is never recorded twice (WRUN-03).
   async function send(command: Command): Promise<void> {
-    setBusy(true);
     setRefusal(null);
     setNote(null);
-    const reply = await csrfFetch(`${base}/${command}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": crypto.randomUUID(),
-      },
-      body: JSON.stringify({ expected_version: await currentVersion() }),
-    }).catch(() => null);
-    setBusy(false);
-    if (reply?.ok !== true) setRefusal(await refusalOf(reply));
+    const result = await commandWrites.submit({
+      body: async () =>
+        JSON.stringify({ expected_version: await currentVersion() }),
+      send: ({ key, body }) =>
+        csrfFetch(`${base}/${command}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": key,
+          },
+          body,
+        }),
+      parse: parseRunCommandResult,
+    });
+    if (result === null) return;
+    if (result.outcome === "unknown") setRefusal(UNKNOWN);
+    else if (result.outcome === "refused")
+      setRefusal(refusalOf(result.refusal));
     onChanged();
   }
 
@@ -90,32 +105,37 @@ export function RunControls({
     event.preventDefault();
     setRefusal(null);
     setNote(null);
-    const dollars = Number(charge);
-    if (charge.trim() === "" || !Number.isFinite(dollars) || dollars < 0) {
-      setRefusal("Enter the charge in US dollars, such as 0.0012.");
-      return;
-    }
-    if (dollars > 0 && Math.round(dollars * MICRO_USD) === 0) {
-      setRefusal(
-        "That's under a millionth of a dollar, which can't be recorded. Enter 0 if there was no charge.",
-      );
-      return;
-    }
-    setBusy(true);
-    const reply = await csrfFetch(`${base}/model-calls/reconcile`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": crypto.randomUUID(),
+    const result = await charges.submit({
+      body: () => {
+        const dollars = Number(charge);
+        if (charge.trim() === "" || !Number.isFinite(dollars) || dollars < 0) {
+          setRefusal("Enter the charge in US dollars, such as 0.0012.");
+          return null;
+        }
+        if (dollars > 0 && Math.round(dollars * MICRO_USD) === 0) {
+          setRefusal(
+            "That's under a millionth of a dollar, which can't be recorded. Enter 0 if there was no charge.",
+          );
+          return null;
+        }
+        return JSON.stringify({
+          charged_micro_usd: Math.round(dollars * MICRO_USD),
+        });
       },
-      body: JSON.stringify({
-        charged_micro_usd: Math.round(dollars * MICRO_USD),
-      }),
-    }).catch(() => null);
-    setBusy(false);
-    if (reply?.ok === true) {
-      const result = parseReconciliationResult(await reply.json());
-      if (result.reconciled_calls === 0) {
+      send: ({ key, body }) =>
+        csrfFetch(`${base}/model-calls/reconcile`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": key,
+          },
+          body,
+        }),
+      parse: parseReconciliationResult,
+    });
+    if (result === null) return;
+    if (result.outcome === "accepted" && result.value !== null) {
+      if (result.value.reconciled_calls === 0) {
         setRefusal(
           "Nothing was recorded, as no call is waiting for a charge now. Your entry wasn't used.",
         );
@@ -123,8 +143,10 @@ export function RunControls({
         setCharge("");
         setNote("The charge is recorded against the oldest open call.");
       }
+    } else if (result.outcome === "unknown") {
+      setRefusal(UNKNOWN);
     } else {
-      setRefusal(await refusalOf(reply));
+      setRefusal(refusalOf(result.refusal));
     }
     onChanged();
   }

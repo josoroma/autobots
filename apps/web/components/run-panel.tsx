@@ -1,6 +1,10 @@
 "use client";
 
-import { parseRunWorkspace, type RunWorkspace } from "@autobots/api-client";
+import {
+  parseRunCommandResult,
+  parseRunWorkspace,
+  type RunWorkspace,
+} from "@autobots/api-client";
 import { CircleAlert, Pause, Play, RotateCw } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -10,7 +14,7 @@ import { StateLine } from "@/components/run-list";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
-import { readErrorResponse } from "@/lib/replies";
+import { useSubmit } from "@/lib/use-submit";
 
 type Command = "pause" | "resume" | "cancel";
 type Task = NonNullable<RunWorkspace["plan"]>["tasks"][number];
@@ -55,7 +59,8 @@ export function RunPanel({
   const [view, setView] = useState<RunWorkspace | null>(null);
   const [failed, setFailed] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const writes = useSubmit();
+  const busy = writes.pending;
   const base = `/api/v1/runs/${encodeURIComponent(runId)}`;
 
   const [loads, setLoads] = useState(0);
@@ -81,29 +86,36 @@ export function RunPanel({
     };
   }, [base, loads]);
 
-  // The version the panel loaded, never a fresh one: a stale press is refused, not retried.
+  // The version the panel loaded, never a fresh one: a stale press is refused, not retried. One key
+  // per press until its outcome is known (Decision 0027 D2), so a lost reply applies it once.
   async function send(command: Command, version: number): Promise<void> {
-    setBusy(true);
     setRefusal(null);
-    const reply = await csrfFetch(`${base}/${command}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": crypto.randomUUID(),
-      },
-      body: JSON.stringify({ expected_version: version }),
-    }).catch(() => null);
-    setBusy(false);
-    if (reply?.ok === true) {
+    const result = await writes.submit({
+      body: () => JSON.stringify({ expected_version: version }),
+      send: ({ key, body }) =>
+        csrfFetch(`${base}/${command}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": key,
+          },
+          body,
+        }),
+      parse: parseRunCommandResult,
+    });
+    if (result === null) return;
+    if (result.outcome === "accepted") {
       setLoads((value) => value + 1);
       onChanged();
       return;
     }
-    const failure = await readErrorResponse(reply);
     setRefusal(
-      failure?.code === "version_conflict"
-        ? STALE
-        : (failure?.message ?? "That could not be done. Nothing changed."),
+      result.outcome === "unknown"
+        ? "The reply was lost, so this may have applied. Pressing again won't apply it twice."
+        : result.refusal?.code === "version_conflict"
+          ? STALE
+          : (result.refusal?.message ??
+            "That could not be done. Nothing changed."),
     );
   }
 

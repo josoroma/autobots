@@ -1,11 +1,12 @@
 "use client";
 
+import { parseReconciliationResult } from "@autobots/api-client";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
-import { readErrorResponse } from "@/lib/replies";
+import { useSubmit } from "@/lib/use-submit";
 
 type Operation = {
   operation_id: string;
@@ -31,32 +32,44 @@ export function UnknownEffects({
 }) {
   const [evidence, setEvidence] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const writes = useSubmit();
 
+  // One key per press until its outcome is known (Decision 0027 D2), so a lost reply records once.
   async function record(
     operationId: string,
     generation: number,
     outcome: string,
   ): Promise<void> {
     setMessage(null);
-    const reply = await csrfFetch(
-      `/api/v1/runs/${encodeURIComponent(runId)}/effects/${encodeURIComponent(operationId)}/reconcile`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
-        },
-        body: JSON.stringify({ outcome, evidence, generation }),
-      },
-    ).catch(() => null);
-    if (reply?.ok === true) {
+    const result = await writes.submit({
+      body: () => JSON.stringify({ outcome, evidence, generation }),
+      send: ({ key, body }) =>
+        csrfFetch(
+          `/api/v1/runs/${encodeURIComponent(runId)}/effects/${encodeURIComponent(operationId)}/reconcile`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Idempotency-Key": key,
+            },
+            body,
+          },
+        ),
+      parse: parseReconciliationResult,
+    });
+    if (result === null) return;
+    if (result.outcome === "accepted") {
       setEvidence("");
       setMessage("Recorded. Resume the run to continue.");
       onResolved();
       return;
     }
-    const failure = await readErrorResponse(reply);
-    setMessage(REFUSALS[failure?.code ?? ""] ?? "That couldn't be recorded.");
+    setMessage(
+      result.outcome === "unknown"
+        ? "This may have been recorded. The reply was lost, so pressing again won't record it twice."
+        : (REFUSALS[result.refusal?.code ?? ""] ??
+            "That couldn't be recorded."),
+    );
   }
 
   return (
@@ -90,7 +103,7 @@ export function UnknownEffects({
               <Button
                 variant="outline"
                 size="sm"
-                disabled={evidence.trim() === ""}
+                disabled={evidence.trim() === "" || writes.pending}
                 onClick={() =>
                   void record(
                     operation.operation_id,
@@ -104,7 +117,7 @@ export function UnknownEffects({
               <Button
                 variant="outline"
                 size="sm"
-                disabled={evidence.trim() === ""}
+                disabled={evidence.trim() === "" || writes.pending}
                 onClick={() =>
                   void record(
                     operation.operation_id,
