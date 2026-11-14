@@ -10,6 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
+import app_db  # noqa: E402
 import disposable_db as guard  # noqa: E402
 
 PROJECT = 'autobots-disposable-abc'
@@ -124,10 +125,10 @@ class Commands(unittest.TestCase):
 
 class Fixtures(unittest.TestCase):
     def test_seeds_hold_no_ddl_and_no_jobs(self):
-        text = (ROOT / 'tests/db/seeds/fixtures.sql').read_text().lower()
-        for word in ('create table', 'alter table', 'drop ', 'password', 'job'):
-            self.assertNotIn(word, text)
-        self.assertEqual(text.count('on conflict'), text.count('insert into'))
+        # R-10: the same terms as the reference seed, from one list in scripts/app_db.py.
+        text = (ROOT / 'tests/db/seeds/fixtures.sql').read_text()
+        self.assertEqual(app_db.seed_violations(text), [])
+        self.assertEqual(text.lower().count('on conflict'), text.lower().count('insert into'))
 
     def test_compose_pins_every_image_locally(self):
         text = (ROOT / guard.COMPOSE).read_text()

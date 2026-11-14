@@ -46,6 +46,14 @@ from supabase_stack import SupabaseStack, generated_values, require_images, requ
 MIGRATIONS = Path('supabase/migrations')
 ROLES = Path('supabase/bootstrap/roles.sql')
 SEEDS = Path('supabase/seeds/reference.sql')
+# R-10: what no seed may hold, for both the reference seed and the test fixtures. A seed is
+# repeatable data only: no schema, no secret, and no run or job, since a job would start work.
+SEED_FORBIDDEN = ('create table', 'alter table', 'drop ', 'password', 'api_key', 'runs', 'run_jobs', 'job')
+
+
+def seed_violations(text: str) -> list[str]:
+    lowered = text.lower()
+    return [term for term in SEED_FORBIDDEN if term in lowered]
 BAD_MIGRATIONS = Path('tests/db/app_bad_migrations')
 FIXTURE = Path('tests/db/app_fixture.sql')
 ROW_TYPES = Path('packages/db-types/src/generated.ts')
@@ -222,6 +230,8 @@ def access_cases(stack: AppStack, cases: Cases) -> None:
     cases.denied('anonymous cannot read private schema', stack.as_role('anon', None, 'select * from app_private.nothing'), denied)
     cases.denied('authenticated cannot read lease columns',
                  stack.as_role('authenticated', USER_A, 'select lease_generation from public.runs'), denied)
+    cases.denied('authenticated cannot read the checkpoint thread',
+                 stack.as_role('authenticated', USER_A, 'select checkpoint_thread_id from public.runs'), denied)
     cases.denied('authenticated cannot read the checkpoint schema',
                  stack.as_role('authenticated', USER_A, 'select * from agent_runtime.anything'), denied)
     cases.denied('authenticated cannot write runs',
