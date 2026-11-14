@@ -412,6 +412,29 @@ test("US-14.4: the workflow monitor shows tool uses under the node that made the
   await expect(save.locator('[data-tool-id="read_run_file"]')).toHaveCount(0);
   await expect(page.locator('[data-node-tools="in"]')).toHaveCount(0);
   await noViolations(page);
+
+  // R-27: tool uses that can't be read say so, and Retry reads them again.
+  const toolUses = (url: URL) => url.pathname.endsWith("/tool-uses");
+  await page.route(toolUses, (route) =>
+    route.fulfill({
+      status: 503,
+      json: {
+        code: "service_unavailable",
+        message: "The local API is unavailable.",
+      },
+    }),
+  );
+  await page.reload();
+  const failure = page
+    .getByRole("region", { name: "Tool uses by node" })
+    .locator('[data-state="unavailable"]');
+  await expect(failure).toHaveAttribute("data-reason", "unavailable");
+  await expect(failure.getByRole("alert")).toHaveText(
+    "Tool uses can't be read right now. Check that the local services are running, then try again.",
+  );
+  await page.unroute(toolUses);
+  await failure.getByRole("button", { name: "Retry" }).click();
+  await expect(read.locator("[data-tool-use]")).toHaveCount(1);
 });
 
 function probe(

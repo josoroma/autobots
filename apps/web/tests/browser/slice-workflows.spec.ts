@@ -149,7 +149,8 @@ test("a graph is validated, published, run and monitored, and the monitor only r
     "live",
     { timeout: 10_000 },
   );
-  // A reply that isn't what was asked for doesn't stop polling or read as live.
+  // A reply that isn't what was asked for doesn't stop polling or read as live. R-27: it says the
+  // page and the service disagree, beside the last known state.
   await page.route("**/api/v1/workflow-executions/**", (route) =>
     route.fulfill({ status: 200, body: "<html>not it</html>" }),
   );
@@ -158,12 +159,17 @@ test("a graph is validated, published, run and monitored, and the monitor only r
     "reconnecting",
     { timeout: 10_000 },
   );
+  await expect(page.locator('[data-reason="out_of_date"]')).toHaveText(
+    "This page and the local service disagree. Reload after updating.",
+  );
+  await expect(page.locator("[data-binding]")).toContainText("Version 1");
   await page.unroute("**/api/v1/workflow-executions/**");
   await expect(page.locator("[data-connection]")).toHaveAttribute(
     "data-connection",
     "live",
     { timeout: 10_000 },
   );
+  await expect(page.locator("[data-reason]")).toHaveCount(0);
   await page.reload();
   await expect(page.locator('[data-emission="up#0.value.0"]')).toContainText(
     "A",
@@ -260,5 +266,19 @@ test("another workspace can't see a workflow or an execution", async ({
   await other.goto(`/workflows/${flow.id}`);
   await expect(other.locator('[data-state="unavailable"]')).toBeVisible();
   await other.goto("/workflow-executions/00000000-0000-4000-8000-000000000000");
-  await expect(other.locator('[data-state="unavailable"]')).toBeVisible();
+  const state = other.locator('[data-state="unavailable"]');
+  await expect(state).toBeVisible();
+  // R-27: a missing execution and a refusal say which, and reading again can't change either.
+  await expect(state).toHaveAttribute("data-reason", "not_found");
+  await expect(state).toHaveText("That execution is not available.");
+  await other.route("**/api/v1/workflow-executions/**", (route) =>
+    route.fulfill({
+      status: 403,
+      json: { code: "not_a_member", message: "Members only, arranged." },
+    }),
+  );
+  await other.reload();
+  await expect(state).toHaveAttribute("data-reason", "denied");
+  await expect(state).toHaveText("Members only, arranged.");
+  await expect(state.getByRole("button", { name: "Retry" })).toHaveCount(0);
 });

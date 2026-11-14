@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 
 const EMAIL_A = process.env.AUTOBOTS_TEST_OWNER_EMAIL ?? "";
 const PASSWORD_A = process.env.AUTOBOTS_TEST_OWNER_PASSWORD ?? "";
@@ -321,4 +321,66 @@ test("status tabs, filters, paging and estimated spend on Runs", async ({
   await expect(
     page.locator(`[data-run="${HELD}"] [data-field="models"]`),
   ).toContainText("Sol");
+});
+
+// R-27: each way the list can fail reads differently, and only an outage offers Retry. The replies
+// are arranged with page.route on the list's first page, plain /api/v1/runs.
+test("the run list says why it can't be read, and Retry reads it again", async ({
+  page,
+}) => {
+  await signIn(page, EMAIL_A, PASSWORD_A);
+  let arranged: Parameters<Route["fulfill"]>[0] | null = null;
+  await page.route("**/api/v1/runs", (route) =>
+    arranged === null || route.request().method() !== "GET"
+      ? route.continue()
+      : route.fulfill(arranged),
+  );
+  const state = page.locator('[data-state="unavailable"]');
+  for (const [reply, reason, words] of [
+    [
+      {
+        status: 403,
+        json: { code: "not_a_member", message: "Members only, arranged." },
+      },
+      "denied",
+      "Members only, arranged.",
+    ],
+    [
+      {
+        status: 422,
+        json: { code: "validation_failed", message: "Arranged." },
+      },
+      "not_found",
+      "Runs can't be found.",
+    ],
+    [
+      { status: 200, json: { schema_version: 1, runs: "arranged" } },
+      "out_of_date",
+      "This page and the local service disagree. Reload after updating.",
+    ],
+  ] as const) {
+    arranged = reply;
+    await page.goto("/runs");
+    await expect(state).toHaveAttribute("data-reason", reason);
+    await expect(state.getByRole("alert")).toHaveText(words);
+    await expect(state.getByRole("button", { name: "Retry" })).toHaveCount(0);
+  }
+  arranged = {
+    status: 503,
+    json: {
+      code: "service_unavailable",
+      message: "The local API is unavailable.",
+    },
+  };
+  await page.goto("/runs");
+  await expect(state).toHaveAttribute("data-reason", "unavailable");
+  await expect(state.getByRole("alert")).toHaveText(
+    "Runs can't be read right now. Check that the local services are running, then try again.",
+  );
+  arranged = null;
+  await state.getByRole("button", { name: "Retry" }).click();
+  await expect(state).toHaveCount(0);
+  await expect(
+    page.locator('[data-state="shown"], [data-state="empty"]'),
+  ).toBeVisible();
 });

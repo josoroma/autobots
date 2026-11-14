@@ -8,10 +8,12 @@ import {
 } from "@autobots/api-client";
 import { CircleAlert, History } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 
 import { STATUS_TEXT } from "@/components/run-list";
+import { LoadEmpty, LoadState } from "@/components/ui/load-state";
 import { SectionLabel } from "@/components/ui/page-header";
+import { worstFailure } from "@/lib/load";
+import { useResource } from "@/lib/use-resource";
 
 const RECENT = 5;
 const RELATIVE = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
@@ -54,48 +56,51 @@ const QUIET = "text-muted-foreground border-t py-3 text-sm";
 
 // PRD-Studio HM-04 and Decision 0022 D9: what waits for a person, then the newest runs.
 export function HomeActivity() {
-  const [approvals, setApprovals] = useState<ApprovalList | null>(null);
-  const [waiting, setWaiting] = useState<RunList | null>(null);
-  const [recent, setRecent] = useState<RunList | null>(null);
-  const [failed, setFailed] = useState(false);
-  const [now, setNow] = useState(0);
-
-  useEffect(() => {
-    let active = true;
-    Promise.all([
-      fetch("/api/v1/approvals", { cache: "no-store" }),
-      fetch("/api/v1/runs?group=needs_you", { cache: "no-store" }),
-      fetch("/api/v1/runs", { cache: "no-store" }),
-    ])
-      .then(async (replies) => {
-        if (!active) return;
-        if (replies.some((reply) => !reply.ok)) {
-          // Read, or an unread refusal holds its connection open for as long as the page lives.
-          await Promise.all(replies.map((reply) => reply.text()));
-          setFailed(true);
-          return;
-        }
-        const [approvalReply, waitingReply, recentReply] = replies;
-        setApprovals(parseApprovalList(await approvalReply!.json()));
-        setWaiting(parseRunList(await waitingReply!.json()));
-        setRecent(parseRunList(await recentReply!.json()));
-        setNow(Date.now());
-      })
-      .catch(() => {
-        if (active) setFailed(true);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  if (failed) {
+  const approvalRead = useResource("/api/v1/approvals", parseApprovalList);
+  const waitingRead = useResource("/api/v1/runs?group=needs_you", parseRunList);
+  const recentRead = useResource("/api/v1/runs", parseRunList);
+  const reads = [approvalRead, waitingRead, recentRead];
+  // One message for the three reads, since either section alone would mislead.
+  const failure = worstFailure(reads.map((read) => read.state));
+  if (failure !== null) {
     return (
-      <p className="text-muted-foreground mt-14 text-sm">
-        What needs you and recent runs can&apos;t be read right now.
-      </p>
+      <LoadState
+        state={failure}
+        what="what needs you and recent runs"
+        onRetry={() => reads.forEach((read) => read.reload())}
+        pending={reads.some((read) => read.pending)}
+        className="mt-14"
+      />
     );
   }
+  return (
+    // Stacked, so Tab moves down through Needs you and then Recent runs, never back up a column.
+    <div className="mt-14 grid gap-10">
+      <NeedsYou
+        approvals={
+          approvalRead.state.kind === "ready" ? approvalRead.state.value : null
+        }
+        waiting={
+          waitingRead.state.kind === "ready" ? waitingRead.state.value : null
+        }
+      />
+      <RecentRuns
+        recent={
+          recentRead.state.kind === "ready" ? recentRead.state.value : null
+        }
+        now={recentRead.settledAt ?? 0}
+      />
+    </div>
+  );
+}
+
+function NeedsYou({
+  approvals,
+  waiting,
+}: {
+  approvals: ApprovalList | null;
+  waiting: RunList | null;
+}) {
   // A run waiting for approval is reached through its request, so only waiting_input is a run here.
   const replies = (waiting?.runs ?? []).filter(
     (run) => run.status === "waiting_input",
@@ -103,123 +108,126 @@ export function HomeActivity() {
   const pending = approvals?.approvals ?? [];
   const loaded = approvals !== null && waiting !== null;
   return (
-    // Stacked, so Tab moves down through Needs you and then Recent runs, never back up a column.
-    <div className="mt-14 grid gap-10">
-      <section
-        aria-labelledby="needs-you-heading"
-        data-field="needs-you"
-        className="flex min-w-0 flex-col"
-      >
-        <div className={HEAD}>
-          <CircleAlert
-            aria-hidden="true"
-            className="text-muted-foreground size-3.5 shrink-0"
-          />
-          <SectionLabel id="needs-you-heading" className="text-[12.5px]">
-            Needs you
-          </SectionLabel>
-        </div>
-        {!loaded ? (
-          <p className={QUIET}>Loading.</p>
-        ) : pending.length === 0 && replies.length === 0 ? (
-          <p className={QUIET}>Nothing needs you right now.</p>
-        ) : (
-          <ul>
-            {pending.map((approval) => (
-              <li
-                key={approval.id}
-                data-needs-approval={approval.id}
-                className={ITEM}
-              >
-                <span className="min-w-0 flex-1 wrap-anywhere">
-                  <span className="text-muted-foreground">Approve </span>
-                  <code className="text-[12.5px]">{approval.tool_id}</code>
-                  {approval.run_goal === null ? null : (
-                    <span className="text-muted-foreground">
-                      {" "}
-                      for {approval.run_goal}
-                    </span>
-                  )}
-                </span>
-                <Link
-                  href={`/approvals?approval=${encodeURIComponent(approval.id)}`}
-                  className="font-medium underline underline-offset-4"
-                >
-                  Review
-                </Link>
-              </li>
-            ))}
-            {replies.map((run) => (
-              <li key={run.id} data-needs-reply={run.id} className={ITEM}>
-                <span className="min-w-0 flex-1 wrap-anywhere">
+    <section
+      aria-labelledby="needs-you-heading"
+      data-field="needs-you"
+      className="flex min-w-0 flex-col"
+    >
+      <div className={HEAD}>
+        <CircleAlert
+          aria-hidden="true"
+          className="text-muted-foreground size-3.5 shrink-0"
+        />
+        <SectionLabel id="needs-you-heading" className="text-[12.5px]">
+          Needs you
+        </SectionLabel>
+      </div>
+      {!loaded ? (
+        <p className={QUIET}>Loading.</p>
+      ) : pending.length === 0 && replies.length === 0 ? (
+        <LoadEmpty className={QUIET}>Nothing needs you right now.</LoadEmpty>
+      ) : (
+        <ul>
+          {pending.map((approval) => (
+            <li
+              key={approval.id}
+              data-needs-approval={approval.id}
+              className={ITEM}
+            >
+              <span className="min-w-0 flex-1 wrap-anywhere">
+                <span className="text-muted-foreground">Approve </span>
+                <code className="text-[12.5px]">{approval.tool_id}</code>
+                {approval.run_goal === null ? null : (
                   <span className="text-muted-foreground">
-                    Waiting for input:{" "}
+                    {" "}
+                    for {approval.run_goal}
                   </span>
-                  {run.goal_summary}
+                )}
+              </span>
+              <Link
+                href={`/approvals?approval=${encodeURIComponent(approval.id)}`}
+                className="font-medium underline underline-offset-4"
+              >
+                Review
+              </Link>
+            </li>
+          ))}
+          {replies.map((run) => (
+            <li key={run.id} data-needs-reply={run.id} className={ITEM}>
+              <span className="min-w-0 flex-1 wrap-anywhere">
+                <span className="text-muted-foreground">
+                  Waiting for input:{" "}
                 </span>
-                <Link
-                  href={`/runs/${encodeURIComponent(run.id)}`}
-                  className="font-medium underline underline-offset-4"
-                >
-                  Reply on the run
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      <section
-        aria-labelledby="recent-heading"
-        data-field="recent-runs"
-        className="flex min-w-0 flex-col"
-      >
-        <div className={HEAD}>
-          <History
-            aria-hidden="true"
-            className="text-muted-foreground size-3.5 shrink-0"
-          />
-          <SectionLabel id="recent-heading" className="text-[12.5px]">
-            Recent runs
-          </SectionLabel>
-        </div>
-        {recent === null ? (
-          <p className={QUIET}>Loading.</p>
-        ) : recent.runs.length === 0 ? (
-          <p className={QUIET}>No runs yet.</p>
-        ) : (
-          <ul>
-            {recent.runs.slice(0, RECENT).map((run) => (
-              <li key={run.id} data-recent-run={run.id} className={ITEM}>
-                <Link
-                  href={`/runs/${encodeURIComponent(run.id)}`}
-                  className="min-w-0 flex-1 font-medium wrap-anywhere underline-offset-4 hover:underline"
-                >
-                  {run.goal_summary}
-                </Link>
-                <span className="text-muted-foreground flex flex-wrap gap-x-2 text-[12.5px] tabular-nums">
-                  <span data-field="state">
-                    {STATUS_TEXT[run.status] ?? run.status}
-                  </span>
-                  <span aria-hidden="true">·</span>
-                  <span data-field="progress">{progressOrSpend(run)}</span>
-                  <span aria-hidden="true">·</span>
-                  <time data-field="when" dateTime={run.created_at}>
-                    {relative(run.created_at, now)}
-                  </time>
+                {run.goal_summary}
+              </span>
+              <Link
+                href={`/runs/${encodeURIComponent(run.id)}`}
+                className="font-medium underline underline-offset-4"
+              >
+                Reply on the run
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+// Relative times are measured from `now`, when the recent runs were read.
+function RecentRuns({ recent, now }: { recent: RunList | null; now: number }) {
+  return (
+    <section
+      aria-labelledby="recent-heading"
+      data-field="recent-runs"
+      className="flex min-w-0 flex-col"
+    >
+      <div className={HEAD}>
+        <History
+          aria-hidden="true"
+          className="text-muted-foreground size-3.5 shrink-0"
+        />
+        <SectionLabel id="recent-heading" className="text-[12.5px]">
+          Recent runs
+        </SectionLabel>
+      </div>
+      {recent === null ? (
+        <p className={QUIET}>Loading.</p>
+      ) : recent.runs.length === 0 ? (
+        <LoadEmpty className={QUIET}>No runs yet.</LoadEmpty>
+      ) : (
+        <ul>
+          {recent.runs.slice(0, RECENT).map((run) => (
+            <li key={run.id} data-recent-run={run.id} className={ITEM}>
+              <Link
+                href={`/runs/${encodeURIComponent(run.id)}`}
+                className="min-w-0 flex-1 font-medium wrap-anywhere underline-offset-4 hover:underline"
+              >
+                {run.goal_summary}
+              </Link>
+              <span className="text-muted-foreground flex flex-wrap gap-x-2 text-[12.5px] tabular-nums">
+                <span data-field="state">
+                  {STATUS_TEXT[run.status] ?? run.status}
                 </span>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="mt-auto pt-2">
-          <Link
-            href="/runs"
-            className="text-sm font-medium underline underline-offset-4"
-          >
-            Open the run list
-          </Link>
-        </div>
-      </section>
-    </div>
+                <span aria-hidden="true">·</span>
+                <span data-field="progress">{progressOrSpend(run)}</span>
+                <span aria-hidden="true">·</span>
+                <time data-field="when" dateTime={run.created_at}>
+                  {relative(run.created_at, now)}
+                </time>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-auto pt-2">
+        <Link
+          href="/runs"
+          className="text-sm font-medium underline underline-offset-4"
+        >
+          Open the run list
+        </Link>
+      </div>
+    </section>
   );
 }

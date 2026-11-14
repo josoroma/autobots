@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 
 // US-15.10, PRD-Studio HM-01 and HM-04 and Decision 0022 D9 and D14, against an owner arranged by
 // scripts/qualify_identity.py: an America/Costa_Rica workspace (UTC-6, no daylight saving), the
@@ -158,4 +158,56 @@ test("Recent runs lists the five newest with state, progress or spend, and a rel
     "Oldest seventh run",
   );
   await noViolations(page);
+});
+
+// R-27: the three reads behind Needs you and Recent runs fail as one, say why, and Retry reads them
+// again. The replies are arranged with page.route on the approvals read.
+test("Needs you and Recent runs say why they can't be read, and Retry reads them again", async ({
+  page,
+}) => {
+  await signIn(page);
+  let arranged: Parameters<Route["fulfill"]>[0] | null = {
+    status: 503,
+    json: {
+      code: "service_unavailable",
+      message: "The local API is unavailable.",
+    },
+  };
+  await page.route("**/api/v1/approvals", (route) =>
+    arranged === null ? route.continue() : route.fulfill(arranged),
+  );
+  await page.goto("/");
+  const state = page.locator('[data-state="unavailable"]');
+  await expect(state).toHaveAttribute("data-reason", "unavailable");
+  await expect(state.getByRole("alert")).toHaveText(
+    "What needs you and recent runs can't be read right now. Check that the local services are running, then try again.",
+  );
+  await expect(page.locator('[data-field="needs-you"]')).toHaveCount(0);
+  arranged = null;
+  await state.getByRole("button", { name: "Retry" }).click();
+  await expect(
+    page.locator('[data-field="needs-you"] [data-needs-approval]'),
+  ).toHaveCount(2);
+  await expect(
+    page.locator('[data-field="recent-runs"] [data-recent-run]'),
+  ).toHaveCount(5);
+
+  // A reply in another shape reads as out of date, not as an outage, and a 401 as signed out.
+  arranged = { status: 200, json: { schema_version: 1, approvals: "x" } };
+  await page.goto("/");
+  await expect(state).toHaveAttribute("data-reason", "out_of_date");
+  await expect(state.getByRole("alert")).toHaveText(
+    "This page and the local service disagree. Reload after updating.",
+  );
+  await expect(state.getByRole("button", { name: "Retry" })).toHaveCount(0);
+  arranged = {
+    status: 401,
+    json: { code: "not_signed_in", message: "Sign in first." },
+  };
+  await page.goto("/");
+  await expect(state).toHaveAttribute("data-reason", "signed_out");
+  await expect(state.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+    "href",
+    "/sign-in",
+  );
 });

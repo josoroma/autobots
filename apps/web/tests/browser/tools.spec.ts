@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 
 // US-14.2 against the real API app with an arranged membership, run by scripts/qualify_web.py.
 // That API's environment has no GitHub variables, so create_github_issue reads key_missing.
@@ -13,6 +13,16 @@ async function signedIn(page: Page, path: string): Promise<void> {
     .addCookies([{ name: "autobots.session", value: SESSION_A, url: ORIGIN }]);
   await page.goto(path);
 }
+
+const OUT_OF_DATE =
+  "This page and the local service disagree. Reload after updating.";
+const DOWN = {
+  status: 503,
+  json: {
+    code: "service_unavailable",
+    message: "The local API is unavailable.",
+  },
+};
 
 async function noViolations(page: Page): Promise<void> {
   const results = await new AxeBuilder({ page })
@@ -261,4 +271,105 @@ test("a tool's modal opens from its URL and passes axe in both themes", async ({
     await expect(page.locator("html")).toHaveClass(new RegExp(theme));
     await noViolations(page);
   }
+});
+
+// R-27: each way the catalog can fail reads differently, and only an outage offers Retry. The
+// replies are arranged with page.route on the catalog's own read.
+test("the catalog says why it can't be read, and Retry reads it again", async ({
+  page,
+}) => {
+  let arranged: Parameters<Route["fulfill"]>[0] | null = null;
+  await page.route("**/api/v1/tools", (route) =>
+    arranged === null ? route.continue() : route.fulfill(arranged),
+  );
+  const logged: unknown[] = [];
+  page.on("console", (message) => {
+    if (message.type() !== "error") return;
+    if (!message.text().startsWith("This page and the local service")) return;
+    void message
+      .args()[1]
+      ?.jsonValue()
+      .then((value: unknown) => logged.push(value));
+  });
+  const state = page.locator('[data-state="unavailable"]');
+  for (const [reply, reason, words] of [
+    [
+      {
+        status: 401,
+        json: { code: "not_signed_in", message: "Sign in first." },
+      },
+      "signed_out",
+      "You're signed out. Sign in to see the tool catalog.",
+    ],
+    [
+      {
+        status: 403,
+        json: { code: "not_a_member", message: "Members only, arranged." },
+      },
+      "denied",
+      "Members only, arranged.",
+    ],
+    [
+      {
+        status: 200,
+        json: { schema_version: 1, catalog_digest: "arranged-value" },
+      },
+      "out_of_date",
+      OUT_OF_DATE,
+    ],
+  ] as const) {
+    arranged = reply;
+    await signedIn(page, "/tools");
+    await expect(state).toHaveAttribute("data-reason", reason);
+    await expect(state.getByRole("alert")).toHaveText(words);
+    await expect(state.getByRole("button", { name: "Retry" })).toHaveCount(0);
+    await expect(state.getByRole("link", { name: "Sign in" })).toHaveCount(
+      reason === "signed_out" ? 1 : 0,
+    );
+  }
+  // The console names the schema and the field, never a value from the reply.
+  await expect.poll(() => logged.length).toBeGreaterThan(0);
+  expect(logged[0]).toMatchObject({
+    event: "web.contract_mismatch",
+    schema: "ToolCatalog",
+  });
+  expect(JSON.stringify(logged)).not.toContain("arranged-value");
+
+  arranged = DOWN;
+  await signedIn(page, "/tools");
+  await expect(state).toHaveAttribute("data-reason", "unavailable");
+  await expect(state.getByRole("alert")).toHaveText(
+    "The tool catalog can't be read right now. Check that the local services are running, then try again.",
+  );
+  arranged = null;
+  await state.getByRole("button", { name: "Retry" }).click();
+  await expect(page.locator('[data-tool="calculate"]')).toBeVisible();
+  await expect(state).toHaveCount(0);
+});
+
+test("a tool that isn't there, or can't be read, says which", async ({
+  page,
+}) => {
+  let arranged: Parameters<Route["fulfill"]>[0] = {
+    status: 422,
+    json: { code: "validation_failed", message: "Not a tool ID." },
+  };
+  await page.route("**/api/v1/tools/calculate", (route) =>
+    route.fulfill(arranged),
+  );
+  await signedIn(page, "/tools/calculate");
+  const state = page.locator('[data-state="unavailable"]');
+  await expect(state).toHaveAttribute("data-reason", "not_found");
+  await expect(state.getByRole("alert")).toHaveText(
+    "That tool isn't in the catalog.",
+  );
+  arranged = DOWN;
+  await page.reload();
+  await expect(state).toHaveAttribute("data-reason", "unavailable");
+  await expect(state.getByRole("alert")).toHaveText(
+    "This tool can't be read right now. Check that the local services are running, then try again.",
+  );
+  await page.unroute("**/api/v1/tools/calculate");
+  await state.getByRole("button", { name: "Retry" }).click();
+  await expect(page.getByRole("heading", { name: "Calculate" })).toBeVisible();
 });

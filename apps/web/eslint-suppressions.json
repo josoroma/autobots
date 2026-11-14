@@ -43,11 +43,6 @@
       "count": 1
     }
   },
-  "components/home-activity.tsx": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "components/jobs-chart.tsx": {
     "max-lines-per-function": {
       "count": 1
@@ -101,9 +96,6 @@
   "components/run-list.tsx": {
     "import/no-cycle": {
       "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
     }
   },
   "components/run-panel.tsx": {
@@ -156,11 +148,6 @@
     "max-lines": {
       "count": 1
     },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "components/workflow-monitor.tsx": {
     "max-lines-per-function": {
       "count": 1
     }

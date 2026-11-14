@@ -2,14 +2,21 @@
 
 import { parseExecutionView, type ExecutionView } from "@autobots/api-client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 
-import { ToolUseTable, useToolUses } from "@/components/tool-uses";
+import {
+  ToolUseTable,
+  ToolUsesState,
+  useToolUses,
+} from "@/components/tool-uses";
 import { Card } from "@/components/ui/card";
+import { LoadState } from "@/components/ui/load-state";
 import { SectionLabel } from "@/components/ui/page-header";
+import { backoff, type Loaded } from "@/lib/load";
+import { useResource } from "@/lib/use-resource";
 import { cn } from "@/lib/utils";
 
 const POLL_MS = 1000;
+const BACKOFF_CAP_MS = 15_000;
 const TERMINAL = new Set(["succeeded", "failed", "cancelled"]);
 const STATUS_TEXT: Record<string, string> = {
   waiting: "Waiting for its inputs",
@@ -23,73 +30,74 @@ const STATUS_TEXT: Record<string, string> = {
   blocked: "Blocked by a failure upstream",
 };
 
+/**
+ * Polls once a second until the run ends. No reply, a 5xx or a reply that isn't the execution keeps
+ * polling, each time more slowly up to 15 s (WBLD-08); a refusal stops, since reading again won't
+ * change it.
+ */
+function nextPoll(
+  loaded: Loaded<ExecutionView>,
+  failures: number,
+): number | null {
+  if (loaded.kind === "ready") {
+    return TERMINAL.has(loaded.value.run_status) ? null : POLL_MS;
+  }
+  return loaded.kind === "unavailable" || loaded.kind === "out_of_date"
+    ? backoff(failures, POLL_MS, BACKOFF_CAP_MS)
+    : null;
+}
+
 /** Shows what's saved. It only reads, so reconnecting can't start or repeat anything. */
 export function WorkflowMonitor({ executionId }: { executionId: string }) {
-  const [view, setView] = useState<ExecutionView | null>(null);
-  const [state, setState] = useState<"live" | "reconnecting" | "unavailable">(
-    "live",
+  const { state, value: view } = useResource(
+    `/api/v1/workflow-executions/${encodeURIComponent(executionId)}`,
+    parseExecutionView,
+    { poll: nextPoll },
   );
-  // Each saved state read again also reads the tool uses again (TV-02).
-  const [loads, setLoads] = useState(0);
-
-  useEffect(() => {
-    let active = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const load = async (): Promise<void> => {
-      const reply = await fetch(
-        `/api/v1/workflow-executions/${encodeURIComponent(executionId)}`,
-        { cache: "no-store" },
-      ).catch(() => null);
-      if (!active) return;
-      if (reply === null || reply.status >= 500) {
-        setState("reconnecting");
-      } else if (!reply.ok) {
-        setState("unavailable");
-        return;
-      } else {
-        const next = await reply
-          .json()
-          .then(parseExecutionView)
-          .catch(() => null);
-        if (!active) return;
-        if (next === null) {
-          setState("reconnecting");
-        } else {
-          setView(next);
-          setLoads((count) => count + 1);
-          setState("live");
-          if (TERMINAL.has(next.run_status)) return;
-        }
-      }
-      timer = setTimeout(() => void load(), POLL_MS);
-    };
-    void load();
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [executionId]);
-
-  if (state === "unavailable") {
+  const connection =
+    state.kind === "ready" || state.kind === "loading"
+      ? "live"
+      : "reconnecting";
+  if (
+    state.kind === "signed_out" ||
+    state.kind === "denied" ||
+    state.kind === "not_found"
+  ) {
     return (
-      <p role="alert" data-state="unavailable" className="text-sm">
-        That execution is not available.
-      </p>
+      <LoadState
+        state={state}
+        what="this execution"
+        notFound="That execution is not available."
+      />
     );
   }
+  // A mismatch says so beside the last known state, while polling goes on.
+  const outdated =
+    state.kind === "out_of_date" ? (
+      <LoadState state={state} what="this execution" />
+    ) : null;
   if (view === null) {
     return (
-      <p
-        role="status"
-        data-connection={state}
-        className="text-muted-foreground text-sm"
-      >
-        {state === "reconnecting" ? "Reconnecting." : "Loading this execution."}
-      </p>
+      <>
+        {outdated}
+        <p
+          role="status"
+          data-connection={connection}
+          className="text-muted-foreground text-sm"
+        >
+          {connection === "reconnecting"
+            ? "Reconnecting."
+            : "Loading this execution."}
+        </p>
+      </>
     );
   }
+  // The tool uses are read again only when the saved state changed, not on every poll
+  // (PRD-Tool-Catalog TV-02, WBLD-08).
+  const revision = JSON.stringify(view);
   return (
     <>
+      {outdated}
       <Card aria-labelledby="binding-heading" className="space-y-3">
         <SectionLabel id="binding-heading">Binding</SectionLabel>
         <div className="flex flex-col gap-x-8 gap-y-2 text-sm @2xl:flex-row @2xl:flex-wrap @2xl:items-baseline">
@@ -117,10 +125,10 @@ export function WorkflowMonitor({ executionId }: { executionId: string }) {
             </Link>
           </p>
           <p
-            data-connection={state}
+            data-connection={connection}
             className={cn(
               "flex items-center gap-1.5 @2xl:ml-auto",
-              state === "reconnecting"
+              connection === "reconnecting"
                 ? "text-muted-foreground"
                 : "text-foreground",
             )}
@@ -129,76 +137,16 @@ export function WorkflowMonitor({ executionId }: { executionId: string }) {
               aria-hidden="true"
               className="size-1.5 shrink-0 rounded-full bg-current"
             />
-            {state === "reconnecting"
+            {connection === "reconnecting"
               ? "Reconnecting. Showing the last known state."
               : "Live"}
           </p>
         </div>
       </Card>
-      <Card aria-labelledby="instances-heading" className="space-y-3">
-        <SectionLabel id="instances-heading">Node instances</SectionLabel>
-        <table className="w-full text-left text-[13.5px]">
-          <thead>
-            <tr className="border-b">
-              <th
-                scope="col"
-                className="text-muted-foreground pr-3 pb-2.5 text-[12.5px] font-medium"
-              >
-                Instance
-              </th>
-              <th
-                scope="col"
-                className="text-muted-foreground px-3 pb-2.5 text-[12.5px] font-medium"
-              >
-                Block version
-              </th>
-              <th
-                scope="col"
-                className="text-muted-foreground pb-2.5 pl-3 text-[12.5px] font-medium"
-              >
-                Status
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {view.instances.map((instance) => (
-              <tr
-                key={instance.key}
-                data-instance={instance.key}
-                data-status={instance.status}
-                className="border-b align-top last:border-b-0"
-              >
-                <td className="py-2.5 pr-3 font-mono text-[12.5px] font-medium wrap-anywhere">
-                  {instance.key}
-                </td>
-                <td className="px-3 py-2.5 font-mono text-[12.5px]">
-                  {view.block_versions[instance.node_id]}
-                </td>
-                <td className="py-2.5 pl-3">
-                  <span className="inline-flex items-baseline gap-2">
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        "size-1.5 shrink-0 translate-y-[-1px] rounded-full bg-current",
-                        tone(instance.status) || "text-muted-foreground",
-                      )}
-                    />
-                    <span>
-                      {STATUS_TEXT[instance.status] ?? instance.status}
-                      {instance.error_code === null
-                        ? ""
-                        : `: ${instance.error_code.replaceAll("_", " ")}`}
-                    </span>
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
+      <InstancesCard view={view} />
       <NodeToolUses
         runId={view.run_id}
-        version={loads}
+        revision={revision}
         instances={view.instances.map((instance) => instance.key)}
       />
       <Card aria-labelledby="emissions-heading" className="space-y-3">
@@ -232,6 +180,72 @@ export function WorkflowMonitor({ executionId }: { executionId: string }) {
   );
 }
 
+function InstancesCard({ view }: { view: ExecutionView }) {
+  return (
+    <Card aria-labelledby="instances-heading" className="space-y-3">
+      <SectionLabel id="instances-heading">Node instances</SectionLabel>
+      <table className="w-full text-left text-[13.5px]">
+        <thead>
+          <tr className="border-b">
+            <th
+              scope="col"
+              className="text-muted-foreground pr-3 pb-2.5 text-[12.5px] font-medium"
+            >
+              Instance
+            </th>
+            <th
+              scope="col"
+              className="text-muted-foreground px-3 pb-2.5 text-[12.5px] font-medium"
+            >
+              Block version
+            </th>
+            <th
+              scope="col"
+              className="text-muted-foreground pb-2.5 pl-3 text-[12.5px] font-medium"
+            >
+              Status
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {view.instances.map((instance) => (
+            <tr
+              key={instance.key}
+              data-instance={instance.key}
+              data-status={instance.status}
+              className="border-b align-top last:border-b-0"
+            >
+              <td className="py-2.5 pr-3 font-mono text-[12.5px] font-medium wrap-anywhere">
+                {instance.key}
+              </td>
+              <td className="px-3 py-2.5 font-mono text-[12.5px]">
+                {view.block_versions[instance.node_id]}
+              </td>
+              <td className="py-2.5 pl-3">
+                <span className="inline-flex items-baseline gap-2">
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "size-1.5 shrink-0 translate-y-[-1px] rounded-full bg-current",
+                      tone(instance.status) || "text-muted-foreground",
+                    )}
+                  />
+                  <span>
+                    {STATUS_TEXT[instance.status] ?? instance.status}
+                    {instance.error_code === null
+                      ? ""
+                      : `: ${instance.error_code.replaceAll("_", " ")}`}
+                  </span>
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
+  );
+}
+
 // Colored words for a state, beside the words themselves (Decision 0021 R3–R4). Unknown states stay plain.
 function tone(status: string): string {
   if (status === "succeeded") return "text-success-text";
@@ -244,14 +258,15 @@ function tone(status: string): string {
 /** Tool uses under the node instance that made them. Nodes share their execution's run. */
 function NodeToolUses({
   runId,
-  version,
+  revision,
   instances,
 }: {
   runId: string;
-  version: number;
+  revision: string;
   instances: readonly string[];
 }) {
-  const { uses, failed } = useToolUses(runId, version);
+  const read = useToolUses(runId, revision);
+  const { uses } = read;
   const keys = [
     ...instances.filter((key) => uses?.some((use) => use.instance_key === key)),
   ];
@@ -261,16 +276,8 @@ function NodeToolUses({
   return (
     <Card aria-labelledby="node-tools-heading" className="space-y-3">
       <SectionLabel id="node-tools-heading">Tool uses by node</SectionLabel>
-      {failed && uses === null ? (
-        <p role="alert" className="text-sm">
-          Tool uses aren&apos;t available right now.
-        </p>
-      ) : uses === null ? (
-        <p className="text-muted-foreground text-sm">Loading tool uses.</p>
-      ) : uses.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          No node has used a tool yet.
-        </p>
+      {uses === null || uses.length === 0 ? (
+        <ToolUsesState uses={read} empty="No node has used a tool yet." />
       ) : (
         <>
           {keys.map((key) => (

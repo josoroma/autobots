@@ -38,6 +38,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, IconTile } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/field";
+import { LoadEmpty, LoadState } from "@/components/ui/load-state";
+import { useResource } from "@/lib/use-resource";
 import { cn } from "@/lib/utils";
 
 // PRD-Tool-Catalog TS-01 to TS-03. Every state is said in words; a badge never stands for one alone.
@@ -153,33 +155,6 @@ function Availability({ tool }: { tool: ToolDescriptor }) {
 const TOOLBAR_LABEL =
   "flex w-full flex-col items-stretch gap-1 text-[13px] font-medium sm:w-auto sm:flex-row sm:items-center sm:gap-2 [&>span:first-child]:text-muted-foreground";
 
-function useLoaded<T>(path: string, parse: (value: unknown) => T) {
-  const [state, setState] = useState<
-    { kind: "loading" } | { kind: "unavailable" } | { kind: "ready"; value: T }
-  >({ kind: "loading" });
-  useEffect(() => {
-    const controller = new AbortController();
-    let active = true;
-    fetch(path, { cache: "no-store", signal: controller.signal })
-      .then(async (reply) => {
-        if (!active) return;
-        if (!reply.ok) {
-          setState({ kind: "unavailable" });
-          return;
-        }
-        setState({ kind: "ready", value: parse(await reply.json()) });
-      })
-      .catch(() => {
-        if (active) setState({ kind: "unavailable" });
-      });
-    return () => {
-      active = false;
-      controller.abort();
-    };
-  }, [path, parse]);
-  return state;
-}
-
 export function ToolCatalogPanel() {
   const router = useRouter();
   const pathname = usePathname();
@@ -189,7 +164,10 @@ export function ToolCatalogPanel() {
   const provider = params.get("provider") ?? "";
   const query = (params.get("q") ?? "").trim().toLowerCase();
   const selected = params.get("tool");
-  const state = useLoaded("/api/v1/tools", parseToolCatalog);
+  const { state, pending, reload } = useResource(
+    "/api/v1/tools",
+    parseToolCatalog,
+  );
 
   function choose(name: string, value: string): void {
     const next = new URLSearchParams(params.toString());
@@ -199,19 +177,14 @@ export function ToolCatalogPanel() {
     router.replace(query === "" ? pathname : `${pathname}?${query}`);
   }
 
-  if (state.kind === "unavailable") {
+  if (state.kind !== "ready") {
     return (
-      <p role="alert" data-state="unavailable" className="text-sm">
-        The tool catalog isn&apos;t available. Check that the local service is
-        running.
-      </p>
-    );
-  }
-  if (state.kind === "loading") {
-    return (
-      <p role="status" className="text-sm">
-        Loading the tool catalog.
-      </p>
+      <LoadState
+        state={state}
+        what="the tool catalog"
+        onRetry={reload}
+        pending={pending}
+      />
     );
   }
   const catalog: ToolCatalog = state.value;
@@ -579,23 +552,20 @@ function FieldTable({
 }
 
 export function ToolDetail({ toolId }: { toolId: string }) {
-  const state = useLoaded(
+  const { state, pending, reload } = useResource(
     `/api/v1/tools/${encodeURIComponent(toolId)}`,
     parseToolVersions,
   );
   const [chosen, setChosen] = useState<number | null>(null);
-  if (state.kind === "unavailable") {
+  if (state.kind !== "ready") {
     return (
-      <p role="alert" data-state="unavailable" className="text-sm">
-        That tool isn&apos;t in the catalog.
-      </p>
-    );
-  }
-  if (state.kind === "loading") {
-    return (
-      <p role="status" className="text-sm">
-        Loading this tool.
-      </p>
+      <LoadState
+        state={state}
+        what="this tool"
+        notFound="That tool isn't in the catalog."
+        onRetry={reload}
+        pending={pending}
+      />
     );
   }
   const versions: ToolVersions = state.value;
@@ -777,7 +747,7 @@ function Fact({
 
 // PRD-Studio TL-02: Experts whose latest version grants this tool, and published workflows that reach it.
 function Grants({ toolId }: { toolId: string }) {
-  const state = useLoaded(
+  const { state, pending, reload } = useResource(
     `/api/v1/tools/${encodeURIComponent(toolId)}/grants`,
     parseToolGrants,
   );
@@ -790,15 +760,16 @@ function Grants({ toolId }: { toolId: string }) {
       <h3 id={`grants-${toolId}`} className="text-sm font-semibold">
         Granted to
       </h3>
-      {state.kind === "loading" ? (
-        <p className="text-muted-foreground text-sm">Loading.</p>
-      ) : state.kind === "unavailable" ? (
-        <p className="text-muted-foreground text-sm">
-          Who has it can&apos;t be read right now.
-        </p>
+      {state.kind !== "ready" ? (
+        <LoadState
+          state={state}
+          what="the Experts and workflows that grant it"
+          onRetry={reload}
+          pending={pending}
+        />
       ) : state.value.experts.length === 0 &&
         state.value.workflows.length === 0 ? (
-        <p className="text-sm">No Expert or published workflow grants it.</p>
+        <LoadEmpty>No Expert or published workflow grants it.</LoadEmpty>
       ) : (
         <ul className="flex flex-wrap gap-2 text-[12.5px]">
           {state.value.experts.map((item) => (

@@ -3,14 +3,17 @@
 import { parseRunList, type RunList as Runs } from "@autobots/api-client";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 
 import { RunPanel } from "@/components/run-panel";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/field";
+import { LoadEmpty, LoadState } from "@/components/ui/load-state";
 import { PageHeader } from "@/components/ui/page-header";
+import { loadJson, type LoadFailure } from "@/lib/load";
+import { useResource } from "@/lib/use-resource";
 import { cn } from "@/lib/utils";
 
 export const STATUS_TEXT: Record<string, string> = {
@@ -30,21 +33,17 @@ export const STATUS_TEXT: Record<string, string> = {
 // what waits for a person takes the attention tone, a failure is destructive; the rest stay neutral.
 type Tone = "live" | "attention" | "success" | "failure" | "idle";
 
+const TONES: Record<string, Tone> = {
+  running: "live",
+  verifying: "live",
+  waiting_input: "attention",
+  waiting_approval: "attention",
+  succeeded: "success",
+  failed: "failure",
+};
+
 function tone(status: string): Tone {
-  switch (status) {
-    case "running":
-    case "verifying":
-      return "live";
-    case "waiting_input":
-    case "waiting_approval":
-      return "attention";
-    case "succeeded":
-      return "success";
-    case "failed":
-      return "failure";
-    default:
-      return "idle";
-  }
+  return TONES[status] ?? "idle";
 }
 
 const STATE_TEXT: Record<Tone, string> = {
@@ -157,67 +156,63 @@ function stateLine(run: Row): string {
   return words;
 }
 
+// What Load more added to one first page: its rows, the newest page and why the last read failed. A
+// newer first page replaces it, so a page read for older filters is never appended to newer ones.
+interface More {
+  base: Runs;
+  runs: Row[];
+  next: Runs | null;
+  failure: LoadFailure | null;
+  loading: boolean;
+}
+
+function withMore(base: Runs, more: More | null): Runs {
+  return more?.next == null
+    ? base
+    : { ...more.next, runs: [...base.runs, ...more.runs] };
+}
+
 export function RunList() {
   const [group, setGroup] = useState<Group>("all");
   const [query, setQuery] = useState("");
   const [profile, setProfile] = useState("");
-  const [list, setList] = useState<Runs | null>(null);
-  const [failed, setFailed] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [refreshed, setRefreshed] = useState(0);
+  const [more, setMore] = useState<More | null>(null);
   // RN-04: the selected run's panel, in the address so a reload keeps it open.
   const selected = useSearchParams().get("run");
-  const router = useRouter();
-
-  const url = useCallback(
-    (cursor: string | null) => {
-      // Defaults send no query string, so the first load is plain /api/v1/runs.
-      const params = new URLSearchParams();
-      if (group !== "all") params.set("group", group);
-      if (query.trim() !== "") params.set("q", query.trim());
-      if (profile !== "") params.set("profile", profile);
-      if (cursor !== null) params.set("cursor", cursor);
-      const search = params.toString();
-      return search === "" ? "/api/v1/runs" : `/api/v1/runs?${search}`;
-    },
-    [group, query, profile],
-  );
-
-  useEffect(() => {
-    let active = true;
-    const timer = setTimeout(() => {
-      fetch(url(null), { cache: "no-store" })
-        .then(async (reply) => {
-          if (!active) return;
-          if (reply.ok) {
-            setList(parseRunList(await reply.json()));
-            setFailed(false);
-          } else {
-            await reply.text();
-            setFailed(true);
-          }
-        })
-        .catch(() => {
-          if (active) setFailed(true);
-        });
-    }, 150);
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [url, refreshed]);
+  // Defaults send no query string, so the first load is plain /api/v1/runs.
+  const path = (cursor: string | null) => {
+    const params = new URLSearchParams();
+    if (group !== "all") params.set("group", group);
+    if (query.trim() !== "") params.set("q", query.trim());
+    if (profile !== "") params.set("profile", profile);
+    if (cursor !== null) params.set("cursor", cursor);
+    const search = params.toString();
+    return search === "" ? "/api/v1/runs" : `/api/v1/runs?${search}`;
+  };
+  // Typing in the filter sends one read once it pauses.
+  const { state, pending, reload } = useResource(path(null), parseRunList, {
+    delayMs: 150,
+  });
+  const base = state.kind === "ready" ? state.value : null;
+  const shown = more?.base === base ? more : null;
+  const list = base === null ? null : withMore(base, shown);
 
   async function loadMore(): Promise<void> {
-    if (list?.next_cursor == null) return;
-    setLoadingMore(true);
-    try {
-      const reply = await fetch(url(list.next_cursor), { cache: "no-store" });
-      if (!reply.ok) return;
-      const next = parseRunList(await reply.json());
-      setList({ ...next, runs: [...list.runs, ...next.runs] });
-    } finally {
-      setLoadingMore(false);
-    }
+    if (base === null || list?.next_cursor == null) return;
+    const kept = shown ?? { base, runs: [], next: null, failure: null };
+    setMore({ ...kept, loading: true });
+    const loaded = await loadJson(path(list.next_cursor), parseRunList);
+    setMore(
+      loaded.kind === "ready"
+        ? {
+            base,
+            runs: [...kept.runs, ...loaded.value.runs],
+            next: loaded.value,
+            failure: null,
+            loading: false,
+          }
+        : { ...kept, failure: loaded, loading: false },
+    );
   }
 
   return (
@@ -279,146 +274,155 @@ export function RunList() {
           </Select>
         </label>
       </div>
-      {failed ? (
-        <p
-          role="alert"
-          data-state="unavailable"
-          className="border-destructive/35 text-destructive rounded-lg border p-4 text-sm"
-        >
-          Runs are unavailable. Sign in, and check that the local API is
-          running.
-        </p>
-      ) : list === null ? (
-        <p
-          role="status"
-          data-state="loading"
-          className="text-muted-foreground text-sm"
-        >
-          Loading runs.
-        </p>
-      ) : list.runs.length === 0 ? (
-        <Card className="border-dashed">
-          <p data-state="empty" className="text-sm">
-            {list.counts.all === 0 ? (
-              <>
-                This workspace has no runs yet. Start one from{" "}
-                <Link href="/" className="font-medium underline">
-                  Home
-                </Link>
-                .
-              </>
-            ) : (
-              "No runs match these filters."
-            )}
-          </p>
-        </Card>
+      {list === null ? (
+        <LoadState
+          state={state}
+          what="runs"
+          onRetry={reload}
+          pending={pending}
+        />
       ) : (
-        <div>
-          {/* Column names for sighted readers; each row says its own facts in words. */}
-          <div
-            aria-hidden="true"
-            className={cn(
-              COLUMNS,
-              "text-muted-foreground hidden border-b px-3 pb-2.5 text-[12.5px] font-medium lg:grid",
-            )}
-          >
-            <span>Goal</span>
-            <span>State</span>
-            <span>Models</span>
-            <span className="text-right">Spend</span>
-            <span className="text-right">Started</span>
-          </div>
-          <ul className="divide-border divide-y border-b text-[13.5px] max-lg:border-t">
-            {list.runs.map((run) => (
-              <li
-                key={run.id}
-                data-run={run.id}
-                data-status={run.status}
-                className={cn(
-                  COLUMNS,
-                  "grid gap-x-6 gap-y-1.5 px-3 py-3 lg:min-h-[56px] lg:items-center lg:py-2",
-                )}
-              >
-                <div className="min-w-0">
-                  <Link
-                    href={`/runs/${run.id}`}
-                    className="text-foreground font-medium break-words underline-offset-4 hover:underline"
-                  >
-                    {run.goal_summary === ""
-                      ? "Untitled run"
-                      : run.goal_summary}
-                  </Link>
-                  <span
-                    data-field="label"
-                    className="text-muted-foreground mt-0.5 block text-xs"
-                  >
-                    {run.label ?? "Goal"}
-                    {run.parent_run_id === null ? null : " · A child run"}
-                    {" · "}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        router.replace(
-                          `/runs?run=${encodeURIComponent(run.id)}`,
-                          { scroll: false },
-                        )
-                      }
-                      aria-expanded={run.id === selected}
-                      aria-controls={
-                        run.id === selected ? "run-panel" : undefined
-                      }
-                      aria-label={`Details for ${run.goal_summary === "" ? "Untitled run" : run.goal_summary}`}
-                      data-field="details"
-                      className="text-foreground underline underline-offset-4"
-                    >
-                      Details
-                    </button>
-                  </span>
-                </div>
-                <StateLine status={run.status} text={stateLine(run)} />
-                <span
-                  data-field="models"
-                  className="text-muted-foreground font-mono text-xs"
-                >
-                  <span className="lg:sr-only">Models </span>
-                  {run.profiles.length === 0
-                    ? "—"
-                    : run.profiles
-                        .map((item) => PROFILE_NAMES[item] ?? item)
-                        .join(" · ")}
-                </span>
-                <Spend run={run} />
-                <span className="text-muted-foreground tabular-nums lg:text-right">
-                  <span className="lg:sr-only">Started </span>
-                  {new Date(run.created_at).toISOString()}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-4 flex items-center gap-3 text-[12.5px]">
-            <span data-state="shown" className="text-muted-foreground">
-              Showing {list.runs.length} of {list.total}
-            </span>
-            <span className="flex-1" />
-            {list.has_more ? (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={loadingMore}
-                onClick={() => void loadMore()}
-              >
-                Load more
-              </Button>
-            ) : null}
-          </div>
-        </div>
+        <Listed
+          list={list}
+          more={shown}
+          selected={selected}
+          onMore={() => void loadMore()}
+        />
       )}
       {selected === null ? null : (
-        <RunPanel
-          key={selected}
-          runId={selected}
-          onChanged={() => setRefreshed((value) => value + 1)}
-        />
+        <RunPanel key={selected} runId={selected} onChanged={reload} />
+      )}
+    </div>
+  );
+}
+
+function Listed({
+  list,
+  more,
+  selected,
+  onMore,
+}: {
+  list: Runs;
+  more: More | null;
+  selected: string | null;
+  onMore: () => void;
+}) {
+  const router = useRouter();
+  if (list.runs.length === 0) {
+    return (
+      <Card className="border-dashed">
+        <LoadEmpty>
+          {list.counts.all === 0 ? (
+            <>
+              This workspace has no runs yet. Start one from{" "}
+              <Link href="/" className="font-medium underline">
+                Home
+              </Link>
+              .
+            </>
+          ) : (
+            "No runs match these filters."
+          )}
+        </LoadEmpty>
+      </Card>
+    );
+  }
+  return (
+    <div>
+      {/* Column names for sighted readers; each row says its own facts in words. */}
+      <div
+        aria-hidden="true"
+        className={cn(
+          COLUMNS,
+          "text-muted-foreground hidden border-b px-3 pb-2.5 text-[12.5px] font-medium lg:grid",
+        )}
+      >
+        <span>Goal</span>
+        <span>State</span>
+        <span>Models</span>
+        <span className="text-right">Spend</span>
+        <span className="text-right">Started</span>
+      </div>
+      <ul className="divide-border divide-y border-b text-[13.5px] max-lg:border-t">
+        {list.runs.map((run) => (
+          <li
+            key={run.id}
+            data-run={run.id}
+            data-status={run.status}
+            className={cn(
+              COLUMNS,
+              "grid gap-x-6 gap-y-1.5 px-3 py-3 lg:min-h-[56px] lg:items-center lg:py-2",
+            )}
+          >
+            <div className="min-w-0">
+              <Link
+                href={`/runs/${run.id}`}
+                className="text-foreground font-medium break-words underline-offset-4 hover:underline"
+              >
+                {run.goal_summary === "" ? "Untitled run" : run.goal_summary}
+              </Link>
+              <span
+                data-field="label"
+                className="text-muted-foreground mt-0.5 block text-xs"
+              >
+                {run.label ?? "Goal"}
+                {run.parent_run_id === null ? null : " · A child run"}
+                {" · "}
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.replace(`/runs?run=${encodeURIComponent(run.id)}`, {
+                      scroll: false,
+                    })
+                  }
+                  aria-expanded={run.id === selected}
+                  aria-controls={run.id === selected ? "run-panel" : undefined}
+                  aria-label={`Details for ${run.goal_summary === "" ? "Untitled run" : run.goal_summary}`}
+                  data-field="details"
+                  className="text-foreground underline underline-offset-4"
+                >
+                  Details
+                </button>
+              </span>
+            </div>
+            <StateLine status={run.status} text={stateLine(run)} />
+            <span
+              data-field="models"
+              className="text-muted-foreground font-mono text-xs"
+            >
+              <span className="lg:sr-only">Models </span>
+              {run.profiles.length === 0
+                ? "—"
+                : run.profiles
+                    .map((item) => PROFILE_NAMES[item] ?? item)
+                    .join(" · ")}
+            </span>
+            <Spend run={run} />
+            <span className="text-muted-foreground tabular-nums lg:text-right">
+              <span className="lg:sr-only">Started </span>
+              {new Date(run.created_at).toISOString()}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-4 flex items-center gap-3 text-[12.5px]">
+        <span data-state="shown" className="text-muted-foreground">
+          Showing {list.runs.length} of {list.total}
+        </span>
+        <span className="flex-1" />
+        {list.has_more ? (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={more?.loading === true}
+            onClick={onMore}
+          >
+            Load more
+          </Button>
+        ) : null}
+      </div>
+      {more?.failure == null ? null : (
+        <LoadState state={more.failure} what="more runs" className="mt-3" />
       )}
     </div>
   );

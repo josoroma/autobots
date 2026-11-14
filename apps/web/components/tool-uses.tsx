@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  parseToolUseList,
-  type ToolUseList,
-  type ToolUseView,
-} from "@autobots/api-client";
+import { parseToolUseList, type ToolUseView } from "@autobots/api-client";
 import {
   CircleAlert,
   CircleCheck,
@@ -12,8 +8,10 @@ import {
   CircleHelp,
   Ban,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import { LoadEmpty, LoadState } from "@/components/ui/load-state";
+import { loadJson, type LoadFailure } from "@/lib/load";
 import { cn } from "@/lib/utils";
 
 // PRD-Tool-Catalog TV-01 to TV-03: when, which tool, why (the plan task), for what, and outcome.
@@ -98,52 +96,80 @@ function outcome(use: ToolUseView): string {
   return use.code === null ? text : `${text}: ${use.code.replaceAll("_", " ")}`;
 }
 
-/** Every page of a run's uses, or a root's tree, read again whenever `version` changes. */
-export function useToolUses(
-  runId: string,
-  version: number,
-): { uses: ToolUseView[] | null; failed: boolean } {
+export interface ToolUses {
+  uses: ToolUseView[] | null;
+  /** Why the newest read failed. Uses already shown stay shown. */
+  failure: LoadFailure | null;
+  pending: boolean;
+  reload: () => void;
+}
+
+/**
+ * Every page of a run's uses, read again whenever `version` changes. A caller passes a value that
+ * changes only when the uses may have, so a poll that finds nothing new reads nothing (WBLD-08).
+ */
+export function useToolUses(runId: string, version: number | string): ToolUses {
+  const [request, setRequest] = useState(0);
+  const key = `${request}|${runId}|${version}`;
   const [state, setState] = useState<{
+    key: string;
     uses: ToolUseView[] | null;
-    failed: boolean;
-  }>({ uses: null, failed: false });
+    failure: LoadFailure | null;
+  }>({ key: "", uses: null, failure: null });
   useEffect(() => {
     // A newer read replaces this one, so this one is aborted rather than left open.
     const controller = new AbortController();
-    let active = true;
     const load = async (): Promise<void> => {
       const all: ToolUseView[] = [];
       let after = 0;
       for (;;) {
-        const reply = await fetch(
+        const page = await loadJson(
           `/api/v1/runs/${encodeURIComponent(runId)}/tool-uses?after=${after}&limit=200`,
-          { cache: "no-store", signal: controller.signal },
-        ).catch(() => null);
-        if (!active) return;
-        if (reply?.ok !== true) {
-          setState((current) => ({ ...current, failed: true }));
+          parseToolUseList,
+          { signal: controller.signal },
+        );
+        if (controller.signal.aborted) return;
+        if (page.kind !== "ready") {
+          setState((current) => ({ ...current, key, failure: page }));
           return;
         }
-        const body: unknown = await reply.json().catch(() => null);
-        if (!active) return;
-        if (body === null) {
-          setState((current) => ({ ...current, failed: true }));
-          return;
-        }
-        const page: ToolUseList = parseToolUseList(body);
-        all.push(...page.uses);
-        if (page.next_cursor === null) break;
-        after = page.next_cursor;
+        all.push(...page.value.uses);
+        if (page.value.next_cursor === null) break;
+        after = page.value.next_cursor;
       }
-      if (active) setState({ uses: all, failed: false });
+      setState({ key, uses: all, failure: null });
     };
     void load();
-    return () => {
-      active = false;
-      controller.abort();
-    };
-  }, [runId, version]);
-  return state;
+    return () => controller.abort();
+  }, [runId, key]);
+  const reload = useCallback(() => setRequest((count) => count + 1), []);
+  return {
+    uses: state.uses,
+    failure: state.failure,
+    pending: state.key !== key,
+    reload,
+  };
+}
+
+/** Loading, or why the uses can't be shown, until the first read succeeds. */
+export function ToolUsesState({
+  uses,
+  empty,
+}: {
+  uses: ToolUses;
+  empty: string;
+}) {
+  if (uses.uses === null) {
+    return (
+      <LoadState
+        state={uses.failure ?? { kind: "loading" }}
+        what="tool uses"
+        onRetry={uses.reload}
+        pending={uses.pending}
+      />
+    );
+  }
+  return <LoadEmpty className="text-muted-foreground">{empty}</LoadEmpty>;
 }
 
 export function ToolUseTable({
@@ -244,7 +270,8 @@ export function ToolsUsed({
   runId: string;
   version: number;
 }) {
-  const { uses, failed } = useToolUses(runId, version);
+  const read = useToolUses(runId, version);
+  const { uses } = read;
   const latest = uses?.at(-1);
   return (
     <section
@@ -259,16 +286,8 @@ export function ToolsUsed({
           ? ""
           : `${latest.tool_id}: ${outcome(latest)}. ${uses?.length ?? 0} tool uses.`}
       </p>
-      {failed && uses === null ? (
-        <p role="alert" className="text-sm">
-          Tool uses aren&apos;t available right now.
-        </p>
-      ) : uses === null ? (
-        <p className="text-muted-foreground text-sm">Loading tool uses.</p>
-      ) : uses.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          No tool has been used yet.
-        </p>
+      {uses === null || uses.length === 0 ? (
+        <ToolUsesState uses={read} empty="No tool has been used yet." />
       ) : (
         <ToolUseTable uses={uses} caption="Tools this run used, in order" />
       )}

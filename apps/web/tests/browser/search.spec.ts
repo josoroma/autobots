@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 
 // US-15.22, PRD-Studio SR-01 and Decision 0022 D3. scripts/qualify_identity.py names a run's goal, an
 // Expert and a workflow with "read" in the ops-n workspace, and a run and an Expert in another workspace.
@@ -155,4 +155,50 @@ test("arrows move the announced option, Enter opens it, and Escape returns focus
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(runs).toBeFocused();
+});
+
+// R-27 and WCMP-05: a failed search says why, never that nothing matches. The replies are arranged
+// with page.route on the search read.
+test("a search that fails says why, and Retry searches again", async ({
+  page,
+}) => {
+  await signIn(page);
+  let arranged: Parameters<Route["fulfill"]>[0] | null = {
+    status: 503,
+    json: {
+      code: "service_unavailable",
+      message: "The local API is unavailable.",
+    },
+  };
+  const searches = (url: URL) => url.pathname === "/api/v1/search";
+  await page.route(searches, (route) =>
+    arranged === null ? route.continue() : route.fulfill(arranged),
+  );
+  await page.goto("/runs");
+  await page.keyboard.press(`${MODIFIER}+k`);
+  const dialog = page.getByRole("dialog", { name: "Search" });
+  const box = dialog.getByRole("combobox");
+  const status = dialog.locator('[data-field="search-status"]');
+  await box.fill("read");
+  await expect(status).toHaveAttribute("data-reason", "unavailable");
+  await expect(status).toHaveText(
+    "Search results can't be read right now. Check that the local services are running, then try again.",
+  );
+  await expect(dialog.getByRole("option")).toHaveCount(0);
+  arranged = null;
+  await dialog.getByRole("button", { name: "Retry" }).click();
+  await expect(status).toHaveText(/^\d+ results?\.$/);
+  await expect(status).not.toHaveAttribute("data-reason", /./);
+
+  arranged = {
+    status: 200,
+    json: { schema_version: 1, query: "reader", results: "x" },
+  };
+  await box.fill("reader");
+  await expect(status).toHaveAttribute("data-reason", "out_of_date");
+  await expect(status).toHaveText(
+    "This page and the local service disagree. Reload after updating.",
+  );
+  await expect(dialog.getByRole("option")).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: "Retry" })).toHaveCount(0);
 });
