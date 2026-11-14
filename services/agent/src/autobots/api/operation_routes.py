@@ -2,7 +2,6 @@
 
 import os
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
@@ -11,9 +10,9 @@ from fastapi import APIRouter, Depends, Header, Request
 from autobots.api.errors import ApiError
 from autobots.api.pool import request_pool
 from autobots.api.security import current_user, require_internal
+from autobots.api.settings import Settings
 from autobots.api.settings_routes import current_workspace, require_owner
 from autobots.application.operations import (
-    DEFAULT_MIN_FREE_BYTES,
     Condition,
     ProbeTimes,
     QueueCounts,
@@ -23,7 +22,6 @@ from autobots.application.operations import (
     database_conditions,
     delayed_occurrences,
     disk_bytes,
-    disk_condition,
     is_ready,
     job_hours,
     live_workers,
@@ -31,12 +29,12 @@ from autobots.application.operations import (
     queue_condition,
     queue_counts,
     restore_history,
-    storage_condition,
     stored_bytes,
     timed_catalog,
     worker_condition,
 )
 from autobots.application.provider_settings import ProviderSettings, read_route_qualifications
+from autobots.application.readiness import first_blocking, installation_conditions
 from autobots.application.retention import (
     RetentionPolicy,
     apply_retention,
@@ -77,23 +75,25 @@ def probe_times(request: Request) -> ProbeTimes:
     return probes
 
 
-def _data_root() -> Path:
-    return Path(os.environ.get("AUTOBOTS_CONFIG_ROOT") or ".")
+def process_settings(request: Request) -> Settings:
+    """What the entry point read from the environment once, at start (PAPI-10)."""
+    settings: Settings = request.app.state.settings
+    return settings
 
 
 async def _installation_conditions(request: Request) -> list[Condition]:
-    database, schema, hold, adapter = await database_conditions(
-        request.app.state.pool, probe_times(request)
+    return await installation_conditions(
+        request.app.state.pool,
+        getattr(request.app.state, "object_store", None),
+        process_settings(request).readiness,
+        probe_times(request),
     )
-    storage = await storage_condition(getattr(request.app.state, "object_store", None))
-    minimum = int(os.environ.get("AUTOBOTS_MIN_FREE_BYTES", DEFAULT_MIN_FREE_BYTES))
-    disk = disk_condition(_data_root(), minimum)
-    return [database, schema, hold, adapter, storage, disk]
 
 
 async def require_ready(request: Request) -> None:
-    """Admission stops when required persistence is unhealthy (LM-07), before any job can exist."""
-    if not is_ready(await _installation_conditions(request)):
+    """Admission stops when required persistence is unhealthy (LM-07), before any job can exist.
+    A due routine waits on the same gate in the worker (Decision 0023 E2)."""
+    if first_blocking(await _installation_conditions(request)) is not None:
         raise ApiError(503, "not_ready", "Local services aren't ready, so nothing was started.")
 
 
@@ -155,12 +155,15 @@ async def get_local_status(
     openrouter, catalog_ms = await timed_catalog(
         getattr(getattr(request.app.state, "provider_context", None), "fetch_catalog", None)
     )
-    disk = disk_bytes(_data_root())
+    settings = process_settings(request)
+    disk = disk_bytes(settings.readiness.data_root)
     probes = probe_times(request)
     return LocalStatus(
         schema_version=1,
         ready=is_ready(conditions),
         scope="workspace" if database_up else "installation",
+        # The live environment on purpose: it shows whether tracing is off in this process now,
+        # after forbid_remote_tracing changed it at start.
         remote_tracing="disabled" if remote_tracing_disabled(os.environ) else "enabled",
         conditions=[
             OperationCondition(name=item.name, state=item.state, code=item.code)  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
@@ -168,12 +171,10 @@ async def get_local_status(
         ],
         queue=queue,
         retention=retention,
-        backup_age_hours=backup_age_hours(
-            os.environ.get("AUTOBOTS_BACKUP_DIR", ""), datetime.now(UTC)
-        ),
+        backup_age_hours=backup_age_hours(settings.backup_dir, datetime.now(UTC)),
         openrouter=openrouter,  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
         delayed_schedules=delayed,
-        restores=_restore_records(os.environ.get("AUTOBOTS_BACKUP_DIR", "")),
+        restores=_restore_records(settings.backup_dir),
         route_qualifications=qualifications,
         values=OperationValues(
             database_p95_ms=probes.p95(),

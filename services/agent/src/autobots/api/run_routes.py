@@ -1,6 +1,5 @@
 """Run admission and user commands. A request records intent; a worker owns execution."""
 
-import os
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -220,10 +219,14 @@ async def post_run(
             except ExpertRefused as error:
                 status_code = 404 if error.code.endswith("not_found") else 409
                 raise ApiError(status_code, error.code, "That routing isn't available.") from None
+            # Decisions 0024 K1 and 0025 V3 order the keys, and the process environment in that
+            # order is the one the entry point read at start, as the OpenRouter key's is. The
+            # `settings` dependency has already refused a missing provider context.
+            environment = request.app.state.provider_context.process_environment
             try:
                 # PK-02: only a run that grants an unavailable tool is refused, before it exists.
                 require_available(
-                    binding.tools, await key_sources(connection, workspace_id, os.environ)
+                    binding.tools, await key_sources(connection, workspace_id, environment)
                 )
             except ToolsUnavailable as refused:
                 raise ApiError(

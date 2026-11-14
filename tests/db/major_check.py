@@ -1,23 +1,35 @@
-"""Majors from review round 1, on a real database through the runtime role. JSON cases. No model call."""
+"""Majors from review round 1, and the admission gate a due routine shares with a person's run (refactor
+plan R-24), on a real database through the runtime role. JSON cases through checklib. No model call."""
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
+import logging
 import os
 import sys
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
 from autobots.adapters.loop_middleware import LoopMiddleware, LoopStopped
+from autobots.application import operations as operations_module
 from autobots.application import routines as routines_module
 from autobots.application.approvals import decide, list_approvals
 from autobots.application.assignments import Delegation, assign_tool
 from autobots.application.experts import create_expert, create_session, resolve_binding
 from autobots.application.goal_loop import LoopResult, _scope_guidance
 from autobots.application.memory import SEARCH_MEMORY, MemoryRefused, search, store_memory
+from autobots.application.operations import database_conditions
 from autobots.application.plans import load_goal
+from autobots.application.readiness import (
+    ReadinessSettings,
+    first_blocking,
+    installation_conditions,
+)
 from autobots.application.reconciliation import (
     has_unresolvable_effect,
     record_evidence,
@@ -38,7 +50,7 @@ from autobots.application.tool_gateway import (
     ToolRegistry,
     ToolScope,
 )
-from autobots.application.worker_leases import claim_next, claim_run
+from autobots.application.worker_leases import claim_next, claim_run, is_held
 from autobots.application.workflows import (
     create_execution,
     create_workflow,
@@ -54,17 +66,13 @@ from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import Actor, RunCommand
 from autobots.domain.tools import DELEGATION_TOOL, OperationClass
 from autobots.operations import worker as worker_module
+from checklib import Cases, Db, OnePool, run_check
 from goal_loop_script import ROUTE
 from pydantic import BaseModel
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = UUID(sys.argv[1])
 ACTOR = uuid4()
-cases: list[dict[str, Any]] = []
-
-
-def check(name: str, expected: str, observed: object, passed: bool) -> None:
-    cases.append({'id': name, 'expected': expected, 'observed': str(observed), 'passed': bool(passed)})
 
 
 class Note(BaseModel):
@@ -75,7 +83,9 @@ class Sent(BaseModel):
     delivered: bool
 
 
-async def effects_and_assignments(db: Any) -> None:
+async def effects_and_assignments(db: Any, cases: Cases) -> None:
+    check = cases.check
+
     async def value(sql: str, *values: object) -> Any:
         return (await (await db.execute(sql, values)).fetchone())[0]
 
@@ -281,7 +291,9 @@ class Down:
         raise RuntimeError('storage is down')
 
 
-async def retention_and_readiness(db: Any) -> None:
+async def retention_and_readiness(db: Any, cases: Cases) -> None:
+    check = cases.check
+
     async def value(sql: str, *values: object) -> Any:
         return (await (await db.execute(sql, values)).fetchone())[0]
 
@@ -348,32 +360,135 @@ async def retention_and_readiness(db: Any) -> None:
     reached = await value('select content_purged_at is not null from public.runs where id = %s', behind)
     check('105 refused runs at the head do not stop a later purge', 'refused 105, the later run purged', (report.refused.get('unresolved_effect'), reached), report.refused.get('unresolved_effect') == 105 and reached is True)
 
-    # M14: a routine is admission, so it waits on the same readiness.
-    calls = 0
+
+class Answers(Down):
+    """Storage that answers its ping and removes nothing, so only the arranged condition refuses."""
+
+    async def ping(self) -> None:
+        return None
+
+
+class Held:
+    """Arranged: the hold a restore leaves (scripts/local_backup.py). The runtime role may only read
+    app_private.installation_holds, so this connection answers the hold's one query with a row and sends
+    every other statement to the database."""
+
+    HOLD = 'select 1 from app_private.installation_holds limit 1'
+
+    def __init__(self, connection: Any) -> None:
+        self.connection = connection
+
+    async def execute(self, sql: str, *values: Any) -> Any:
+        return await self.connection.execute('select 1' if sql == self.HOLD else sql, *values)
+
+
+class Said(logging.Handler):
+    """The codes the worker logged while routines wait."""
+
+    def __init__(self) -> None:
+        super().__init__(logging.DEBUG)
+        self.codes: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if record.getMessage() == 'worker.routines_waiting':
+            self.codes.append(str(getattr(record, 'fields', {}).get('reason')))
+
+
+# A column a newer release relies on and this database lacks, so the code is newer than the database.
+NEWER_COLUMN = ('public.runs', 'column_a_newer_release_adds')
+# The disk can't refuse with no minimum, so only the arranged condition does.
+GATE = ReadinessSettings(data_root=Path('.'), min_free_bytes=0)
+
+
+async def routines_wait_on_readiness(db: Db) -> None:
+    """A due routine is admission, so the worker refuses it on the gate a person's run passes, logs the
+    refusing code and keeps declared retention (LM-07, Decision 0023 E2, refactor plan R-24). Routine
+    evaluation is counted instead of run, so nothing here admits a run."""
+    cases = db.cases
+    evaluated: list[int] = []
     real = worker_module.evaluate_routines
 
     async def counted(*_: Any, **__: Any) -> int:
-        nonlocal calls
-        calls += 1
+        evaluated.append(1)
         return 0
 
-    worker_module.evaluate_routines = counted
-    try:
-        down = await worker_module.maintenance_step(worker_module.no_credential, Down())(db)
-    finally:
-        worker_module.evaluate_routines = real
-    check('with Storage down, no routine is evaluated', '0 evaluations', (down, calls), down is False and calls == 0)
-    purged_with_storage_down = await terminal()
-    await write_policy(db, WORKSPACE, ACTOR, RetentionPolicy(run_days=30))
-    await worker_module.maintenance_step(worker_module.no_credential, Down())(db)
-    swept = await value('select content_purged_at is not null from public.runs where id = %s', purged_with_storage_down)
-    check('but declared retention still runs', 'purged', swept, swept is True)
-    await write_policy(db, WORKSPACE, ACTOR, RetentionPolicy())
-    refusal = await worker_module.unattended_refusal(db, Down())
-    check('and it says why', 'storage_unreachable', refusal, refusal == 'storage_unreachable')
+    async def maintain(connection: Any, store: Any, settings: ReadinessSettings = GATE) -> tuple[bool, int, list[str]]:
+        """One maintenance pass: what it returned, how many routine evaluations it made and the codes it logged."""
+        said, logger = Said(), logging.getLogger('autobots.worker')
+        evaluated.clear()
+        logger.addHandler(said)
+        worker_module.evaluate_routines = counted
+        try:
+            worked = await worker_module.maintenance_step(worker_module.no_credential, store, settings)(connection)
+        finally:
+            worker_module.evaluate_routines = real
+            logger.removeHandler(said)
+        return worked, len(evaluated), said.codes
+
+    async def refusal(connection: Any, store: Any) -> str | None:
+        """What a person's run is refused with, through the gate require_ready applies."""
+        blocking = first_blocking(await installation_conditions(OnePool(connection), store, GATE))
+        return None if blocking is None else blocking.code
+
+    @contextlib.asynccontextmanager
+    async def declared_window() -> AsyncIterator[UUID]:
+        """A run that finished 90 days ago, under a 30-day window that ends with the block."""
+        run = uuid4()
+        await db.connection.execute("insert into public.runs (id, workspace_id, limit_micro_usd, status, updated_at) values (%s, %s, 1, 'succeeded', now() - interval '90 days')", (run, db.workspace))
+        await write_policy(db.connection, db.workspace, db.actor, RetentionPolicy(run_days=30))
+        try:
+            yield run
+        finally:
+            await write_policy(db.connection, db.workspace, db.actor, RetentionPolicy())
+
+    async def purged(run: UUID) -> bool:
+        return bool(await db.value('select content_purged_at is not null from public.runs where id = %s', run))
+
+    with cases.scenario('a ready install'):
+        cases.check('with everything ready, the worker evaluates due routines', 'one evaluation, nothing logged',
+                    await maintain(db.connection, Answers()), lambda seen: seen[1:] == (1, []))
+
+    with cases.scenario('Storage down'):
+        async with declared_window() as run:
+            down = await maintain(db.connection, Down())
+        cases.check('with Storage down, no routine is evaluated', 'False, 0 evaluations', down[:2], lambda seen: seen == (False, 0))
+        cases.check('but declared retention still runs', 'purged', await purged(run), lambda swept: swept is True)
+        cases.check('and it says why', "['storage_unreachable']", down[2], lambda codes: codes == ['storage_unreachable'])
+
+    with cases.scenario('a held install'):
+        held = Held(db.connection)
+        cases.check('arranged: the hold reads as held, to the worker and to readiness', 'True, restore_hold',
+                    (await is_held(held), (await database_conditions(OnePool(held)))[2].code), lambda seen: seen == (True, 'restore_hold'))
+        async with declared_window() as run:
+            stopped = await maintain(held, Answers())
+        cases.check('with the install held, no routine is evaluated and nothing is purged', 'False, 0 evaluations, nothing logged, not purged',
+                    (*stopped, await purged(run)), lambda seen: seen == (False, 0, [], False))
+        cases.check("and a person's run is refused with restore_hold", 'restore_hold', await refusal(held, Answers()),
+                    lambda code: code == 'restore_hold')
+
+    with cases.scenario('the schema behind'):
+        required = operations_module.REQUIRED_COLUMNS
+        async with declared_window() as run:
+            operations_module.REQUIRED_COLUMNS = (*required, NEWER_COLUMN)
+            try:
+                behind = await maintain(db.connection, Answers())
+                refused = await refusal(db.connection, Answers())
+            finally:
+                operations_module.REQUIRED_COLUMNS = required
+        cases.check('with the schema behind, no routine is evaluated', 'False, 0 evaluations', behind[:2], lambda seen: seen == (False, 0))
+        cases.check('and the worker logs schema_behind', "['schema_behind']", behind[2], lambda codes: codes == ['schema_behind'])
+        cases.check('but declared retention still runs with the schema behind', 'purged', await purged(run), lambda swept: swept is True)
+        cases.check("and a person's run is refused with the same code", 'schema_behind', refused, lambda code: code == 'schema_behind')
+
+    with cases.scenario('low disk'):
+        low = await maintain(db.connection, Answers(), ReadinessSettings(data_root=Path('.'), min_free_bytes=2**62))
+        cases.check('with low disk, no routine is evaluated, and the worker says why', "False, 0 evaluations, ['disk_low']", low,
+                    lambda seen: seen == (False, 0, ['disk_low']))
 
 
-async def workflows_routines_memory(db: Any) -> None:
+async def workflows_routines_memory(db: Any, cases: Cases) -> None:
+    check = cases.check
+
     async def value(sql: str, *values: object) -> Any:
         return (await (await db.execute(sql, values)).fetchone())[0]
 
@@ -484,12 +599,12 @@ async def workflows_routines_memory(db: Any) -> None:
     await clear()
 
 
-async def main() -> None:
-    async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
-        await workflows_routines_memory(db)
-        await effects_and_assignments(db)
-        await retention_and_readiness(db)
-    print(json.dumps({'cases': cases}))
+async def main(cases: Cases) -> None:
+    async with Db.connect(URL, cases, WORKSPACE, ACTOR) as db:
+        await workflows_routines_memory(db.connection, cases)
+        await effects_and_assignments(db.connection, cases)
+        await retention_and_readiness(db.connection, cases)
+        await routines_wait_on_readiness(db)
 
 
-asyncio.run(main())
+run_check(main)

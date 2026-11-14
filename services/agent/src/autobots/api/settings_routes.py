@@ -2,7 +2,6 @@
 details (MD-02, MD-03), the run intent check and the shared session and workspace dependencies.
 Changes need owner authority and a version."""
 
-import os
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
 from uuid import UUID
@@ -180,7 +179,9 @@ async def keys_and_vars_settings(request: Request) -> AsyncIterator[ToolKeySetti
     if pool is None or context is None:
         raise ApiError(503, "service_unavailable", "Keys & vars settings are unavailable.")
     async with pool.connection() as connection:
-        yield ToolKeySettings(connection, context.master_key_file, os.environ)
+        # Decisions 0024 K1 and 0025 V3 order the keys, and the process environment in that order
+        # is the one the entry point read at start, as the OpenRouter key's is.
+        yield ToolKeySettings(connection, context.master_key_file, context.process_environment)
 
 
 KeysAndVarsSettings = Annotated[ToolKeySettings, Depends(keys_and_vars_settings)]

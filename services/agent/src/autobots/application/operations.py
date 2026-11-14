@@ -27,7 +27,6 @@ logger = logging.getLogger("autobots.operations")
 DB_SECONDS = 3.0
 STORAGE_SECONDS = 3.0
 HEARTBEAT_FRESH_SECONDS = 60
-DEFAULT_MIN_FREE_BYTES = 2 * 1024**3
 # The relations a release can't run without. Add the one a required new migration creates.
 REQUIRED_RELATIONS = (
     "public.runs",
@@ -505,9 +504,15 @@ async def job_hours(connection: Any, workspace_id: UUID) -> tuple[str, list[JobH
 NOT_BLOCKING = frozenset({"schema_ahead"})
 
 
-def is_ready(conditions: tuple[Condition, ...] | list[Condition]) -> bool:
-    return all(
-        item.state == "ok" or item.code in NOT_BLOCKING
-        for item in conditions
-        if item.name in BLOCKING
+def stops_admission(condition: Condition) -> bool:
+    """A blocking check that isn't ok stops admission (LM-07), unless it only degrades by Decision
+    0023 E2. The one rule behind `is_ready` and `readiness.first_blocking`."""
+    return (
+        condition.name in BLOCKING
+        and condition.state != "ok"
+        and condition.code not in NOT_BLOCKING
     )
+
+
+def is_ready(conditions: tuple[Condition, ...] | list[Condition]) -> bool:
+    return not any(stops_admission(item) for item in conditions)

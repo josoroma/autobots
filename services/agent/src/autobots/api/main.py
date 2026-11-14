@@ -12,6 +12,7 @@ from autobots.api.app import create_app
 from autobots.api.membership import PostgresMembership
 from autobots.api.settings import load_settings
 from autobots.application.provider_settings import ProviderContext
+from autobots.application.readiness import MalformedSetting
 from autobots.operations.logs import configure_logging, forbid_remote_tracing
 
 DEFAULT_KEY_FILE = "Library/Application Support/Autobots/secrets/provider-master.key"
@@ -38,7 +39,12 @@ def create_configured_app() -> FastAPI:
     # First, so nothing built below can see an inherited tracing setting.
     forbid_remote_tracing(os.environ)
     configure_logging()
-    app = create_app(load_settings())
+    try:
+        settings = load_settings()
+    except MalformedSetting as error:
+        # Stops at start with the variable named, rather than refusing every admission.
+        raise SystemExit(str(error)) from None
+    app = create_app(settings)
     app.state.membership = PostgresMembership(app.state)
     stream_seconds = os.environ.get("AUTOBOTS_STREAM_SECONDS", "")
     if stream_seconds:

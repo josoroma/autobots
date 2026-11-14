@@ -24,17 +24,18 @@ from uuid import UUID
 import psycopg
 from pydantic import SecretStr
 
-from autobots.adapters.checkpoints import adapter_qualified
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.api.main import provider_context_from_environment
 from autobots.application.approvals import expire_due
 from autobots.application.goal_loop import UNBOUND, LoopConfig, process_next
-from autobots.application.operations import (
-    DEFAULT_MIN_FREE_BYTES,
-    disk_condition,
-    storage_condition,
-)
 from autobots.application.provider_settings import CatalogFetcher, ProviderSettings
+from autobots.application.readiness import (
+    LentConnection,
+    MalformedSetting,
+    ReadinessSettings,
+    first_blocking,
+    installation_conditions,
+)
 from autobots.application.retention import apply_all
 from autobots.application.routines import evaluate_routines
 from autobots.application.worker_inference import CatalogCache, InferenceSource
@@ -175,23 +176,26 @@ def install_signal_handlers(stop: asyncio.Event) -> None:
         loop.add_signal_handler(signal_number, stop.set)
 
 
-async def unattended_refusal(connection: Any, store: Any) -> str | None:
-    if not await adapter_qualified(connection):
-        return "adapter_unqualified"
-    storage = await storage_condition(store)
-    if storage.state != "ok":
-        return storage.code
-    minimum = int(os.environ.get("AUTOBOTS_MIN_FREE_BYTES", DEFAULT_MIN_FREE_BYTES))
-    disk = disk_condition(Path(os.environ.get("AUTOBOTS_CONFIG_ROOT") or "."), minimum)
-    return None if disk.state == "ok" else disk.code
+def readiness_from_environment() -> ReadinessSettings:
+    """Read once at start, so a malformed value stops the worker instead of failing every pass."""
+    try:
+        return ReadinessSettings.from_environment(os.environ)
+    except MalformedSetting as error:
+        raise SystemExit(str(error)) from None
 
 
 def maintenance_step(
     credential_check: Callable[[Any, UUID], Awaitable[str]],
     store: Any,
+    readiness: ReadinessSettings,
     retention_seconds: float = 3600,
 ) -> Step:
-    """Expired approvals, due routines and declared retention, each safe from many workers."""
+    """Expired approvals, due routines and declared retention, each safe from many workers.
+
+    A restore hold stops all three (SP-018). Otherwise a routine is admission, so it waits on the
+    gate a person's run passes (LM-07, Decision 0023 E2), and the refusing code is logged when it
+    changes. Retention doesn't wait: it removes content, and waits on Storage by itself.
+    """
     last_retention: list[float] = []
     said: list[str] = []
 
@@ -203,16 +207,16 @@ def maintenance_step(
         async def check(workspace_id: UUID) -> str:
             return await credential_check(connection, workspace_id)
 
-        # A routine is admission too, so it waits on the same readiness a person would. Retention
-        # below doesn't: it removes content, and waits on Storage by itself.
-        refused = await unattended_refusal(connection, store)
+        refused = first_blocking(
+            await installation_conditions(LentConnection(connection), store, readiness)
+        )
         admitted = 0
         if refused is None:
             admitted = await evaluate_routines(connection, check)
             said[:] = []
-        elif said != [refused]:
-            said[:] = [refused]
-            log_event(logger, "worker.routines_waiting", logging.WARNING, reason=refused)
+        elif said != [refused.code]:
+            said[:] = [refused.code]
+            log_event(logger, "worker.routines_waiting", logging.WARNING, reason=refused.code)
         now = asyncio.get_running_loop().time()
         if not last_retention or now - last_retention[0] >= retention_seconds:
             last_retention[:] = [now]
@@ -323,13 +327,14 @@ async def main(
         os.environ.get("AUTOBOTS_SERVICE_ROLE_KEY", ""),
     )
     store = SupabaseObjectStore(base, SecretStr(key)) if base and key else None
+    readiness = readiness_from_environment()
     config = WorkerConfig(
         worker_id=f"{os.uname().nodename}-{os.getpid()}-{secrets.token_hex(3)}",
         database_url=url,
         drain_seconds=float(os.environ.get("AUTOBOTS_WORKER_DRAIN_SECONDS", "30")),
     )
     stop = asyncio.Event()
-    step = maintenance_step(credential_check_from_environment(), store)
+    step = maintenance_step(credential_check_from_environment(), store, readiness)
     if os.environ.get(INFERENCE_SWITCH) == "enabled":
         source = inference_from_environment(url, store, client_factory, fetch_catalog)
         config = replace(config, claims_inference=True)

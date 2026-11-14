@@ -17,6 +17,7 @@ from pydantic import SecretStr
 from autobots.api import operation_routes
 from autobots.api.app import create_app
 from autobots.api.settings import Settings
+from autobots.application import readiness
 from autobots.application.operations import (
     PROBES_KEPT,
     Condition,
@@ -183,9 +184,10 @@ def test_the_status_holds_numbers_only_and_producing_it_sends_nothing_off_this_m
         return original(self, address)
 
     monkeypatch.setattr(socket.socket, "connect", guarded)
+    # The installation's conditions come through the admission gate's module.
+    monkeypatch.setattr(readiness, "database_conditions", conditions)
+    monkeypatch.setattr(readiness, "storage_condition", storage)
     for name, stub in (
-        ("database_conditions", conditions),
-        ("storage_condition", storage),
         ("queue_counts", counts),
         ("worker_condition", worker),
         ("read_policy", policy),
