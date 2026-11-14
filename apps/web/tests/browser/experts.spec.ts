@@ -542,7 +542,7 @@ test("Expert cards show their facts, filters and the approval note", async ({
   await expect(watcher).toContainText("market_history");
   await expect(watcher).toContainText("+2");
   await expect(watcher.locator('[data-field="runs"]')).toHaveText(
-    /^3 runs · last \d+ min ago$/,
+    /^3 runs · last run (just now|\d+ minutes? ago)$/,
   );
   await expect(
     watcher.getByRole("button", { name: "Start run with Market watcher" }),

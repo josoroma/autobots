@@ -20,6 +20,8 @@ import { IconTile } from "@/components/ui/card";
 import { Choice, Input } from "@/components/ui/field";
 import { SectionLabel } from "@/components/ui/page-header";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { formatRelative } from "@/lib/format";
+import { PROFILE_NAME } from "@/lib/model-profile";
 import { withHeld } from "@/lib/submit";
 import { cn } from "@/lib/utils";
 import { useSubmit } from "@/lib/use-submit";
@@ -49,14 +51,18 @@ export function ExpertsPanel() {
   );
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
+  // When the list was read, so each card's last run is measured from then, not during render.
+  const [now, setNow] = useState(0);
 
   useEffect(() => {
     let active = true;
     fetch("/api/v1/experts", { cache: "no-store" })
       .then(async (reply) => {
         if (!active) return;
-        if (reply.ok) setExperts(parseExpertList(await reply.json()).experts);
-        else setFailed(true);
+        if (reply.ok) {
+          setExperts(parseExpertList(await reply.json()).experts);
+          setNow(Date.now());
+        } else setFailed(true);
       })
       .catch(() => {
         if (active) setFailed(true);
@@ -272,6 +278,7 @@ export function ExpertsPanel() {
                 key={expert.id}
                 expert={expert}
                 catalog={catalog}
+                now={now}
                 checked={routed.has(expert.id)}
                 locked={routing}
                 busy={sessions.pending}
@@ -346,11 +353,6 @@ const FILTERS: [Filter, string][] = [
   ["outside", "Can change things outside"],
   ["read_only", "Read only"],
 ];
-const PROFILE_NAMES: Record<string, string> = {
-  openrouter_terra: "Terra",
-  openrouter_sol: "Sol",
-  openrouter_deepseek_flash: "DeepSeek Flash",
-};
 // The noun each always-approved tool decides on, for "Approval on every issue".
 const APPROVAL_NOUN: Record<string, string> = {
   create_github_issue: "issue",
@@ -361,17 +363,11 @@ function latestTools(expert: ExpertView): readonly string[] {
   return expert.versions.at(-1)?.config.tools ?? [];
 }
 
-function lastRun(iso: string): string {
-  const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
-  if (minutes < 60) return `${Math.max(minutes, 0)} min ago`;
-  if (minutes < 60 * 24) return `${Math.round(minutes / 60)} h ago`;
-  return new Date(iso).toLocaleDateString();
-}
-
 // One Expert as a card: what its latest version says, from the list already loaded.
 function ExpertCard({
   expert,
   catalog,
+  now,
   checked,
   locked,
   busy,
@@ -380,6 +376,8 @@ function ExpertCard({
 }: {
   expert: ExpertView;
   catalog: ReadonlyMap<string, ToolDescriptor>;
+  /** When the list was read, in epoch milliseconds. */
+  now: number;
   checked: boolean;
   // A held coordinator session names these Experts, so they stay as sent.
   locked: boolean;
@@ -418,7 +416,7 @@ function ExpertCard({
             executor ·{" "}
             {executor === undefined
               ? "Workspace default"
-              : (PROFILE_NAMES[executor] ?? executor)}{" "}
+              : PROFILE_NAME[executor]}{" "}
             · version {expert.latest_version}
           </p>
         </div>
@@ -453,7 +451,7 @@ function ExpertCard({
           : `${expert.run_count} ${expert.run_count === 1 ? "run" : "runs"}${
               expert.last_run_at === null
                 ? ""
-                : ` · last ${lastRun(expert.last_run_at)}`
+                : ` · last run ${formatRelative(expert.last_run_at, now)}`
             }`}
       </p>
       {approvals.length === 0 ? null : (

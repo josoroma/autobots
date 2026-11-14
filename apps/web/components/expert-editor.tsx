@@ -2,7 +2,9 @@
 
 import {
   type ExpertView,
+  type ModelList,
   parseExpertView,
+  parseModelList,
   parseSessionView,
   parseToolCatalog,
   type SessionCreate,
@@ -16,18 +18,28 @@ import { HeldNote } from "@/components/held-note";
 import { Button } from "@/components/ui/button";
 import { Card, INNER_BOX } from "@/components/ui/card";
 import { Choice, Input, Select, Textarea } from "@/components/ui/field";
+import { LoadState } from "@/components/ui/load-state";
 import { SectionLabel } from "@/components/ui/page-header";
-import { AVAILABILITY, repair } from "@/components/tool-catalog";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { PROFILE_NAME, profileName } from "@/lib/model-profile";
 import { withHeld } from "@/lib/submit";
+import { AVAILABILITY_LABEL, repairText } from "@/lib/tools/text";
 import { cn } from "@/lib/utils";
+import { useResource } from "@/lib/use-resource";
 import { useSubmit } from "@/lib/use-submit";
 
-const PROFILES = [
-  { id: "", label: "Workspace setting" },
-  { id: "openrouter_terra", label: "Terra" },
-  { id: "openrouter_sol", label: "Sol" },
-];
+const WORKSPACE_SETTING = "";
+
+/**
+ * Whether new runs may use a profile, as ModelAvailability.offered says (Decision 0013, Decision
+ * 0019 S2), or null while the models aren't read. The service owns the rule (XWEB-04, WBLD-07).
+ */
+function offeredFor(models: ModelList | null, profile: string): boolean | null {
+  if (models === null) return null;
+  return models.models.some(
+    (model) => model.profile === profile && model.offered,
+  );
+}
 
 type Draft = {
   purpose: string;
@@ -90,6 +102,8 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
   const [state, setState] = useState<"ready" | "unavailable">("ready");
   const [message, setMessage] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<ToolCatalog | null>(null);
+  const modelsRead = useResource("/api/models", parseModelList);
+  const models = modelsRead.value;
 
   useEffect(() => {
     let active = true;
@@ -129,16 +143,15 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
 
   // This form edits only the executor. Other offered bindings stay, and one naming a model that
   // isn't offered goes with this save, which the form says, since it would otherwise refuse it.
+  // Until the models are read, every binding stays, and the service refuses one it doesn't offer.
   const saved: Record<string, string> =
     expert?.versions.at(-1)?.config.role_bindings ?? {};
   const others = Object.entries(saved).filter(([role]) => role !== "executor");
   const kept = Object.fromEntries(
-    others.filter(([, profile]) =>
-      PROFILES.some((item) => item.id === profile),
-    ),
+    others.filter(([, profile]) => offeredFor(models, profile) !== false),
   );
   const dropped = others
-    .filter(([, profile]) => !PROFILES.some((item) => item.id === profile))
+    .filter(([, profile]) => offeredFor(models, profile) === false)
     .map(([role]) => role);
 
   async function save(event: FormEvent): Promise<void> {
@@ -357,7 +370,7 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
                 const named = draft.tools.includes(tool.tool_id);
                 const fromGroup = draft.groups.includes(tool.group);
                 const unavailable = tool.availability !== "available";
-                const fix = repair(tool);
+                const fix = repairText(tool);
                 return (
                   <div key={tool.tool_id} data-tool={tool.tool_id}>
                     <label
@@ -403,7 +416,7 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
                         className="text-muted-foreground ml-6.5 text-xs"
                         data-field="unavailable"
                       >
-                        {AVAILABILITY[tool.availability] ?? tool.availability}
+                        {AVAILABILITY_LABEL[tool.availability]}
                         {fix === null ? "" : `. ${fix}`}
                       </p>
                     ) : null}
@@ -429,28 +442,20 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
             <label htmlFor="executor" className="text-sm font-medium">
               Model for its work
             </label>
-            <Select
-              id="executor"
+            <ExecutorChoice
               value={draft.executor}
+              models={models}
               disabled={held}
-              className="sm:max-w-xs"
-              onChange={(event) =>
-                setDraft({ ...draft, executor: event.target.value })
-              }
-            >
-              {PROFILES.map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {profile.label}
-                </option>
-              ))}
-              {PROFILES.some(
-                (profile) => profile.id === draft.executor,
-              ) ? null : (
-                <option value={draft.executor} disabled>
-                  {draft.executor}: not offered for new runs until qualified
-                </option>
-              )}
-            </Select>
+              onChange={(executor) => setDraft({ ...draft, executor })}
+            />
+            {modelsRead.state.kind === "loading" ? null : (
+              <LoadState
+                state={modelsRead.state}
+                what="the models new runs may use"
+                onRetry={modelsRead.reload}
+                pending={modelsRead.pending}
+              />
+            )}
           </div>
           {dropped.length === 0 ? null : (
             <p
@@ -508,3 +513,46 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
 
 // A section label inside the form, kept a native legend so the group keeps its name.
 const LEGEND = "text-muted-foreground mb-2 text-xs font-semibold tracking-wide";
+
+// The executor's choices: the workspace setting and each profile /api/models offers. A saved choice
+// that isn't offered stays shown and disabled, so the form never changes it unasked.
+function ExecutorChoice({
+  value,
+  models,
+  disabled,
+  onChange,
+}: {
+  value: string;
+  models: ModelList | null;
+  disabled: boolean;
+  onChange: (profile: string) => void;
+}) {
+  const offered = (models?.models ?? []).filter((model) => model.offered);
+  const listed =
+    value === WORKSPACE_SETTING ||
+    offered.some((model) => model.profile === value);
+  return (
+    <Select
+      id="executor"
+      value={value}
+      disabled={disabled}
+      className="sm:max-w-xs"
+      onChange={(event) => onChange(event.target.value)}
+    >
+      <option value={WORKSPACE_SETTING}>Workspace setting</option>
+      {offered.map((model) => (
+        <option key={model.profile} value={model.profile}>
+          {PROFILE_NAME[model.profile]}
+        </option>
+      ))}
+      {listed ? null : models === null ? (
+        // Until the models are read, the saved choice shows as it is.
+        <option value={value}>{profileName(value)}</option>
+      ) : (
+        <option value={value} disabled>
+          {value}: not offered for new runs until qualified
+        </option>
+      )}
+    </Select>
+  );
+}

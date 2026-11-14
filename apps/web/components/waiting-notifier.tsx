@@ -10,6 +10,7 @@ import {
   notifyChosen,
 } from "@/lib/notify";
 import {
+  isWaiting,
   newlyWaiting,
   pollDelay,
   WAITING_TITLE,
@@ -63,7 +64,8 @@ export function WaitingNotifier() {
 
     function announce(run: RunListItem): void {
       const key = `${run.id}:${run.status}`;
-      const note = new Notification(WAITING_TITLE[run.status] ?? "", {
+      if (!isWaiting(run.status)) return;
+      const note = new Notification(WAITING_TITLE[run.status], {
         body: run.goal_summary === "" ? "Untitled run" : run.goal_summary,
         tag: key,
       });

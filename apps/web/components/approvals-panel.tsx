@@ -20,6 +20,7 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, INNER_BOX } from "@/components/ui/card";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { untilDeadline } from "@/lib/format";
 import { chord, press, type Arm } from "@/lib/approval-shortcut";
 import { typing } from "@/lib/keyboard";
 import { changedChoice, withHeld } from "@/lib/submit";
@@ -120,18 +121,6 @@ function policyText(approval: ApprovalView): string {
       ? ""
       : `, rule ${approval.policy_rule.replaceAll("_", " ")}`;
   return `${approval.policy_version}${rule}.`;
-}
-
-function relative(iso: string, now: number): string {
-  const minutes = Math.round((new Date(iso).getTime() - now) / 60_000);
-  const size = Math.abs(minutes);
-  const amount =
-    size < 60
-      ? `${size} min`
-      : size < 60 * 48
-        ? `${Math.round(size / 60)} h`
-        : `${Math.round(size / 1440)} d`;
-  return minutes >= 0 ? `in ${amount}` : `${amount} ago`;
 }
 
 function decidedText(approval: ApprovalView): string {
@@ -441,7 +430,7 @@ export function ApprovalsPanel({
                   </span>
                   <span className="text-muted-foreground block text-xs">
                     {tab === "waiting"
-                      ? `Expires ${relative(approval.expires_at, now)}`
+                      ? `Expires ${untilDeadline(approval.expires_at, now)}`
                       : (OUTCOME[approval.status] ?? approval.status)}
                   </span>
                 </button>
@@ -519,7 +508,7 @@ function ApprovalDetail({
             {new Date(approval.expires_at).toLocaleString()}.
           </span>{" "}
           <span className="text-muted-foreground">
-            ({relative(approval.expires_at, now)})
+            ({untilDeadline(approval.expires_at, now)})
           </span>
         </Fact>
         {waiting ? (

@@ -11,19 +11,21 @@ import { useEffect, useState } from "react";
 
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Select } from "@/components/ui/field";
+import { FALLBACK_BUDGET_MICRO_USD } from "@/lib/budget";
+import { formatUsd } from "@/lib/format";
+import { summarizerDiffers } from "@/lib/model-roles";
 import { cn } from "@/lib/utils";
 
 // MP-07. Every screen that creates a run shows this, and reading it starts nothing.
 const EXECUTOR = "executor";
 const WORKSPACE_DEFAULT = "";
-const MICRO_USD = 1_000_000;
-export const DEFAULT_BUDGET_MICRO_USD = 1_000_000;
 
 export function RunDisclosure({
   chosen,
   onChoose,
   roleOverrides,
-  budgetMicroUsd = DEFAULT_BUDGET_MICRO_USD,
+  // A screen that sends no budget runs with RunRequest's default limit, US$1.00 as D11's default is.
+  budgetMicroUsd = FALLBACK_BUDGET_MICRO_USD,
   sendsOnlyIfAgent = false,
   usesModel = true,
 }: {
@@ -93,8 +95,6 @@ export function RunDisclosure({
   const fromExpert = Object.values(roleOverrides ?? {}).some(notOffered);
   // The model, roles and summarizer note appear only once the choice is read and allowed.
   const showModel = !failed && executor !== undefined && !refused;
-
-  const budget = (budgetMicroUsd / MICRO_USD).toFixed(2);
 
   // Each sentence below keeps its exact words, which product rules and tests read. Spans only arrange
   // them: a small label, the figure, and hidden punctuation that keeps the sentence whole.
@@ -191,7 +191,9 @@ export function RunDisclosure({
           </Eyebrow>{" "}
           <span>
             <span className="text-muted-foreground">up to</span>{" "}
-            <span className="font-medium tabular-nums">US${budget}</span>
+            <span className="font-medium tabular-nums">
+              {formatUsd(budgetMicroUsd)}
+            </span>
           </span>{" "}
           <span className="text-muted-foreground">for this run.</span>
         </p>
@@ -213,8 +215,7 @@ export function RunDisclosure({
               ))}
             </ul>
           </details>
-          {bindings.find((binding) => binding.role === "summarizer")
-            ?.profile !== executor?.profile ? (
+          {summarizerDiffers(bindings) ? (
             <p data-disclosure="summarizer" className="flex items-start gap-2">
               <TriangleAlert
                 aria-hidden="true"

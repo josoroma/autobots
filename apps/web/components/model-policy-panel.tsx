@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type BindingSource,
   parseModelList,
   parseModelPolicyState,
   type ModelList,
@@ -13,6 +14,12 @@ import { Button } from "@/components/ui/button";
 import { Card, INNER_BOX } from "@/components/ui/card";
 import { Select } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { formatUsd } from "@/lib/format";
+import {
+  BINDING_SOURCE_LABEL,
+  differingRoles,
+  summarizerDiffers,
+} from "@/lib/model-roles";
 import { refusalText } from "@/lib/submit";
 import { useSubmit } from "@/lib/use-submit";
 import { cn } from "@/lib/utils";
@@ -20,24 +27,15 @@ import { cn } from "@/lib/utils";
 const WORKSPACE_DEFAULT = "";
 // The workspace default select's "none": each role takes its built-in default (MD-02).
 const BUILTIN_DEFAULT = "";
-const EXECUTOR = "executor";
 
-// PRD-Studio MD-02: which step of MP-01's order chose a role's binding.
-const SOURCE_LABEL: Record<string, string> = {
-  run_override: "Run override",
-  workspace_override: "Workspace override",
-  workspace_default: "Workspace default",
-  builtin_default: "Built-in default",
-};
-
-// Micro-USD per 1M tokens, as US$ with at least two decimals.
+// Micro-USD per 1M tokens, in the app's one money format.
 function perMillion(micro: number | null): string {
-  if (micro === null) return "not listed";
-  const dollars = (micro / 1_000_000).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 4,
-  });
-  return `US$${dollars}`;
+  return micro === null ? "not listed" : formatUsd(micro);
+}
+
+// PRD-Studio MD-02: which step chose a saved role's binding.
+function sourceText(source: BindingSource | undefined): string {
+  return source === undefined ? "Not recorded" : BINDING_SOURCE_LABEL[source];
 }
 
 function fetchedAt(value: string | null): string {
@@ -61,8 +59,6 @@ function sameForm(
     [...keys].every((role) => saved[role] === overrides[role])
   );
 }
-const SUMMARIZER = "summarizer";
-
 // R-19 step 4: this screen's words for a refusal's code, per action. Any other keeps the service's.
 const SAVE_REFUSALS: Readonly<Record<string, string>> = {
   stale_version:
@@ -86,11 +82,7 @@ function modelLabel(canonicalId: string, wireId: string): string {
 // Only what's saved is described, so the screen can't say a draft has taken effect.
 function RoleEffect({ state }: { state: ModelPolicyState }) {
   const bindings = state.policy.bindings;
-  const executor = bindings.find((binding) => binding.role === EXECUTOR);
-  const differing = bindings.filter(
-    (binding) =>
-      binding.role !== EXECUTOR && binding.profile !== executor?.profile,
-  );
+  const differing = differingRoles(bindings);
   return (
     <div
       data-field="role-effect"
@@ -112,14 +104,14 @@ function RoleEffect({ state }: { state: ModelPolicyState }) {
         ) : (
           <p data-role-effect="differs">
             These differ from the executor, so they don&apos;t take effect:{" "}
-            {differing.map((binding) => binding.role).join(", ")}.
+            {differing.join(", ")}.
           </p>
         )}
         <p>
           A summarizer that differs pauses the run with route_not_bound, once
           the run needs compaction.
         </p>
-        {differing.some((binding) => binding.role === SUMMARIZER) ? (
+        {summarizerDiffers(bindings) ? (
           <p data-role-effect="summarizer" className="font-medium">
             The summarizer differs here, so long runs will pause that way.
           </p>
@@ -403,8 +395,7 @@ export function ModelPolicyPanel() {
                     data-binding-source={savedSource.get(binding.role)}
                     className="text-muted-foreground block text-[12px]"
                   >
-                    {SOURCE_LABEL[savedSource.get(binding.role) ?? ""] ??
-                      "Not recorded"}
+                    {sourceText(savedSource.get(binding.role))}
                     {", "}
                     {binding.canonical_id}
                   </span>

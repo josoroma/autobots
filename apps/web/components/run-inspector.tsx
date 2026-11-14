@@ -7,12 +7,9 @@ import type { ReactNode } from "react";
 
 import { LoadState } from "@/components/ui/load-state";
 import { PageHeader } from "@/components/ui/page-header";
+import { formatUsd } from "@/lib/format";
 import { RUN_NOT_FOUND } from "@/lib/run-workspace-load";
 import { useResource } from "@/lib/use-resource";
-
-function dollars(micro: number): string {
-  return `US$${micro / 1_000_000}`;
-}
 
 function tokens(value: number | null): string {
   return value === null ? "not reported" : String(value);
@@ -125,26 +122,26 @@ export function RunInspectorView({ runId }: { runId: string }) {
                       records:{" "}
                       {call.reported_micro_usd === null
                         ? "none"
-                        : dollars(call.reported_micro_usd)}
+                        : formatUsd(call.reported_micro_usd)}
                     </p>
                   ) : call.charge_source_unknown ? (
                     <p data-cost="unattributed">
                       Charge reconciled, source not recorded:{" "}
                       {call.reported_micro_usd === null
                         ? "none"
-                        : dollars(call.reported_micro_usd)}
+                        : formatUsd(call.reported_micro_usd)}
                     </p>
                   ) : (
                     <p data-cost="reported">
                       Reported charge:{" "}
                       {call.reported_micro_usd === null
                         ? "none"
-                        : dollars(call.reported_micro_usd)}
+                        : formatUsd(call.reported_micro_usd)}
                     </p>
                   )}
                   <p data-cost="estimated" className="text-muted-foreground">
                     Estimated worst case, not a charge:{" "}
-                    {dollars(call.estimated_micro_usd)}
+                    {formatUsd(call.estimated_micro_usd)}
                   </p>
                 </div>
               </li>

@@ -2,10 +2,19 @@
  * Which runs newly wait, and when the notifier polls next (PRD-Studio SE-05, WCMP-06). Pure, so
  * `node --test` covers it; `components/waiting-notifier.tsx` runs the loop in the browser.
  */
-export const WAITING_TITLE: Readonly<Record<string, string>> = {
+import type { RunStatus } from "@autobots/api-client";
+
+// The statuses that wait for a person, keyed by the generated RunStatus (WCMP-14).
+export const WAITING_TITLE = {
   waiting_approval: "A run waits for your approval",
   waiting_input: "A run waits for your input",
-};
+} as const satisfies Partial<Record<RunStatus, string>>;
+
+export type WaitingStatus = keyof typeof WAITING_TITLE;
+
+export function isWaiting(status: RunStatus): status is WaitingStatus {
+  return Object.hasOwn(WAITING_TITLE, status);
+}
 export const EVERY_MS = 4_000;
 // Signed out or not a member: sign-in navigates without a page load, so the notifier keeps asking.
 export const SIGNED_OUT_MS = 60_000;
@@ -22,7 +31,7 @@ export function pollDelay(result: PollResult, failures: number): number {
 
 interface WaitingRun {
   id: string;
-  status: string;
+  status: RunStatus;
 }
 
 /**
@@ -33,7 +42,7 @@ export function newlyWaiting<T extends WaitingRun>(
   seen: ReadonlySet<string> | null,
   runs: readonly T[],
 ): { fresh: T[]; seen: Set<string> } {
-  const waiting = runs.filter((run) => WAITING_TITLE[run.status] !== undefined);
+  const waiting = runs.filter((run) => isWaiting(run.status));
   const now = new Set(waiting.map((run) => `${run.id}:${run.status}`));
   const fresh =
     seen === null

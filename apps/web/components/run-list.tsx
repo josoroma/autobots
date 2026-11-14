@@ -6,91 +6,40 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { RunPanel } from "@/components/run-panel";
-
+import { StateLine } from "@/components/runs/run-state";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/field";
 import { LoadEmpty, LoadState } from "@/components/ui/load-state";
 import { PageHeader } from "@/components/ui/page-header";
+import { spendOf } from "@/lib/budget";
+import { formatInstant, formatUsd } from "@/lib/format";
 import { loadJson, type LoadFailure } from "@/lib/load";
+import { PROFILE_NAME, profileName } from "@/lib/model-profile";
+import { RUN_STATUS_LABEL, stopReasonText } from "@/lib/runs/status";
 import { useResource } from "@/lib/use-resource";
 import { cn } from "@/lib/utils";
 
-export const STATUS_TEXT: Record<string, string> = {
-  queued: "Queued",
-  running: "Running",
-  waiting_input: "Waiting for input",
-  waiting_approval: "Waiting for approval",
-  paused: "Paused",
-  verifying: "Verifying",
-  cancelling: "Cancelling",
-  succeeded: "Succeeded",
-  failed: "Failed",
-  cancelled: "Cancelled",
-};
-
-// Decision 0021 R3–R4: the dot repeats the state's words, never replaces them. What runs is live,
-// what waits for a person takes the attention tone, a failure is destructive; the rest stay neutral.
-type Tone = "live" | "attention" | "success" | "failure" | "idle";
-
-const TONES: Record<string, Tone> = {
-  running: "live",
-  verifying: "live",
-  waiting_input: "attention",
-  waiting_approval: "attention",
-  succeeded: "success",
-  failed: "failure",
-};
-
-function tone(status: string): Tone {
-  return TONES[status] ?? "idle";
-}
-
-const STATE_TEXT: Record<Tone, string> = {
-  live: "text-live-text",
-  attention: "text-attention",
-  success: "text-foreground",
-  failure: "text-destructive",
-  idle: "text-foreground",
-};
-
-const STATE_DOT: Record<Tone, string> = {
-  live: "bg-live-text ring-live-text/20 ring-[3px]",
-  attention: "bg-attention",
-  success: "bg-success-text",
-  failure: "bg-destructive",
-  idle: "border-muted-foreground border-[1.5px]",
-};
-
 const COLUMNS = "lg:grid-cols-[minmax(0,1fr)_12rem_7rem_9rem_9rem] lg:gap-x-5";
 
-type Group = "all" | "active" | "needs_you" | "finished";
+// The API's run groups, by the counts it sends (the generator emits no type for the query).
+type Group = keyof Runs["counts"];
 const GROUPS: { id: Group; label: string }[] = [
   { id: "all", label: "All" },
   { id: "active", label: "Active" },
   { id: "needs_you", label: "Needs you" },
   { id: "finished", label: "Finished" },
 ];
-const PROFILE_NAMES: Record<string, string> = {
-  openrouter_terra: "Terra",
-  openrouter_sol: "Sol",
-  openrouter_deepseek_flash: "DeepSeek Flash",
-};
-const STOP_TEXT: Record<string, string> = {
-  tool_budget_exceeded: "tool budget",
-  budget_exhausted: "budget",
-};
 
 type Row = Runs["runs"][number];
 
-function dollars(micro: number): string {
-  return `US$${(micro / 1_000_000).toFixed(2)}`;
-}
-
 // PRD-Studio RN-03: "≈" while a reservation is outstanding or a charge went unreported.
 function Spend({ run }: { run: Row }) {
-  const estimated = run.reserved_micro_usd > 0 || run.unreported;
-  const spent = run.charged_micro_usd + run.reserved_micro_usd;
+  const { micro: spent, estimated } = spendOf(
+    run.charged_micro_usd,
+    run.reserved_micro_usd,
+    run.unreported,
+  );
   const share =
     run.limit_micro_usd > 0
       ? Math.min(100, Math.round((spent / run.limit_micro_usd) * 100))
@@ -104,10 +53,10 @@ function Spend({ run }: { run: Row }) {
             <span className="sr-only">About </span>
           </>
         ) : null}
-        {dollars(spent)}
+        {formatUsd(spent)}
       </span>
       <span className="text-muted-foreground block text-xs tabular-nums">
-        {estimated ? "estimated, " : ""}of {dollars(run.limit_micro_usd)}
+        {estimated ? "estimated, " : ""}of {formatUsd(run.limit_micro_usd)}
       </span>
       <span
         aria-hidden="true"
@@ -122,32 +71,10 @@ function Spend({ run }: { run: Row }) {
   );
 }
 
-// The state's dot and words, for a row and for the side panel.
-export function StateLine({ status, text }: { status: string; text?: string }) {
-  return (
-    <span
-      data-field="state"
-      className={cn(
-        "inline-flex items-center gap-2 text-[13px]",
-        STATE_TEXT[tone(status)],
-      )}
-    >
-      <span
-        aria-hidden="true"
-        className={cn(
-          "size-[7px] shrink-0 rounded-full",
-          STATE_DOT[tone(status)],
-        )}
-      />
-      {text ?? STATUS_TEXT[status] ?? status}
-    </span>
-  );
-}
-
 function stateLine(run: Row): string {
-  const words = STATUS_TEXT[run.status] ?? run.status;
+  const words = RUN_STATUS_LABEL[run.status];
   if (run.status === "failed" && run.stop_reason)
-    return `${words} · ${STOP_TEXT[run.stop_reason] ?? run.stop_reason.replaceAll("_", " ")}`;
+    return `${words} · ${stopReasonText(run.stop_reason)}`;
   if (
     (run.status === "running" || run.status === "verifying") &&
     run.tasks_total > 0
@@ -266,7 +193,7 @@ export function RunList() {
             className="h-8 w-40"
           >
             <option value="">Any model</option>
-            {Object.entries(PROFILE_NAMES).map(([id, name]) => (
+            {Object.entries(PROFILE_NAME).map(([id, name]) => (
               <option key={id} value={id}>
                 {name}
               </option>
@@ -393,14 +320,12 @@ function Listed({
               <span className="lg:sr-only">Models </span>
               {run.profiles.length === 0
                 ? "—"
-                : run.profiles
-                    .map((item) => PROFILE_NAMES[item] ?? item)
-                    .join(" · ")}
+                : run.profiles.map(profileName).join(" · ")}
             </span>
             <Spend run={run} />
             <span className="text-muted-foreground tabular-nums lg:text-right">
               <span className="lg:sr-only">Started </span>
-              {new Date(run.created_at).toISOString()}
+              {formatInstant(run.created_at)}
             </span>
           </li>
         ))}

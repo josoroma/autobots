@@ -5,6 +5,7 @@ import {
   parseReconciliationResult,
   parseRunCommandResult,
   parseRunSummary,
+  type RunStatus,
 } from "@autobots/api-client";
 import { CircleAlert, CircleDollarSign, Pause, Play } from "lucide-react";
 import { useState, type FormEvent } from "react";
@@ -13,37 +14,15 @@ import { HeldNote } from "@/components/held-note";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { MICRO_USD } from "@/lib/format";
+import {
+  COMMAND_LABEL,
+  commandTarget,
+  commandsFor,
+  type RunCommand,
+} from "@/lib/runs/status";
 import { changedChoice, labelOf, withHeld } from "@/lib/submit";
 import { useSubmit } from "@/lib/use-submit";
-
-type Command = "pause" | "resume" | "cancel";
-
-const TERMINAL = new Set(["succeeded", "failed", "cancelled"]);
-// SP-010: what each state can take. A terminal run takes nothing, so nothing is offered.
-const PAUSABLE = new Set([
-  "queued",
-  "running",
-  "waiting_input",
-  "waiting_approval",
-  "verifying",
-]);
-const LABELS: Record<Command, string> = {
-  pause: "Pause",
-  resume: "Resume",
-  cancel: "Cancel run",
-};
-const MICRO_USD = 1_000_000;
-
-/** A command's target for the submit hook: the run for Pause and Resume, its own for Cancel. */
-export function commandTarget(command: Command): string {
-  return command === "cancel" ? "cancel" : "";
-}
-
-export function commandsFor(status: string): Command[] {
-  if (TERMINAL.has(status) || status === "cancelling") return [];
-  if (status === "paused") return ["resume", "cancel"];
-  return PAUSABLE.has(status) ? ["pause", "cancel"] : ["cancel"];
-}
 
 function refusalOf(failure: ErrorResponse | null): string {
   return failure?.message ?? "That could not be done. Nothing changed.";
@@ -60,7 +39,7 @@ export function RunControls({
   onChanged,
 }: {
   runId: string;
-  status: string;
+  status: RunStatus;
   version: number;
   openCalls: number;
   onChanged: () => void;
@@ -89,7 +68,7 @@ export function RunControls({
   // and Resume share the run as their target, so after a lost Pause, Resume sends nothing until a
   // reload shows whether it applied. Cancel has its own: a repeated cancellation changes nothing, so
   // it can't contradict either, and a lost Pause never holds back stopping the run.
-  async function send(command: Command): Promise<void> {
+  async function send(command: RunCommand): Promise<void> {
     setRefusal(null);
     setNote(null);
     const result = await commandWrites.submit({
@@ -110,7 +89,7 @@ export function RunControls({
     });
     if (result === null) return;
     if (result.outcome === "changed") {
-      setRefusal(changedChoice(labelOf(LABELS, result.heldChoice)));
+      setRefusal(changedChoice(labelOf(COMMAND_LABEL, result.heldChoice)));
       return;
     }
     if (result.outcome === "unknown") setRefusal(UNKNOWN);
@@ -186,7 +165,7 @@ export function RunControls({
               ) : command === "resume" ? (
                 <Play aria-hidden="true" />
               ) : null}
-              {LABELS[command]}
+              {COMMAND_LABEL[command]}
             </Button>
           ))}
         </div>

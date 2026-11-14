@@ -27,7 +27,6 @@ import {
   ShieldCheck,
   Users,
   Wallet,
-  Wrench,
   CalendarClock,
 } from "lucide-react";
 import Link from "next/link";
@@ -39,91 +38,25 @@ import { Card, IconTile } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/field";
 import { LoadEmpty, LoadState } from "@/components/ui/load-state";
+import {
+  APPROVAL_TEXT,
+  AVAILABILITY_FILTERS,
+  AVAILABILITY_LABEL,
+  COST_LABEL,
+  keyOrigin,
+  keySource,
+  OPERATION_CLASS_LABEL,
+  PROVIDER_LABEL,
+  repairText,
+} from "@/lib/tools/text";
 import { useResource } from "@/lib/use-resource";
 import { cn } from "@/lib/utils";
 
 // PRD-Tool-Catalog TS-01 to TS-03. Every state is said in words; a badge never stands for one alone.
-
-const PROVIDERS: Record<string, string> = {
-  autobots: "Autobots, on this Mac",
-  tavily: "Tavily",
-  jina: "Jina",
-  yahoo_finance: "Yahoo Finance",
-  world_bank: "World Bank",
-  github: "GitHub",
-};
-
-const CLASSES: Record<string, string> = {
-  pure: "Pure",
-  read_only: "Read only",
-  reversible_internal_write: "Writes inside the run",
-  consequential_external_write: "Changes something outside",
-  arbitrary_execution: "Arbitrary execution",
-};
-
-const COSTS: Record<string, string> = {
-  free_local: "No provider charge",
-  metered_provider: "Metered by its provider",
-};
-
-export const AVAILABILITY: Record<string, string> = {
-  available: "Available",
-  key_missing: "Unavailable: key not set",
-  disabled_by_policy: "Unavailable: disabled by policy",
-  not_qualified: "Unavailable: not qualified",
-};
-
-const AVAILABILITY_FILTERS = ["available", "key_missing", "disabled_by_policy"];
-
-// Decisions 0024 and 0025: these keys can also be saved per workspace in Settings → Keys & vars.
-const SAVABLE_KEYS: Record<string, string> = { tavily: "Tavily", jina: "Jina" };
-
-// PK-05: where an available tool's key comes from, never the key.
-export function keySource(tool: ToolDescriptor): string | null {
-  const requirement = tool.key_requirement;
-  if (!requirement) return null;
-  const names = requirement.variables.join(", ");
-  if (requirement.source === "settings") {
-    return "Key saved in Settings → Keys & vars for this workspace";
-  }
-  if (requirement.source === "environment") {
-    return `${names}, from the server environment or .env`;
-  }
-  return `${names}, not set`;
-}
-
-export function repair(tool: ToolDescriptor): string | null {
-  if (tool.availability === "key_missing" && tool.key_requirement) {
-    const names = tool.key_requirement.variables.join(" and ");
-    const savable = SAVABLE_KEYS[tool.key_requirement.credential];
-    if (savable !== undefined) {
-      return `Save a ${savable} key in Settings → Keys & vars, or set ${names} in .env, then restart the worker and the API.`;
-    }
-    // PRD-Studio GH-07: names and permissions only, never a value.
-    const scopes =
-      tool.key_requirement.scopes.length === 0
-        ? ""
-        : ` The token needs these permissions on that repository only: ${tool.key_requirement.scopes.join(", ")}.`;
-    return `Save them in Settings → Keys & vars, or set ${names} in .env.${scopes} After a change to .env, restart the worker and the API.`;
-  }
-  if (tool.availability_reason === "isolated_executor_not_qualified") {
-    return "Disabled until the isolated browser executor is qualified and browsing is turned on in Settings → Keys & vars or .env. See the operations runbook.";
-  }
-  if (tool.availability === "not_qualified") {
-    return "Waits for its provider's qualification.";
-  }
-  return null;
-}
-
-// Decision 0026 C9: `by_action` tools hold only some actions for a person.
-const APPROVAL_TEXT: Record<ToolDescriptor["approval"], string> = {
-  always: "Every call waits for a person",
-  by_action: "Some actions wait for a person",
-  never: "Not needed",
-};
+// The words live in lib/tools/text.ts, which the Expert editor shares (R-37).
 
 // Decorative: the group heading and the tool's title carry the meaning.
-const GROUP_ICONS: Record<string, LucideIcon> = {
+const GROUP_ICONS: Readonly<Record<ToolDescriptor["group"], LucideIcon>> = {
   planning: ListTodo,
   general: Calculator,
   web_search: Search,
@@ -147,7 +80,7 @@ function Availability({ tool }: { tool: ToolDescriptor }) {
       dot={available}
       data-availability={tool.availability}
     >
-      {AVAILABILITY[tool.availability] ?? tool.availability}
+      {AVAILABILITY_LABEL[tool.availability]}
     </Badge>
   );
 }
@@ -254,7 +187,7 @@ export function ToolCatalogPanel() {
               <option value="">Any availability</option>
               {AVAILABILITY_FILTERS.map((item) => (
                 <option key={item} value={item}>
-                  {AVAILABILITY[item]}
+                  {AVAILABILITY_LABEL[item]}
                 </option>
               ))}
             </Select>
@@ -269,7 +202,7 @@ export function ToolCatalogPanel() {
               <option value="">All providers</option>
               {providers.map((item) => (
                 <option key={item} value={item}>
-                  {PROVIDERS[item] ?? item}
+                  {PROVIDER_LABEL[item]}
                 </option>
               ))}
             </Select>
@@ -292,7 +225,7 @@ export function ToolCatalogPanel() {
             .filter((item) => shown.some((tool) => tool.group === item.group))
             .map((item) => {
               const inGroup = shown.filter((tool) => tool.group === item.group);
-              const Icon = GROUP_ICONS[item.group] ?? Wrench;
+              const Icon = GROUP_ICONS[item.group];
               return (
                 <section
                   key={item.group}
@@ -320,7 +253,8 @@ export function ToolCatalogPanel() {
                     {shown
                       .filter((tool) => tool.group === item.group)
                       .map((tool) => {
-                        const fix = repair(tool);
+                        const fix = repairText(tool);
+                        const origin = keyOrigin(tool);
                         return (
                           <li
                             key={tool.tool_id}
@@ -347,19 +281,14 @@ export function ToolCatalogPanel() {
                                   {tool.tool_id} v{tool.version}
                                 </code>
                                 <span>
-                                  · {PROVIDERS[tool.provider] ?? tool.provider}{" "}
-                                  ·{" "}
-                                  {CLASSES[tool.operation_class] ??
-                                    tool.operation_class}{" "}
+                                  · {PROVIDER_LABEL[tool.provider]} ·{" "}
+                                  {OPERATION_CLASS_LABEL[tool.operation_class]}{" "}
                                   ·{" "}
                                   {tool.network
                                     ? "Leaves this Mac"
                                     : "Stays on this Mac"}{" "}
-                                  · {COSTS[tool.cost_class] ?? tool.cost_class}
-                                  {tool.availability === "available" &&
-                                  tool.key_requirement?.source
-                                    ? ` · Key from ${tool.key_requirement.source === "settings" ? "Settings" : "the environment"}`
-                                    : null}
+                                  · {COST_LABEL[tool.cost_class]}
+                                  {origin === null ? null : ` · ${origin}`}
                                 </span>
                               </p>
                               <p className="text-[13px] leading-relaxed">
@@ -573,8 +502,8 @@ export function ToolDetail({ toolId }: { toolId: string }) {
   if (newest === undefined) return null;
   const tool =
     versions.versions.find((item) => item.version === chosen) ?? newest;
-  const fix = repair(tool);
-  const Icon = GROUP_ICONS[tool.group] ?? Wrench;
+  const fix = repairText(tool);
+  const Icon = GROUP_ICONS[tool.group];
   const approval = tool.approval !== "never";
   return (
     <div className="space-y-5">
@@ -630,7 +559,7 @@ export function ToolDetail({ toolId }: { toolId: string }) {
             {tool.network ? "Leaves this Mac" : "Stays on this Mac"}
           </Fact>
           <Fact icon={Wallet} term="Cost">
-            {COSTS[tool.cost_class] ?? tool.cost_class}
+            {COST_LABEL[tool.cost_class]}
             {tool.cost_note ? `, ${tool.cost_note}` : ""}
           </Fact>
           <Fact
@@ -672,9 +601,9 @@ export function ToolDetail({ toolId }: { toolId: string }) {
             </Select>
           </dd>
           <dt className="text-muted-foreground">Provider</dt>
-          <dd>{PROVIDERS[tool.provider] ?? tool.provider}</dd>
+          <dd>{PROVIDER_LABEL[tool.provider]}</dd>
           <dt className="text-muted-foreground">Class</dt>
-          <dd>{CLASSES[tool.operation_class] ?? tool.operation_class}</dd>
+          <dd>{OPERATION_CLASS_LABEL[tool.operation_class]}</dd>
           <dt className="text-muted-foreground">Key</dt>
           <dd data-field="key" className="break-words">
             {keySource(tool) ?? "None"}

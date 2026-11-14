@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import type { RunStatus } from "@autobots/api-client";
+
 import {
   EVERY_MS,
   MAX_MS,
@@ -9,7 +11,7 @@ import {
   SIGNED_OUT_MS,
 } from "../../lib/waiting.ts";
 
-const run = (id: string, status: string) => ({ id, status });
+const run = (id: string, status: RunStatus) => ({ id, status });
 
 test("the first poll only notes what already waits", () => {
   const { fresh, seen } = newlyWaiting(null, [

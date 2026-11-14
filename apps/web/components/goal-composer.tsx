@@ -22,10 +22,7 @@ import { FileText, Paperclip, Play, X } from "lucide-react";
 import { AdmissionMessage } from "@/components/admission-message";
 import { HeldNote } from "@/components/held-note";
 import { Button } from "@/components/ui/button";
-import {
-  DEFAULT_BUDGET_MICRO_USD,
-  RunDisclosure,
-} from "@/components/run-disclosure";
+import { RunDisclosure } from "@/components/run-disclosure";
 import {
   Card,
   CardDescription,
@@ -35,7 +32,9 @@ import {
 } from "@/components/ui/card";
 import { Input, Select, Textarea } from "@/components/ui/field";
 import { focusGoal, NEW_RUN_PARAM } from "@/components/new-run";
+import { budgetFor, budgetOffer } from "@/lib/budget";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { formatUsd } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { readReply } from "@/lib/replies";
 import { profileField } from "@/lib/model-profile";
@@ -92,10 +91,6 @@ function fileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1_048_576) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1_048_576).toFixed(1)} MB`;
-}
-
-function dollars(micro: number): string {
-  return `US$${(micro / 1_000_000).toFixed(2)}`;
 }
 
 // Chips read as one row of compact, labelled native selects (Decision 0021: no box shadows).
@@ -257,22 +252,10 @@ export function GoalComposer() {
   }, [profile, expertId]);
 
   const range = preview?.budget ?? null;
-  const budgetSteps: number[] = [];
-  if (range !== null) {
-    for (
-      let value = range.min_micro_usd;
-      value <= range.max_micro_usd;
-      value += range.step_micro_usd
-    ) {
-      budgetSteps.push(value);
-    }
-  }
-  const budgetLeft = range === null || budgetSteps.length > 0;
+  const offer = budgetOffer(range);
+  const budgetLeft = offer.kind === "unknown" || offer.choices.length > 0;
   // The default until a choice is made, and never a value the server no longer offers.
-  const budget =
-    chosenBudget !== null && budgetSteps.includes(chosenBudget)
-      ? chosenBudget
-      : (range?.default_micro_usd ?? DEFAULT_BUDGET_MICRO_USD);
+  const budget = budgetFor(offer, chosenBudget);
   const expert = experts?.experts.find((item) => item.id === expertId) ?? null;
   const expertBindings = expert?.versions.find(
     (version) => version.version === expert.latest_version,
@@ -494,12 +477,12 @@ export function GoalComposer() {
               onChange={(event) => setChosenBudget(Number(event.target.value))}
               className={cn(CHIP_SELECT, "tabular-nums")}
             >
-              {range === null ? (
-                <option value={String(budget)}>{dollars(budget)}</option>
+              {offer.kind === "unknown" ? (
+                <option value={String(budget)}>{formatUsd(budget)}</option>
               ) : budgetLeft ? (
-                budgetSteps.map((value) => (
+                offer.choices.map((value) => (
                   <option key={value} value={String(value)}>
-                    {dollars(value)}
+                    {formatUsd(value)}
                   </option>
                 ))
               ) : (
@@ -513,7 +496,7 @@ export function GoalComposer() {
             data-field="daily-left"
             className="text-muted-foreground text-[12.5px] tabular-nums"
           >
-            {dollars(Math.max(range.remaining_daily_micro_usd, 0))} left of
+            {formatUsd(Math.max(range.remaining_daily_micro_usd, 0))} left of
             today&apos;s cap
           </p>
         )}

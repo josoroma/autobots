@@ -3,6 +3,7 @@
 import { parseExecutionView, type ExecutionView } from "@autobots/api-client";
 import Link from "next/link";
 
+import { StateLine } from "@/components/runs/run-state";
 import {
   ToolUseTable,
   ToolUsesState,
@@ -12,12 +13,13 @@ import { Card } from "@/components/ui/card";
 import { LoadState } from "@/components/ui/load-state";
 import { SectionLabel } from "@/components/ui/page-header";
 import { backoff, type Loaded } from "@/lib/load";
+import { isRunStatus, isTerminal, stopReasonText } from "@/lib/runs/status";
 import { useResource } from "@/lib/use-resource";
 import { cn } from "@/lib/utils";
 
 const POLL_MS = 1000;
 const BACKOFF_CAP_MS = 15_000;
-const TERMINAL = new Set(["succeeded", "failed", "cancelled"]);
+// A node instance's states, which are its own, apart from its run's.
 const STATUS_TEXT: Record<string, string> = {
   waiting: "Waiting for its inputs",
   running: "Running now",
@@ -40,7 +42,7 @@ function nextPoll(
   failures: number,
 ): number | null {
   if (loaded.kind === "ready") {
-    return TERMINAL.has(loaded.value.run_status) ? null : POLL_MS;
+    return isTerminal(loaded.value.run_status) ? null : POLL_MS;
   }
   return loaded.kind === "unavailable" || loaded.kind === "out_of_date"
     ? backoff(failures, POLL_MS, BACKOFF_CAP_MS)
@@ -110,12 +112,15 @@ export function WorkflowMonitor({ executionId }: { executionId: string }) {
           </p>
           <p role="status" data-run-status={view.run_status}>
             Run:{" "}
-            <span className={cn("font-medium", tone(view.run_status))}>
-              {view.run_status.replaceAll("_", " ")}
-            </span>
+            {/* ExecutionView types run_status as a string, so one the client doesn't know shows as sent. */}
+            {isRunStatus(view.run_status) ? (
+              <StateLine status={view.run_status} />
+            ) : (
+              <span className="font-medium">{view.run_status}</span>
+            )}
             {view.stop_reason === null
               ? ""
-              : `, ${view.stop_reason.replaceAll("_", " ")}`}
+              : `, ${stopReasonText(view.stop_reason)}`}
             .{" "}
             <Link
               href={`/runs/${view.run_id}`}
@@ -246,7 +251,7 @@ function InstancesCard({ view }: { view: ExecutionView }) {
   );
 }
 
-// Colored words for a state, beside the words themselves (Decision 0021 R3–R4). Unknown states stay plain.
+// A node instance's colored dot, beside its words (Decision 0021 R3–R4). Unknown states stay plain.
 function tone(status: string): string {
   if (status === "succeeded") return "text-success-text";
   if (status === "failed" || status === "blocked") return "text-destructive";

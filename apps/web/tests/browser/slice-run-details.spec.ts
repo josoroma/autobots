@@ -220,7 +220,7 @@ test("the workspace shows budgets, and the inspector shows reported and estimate
   const failed = page.locator('[data-call="failed_before_acceptance"]').first();
   await expect(failed).toContainText("Error: provider error");
   await expect(failed.locator('[data-cost="reported"]')).toHaveText(
-    "Reported charge: US$0",
+    "Reported charge: US$0.00",
   );
   await expect(failed.locator('[data-cost="estimated"]')).toContainText(
     "Estimated worst case, not a charge:",

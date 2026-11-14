@@ -9,33 +9,15 @@ import {
 import { CircleAlert, History } from "lucide-react";
 import Link from "next/link";
 
-import { STATUS_TEXT } from "@/components/run-list";
 import { LoadEmpty, LoadState } from "@/components/ui/load-state";
 import { SectionLabel } from "@/components/ui/page-header";
+import { spendOf } from "@/lib/budget";
+import { formatRelative, formatUsd } from "@/lib/format";
 import { worstFailure } from "@/lib/load";
+import { RUN_STATUS_LABEL } from "@/lib/runs/status";
 import { useResource } from "@/lib/use-resource";
 
 const RECENT = 5;
-const RELATIVE = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
-  ["day", 86_400_000],
-  ["hour", 3_600_000],
-  ["minute", 60_000],
-];
-
-function relative(iso: string, now: number): string {
-  const elapsed = Date.parse(iso) - now;
-  for (const [unit, size] of UNITS) {
-    if (Math.abs(elapsed) >= size) {
-      return RELATIVE.format(Math.round(elapsed / size), unit);
-    }
-  }
-  return "just now";
-}
-
-function dollars(micro: number): string {
-  return `US$${(micro / 1_000_000).toFixed(2)}`;
-}
 
 type Run = RunList["runs"][number];
 
@@ -44,9 +26,12 @@ function progressOrSpend(run: Run): string {
   if (run.tasks_total > 0) {
     return `${run.tasks_complete} of ${run.tasks_total} tasks`;
   }
-  const estimated = run.reserved_micro_usd > 0 || run.unreported;
-  const spent = dollars(run.charged_micro_usd + run.reserved_micro_usd);
-  return `${estimated ? "≈ " : ""}${spent} spent`;
+  const { micro, estimated } = spendOf(
+    run.charged_micro_usd,
+    run.reserved_micro_usd,
+    run.unreported,
+  );
+  return `${estimated ? "≈ " : ""}${formatUsd(micro)} spent`;
 }
 
 const HEAD = "mb-2 flex items-center gap-2";
@@ -206,14 +191,12 @@ function RecentRuns({ recent, now }: { recent: RunList | null; now: number }) {
                 {run.goal_summary}
               </Link>
               <span className="text-muted-foreground flex flex-wrap gap-x-2 text-[12.5px] tabular-nums">
-                <span data-field="state">
-                  {STATUS_TEXT[run.status] ?? run.status}
-                </span>
+                <span data-field="state">{RUN_STATUS_LABEL[run.status]}</span>
                 <span aria-hidden="true">·</span>
                 <span data-field="progress">{progressOrSpend(run)}</span>
                 <span aria-hidden="true">·</span>
                 <time data-field="when" dateTime={run.created_at}>
-                  {relative(run.created_at, now)}
+                  {formatRelative(run.created_at, now)}
                 </time>
               </span>
             </li>

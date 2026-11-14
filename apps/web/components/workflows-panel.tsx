@@ -15,13 +15,15 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { HeldNote } from "@/components/held-note";
-import { STATUS_TEXT } from "@/components/run-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { IconTile } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/field";
 import { SectionLabel } from "@/components/ui/page-header";
+import { spendOf } from "@/lib/budget";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { formatDuration, formatRelative, formatUsd } from "@/lib/format";
+import { runStatusText } from "@/lib/runs/status";
 import { cn } from "@/lib/utils";
 import { withHeld } from "@/lib/submit";
 import { useSubmit } from "@/lib/use-submit";
@@ -34,46 +36,15 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 type Execution = WorkflowExecutionList["executions"][number];
 
-const RELATIVE = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-
-function relative(iso: string, now: number): string {
-  const elapsed = Date.parse(iso) - now;
-  for (const [unit, size] of [
-    ["day", 86_400_000],
-    ["hour", 3_600_000],
-    ["minute", 60_000],
-  ] as const) {
-    if (Math.abs(elapsed) >= size) {
-      return RELATIVE.format(Math.round(elapsed / size), unit);
-    }
-  }
-  return "just now";
-}
-
-function dollars(micro: number): string {
-  return `US$${(micro / 1_000_000).toFixed(2)}`;
-}
-
 // WF-04: an estimate while a reservation is held or a charge was never reported.
 function spend(execution: Execution): string {
-  const estimated = execution.reserved_micro_usd > 0 || execution.unreported;
-  const amount = dollars(
-    execution.charged_micro_usd + execution.reserved_micro_usd,
+  const { micro, estimated } = spendOf(
+    execution.charged_micro_usd,
+    execution.reserved_micro_usd,
+    execution.unreported,
   );
+  const amount = formatUsd(micro);
   return estimated ? `≈ ${amount}, estimated` : `${amount}, reported`;
-}
-
-function duration(seconds: number | null): string {
-  if (seconds === null) return "still running";
-  const minutes = Math.floor(seconds / 60);
-  const rest = seconds % 60;
-  return minutes === 0
-    ? `${rest}s`
-    : `${minutes}m ${String(rest).padStart(2, "0")}s`;
-}
-
-function stateText(status: string): string {
-  return STATUS_TEXT[status] ?? status;
 }
 
 const TH = "text-muted-foreground px-3 pb-2.5 text-[12.5px] font-medium";
@@ -349,11 +320,11 @@ export function WorkflowsPanel() {
                         <span className="text-muted-foreground">Never run</span>
                       ) : (
                         <>
-                          {stateText(workflow.last_execution.status)}
+                          {runStatusText(workflow.last_execution.status)}
                           <span className="text-muted-foreground">
                             {", "}
                             <time dateTime={workflow.last_execution.started_at}>
-                              {relative(
+                              {formatRelative(
                                 workflow.last_execution.started_at,
                                 now,
                               )}
@@ -643,7 +614,9 @@ function WorkflowPreviewPanel({
                 >
                   Version {execution.version}
                 </Link>
-                <span data-field="state">{stateText(execution.status)}</span>
+                <span data-field="state">
+                  {runStatusText(execution.status)}
+                </span>
                 <span data-field="spend" className="tabular-nums">
                   {spend(execution)}
                 </span>
@@ -651,13 +624,15 @@ function WorkflowPreviewPanel({
                   data-field="duration"
                   className="text-muted-foreground tabular-nums"
                 >
-                  {duration(execution.duration_seconds)}
+                  {execution.duration_seconds === null
+                    ? "still running"
+                    : formatDuration(execution.duration_seconds)}
                 </span>
                 <time
                   dateTime={execution.started_at}
                   className="text-muted-foreground"
                 >
-                  {relative(execution.started_at, now)}
+                  {formatRelative(execution.started_at, now)}
                 </time>
               </li>
             ))}

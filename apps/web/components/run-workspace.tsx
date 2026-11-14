@@ -10,22 +10,19 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import Link from "next/link";
-import {
-  useEffect,
-  useState,
-  type ComponentProps,
-  type ReactNode,
-} from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { ContinueRun } from "@/components/continue-run";
 import { RunControls } from "@/components/run-controls";
+import { RunStateBadge } from "@/components/runs/run-state";
 import { useRunWorkspace } from "@/components/runs/workspace/use-run-workspace";
 import { ToolsUsed } from "@/components/tool-uses";
-import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { LoadState } from "@/components/ui/load-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { UnknownEffects } from "@/components/unknown-effects";
+import { formatUsd } from "@/lib/format";
+import { BINDING_SOURCE_LABEL, summarizerDiffers } from "@/lib/model-roles";
 import {
   RUN_NOT_FOUND,
   retryWords,
@@ -33,46 +30,9 @@ import {
   type Connection,
   type WorkspaceLoad,
 } from "@/lib/run-workspace-load";
+import { RUN_STATUS_SENTENCE, stopReasonText } from "@/lib/runs/status";
 import { cn } from "@/lib/utils";
 
-// Reasons are kept apart from status, so "paused" and "failed" can say why.
-const STATUS_TEXT: Record<string, string> = {
-  queued: "Queued. Waiting for a worker.",
-  running: "Running.",
-  waiting_input: "Waiting for your input.",
-  waiting_approval: "Waiting for an approval decision.",
-  paused: "Paused. No new work starts until it resumes.",
-  verifying: "Checking the result against its criteria.",
-  cancelling: "Cancelling. Active work is being settled.",
-  succeeded: "Succeeded.",
-  failed: "Failed.",
-  cancelled: "Cancelled.",
-};
-// Decision 0021: the header's short state words, as the run list says them, in a tone that repeats them.
-const STATUS_LABEL: Record<string, string> = {
-  queued: "Queued",
-  running: "Running",
-  waiting_input: "Waiting for input",
-  waiting_approval: "Waiting for approval",
-  paused: "Paused",
-  verifying: "Verifying",
-  cancelling: "Cancelling",
-  succeeded: "Succeeded",
-  failed: "Failed",
-  cancelled: "Cancelled",
-};
-const STATUS_TONE: Record<string, ComponentProps<typeof Badge>["variant"]> = {
-  queued: "muted",
-  running: "live",
-  waiting_input: "attention",
-  waiting_approval: "attention",
-  paused: "outline",
-  verifying: "live",
-  cancelling: "muted",
-  succeeded: "success",
-  failed: "danger",
-  cancelled: "muted",
-};
 const CONNECTION_TEXT: Record<Connection, string> = {
   loading: "Loading",
   live: "Live",
@@ -80,13 +40,6 @@ const CONNECTION_TEXT: Record<Connection, string> = {
   ended: "Finished. No more activity is expected.",
 };
 
-// PRD-Studio MD-02: which step of MP-01's order chose the binding when this run was admitted.
-const ROLE_SOURCE: Record<string, string> = {
-  run_override: "run override",
-  workspace_override: "workspace override",
-  workspace_default: "workspace default",
-  builtin_default: "built-in default",
-};
 function describe(event: RunEvent): string {
   const payload = event.payload;
   if (payload.type === "run.status_changed") {
@@ -160,22 +113,12 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
     return <RunLoadState load={load} onRetry={retry} />;
   const { snapshot, connection } = load;
   const timeline = [...events.values()].sort((a, b) => a.sequence - b.sequence);
-  const label = STATUS_LABEL[snapshot.run.status];
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
           <h1 className="text-[32px] leading-tight">Run</h1>
-          {label === undefined ? null : (
-            // The status sentence below says the same to assistive technology.
-            <Badge
-              aria-hidden="true"
-              variant={STATUS_TONE[snapshot.run.status] ?? "outline"}
-              dot
-            >
-              {label}
-            </Badge>
-          )}
+          <RunStateBadge status={snapshot.run.status} />
         </div>
         <p className="text-sm">
           <Link
@@ -195,11 +138,11 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
               data-run-status={snapshot.run.status}
               className="text-[15px] leading-relaxed"
             >
-              {STATUS_TEXT[snapshot.run.status]}
+              {RUN_STATUS_SENTENCE[snapshot.run.status]}
               {snapshot.stop_reason === null ? null : (
                 <span data-stop-reason={snapshot.stop_reason}>
                   {" "}
-                  Reason: {snapshot.stop_reason.replaceAll("_", " ")}.
+                  Reason: {stopReasonText(snapshot.stop_reason)}.
                 </span>
               )}
             </p>
@@ -533,11 +476,7 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
                   executor&apos;s binding dispatches in this release, and other
                   roles that differ from it don&apos;t take effect.
                 </p>
-                {snapshot.role_map.find(
-                  (binding) => binding.role === "summarizer",
-                )?.profile !==
-                snapshot.role_map.find((binding) => binding.role === "executor")
-                  ?.profile ? (
+                {summarizerDiffers(snapshot.role_map) ? (
                   <p
                     data-role-map="summarizer"
                     className="text-[13px] leading-relaxed"
@@ -569,7 +508,7 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
                           className="text-muted-foreground"
                         >
                           {" "}
-                          · {ROLE_SOURCE[binding.source]}
+                          · {BINDING_SOURCE_LABEL[binding.source].toLowerCase()}
                         </span>
                       )}
                     </li>
@@ -591,12 +530,11 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
                 {snapshot.usage.output_tokens} out.
               </p>
               <p>
-                Spend limit: US$
-                {(snapshot.run.budget.limit_micro_usd / 1_000_000).toFixed(2)}.
-                Reported so far: US$
-                {snapshot.run.budget.spent_micro_usd / 1_000_000}. Held as an
-                estimate for calls not settled: US$
-                {snapshot.run.budget.reserved_micro_usd / 1_000_000}.{" "}
+                Spend limit: {formatUsd(snapshot.run.budget.limit_micro_usd)}.
+                Reported so far:{" "}
+                {formatUsd(snapshot.run.budget.spent_micro_usd)}. Held as an
+                estimate for calls not settled:{" "}
+                {formatUsd(snapshot.run.budget.reserved_micro_usd)}.{" "}
                 <span className="text-muted-foreground">
                   The workspace&apos;s per-run and daily limits apply too, and
                   the lowest one stops the run.
@@ -608,10 +546,10 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
             <p className="text-[13px] leading-relaxed tabular-nums">
               {snapshot.usage.model_calls} model calls,{" "}
               {snapshot.usage.tool_dispatches} tool calls,{" "}
-              {snapshot.usage.repairs} repairs. Spent $
-              {snapshot.run.budget.spent_micro_usd / 1_000_000} of $
-              {snapshot.run.budget.limit_micro_usd / 1_000_000}, with $
-              {snapshot.run.budget.reserved_micro_usd / 1_000_000} reserved.
+              {snapshot.usage.repairs} repairs. Spent{" "}
+              {formatUsd(snapshot.run.budget.spent_micro_usd)} of{" "}
+              {formatUsd(snapshot.run.budget.limit_micro_usd)}, with{" "}
+              {formatUsd(snapshot.run.budget.reserved_micro_usd)} reserved.
             </p>
             {snapshot.outstanding.uncertain_calls +
               snapshot.outstanding.unknown_effects +

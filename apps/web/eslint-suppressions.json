@@ -93,15 +93,7 @@
       "count": 1
     }
   },
-  "components/run-list.tsx": {
-    "import/no-cycle": {
-      "count": 1
-    }
-  },
   "components/run-panel.tsx": {
-    "import/no-cycle": {
-      "count": 1
-    },
     "max-lines-per-function": {
       "count": 1
     }
@@ -128,9 +120,6 @@
     }
   },
   "components/tool-catalog.tsx": {
-    "complexity": {
-      "count": 1
-    },
     "max-lines": {
       "count": 1
     },

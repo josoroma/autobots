@@ -369,7 +369,9 @@ test("a decided request shows its run, task, expiry and who decided", async ({
   await expect(card.locator("[data-approval-decided]")).toContainText(
     "Approved by you at",
   );
-  await expect(card).toContainText(/Expires \d.*\((in \d|\d+ (min|h|d) ago)/);
+  await expect(card).toContainText(
+    /Expires \d.*\((in \d|in less than a minute|\d+ (minute|hour|day)s? ago|just now|yesterday)\)/,
+  );
 });
 
 test("the exact request whole, in Fields and JSON views", async ({ page }) => {

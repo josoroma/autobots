@@ -4,9 +4,9 @@ import {
   parseLocalStatus,
   parseRetentionSettings,
   type LocalStatus,
+  type OperationCondition,
 } from "@autobots/api-client";
 import {
-  Activity,
   Archive,
   Box,
   CalendarClock,
@@ -35,6 +35,7 @@ import { JobsChart } from "@/components/jobs-chart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { formatInstant } from "@/lib/format";
 import { parseDays } from "@/lib/retention";
 import { schemaValue } from "@/lib/schema-value";
 import { refusalText } from "@/lib/submit";
@@ -72,7 +73,10 @@ const CONDITIONS: Record<string, string> = {
     "Queued work needs a worker that can call a model, and none is running.",
 };
 
-const LABELS: Record<string, string> = {
+type CheckName = OperationCondition["name"];
+
+// Keyed by the contract's unions, so a check or state it gains fails the type check here (WSYS-09).
+const LABELS: Readonly<Record<CheckName, string>> = {
   database: "Database",
   schema: "Schema",
   hold: "Hold",
@@ -84,7 +88,7 @@ const LABELS: Record<string, string> = {
 };
 
 // Decorative: each check's name and message carry its meaning.
-const ICONS: Record<string, LucideIcon> = {
+const ICONS: Readonly<Record<CheckName, LucideIcon>> = {
   database: Database,
   schema: ListChecks,
   hold: Pause,
@@ -96,7 +100,7 @@ const ICONS: Record<string, LucideIcon> = {
 };
 
 // The dot only repeats the message beside it (Decision 0021 R4).
-const DOTS: Record<string, string> = {
+const DOTS: Readonly<Record<OperationCondition["state"], string>> = {
   ok: "bg-success-text",
   degraded: "bg-muted-foreground",
   unavailable: "bg-destructive",
@@ -125,7 +129,7 @@ const HOLD_TEXT: Record<string, string> = {
 type Values = LocalStatus["values"];
 
 // PRD-Studio OP-02: a check's measured value, when one exists (Decision 0022 D5). Numbers only.
-function valueFor(name: string, values: Values): string | null {
+function valueFor(name: CheckName, values: Values): string | null {
   switch (name) {
     case "database":
       return values.database_p95_ms === null
@@ -152,7 +156,7 @@ function valueFor(name: string, values: Values): string | null {
       return values.workers === null
         ? null
         : `${values.workers} ${values.workers === 1 ? "worker" : "workers"}.`;
-    default:
+    case "hold":
       return null;
   }
 }
@@ -344,7 +348,8 @@ export function OperationsPanel() {
         className="bg-border border-border grid gap-px overflow-hidden rounded-xl border sm:grid-cols-2 lg:grid-cols-4"
       >
         {status.conditions.map((condition) => {
-          const Icon = ICONS[condition.name] ?? Activity;
+          const Icon = ICONS[condition.name];
+          const value = valueFor(condition.name, status.values);
           return (
             <li
               key={condition.name}
@@ -362,19 +367,19 @@ export function OperationsPanel() {
                   aria-hidden="true"
                   className={cn(
                     "ml-auto size-1.5 shrink-0 rounded-full",
-                    DOTS[condition.state] ?? "bg-muted-foreground",
+                    DOTS[condition.state],
                   )}
                 />
               </p>
               <p className="text-muted-foreground text-[12.5px] leading-relaxed">
                 {CONDITIONS[condition.code] ?? condition.code}
               </p>
-              {valueFor(condition.name, status.values) === null ? null : (
+              {value === null ? null : (
                 <p
                   data-field={`value-${condition.name}`}
                   className="text-foreground text-[12.5px] break-words tabular-nums"
                 >
-                  {valueFor(condition.name, status.values)}
+                  {value}
                 </p>
               )}
             </li>
@@ -468,7 +473,7 @@ export function OperationsPanel() {
                   className="py-2"
                 >
                   {occurrence.routine}: {occurrence.status.replaceAll("_", " ")}{" "}
-                  at {new Date(occurrence.occurrence_time).toISOString()}
+                  at {formatInstant(occurrence.occurrence_time)}
                   {occurrence.reason === null
                     ? ""
                     : `, ${occurrence.reason.replaceAll("_", " ")}`}
@@ -493,7 +498,7 @@ export function OperationsPanel() {
             >
               {status.restores.map((restore) => (
                 <li key={`${restore.at}-${restore.result}`} className="py-2">
-                  {new Date(restore.at).toISOString()}:{" "}
+                  {formatInstant(restore.at)}:{" "}
                   {restore.result === "passed"
                     ? `verified, ${restore.checks_passed} of ${restore.checks_total} checks`
                     : restore.result === "failed"

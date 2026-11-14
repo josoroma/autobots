@@ -27,7 +27,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Select, Textarea } from "@/components/ui/field";
 import { SectionLabel } from "@/components/ui/page-header";
+import { budgetFor, budgetOffer, type BudgetOffer } from "@/lib/budget";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { formatUsd } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { withHeld } from "@/lib/submit";
 import { useSubmit } from "@/lib/use-submit";
@@ -141,8 +143,9 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
   const [chosen, setChosen] = useState<number | null>(null);
   const [inputs, setInputs] = useState("{}");
   const [description, setDescription] = useState("");
-  const [budgets, setBudgets] = useState<number[] | null>(null);
-  const [budget, setBudget] = useState(1_000_000);
+  const [offer, setOffer] = useState<BudgetOffer>({ kind: "unknown" });
+  const [chosenBudget, setChosenBudget] = useState<number | null>(null);
+  const budget = budgetFor(offer, chosenBudget);
 
   useEffect(() => {
     let active = true;
@@ -172,18 +175,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
     fetch("/api/v1/run-preview", { cache: "no-store" })
       .then(async (reply) => {
         if (!active || !reply.ok) return;
-        const range = parseRunPreview(await reply.json()).budget;
-        if (range === null) return;
-        const steps: number[] = [];
-        for (
-          let value = range.min_micro_usd;
-          value <= range.max_micro_usd;
-          value += range.step_micro_usd
-        ) {
-          steps.push(value);
-        }
-        setBudgets(steps);
-        setBudget(range.default_micro_usd);
+        setOffer(budgetOffer(parseRunPreview(await reply.json()).budget));
       })
       .catch(() => undefined);
     fetch("/api/v1/workflow-blocks", { cache: "no-store" })
@@ -430,7 +422,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
         return JSON.stringify({
           version: chosen,
           inputs: values,
-          ...(budgets === null || budgets.length === 0
+          ...(offer.kind === "unknown" || offer.choices.length === 0
             ? {}
             : { budget_micro_usd: budget }),
         });
@@ -724,24 +716,26 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
                 className="font-mono text-[12.5px] leading-relaxed"
               />
             </div>
-            {budgets === null ? null : (
+            {offer.kind === "unknown" ? null : (
               <div className="space-y-1.5">
                 <label htmlFor="execution-budget" className={SECTION}>
                   Budget
                 </label>
                 <Select
                   id="execution-budget"
-                  value={budgets.length === 0 ? "" : String(budget)}
-                  disabled={budgets.length === 0 || runHeld}
-                  onChange={(event) => setBudget(Number(event.target.value))}
+                  value={offer.choices.length === 0 ? "" : String(budget)}
+                  disabled={offer.choices.length === 0 || runHeld}
+                  onChange={(event) =>
+                    setChosenBudget(Number(event.target.value))
+                  }
                   className="tabular-nums sm:max-w-40"
                 >
-                  {budgets.length === 0 ? (
+                  {offer.choices.length === 0 ? (
                     <option value="">Nothing left today</option>
                   ) : (
-                    budgets.map((value) => (
+                    offer.choices.map((value) => (
                       <option key={value} value={String(value)}>
-                        US${(value / 1_000_000).toFixed(2)}
+                        {formatUsd(value)}
                       </option>
                     ))
                   )}

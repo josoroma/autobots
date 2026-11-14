@@ -9,22 +9,23 @@ import { CircleAlert, Pause, Play, RotateCw } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { commandTarget, commandsFor } from "@/components/run-controls";
-import { StateLine } from "@/components/run-list";
+import { StateLine } from "@/components/runs/run-state";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { spendOf } from "@/lib/budget";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { formatDuration, formatInstant, formatUsd } from "@/lib/format";
+import {
+  COMMAND_LABEL,
+  commandTarget,
+  commandsFor,
+  type RunCommand,
+} from "@/lib/runs/status";
 import { cn } from "@/lib/utils";
 import { changedChoice, labelOf, withHeld } from "@/lib/submit";
 import { useSubmit } from "@/lib/use-submit";
 
-type Command = "pause" | "resume" | "cancel";
 type Task = NonNullable<RunWorkspace["plan"]>["tasks"][number];
 
-const LABELS: Record<Command, string> = {
-  pause: "Pause",
-  resume: "Resume",
-  cancel: "Cancel run",
-};
 const MARKER_TEXT: Record<Task["marker"], string> = {
   done: "Done",
   current: "Current",
@@ -32,20 +33,6 @@ const MARKER_TEXT: Record<Task["marker"], string> = {
 };
 const STALE =
   "This run changed after the panel loaded, so nothing was done. Reload the panel to see it now, then try again.";
-
-function dollars(micro: number): string {
-  return `US$${(micro / 1_000_000).toFixed(2)}`;
-}
-
-export function wallTime(seconds: number | null): string {
-  if (seconds === null) return "—";
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const rest = seconds % 60;
-  if (hours > 0) return `${hours}h ${String(minutes).padStart(2, "0")}m`;
-  if (minutes > 0) return `${minutes}m ${String(rest).padStart(2, "0")}s`;
-  return `${rest}s`;
-}
 
 const count = new Intl.NumberFormat("en");
 
@@ -90,7 +77,7 @@ export function RunPanel({
   // The version the panel loaded, never a fresh one: a stale press is refused, not retried. One key
   // per press until its outcome is known (Decision 0027 D2), so a lost reply applies it once. Pause
   // and Resume share the run as their target, and Cancel has its own (see commandTarget).
-  async function send(command: Command, version: number): Promise<void> {
+  async function send(command: RunCommand, version: number): Promise<void> {
     setRefusal(null);
     const result = await writes.submit({
       body: () => JSON.stringify({ expected_version: version }),
@@ -109,7 +96,7 @@ export function RunPanel({
     });
     if (result === null) return;
     if (result.outcome === "changed") {
-      setRefusal(changedChoice(labelOf(LABELS, result.heldChoice)));
+      setRefusal(changedChoice(labelOf(COMMAND_LABEL, result.heldChoice)));
       return;
     }
     if (result.outcome === "accepted") {
@@ -149,10 +136,11 @@ export function RunPanel({
     );
   const run = view.run;
   const commands = commandsFor(run.status);
-  const spent = run.budget.spent_micro_usd + run.budget.reserved_micro_usd;
-  const estimated =
-    run.budget.reserved_micro_usd > 0 ||
-    view.outstanding.unreported_charges > 0;
+  const { micro: spent, estimated } = spendOf(
+    run.budget.spent_micro_usd,
+    run.budget.reserved_micro_usd,
+    view.outstanding.unreported_charges > 0,
+  );
   const tasks = view.plan?.tasks ?? [];
   const title = view.objective ?? "Untitled run";
   return (
@@ -181,7 +169,7 @@ export function RunPanel({
             data-field="panel-started"
             className="text-foreground tabular-nums"
           >
-            {run.created_at}
+            {formatInstant(run.created_at)}
           </dd>
         </dl>
       </div>
@@ -229,7 +217,9 @@ export function RunPanel({
                     data-field="task-wall"
                     className="text-foreground tabular-nums"
                   >
-                    {wallTime(task.wall_seconds)}
+                    {task.wall_seconds === null
+                      ? "—"
+                      : formatDuration(task.wall_seconds)}
                   </dd>
                 </dl>
               </li>
@@ -242,7 +232,7 @@ export function RunPanel({
         <dt className="text-muted-foreground">Spend</dt>
         <dd data-field="panel-spend" className="tabular-nums">
           {estimated ? "≈ " : ""}
-          {dollars(spent)} of {dollars(run.budget.limit_micro_usd)}
+          {formatUsd(spent)} of {formatUsd(run.budget.limit_micro_usd)}
           {estimated ? ", estimated" : ""}
         </dd>
         <dt className="text-muted-foreground">Tokens</dt>
@@ -276,7 +266,7 @@ export function RunPanel({
             ) : command === "resume" ? (
               <Play aria-hidden="true" />
             ) : null}
-            {LABELS[command]}
+            {COMMAND_LABEL[command]}
           </Button>
         ))}
       </div>

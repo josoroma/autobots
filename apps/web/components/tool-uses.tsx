@@ -17,12 +17,13 @@ import { cn } from "@/lib/utils";
 // PRD-Tool-Catalog TV-01 to TV-03: when, which tool, why (the plan task), for what, and outcome.
 // Only public fields, digests and sizes reach this page; content never does.
 
-const OUTCOMES: Record<string, string> = {
-  succeeded: "Succeeded",
-  failed: "Failed",
-  unknown: "Outcome unknown",
-  denied: "Denied",
-};
+const OUTCOMES: Readonly<Record<NonNullable<ToolUseView["outcome"]>, string>> =
+  {
+    succeeded: "Succeeded",
+    failed: "Failed",
+    unknown: "Outcome unknown",
+    denied: "Denied",
+  };
 
 const HEAD = "px-3 py-2 font-medium";
 const CELL = "px-3 py-2.5";
@@ -92,7 +93,7 @@ function result(use: ToolUseView): string {
 
 function outcome(use: ToolUseView): string {
   if (use.outcome === null) return "Not finished";
-  const text = OUTCOMES[use.outcome] ?? use.outcome;
+  const text = OUTCOMES[use.outcome];
   return use.code === null ? text : `${text}: ${use.code.replaceAll("_", " ")}`;
 }
 
