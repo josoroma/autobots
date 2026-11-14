@@ -10,6 +10,7 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { readErrorResponse } from "@/lib/replies";
 
 type Command = "pause" | "resume" | "cancel";
 
@@ -36,9 +37,7 @@ export function commandsFor(status: string): Command[] {
 }
 
 async function refusalOf(reply: Response | null): Promise<string> {
-  const failure = (await reply?.json().catch(() => null)) as {
-    message?: string;
-  } | null;
+  const failure = await readErrorResponse(reply);
   return failure?.message ?? "That could not be done. Nothing changed.";
 }
 

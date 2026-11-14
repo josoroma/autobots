@@ -22,6 +22,7 @@ import { Input, Select } from "@/components/ui/field";
 import { SectionLabel } from "@/components/ui/page-header";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
+import { readErrorResponse } from "@/lib/replies";
 
 type Tab = "all" | "published" | "drafts";
 const TABS: { id: Tab; label: string }[] = [
@@ -138,9 +139,7 @@ export function WorkflowsPanel() {
       router.push(`/workflows/${parseWorkflowView(await reply.json()).id}`);
       return;
     }
-    const failure = (await reply?.json().catch(() => null)) as {
-      code?: string;
-    } | null;
+    const failure = await readErrorResponse(reply);
     setMessage(
       failure?.code === "owner_required"
         ? "Only the workspace owner can create a workflow."

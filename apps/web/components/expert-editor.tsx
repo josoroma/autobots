@@ -1,9 +1,11 @@
 "use client";
 
 import {
-  parseExpertView,
-  parseToolCatalog,
   type ExpertView,
+  parseExpertView,
+  parseSessionView,
+  parseToolCatalog,
+  type SessionCreate,
   type ToolCatalog,
   type ToolDescriptor,
 } from "@autobots/api-client";
@@ -17,6 +19,7 @@ import { SectionLabel } from "@/components/ui/page-header";
 import { AVAILABILITY, repair } from "@/components/tool-catalog";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
+import { readErrorResponse, readReply } from "@/lib/replies";
 
 const PROFILES = [
   { id: "", label: "Workspace setting" },
@@ -163,10 +166,7 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
       );
       return;
     }
-    const failure = (await reply?.json().catch(() => null)) as {
-      code?: string;
-      message?: string;
-    } | null;
+    const failure = await readErrorResponse(reply);
     setMessage(
       failure?.code === "model_not_offered"
         ? (failure.message ?? "That model isn't offered for new runs.")
@@ -193,11 +193,12 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
       body: JSON.stringify({
         kind: "direct",
         experts: [{ expert_id: expert.id }],
-      }),
+      } satisfies SessionCreate),
     }).catch(() => null);
     if (reply?.ok === true) {
-      const session = (await reply.json()) as { id: string };
-      router.push(`/sessions/${session.id}`);
+      const session = await readReply(reply, parseSessionView);
+      if (session === null) setMessage("That session could not be started.");
+      else router.push(`/sessions/${session.id}`);
     } else {
       setMessage("That session could not be started.");
     }

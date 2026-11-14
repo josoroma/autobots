@@ -139,7 +139,7 @@ def judge_node(record: Mapping[str, Any]) -> dict[str, Any]:
     found = re.search(r'^# tests (\d+)$', output, re.M)
     executed = int(found.group(1)) if found else 0
     # A skipped or todo test is not a pass, as for unittest and pytest.
-    skipped = sum(int(count) for count in re.findall(r'^# (?:skip|todo) (\d+)$', output, re.M))
+    skipped = sum(int(count) for count in re.findall(r'^# (?:skipped|todo) (\d+)$', output, re.M))
     if record['status'] == 'passed' and (executed < 1 or skipped):
         return {'tests_executed': executed, 'tests_skipped': skipped, 'status': 'failed',
                 'output': output + f'\nNode ran {executed} tests and skipped {skipped}; neither an empty suite nor a '

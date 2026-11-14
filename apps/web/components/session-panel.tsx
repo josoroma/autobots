@@ -1,6 +1,11 @@
 "use client";
 
-import { parseSessionView, type SessionView } from "@autobots/api-client";
+import {
+  parseRunAccepted,
+  parseSessionView,
+  type RunRequest,
+  type SessionView,
+} from "@autobots/api-client";
 import { Play } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -11,6 +16,8 @@ import { Card } from "@/components/ui/card";
 import { Choice, Textarea } from "@/components/ui/field";
 import { SectionLabel } from "@/components/ui/page-header";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { readErrorResponse, readReply } from "@/lib/replies";
+import { profileField } from "@/lib/model-profile";
 
 export function SessionPanel({ sessionId }: { sessionId: string }) {
   const [session, setSession] = useState<SessionView | null>(null);
@@ -57,17 +64,23 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
       body: JSON.stringify({
         goal_text: goal,
         session_id: session.id,
-        expert_id: expertId,
-        ...(profile === "" ? {} : { run_profile: profile }),
-      }),
+        expert_id: expertId ?? null,
+        ...profileField(profile),
+      } satisfies RunRequest),
     }).catch(() => null);
     if (reply?.ok === true) {
-      setRunId(((await reply.json()) as { run_id: string }).run_id);
+      // A reply that doesn't parse leaves the outcome unknown, not refused (R-09, Decision 0027 D2).
+      const accepted = await readReply(reply, parseRunAccepted);
+      if (accepted === null) {
+        setProblem(
+          "The reply was unclear, so it may have started. Check Runs before starting it again.",
+        );
+        return;
+      }
+      setRunId(accepted.run_id);
       return;
     }
-    const failure = (await reply?.json().catch(() => null)) as {
-      code?: string;
-    } | null;
+    const failure = await readErrorResponse(reply);
     setProblem(
       failure?.code === "credentials_required"
         ? "Model-backed work needs an OpenRouter key."

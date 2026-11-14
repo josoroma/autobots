@@ -1,5 +1,6 @@
 "use client";
 
+import { parseRunAccepted, type RunRequest } from "@autobots/api-client";
 import { CircleAlert, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
@@ -7,6 +8,8 @@ import { useRef, useState } from "react";
 import { RunDisclosure } from "@/components/run-disclosure";
 import { Button } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { readErrorResponse, readReply } from "@/lib/replies";
+import { profileField } from "@/lib/model-profile";
 
 // A finished run never reopens. This starts a new one linked to it, which is how failed work goes on.
 export function ContinueRun({ runId }: { runId: string }) {
@@ -41,8 +44,8 @@ export function ContinueRun({ runId }: { runId: string }) {
       body: JSON.stringify({
         // Left out on purpose: the server repeats the goal it stored, whole.
         continues_run_id: runId,
-        ...(profile === "" ? {} : { run_profile: profile }),
-      }),
+        ...profileField(profile),
+      } satisfies RunRequest),
     }).catch(() => null);
     // A 5xx can come after the API committed, so it proves no more than a lost reply.
     if (reply === null || reply.status >= 500) {
@@ -50,10 +53,7 @@ export function ContinueRun({ runId }: { runId: string }) {
       return;
     }
     if (reply.ok) {
-      const accepted = (await reply.json().catch(() => null)) as {
-        run_id: string;
-        replayed?: boolean;
-      } | null;
+      const accepted = await readReply(reply, parseRunAccepted);
       if (accepted === null) {
         unknownOutcome();
         return;
@@ -62,9 +62,7 @@ export function ContinueRun({ runId }: { runId: string }) {
       setStarted(accepted.run_id);
       return;
     }
-    const failure = (await reply.json().catch(() => null)) as {
-      message?: string;
-    } | null;
+    const failure = await readErrorResponse(reply);
     // Only a refusal with no earlier unknown attempt proves nothing started under this key.
     if (!lost) key.current = null;
     setPending(false);

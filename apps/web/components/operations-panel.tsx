@@ -38,6 +38,7 @@ import { csrfFetch } from "@/lib/csrf-fetch";
 import { parseDays } from "@/lib/retention";
 import { schemaValue } from "@/lib/schema-value";
 import { cn } from "@/lib/utils";
+import { readErrorResponse } from "@/lib/replies";
 
 const CONDITIONS: Record<string, string> = {
   database_ready: "The database is answering.",
@@ -242,9 +243,7 @@ export function OperationsPanel() {
     }).catch(() => null);
     // A refused save keeps what was typed, so it can be corrected.
     if (reply === null || !reply.ok) {
-      const refusal = (await reply?.json().catch(() => null)) as {
-        message?: unknown;
-      } | null;
+      const refusal = await readErrorResponse(reply);
       setMessage(
         // The page already refuses malformed and out-of-range days, so a 422 is the pairing rule.
         reply?.status === 422

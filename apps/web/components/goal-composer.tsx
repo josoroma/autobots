@@ -1,12 +1,17 @@
 "use client";
 
 import {
+  type ExpertList,
+  type InputDocument,
+  type ModelList,
   parseExpertList,
   parseModelList,
+  parseRunAccepted,
   parseRunPreview,
-  type ExpertList,
-  type ModelList,
+  parseSessionView,
   type RunPreview,
+  type RunRequest,
+  type SessionCreate,
 } from "@autobots/api-client";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -29,6 +34,8 @@ import { Input, Select, Textarea } from "@/components/ui/field";
 import { focusGoal, NEW_RUN_PARAM } from "@/components/new-run";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
+import { readErrorResponse, readReply } from "@/lib/replies";
+import { profileField } from "@/lib/model-profile";
 
 // The draft and choice survive setup in this tab only. Opening or restoring them never starts anything:
 // the one admission below happens only when Run is pressed. No credential is ever kept here.
@@ -47,7 +54,9 @@ function storedDraft(): string {
 // sent until Run is pressed, and the files go with that one request.
 const MAX_FILES = 5;
 const MAX_FILE_BYTES = 1_048_576;
-const MEDIA_TYPES: Record<string, string> = {
+type MediaType = NonNullable<InputDocument["media_type"]>;
+
+const MEDIA_TYPES: Record<string, MediaType> = {
   txt: "text/plain",
   text: "text/plain",
   md: "text/markdown",
@@ -59,7 +68,7 @@ const MEDIA_TYPES: Record<string, string> = {
 type Attached = {
   name: string;
   path: string;
-  media_type: string;
+  media_type: MediaType;
   content: string;
   size: number;
 };
@@ -108,7 +117,8 @@ type Outcome =
   | "error"
   | "model_not_offered"
   | "budget_refused"
-  | "session_failed";
+  | "session_failed"
+  | "unknown";
 
 export function GoalComposer() {
   const restored = useSyncExternalStore(subscribe, storedDraft, () => "");
@@ -264,13 +274,13 @@ export function GoalComposer() {
       body: JSON.stringify({
         kind: "direct",
         experts: [{ expert_id: expertId }],
-      }),
+      } satisfies SessionCreate),
     }).catch(() => null);
     if (reply?.ok !== true) {
       await reply?.text().catch(() => null);
       return null;
     }
-    return ((await reply.json()) as { id: string }).id;
+    return (await readReply(reply, parseSessionView))?.id ?? null;
   }
 
   async function run(): Promise<void> {
@@ -295,7 +305,7 @@ export function GoalComposer() {
         goal_text: draft,
         budget_micro_usd: budget,
         ...(sessionId === null ? {} : { session_id: sessionId }),
-        ...(profile === "" ? {} : { run_profile: profile }),
+        ...profileField(profile),
         ...(files.length === 0
           ? {}
           : {
@@ -305,20 +315,22 @@ export function GoalComposer() {
                 media_type,
               })),
             }),
-      }),
+      } satisfies RunRequest),
     }).catch(() => null);
     if (reply?.ok === true) {
-      const accepted = (await reply.json()) as { run_id: string };
+      // A reply that doesn't parse leaves the outcome unknown, not refused (R-09, Decision 0027 D2).
+      const accepted = await readReply(reply, parseRunAccepted);
+      if (accepted === null) {
+        setOutcome("unknown");
+        return;
+      }
       setRunId(accepted.run_id);
       setOutcome("queued");
       setFiles([]);
       setRefusals([]);
       return;
     }
-    const failure = (await reply?.json().catch(() => null)) as {
-      code?: string;
-      message?: string;
-    } | null;
+    const failure = await readErrorResponse(reply);
     if (failure?.code?.startsWith("budget_") === true) {
       setRefusal(failure.message ?? "That budget can't be used.");
       setOutcome("budget_refused");
@@ -632,6 +644,8 @@ export function GoalComposer() {
             <>{refusal} No run started. Your draft is kept.</>
           ) : outcome === "session_failed" ? (
             "The Expert's session could not be started, so no run started. Your draft is kept."
+          ) : outcome === "unknown" ? (
+            "The reply was unclear, so the run may have started. Check Runs before starting it again. Your draft is kept."
           ) : outcome === "model_refused" ? (
             "That model or request isn't approved, so no run started. Your draft is kept."
           ) : outcome === "queued" ? (

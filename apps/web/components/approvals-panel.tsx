@@ -21,6 +21,7 @@ import { csrfFetch } from "@/lib/csrf-fetch";
 import { chord, press, type Arm } from "@/lib/approval-shortcut";
 import { typing } from "@/lib/keyboard";
 import { cn } from "@/lib/utils";
+import { readErrorResponse } from "@/lib/replies";
 
 const MESSAGES: Record<string, string> = {
   owner_required: "Only the workspace owner can decide.",
@@ -211,9 +212,7 @@ export function ApprovalsPanel({
             : "Rejected. The run can replan or fail, and this request won't run.",
         );
       } else {
-        const failure = (await reply?.json().catch(() => null)) as {
-          code?: string;
-        } | null;
+        const failure = await readErrorResponse(reply);
         setMessage(
           MESSAGES[failure?.code ?? ""] ?? "That decision couldn't be saved.",
         );

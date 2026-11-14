@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { readErrorResponse } from "@/lib/replies";
 
 type Operation = {
   operation_id: string;
@@ -54,9 +55,7 @@ export function UnknownEffects({
       onResolved();
       return;
     }
-    const failure = (await reply?.json().catch(() => null)) as {
-      code?: string;
-    } | null;
+    const failure = await readErrorResponse(reply);
     setMessage(REFUSALS[failure?.code ?? ""] ?? "That couldn't be recorded.");
   }
 

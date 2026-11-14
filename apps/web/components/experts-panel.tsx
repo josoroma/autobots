@@ -1,10 +1,12 @@
 "use client";
 
 import {
+  type ExpertView,
   parseExpertList,
   parseExpertView,
+  parseSessionView,
   parseToolCatalog,
-  type ExpertView,
+  type SessionCreate,
   type ToolDescriptor,
 } from "@autobots/api-client";
 import { ArrowRight, Plus, ShieldAlert } from "lucide-react";
@@ -18,6 +20,7 @@ import { Choice, Input } from "@/components/ui/field";
 import { SectionLabel } from "@/components/ui/page-header";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
+import { readErrorResponse, readReply } from "@/lib/replies";
 
 export function ExpertsPanel() {
   const router = useRouter();
@@ -91,11 +94,12 @@ export function ExpertsPanel() {
       body: JSON.stringify({
         kind: "direct",
         experts: [{ expert_id: expertId }],
-      }),
+      } satisfies SessionCreate),
     }).catch(() => null);
     if (reply?.ok === true) {
-      const session = (await reply.json()) as { id: string };
-      router.push(`/sessions/${session.id}`);
+      const session = await readReply(reply, parseSessionView);
+      if (session === null) setMessage("That session could not be started.");
+      else router.push(`/sessions/${session.id}`);
     } else {
       setMessage("That session could not be started.");
     }
@@ -116,9 +120,7 @@ export function ExpertsPanel() {
       router.push(`/experts/${parseExpertView(await reply.json()).id}`);
       return;
     }
-    const failure = (await reply?.json().catch(() => null)) as {
-      code?: string;
-    } | null;
+    const failure = await readErrorResponse(reply);
     setMessage(
       failure?.code === "owner_required"
         ? "Only the workspace owner can create an Expert."
@@ -138,11 +140,12 @@ export function ExpertsPanel() {
       body: JSON.stringify({
         kind: "coordinator",
         experts: [...routed].map((expert_id) => ({ expert_id })),
-      }),
+      } satisfies SessionCreate),
     }).catch(() => null);
     if (reply?.ok === true) {
-      const session = (await reply.json()) as { id: string };
-      router.push(`/sessions/${session.id}`);
+      const session = await readReply(reply, parseSessionView);
+      if (session === null) setMessage("That session could not be started.");
+      else router.push(`/sessions/${session.id}`);
     } else {
       setMessage("That session could not be started.");
     }

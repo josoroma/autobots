@@ -28,6 +28,7 @@ import { Input, Select, Textarea } from "@/components/ui/field";
 import { SectionLabel } from "@/components/ui/page-header";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
+import { readErrorResponse } from "@/lib/replies";
 
 const STARTER = JSON.stringify(
   {
@@ -217,10 +218,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
       );
       return;
     }
-    const failure = (await reply?.json().catch(() => null)) as {
-      code?: string;
-      message?: string;
-    } | null;
+    const failure = await readErrorResponse(reply);
     setMessage(
       failure?.code === "owner_required"
         ? "Only the workspace owner can publish."
@@ -251,10 +249,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
     if (reply?.ok === true) {
       return { view: parseWorkflowView(await reply.json()) };
     }
-    const failure = (await reply?.json().catch(() => null)) as {
-      code?: string;
-      message?: string;
-    } | null;
+    const failure = await readErrorResponse(reply);
     return { view: null, ...failure };
   }
 
@@ -348,9 +343,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
       );
       return;
     }
-    const failure = (await reply?.json().catch(() => null)) as {
-      code?: string;
-    } | null;
+    const failure = await readErrorResponse(reply);
     setMessage(
       failure?.code === "owner_required"
         ? "Only the workspace owner can describe a workflow."
@@ -389,9 +382,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
       );
       return;
     }
-    const failure = (await reply?.json().catch(() => null)) as {
-      message?: string;
-    } | null;
+    const failure = await readErrorResponse(reply);
     setMessage(failure?.message ?? "That could not be started.");
   }
 

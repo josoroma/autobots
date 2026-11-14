@@ -1,8 +1,6 @@
 "use client";
 
 import {
-  parseEventPage,
-  parseRunEvent,
   parseRunWorkspace,
   type RunEvent,
   type RunWorkspace,
@@ -31,6 +29,11 @@ import { buttonVariants } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { UnknownEffects } from "@/components/unknown-effects";
 import { cn } from "@/lib/utils";
+import {
+  parseCursorFrame,
+  parseEventFrame,
+  splitEventPage,
+} from "@/lib/stream-frames";
 
 // Reasons are kept apart from status, so "paused" and "failed" can say why.
 const STATUS_TEXT: Record<string, string> = {
@@ -140,15 +143,6 @@ function withDelta(
   return { ...current, text: current.text + delta.text, joined: true };
 }
 
-// Decision 0017 Q13: an event type this page doesn't know is skipped, never an error.
-function known(raw: unknown): RunEvent | null {
-  try {
-    return parseRunEvent(raw);
-  } catch {
-    return null;
-  }
-}
-
 export function RunWorkspaceView({ runId }: { runId: string }) {
   const [snapshot, setSnapshot] = useState<RunWorkspace | null>(null);
   const [events, setEvents] = useState<ReadonlyMap<number, RunEvent>>(
@@ -204,25 +198,24 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
       source = new EventSource(`${base}/events/stream?after=${cursor}`);
       source.onopen = () => setConnection("live");
       source.addEventListener("run", (message) => {
-        const event = known(JSON.parse(message.data as string));
+        const event = parseEventFrame(message.data);
         if (event === null || event.sequence <= cursor) return;
         add([event]);
         void refresh();
       });
       // US-15.24: result text while it's written. Never stored, so never part of the timeline.
       source.addEventListener("live", (message) => {
-        const event = known(JSON.parse(message.data as string));
+        const event = parseEventFrame(message.data);
         if (event === null || event.payload.type !== "result.text.delta")
           return;
         if (!streamWanted()) return;
         const delta = event.payload;
         setLive((current) => withDelta(current, delta));
       });
+      // WRUN-06: a frame without a usable number is ignored, so the cursor never becomes NaN.
       source.addEventListener("cursor", (message) => {
-        cursor = Math.max(
-          cursor,
-          (JSON.parse(message.data as string) as { cursor: number }).cursor,
-        );
+        const next = parseCursorFrame(message.data);
+        if (next !== null) cursor = Math.max(cursor, next);
       });
       source.addEventListener("gap", () => {
         setGap(true);
@@ -256,17 +249,20 @@ export function RunWorkspaceView({ runId }: { runId: string }) {
           retry();
           return;
         }
-        const raw = (await reply.json()) as { events?: unknown[] };
-        const page = parseEventPage({ ...raw, events: [] });
+        // A page that doesn't parse retries, rather than leaving the stream stopped.
+        const split = await reply
+          .json()
+          .then(splitEventPage)
+          .catch(() => null);
         if (closed) return;
-        if (page.gap) setGap(true);
-        add(
-          (raw.events ?? [])
-            .map(known)
-            .filter((event): event is RunEvent => event !== null),
-        );
-        if (page.next_cursor === cursor) break;
-        cursor = page.next_cursor;
+        if (split === null) {
+          retry();
+          return;
+        }
+        if (split.page.gap) setGap(true);
+        add(split.events);
+        if (split.page.next_cursor === cursor) break;
+        cursor = split.page.next_cursor;
       }
       connect();
     };

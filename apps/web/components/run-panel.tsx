@@ -10,6 +10,7 @@ import { StateLine } from "@/components/run-list";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
+import { readErrorResponse } from "@/lib/replies";
 
 type Command = "pause" | "resume" | "cancel";
 type Task = NonNullable<RunWorkspace["plan"]>["tasks"][number];
@@ -98,10 +99,7 @@ export function RunPanel({
       onChanged();
       return;
     }
-    const failure = (await reply?.json().catch(() => null)) as {
-      code?: string;
-      message?: string;
-    } | null;
+    const failure = await readErrorResponse(reply);
     setRefusal(
       failure?.code === "version_conflict"
         ? STALE
