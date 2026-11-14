@@ -217,3 +217,34 @@ test("an execution's budget is frozen on its run, and one outside the range star
   expect((await refused.json()).code).toBe("budget_out_of_range");
   expect(await count()).toBe(before + 1);
 });
+
+// R-19, Decision 0027 D2: the route answers for the API, so this starts no execution and spends nothing.
+test("a double click on Run this version sends one execution", async ({
+  page,
+}) => {
+  await signIn(page);
+  let posts = 0;
+  await page.route(`**/api/v1/workflows/${PLAIN}/executions`, async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    posts += 1;
+    await new Promise((settle) => setTimeout(settle, 400));
+    await route.fulfill({
+      status: 201,
+      json: {
+        schema_version: 1,
+        id: "22222222-2222-4222-8222-222222222222",
+        run_id: "33333333-3333-4333-8333-333333333333",
+        workflow_id: PLAIN,
+        workflow_version: 1,
+        graph_hash: "a".repeat(64),
+        block_versions: {},
+      },
+    });
+  });
+  await page.goto(`/workflows/${PLAIN}`);
+  await page.getByLabel("Inputs").fill('{"in": "pressed twice"}');
+  await page.getByRole("button", { name: "Run this version" }).dblclick();
+  await page.waitForURL(/\/workflow-executions\//);
+  expect(posts).toBe(1);
+  await page.unroute(`**/api/v1/workflows/${PLAIN}/executions`);
+});

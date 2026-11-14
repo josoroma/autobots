@@ -1,9 +1,10 @@
 "use client";
 
 import {
-  parseApprovalList,
   type ApprovalList,
   type ApprovalView,
+  parseApprovalList,
+  parseApprovalResult,
 } from "@autobots/api-client";
 import { ArrowUpRight, Check, Lock } from "lucide-react";
 import Link from "next/link";
@@ -21,7 +22,7 @@ import { csrfFetch } from "@/lib/csrf-fetch";
 import { chord, press, type Arm } from "@/lib/approval-shortcut";
 import { typing } from "@/lib/keyboard";
 import { cn } from "@/lib/utils";
-import { readErrorResponse } from "@/lib/replies";
+import { useSubmit } from "@/lib/use-submit";
 
 const MESSAGES: Record<string, string> = {
   owner_required: "Only the workspace owner can decide.",
@@ -122,6 +123,7 @@ export function ApprovalsPanel({
   // HM-04: Home's Review link opens with its request selected, when it's still waiting.
   initial?: string | null;
 }) {
+  const decisions = useSubmit();
   const [tab, setTab] = useState<Tab>("waiting");
   const [list, setList] = useState<ApprovalList | null>(null);
   const [counts, setCounts] = useState<ApprovalList["counts"] | null>(null);
@@ -188,38 +190,46 @@ export function ApprovalsPanel({
   const approvals = useMemo(() => list?.approvals ?? [], [list]);
   const current = approvals.find((item) => item.id === selected) ?? null;
 
+  // One key per decision until its outcome is known (Decision 0027 D2), scoped to the request.
   const decide = useCallback(
     async (approval: ApprovalView, decision: "approve" | "reject") => {
       setMessage(null);
-      const reply = await csrfFetch(
-        `/api/v1/approvals/${encodeURIComponent(approval.id)}/decision`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Idempotency-Key": crypto.randomUUID(),
-          },
-          body: JSON.stringify({
-            decision,
-            argument_hash: approval.argument_hash,
-          }),
-        },
-      ).catch(() => null);
-      if (reply?.ok === true) {
+      const result = await decisions.submit({
+        body: () =>
+          JSON.stringify({ decision, argument_hash: approval.argument_hash }),
+        send: ({ key, body }) =>
+          csrfFetch(
+            `/api/v1/approvals/${encodeURIComponent(approval.id)}/decision`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Idempotency-Key": key,
+              },
+              body,
+            },
+          ),
+        parse: parseApprovalResult,
+        scope: approval.id,
+      });
+      if (result === null) return;
+      if (result.outcome === "accepted") {
         setMessage(
           decision === "approve"
             ? "Approved. Only this exact request is released."
             : "Rejected. The run can replan or fail, and this request won't run.",
         );
       } else {
-        const failure = await readErrorResponse(reply);
         setMessage(
-          MESSAGES[failure?.code ?? ""] ?? "That decision couldn't be saved.",
+          result.outcome === "unknown"
+            ? "The reply was lost, so this may have been decided. Deciding again won't apply it twice."
+            : (MESSAGES[result.refusal?.code ?? ""] ??
+                "That decision couldn't be saved."),
         );
       }
       await load(tab);
     },
-    [load, tab],
+    [decisions, load, tab],
   );
 
   useEffect(() => {

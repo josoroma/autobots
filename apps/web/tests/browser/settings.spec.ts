@@ -216,7 +216,10 @@ test("Validate and Disconnect work, and disconnecting blocks model work again", 
   await signIn(page, EMAIL_A, PASSWORD_A);
   await page.goto("/settings/models");
   await page.getByRole("button", { name: "Validate", exact: true }).click();
-  await expect(page.getByRole("status")).toHaveText("Saved.");
+  // R-19: Validate says it checked, not that it saved.
+  await expect(page.getByRole("status")).toHaveText(
+    "Checked. The key's status above is current.",
+  );
   await page.getByRole("button", { name: "Disconnect" }).click();
   await expect(page.locator('[data-field="source"]')).toHaveText("None");
   await page.goto("/");

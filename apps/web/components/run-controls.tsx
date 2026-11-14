@@ -93,6 +93,7 @@ export function RunControls({
           body,
         }),
       parse: parseRunCommandResult,
+      scope: command,
     });
     if (result === null) return;
     if (result.outcome === "unknown") setRefusal(UNKNOWN);

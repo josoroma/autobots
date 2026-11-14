@@ -8,6 +8,8 @@ export type Outcome = "accepted" | "refused" | "unknown";
 export interface Attempt {
   key: string;
   body: string;
+  /** What the write targets, such as an approval or a command. A retry never crosses targets. */
+  scope: string;
 }
 
 /**
@@ -25,12 +27,18 @@ export function outcomeOf(
   return hasEnvelope ? "refused" : "unknown";
 }
 
-/** The attempt to send: the one whose outcome is unknown, or a new key for this body. */
+/** The attempt to send: the unknown one for this target, or a new key for this body. */
 export function nextAttempt(
   unknown: Attempt | null,
   body: string | null,
   mint: () => string,
+  scope = "",
 ): Attempt | null {
-  if (unknown !== null) return unknown;
-  return body === null ? null : { key: mint(), body };
+  if (unknown !== null && unknown.scope === scope) return unknown;
+  return body === null ? null : { key: mint(), body, scope };
+}
+
+/** Whether a press resends an unknown attempt rather than building a new body. */
+export function resends(unknown: Attempt | null, scope = ""): boolean {
+  return unknown !== null && unknown.scope === scope;
 }

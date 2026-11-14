@@ -102,6 +102,7 @@ export function RunPanel({
           body,
         }),
       parse: parseRunCommandResult,
+      scope: command,
     });
     if (result === null) return;
     if (result.outcome === "accepted") {

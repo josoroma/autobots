@@ -19,7 +19,7 @@ import { SectionLabel } from "@/components/ui/page-header";
 import { AVAILABILITY, repair } from "@/components/tool-catalog";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
-import { readErrorResponse, readReply } from "@/lib/replies";
+import { useSubmit } from "@/lib/use-submit";
 
 const PROFILES = [
   { id: "", label: "Workspace setting" },
@@ -70,7 +70,18 @@ function draftOf(expert: ExpertView): Draft {
   };
 }
 
+const SAVE_REFUSALS: Readonly<Record<string, string>> = {
+  owner_required: "Only the workspace owner can save a revision.",
+  expert_version_conflict: "Someone saved a newer version. Reload to see it.",
+  expert_tool_unavailable:
+    "A granted tool is unavailable in this install. Remove it, or configure it first.",
+  expert_tool_group_empty: "A granted group has no tools an Expert may use.",
+};
+
 export function ExpertEditor({ expertId }: { expertId: string }) {
+  // One write at a time, and one key per intent until its outcome is known (Decision 0027 D2).
+  const revisions = useSubmit();
+  const sessions = useSubmit();
   const router = useRouter();
   const [expert, setExpert] = useState<ExpertView | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -132,15 +143,9 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
     event.preventDefault();
     if (expert === null || draft === null) return;
     setMessage(null);
-    const reply = await csrfFetch(
-      `/api/v1/experts/${encodeURIComponent(expert.id)}/versions`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
-        },
-        body: JSON.stringify({
+    const result = await revisions.submit({
+      body: () =>
+        JSON.stringify({
           expected_version: expert.latest_version,
           config: {
             // What this form doesn't edit, such as skills, stays as it was.
@@ -155,10 +160,20 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
             },
           },
         }),
-      },
-    ).catch(() => null);
-    if (reply?.ok === true) {
-      const saved = parseExpertView(await reply.json());
+      send: ({ key, body }) =>
+        csrfFetch(`/api/v1/experts/${encodeURIComponent(expert.id)}/versions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": key,
+          },
+          body,
+        }),
+      parse: parseExpertView,
+    });
+    if (result === null) return;
+    if (result.outcome === "accepted" && result.value !== null) {
+      const saved = result.value;
       setExpert(saved);
       setDraft(draftOf(saved));
       setMessage(
@@ -166,42 +181,49 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
       );
       return;
     }
-    const failure = await readErrorResponse(reply);
+    if (result.outcome === "unknown") {
+      setMessage(
+        "The reply was lost, so it may have been saved. Pressing again won't save it twice.",
+      );
+      return;
+    }
+    const failure = result.refusal;
     setMessage(
       failure?.code === "model_not_offered"
-        ? (failure.message ?? "That model isn't offered for new runs.")
-        : failure?.code === "owner_required"
-          ? "Only the workspace owner can save a revision."
-          : failure?.code === "expert_version_conflict"
-            ? "Someone saved a newer version. Reload to see it."
-            : failure?.code === "expert_tool_unavailable"
-              ? "A granted tool is unavailable in this install. Remove it, or configure it first."
-              : failure?.code === "expert_tool_group_empty"
-                ? "A granted group has no tools an Expert may use."
-                : "That could not be saved.",
+        ? failure.message
+        : (SAVE_REFUSALS[failure?.code ?? ""] ?? "That could not be saved."),
     );
   }
 
   async function startSession(): Promise<void> {
     if (expert === null) return;
-    const reply = await csrfFetch("/api/v1/sessions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": crypto.randomUUID(),
-      },
-      body: JSON.stringify({
-        kind: "direct",
-        experts: [{ expert_id: expert.id }],
-      } satisfies SessionCreate),
-    }).catch(() => null);
-    if (reply?.ok === true) {
-      const session = await readReply(reply, parseSessionView);
-      if (session === null) setMessage("That session could not be started.");
-      else router.push(`/sessions/${session.id}`);
-    } else {
-      setMessage("That session could not be started.");
+    const result = await sessions.submit({
+      body: () =>
+        JSON.stringify({
+          kind: "direct",
+          experts: [{ expert_id: expert.id }],
+        } satisfies SessionCreate),
+      send: ({ key, body }) =>
+        csrfFetch("/api/v1/sessions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": key,
+          },
+          body,
+        }),
+      parse: parseSessionView,
+    });
+    if (result === null) return;
+    if (result.outcome === "accepted" && result.value !== null) {
+      router.push(`/sessions/${result.value.id}`);
+      return;
     }
+    setMessage(
+      result.outcome === "unknown"
+        ? "The reply was lost, so the session may have started. Pressing again won't start a second one."
+        : "That session could not be started.",
+    );
   }
 
   if (state === "unavailable") {
@@ -430,7 +452,9 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
             </p>
           )}
           <div className="flex flex-wrap gap-2 border-t pt-5">
-            <Button type="submit">Save revision</Button>
+            <Button type="submit" disabled={revisions.pending}>
+              Save revision
+            </Button>
             <Button
               type="button"
               variant="outline"

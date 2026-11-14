@@ -21,9 +21,31 @@ test("a new intent gets a new key, and an unknown one is resent as it was", () =
   let minted = 0;
   const mint = () => `key-${++minted}`;
   const first = nextAttempt(null, '{"goal_text":"a"}', mint);
-  assert.deepEqual(first, { key: "key-1", body: '{"goal_text":"a"}' });
+  assert.deepEqual(first, {
+    key: "key-1",
+    body: '{"goal_text":"a"}',
+    scope: "",
+  });
   // The draft changed, but the first write's outcome is unknown, so it's resent unchanged.
   assert.deepEqual(nextAttempt(first, '{"goal_text":"b"}', mint), first);
   assert.equal(minted, 1);
   assert.equal(nextAttempt(null, null, mint), null);
+});
+
+test("an unknown attempt is resent only to its own target", () => {
+  let minted = 0;
+  const mint = () => `key-${++minted}`;
+  const pause = nextAttempt(null, '{"expected_version":3}', mint, "pause");
+  assert.equal(
+    nextAttempt(pause, '{"expected_version":3}', mint, "pause"),
+    pause,
+  );
+  assert.deepEqual(
+    nextAttempt(pause, '{"expected_version":4}', mint, "cancel"),
+    {
+      key: "key-2",
+      body: '{"expected_version":4}',
+      scope: "cancel",
+    },
+  );
 });

@@ -15,6 +15,7 @@ import { Card, IconTile } from "@/components/ui/card";
 import { Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
+import { readErrorResponse } from "@/lib/replies";
 
 const AUTH_LABELS: Record<ProviderStatus["auth_status"], string> = {
   missing:
@@ -189,10 +190,12 @@ export function ProviderSettingsPanel() {
     };
   }, []);
 
+  // R-19: each action says what it did, so Validate and Disconnect no longer report "Saved.".
   async function mutate(
     path: string,
     method: string,
     body?: unknown,
+    done = "Saved.",
   ): Promise<void> {
     setBusy(true);
     setMessage(null);
@@ -208,11 +211,9 @@ export function ProviderSettingsPanel() {
     setBusy(false);
     if (reply?.ok === true) {
       setStatus(parseProviderStatus(await reply.json()));
-      setMessage("Saved.");
+      setMessage(done);
     } else {
-      const failure = (await reply?.json().catch(() => null)) as {
-        message?: string;
-      } | null;
+      const failure = await readErrorResponse(reply);
       setMessage(failure?.message ?? "That did not work. Nothing changed.");
       await load();
     }
@@ -341,6 +342,8 @@ export function ProviderSettingsPanel() {
                   void mutate(
                     "/api/settings/model-providers/openrouter/validate",
                     "POST",
+                    undefined,
+                    "Checked. The key's status above is current.",
                   )
                 }
               >
@@ -357,6 +360,7 @@ export function ProviderSettingsPanel() {
                       {
                         expected_version: status.settings_version,
                       },
+                      "Disconnected. The saved key is removed.",
                     )
                   }
                 >

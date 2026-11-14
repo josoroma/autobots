@@ -22,7 +22,7 @@ import { Input, Select } from "@/components/ui/field";
 import { SectionLabel } from "@/components/ui/page-header";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
-import { readErrorResponse } from "@/lib/replies";
+import { useSubmit } from "@/lib/use-submit";
 
 type Tab = "all" | "published" | "drafts";
 const TABS: { id: Tab; label: string }[] = [
@@ -81,7 +81,14 @@ const NARROW_HIDDEN = "hidden @xl:table-cell";
 
 // PRD-Studio WF-01, WF-03 and WF-04: tabs, search, the rows' facts, and the selected workflow's
 // preview and recent executions. The preview sits under the list, so Tab never climbs.
+const CREATE_REFUSALS: Readonly<Record<string, string>> = {
+  owner_required: "Only the workspace owner can create a workflow.",
+  workflow_name_taken: "That name is already used.",
+};
+
 export function WorkflowsPanel() {
+  // One write at a time, and one key per intent until its outcome is known (Decision 0027 D2).
+  const creates = useSubmit();
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -127,25 +134,29 @@ export function WorkflowsPanel() {
   async function create(event: FormEvent): Promise<void> {
     event.preventDefault();
     setMessage(null);
-    const reply = await csrfFetch("/api/v1/workflows", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": crypto.randomUUID(),
-      },
-      body: JSON.stringify({ name }),
-    }).catch(() => null);
-    if (reply?.ok === true) {
-      router.push(`/workflows/${parseWorkflowView(await reply.json()).id}`);
+    const result = await creates.submit({
+      body: () => JSON.stringify({ name }),
+      send: ({ key, body }) =>
+        csrfFetch("/api/v1/workflows", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": key,
+          },
+          body,
+        }),
+      parse: parseWorkflowView,
+    });
+    if (result === null) return;
+    if (result.outcome === "accepted" && result.value !== null) {
+      router.push(`/workflows/${result.value.id}`);
       return;
     }
-    const failure = await readErrorResponse(reply);
     setMessage(
-      failure?.code === "owner_required"
-        ? "Only the workspace owner can create a workflow."
-        : failure?.code === "workflow_name_taken"
-          ? "That name is already used."
-          : "That could not be saved.",
+      result.outcome === "unknown"
+        ? "The reply was lost, so it may have been created. Pressing again won't create a second one."
+        : (CREATE_REFUSALS[result.refusal?.code ?? ""] ??
+            "That could not be saved."),
     );
   }
 
@@ -410,7 +421,10 @@ export function WorkflowsPanel() {
               maxLength={100}
             />
           </div>
-          <Button type="submit" disabled={name.trim() === ""}>
+          <Button
+            type="submit"
+            disabled={name.trim() === "" || creates.pending}
+          >
             <Plus aria-hidden="true" />
             Create
           </Button>

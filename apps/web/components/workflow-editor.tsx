@@ -29,6 +29,7 @@ import { SectionLabel } from "@/components/ui/page-header";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
 import { readErrorResponse } from "@/lib/replies";
+import { useSubmit } from "@/lib/use-submit";
 
 const STARTER = JSON.stringify(
   {
@@ -105,6 +106,12 @@ function withLabel(text: string, nodeId: string, label: string): string {
 }
 
 export function WorkflowEditor({ workflowId }: { workflowId: string }) {
+  // One write at a time, and one key per intent until its outcome is known (Decision 0027 D2).
+  const executions = useSubmit();
+  const publishing = useSubmit();
+  const draftSaves = useSubmit();
+  const draftDiscards = useSubmit();
+  const draftPublishes = useSubmit();
   const router = useRouter();
   const [workflow, setWorkflow] = useState<WorkflowView | null>(null);
   const [catalog, setCatalog] = useState<BlockCatalog | null>(null);
@@ -195,22 +202,29 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
   async function publish(): Promise<void> {
     if (workflow === null) return;
     setMessage(null);
-    const reply = await csrfFetch(
-      `/api/v1/workflows/${encodeURIComponent(workflow.id)}/versions`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
-        },
-        body: JSON.stringify({
+    const result = await publishing.submit({
+      body: () =>
+        JSON.stringify({
           expected_version: workflow.latest_version,
           graph: parsed(draft),
         }),
-      },
-    ).catch(() => null);
-    if (reply?.ok === true) {
-      const saved = parseWorkflowView(await reply.json());
+      send: ({ key, body }) =>
+        csrfFetch(
+          `/api/v1/workflows/${encodeURIComponent(workflow.id)}/versions`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Idempotency-Key": key,
+            },
+            body,
+          },
+        ),
+      parse: parseWorkflowView,
+    });
+    if (result === null) return;
+    if (result.outcome === "accepted" && result.value !== null) {
+      const saved = result.value;
       setWorkflow(saved);
       setChosen(saved.latest_version);
       setMessage(
@@ -218,11 +232,12 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
       );
       return;
     }
-    const failure = await readErrorResponse(reply);
     setMessage(
-      failure?.code === "owner_required"
-        ? "Only the workspace owner can publish."
-        : (failure?.message ?? "That could not be published."),
+      result.outcome === "unknown"
+        ? "The reply was lost, so it may have been published. Pressing again won't publish it twice."
+        : result.refusal?.code === "owner_required"
+          ? "Only the workspace owner can publish."
+          : (result.refusal?.message ?? "That could not be published."),
     );
   }
 
@@ -233,27 +248,42 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
     body?: unknown,
   ): Promise<{ view: WorkflowView | null; code?: string; message?: string }> {
     if (workflow === null) return { view: null };
-    const reply = await csrfFetch(
-      `/api/v1/workflows/${encodeURIComponent(workflow.id)}/draft${suffix}`,
-      {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          ...(method === "POST"
-            ? { "Idempotency-Key": crypto.randomUUID() }
-            : {}),
-        },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      },
-    ).catch(() => null);
-    if (reply?.ok === true) {
-      return { view: parseWorkflowView(await reply.json()) };
+    const writes = {
+      PUT: draftSaves,
+      DELETE: draftDiscards,
+      POST: draftPublishes,
+    }[method];
+    const result = await writes.submit({
+      body: () => (body === undefined ? "" : JSON.stringify(body)),
+      send: ({ key, body: text }) =>
+        csrfFetch(
+          `/api/v1/workflows/${encodeURIComponent(workflow.id)}/draft${suffix}`,
+          {
+            method,
+            headers: {
+              "Content-Type": "application/json",
+              ...(method === "POST" ? { "Idempotency-Key": key } : {}),
+            },
+            ...(text === "" ? {} : { body: text }),
+          },
+        ),
+      parse: parseWorkflowView,
+    });
+    if (result === null) return { view: null, code: "pending" };
+    if (result.outcome === "accepted") return { view: result.value };
+    if (result.outcome === "unknown") {
+      return {
+        view: null,
+        message:
+          "The reply was lost, so this may have applied. Pressing again won't repeat it.",
+      };
     }
-    const failure = await readErrorResponse(reply);
-    return { view: null, ...failure };
+    return { view: null, ...result.refusal };
   }
 
   function refused(code: string | undefined, message: string | undefined) {
+    // A press while the same write is pending sends nothing, so it says nothing.
+    if (code === "pending") return;
     setMessage(
       code === "owner_required"
         ? "Only the workspace owner can change the draft."
@@ -351,39 +381,50 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
     );
   }
 
+  // One key per press until its outcome is known (Decision 0027 D2): a double click or a lost reply
+  // starts one execution, with one budget (WBLD-02).
   async function run(): Promise<void> {
     if (workflow === null || chosen === null) return;
     setMessage(null);
-    const values = parsed(inputs);
-    if (values === null) {
-      setMessage("The inputs aren't valid JSON.");
-      return;
-    }
-    const reply = await csrfFetch(
-      `/api/v1/workflows/${encodeURIComponent(workflow.id)}/executions`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
-        },
-        body: JSON.stringify({
+    const result = await executions.submit({
+      body: () => {
+        const values = parsed(inputs);
+        if (values === null) {
+          setMessage("The inputs aren't valid JSON.");
+          return null;
+        }
+        return JSON.stringify({
           version: chosen,
           inputs: values,
           ...(budgets === null || budgets.length === 0
             ? {}
             : { budget_micro_usd: budget }),
-        }),
+        });
       },
-    ).catch(() => null);
-    if (reply?.ok === true) {
-      router.push(
-        `/workflow-executions/${parseExecutionBinding(await reply.json()).id}`,
-      );
+      send: ({ key, body }) =>
+        csrfFetch(
+          `/api/v1/workflows/${encodeURIComponent(workflow.id)}/executions`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Idempotency-Key": key,
+            },
+            body,
+          },
+        ),
+      parse: parseExecutionBinding,
+    });
+    if (result === null) return;
+    if (result.outcome === "accepted" && result.value !== null) {
+      router.push(`/workflow-executions/${result.value.id}`);
       return;
     }
-    const failure = await readErrorResponse(reply);
-    setMessage(failure?.message ?? "That could not be started.");
+    setMessage(
+      result.outcome === "unknown"
+        ? "The reply was lost, so it may have started. Pressing again won't start a second one."
+        : (result.refusal?.message ?? "That could not be started."),
+    );
   }
 
   if (unavailable) {
@@ -504,7 +545,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
             <ListChecks aria-hidden="true" />
             Validate
           </Button>
-          <Button onClick={() => void publish()}>
+          <Button onClick={() => void publish()} disabled={publishing.pending}>
             <Upload aria-hidden="true" />
             Publish
           </Button>
@@ -519,14 +560,22 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
           </Button>
           <Button
             variant="outline"
-            disabled={workflow.draft === null}
+            disabled={
+              workflow.draft === null ||
+              draftPublishes.pending ||
+              draftDiscards.pending
+            }
             onClick={() => void publishDraft()}
           >
             Publish draft
           </Button>
           <Button
             variant="outline"
-            disabled={workflow.draft === null}
+            disabled={
+              workflow.draft === null ||
+              draftPublishes.pending ||
+              draftDiscards.pending
+            }
             onClick={() => void discardDraft()}
           >
             Discard draft
@@ -663,7 +712,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
               }
             />
             <div className="flex justify-end border-t pt-4">
-              <Button onClick={() => void run()}>
+              <Button onClick={() => void run()} disabled={executions.pending}>
                 <Play aria-hidden="true" />
                 Run this version
               </Button>

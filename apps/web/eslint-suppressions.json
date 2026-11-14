@@ -19,9 +19,6 @@
     }
   },
   "components/expert-editor.tsx": {
-    "complexity": {
-      "count": 1
-    },
     "max-lines": {
       "count": 1
     },
@@ -89,9 +86,6 @@
     }
   },
   "components/provider-settings-panel.tsx": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
-    },
     "max-lines-per-function": {
       "count": 1
     }

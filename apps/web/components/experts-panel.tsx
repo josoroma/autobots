@@ -20,9 +20,17 @@ import { Choice, Input } from "@/components/ui/field";
 import { SectionLabel } from "@/components/ui/page-header";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
-import { readErrorResponse, readReply } from "@/lib/replies";
+import { useSubmit } from "@/lib/use-submit";
+
+const CREATE_REFUSALS: Readonly<Record<string, string>> = {
+  owner_required: "Only the workspace owner can create an Expert.",
+  expert_name_taken: "That name is already used.",
+};
 
 export function ExpertsPanel() {
+  // One write at a time, and one key per intent until its outcome is known (Decision 0027 D2).
+  const sessions = useSubmit();
+  const creates = useSubmit();
   const router = useRouter();
   const [experts, setExperts] = useState<readonly ExpertView[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -85,70 +93,94 @@ export function ExpertsPanel() {
   );
 
   async function startRun(expertId: string): Promise<void> {
-    const reply = await csrfFetch("/api/v1/sessions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": crypto.randomUUID(),
-      },
-      body: JSON.stringify({
-        kind: "direct",
-        experts: [{ expert_id: expertId }],
-      } satisfies SessionCreate),
-    }).catch(() => null);
-    if (reply?.ok === true) {
-      const session = await readReply(reply, parseSessionView);
-      if (session === null) setMessage("That session could not be started.");
-      else router.push(`/sessions/${session.id}`);
-    } else {
-      setMessage("That session could not be started.");
+    const result = await sessions.submit({
+      body: () =>
+        JSON.stringify({
+          kind: "direct",
+          experts: [{ expert_id: expertId }],
+        } satisfies SessionCreate),
+      send: ({ key, body }) =>
+        csrfFetch("/api/v1/sessions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": key,
+          },
+          body,
+        }),
+      parse: parseSessionView,
+      scope: expertId,
+    });
+    if (result === null) return;
+    if (result.outcome === "accepted" && result.value !== null) {
+      router.push(`/sessions/${result.value.id}`);
+      return;
     }
+    setMessage(
+      result.outcome === "unknown"
+        ? "The reply was lost, so the session may have started. Pressing again won't start a second one."
+        : "That session could not be started.",
+    );
   }
 
   async function create(event: FormEvent): Promise<void> {
     event.preventDefault();
     setMessage(null);
-    const reply = await csrfFetch("/api/v1/experts", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": crypto.randomUUID(),
-      },
-      body: JSON.stringify({ name, config: {} }),
-    }).catch(() => null);
-    if (reply?.ok === true) {
-      router.push(`/experts/${parseExpertView(await reply.json()).id}`);
+    const result = await creates.submit({
+      body: () => JSON.stringify({ name, config: {} }),
+      send: ({ key, body }) =>
+        csrfFetch("/api/v1/experts", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": key,
+          },
+          body,
+        }),
+      parse: parseExpertView,
+    });
+    if (result === null) return;
+    if (result.outcome === "accepted" && result.value !== null) {
+      router.push(`/experts/${result.value.id}`);
       return;
     }
-    const failure = await readErrorResponse(reply);
     setMessage(
-      failure?.code === "owner_required"
-        ? "Only the workspace owner can create an Expert."
-        : failure?.code === "expert_name_taken"
-          ? "That name is already used."
-          : "That could not be saved.",
+      result.outcome === "unknown"
+        ? "The reply was lost, so it may have been created. Pressing again won't create a second one."
+        : (CREATE_REFUSALS[result.refusal?.code ?? ""] ??
+            "That could not be saved."),
     );
   }
 
   async function coordinate(): Promise<void> {
-    const reply = await csrfFetch("/api/v1/sessions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": crypto.randomUUID(),
-      },
-      body: JSON.stringify({
-        kind: "coordinator",
-        experts: [...routed].map((expert_id) => ({ expert_id })),
-      } satisfies SessionCreate),
-    }).catch(() => null);
-    if (reply?.ok === true) {
-      const session = await readReply(reply, parseSessionView);
-      if (session === null) setMessage("That session could not be started.");
-      else router.push(`/sessions/${session.id}`);
-    } else {
-      setMessage("That session could not be started.");
+    const result = await sessions.submit({
+      body: () =>
+        JSON.stringify({
+          kind: "coordinator",
+          experts: [...routed].map((expert_id) => ({ expert_id })),
+        } satisfies SessionCreate),
+      send: ({ key, body }) =>
+        csrfFetch("/api/v1/sessions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": key,
+          },
+          body,
+        }),
+      parse: parseSessionView,
+      scope: "coordinator",
+    });
+    if (result === null) return;
+    if (result.outcome === "accepted" && result.value !== null) {
+      router.push(`/sessions/${result.value.id}`);
+      return;
     }
+    setMessage(
+      result.outcome === "unknown"
+        ? "The reply was lost, so the session may have started. Pressing again won't start a second one."
+        : "That session could not be started.",
+    );
   }
 
   function toggle(id: string): void {
@@ -271,7 +303,10 @@ export function ExpertsPanel() {
               maxLength={100}
             />
           </div>
-          <Button type="submit" disabled={name.trim() === ""}>
+          <Button
+            type="submit"
+            disabled={name.trim() === "" || creates.pending}
+          >
             <Plus aria-hidden="true" />
             Create
           </Button>

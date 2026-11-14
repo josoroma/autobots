@@ -9,6 +9,7 @@ import { readErrorResponse, readReply } from "@/lib/replies";
 import {
   nextAttempt,
   outcomeOf,
+  resends,
   type Attempt,
   type Outcome,
 } from "@/lib/submit";
@@ -27,6 +28,8 @@ export interface SubmitSteps<T> {
   body: () => Promise<string | null> | string | null;
   send: (attempt: Attempt) => Promise<Response>;
   parse: (value: unknown) => T;
+  /** The write's target, when one hook serves several; an unknown attempt is resent only to it. */
+  scope?: string;
 }
 
 export function useSubmit() {
@@ -40,11 +43,13 @@ export function useSubmit() {
       busy.current = true;
       setPending(true);
       try {
-        const retried = unknown.current !== null;
+        const scope = steps.scope ?? "";
+        const retried = resends(unknown.current, scope);
         const attempt = nextAttempt(
           unknown.current,
           retried ? null : await steps.body(),
           () => crypto.randomUUID(),
+          scope,
         );
         if (attempt === null) return null;
         const reply = await steps.send(attempt).catch(() => null);
