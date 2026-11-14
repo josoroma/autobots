@@ -16,16 +16,14 @@ import hashlib
 import json
 import os
 import secrets
-import signal
 import subprocess
 import sys
 import time
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from urllib import error, request
 
 from app_db import MIGRATION_NAME, MIGRATIONS, ROLES, SEEDS, AppStack
 from disposable_db import (
@@ -38,6 +36,22 @@ from disposable_db import (
     tool_env,
 )
 from harness_lib import project_root
+from paid_run import (
+    ACTIVE,
+    OTHER_WORK,
+    TERMINAL,
+    Database,
+    Ledger,
+    LedgerEntry,
+    PaidSession,
+    goal_exit_code,
+    http_json,
+    logged_spawn,
+    note_failed,
+    refuse_other_work,
+    reserve,
+    settle,
+)
 from supabase_stack import (
     UPSTREAM,
     example_defaults,
@@ -52,12 +66,9 @@ PERSISTENT_FILES = (UPSTREAM / 'docker-compose.yml', Path('infra/supabase/compos
 STORAGE_SQL = Path('supabase/bootstrap/storage.sql')
 STORAGE_ROW = 'bootstrap/storage.sql'
 PYTHON = Path('services/agent/.venv/bin/python')
-HELPER = 'tests/db/live_goal_helper.py'
 OWNER_EMAIL = 'owner@autobots.invalid'
 TEN_YEARS = 86400 * 3650
 GOAL_SECONDS = 1000
-ACTIVE = {'queued', 'running', 'verifying', 'cancelling'}
-TERMINAL = {'succeeded', 'failed', 'cancelled'}
 SCHEMA = """create schema autobots_install;
 create table autobots_install.identity (install_id text primary key, project text not null, created_at timestamptz not null default now());
 create table autobots_install.migrations (name text primary key, sha256 text not null, applied_at timestamptz not null default now());
@@ -300,40 +311,56 @@ def status(root: Path, record: Record) -> dict:
             'listeners': bindings, 'identity_refusals': identity_refusals(install_stack(root, record), record, record.project)}
 
 
-def reserve_goal(ledger_path: Path, limit: int) -> tuple[object, dict]:
+def reserve_goal(ledger_path: Path, limit: int) -> tuple[Ledger, LedgerEntry]:
     """Before any request: the goal's whole budget has to fit what's left of the shared cap."""
-    sys.path.insert(0, str(project_root() / 'services/agent/src'))
-    from autobots.operations.reasoning_trial import SHARED_CAP_MICRO_USD
-    from autobots.operations.route_qualification import CapReached, Ledger
-    ledger = Ledger(ledger_path, SHARED_CAP_MICRO_USD)
-    try:
-        return ledger, ledger.reserve(f'install-goal:{datetime.now(UTC).isoformat()}', limit)
-    except CapReached:
-        raise Refused(f'a goal limited to {limit} micro-USD would take the shared ledger, at {ledger.committed()}, past {ledger.cap}. Nothing was sent') from None
+    return reserve(project_root(), ledger_path, f'install-goal:{datetime.now(UTC).isoformat()}', limit)
 
 
-def http_json(method: str, url: str, headers: Mapping[str, str], body: Mapping | None = None) -> tuple[int, str]:
-    data = None if body is None else json.dumps(body).encode()
-    try:
-        with request.urlopen(request.Request(url, data=data, method=method, headers=dict(headers)), timeout=30) as reply:
-            return reply.status, reply.read().decode(errors='replace')
-    except error.HTTPError as failure:
-        return failure.code, failure.read().decode(errors='replace')
+def install_session(root: Path, record: Record, stack: Database, application: Mapping[str, str], log_name: str) -> PaidSession:
+    """The install's paid session (scripts/paid_run.py): its application values for the helper and the
+    worker, which logs to `log_name` in the install's private logs."""
+    env = {**tool_env(), **application, 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'}
+    return PaidSession(root, stack, env, logged_spawn(root, env, record.directory / 'logs' / log_name))
 
 
-def note_failed(report: dict, what: str) -> None:
-    """Every check that couldn't run stays listed, and the exit code reads this."""
-    earlier = report.get('after_run_check_failed')
-    report['after_run_check_failed'] = f'{earlier}; {what}' if earlier else what
+def owner_workspace(session: PaidSession) -> str:
+    workspace = session.sql("select workspace_id from public.workspace_members where role = 'owner' limit 1;")
+    if workspace is None:
+        raise Unavailable("could not read the owner's workspace, so nothing was sent")
+    return workspace
 
 
-def refuse_other_work(found: str) -> None:
-    """The worker claims whatever is queued, in any workspace, so anything else would spend unseen."""
-    if found == '0':
-        return
-    if not found.isdigit():
-        raise Refused('Could not read what else is queued, so nothing was sent')
-    raise Refused(f'{found} other queued jobs or enabled routines would run on this paid worker. Settle them first. Nothing was sent')
+def save_key_unless_active(session: PaidSession, key_file: Path, workspace: str) -> None:
+    active = f"select count(*) from app_private.provider_credentials where workspace_id = '{workspace}' and provider = 'openrouter' and status = 'active';"
+    if session.sql(active) == '0':
+        session.helper('save', str(key_file), workspace)
+
+
+def spend_clock(session: PaidSession) -> str:
+    started_at = session.sql('select clock_timestamp();')
+    if started_at is None:
+        # Every spend check filters on this, so without it the watchdog could never fire.
+        raise Unavailable('could not read the database clock, so nothing was sent')
+    return started_at
+
+
+def spent_since(started_at: str) -> str:
+    """Everything committed on the install since `started_at`, whichever run spent it."""
+    return f"select coalesce(sum(coalesce(charged_micro_usd, reserved_micro_usd)), 0) from app_private.model_invocations where created_at >= '{started_at}';"
+
+
+def record_unsettled(session: PaidSession, started_at: str, report: dict) -> None:
+    unsettled = session.sql(f"select count(*) from app_private.model_invocations where created_at >= '{started_at}' and charged_micro_usd is null;")
+    if unsettled is None:
+        note_failed(report, 'the unsettled count could not be read')
+    else:
+        report['calls_without_a_reported_charge'] = int(unsettled)
+
+
+def write_report(record: Record, kind: str, report: Mapping) -> None:
+    out = record.directory / 'reports' / f'{kind}-{datetime.now(UTC).strftime("%Y%m%dT%H%M%S")}.json'
+    private_write(out, json.dumps(report, indent=2))
+    print(json.dumps(report, indent=2))
 
 
 def goal(root: Path, record: Record, requested: str, key_file: Path, limit: int, ledger_path: Path, goal_text: str, required: list[dict]) -> int:
@@ -343,60 +370,24 @@ def goal(root: Path, record: Record, requested: str, key_file: Path, limit: int,
     try:
         require_install(stack, record, requested)
     except Refused:
-        ledger.settle(entry, 0, 'not_started')  # type: ignore[attr-defined]
+        ledger.settle(entry, 0, 'not_started')
         raise
     application = read_values(record.app_env)
     owner = read_values(record.directory / 'owner.env')
-    env = {**tool_env(), **application, 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'}
-
-    def helper(*argv: str) -> str:
-        done = subprocess.run([str(root / PYTHON), str(root / HELPER), *argv], env=env, capture_output=True, text=True, errors='replace', timeout=120, check=False)
-        if done.returncode:
-            raise Unavailable(f'{argv[0]} failed: {done.stderr.strip().splitlines()[-1][:300] if done.stderr.strip() else "no detail"}')
-        return done.stdout.strip()
-
-    def sql(statement: str) -> str:
-        result = stack.runtime(statement)
-        return result.stdout.strip().splitlines()[0] if result.returncode == 0 and result.stdout.strip() else ''
-
+    session = install_session(root, record, stack, application, 'worker-goal.log')
     report: dict = {'schema_version': 'autobots.install-goal/v1', 'started_at_utc': datetime.now(UTC).isoformat(), 'project': record.project, 'model_transport': 'live OpenRouter',
                     'limit_micro_usd': limit, 'goal': goal_text, 'required_artifacts': required, 'not_established': ['H1', 'product acceptance', 'task quality beyond this goal']}
     charged: int | None = None
-    worker = None
     run_id = ''
     final = ''
-
-    def stop_worker() -> None:
-        if worker is not None and worker.poll() is None:
-            worker.send_signal(signal.SIGTERM)
-            try:
-                report['worker_exit'] = worker.wait(60)
-            except subprocess.TimeoutExpired:
-                worker.kill()
-                report['worker_exit'] = 'killed after 60 seconds'
-
-    def write_report() -> None:
-        out = record.directory / 'reports' / f'goal-{datetime.now(UTC).strftime("%Y%m%dT%H%M%S")}.json'
-        private_write(out, json.dumps(report, indent=2))
-        print(json.dumps(report, indent=2))
-
     try:
-        refuse_other_work(sql("select (select count(*) from app_private.run_jobs where status in ('queued', 'claimed')) + (select count(*) from public.routines where enabled);"))
-        report['key_usage_before_usd'] = float(helper('usage', str(key_file)))
-        base = application['AUTOBOTS_SUPABASE_URL']
-        code, reply = http_json('POST', f'{base}/auth/v1/token?grant_type=password', {'apikey': application['AUTOBOTS_SUPABASE_ANON_KEY'], 'Content-Type': 'application/json'},
-                                {'email': owner['OWNER_EMAIL'], 'password': owner['OWNER_PASSWORD']})
-        if code != 200:
-            raise Unavailable(f'the owner could not sign in: {code}')
-        token = json.loads(reply)['access_token']
-        workspace = sql("select workspace_id from public.workspace_members where role = 'owner' limit 1;")
-        if sql(f"select count(*) from app_private.provider_credentials where workspace_id = '{workspace}' and provider = 'openrouter' and status = 'active';") == '0':
-            helper('save', str(key_file), workspace)
-        started_at = sql('select clock_timestamp();')
-        if not started_at:
-            # Every spend check below filters on this, so without it the watchdog could never fire.
-            raise Unavailable('could not read the database clock, so nothing was sent')
-        spent_since = f"select coalesce(sum(coalesce(charged_micro_usd, reserved_micro_usd)), 0) from app_private.model_invocations where created_at >= '{started_at}';"
+        refuse_other_work(session.sql(OTHER_WORK))
+        report['key_usage_before_usd'] = float(session.helper('usage', str(key_file)))
+        token = session.sign_in(application['AUTOBOTS_SUPABASE_URL'], application['AUTOBOTS_SUPABASE_ANON_KEY'], owner['OWNER_EMAIL'], owner['OWNER_PASSWORD'])
+        workspace = owner_workspace(session)
+        save_key_unless_active(session, key_file, workspace)
+        started_at = spend_clock(session)
+        spend = spent_since(started_at)
         headers = {'X-Autobots-Internal': application['AUTOBOTS_INTERNAL_TOKEN'], 'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
         api = f'http://127.0.0.1:{record.api_port}'
         code, reply = http_json('POST', f'{api}/v1/runs', {**headers, 'Idempotency-Key': secrets.token_hex(8)}, {'goal_text': goal_text, 'limit_micro_usd': limit, 'required_artifacts': required})
@@ -405,65 +396,28 @@ def goal(root: Path, record: Record, requested: str, key_file: Path, limit: int,
             raise Unavailable(f'the API refused the goal: {code} {reply[:200]}')
         run_id = json.loads(reply)['run_id']
         report['run_id'] = run_id
-        handle = (record.directory / 'logs/worker-goal.log').open('a')
-        # The switch is on for this one process only, and it's on nowhere else.
-        worker = subprocess.Popen([str(root / PYTHON), '-m', 'autobots.operations.worker'], env={**env, 'AUTOBOTS_WORKER_INFERENCE': 'enabled'}, cwd=root,
-                                  stdin=subprocess.DEVNULL, stdout=handle, stderr=handle, start_new_session=True)
-        started = time.monotonic()
-        timeline, last = [], ''
-        while time.monotonic() - started < GOAL_SECONDS:
-            final = sql(f"select status from public.runs where id = '{run_id}';")
-            if final != last:
-                timeline.append({'seconds': round(time.monotonic() - started, 1), 'status': final})
-                print(f'{round(time.monotonic() - started)}s: {final}', flush=True)
-                last = final
-            if final and final not in ACTIVE:
-                break
-            committed = sql(spent_since)
-            if committed and int(committed) > limit:
-                report['watchdog_fired'] = True
-                worker.send_signal(signal.SIGKILL)
-                break
-            if worker.poll() is not None:
-                report['worker_exited_early'] = worker.returncode
-                break
-            time.sleep(3)
+        status = f"select status from public.runs where id = '{run_id}';"
+        session.start_worker()
+        watched = session.watch(lambda: {'status': session.sql(status) or ''}, lambda current: bool(current['status']) and current['status'] not in ACTIVE,
+                                limit, spend, GOAL_SECONDS)
         # Stopped before anything is read, since it can still dispatch while it drains.
-        stop_worker()
-        final = sql(f"select status from public.runs where id = '{run_id}';")
-        report['timeline'], report['status'] = timeline, final
-        report['stop_reason'] = sql(f"select coalesce(stop_reason, 'none') from app_private.run_usage where run_id = '{run_id}';")
-        report['verification'] = sql(f"select passed::text || ' ' || unmet::text from app_private.run_verifications where run_id = '{run_id}' order by created_at desc limit 1;")
-        report['published'] = sql(f"select coalesce(string_agg(name || ' ' || sha256 || ' ' || size_bytes, ', '), 'none') from public.artifacts where run_id = '{run_id}' and status = 'published';")
-        report['calls'] = sql(f"select count(*) from app_private.model_invocations where created_at >= '{started_at}';")
-        report['route'] = sql(f"select coalesce(string_agg(distinct profile || ' ' || wire_id, ', '), 'none') from app_private.model_invocations where root_run_id = '{run_id}';")
-        spent = sql(spent_since)
-        unsettled = sql(f"select count(*) from app_private.model_invocations where created_at >= '{started_at}' and charged_micro_usd is null;")
-        if spent:
-            report['committed_micro_usd'] = int(spent)
-        else:
-            note_failed(report, 'the spend could not be read')
-        if unsettled:
-            report['calls_without_a_reported_charge'] = int(unsettled)
-        else:
-            note_failed(report, 'the unsettled count could not be read')
-        charged = int(spent) if spent else None
-    except Refused:
-        ledger.settle(entry, 0, 'not_started')  # type: ignore[attr-defined]
-        raise
+        session.stop_worker(report)
+        final = session.sql(status) or ''
+        watched.record(report)
+        report['status'] = final
+        report['stop_reason'] = session.sql(f"select coalesce(stop_reason, 'none') from app_private.run_usage where run_id = '{run_id}';")
+        report['verification'] = session.sql(f"select passed::text || ' ' || unmet::text from app_private.run_verifications where run_id = '{run_id}' order by created_at desc limit 1;")
+        report['published'] = session.sql(f"select coalesce(string_agg(name || ' ' || sha256 || ' ' || size_bytes, ', '), 'none') from public.artifacts where run_id = '{run_id}' and status = 'published';")
+        report['calls'] = session.sql(f"select count(*) from app_private.model_invocations where created_at >= '{started_at}';")
+        report['route'] = session.sql(f"select coalesce(string_agg(distinct profile || ' ' || wire_id, ', '), 'none') from app_private.model_invocations where root_run_id = '{run_id}';")
+        charged = session.spend_after(watched, spend, report)
+        record_unsettled(session, started_at, report)
     finally:
-        stop_worker()
-        if entry.get('state') == 'reserved':  # type: ignore[attr-defined]
-            # A run that isn't finished can spend again on resume, so its whole budget stays held.
-            if not run_id:
-                ledger.settle(entry, 0, 'not_started')  # type: ignore[attr-defined]
-            elif final in TERMINAL and charged is not None:
-                ledger.settle(entry, charged, 'settled')  # type: ignore[attr-defined]
-            else:
-                ledger.settle(entry, None, 'run_not_finished')  # type: ignore[attr-defined]
-        report['shared_ledger_committed_micro_usd'] = ledger.committed()  # type: ignore[attr-defined]
+        session.stop_worker(report)
+        # A run that isn't finished can spend again on resume, so its whole budget stays held.
+        settle(ledger, entry, bool(run_id), {'goal': final}, charged, report)
         try:
-            report['workers_claiming_inference_afterward'] = sql("select count(*) from app_private.worker_heartbeats where claims_inference and state <> 'stopped' and beat_at > now() - interval '60 seconds';")
+            report['workers_claiming_inference_afterward'] = session.sql("select count(*) from app_private.worker_heartbeats where claims_inference and state <> 'stopped' and beat_at > now() - interval '60 seconds';")
         except (Unavailable, subprocess.SubprocessError, OSError) as problem:
             note_failed(report, type(problem).__name__)
         write_report_needed = bool(run_id)
@@ -474,21 +428,13 @@ def goal(root: Path, record: Record, requested: str, key_file: Path, limit: int,
             absent = [name for name in ('status', 'timeline', 'committed_micro_usd', 'calls') if report.get(name) in (None, '', [])]
             report['not_checked'] = ['key usage after the run', 'the key in stored rows or logs', *absent]
             try:
-                write_report()
+                write_report(record, 'goal', report)
             except OSError as problem:
                 print(f'the report could not be written: {type(problem).__name__}', file=sys.stderr)
     if write_report_needed:
-        time.sleep(60)  # OpenRouter's figure can lag, so this checks the ledger and doesn't replace it.
-        try:
-            report['key_usage_after_usd'] = float(helper('usage', str(key_file)))
-            durable, logged = helper('leaks', str(key_file), str(record.directory / 'logs')).split()
-            report['key_found'] = {'durable_rows': int(durable), 'log_files': int(logged)}
-        except (Unavailable, ValueError, subprocess.SubprocessError, OSError) as problem:
-            note_failed(report, str(problem) if isinstance(problem, Unavailable) else type(problem).__name__)
-    write_report()
-    found = report.get('key_found')
-    leaked = isinstance(found, dict) and any(found.values())
-    return 0 if report.get('status') == 'succeeded' and 'after_run_check_failed' not in report and not leaked else 1
+        session.after_run_checks(key_file, record.directory / 'logs', report)
+    write_report(record, 'goal', report)
+    return goal_exit_code(report, achieved=report.get('status') == 'succeeded')
 
 
 # Decision 0023 E6: what the owner asked to see in their app, all of it real. Spend, in micro-USD.
@@ -506,9 +452,10 @@ EXAMPLE_WORKFLOW = ('Vendor due diligence', {'in': [
     'Supabase, as the database and auth vendor for a small local-first app: summarise its pricing model, security '
     'posture and lock-in risk in under 200 words, save that as supabase.md with save_artifact, and complete your task citing it.']},
     250_000)
+Sql = Callable[[str], str | None]
 
 
-def grant_publish(sql, api: str, headers: Mapping[str, str], workspace: str, names: tuple[str, ...]) -> list[str]:
+def grant_publish(sql: Sql, api: str, headers: Mapping[str, str], workspace: str, names: tuple[str, ...]) -> list[str]:
     """Decision 0023 E7: a seeded Expert that saves but can't publish gets one new version with
     `publish_artifact` added, through the API. Nothing is removed, and earlier versions stay."""
     granted = []
@@ -530,14 +477,14 @@ def grant_publish(sql, api: str, headers: Mapping[str, str], workspace: str, nam
     return granted
 
 
-def cancel_unstarted(sql, api: str, headers: Mapping[str, str], workspace: str, goals: list[str]) -> int:
+def cancel_unstarted(sql: Sql, api: str, headers: Mapping[str, str], workspace: str, goals: list[str]) -> int:
     """Cancels this command's own queued example runs that never made a model call, through the API."""
     cancelled = 0
     for goal_text in goals:
         quoted = goal_text.replace("'", "''")
         rows = sql(f"select coalesce(string_agg(r.id || ' ' || r.version, ','), '') from public.runs r where r.workspace_id = '{workspace}' "
                    f"and r.status = 'queued' and r.goal_text = '{quoted}' and not exists "
-                   "(select 1 from app_private.model_invocations m where m.root_run_id = r.id);")
+                   "(select 1 from app_private.model_invocations m where m.root_run_id = r.id);") or ''
         for row in filter(None, rows.split(',')):
             run, version = row.split(' ')
             code, _ = http_json('POST', f'{api}/v1/runs/{run}/cancel', {**headers, 'Idempotency-Key': secrets.token_hex(8)}, {'expected_version': int(version)})
@@ -545,6 +492,12 @@ def cancel_unstarted(sql, api: str, headers: Mapping[str, str], workspace: str, 
                 raise Unavailable(f'an earlier queued example run could not be cancelled: {code}')
             cancelled += 1
     return cancelled
+
+
+def examples_done(current: Mapping[str, str]) -> bool:
+    """Every goal run terminal, and the workflow terminal or stopped at its approval gate."""
+    goals_done = all(status in TERMINAL for label, status in current.items() if label != 'workflow')
+    return goals_done and current.get('workflow') in TERMINAL | {'waiting_approval'}
 
 
 def examples(root: Path, record: Record, requested: str, key_file: Path, ledger_path: Path) -> int:
@@ -555,68 +508,42 @@ def examples(root: Path, record: Record, requested: str, key_file: Path, ledger_
     try:
         require_install(stack, record, requested)
     except Refused:
-        ledger.settle(entry, 0, 'not_started')  # type: ignore[attr-defined]
+        ledger.settle(entry, 0, 'not_started')
         raise
     application = read_values(record.app_env)
     owner = read_values(record.directory / 'owner.env')
-    env = {**tool_env(), **application, 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'}
-
-    def helper(*argv: str) -> str:
-        done = subprocess.run([str(root / PYTHON), str(root / HELPER), *argv], env=env, capture_output=True, text=True, errors='replace', timeout=120, check=False)
-        if done.returncode:
-            raise Unavailable(f'{argv[0]} failed: {done.stderr.strip().splitlines()[-1][:300] if done.stderr.strip() else "no detail"}')
-        return done.stdout.strip()
-
-    def sql(statement: str) -> str:
-        result = stack.runtime(statement)
-        return result.stdout.strip().splitlines()[0] if result.returncode == 0 and result.stdout.strip() else ''
-
+    session = install_session(root, record, stack, application, 'worker-examples.log')
+    sql = session.sql
     report: dict = {'schema_version': 'autobots.install-examples/v1', 'started_at_utc': datetime.now(UTC).isoformat(), 'project': record.project,
                     'model_transport': 'live OpenRouter', 'limit_micro_usd': EXAMPLES_LIMIT,
                     'not_established': ['H1', 'product acceptance', 'task quality']}
-    worker = None
+    goals = [spec['goal_text'] for spec in EXAMPLE_RUNS]
+    api = f'http://127.0.0.1:{record.api_port}'
+    headers: dict[str, str] = {}
+    workspace = ''
     runs: dict[str, str] = {}
     finals: dict[str, str] = {}
     charged: int | None = None
-
-    def stop_worker() -> None:
-        if worker is not None and worker.poll() is None:
-            worker.send_signal(signal.SIGTERM)
-            try:
-                report['worker_exit'] = worker.wait(60)
-            except subprocess.TimeoutExpired:
-                worker.kill()
-                report['worker_exit'] = 'killed after 60 seconds'
-
     try:
-        base = application['AUTOBOTS_SUPABASE_URL']
-        code, reply = http_json('POST', f'{base}/auth/v1/token?grant_type=password', {'apikey': application['AUTOBOTS_SUPABASE_ANON_KEY'], 'Content-Type': 'application/json'},
-                                {'email': owner['OWNER_EMAIL'], 'password': owner['OWNER_PASSWORD']})
-        if code != 200:
-            raise Unavailable(f'the owner could not sign in: {code}')
-        token = json.loads(reply)['access_token']
-        workspace = sql("select workspace_id from public.workspace_members where role = 'owner' limit 1;")
+        token = session.sign_in(application['AUTOBOTS_SUPABASE_URL'], application['AUTOBOTS_SUPABASE_ANON_KEY'], owner['OWNER_EMAIL'], owner['OWNER_PASSWORD'])
+        workspace = owner_workspace(session)
         headers = {'X-Autobots-Internal': application['AUTOBOTS_INTERNAL_TOKEN'], 'Authorization': f'Bearer {token}', 'Content-Type': 'application/json',
                    'X-Autobots-Workspace': workspace}
-        api = f'http://127.0.0.1:{record.api_port}'
-        report['cancelled_from_an_earlier_attempt'] = cancel_unstarted(sql, api, headers, workspace, [spec['goal_text'] for spec in EXAMPLE_RUNS])
-        refuse_other_work(sql("select (select count(*) from app_private.run_jobs where status in ('queued', 'claimed')) + (select count(*) from public.routines where enabled);"))
-        report['key_usage_before_usd'] = float(helper('usage', str(key_file)))
-        if sql(f"select count(*) from app_private.provider_credentials where workspace_id = '{workspace}' and provider = 'openrouter' and status = 'active';") == '0':
-            helper('save', str(key_file), workspace)
-        seeded = subprocess.run([str(root / PYTHON), '-m', 'autobots.operations.concept_seed', '--workspace', workspace], env=env,
+        report['cancelled_from_an_earlier_attempt'] = cancel_unstarted(sql, api, headers, workspace, goals)
+        refuse_other_work(sql(OTHER_WORK))
+        report['key_usage_before_usd'] = float(session.helper('usage', str(key_file)))
+        save_key_unless_active(session, key_file, workspace)
+        seeded = subprocess.run([str(root / PYTHON), '-m', 'autobots.operations.concept_seed', '--workspace', workspace], env=session.env,
                                 capture_output=True, text=True, errors='replace', timeout=120, check=False)
         if seeded.returncode:
             raise Unavailable(f'the concept seed failed: {seeded.stderr.strip()[-300:]}')
         report['seed'] = json.loads(seeded.stdout.strip().splitlines()[-1])
         report['experts_given_publish'] = grant_publish(sql, api, headers, workspace, ('Market watcher', 'Research analyst'))
-        started_at = sql('select clock_timestamp();')
-        if not started_at:
-            raise Unavailable('could not read the database clock, so nothing was sent')
-        spent_since = f"select coalesce(sum(coalesce(charged_micro_usd, reserved_micro_usd)), 0) from app_private.model_invocations where created_at >= '{started_at}';"
+        started_at = spend_clock(session)
+        spend = spent_since(started_at)
         for index, spec in enumerate(EXAMPLE_RUNS):
             quoted = spec['goal_text'].replace("'", "''")
-            if sql(f"select count(*) from public.runs where workspace_id = '{workspace}' and goal_text = '{quoted}' and status = 'succeeded';") not in ('', '0'):
+            if (sql(f"select count(*) from public.runs where workspace_id = '{workspace}' and goal_text = '{quoted}' and status = 'succeeded';") or '0') != '0':
                 continue  # A rerun doesn't repeat an example that already succeeded.
             body = {key: value for key, value in spec.items() if key != 'expert'}
             if 'expert' in spec:
@@ -639,78 +566,39 @@ def examples(root: Path, record: Record, requested: str, key_file: Path, ledger_
             raise Unavailable(f'the API refused the workflow execution: {code} {reply[:200]}')
         runs['workflow'] = json.loads(reply)['run_id']
         report['runs'] = runs
-        handle = (record.directory / 'logs/worker-examples.log').open('a')
-        # The switch is on for this one process only, and it's on nowhere else.
-        worker = subprocess.Popen([str(root / PYTHON), '-m', 'autobots.operations.worker'], env={**env, 'AUTOBOTS_WORKER_INFERENCE': 'enabled'}, cwd=root,
-                                  stdin=subprocess.DEVNULL, stdout=handle, stderr=handle, start_new_session=True)
-        started = time.monotonic()
-        timeline: list[dict] = []
-        while time.monotonic() - started < GOAL_SECONDS:
-            current = {label: sql(f"select status from public.runs where id = '{run}';") for label, run in runs.items()}
-            if current != finals:
-                timeline.append({'seconds': round(time.monotonic() - started, 1), **current})
-                print(f'{round(time.monotonic() - started)}s: {current}', flush=True)
-                finals = current
-            goals_done = all(current[label] in TERMINAL for label in runs if label != 'workflow')
-            if goals_done and current['workflow'] in TERMINAL | {'waiting_approval'}:
-                break
-            committed = sql(spent_since)
-            if committed and int(committed) > EXAMPLES_LIMIT:
-                report['watchdog_fired'] = True
-                worker.send_signal(signal.SIGKILL)
-                break
-            if worker.poll() is not None:
-                report['worker_exited_early'] = worker.returncode
-                break
-            time.sleep(3)
-        stop_worker()
-        finals = {label: sql(f"select status from public.runs where id = '{run}';") for label, run in runs.items()}
-        report['timeline'], report['status'] = timeline, finals
+
+        def statuses() -> dict[str, str]:
+            return {label: sql(f"select status from public.runs where id = '{run}';") or '' for label, run in runs.items()}
+
+        session.start_worker()
+        watched = session.watch(statuses, examples_done, EXAMPLES_LIMIT, spend, GOAL_SECONDS)
+        session.stop_worker(report)
+        finals = statuses()
+        watched.record(report)
+        report['status'] = finals
         report['artifacts'] = {label: sql(f"select coalesce(string_agg(name || ' ' || size_bytes, ', '), 'none') from public.artifacts where run_id = '{run}' and status = 'published';")
                                for label, run in runs.items()}
         report['routes'] = {label: sql(f"select coalesce(string_agg(distinct profile, ', '), 'none') from app_private.model_invocations where root_run_id = '{run}';")
                             for label, run in runs.items()}
         report['pending_approvals'] = sql(f"select count(*) from public.approval_requests where run_id = '{runs['workflow']}' and status = 'pending';")
         report['calls'] = sql(f"select count(*) from app_private.model_invocations where created_at >= '{started_at}';")
-        spent = sql(spent_since)
-        report['committed_micro_usd'] = int(spent) if spent else None
-        report['calls_without_a_reported_charge'] = sql(f"select count(*) from app_private.model_invocations where created_at >= '{started_at}' and charged_micro_usd is null;")
-        charged = int(spent) if spent else None
-    except Refused:
-        ledger.settle(entry, 0, 'not_started')  # type: ignore[attr-defined]
-        raise
+        charged = session.spend_after(watched, spend, report)
+        record_unsettled(session, started_at, report)
     except Unavailable:
-        if worker is None and runs:
-            report['cancelled_after_failure'] = cancel_unstarted(sql, api, headers, workspace, [spec['goal_text'] for spec in EXAMPLE_RUNS])
+        if session.worker is None and runs:
+            report['cancelled_after_failure'] = cancel_unstarted(sql, api, headers, workspace, goals)
             ids = ', '.join(f"'{run}'" for run in runs.values())
             if sql(f'select count(*) from app_private.model_invocations where root_run_id in ({ids});') == '0':
                 runs.clear()  # No inference worker ran, so nothing was sent for them.
         raise
     finally:
-        stop_worker()
-        if entry.get('state') == 'reserved':  # type: ignore[attr-defined]
-            if not runs:
-                ledger.settle(entry, 0, 'not_started')  # type: ignore[attr-defined]
-            elif charged is not None and all(status in TERMINAL for status in finals.values()):
-                ledger.settle(entry, charged, 'settled')  # type: ignore[attr-defined]
-            else:
-                # A run that can still go on keeps the whole reservation held.
-                ledger.settle(entry, None, 'run_not_finished')  # type: ignore[attr-defined]
-        report['shared_ledger_committed_micro_usd'] = ledger.committed()  # type: ignore[attr-defined]
+        session.stop_worker(report)
+        # A run that can still go on keeps the whole reservation held.
+        settle(ledger, entry, bool(runs), finals, charged, report)
     if runs:
-        time.sleep(60)  # OpenRouter's figure can lag.
-        try:
-            report['key_usage_after_usd'] = float(helper('usage', str(key_file)))
-            durable, logged = helper('leaks', str(key_file), str(record.directory / 'logs')).split()
-            report['key_found'] = {'durable_rows': int(durable), 'log_files': int(logged)}
-        except (Unavailable, ValueError, subprocess.SubprocessError, OSError) as problem:
-            note_failed(report, str(problem) if isinstance(problem, Unavailable) else type(problem).__name__)
-    out = record.directory / 'reports' / f'examples-{datetime.now(UTC).strftime("%Y%m%dT%H%M%S")}.json'
-    private_write(out, json.dumps(report, indent=2))
-    print(json.dumps(report, indent=2))
-    found = report.get('key_found')
-    leaked = isinstance(found, dict) and any(found.values())
-    return 0 if runs and 'after_run_check_failed' not in report and not leaked and not report.get('watchdog_fired') else 1
+        session.after_run_checks(key_file, record.directory / 'logs', report)
+    write_report(record, 'examples', report)
+    return goal_exit_code(report, achieved=bool(runs))
 
 
 def screens(root: Path, record: Record, requested: str, grep: str) -> int:

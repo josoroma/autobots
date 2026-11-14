@@ -55,10 +55,11 @@ SHARED_CHECK_FILES = frozenset({*APP_INPUT_FILES, 'scripts/toolchain.py', 'scrip
                                 'scripts/generate_contracts.py', 'scripts/qualify_web.py'})
 SHARED_CHECK_PREFIXES = ('contracts/', 'tests/toolchain/', 'tests/faults/', 'tests/web/')
 RUNNER_FILES = frozenset({'scripts/verify.py', 'scripts/harness_lib.py'})
+# The shared records and errors the runner and every qualifier import (R-39).
+RUNNER_PREFIXES = ('scripts/qualification/',)
 DB_CHECK_FILES = frozenset({'scripts/disposable_db.py', 'scripts/supabase_stack.py', 'scripts/app_db.py', 'scripts/qualify_identity.py',
-                            'scripts/persistent_install.py', 'scripts/qualify_persistent_apply.py'})
-# scripts/qualification/ runs every qualifier's child checks (R-39), so a change there needs db.
-DB_CHECK_PREFIXES = ('infra/', 'supabase/', 'tests/db/', 'packages/db-types/', 'scripts/qualification/')
+                            'scripts/persistent_install.py', 'scripts/qualify_persistent_apply.py', 'scripts/paid_run.py'})
+DB_CHECK_PREFIXES = ('infra/', 'supabase/', 'tests/db/', 'packages/db-types/')
 HARNESS_CHECKS = frozenset({'project_configuration', 'backlog_validation', 'harness_behavior_tests'})
 APPLICATION_PROFILES = ('fast', 'full')
 PYTHON_STEPS = frozenset({'python_lock', 'python_env', 'ruff_check', 'ruff_format', 'mypy', 'pytest', 'contract_drift'})
@@ -168,7 +169,7 @@ def _base_domains(relative: str) -> set[str]:
         return {'db'}
     if relative.startswith(('apps/web/', 'packages/')):
         return {'web'}
-    if relative in RUNNER_FILES:
+    if relative in RUNNER_FILES or relative.startswith(RUNNER_PREFIXES):
         return {'python', 'web', 'db'}
     if relative in SHARED_CHECK_FILES or relative.startswith(SHARED_CHECK_PREFIXES):
         return {'python', 'web'}

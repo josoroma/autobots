@@ -13,9 +13,10 @@ import toolchain  # noqa: E402
 import verify  # noqa: E402
 
 # The hook's trust boundary, which mypy checks strictly (STD-48).
-# The hook's trust boundary, and the runner that records every qualifier's child checks (R-39).
+# The hook's trust boundary, the runner that records every qualifier's child checks (R-39) and the
+# paid-run session that guards real spend (R-23).
 TRUST_BOUNDARY = {'.claude/hooks/dispatch.py', 'scripts/harness_lib.py', 'scripts/verify.py', 'scripts/specs.py',
-                  'scripts/evidence.py', 'scripts/toolchain.py', 'scripts/qualification/'}
+                  'scripts/evidence.py', 'scripts/toolchain.py', 'scripts/qualification/', 'scripts/paid_run.py'}
 
 
 class RepositoryPython(unittest.TestCase):

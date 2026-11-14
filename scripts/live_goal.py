@@ -2,16 +2,16 @@
 """One real goal through the product's API and worker, on a disposable stack, with a real paid model.
 
 This spends money. It refuses without --paid, and nothing in `verify.py` runs it. The run's own budget
-is the limit under test, so a watchdog here also stops the worker if what's committed ever passes it.
-The stack, its copy of the key and its master key are removed at the end. Exit 0 the run succeeded,
-1 it didn't, 2 a prerequisite is missing.
+is the limit under test, so the paid session's watchdog (scripts/paid_run.py) also stops the worker if
+what's committed ever passes it, or can't be read for three polls in a row (Decision 0028 E2). The
+stack, its copy of the key and its master key are removed at the end. Exit 0 the run succeeded with its
+spend known and the key found nowhere, 1 it didn't, 2 a prerequisite is missing.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import secrets
-import signal
 import subprocess
 import sys
 import tempfile
@@ -32,15 +32,14 @@ from disposable_db import (
     tool_env,
 )
 from harness_lib import fingerprint, project_root
-from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner, password_token
-from qualify_operations import Ops, api_call, exited, wait
+from paid_run import ACTIVE, PaidSession, goal_exit_code
+from qualify_identity import STORAGE_SQL, bootstrap_owner
+from qualify_operations import Ops, api_call, wait
 from supabase_stack import generated_values, require_images, require_rendered
 
 # The user's go-ahead: "Yes, try one goal", at US$0.25.
 AUTHORIZED_MICRO_USD = 250_000
 OUT = Path('.checks/live-goal')
-HELPER = 'tests/db/live_goal_helper.py'
-ACTIVE = {'queued', 'running', 'verifying', 'cancelling'}
 SECONDS = 1000
 TRACING = ('LANGSMITH_TRACING', 'LANGCHAIN_TRACING_V2', 'LANGSMITH_API_KEY', 'LANGSMITH_ENDPOINT')
 GOAL = ('Write a short Markdown report named report.md comparing SQLite and PostgreSQL for a single-user desktop '
@@ -49,10 +48,10 @@ GOAL = ('Write a short Markdown report named report.md comparing SQLite and Post
 REQUIRED = [{'name': 'report.md', 'must_contain': ['Trade-offs covered: 3']}]
 
 
-def rows(ops: Ops, statement: str) -> list[dict]:
-    """Each row as JSON, so a value can't break the line format."""
-    result = ops.stack.runtime(f'select row_to_json(t) from ({statement}) t;')
-    return [json.loads(line) for line in result.stdout.splitlines() if line.strip().startswith('{')]
+def disposable_session(root: Path, ops: Ops, provider_env: dict[str, str]) -> PaidSession:
+    """A disposable stack's paid session. The helper gets the provider settings, and the worker starts
+    through Ops, so Ops stops it with everything else it started."""
+    return PaidSession(root, ops.stack, {**ops.env, **provider_env}, lambda argv, extra: ops.spawn('worker', argv, {**provider_env, **extra}))
 
 
 def attempt(root: Path, key_file: Path, limit: int, profile: str | None = None) -> int:
@@ -79,22 +78,13 @@ def attempt(root: Path, key_file: Path, limit: int, profile: str | None = None) 
         ops.env.pop(name, None)
     provider_env = {'AUTOBOTS_CONFIG_ROOT': str(config_root), 'NODE_ENV': 'production',
                     'AUTOBOTS_PROVIDER_MASTER_KEY_FILE': str(config_root / 'secrets/master.key')}
-
-    def helper(*argv: str) -> str:
-        done = subprocess.run([str(root / PYTHON), str(root / HELPER), *argv], env={**ops.env, **provider_env}, capture_output=True,
-                              text=True, errors='replace', timeout=120, check=False)
-        if done.returncode:
-            # The exception's type and message only, in case a traceback ever showed a local.
-            raise Unavailable(f'{argv[0]} failed: {done.stderr.strip().splitlines()[-1][:300] if done.stderr.strip() else "no detail"}')
-        return done.stdout.strip()
-
+    session = disposable_session(root, ops, provider_env)
     before_resources = other_resources(project)
     report: dict = {'schema_version': 'autobots.live-goal/v1', 'started_at_utc': datetime.now(UTC).isoformat(),
                     'input_fingerprint': fingerprint(root), 'target_class': 'disposable', 'model_transport': 'live OpenRouter',
                     'limit_micro_usd': limit, 'goal': GOAL, 'required_artifacts': REQUIRED, 'timeline': [], 'watchdog_fired': False,
                     'not_established': ['H1', 'product acceptance', 'US-3.4', 'task quality beyond this one goal', 'the persistent stack']}
-    report['key_usage_before_usd'] = float(helper('usage', str(key_file)))
-    worker = None
+    report['key_usage_before_usd'] = float(session.helper('usage', str(key_file)))
     run_id = ''
     started = time.monotonic()
     try:
@@ -109,11 +99,11 @@ def attempt(root: Path, key_file: Path, limit: int, profile: str | None = None) 
             raise Unavailable('the storage setup failed')
         email, password = 'owner@example.invalid', secrets.token_urlsafe(24)
         workspace = bootstrap_owner(root, ops.base, stack.values['SERVICE_ROLE_KEY'], ops.url, email, password)['workspace_id']
-        token = password_token(ops.base, stack.values['ANON_KEY'], email, password)[1]
+        token = session.sign_in(ops.base, stack.values['ANON_KEY'], email, password)
         ops.api(api_port, config_root)
         wait(lambda: api_call(api_port, ops.internal, token)[0] == 200, 40)
-        helper('save', str(key_file), workspace)
-        report['key_check'] = rows(ops, f"select auth_status from app_private.provider_settings where workspace_id = '{workspace}'")
+        session.helper('save', str(key_file), workspace)
+        report['key_check'] = session.rows(f"select auth_status from app_private.provider_settings where workspace_id = '{workspace}'")
 
         if profile:
             code, reply = api_call(api_port, ops.internal, token, 'PUT', '/v1/settings/model-policy',
@@ -130,48 +120,35 @@ def attempt(root: Path, key_file: Path, limit: int, profile: str | None = None) 
         run_id = json.loads(reply)['run_id']
         report['run_id'] = run_id
 
-        worker = ops.spawn('worker', [str(root / PYTHON), '-m', 'autobots.operations.worker'], {**provider_env, 'AUTOBOTS_WORKER_INFERENCE': 'enabled'})
+        status = f"select status from public.runs where id = '{run_id}';"
+        spend = f"select coalesce(sum(coalesce(charged_micro_usd, reserved_micro_usd)), 0) from app_private.model_invocations where root_run_id = '{run_id}';"
+        session.start_worker()
         goal_started = time.monotonic()
-        last = ''
-        while time.monotonic() - goal_started < SECONDS:
-            status = ops.sql(f"select status from public.runs where id = '{run_id}';")
-            if status != last:
-                report['timeline'].append({'seconds': round(time.monotonic() - goal_started, 1), 'status': status})
-                print(f'{round(time.monotonic() - goal_started)}s: {status}', flush=True)
-                last = status
-            if status and status not in ACTIVE:
-                break
-            committed = ops.sql(f"select coalesce(sum(coalesce(charged_micro_usd, reserved_micro_usd)), 0) from app_private.model_invocations where root_run_id = '{run_id}';")
-            if committed and int(committed) > limit:
-                report['watchdog_fired'] = True
-                worker.send_signal(signal.SIGKILL)
-                break
-            if worker.poll() is not None:
-                report['worker_exited_early'] = worker.returncode
-                break
-            time.sleep(3)
+        watched = session.watch(lambda: {'status': session.sql(status) or ''}, lambda current: bool(current['status']) and current['status'] not in ACTIVE,
+                                limit, spend, SECONDS)
         report['goal_seconds'] = round(time.monotonic() - goal_started, 1)
+        watched.record(report)
+        # Stopped before anything is read, since it can still dispatch while it drains.
+        session.stop_worker(report)
+        session.spend_after(watched, spend, report)
 
         # Everything below reads the same stack, so a failure in one can't hide the others.
         # Spend comes from the ledger below, as the API's does. The runs table's own column isn't maintained.
-        report['run'] = rows(ops, f"select status, limit_micro_usd from public.runs where id = '{run_id}'")
-        report['usage'] = rows(ops, f"select * from app_private.run_usage where run_id = '{run_id}'")
-        report['invocations'] = rows(ops, f"select attempt, profile, wire_id, status, failure_class, finish_reason, input_tokens, output_tokens, reasoning_tokens, "
-                                          f"tool_names, invalid_tool_calls, reserved_micro_usd, charged_micro_usd, upstream_provider, "
-                                          f"round(extract(epoch from finished_at - created_at)::numeric, 1) as seconds, char_length(accumulated_output) as partial_chars "
-                                          f"from app_private.model_invocations where root_run_id = '{run_id}' order by created_at")
-        report['receipts'] = rows(ops, f"select tool_id, status, failure_code, failure_detail, created_at from app_private.tool_receipts where run_id = '{run_id}' order by created_at")
-        report['verifications'] = rows(ops, f"select passed, unmet, created_at from app_private.run_verifications where run_id = '{run_id}' order by created_at")
-        report['files'] = rows(ops, f"select path, version, char_length(content) as chars, sha256, content from app_private.run_files where run_id = '{run_id}' order by created_at")
-        report['events'] = rows(ops, f"select sequence, occurred_at, payload from public.run_events where run_id = '{run_id}' order by sequence")
-        report['published'] = rows(ops, f"select name, status, sha256, size_bytes from public.artifacts where run_id = '{run_id}' order by created_at")
-        report['workspace_spend'] = rows(ops, f"select coalesce(sum(charged_micro_usd), 0) as charged, count(*) as calls from app_private.model_invocations where workspace_id = '{workspace}'")
-        if worker.poll() is None:
-            worker.send_signal(signal.SIGTERM)
-            report['worker_exit'] = exited(worker, 60)
+        report['run'] = session.rows(f"select status, limit_micro_usd from public.runs where id = '{run_id}'")
+        report['usage'] = session.rows(f"select * from app_private.run_usage where run_id = '{run_id}'")
+        report['invocations'] = session.rows(f"select attempt, profile, wire_id, status, failure_class, finish_reason, input_tokens, output_tokens, reasoning_tokens, "
+                                             f"tool_names, invalid_tool_calls, reserved_micro_usd, charged_micro_usd, upstream_provider, "
+                                             f"round(extract(epoch from finished_at - created_at)::numeric, 1) as seconds, char_length(accumulated_output) as partial_chars "
+                                             f"from app_private.model_invocations where root_run_id = '{run_id}' order by created_at")
+        report['receipts'] = session.rows(f"select tool_id, status, failure_code, failure_detail, created_at from app_private.tool_receipts where run_id = '{run_id}' order by created_at")
+        report['verifications'] = session.rows(f"select passed, unmet, created_at from app_private.run_verifications where run_id = '{run_id}' order by created_at")
+        report['files'] = session.rows(f"select path, version, char_length(content) as chars, sha256, content from app_private.run_files where run_id = '{run_id}' order by created_at")
+        report['events'] = session.rows(f"select sequence, occurred_at, payload from public.run_events where run_id = '{run_id}' order by sequence")
+        report['published'] = session.rows(f"select name, status, sha256, size_bytes from public.artifacts where run_id = '{run_id}' order by created_at")
+        report['workspace_spend'] = session.rows(f"select coalesce(sum(charged_micro_usd), 0) as charged, count(*) as calls from app_private.model_invocations where workspace_id = '{workspace}'")
         written = '\n'.join(path.read_text(errors='replace') for path in logs.glob('*.log'))
         report['step_failures_in_logs'] = written.count('worker.step_failed')
-        durable, logged = helper('leaks', str(key_file), str(logs)).split()
+        durable, logged = session.helper('leaks', str(key_file), str(logs)).split()
         report['key_found'] = {'durable_rows': int(durable), 'log_files': int(logged)}
     finally:
         ops.stop_all()
@@ -186,7 +163,7 @@ def attempt(root: Path, key_file: Path, limit: int, profile: str | None = None) 
         try:
             # OpenRouter's figure can lag, so this is a check and the ledger above isn't replaced by it.
             time.sleep(60)
-            report['key_usage_after_usd'] = float(helper('usage', str(key_file)))
+            report['key_usage_after_usd'] = float(session.helper('usage', str(key_file)))
         except Unavailable as error:
             report['key_usage_after_usd'] = f'unread: {error}'
         out.mkdir(parents=True, exist_ok=True)
@@ -194,7 +171,7 @@ def attempt(root: Path, key_file: Path, limit: int, profile: str | None = None) 
     final = (report.get('run') or [{}])[0].get('status')
     print(json.dumps({key: report.get(key) for key in ('run_id', 'goal_seconds', 'timeline', 'watchdog_fired', 'key_usage_before_usd', 'key_usage_after_usd', 'key_found', 'left_behind', 'other_docker_unchanged')}, indent=2))
     print(f'FINAL: {final}')
-    return 0 if final == 'succeeded' else 1
+    return goal_exit_code(report, achieved=final == 'succeeded')
 
 
 def main() -> int:
