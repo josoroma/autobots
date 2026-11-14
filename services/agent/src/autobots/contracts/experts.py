@@ -12,7 +12,7 @@ VIEW = ConfigDict(extra="forbid", frozen=True)
 
 
 class ExpertConfig(BaseModel):
-    """Not strict, so JSON strings become enums. Unknown fields and values are still refused."""
+    # Not strict, so JSON strings become enums. Unknown fields and values are still refused.
 
     model_config = VIEW
 

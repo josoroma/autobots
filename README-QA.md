@@ -153,7 +153,7 @@ The current goal-loop inventory is below; all listed versions are **v1**. Regist
 
 Expert revisions default to an empty configurable tool list; they do not automatically receive every general tool. Their base plan/read-offload tools are supplied by the application. `workflow_approval` is a separate workflow-runner gate, not a general tool offered to the goal model.
 
-There is currently **no generic browser, web search, shell, arbitrary Python execution, host-file access, dynamic MCP discovery, email send or external publishing connector** in this registry. The consequential-effect fixtures use mock destinations; **US-7.2** still needs the first real connector/service scope decision. The required gateway policy for future MCP tools does not mean MCP integration is already implemented.
+The registry now holds web search and extraction (Tavily and Jina, Decision 0017), GitHub issue and pull-request connectors, the `cronjob` tool (Decision 0026) and an isolated browser behind `browse_goal` (Decision 0020), each through the gateway's policy, approvals and receipts; `goal_loop.loop_registry` lists them. It has **no shell, unrestricted Python execution, host-file access, dynamic MCP discovery, email send or external publishing connector**. The consequential-effect fixtures use mock destinations. The required gateway policy for future MCP tools does not mean MCP integration is already implemented.
 
 Code: [grant vocabulary](services/agent/src/autobots/domain/tools.py), [runtime registry](services/agent/src/autobots/application/goal_loop.py), [version inventory](services/agent/src/autobots/domain/execution.py), [Expert contract](services/agent/src/autobots/contracts/experts.py), [mock effect tools](tests/db/effect_tools.py). The three-tool `default_registry()` in `application/tools.py` is a smaller helper, not the full runtime inventory.
 
@@ -279,7 +279,7 @@ Treat this as a bounded implementation story under the repository contract. The 
 
 1. Define versioned Pydantic input/output contracts, a description, effect class, timeout, output limits and resource extraction.
 2. Implement the handler using the supplied run scope. Validate permissions in code; prompt instructions are not access control.
-3. For writes, define operation/reconciliation and deduplication behavior. Consequential effects require the argument-bound approval path. Arbitrary execution is currently rejected by registration.
+3. For writes, define operation/reconciliation and deduplication behavior. Consequential effects require the argument-bound approval path. Registration refuses arbitrary execution until its executor is qualified (`ToolRegistry.register`).
 4. Register the definition in the relevant registry and deliberately expose it through eligible grants. Adding a name only to an Expert configuration is rejected.
 5. Update the execution-version contract. A semantic change must not silently reinterpret an existing checkpoint.
 6. Verify successful use plus denied scope, invalid arguments/output, timeout, replay, cancellation and uncertain-effect recovery as applicable. Keep mocked, disposable and live evidence separate.

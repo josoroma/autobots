@@ -225,7 +225,7 @@ export function ToolCatalogPanel() {
           .toLowerCase()
           .includes(query)),
   );
-  // PRD-Studio TL-01: the detail opens beside the list, and the URL keeps it.
+  // Decision 0026 G2: the detail opens in a modal dialog, and the URL keeps it as ?tool=.
   function panelHref(toolId: string): string {
     const next = new URLSearchParams(params.toString());
     next.set("tool", toolId);

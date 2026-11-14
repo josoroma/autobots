@@ -38,7 +38,7 @@ async def get_search(
         query=query,
         results=[
             SearchResult(
-                kind=hit.kind,  # type: ignore[arg-type]
+                kind=hit.kind,  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
                 id=hit.id,
                 title=public_text(hit.title, limit=200) or "Untitled",
                 detail=hit.detail,

@@ -109,7 +109,7 @@ def _fields(
             fields.append(
                 FieldDescriptor(
                     path=path,
-                    direction=direction,  # type: ignore[arg-type]
+                    direction=direction,  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
                     type=_type(value, definitions),
                     required=name in required,
                     description=value.get("description"),

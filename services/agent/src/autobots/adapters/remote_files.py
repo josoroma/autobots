@@ -49,7 +49,7 @@ def store_remote_file_tool(
             version=version,
             sha256=digest,
             size_bytes=len(fetched.body),
-            media_type=media_type,  # type: ignore[arg-type]
+            media_type=media_type,  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
         )
 
     async def stored_already(

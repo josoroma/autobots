@@ -29,11 +29,12 @@ const ABSENT = {
   onboarding:
     "No separate flow. Key setup on Models is what a new owner meets, and it's captured as key-setup.",
   "dialogs and portals":
-    "The app has none. Choices are inline, and selects are native.",
+    "Native dialog elements only: the Tools page's guide (Decision 0026 G2), search and About. No portals; selects are native.",
   menus: "None apart from native selects, whose open lists the OS draws.",
   notifications:
     "No toast or notification surface. Results are inline status text, measured where they appear.",
-  charts: "The app has none, so no chart token is in use.",
+  charts:
+    "One chart, the jobs chart on Operations, drawn with the chart tokens. It's captured on the operations surface.",
   "artifact previews":
     "Artifacts are downloaded through a link, and no preview exists. The list is captured on the run.",
   "file lists":

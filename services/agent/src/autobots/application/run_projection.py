@@ -1,4 +1,5 @@
-"""The public view of a run, SP-011. Nothing here reads checkpoints or graph state."""
+"""The public view of a run, SP-011. Graph state is never read: the inspector takes checkpoint
+ids, steps and sources only."""
 
 import base64
 from datetime import UTC, datetime
@@ -115,7 +116,7 @@ async def _require_run(connection: Any, workspace_id: UUID, run_id: UUID) -> Any
 
 
 def _summary(row: Any) -> RunSummary:
-    return run_summary_from_domain(run_from_row(dict(zip(_NAMES, row[:-1], strict=True))))  # type: ignore[arg-type]
+    return run_summary_from_domain(run_from_row(dict(zip(_NAMES, row[:-1], strict=True))))  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
 
 
 async def read_summary(connection: Any, workspace_id: UUID, run_id: UUID) -> RunSummary | None:

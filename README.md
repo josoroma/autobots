@@ -1,6 +1,6 @@
 # AutoGPT clone: local Mac application with OpenRouter
 
-**PRDs finalized for implementation — November 4, 2026.** The application, workers, database, Auth, files and logs run locally on this Mac. **All model inference uses OpenRouter.** Start implementation with [SPECS.md](SPECS.md), the Option B execution entry point; it organizes the selected design and its normative companion contracts. Implementation and release qualification remain pending.
+**PRDs finalized for implementation — November 4, 2026.** The application, workers, database, Auth, files and logs run locally on this Mac. **All model inference uses OpenRouter.** [SPECS.md](SPECS.md) is the Option B backlog and organizes the selected design and its normative companion contracts. The application, the durable worker, the database and the Studio screens are built and run on this Mac: [README-SETUP-RUN.md](README-SETUP-RUN.md) starts them, [CODEBASE.md](CODEBASE.md) describes what exists, and [AGENTS.md](AGENTS.md#commands) lists the checks.
 
 | Document | Purpose |
 |---|---|
@@ -12,7 +12,7 @@
 | [PRD-LangChain-Deep-Agents.md](PRD-LangChain-Deep-Agents.md) | Recommended local Next.js plus Python LangGraph/Deep Agents design, local Supabase and OpenRouter-only inference |
 | [PRD-Development-Harness.md](PRD-Development-Harness.md) | First Option B milestone: `.claude` skills, agents, rules and command hooks; portable checks for Next.js, Python, contracts, workers, Docker, migrations and seeds |
 | [PRD-Design-System.md](PRD-Design-System.md) | User-supplied shadcn Luma tokens, dark-default behavior, shared component styling and visual/accessibility evidence |
-| [PRD-Model-Providers.md](PRD-Model-Providers.md) | Two approved OpenRouter models, `.env` key loading, in-app setup, encrypted credentials, routing and budgets |
+| [PRD-Model-Providers.md](PRD-Model-Providers.md) | Three approved OpenRouter models, `.env` key loading, in-app setup, encrypted credentials, routing and budgets |
 | [PRD-Local-Mac-Deployment.md](PRD-Local-Mac-Deployment.md) | Local Supabase Docker deployment, Auth, private Storage, database connections, ports, backups and recovery |
 | [PRD-Comparison-Recommendation.md](PRD-Comparison-Recommendation.md) | Capability comparison, recommended architecture, tradeoffs and shared qualification gates |
 
@@ -20,7 +20,7 @@
 
 **Interface:** use **shadcn Luma, dark by default**, with the exact [light/dark CSS tokens](docs/design/luma.css). An explicit light/dark choice persists locally and is applied before paint; the OS setting does not change the first-visit dark default. Shared semantic tokens govern every screen, including the sidebar, forms, approvals and workflow canvas. The [regenerated concept gallery](docs/imagine/index.html) illustrates this direction; earlier warm-neutral/forest-green concepts are superseded. Images remain concept artwork, and browser/accessibility qualification remains implementation work.
 
-**First implementation work:** complete the development harness's **H0 foundation and H1 activated baseline** before feature code, product migrations or production worker logic. Shared instructions, project `.claude` skills/agents/rules, command-hook configuration and the specification/harness checker are now present. They adapt the requested OhMyOrch ingestor. Application toolchain and database gates now exist, and actual Claude event delivery stays unqualified by [Decision 0012](docs/engineering/decisions/0012-unqualified-hooks-in-h1.md). US-10.2 assesses H1 and release. The portable checker is usable independently. Development tooling adds no model/provider and does not start services. [Adaptation](docs/engineering/ohmyorch-adaptation.md) · [Runbook](docs/engineering/runbooks/development-harness.md) · [Evidence](docs/engineering/evidence/HARNESS-ADAPT-001/summary.md)
+**Development harness.** It was built first, as the H0 foundation and H1 activated baseline. Shared instructions, project `.claude` skills/agents/rules, command-hook configuration and the specification/harness checker are now present. They adapt the requested OhMyOrch ingestor. Application toolchain and database gates now exist, and actual Claude event delivery stays unqualified by [Decision 0012](docs/engineering/decisions/0012-unqualified-hooks-in-h1.md). US-10.2 assesses H1 and release. The portable checker is usable independently. Development tooling adds no model/provider and does not start services. [Adaptation](docs/engineering/ohmyorch-adaptation.md) · [Runbook](docs/engineering/runbooks/development-harness.md) · [Evidence](docs/engineering/evidence/HARNESS-ADAPT-001/summary.md)
 
 Run the delivered checks locally:
 
@@ -33,7 +33,7 @@ Use the project skill `autobots-spec-ingest` to refresh the backlog. Its read-on
 
 Every H0/H1 and product work item follows a proportional **plan → implement → independent review → verify → runbook + evidence** workflow. Record review findings and their disposition, run the required checks against the final changes, and retain reproducible evidence and remaining limitations. Update and exercise the relevant runbook in the qualified disposable environment; if operational behavior is unchanged, record that fact rather than inventing a procedure. Small changes use concise records, not skipped stages. [SPECS.md](SPECS.md) and the [development harness contract](PRD-Development-Harness.md) define the detailed workflow.
 
-All **14 inference roles default to Terra**. DeepSeek stays approved and isn't offered for new runs until it's qualified, by [Decision 0013](docs/engineering/decisions/0013-release-closure.md):
+Of the **14 inference roles**, 13 default to Terra, and `researcher` defaults to Sol (`builtin_default` in `domain/models.py`). DeepSeek stays approved and isn't offered for new runs until it's qualified, by [Decision 0013](docs/engineering/decisions/0013-release-closure.md):
 
 | Requested canonical snapshot | Verified OpenRouter API request ID |
 |---|---|

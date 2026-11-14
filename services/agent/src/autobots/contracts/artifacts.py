@@ -27,7 +27,9 @@ class PublishedArtifact(BaseModel):
 
 
 class ArtifactSummary(BaseModel):
-    """Not strict, since it is built from database values. Never holds a storage path."""
+    """It never holds a storage path."""
+
+    # Not strict, since it is built from database values.
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 

@@ -41,14 +41,16 @@ REQUIRED_RELATIONS = (
     "app_private.improvement_replay_runs",
     "agent_runtime.adapter_qualifications",
     "agent_runtime.route_qualifications",
-    # Migrations 38 to 53 (Decision 0023 E2), for a database with no readable history.
+    # Migrations 38 to 49 by Decision 0023 E2, and those added since, for a database with no
+    # readable history.
     "app_private.tool_uses",
     "public.user_profiles",
     "public.workflow_drafts",
     "app_private.plan_task_times",
     "app_private.tool_key_settings",
 )
-# A migration can add only columns, which a relation check can't see. The newest code relies on.
+# A migration can add only columns, which a relation check can't see. These are the ones the newest
+# code relies on.
 REQUIRED_COLUMNS = (
     ("public.approval_requests", "policy_reason"),
     ("public.approval_requests", "resource_target"),

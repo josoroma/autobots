@@ -37,9 +37,11 @@ import { cn } from "@/lib/utils";
 import { readErrorResponse, readReply } from "@/lib/replies";
 import { profileField } from "@/lib/model-profile";
 
-// The draft and choice survive setup in this tab only. Opening or restoring them never starts anything:
-// the one admission below happens only when Run is pressed. No credential is ever kept here.
+// The draft survives setup in this tab only; the profile, Expert and budget choices are plain state.
+// Restoring the draft never starts anything: the one admission below happens only when Run is pressed.
+// No credential is ever kept here.
 const DRAFT_KEY = "autobots.draft";
+// The draft is read once, so nothing needs to follow storage changes from other tabs.
 const subscribe = () => () => undefined;
 
 function storedDraft(): string {

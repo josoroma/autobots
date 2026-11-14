@@ -1,4 +1,6 @@
-"""The exact MP-05 routes, behind the BFF. Changes need owner authority and a version."""
+"""Settings routes behind the BFF: the model policy (MP-05), provider and tool keys (PK-07), model
+details (MD-02, MD-03), the run intent check and the shared session and workspace dependencies.
+Changes need owner authority and a version."""
 
 import os
 from collections.abc import AsyncIterator
@@ -412,6 +414,6 @@ async def check_run_intent(
     return RunIntentCheck(
         schema_version=1,
         ready=code == "ready",
-        code=code,  # type: ignore[arg-type]
+        code=code,  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
         budget=budget,
     )

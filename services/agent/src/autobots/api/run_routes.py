@@ -267,7 +267,7 @@ async def post_run(
         schema_version=1,
         run_id=result.run_id,
         version=result.version,
-        status=result.status,  # type: ignore[arg-type]
+        status=result.status,  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
         replayed=result.replayed,
     )
 
@@ -320,7 +320,7 @@ async def _command(
         schema_version=1,
         run_id=result.run_id,
         version=result.version,
-        status=result.status,  # type: ignore[arg-type]
+        status=result.status,  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
         changed=result.changed,
     )
 

@@ -163,7 +163,7 @@ async def get_local_status(
         scope="workspace" if database_up else "installation",
         remote_tracing="disabled" if remote_tracing_disabled(os.environ) else "enabled",
         conditions=[
-            OperationCondition(name=item.name, state=item.state, code=item.code)  # type: ignore[arg-type]
+            OperationCondition(name=item.name, state=item.state, code=item.code)  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
             for item in conditions
         ],
         queue=queue,
@@ -171,7 +171,7 @@ async def get_local_status(
         backup_age_hours=backup_age_hours(
             os.environ.get("AUTOBOTS_BACKUP_DIR", ""), datetime.now(UTC)
         ),
-        openrouter=openrouter,  # type: ignore[arg-type]
+        openrouter=openrouter,  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
         delayed_schedules=delayed,
         restores=_restore_records(os.environ.get("AUTOBOTS_BACKUP_DIR", "")),
         route_qualifications=qualifications,

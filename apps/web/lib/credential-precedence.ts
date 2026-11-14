@@ -1,4 +1,5 @@
-// MP-03's source order, for server code. Shared fixtures in contracts/fixtures/ keep Python identical.
+// MP-03's source order. No application code calls this: it's the TypeScript half of the US-3.1 parity
+// fixture, which contracts/fixtures/ shares with the Python implementation.
 import { readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 

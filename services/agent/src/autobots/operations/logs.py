@@ -92,7 +92,7 @@ def forbid_remote_tracing(environ: MutableMapping[str, str]) -> None:
             from langsmith import utils
         except ImportError:
             return
-        utils.get_env_var.cache_clear()  # type: ignore[attr-defined]
+        utils.get_env_var.cache_clear()  # type: ignore[attr-defined]  # functools.cache adds cache_clear, which the stubs omit
 
 
 def remote_tracing_disabled(environ: MutableMapping[str, str]) -> bool:

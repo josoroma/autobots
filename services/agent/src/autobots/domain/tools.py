@@ -23,7 +23,6 @@ GENERAL_TOOLS = {
     "publish_artifact": 1,
     "search_memory": 1,
 }
-# Proposing an improvement changes nothing by itself, but a run only gets it if an owner chose that.
 # Tool-provider tools, Decision 0017. Each needs its provider's key, read per attempt.
 PROVIDER_TOOLS = {
     "tavily_search": 1,
@@ -37,6 +36,8 @@ PROVIDER_TOOLS = {
 }
 EXPERT_TOOLS = {
     **GENERAL_TOOLS,
+    # Proposing an improvement changes nothing by itself, but a run gets it only if an owner chose
+    # that.
     "propose_improvement": 1,
     # Version 2 adds labels (PRD-Studio GH-05). A run whose grants pinned version 1 keeps it.
     "create_github_issue": 2,

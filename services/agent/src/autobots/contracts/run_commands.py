@@ -11,7 +11,7 @@ from autobots.domain.runs import RunStatus
 
 
 class RunRequest(BaseModel):
-    """Not strict, since a UUID arrives here as a JSON string."""
+    # Not strict, since a UUID arrives here as a JSON string.
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -39,7 +39,7 @@ class RunRequest(BaseModel):
 
 
 class RunAccepted(BaseModel):
-    """Not strict, since it is built from database values. It is validated as it is built."""
+    # Not strict, since it is built from database values. It is validated as it is built.
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 

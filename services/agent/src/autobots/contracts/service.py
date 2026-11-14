@@ -1,4 +1,4 @@
-"""Contracts for the first routes."""
+"""Contracts for health, the session, workspaces and the profile."""
 
 from typing import Literal
 

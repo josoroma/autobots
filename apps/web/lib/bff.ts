@@ -60,7 +60,8 @@ async function authorized(
     Authorization: `Bearer ${session}`,
     "X-Autobots-Internal": config.internalToken,
   });
-  // Decision 0023 E3: the chosen workspace, which the API checks against membership.
+  // Decision 0023 E3: the chosen workspace, which the API checks against membership. `forward` lets a
+  // workspace header the browser sends replace it, and the API checks that one the same way.
   const workspace = await chosenWorkspace();
   if (workspace !== null) {
     headers.set(WORKSPACE_HEADER, workspace);

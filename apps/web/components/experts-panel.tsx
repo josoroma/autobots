@@ -288,7 +288,6 @@ export function ExpertsPanel() {
 
 const SHOWN_TOOLS = 4;
 
-// One Expert as a card: what its latest version says, from the list already loaded.
 type Filter = "all" | "outside" | "read_only";
 const FILTERS: [Filter, string][] = [
   ["all", "All"],
@@ -317,6 +316,7 @@ function lastRun(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
+// One Expert as a card: what its latest version says, from the list already loaded.
 function ExpertCard({
   expert,
   catalog,

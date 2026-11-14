@@ -1,7 +1,7 @@
 [project]
 name = "autobots"
 version = "0.0.0"
-description = "Autobots agent service: minimal non-feature scaffold."
+description = "Autobots agent service: the API, the durable run worker and the domain behind them."
 requires-python = "==3.12.*"
 dependencies = [
   "cryptography==50.0.2",

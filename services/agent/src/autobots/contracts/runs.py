@@ -1,4 +1,4 @@
-"""The initial public slice. Lease, checkpoint and credential fields are deliberately absent."""
+"""Public run contracts. Lease, checkpoint and credential fields are absent on purpose (SP-011)."""
 
 from typing import Any, Literal
 

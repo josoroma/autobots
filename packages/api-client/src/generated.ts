@@ -615,7 +615,7 @@ export const schemas = {
   },
   "ArtifactSummary": {
     "additionalProperties": false,
-    "description": "Not strict, since it is built from database values. Never holds a storage path.",
+    "description": "It never holds a storage path.",
     "properties": {
       "id": {
         "format": "uuid",
@@ -1541,7 +1541,6 @@ export const schemas = {
   },
   "ExpertConfig": {
     "additionalProperties": false,
-    "description": "Not strict, so JSON strings become enums. Unknown fields and values are still refused.",
     "properties": {
       "instructions": {
         "default": "",
@@ -2821,7 +2820,6 @@ export const schemas = {
   },
   "ModelPolicyUpdate": {
     "additionalProperties": false,
-    "description": "Not strict, so JSON strings become enums. Unknown fields and values are still refused.",
     "properties": {
       "default_profile": {
         "anyOf": [
@@ -4223,7 +4221,6 @@ export const schemas = {
   },
   "RunAccepted": {
     "additionalProperties": false,
-    "description": "Not strict, since it is built from database values. It is validated as it is built.",
     "properties": {
       "replayed": {
         "title": "Replayed",
@@ -4780,7 +4777,6 @@ export const schemas = {
   },
   "RunRequest": {
     "additionalProperties": false,
-    "description": "Not strict, since a UUID arrives here as a JSON string.",
     "properties": {
       "acceptance_criteria": {
         "items": {

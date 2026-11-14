@@ -30,7 +30,8 @@ COMPLETE_TASK = "complete_task"
 
 
 def input_digest(arguments: Any) -> str:
-    """The same normalization as the gateway's argument hash, for anything a model sent."""
+    """A digest of the arguments as the model sent them, before parsing. The gateway hashes the
+    parsed arguments, so the two agree only when parsing changes nothing."""
     try:
         encoded = json.dumps(arguments, sort_keys=True, separators=(",", ":"), default=str)
     except (TypeError, ValueError):

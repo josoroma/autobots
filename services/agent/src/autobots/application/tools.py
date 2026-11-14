@@ -1,4 +1,4 @@
-"""The narrow first tool set: a calculation, a read and an artifact save. Nothing else exists."""
+"""Built-in local tools: a calculation, run-file reads and writes, CSV reads and artifact saves."""
 
 import csv
 import hashlib

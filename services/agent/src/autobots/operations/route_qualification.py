@@ -219,7 +219,7 @@ class ClosedPlan(Plan):
 
     model_config = ConfigDict(extra="forbid")
 
-    tasks: list[ClosedTask]  # type: ignore[assignment]
+    tasks: list[ClosedTask]  # type: ignore[assignment]  # narrows the parent task type for this trial
 
 
 class ConstrainedTask(Task):
@@ -229,7 +229,7 @@ class ConstrainedTask(Task):
 class ConstrainedPlan(Plan):
     """The same shape with list-length keywords, which not every route's strict mode accepts."""
 
-    tasks: list[ConstrainedTask] = Field(min_length=2)  # type: ignore[assignment]
+    tasks: list[ConstrainedTask] = Field(min_length=2)  # type: ignore[assignment]  # narrows the parent task type for this trial
 
 
 @dataclass
@@ -483,7 +483,7 @@ class Corpus:
                     chunks += 1
                     if chunks >= 3:
                         break
-                await stream.aclose()  # type: ignore[attr-defined]
+                await stream.aclose()  # type: ignore[attr-defined]  # the SDK types it as an iterator; it is an async generator
         finally:
             self.ledger.settle(entry, None, "uncertain")
         return ("passed" if chunks >= 3 else "failed"), {

@@ -266,7 +266,7 @@ async def browse(  # noqa: PLR0911 - baseline 2026-11-14, shrink only (STD-06)
                 return _outcome(state, "invalid_action")
             target = view.links[action.number - 1].url
         else:
-            target = action.url  # type: ignore[attr-defined]
+            target = action.url  # type: ignore[attr-defined]  # every action left here carries a url
         if not permitted(target):
             state.history.append(f"{state.steps}. refused {bare(target)}")
             return _outcome(state, "refused_action")

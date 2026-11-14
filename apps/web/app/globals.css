@@ -99,8 +99,6 @@ html[data-density="compact"] {
     outline-offset: 2px;
     box-shadow: 0 0 0 2px var(--foreground);
   }
-  /* US-11.11: `--input` as a border measures 1.26:1 in light and 1.57:1 in dark, under 3:1. It stays,
-     and this edge is what identifies the control. Focus replaces it with the indicator above. */
   @media (prefers-reduced-motion: reduce) {
     * {
       transition-duration: 0.01ms !important;

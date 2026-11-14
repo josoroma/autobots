@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Validate and render the local adaptation of OhMyOrch's SPECS grammar.
+"""Validate, render and promote the local adaptation of OhMyOrch's SPECS grammar.
 
 Python 3.12+, standard library only. Validation is read-only. Rendering owns only
 the three navigation sections preceding Product Context, never story content.
+`promote` rewrites a story's Status line from BLOCKED to READY once its dependencies
+are DONE, and changes nothing else.
 This checks structure and references, not whether a requirement is justified or
 whether an implementation/evidence claim is true.
 """

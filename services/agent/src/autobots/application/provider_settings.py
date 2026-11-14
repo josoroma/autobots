@@ -165,9 +165,9 @@ class ProviderSettings:
             schema_version=1,
             provider="openrouter",
             settings_version=version,
-            source=source,  # type: ignore[arg-type]
-            auth_status=auth_status,  # type: ignore[arg-type]
-            catalog_status=await self.catalog_status(),  # type: ignore[arg-type]
+            source=source,  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
+            auth_status=auth_status,  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
+            catalog_status=await self.catalog_status(),  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
             qualification=await self.route_qualifications(),
             credential_id=credential_id,
             credential_version=credential_version,
@@ -298,7 +298,7 @@ class ProviderSettings:
         status = "available" if payload is not None else "unavailable"
         return ModelList(
             schema_version=1,
-            catalog_status=status,  # type: ignore[arg-type]
+            catalog_status=status,  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
             fetched_at=now if payload is not None else None,
             models=models,
         )

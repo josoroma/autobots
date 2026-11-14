@@ -121,7 +121,7 @@ class ModelList(BaseModel):
 
 
 class ModelPolicyUpdate(BaseModel):
-    """Not strict, so JSON strings become enums. Unknown fields and values are still refused."""
+    # Not strict, so JSON strings become enums. Unknown fields and values are still refused.
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
