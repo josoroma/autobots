@@ -10,7 +10,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from autobots.api.approval_routes import router as approval_router
 from autobots.api.artifact_routes import router as artifact_router
-from autobots.api.errors import register_error_handlers
+from autobots.api.errors import ERROR_RESPONSES, register_error_handlers
 from autobots.api.event_routes import router as event_router
 from autobots.api.expert_routes import router as expert_router
 from autobots.api.improvement_routes import router as improvement_router
@@ -75,18 +75,18 @@ def create_app(
     app.state.provider_context = None
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(resolved.allowed_hosts))
     register_error_handlers(app)
-    app.include_router(router)
-    app.include_router(settings_router)
-    app.include_router(run_router)
-    app.include_router(artifact_router)
-    app.include_router(approval_router)
-    app.include_router(event_router)
-    app.include_router(expert_router)
-    app.include_router(workflow_router)
-    app.include_router(routine_router)
-    app.include_router(memory_router)
-    app.include_router(improvement_router)
-    app.include_router(operation_router)
-    app.include_router(tool_router)
-    app.include_router(search_router)
+    app.include_router(router, responses=ERROR_RESPONSES)
+    app.include_router(settings_router, responses=ERROR_RESPONSES)
+    app.include_router(run_router, responses=ERROR_RESPONSES)
+    app.include_router(artifact_router, responses=ERROR_RESPONSES)
+    app.include_router(approval_router, responses=ERROR_RESPONSES)
+    app.include_router(event_router, responses=ERROR_RESPONSES)
+    app.include_router(expert_router, responses=ERROR_RESPONSES)
+    app.include_router(workflow_router, responses=ERROR_RESPONSES)
+    app.include_router(routine_router, responses=ERROR_RESPONSES)
+    app.include_router(memory_router, responses=ERROR_RESPONSES)
+    app.include_router(improvement_router, responses=ERROR_RESPONSES)
+    app.include_router(operation_router, responses=ERROR_RESPONSES)
+    app.include_router(tool_router, responses=ERROR_RESPONSES)
+    app.include_router(search_router, responses=ERROR_RESPONSES)
     return app

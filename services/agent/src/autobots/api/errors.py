@@ -1,11 +1,28 @@
 """Stable, safe error responses. Detail stays on the server."""
 
+from typing import Any
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
 from autobots.contracts.runs import ErrorResponse
+
+# R-02, PAPI-03: every operation declares the body its refusals carry. Declaring 422 replaces
+# FastAPI's default validation schema, which this service never sends.
+ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
+    status: {"model": ErrorResponse, "description": description}
+    for status, description in (
+        (401, "Not signed in, or not authorized."),
+        (403, "Refused for this workspace or role."),
+        (404, "Not found."),
+        (409, "Conflicts with the current state."),
+        (422, "The request is not valid."),
+        (500, "Something went wrong."),
+        (503, "A required local service isn't ready."),
+    )
+}
 
 
 class ApiError(Exception):

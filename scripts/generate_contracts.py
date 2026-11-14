@@ -73,14 +73,16 @@ def operation(path: str, method: str, details: Mapping) -> str:
     body_schema = details.get('requestBody', {}).get('content', {}).get('application/json', {}).get('schema', {}).get('$ref')
     if body_schema is not None:
         arguments += f', body: {schema_name(body_schema)}'
-    payload = ', body' if body_schema is not None else ''
-    return (f'export async function {name}(options: ClientOptions{arguments}): Promise<{response}> {{\n'
-            f"  return parse{response}(await requestJson(options, {json.dumps(method.upper())}, `{url}`{payload}));\n}}\n")
+    payload = 'body' if body_schema is not None else 'undefined'
+    # R-02: a refusal carries the parsed envelope, and a call can add headers and an abort signal.
+    return (f'export async function {name}(options: ClientOptions{arguments}, request?: RequestOptions): Promise<{response}> {{\n'
+            f"  return parse{response}(await requestJson(options, {json.dumps(method.upper())}, `{url}`, {payload}, request, "
+            'parseErrorResponse));\n}\n')
 
 
 def typescript_client(document: Mapping) -> str:
     schemas = document['components']['schemas']
-    parts = [HEADER, "import { type ClientOptions, parseWith, requestJson } from './runtime.ts';\n\n",
+    parts = [HEADER, "import { type ClientOptions, type RequestOptions, parseWith, requestJson } from './runtime.ts';\n\n",
              'export const schemas = ', json.dumps(schemas, indent=2, sort_keys=True), ' as const;\n\n']
     for name in sorted(schemas):
         parts.append(declaration(name, schemas[name]))

@@ -154,19 +154,72 @@ export interface ClientOptions {
   headers?: Record<string, string>;
 }
 
+/** Per-call additions: headers such as an Idempotency-Key, and a signal to abort the request. */
+export interface RequestOptions {
+  headers?: Record<string, string>;
+  signal?: AbortSignal;
+}
+
+/** The service's error body (`ErrorResponse`). The generated parser checks it fully. */
+export interface ErrorEnvelope {
+  code: string;
+  message: string;
+}
+
+/**
+ * A reply outside 2xx (R-02). `envelope` is the service's error body when the reply carries one, and
+ * null otherwise, such as a proxy's page or an empty body. A shape mismatch on success is a
+ * `ContractError` instead, so a refusal can be told from contract drift.
+ */
+export class HttpFailure extends Error {
+  readonly status: number;
+  readonly envelope: ErrorEnvelope | null;
+
+  constructor(path: string, status: number, envelope: ErrorEnvelope | null) {
+    super(`${path}: request failed with status ${status}`);
+    this.name = "HttpFailure";
+    this.status = status;
+    this.envelope = envelope;
+  }
+}
+
+async function readEnvelope(
+  response: Response,
+  parseError: ((value: unknown) => ErrorEnvelope) | undefined,
+): Promise<ErrorEnvelope | null> {
+  if (parseError === undefined) return null;
+  const text = await response.text().catch(() => "");
+  try {
+    return parseError(JSON.parse(text));
+  } catch {
+    return null;
+  }
+}
+
 export async function requestJson(
   options: ClientOptions,
   method: string,
   path: string,
   body?: unknown,
+  request?: RequestOptions,
+  parseError?: (value: unknown) => ErrorEnvelope,
 ): Promise<unknown> {
   const response = await options.fetch(`${options.baseUrl}${path}`, {
     method,
-    headers: { ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...options.headers },
+    headers: {
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      ...options.headers,
+      ...request?.headers,
+    },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    ...(request?.signal === undefined ? {} : { signal: request.signal }),
   });
   if (!response.ok) {
-    throw new ContractError(path, `request failed with status ${response.status}`);
+    throw new HttpFailure(path, response.status, await readEnvelope(response, parseError));
   }
-  return (await response.json()) as unknown;
+  try {
+    return (await response.json()) as unknown;
+  } catch {
+    throw new ContractError(path, "not JSON");
+  }
 }
