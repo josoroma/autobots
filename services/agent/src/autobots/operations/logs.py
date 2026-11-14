@@ -9,20 +9,10 @@ from collections.abc import MutableMapping
 from datetime import UTC, datetime
 from typing import Any, TextIO
 
-_SECRET = re.compile(
-    r"sk-or-[\w-]+"
-    r"|sk-[A-Za-z0-9_-]{8,}"
-    # Tool providers' keys, Decision 0017: Tavily, Jina and GitHub tokens.
-    r"|tvly-[\w-]{8,}"
-    r"|jina_[A-Za-z0-9]{8,}"
-    r"|(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}"
-    r"|github_pat_[A-Za-z0-9_]{20,}"
-    r"|(?i:bearer)\s+[\w.~+/=-]+"
-    r"|eyJ[\w-]+\.[\w-]+\.[\w-]*"
-    r"|\b(?:postgres(?:ql)?|https?)://[^\s/@]+:[^\s/@]+@\S+"
-    r"|\b(?:postgres(?:ql)?)://\S+"
-    r"|(?i:(?:password|passwd|token|secret|api[_-]?key|authorization)\s*[=:]\s*)\S+"
-)
+from autobots.domain.secret_patterns import LOG_SHAPES, mask
+
+# Logs also mask a key inside a word. Shown text doesn't, so "task-specific" stays readable there.
+_SHAPES = (*LOG_SHAPES, re.compile(r"sk-or-[\w-]+"), re.compile(r"sk-[A-Za-z0-9_-]{8,}"))
 _IDENTIFIER = re.compile(
     r"\b([0-9a-fA-F]{8})-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
 )
@@ -48,7 +38,7 @@ _TRACING_REMOVED = (
 
 def redact(text: str) -> str:
     """Removes what looks like a secret and shortens an identifier to the part an operator needs."""
-    return _IDENTIFIER.sub(r"\1…", _SECRET.sub("[redacted]", text))
+    return _IDENTIFIER.sub(r"\1…", mask(text, _SHAPES))
 
 
 class JsonFormatter(logging.Formatter):

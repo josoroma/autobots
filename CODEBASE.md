@@ -78,6 +78,7 @@ Layers under `services/agent/src/autobots/`:
   - `models.py`: three approved profiles, 14 roles, `BindingSource` (run override, workspace override, workspace default, built-in default), `OFFERED_FOR_NEW_RUNS = {Terra, Sol}`, and `MAX_OUTPUT_TOKENS = 512`.
   - `budgets.py`: US$0.25–US$5.00 in US$0.25 steps.
   - Also `runs.py`, `tools.py`, `tool_catalog.py`, `workflows.py` (`ir_normalized`), `workflow_execution.py`, `routines.py`, `execution.py`.
+  - `secret_patterns.py`, added after the analyzed revision: the secret shapes that both log redaction and shown text (`public_text`) mask.
 - **`contracts/`:** the public Pydantic DTOs, which are the source of OpenAPI. Row helpers are in `persistence/rows.py`.
 - **`application/`:**
   - Admission: `runs.py`.

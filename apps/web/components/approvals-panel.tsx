@@ -18,6 +18,7 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, INNER_BOX } from "@/components/ui/card";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { chord, press, type Arm } from "@/lib/approval-shortcut";
 import { typing } from "@/lib/keyboard";
 import { cn } from "@/lib/utils";
 
@@ -126,10 +127,7 @@ export function ApprovalsPanel({
   const [selected, setSelected] = useState<string | null>(initial);
   const [failed, setFailed] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [armed, setArmed] = useState<{
-    decision: "approve" | "reject";
-    until: number;
-  } | null>(null);
+  const [armed, setArmed] = useState<Arm | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const [now, setNow] = useState(() => Date.now());
 
@@ -254,29 +252,28 @@ export function ApprovalsPanel({
         }
         return;
       }
-      const decision =
-        event.key === "Enter"
-          ? "approve"
-          : event.key === "Backspace"
-            ? "reject"
-            : null;
+      const decision = chord(event);
       if (decision === null || current === null || tab !== "waiting") return;
       event.preventDefault();
-      if (decision === "approve" && current.arguments_truncated) {
+      const next = press(armed, {
+        decision,
+        approvalId: current.id,
+        truncated: current.arguments_truncated,
+        repeat: event.repeat,
+        now: Date.now(),
+      });
+      if (next.kind === "ignore") return;
+      if (next.kind === "too_large") {
         setAnnouncement(MESSAGES.approval_too_large ?? "");
         return;
       }
-      if (
-        armed !== null &&
-        armed.decision === decision &&
-        Date.now() <= armed.until
-      ) {
+      if (next.kind === "decide") {
         setArmed(null);
         setAnnouncement("");
-        void decide(current, decision);
+        void decide(current, next.decision);
         return;
       }
-      setArmed({ decision, until: Date.now() + 2_000 });
+      setArmed(next.arm);
       setAnnouncement(
         `Press ${decision === "approve" ? "⌘↵" : "⌘⌫"} again within 2 seconds to ${decision} ${current.tool_id}, version ${current.tool_version}.`,
       );

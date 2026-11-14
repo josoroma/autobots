@@ -1,6 +1,10 @@
 "use client";
 
-import { parseLocalStatus, type LocalStatus } from "@autobots/api-client";
+import {
+  parseLocalStatus,
+  parseRetentionSettings,
+  type LocalStatus,
+} from "@autobots/api-client";
 import {
   Activity,
   Archive,
@@ -31,6 +35,7 @@ import { JobsChart } from "@/components/jobs-chart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { parseDays } from "@/lib/retention";
 import { schemaValue } from "@/lib/schema-value";
 import { cn } from "@/lib/utils";
 
@@ -150,10 +155,20 @@ function valueFor(name: string, values: Values): string | null {
   }
 }
 
-function days(value: string): number | null {
-  const parsed = Number.parseInt(value, 10);
-  return Number.isNaN(parsed) ? null : parsed;
+// The contract owns each window's range, so the check uses the generated parser, not a copy.
+function allowed(
+  field: "run_days" | "receipt_days",
+  days: number | null,
+): boolean {
+  try {
+    parseRetentionSettings({ [field]: days });
+    return true;
+  } catch {
+    return false;
+  }
 }
+
+const RETENTION_ERROR = "retention-days-error";
 
 export function OperationsPanel() {
   const [status, setStatus] = useState<LocalStatus | null>(null);
@@ -161,6 +176,7 @@ export function OperationsPanel() {
   const [runDays, setRunDays] = useState("");
   const [receiptDays, setReceiptDays] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [invalid, setInvalid] = useState({ run: false, receipt: false });
 
   const load = useCallback(async (): Promise<void> => {
     const reply = await fetch("/api/v1/operations/local-status", {
@@ -207,21 +223,40 @@ export function OperationsPanel() {
 
   async function save(): Promise<void> {
     setMessage(null);
+    const run = parseDays(runDays);
+    const receipt = parseDays(receiptDays);
+    const refused = {
+      run: !run.valid || !allowed("run_days", run.days),
+      receipt: !receipt.valid || !allowed("receipt_days", receipt.days),
+    };
+    setInvalid(refused);
+    // WSYS-01: a misread window would feed an irreversible pass, so nothing malformed is sent.
+    if (refused.run || refused.receipt || !run.valid || !receipt.valid) return;
     const reply = await csrfFetch("/api/v1/operations/retention", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        run_days: days(runDays),
-        receipt_days: days(receiptDays),
+        run_days: run.days,
+        receipt_days: receipt.days,
       }),
-    });
-    setMessage(
-      reply.ok
-        ? "Saved. Nothing is removed until the next retention pass."
-        : "Not saved. Retry keys need a run content window at least as short, and windows start at one day.",
-    );
+    }).catch(() => null);
     // A refused save keeps what was typed, so it can be corrected.
-    if (reply.ok) await load();
+    if (reply === null || !reply.ok) {
+      const refusal = (await reply?.json().catch(() => null)) as {
+        message?: unknown;
+      } | null;
+      setMessage(
+        // The page already refuses malformed and out-of-range days, so a 422 is the pairing rule.
+        reply?.status === 422
+          ? "Not saved. Retry keys need a run content window at least as short."
+          : typeof refusal?.message === "string"
+            ? `Not saved. ${refusal.message}`
+            : "Not saved. The service didn't answer, so try again.",
+      );
+      return;
+    }
+    setMessage("Saved. Nothing is removed until the next retention pass.");
+    await load();
   }
 
   if (failed !== null) return <p role="alert">{failed}</p>;
@@ -507,7 +542,12 @@ export function OperationsPanel() {
                     className="w-28"
                     inputMode="numeric"
                     value={runDays}
-                    onChange={(event) => setRunDays(event.target.value)}
+                    aria-invalid={invalid.run || undefined}
+                    aria-describedby={invalid.run ? RETENTION_ERROR : undefined}
+                    onChange={(event) => {
+                      setRunDays(event.target.value);
+                      setInvalid((now) => ({ ...now, run: false }));
+                    }}
                   />
                 </label>
                 <label className={RETENTION_ROW}>
@@ -516,9 +556,22 @@ export function OperationsPanel() {
                     className="w-28"
                     inputMode="numeric"
                     value={receiptDays}
-                    onChange={(event) => setReceiptDays(event.target.value)}
+                    aria-invalid={invalid.receipt || undefined}
+                    aria-describedby={
+                      invalid.receipt ? RETENTION_ERROR : undefined
+                    }
+                    onChange={(event) => {
+                      setReceiptDays(event.target.value);
+                      setInvalid((now) => ({ ...now, receipt: false }));
+                    }}
                   />
                 </label>
+                {invalid.run || invalid.receipt ? (
+                  <p id={RETENTION_ERROR} role="alert" className="text-sm">
+                    Use whole days from 1 to 36,500, or leave a window empty.
+                    Nothing was saved.
+                  </p>
+                ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <Button size="sm" onClick={() => void save()}>

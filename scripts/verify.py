@@ -159,7 +159,9 @@ def tool_plan(root: Path, profile: str, changed: Sequence[str] | None) -> tuple[
                  Step('api_client_typecheck', (str(web_bin / 'tsc'), '-p', 'packages/api-client'), root),
                  Step('api_client_tests', (str(Path(tools.node_dir) / 'node'), '--test', 'packages/api-client/tests/contract.test.ts'), root),
                  Step('web_unit_tests', (str(Path(tools.node_dir) / 'node'), '--test', 'apps/web/tests/unit/request-guard.test.ts',
-                                        'apps/web/tests/unit/credential-precedence.test.ts'), root),
+                                        'apps/web/tests/unit/credential-precedence.test.ts',
+                                        'apps/web/tests/unit/retention.test.ts',
+                                        'apps/web/tests/unit/approval-shortcut.test.ts'), root),
                  Step('browser_qualification', (sys.executable, 'scripts/qualify_web.py'), root, LONG))
     steps = [step for step in (*check_steps(root, tools), *contracts, qualification, scope_tests) if step.id in chosen]
     return ToolPlan(steps, child_env(root, tools, verifying=True)), left_out

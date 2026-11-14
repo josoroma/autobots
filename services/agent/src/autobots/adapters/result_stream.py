@@ -45,7 +45,8 @@ def reset_tap(token: Any) -> None:
     _TAP.reset(token)
 
 
-# A tolerant reader for one JSON object that is still arriving.
+# A reader for one JSON object that is still arriving. It tolerates text that hasn't finished
+# arriving, not malformed text: that raises ValueError, which ends that call's live text.
 
 
 def _skip_ws(text: str, index: int) -> int:
@@ -157,6 +158,7 @@ class _Call:
     segment: int | None = None
     sent: int = 0
     changed: bool = False
+    unreadable: bool = False
 
 
 @dataclass
@@ -178,28 +180,57 @@ class ResultTap:
         self._calls = {}
 
     async def feed(self, chunk: Any) -> None:
-        for piece in getattr(chunk, "tool_call_chunks", None) or ():
-            index = int(piece.get("index") or 0)
-            call = self._calls.setdefault(index, _Call())
-            if piece.get("name"):
-                call.name = str(piece["name"])
-            if piece.get("args"):
-                call.arguments += str(piece["args"])
-                call.changed = True
-        if time.monotonic() - self._last_flush >= FLUSH_SECONDS:
-            await self.flush()
+        if self._broken:
+            return
+        try:
+            for piece in getattr(chunk, "tool_call_chunks", None) or ():
+                index = int(piece.get("index") or 0)
+                call = self._calls.setdefault(index, _Call())
+                if piece.get("name"):
+                    call.name = str(piece["name"])
+                if piece.get("args"):
+                    call.arguments += str(piece["args"])
+                    call.changed = True
+            if time.monotonic() - self._last_flush >= FLUSH_SECONDS:
+                await self.flush()
+        except Exception as error:
+            self._stop(error)
 
     async def finish(self) -> None:
-        await self.flush()
-        self._calls = {}
+        try:
+            if not self._broken:
+                await self.flush()
+        except Exception as error:
+            self._stop(error)
+        finally:
+            self._calls = {}
+
+    def _stop(self, error: Exception) -> None:
+        """PADP-01: live text is a courtesy, so a tap failure ends it and never reaches the call,
+        where it would read as a failed stream and stop a paid run."""
+        self._broken = True
+        log_event(logger, "result_text.unavailable", logging.WARNING, error=type(error).__name__)
 
     async def flush(self) -> None:
         self._last_flush = time.monotonic()
         for call in self._calls.values():
-            if call.name != RESULT_TOOL or not call.changed:
+            if call.name != RESULT_TOOL or call.unreadable or not call.changed:
                 continue
             call.changed = False
-            fields, growing = partial_object(call.arguments)
+            try:
+                fields, growing = partial_object(call.arguments)
+            except ValueError as error:
+                # Malformed, not unfinished. The assembled reply still settles this call, as an
+                # invalid tool call, so only its live text ends here.
+                call.unreadable = True
+                log_event(
+                    logger,
+                    "result_text.unavailable",
+                    logging.WARNING,
+                    error=type(error).__name__,
+                    reason="malformed_arguments",
+                )
+                continue
             path = fields.get("path")
             if path is None or not path.startswith(RESULT_PREFIX):
                 continue
@@ -246,6 +277,13 @@ class ResultTap:
             )
 
     async def close(self) -> None:
-        if self._connection is not None:
-            await self._connection.close()
-            self._connection = None
+        connection, self._connection = self._connection, None
+        if connection is None:
+            return
+        try:
+            await connection.close()
+        except Exception as error:
+            # Called from the run's own cleanup, where a failure would replace the run's outcome.
+            log_event(
+                logger, "result_text.close_failed", logging.WARNING, error=type(error).__name__
+            )

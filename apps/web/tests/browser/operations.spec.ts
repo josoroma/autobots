@@ -61,6 +61,37 @@ test("retention saves, and a key window shorter than content is refused", async 
   await expect(page.getByText(/Saved\. Nothing is removed/)).toBeVisible();
 });
 
+// WSYS-01: "1,000" once saved as one day, ahead of an irreversible retention pass.
+test("a malformed or out-of-range retention window is refused on the page, and nothing is sent", async ({
+  page,
+}) => {
+  await signIn(page, EMAIL_A, PASSWORD_A);
+  await page.goto("/operations");
+  const writes: string[] = [];
+  page.on("request", (request) => {
+    if (
+      request.method() === "PUT" &&
+      request.url().includes("/operations/retention")
+    )
+      writes.push(request.url());
+  });
+  const field = page.getByLabel(/Run content/);
+  for (const typed of ["1,000", "3O", "2e3", "0"]) {
+    await field.fill(typed);
+    await page.getByRole("button", { name: "Save retention" }).click();
+    await expect(page.locator("#retention-days-error")).toContainText(
+      "Use whole days",
+    );
+    await expect(field).toHaveAttribute("aria-invalid", "true");
+    await expect(field).toHaveValue(typed);
+  }
+  expect(writes).toEqual([]);
+  // Editing clears the refusal. Later suites use this workspace, so it's left keeping everything.
+  await field.fill("");
+  await expect(page.locator("#retention-days-error")).toHaveCount(0);
+  await expect(field).not.toHaveAttribute("aria-invalid", "true");
+});
+
 test("a member is refused", async ({ page }) => {
   await signIn(page, EMAIL_C, PASSWORD_C);
   await page.goto("/operations");

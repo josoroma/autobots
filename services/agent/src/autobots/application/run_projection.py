@@ -1,7 +1,6 @@
 """The public view of a run, SP-011. Nothing here reads checkpoints or graph state."""
 
 import base64
-import re
 from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import UUID
@@ -49,16 +48,13 @@ from autobots.domain.models import (
     UnknownModelProfile,
     approved_profile,
 )
+from autobots.domain.secret_patterns import redact_shown
 from autobots.domain.tools import PLAN_TOOLS
 
 PAGE_SIZE = 200
 RUN_LIST_SIZE = 100
 INSPECTOR_CHECKPOINTS = 500
 MAX_TEXT = 500
-# Plans and summaries are written by a model, so a key it was shown must not be displayed.
-_SECRETS = re.compile(
-    r"((?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{4,}|Bearer\s+[A-Za-z0-9._-]{8,}|eyJ[A-Za-z0-9_-]{10,})"
-)
 # Spend comes from the ledger, so the public figures can't drift from what admission counted.
 _NAMES = (
     "id",
@@ -87,7 +83,8 @@ _SELECT_RUN = (
 
 
 def public_text(text: str, *, limit: int = MAX_TEXT) -> str:
-    return _SECRETS.sub("[redacted]", text)[:limit]
+    """Plans and summaries are written by a model, so a key it was shown must not be displayed."""
+    return redact_shown(text)[:limit]
 
 
 def project_event(run_id: UUID, sequence: int, payload: Any, occurred_at: Any) -> RunEvent | None:

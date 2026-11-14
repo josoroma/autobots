@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import time
 from typing import Any
 from uuid import uuid4
 
@@ -164,3 +165,81 @@ def test_a_call_cut_off_mid_argument_stays_invalid_as_without_streaming() -> Non
     assert message.tool_calls == []
     assert [call["name"] for call in message.invalid_tool_calls] == ["save_artifact"]
     assert message.invalid_tool_calls[0]["args"] == '{"path": "outputs/rep'
+
+
+# PADP-01: malformed arguments, not just unfinished ones. Each is followed by a well-formed result.
+MALFORMED = {
+    "raw control character": '{"path": "outputs/a.md", "content": "line one\nline two"}',
+    "invalid escape": '{"path": "outputs/a.md", "content": "an \\q escape"}',
+    "bad unicode escape": '{"path": "outputs/a.md", "content": "a \\uZZZZ escape"}',
+}
+
+
+@pytest.mark.parametrize("arguments", MALFORMED.values(), ids=MALFORMED.keys())
+def test_a_malformed_result_call_ends_only_its_own_live_text(
+    monkeypatch: pytest.MonkeyPatch, arguments: str
+) -> None:
+    monkeypatch.setattr(result_stream, "FLUSH_SECONDS", 0.0)
+    sent: list[dict[str, Any]] = []
+
+    async def notify(payload: dict[str, Any]) -> None:
+        sent.append(payload)
+
+    chunks = _fragments(arguments, "save_artifact", 0)
+    chunks += _fragments(
+        json.dumps({"path": "outputs/report.md", "content": CONTENT}), "save_artifact", 1
+    )
+    chunks.append(AIMessageChunk(content="", response_metadata={"finish_reason": "tool_calls"}))
+
+    async def run() -> Any:
+        token = use_tap(ResultTap(uuid4(), notify=notify))
+        try:
+            return await _streamed(Streams(chunks), [])
+        finally:
+            reset_tap(token)
+
+    message = asyncio.run(run())
+    # The reply settles as it would without the tap: the malformed call is an invalid tool call.
+    assert [call["name"] for call in message.invalid_tool_calls] == ["save_artifact"]
+    assert [call["args"]["content"] for call in message.tool_calls] == [CONTENT]
+    # The well-formed call's text still went out whole, in its own segment.
+    last = max(item["segment"] for item in sent)
+    ordered = sorted((item for item in sent if item["segment"] == last), key=lambda i: i["offset"])
+    assert "".join(item["text"] for item in ordered) == CONTENT
+
+
+@pytest.mark.parametrize("when", ["feed", "finish"])
+def test_a_tap_that_fails_while_reading_never_stops_the_call(
+    monkeypatch: pytest.MonkeyPatch, when: str
+) -> None:
+    class Failing(ResultTap):
+        async def flush(self) -> None:
+            raise RuntimeError("an unforeseen tap failure")
+
+    # Reading the text happens as chunks arrive, or only at the end within one interval.
+    monkeypatch.setattr(result_stream, "FLUSH_SECONDS", 0.0 if when == "feed" else 3600.0)
+
+    async def notify(_: dict[str, Any]) -> None:
+        return None
+
+    async def run() -> Any:
+        tap = Failing(uuid4(), notify=notify)
+        tap._last_flush = time.monotonic()
+        token = use_tap(tap)
+        try:
+            return await _streamed(Streams(_chunks()), [])
+        finally:
+            reset_tap(token)
+
+    assert asyncio.run(run()).tool_calls[2]["args"]["content"] == CONTENT
+
+
+def test_closing_a_tap_whose_connection_fails_never_raises() -> None:
+    class Broken:
+        async def close(self) -> None:
+            raise OSError("the connection is gone")
+
+    tap = ResultTap(uuid4())
+    tap._connection = Broken()
+    asyncio.run(tap.close())
+    assert tap._connection is None

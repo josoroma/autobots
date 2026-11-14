@@ -438,6 +438,24 @@ test("a shortcut needs a second press, and never acts while typing", async ({
     document.getElementById("arranged-field")?.remove(),
   );
 
+  // WTAP-02: a held ⌘↵ repeats its keydown, and an Alt chord isn't the shortcut. Neither decides.
+  await page.locator("h1").click();
+  await page.keyboard.down("Meta");
+  await page.keyboard.down("Enter");
+  await expect(said).toContainText("again within 2 seconds to approve");
+  await page.keyboard.down("Enter");
+  await page.keyboard.up("Enter");
+  await page.keyboard.up("Meta");
+  await page.keyboard.press("Alt+Enter");
+  await page.keyboard.press("Alt+Enter");
+  // A decision clears this announcement at once, so still arming, or lapsed, means none was made.
+  await page.waitForTimeout(500);
+  await expect(said).toHaveText(
+    /again within 2 seconds to approve|Nothing was decided\./,
+  );
+  await expect(page.locator('[data-message="decision"]')).toHaveCount(0);
+  expect(await pending()).toBe(true);
+
   await page.locator("h1").click();
   await page.keyboard.press("Meta+Backspace");
   await expect(said).toContainText("again within 2 seconds to reject");
