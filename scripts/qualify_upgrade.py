@@ -35,11 +35,15 @@ from disposable_db import (
     tool_env,
 )
 from harness_lib import fingerprint, project_root
+from qualification.children import run_child_check
+from qualification.records import write_report
 from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner, password_token
-from qualify_operations import Checks, Ops, api_call, conditions, exited, wait
+from qualify_operations import MODEL_TRANSPORT, Checks, Ops, api_call, conditions, exited, wait
 from supabase_stack import generated_values, require_images, require_rendered
 
 REPORT = Path('.checks/upgrade/qualification.json')
+# Where a failed child check's stderr is kept (qualification/children.py).
+ERR_DIR = Path('.checks/upgrade')
 # The release delivered before this one, with the worker fixture and every migration up to its own.
 PRIOR_REVISION = '8cba043'
 BINDINGS = "select id, policy_snapshot, expert_id, expert_version, session_id from public.runs where id::text = any(%s) order by id"
@@ -67,7 +71,7 @@ def qualify(root: Path) -> int:
         raise Unavailable('the Docker engine is not reachable')
     (root / REPORT).unlink(missing_ok=True)
     require_images(require_rendered(stack))
-    cases = Checks()
+    cases = Checks(model_transport=MODEL_TRANSPORT)
     before = other_resources(project)
     started_at = time.monotonic()
     base = f'http://127.0.0.1:{gateway_port}'
@@ -98,9 +102,10 @@ def qualify(root: Path) -> int:
 
         def prior_admit() -> str:
             result = subprocess.run([str(root / PYTHON), str(prior / 'tests/db/operations_check.py'), 'admit', workspace], env={**ops.env, **prior_env}, capture_output=True, text=True, timeout=60, check=False)
-            if result.returncode:
-                raise Unavailable(f'the prior release did not admit: {result.stderr.strip()[-300:]}')
-            return result.stdout.strip().splitlines()[-1]
+            lines = result.stdout.strip().splitlines()
+            if result.returncode or not lines:
+                raise Unavailable(f'the prior release did not admit: exit {result.returncode}: {result.stderr.strip()[-300:]}')
+            return lines[-1]
 
         def prior_worker(name: str, hold: float, drain: float, mode: str) -> subprocess.Popen:
             return ops.spawn(name, [str(root / PYTHON), str(prior / 'tests/db/operations_worker.py'), ops.url, name, str(hold), str(drain), str(marker), mode], prior_env)
@@ -172,7 +177,8 @@ print(hashlib.sha256(json.dumps(rows, default=str, sort_keys=True).encode()).hex
         cases.check('an edited applied migration is refused (arranged)', 'refused', refusal and refusal[-60:], bool(refusal) and 'never edit' in refusal)
 
         # A workspace and a role that chose the model a later release retires.
-        stack.runtime(f"""insert into app_private.model_policies (workspace_id, version, default_profile, role_overrides) values ('{workspace}', 7, 'openrouter_astra', '{{"coder": "openrouter_astra", "planner": "openrouter_deepseek_flash"}}') on conflict (workspace_id) do update set default_profile = excluded.default_profile, role_overrides = excluded.role_overrides;""")
+        cases.arrange('a workspace and a role that chose a retired model',
+                      stack.runtime(f"""insert into app_private.model_policies (workspace_id, version, default_profile, role_overrides) values ('{workspace}', 7, 'openrouter_astra', '{{"coder": "openrouter_astra", "planner": "openrouter_deepseek_flash"}}') on conflict (workspace_id) do update set default_profile = excluded.default_profile, role_overrides = excluded.role_overrides;"""))
 
         # The real upgrade.
         upgraded, problem = apply_migrations(stack, root / 'supabase/migrations')
@@ -188,14 +194,8 @@ print(hashlib.sha256(json.dumps(rows, default=str, sort_keys=True).encode()).hex
         kept = ops.sql(f"select count(*) from agent_runtime.checkpoints c join public.runs r on r.checkpoint_thread_id = c.thread_id where r.id = '{interrupted}';")
         cases.check('saved checkpoints are all still there', checkpoints, kept, kept == checkpoints)
 
-        checked = subprocess.run([str(root / PYTHON), str(root / 'tests/db/upgrade_check.py'), 'upgrade', workspace, queued, interrupted, before_hash],
-                                 env={**ops.env, 'AUTOBOTS_PRIOR_RUNS': json.dumps(prior_runs)}, capture_output=True, text=True, errors='replace', timeout=240, check=False)
-        if checked.returncode:
-            (root / '.checks/upgrade/upgrade.err').write_text(checked.stderr)
-            cases.check('the upgrade check ran', 'exit 0', f'exit {checked.returncode}: {checked.stderr.strip()[-380:]}', False)
-        if checked.stdout.strip():
-            for case in json.loads(checked.stdout.strip().splitlines()[-1])['cases']:
-                cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+        checked = run_child_check(cases, root, 'upgrade_check.py', 'upgrade', workspace, queued, interrupted, before_hash, label='the upgrade check',
+                                  env={**ops.env, 'AUTOBOTS_PRIOR_RUNS': json.dumps(prior_runs)}, timeout=240, err_dir=root / ERR_DIR, err_name='upgrade')
         # Arranged: this process inherited tracing settings and skipped every entry point, and built real agents.
         tried = 'collector.example.invalid' in checked.stderr or 'LangSmith' in checked.stderr
         cases.check('agent construction turns tracing off, whoever calls it', 'no attempt to reach the arranged collector', tried, not tried)
@@ -214,7 +214,8 @@ print(hashlib.sha256(json.dumps(rows, default=str, sort_keys=True).encode()).hex
         # Resume is refused through the route while a run is blocked. The key check comes first without a key,
         # so this is the same function the route calls, arranged directly.
         blocked_run = ops.admit(workspace)
-        stack.sql(f"update public.runs set execution_contract = '{{\"graph_state\": 99, \"tools\": {{}}}}' where id = '{blocked_run}';")
+        cases.arrange('a run blocked by a graph state this release does not know',
+                      stack.sql(f"update public.runs set execution_contract = '{{\"graph_state\": 99, \"tools\": {{}}}}' where id = '{blocked_run}';"))
         probe = subprocess.run([str(root / PYTHON), '-c', (
             "import asyncio, os, psycopg, sys\n"
             "from uuid import UUID\n"
@@ -224,18 +225,14 @@ print(hashlib.sha256(json.dumps(rows, default=str, sort_keys=True).encode()).hex
             "        print(await execution_block(db, UUID(sys.argv[1])))\n"
             "asyncio.run(main())\n"), blocked_run], env=ops.env, capture_output=True, text=True, timeout=30, check=False)
         cases.check('the resume route has a reason to refuse a blocked run', 'graph state 99', probe.stdout.strip()[:60], 'graph state 99' in probe.stdout)
-        stack.runtime(f"update app_private.run_jobs set status = 'done' where run_id = '{blocked_run}';")
+        cases.arrange("the blocked run's job set aside", stack.runtime(f"update app_private.run_jobs set status = 'done' where run_id = '{blocked_run}';"))
 
         # An unqualified adapter (arranged): as if a framework release changed under the same schema.
-        adapter = subprocess.run([str(root / PYTHON), str(root / 'tests/db/upgrade_check.py'), 'adapter', ops.url.replace(f'autobots_runtime:{stack.runtime_password}', f'autobots_migrator:{stack.migrator_password}'), ops.url],
-                                 env=ops.env, capture_output=True, text=True, errors='replace', timeout=120, check=False)
-        if adapter.returncode:
-            (root / '.checks/upgrade/adapter.err').write_text(adapter.stderr)
-            cases.check('the adapter check ran', 'exit 0', f'exit {adapter.returncode}: {adapter.stderr.strip()[-380:]}', False)
-        if adapter.stdout.strip():
-            for case in json.loads(adapter.stdout.strip().splitlines()[-1])['cases']:
-                cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+        migrator_url = ops.url.replace(f'autobots_runtime:{stack.runtime_password}', f'autobots_migrator:{stack.migrator_password}')
+        run_child_check(cases, root, 'upgrade_check.py', 'adapter', migrator_url, ops.url, label='the adapter check', env=ops.env, timeout=120,
+                        err_dir=root / ERR_DIR, err_name='adapter')
         saved = stack.sql('create table public.arranged_adapter_rows as select * from agent_runtime.adapter_qualifications;\ndelete from agent_runtime.adapter_qualifications;\n')
+        cases.arrange('an unqualified adapter', saved)
         pending = ops.admit(workspace)
         code, body = api_call(api_port, ops.internal, token)
         admit_code, _ = api_call(api_port, ops.internal, token, 'POST', '/v1/runs', goal, {'Idempotency-Key': secrets.token_hex(8)})
@@ -246,7 +243,8 @@ print(hashlib.sha256(json.dumps(rows, default=str, sort_keys=True).encode()).hex
         exited(early, 20)
         state = ops.sql(f"select status from app_private.run_jobs where run_id = '{pending}';")
         cases.check('an unqualified adapter stops continuation until qualified (arranged)', 'adapter_unqualified, 503, job still queued', f"{saved.returncode}, {conditions(body).get('adapter')}, {admit_code}, {state}", saved.returncode == 0 and conditions(body).get('adapter') == 'adapter_unqualified' and admit_code == 503 and state == 'queued')
-        stack.sql('insert into agent_runtime.adapter_qualifications select * from public.arranged_adapter_rows;\ndrop table public.arranged_adapter_rows;\n')
+        cases.arrange('the adapter qualification restored',
+                      stack.sql('insert into agent_runtime.adapter_qualifications select * from public.arranged_adapter_rows;\ndrop table public.arranged_adapter_rows;\n'))
         back = wait(lambda: json.loads(api_call(api_port, ops.internal, token)[1])['ready'] is True, 15)
         cases.check('recording the qualification restores readiness', 'ready', back, back)
     finally:
@@ -259,14 +257,12 @@ print(hashlib.sha256(json.dumps(rows, default=str, sort_keys=True).encode()).hex
     cases.check('cleanup removed the owned containers and volumes', 'none left', left_over or 'none', not left_over)
     after_resources = other_resources(project)
     cases.check('other Docker resources are untouched', 'same', f'{len(before)} before, {len(after_resources)} after', before == after_resources)
-    passed = all(record['status'] == 'passed' for record in cases.records)
-    path_report = root / REPORT
-    path_report.parent.mkdir(parents=True, exist_ok=True)
-    path_report.write_text(json.dumps({'schema_version': 'autobots.upgrade-qualification/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
-                                       'duration_seconds': round(time.monotonic() - started_at, 1), 'input_fingerprint': fingerprint(root), 'prior_revision': PRIOR_REVISION,
-                                       'digest': hashlib.sha256(json.dumps(cases.records).encode()).hexdigest(),
-                                       'status': 'passed' if passed else 'failed', 'target_class': 'disposable', 'cases': cases.records,
-                                       'not_established': ['H1', 'product acceptance', 'the persistent stack', 'a real model call', 'a real image or framework version change']}, indent=2))
+    passed = cases.status == 'passed'
+    write_report(root / REPORT, {'schema_version': 'autobots.upgrade-qualification/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
+                                 'duration_seconds': round(time.monotonic() - started_at, 1), 'input_fingerprint': fingerprint(root), 'prior_revision': PRIOR_REVISION,
+                                 'digest': hashlib.sha256(json.dumps(cases.records).encode()).hexdigest(),
+                                 'status': cases.status, 'target_class': 'disposable', 'cases': cases.records,
+                                 'not_established': ['H1', 'product acceptance', 'the persistent stack', 'a real model call', 'a real image or framework version change']})
     print(f'{"PASS" if passed else "FAIL"}: upgrade qualification, {round(time.monotonic() - started_at)}s, report {REPORT}')
     return 0 if passed else 1
 

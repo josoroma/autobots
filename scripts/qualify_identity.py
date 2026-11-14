@@ -39,6 +39,8 @@ from disposable_db import (
     tool_env,
 )
 from harness_lib import fingerprint, project_root
+from qualification.children import Child, run_arrangement, run_child, run_child_check, service_env
+from qualification.records import write_report
 from qualify_web import BROWSERS, run_problems, start, stop, summarize, wait_until_up
 from suites import (
     IDENTITY_SUITES,
@@ -54,6 +56,32 @@ REPORT = Path('.checks/identity/qualification.json')
 STORAGE_SQL = Path('supabase/bootstrap/storage.sql')
 BUCKET = 'workspace-artifacts'
 PYTHON = Path('services/agent/.venv/bin/python')
+# Where a failed child check's stderr is kept (qualification/children.py).
+ERR_DIR = Path('.checks/identity')
+# Its children drive runs with a scripted model, as verify.STEP_CLASSES says.
+MODEL_TRANSPORT = 'mock'
+# The checks after the artifact check, in order, against real Storage through the runtime role. Arguments
+# name workspace A, workspace B or the service's interpreter (qualification/children.py Child).
+IDENTITY_CHILDREN = (
+    Child('verification_check.py', 'the verification check', ('{a}',), timeout=240),
+    Child('assignment_check.py', 'the assignment check', ('{a}', '{python}'), timeout=240),
+    Child('approval_check.py', 'the approval check', ('{a}', '{b}'), timeout=240),
+    Child('effect_check.py', 'the effect check', ('{a}', '{b}', '{python}'), timeout=240),
+    Child('workflow_run_check.py', 'the workflow run check', ('{a}', '{python}'), timeout=240),
+    Child('blocker_check.py', 'the blocker check', ('{a}',), timeout=240),
+    Child('major_check.py', 'the major check', ('{a}', '{b}'), timeout=240),
+    Child('connector_check.py', 'the connector check', ('{a}',), timeout=240),
+    Child('pull_request_check.py', 'the pull request check', ('{a}',), timeout=240),
+    Child('wake_check.py', 'the wake check', ('{a}',), timeout=240),
+    Child('review_check.py', 'the review check', ('{a}',), timeout=240),
+    Child('improvement_check.py', 'the improvement check', ('{a}', '{b}'), timeout=240),
+    Child('provider_key_check.py', 'the provider key check', ('{a}',), timeout=240),
+    # Last, so no later check's cleanup ends the runs they leave claimed for the browser.
+    # The task timing check claims only its own runs and cleans up nothing.
+    Child('tool_use_view_check.py', 'the tool-use view check', ('{a}',), timeout=240),
+    Child('task_timing_check.py', 'the task timing check', ('{a}',), timeout=240),
+    Child('result_stream_check.py', 'the result stream check', ('{a}',), timeout=240),
+)
 
 
 def http(method: str, url: str, headers: Mapping[str, str] | None = None, body: bytes | None = None) -> tuple[int, str]:
@@ -76,7 +104,13 @@ def bootstrap_owner(root: Path, base: str, service_key: str, database_url: str, 
                             capture_output=True, text=True, timeout=60, check=False)
     if result.returncode:
         raise Unavailable(f'owner bootstrap failed: {result.stderr.strip()[-200:]}')
-    return json.loads(result.stdout)
+    try:
+        owner = json.loads(result.stdout)
+    except ValueError as error:
+        raise Unavailable(f'owner bootstrap printed no JSON: {result.stdout.strip()[-200:]}') from error
+    if not isinstance(owner, dict):
+        raise Unavailable('owner bootstrap printed no JSON object')
+    return owner
 
 
 def password_token(base: str, anon: str, email: str, password: str) -> tuple[int, str]:
@@ -109,7 +143,8 @@ def rest_cases(cases: Cases, stack: AppStack, base: str, anon: str, token_a: str
     cases.check('lease columns are refused', 'a 4xx refusal', str(status), denied(status))
     status, _ = rest('runs', token_a, 'POST', {'Content-Type': 'application/json'}, b'{"limit_micro_usd": 1}')
     cases.check('a member cannot write runs through PostgREST', 'a 4xx refusal', str(status), denied(status))
-    stack.migrator('create table app_private.canary (id int);\ncreate table agent_runtime.canary (id int);\n')
+    cases.arrange('a canary table in each private schema',
+                  stack.migrator('create table app_private.canary (id int);\ncreate table agent_runtime.canary (id int);\n'))
     for schema in ('app_private', 'agent_runtime'):
         status, _ = rest('canary', token_a, extra={'Accept-Profile': schema})
         cases.check(f'{schema} is not an exposed PostgREST schema', 'refused', str(status), denied(status))
@@ -120,10 +155,8 @@ def rest_cases(cases: Cases, stack: AppStack, base: str, anon: str, token_a: str
     cases.check('private schemas are absent from the PostgREST description', 'absent', f'{status}, listed {listed}', status == 200 and not listed)
     published = rows(stack, "select count(*) from pg_publication_tables where schemaname in ('app_private', 'agent_runtime');")
     cases.check('private schemas are in no Realtime publication', '0 tables', published, published == '0')
-    grants = rows(stack, "select count(*) from information_schema.role_usage_grants where false;")
-    cases.check('authenticated holds no usage on private schemas', 'none',
-                rows(stack, "select has_schema_privilege('authenticated', 'app_private', 'usage')::text || ',' || has_schema_privilege('anon', 'agent_runtime', 'usage')::text;"),
-                grants == '0' and rows(stack, "select has_schema_privilege('authenticated', 'app_private', 'usage') or has_schema_privilege('anon', 'agent_runtime', 'usage');") == 'f')
+    usage = rows(stack, "select has_schema_privilege('authenticated', 'app_private', 'usage')::text || ',' || has_schema_privilege('anon', 'agent_runtime', 'usage')::text;")
+    cases.check('authenticated holds no usage on private schemas', 'false,false', usage, usage == 'false,false')
 
 
 def storage_cases(cases: Cases, base: str, anon: str, token_a: str, token_b: str, workspace_a: str, workspace_b: str) -> None:
@@ -160,114 +193,80 @@ def artifact_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port
                    workspace_a: str, workspace_b: str) -> dict[str, str]:
     """Publication and recovery against real Storage, through the runtime role."""
     url = f'postgresql://autobots_runtime:{stack.runtime_password}@127.0.0.1:{db_port}/postgres'
-    result = subprocess.run([str(root / PYTHON), str(root / 'tests/db/artifact_check.py'), workspace_a, workspace_b],
-                            env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'AUTOBOTS_STORAGE_BASE': base, 'AUTOBOTS_STORAGE_ANON': anon,
-                                 'AUTOBOTS_STORAGE_SERVICE': stack.values['SERVICE_ROLE_KEY'], 'AUTOBOTS_TOKEN_A': token_a, 'AUTOBOTS_TOKEN_B': token_b,
-                                 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
-                            capture_output=True, text=True, errors='replace', timeout=240, check=False)
-    if result.returncode:
-        cases.check('the artifact check ran', 'exit 0', f'exit {result.returncode}: {result.stderr.strip()[-380:]}', False)
-    if not result.stdout.strip():
+    service = stack.values['SERVICE_ROLE_KEY']
+    artifact = run_child_check(cases, root, 'artifact_check.py', workspace_a, workspace_b, label='the artifact check',
+                               env=service_env(root, url, AUTOBOTS_STORAGE_BASE=base, AUTOBOTS_STORAGE_ANON=anon, AUTOBOTS_STORAGE_SERVICE=service,
+                                               AUTOBOTS_TOKEN_A=token_a, AUTOBOTS_TOKEN_B=token_b),
+                               timeout=240, err_dir=root / ERR_DIR)
+    if artifact.report is None:
         return {}
-    report = json.loads(result.stdout.strip().splitlines()[-1])
-    for case in report['cases']:
-        cases.check(case['id'], case['expected'], case['observed'], case['passed'])
     extra_env: dict[str, str] = {}
-    for check_file, arguments, label in (('verification_check.py', [workspace_a], 'verification'),
-                                         ('assignment_check.py', [workspace_a, str(root / PYTHON)], 'assignment'),
-                                         ('approval_check.py', [workspace_a, workspace_b], 'approval'),
-                                         ('effect_check.py', [workspace_a, workspace_b, str(root / PYTHON)], 'effect'),
-                                         ('workflow_run_check.py', [workspace_a, str(root / PYTHON)], 'workflow run'),
-                                         ('blocker_check.py', [workspace_a], 'blocker'),
-                                         ('major_check.py', [workspace_a, workspace_b], 'major'),
-                                         ('connector_check.py', [workspace_a], 'connector'),
-                                         ('pull_request_check.py', [workspace_a], 'pull request'),
-                                         ('wake_check.py', [workspace_a], 'wake'),
-                                         ('review_check.py', [workspace_a], 'review'),
-                                         ('improvement_check.py', [workspace_a, workspace_b], 'improvement'),
-                                         ('provider_key_check.py', [workspace_a], 'provider key'),
-                                         # Last, so no later check's cleanup ends the runs they leave claimed for the browser.
-                                         # The task timing check claims only its own runs and cleans up nothing.
-                                         ('tool_use_view_check.py', [workspace_a], 'tool-use view'),
-                                         ('task_timing_check.py', [workspace_a], 'task timing'),
-                                         ('result_stream_check.py', [workspace_a], 'result stream')):
-        checked = subprocess.run([str(root / PYTHON), str(root / 'tests/db' / check_file), *arguments],
-                                 env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'AUTOBOTS_STORAGE_BASE': base, 'AUTOBOTS_STORAGE_SERVICE': stack.values['SERVICE_ROLE_KEY'],
-                                      'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
-                                 capture_output=True, text=True, errors='replace', timeout=240, check=False)
-        if checked.returncode:
-            (root / '.checks/identity').mkdir(parents=True, exist_ok=True)
-            (root / f'.checks/identity/{check_file}.err').write_text(checked.stderr)
-            cases.check(f'the {label} check ran', 'exit 0', f'exit {checked.returncode}: {checked.stderr.strip()[-380:]}', False)
-        if checked.stdout.strip():
-            output = json.loads(checked.stdout.strip().splitlines()[-1])
-            extra_env.update(output.get('browser_env', {}))
-            for case in output['cases']:
-                cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+    values = {'a': workspace_a, 'b': workspace_b, 'python': str(root / PYTHON)}
+    for child in IDENTITY_CHILDREN:
+        ran = run_child(cases, root, child, values, env=service_env(root, url, AUTOBOTS_STORAGE_BASE=base, AUTOBOTS_STORAGE_SERVICE=service),
+                        err_dir=root / ERR_DIR)
+        extra_env.update(ran.env('browser_env'))
+
     # US-16.2: each schema state is arranged as the admin, read as the runtime role, then restored.
     def schema_state(state: str) -> None:
-        probed = subprocess.run([str(root / PYTHON), str(root / 'tests/db/schema_release_check.py'), state],
-                                env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'},
-                                capture_output=True, text=True, errors='replace', timeout=60, check=False)
-        if probed.returncode or not probed.stdout.strip():
-            cases.check(f'the schema check ran for {state}', 'exit 0', f'exit {probed.returncode}: {probed.stderr.strip()[-300:]}', False)
-            return
-        for case in json.loads(probed.stdout.strip().splitlines()[-1])['cases']:
-            cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+        run_child_check(cases, root, 'schema_release_check.py', state, label=f'the schema check for {state}', env=service_env(root, url),
+                        timeout=60, err_dir=root / ERR_DIR, err_name=f'schema_release_check-{state}')
 
     history = 'autobots_disposable.migrations'
     newest = sorted(path.name for path in (root / 'supabase/migrations').glob('*.sql'))[-1]
     future = '29991231000000_a_later_release.sql'
     schema_state('equal')
-    held = stack.sql(f"select sha256 from {history} where name = '{newest}';\n").stdout.strip()
-    arranged = [stack.sql(f"delete from {history} where name = '{newest}';\n").returncode == 0]
+    read = stack.sql(f"select sha256 from {history} where name = '{newest}';\n")
+    held = read.stdout.strip()
+    steps = [read, stack.sql(f"delete from {history} where name = '{newest}';\n")]
     try:
         schema_state('behind')
     finally:
-        arranged.append(stack.sql(f"insert into {history} (name, sha256) values ('{newest}', '{held}');\n").returncode == 0)
-    arranged.append(stack.sql(f"insert into {history} (name, sha256) values ('{future}', repeat('0', 64));\n").returncode == 0)
+        steps.append(stack.sql(f"insert into {history} (name, sha256) values ('{newest}', '{held}');\n"))
+    steps.append(stack.sql(f"insert into {history} (name, sha256) values ('{future}', repeat('0', 64));\n"))
     try:
         schema_state('ahead')
     finally:
-        arranged.append(stack.sql(f"delete from {history} where name = '{future}';\n").returncode == 0)
-    arranged.append(stack.sql(f"alter table {history} rename to migrations_hidden;\n").returncode == 0)
+        steps.append(stack.sql(f"delete from {history} where name = '{future}';\n"))
+    steps.append(stack.sql(f"alter table {history} rename to migrations_hidden;\n"))
     try:
         schema_state('no-history')
-        arranged.append(stack.sql('alter table app_private.plan_task_times rename to plan_task_times_hidden;\n').returncode == 0)
+        steps.append(stack.sql('alter table app_private.plan_task_times rename to plan_task_times_hidden;\n'))
         try:
             schema_state('no-history-missing')
         finally:
-            arranged.append(stack.sql('alter table app_private.plan_task_times_hidden rename to plan_task_times;\n').returncode == 0)
+            steps.append(stack.sql('alter table app_private.plan_task_times_hidden rename to plan_task_times;\n'))
     finally:
-        arranged.append(stack.sql(f"alter table {history.split('.')[0]}.migrations_hidden rename to migrations;\n").returncode == 0)
+        steps.append(stack.sql(f"alter table {history.split('.')[0]}.migrations_hidden rename to migrations;\n"))
     restored = stack.sql(f"select count(*) from {history} where name ~ '^[0-9]{{14}}_'; select to_regclass('app_private.plan_task_times') is not null;\n").stdout.split()
-    cases.check('each schema state was arranged and then restored', f'every step exit 0, {len(list((root / "supabase/migrations").glob("*.sql")))} rows, the table back',
-                (arranged, restored), all(arranged) and restored == [str(len(list((root / 'supabase/migrations').glob('*.sql')))), 't'])
+    migrations = len(list((root / 'supabase/migrations').glob('*.sql')))
+    exits = [step.returncode for step in steps]
+    cases.arranged('each schema state, then restored', f'every step exit 0, the newest sha256 read, {migrations} rows, the table back',
+                   (exits, bool(held), restored), not any(exits) and bool(held) and restored == [str(migrations), 't'])
     # US-13.1: an older request, arranged as the migration finds one. Only the superuser bypasses the trigger.
     legacy = extra_env.get('AUTOBOTS_TEST_APPROVAL_LEGACY')
     if legacy:
         cleared = stack.sql("begin;\nset local session_replication_role = replica;\n"
                             "update public.approval_requests set policy_reason = null, resource_target = null, requested_by = null, requested_by_agent = null, "
                             f"scope_snapshot = null, policy_version = null, policy_rule = null where id = '{legacy}';\ncommit;\n")
-        cases.check('an older request is arranged with nothing recorded', 'exit 0', f'exit {cleared.returncode}', cleared.returncode == 0)
+        cases.arrange('an older request with nothing recorded', cleared)
         for column, filled_in in (('requested_by_agent', '{"kind": "coordinator"}'), ('scope_snapshot', '{"tools": {}, "paths": []}'), ('policy_version', 'approval-policy/1')):
             filled = stack.runtime(f"update public.approval_requests set {column} = '{filled_in}' where id = '{legacy}';\n")
             cases.check(f"an older request's {column} can't be filled in", 'refused as immutable', filled.stderr.strip()[-120:],
                         filled.returncode != 0 and 'immutable' in filled.stderr)
     # Arranged for the run workspace: text a model wrote, a raw framework event, and lost history.
-    loop_run, gap_run = report.get('loop_run', ''), report.get('run_id', '')
-    arranged = stack.runtime(
+    loop_run, gap_run = artifact.text('loop_run'), artifact.text('run_id')
+    written = stack.runtime(
         f"insert into app_private.plan_evidence (run_id, task_id, evidence, summary) values ('{loop_run}', 'a', '[]', 'used sk-or-leaked-value-here');\n"
         f"update public.runs set event_sequence = event_sequence + 1 where id = '{loop_run}';\n"
         f"insert into public.run_events (run_id, sequence, schema_version, payload, occurred_at) select '{loop_run}', event_sequence, 1, "
         f"""'{{"type": "model.reasoning", "text": "PROTECTED-REASONING"}}', now() from public.runs where id = '{loop_run}';\n""")
     # The gap is arranged as the admin: the runtime role can't delete run events (R-17).
-    if arranged.returncode == 0:
-        arranged = stack.sql(f"delete from public.run_events where run_id = '{gap_run}' and sequence < 3;\n")
-    cases.check('the run workspace fixtures are arranged', 'exit 0', f'exit {arranged.returncode}: {arranged.stderr[-200:]}', arranged.returncode == 0)
-    return {**extra_env, 'AUTOBOTS_TEST_LOOP_RUN': loop_run, 'AUTOBOTS_TEST_ARTIFACT_RUN': report.get('run_id', ''), 'AUTOBOTS_TEST_ARTIFACT_ID': report.get('artifact_id', ''),
-            'AUTOBOTS_TEST_ARTIFACT_TEXT': report.get('expected_text', ''), 'AUTOBOTS_TEST_ARTIFACT_GONE': report.get('gone_id', ''),
-            'AUTOBOTS_TEST_ARTIFACT_TAMPERED': report.get('tampered_id', '')}
+    gap = stack.sql(f"delete from public.run_events where run_id = '{gap_run}' and sequence < 3;\n") if written.returncode == 0 else written
+    cases.arrange('the run workspace fixtures', written, gap)
+    return {**extra_env, 'AUTOBOTS_TEST_LOOP_RUN': loop_run, 'AUTOBOTS_TEST_ARTIFACT_RUN': artifact.text('run_id'), 'AUTOBOTS_TEST_ARTIFACT_ID': artifact.text('artifact_id'),
+            'AUTOBOTS_TEST_ARTIFACT_TEXT': artifact.text('expected_text'), 'AUTOBOTS_TEST_ARTIFACT_GONE': artifact.text('gone_id'),
+            'AUTOBOTS_TEST_ARTIFACT_TAMPERED': artifact.text('tampered_id')}
 
 
 def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port: int, email: str, password: str,
@@ -290,12 +289,13 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
     api_port, web_port = any_port(), any_port()
     config_root = Path(tempfile.mkdtemp(prefix='autobots-config-'))
     # The arranged installation key. Only workspace B is granted it, so A exercises the app store.
-    (config_root / '.env.local').write_text('OPENROUTER_API_KEY=sk-or-valid-arranged-installation\\n')
+    (config_root / '.env.local').write_text('OPENROUTER_API_KEY=sk-or-valid-arranged-installation\n')
     # US-14.17: a Jina key in the configuration root's lowest-priority .env, and no Tavily key anywhere.
     (config_root / '.env').write_text('JINA_API_KEY=jina_fixtureConfigRoot0001')
-    stack.sql(f"insert into app_private.installation_credential_grants values ('{workspace_b}');\\n")
+    cases.arrange("workspace B's installation key grant", stack.sql(f"insert into app_private.installation_credential_grants values ('{workspace_b}');\n"))
     if artifacts.get('AUTOBOTS_TEST_COMPOSER_WORKSPACE'):
-        stack.sql(f"insert into app_private.installation_credential_grants values ('{artifacts['AUTOBOTS_TEST_COMPOSER_WORKSPACE']}');\\n")
+        cases.arrange("the composer workspace's installation key grant",
+                      stack.sql(f"insert into app_private.installation_credential_grants values ('{artifacts['AUTOBOTS_TEST_COMPOSER_WORKSPACE']}');\n"))
     upstream_log = root / '.checks/identity/upstream.log'
     upstream_log.parent.mkdir(parents=True, exist_ok=True)
     upstream_log.write_text('')
@@ -307,7 +307,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
     arranged = stack.sql(f"insert into public.routines (id, workspace_id, name, enabled, evaluated_until) values ('{routine}', '{workspace_a}', 'Arranged nightly report', false, now());\n"
                          f"insert into public.routine_versions (routine_id, version, config, created_by) values ('{routine}', 1, '{{}}', '{workspace_a}');\n"
                          f"insert into public.routine_occurrences (routine_id, occurrence_time, routine_version, status, reason) values ('{routine}', '2026-11-05T03:00:00Z', 1, 'missed', 'host_away');\n")
-    cases.check('the delayed occurrence is arranged', 'exit 0', f'exit {arranged.returncode}', arranged.returncode == 0)
+    cases.arrange('the delayed occurrence', arranged)
     api_url, web_url = f'http://127.0.0.1:{api_port}', f'http://127.0.0.1:{web_port}'
     runtime_url = f'postgresql://autobots_runtime:{stack.runtime_password}@127.0.0.1:{db_port}/postgres'
     api_env = {**tool_env(), 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1', 'AUTOBOTS_INTERNAL_TOKEN': internal,
@@ -346,13 +346,16 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
         for report_path, title in zip(qualification_reports, ('after an API restart', 'a route with no record'), strict=False):
             report_path.unlink(missing_ok=True)
             if title == 'a route with no record':
-                stack.sql("create table public.arranged_route_rows as select * from agent_runtime.route_qualifications;\ndelete from agent_runtime.route_qualifications where profile = 'openrouter_terra';\n")
+                cases.arrange('a route with no record', stack.sql("create table public.arranged_route_rows as select * from agent_runtime.route_qualifications;\n"
+                                                                  "delete from agent_runtime.route_qualifications where profile = 'openrouter_terra';\n"))
             ran = subprocess.run([str(playwright), 'test', QUALIFICATION_SUITE, '-g', title, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=120, check=False,
                                  env={**browser_env, 'AUTOBOTS_WEB_REPORT': str(report_path)})
             qualification_codes.append(ran.returncode)
             if ran.returncode:
                 print(ran.stdout[-1500:], file=sys.stderr)
-        stack.sql("delete from agent_runtime.route_qualifications;\ninsert into agent_runtime.route_qualifications select * from public.arranged_route_rows;\ndrop table public.arranged_route_rows;\n")
+        cases.arrange('the route records restored', stack.sql("delete from agent_runtime.route_qualifications;\n"
+                                                              "insert into agent_runtime.route_qualifications select * from public.arranged_route_rows;\n"
+                                                              "drop table public.arranged_route_rows;\n"))
         # A saved choice naming DeepSeek can't be made through the product now, so each is arranged.
         saved_choices = (('a saved default naming DeepSeek', "default_profile = 'openrouter_deepseek_flash', role_overrides = '{}'"),
                          ('a saved override on another role', "default_profile = 'openrouter_terra', role_overrides = '{\"coder\": \"openrouter_deepseek_flash\"}'"),
@@ -362,8 +365,8 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
             report_path = root / f'.checks/identity/playwright-saved-choice-{index}.json'
             report_path.unlink(missing_ok=True)
             qualification_reports.append(report_path)
-            arranged = stack.runtime(f"update app_private.model_policies set version = version + 1, {setting} where workspace_id = '{workspace_a}';\n")
-            cases.check(f'the saved choice is arranged: {title}', 'exit 0', f'exit {arranged.returncode}', arranged.returncode == 0)
+            cases.arrange(f'the saved choice: {title}',
+                          stack.runtime(f"update app_private.model_policies set version = version + 1, {setting} where workspace_id = '{workspace_a}';\n"))
             ran = subprocess.run([str(playwright), 'test', SAVED_CHOICE_SUITE, '-g', title, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=120, check=False,
                                  env={**browser_env, 'AUTOBOTS_WEB_REPORT': str(report_path)})
             qualification_codes.append(ran.returncode)
@@ -376,8 +379,9 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
             report_path.unlink(missing_ok=True)
             qualification_reports.append(report_path)
             if index == 2:
-                stack.runtime("insert into app_private.worker_heartbeats (worker_id, state, claims_inference, beat_at) "
-                              "values ('arranged-readiness', 'running', true, clock_timestamp() + interval '15 minutes');\n")
+                cases.arrange('a worker heartbeat that stays fresh for the readiness run',
+                              stack.runtime("insert into app_private.worker_heartbeats (worker_id, state, claims_inference, beat_at) "
+                                            "values ('arranged-readiness', 'running', true, clock_timestamp() + interval '15 minutes');\n"))
             ran = subprocess.run([str(playwright), 'test', READINESS_SUITE, '-g', title, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=180, check=False,
                                  env={**browser_env, 'AUTOBOTS_WEB_REPORT': str(report_path)})
             qualification_codes.append(ran.returncode)
@@ -386,12 +390,14 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
         # As the admin: the runtime role holds DELETE on workflow drafts only (R-17).
         cleared = stack.sql("delete from app_private.worker_heartbeats where worker_id = 'arranged-readiness'; "
                             "select count(*) from app_private.worker_heartbeats where worker_id = 'arranged-readiness';\n")
-        cases.check('the arranged readiness heartbeat is removed before the slice', 'exit 0, 0 rows',
-                    f'exit {cleared.returncode}, {cleared.stdout.strip()} rows', cleared.returncode == 0 and cleared.stdout.strip() == '0')
+        cases.arranged('the readiness heartbeat removed before the slice', 'exit 0, 0 rows',
+                       f'exit {cleared.returncode}, {cleared.stdout.strip()} rows', cleared.returncode == 0 and cleared.stdout.strip() == '0')
         # The slice runs last, with a worker, so nothing above sees its jobs claimed.
-        stack.runtime("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done';\n")
-        # Arranged: the settings suite changed the workspace default, and the fixture worker's route is the original.
-        stack.runtime("update app_private.model_policies set default_profile = 'openrouter_terra', role_overrides = '{}';\n")
+        cases.arrange('no job left for the slice worker but its own',
+                      stack.runtime("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done';\n"))
+        # The settings suite changed the workspace default, and the fixture worker's route is the original.
+        cases.arrange("the slice's original model route",
+                      stack.runtime("update app_private.model_policies set default_profile = 'openrouter_terra', role_overrides = '{}';\n"))
         slice_report = root / '.checks/identity/playwright-slice.json'
         slice_report.unlink(missing_ok=True)
         worker_env = {**tool_env(), 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1', 'AUTOBOTS_DATABASE_URL': runtime_url,
@@ -449,7 +455,7 @@ def qualify(root: Path) -> int:
     (root / REPORT).unlink(missing_ok=True)
     rendered = require_rendered(stack)
     require_images(rendered)
-    cases = Cases(model_transport='mock')
+    cases = Cases(model_transport=MODEL_TRANSPORT)
     before = other_resources(project)
     started_at = time.monotonic()
     base = f'http://127.0.0.1:{gateway_port}'
@@ -477,25 +483,29 @@ def qualify(root: Path) -> int:
         status_b, token_b = password_token(base, anon, email_b, password_b)
         cases.check('owners sign in with a local password', '200 each', f'{status_a}, {status_b}', status_a == status_b == 200)
         run_a = '11111111-1111-4111-8111-111111111111'
-        stack.runtime(f"insert into public.runs (id, workspace_id, limit_micro_usd) values ('{run_a}', '{owner_a['workspace_id']}', 1);\n")
+        cases.arrange("workspace A's run", stack.runtime(f"insert into public.runs (id, workspace_id, limit_micro_usd) values ('{run_a}', '{owner_a['workspace_id']}', 1);\n"))
         rest_cases(cases, stack, base, anon, token_a, token_b, run_a)
         storage_cases(cases, base, anon, token_a, token_b, owner_a['workspace_id'], owner_b['workspace_id'])
         artifacts = artifact_cases(root, cases, stack, base, db_port, anon, token_a, token_b, owner_a['workspace_id'], owner_b['workspace_id'])
         email_c, password_c = 'member-c@example.invalid', secrets.token_urlsafe(24)
         owner_c = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_c, password_c)
-        stack.runtime(f"insert into public.workspace_members (workspace_id, user_id, role) values ('{owner_a['workspace_id']}', '{owner_c['user_id']}', 'member');\\n")
+        cases.arrange('member C in workspace A',
+                      stack.runtime(f"insert into public.workspace_members (workspace_id, user_id, role) values ('{owner_a['workspace_id']}', '{owner_c['user_id']}', 'member');\n"))
         # Arranged: a run in a workspace with no key at all, since admission would refuse one.
         email_d, password_d = 'owner-d@example.invalid', secrets.token_urlsafe(24)
         owner_d = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_d, password_d)
         no_key_run = '33333333-3333-4333-8333-333333333333'
-        stack.runtime(f"insert into public.runs (id, workspace_id, limit_micro_usd, goal_summary) values ('{no_key_run}', '{owner_d['workspace_id']}', 1, 'Arranged in a workspace with no key');\n")
+        cases.arrange('a run in a workspace with no key',
+                      stack.runtime(f"insert into public.runs (id, workspace_id, limit_micro_usd, goal_summary) values ('{no_key_run}', '{owner_d['workspace_id']}', 1, 'Arranged in a workspace with no key');\n"))
         artifacts = {**artifacts, 'AUTOBOTS_TEST_NO_KEY_RUN': no_key_run, 'AUTOBOTS_TEST_NO_KEY_EMAIL': email_d, 'AUTOBOTS_TEST_NO_KEY_PASSWORD': password_d}
         # US-15.3, arranged: a member of workspace A only, who isn't its owner.
         email_f, password_f = 'reader-f@example.invalid', secrets.token_urlsafe(24)
         reader = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_f, password_f)
-        stack.runtime(f"insert into public.workspace_members (workspace_id, user_id, role) values ('{owner_a['workspace_id']}', '{reader['user_id']}', 'member');\n")
+        cases.arrange('the reader as a member of workspace A',
+                      stack.runtime(f"insert into public.workspace_members (workspace_id, user_id, role) values ('{owner_a['workspace_id']}', '{reader['user_id']}', 'member');\n"))
         # As the admin: the runtime role can't delete members (R-17).
-        stack.sql(f"delete from public.workspace_members where workspace_id = '{reader['workspace_id']}' and user_id = '{reader['user_id']}';\n")
+        cases.arrange('the reader outside its own workspace',
+                      stack.sql(f"delete from public.workspace_members where workspace_id = '{reader['workspace_id']}' and user_id = '{reader['user_id']}';\n"))
         artifacts = {**artifacts, 'AUTOBOTS_TEST_READER_EMAIL': email_f, 'AUTOBOTS_TEST_READER_PASSWORD': password_f}
         # US-15.4, arranged: an owner whose workspace holds 101 runs, so a second page exists, and three
         # with spend: one reserved, one with an unreported charge and one fully reported.
@@ -503,7 +513,7 @@ def qualify(root: Path) -> int:
         lister = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_g, password_g)
         listed = lister['workspace_id']
         spend_runs = ('44444444-4444-4444-8444-000000000001', '44444444-4444-4444-8444-000000000002', '44444444-4444-4444-8444-000000000003')
-        stack.runtime(
+        cases.arrange('101 runs, three with spend', stack.runtime(
             "insert into public.runs (id, workspace_id, status, goal_summary, limit_micro_usd, created_at, policy_snapshot) "
             f"select gen_random_uuid(), '{listed}', (array['queued','succeeded','paused','waiting_input'])[1 + n % 4], "
             "'Filler run ' || n, 1000000, now() - make_interval(mins => 200 + n), "
@@ -516,7 +526,7 @@ def qualify(root: Path) -> int:
             "reserved_micro_usd, charged_micro_usd, status, failure_class) values "
             f"(gen_random_uuid(), '{listed}', '{spend_runs[0]}', '{spend_runs[0]}', 'executor', 'openrouter_terra', 'w', 1, current_date, 180000, null, 'reserved', null), "
             f"(gen_random_uuid(), '{listed}', '{spend_runs[1]}', '{spend_runs[1]}', 'executor', 'openrouter_terra', 'w', 1, current_date, 30000, null, 'uncertain', 'charge_not_reported'), "
-            f"(gen_random_uuid(), '{listed}', '{spend_runs[2]}', '{spend_runs[2]}', 'executor', 'openrouter_terra', 'w', 1, current_date, 0, 70000, 'succeeded', null);\n")
+            f"(gen_random_uuid(), '{listed}', '{spend_runs[2]}', '{spend_runs[2]}', 'executor', 'openrouter_terra', 'w', 1, current_date, 0, 70000, 'succeeded', null);\n"))
         artifacts = {**artifacts, 'AUTOBOTS_TEST_RUNS_EMAIL': email_g, 'AUTOBOTS_TEST_RUNS_PASSWORD': password_g}
         # US-15.6, arranged by SQL, as a grant naming an unconfigured connector is refused at save:
         # three Experts with known tools, one with three runs.
@@ -527,13 +537,13 @@ def qualify(root: Path) -> int:
                         '{"tools": ["market_history", "inflation_rates", "calculate", "read_csv", "save_artifact", "read_run_file"], "role_bindings": {"executor": "openrouter_terra"}}'),
                        ('55555555-5555-4555-8555-000000000002', 'Issue triager', '{"tools": ["read_csv", "create_github_issue"]}'),
                        ('55555555-5555-4555-8555-000000000003', 'Brief writer', '{"tools": ["save_artifact"]}'))
-        stack.runtime(''.join(
+        cases.arrange('three Experts, one with three runs', stack.runtime(''.join(
             f"insert into public.experts (id, workspace_id, name, latest_version) values ('{identifier}', '{curated}', '{name}', 1);\n"
             f"insert into public.expert_versions (expert_id, version, config, created_by) values ('{identifier}', 1, '{config}', '{curator['user_id']}');\n"
             for identifier, name, config in expert_rows)
             + "insert into public.runs (id, workspace_id, status, goal_summary, limit_micro_usd, expert_id, created_at) "
               f"select gen_random_uuid(), '{curated}', 'succeeded', 'Watch ' || n, 1000000, '{expert_rows[0][0]}', now() - make_interval(mins => 10 * n) "
-              "from generate_series(1, 3) n;\n")
+              "from generate_series(1, 3) n;\n"))
 
         # US-15.7, arranged: an Expert that granted read_csv only in an older version, and a published
         # workflow whose agent step uses Issue triager, which grants read_csv now.
@@ -541,30 +551,27 @@ def qualify(root: Path) -> int:
         graph = ('{"nodes": [{"id": "start", "block": "input", "version": 1, "config": {}}, '
                  f'{{"id": "triage", "block": "agent", "version": 1, "config": {{"expert_id": "{expert_rows[1][0]}"}}}}, '
                  '{"id": "done", "block": "output", "version": 1, "config": {}}], "links": []}')
-        stack.runtime(
+        cases.arrange('an Expert with an older grant, and a published workflow', stack.runtime(
             f"insert into public.experts (id, workspace_id, name, latest_version) values ('{old_granter}', '{curated}', 'Old granter', 2);\n"
             f"insert into public.expert_versions (expert_id, version, config, created_by) values "
             f"('{old_granter}', 1, '{{\"tools\": [\"read_csv\"]}}', '{curator['user_id']}'), "
             f"('{old_granter}', 2, '{{\"tools\": [\"calculate\"]}}', '{curator['user_id']}');\n"
             f"insert into public.workflows (id, workspace_id, name, latest_version) values ('{flow}', '{curated}', 'Nightly triage', 1);\n"
             f"insert into public.workflow_versions (workflow_id, version, graph, graph_hash, block_versions, source, created_by) "
-            f"values ('{flow}', 1, '{graph}', 'arranged', '{{}}', 'user', '{curator['user_id']}');\n")
+            f"values ('{flow}', 1, '{graph}', 'arranged', '{{}}', 'user', '{curator['user_id']}');\n"))
         artifacts = {**artifacts, 'AUTOBOTS_TEST_EXPERTS_EMAIL': email_h, 'AUTOBOTS_TEST_EXPERTS_PASSWORD': password_h}
         # US-15.8, arranged: an owner whose workspace saves no default and one role override, and a run
         # admitted with a run role override, through the admission code (tests/db/model_sources.py).
         email_i, password_i = 'models-i@example.invalid', secrets.token_urlsafe(24)
         chooser = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_i, password_i)
-        sourced = subprocess.run([str(root / PYTHON), str(root / 'tests/db/model_sources.py'), chooser['workspace_id'], chooser['user_id']],
-                                 capture_output=True, text=True, errors='replace', timeout=120, check=False, cwd=root,
-                                 env={**tool_env(), 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1', 'AUTOBOTS_DATABASE_URL': runtime_url})
-        if sourced.returncode:
-            raise Unavailable(f'the binding-source run could not be arranged: {sourced.stderr[-500:]}')
-        sources = json.loads(sourced.stdout.strip().splitlines()[-1])
+        sourced = run_arrangement(cases, root, 'model_sources.py', chooser['workspace_id'], chooser['user_id'], label='the binding-source run',
+                                  env=service_env(root, runtime_url), timeout=120, cwd=root)
+        recorded = sourced.get('sources')
+        sources = recorded if isinstance(recorded, dict) else {}
         cases.check('a run admitted with a run role override records its sources', 'executor run_override, coder workspace_override, researcher builtin_default',
-                    str({role: sources['sources'].get(role) for role in ('executor', 'coder', 'researcher')}),
-                    (sources['sources'].get('executor'), sources['sources'].get('coder'), sources['sources'].get('researcher'))
-                    == ('run_override', 'workspace_override', 'builtin_default'))
-        artifacts = {**artifacts, 'AUTOBOTS_TEST_MODELS_EMAIL': email_i, 'AUTOBOTS_TEST_MODELS_PASSWORD': password_i, 'AUTOBOTS_TEST_MODELS_RUN': sources['run_id']}
+                    str({role: sources.get(role) for role in ('executor', 'coder', 'researcher')}),
+                    (sources.get('executor'), sources.get('coder'), sources.get('researcher')) == ('run_override', 'workspace_override', 'builtin_default'))
+        artifacts = {**artifacts, 'AUTOBOTS_TEST_MODELS_EMAIL': email_i, 'AUTOBOTS_TEST_MODELS_PASSWORD': password_i, 'AUTOBOTS_TEST_MODELS_RUN': str(sourced.get('run_id', ''))}
         # US-15.9, arranged: an owner whose workspace uses the installation key and has US$2.10 left of its
         # daily cap, as US$2.90 was charged today, with one Expert for the composer's Expert chip.
         email_j, password_j = 'composer-j@example.invalid', secrets.token_urlsafe(24)
@@ -579,7 +586,7 @@ def qualify(root: Path) -> int:
             f"insert into public.experts (id, workspace_id, name, latest_version) values ('{helper}', '{composed}', 'Composer helper', 1);\n"
             f"insert into public.expert_versions (expert_id, version, config, created_by) values ('{helper}', 1, "
             f"'{{\"tools\": [\"calculate\", \"read_csv\"], \"role_bindings\": {{\"executor\": \"openrouter_sol\"}}}}', '{composer['user_id']}');\n")
-        cases.check('the composer workspace is arranged', 'exit 0', f'exit {arranged_spend.returncode}: {arranged_spend.stderr[-200:]}', arranged_spend.returncode == 0)
+        cases.arrange('the composer workspace', arranged_spend)
         artifacts = {**artifacts, 'AUTOBOTS_TEST_COMPOSER_EMAIL': email_j, 'AUTOBOTS_TEST_COMPOSER_PASSWORD': password_j,
                      'AUTOBOTS_TEST_COMPOSER_WORKSPACE': composed, 'AUTOBOTS_TEST_COMPOSER_EXPERT': helper}
         # US-15.10, arranged: a Costa Rica workspace whose owner is named Ada, with seven runs a minute apart.
@@ -610,7 +617,7 @@ def qualify(root: Path) -> int:
             + "insert into app_private.model_invocations (id, workspace_id, root_run_id, run_id, role, profile, wire_id, attempt, spend_day, reserved_micro_usd, "
               f"charged_micro_usd, status) values (gen_random_uuid(), '{homed}', '{home_runs[4]}', '{home_runs[4]}', 'executor', 'openrouter_terra', 'w', 1, "
               "current_date, 0, 70000, 'succeeded');\n")
-        cases.check('the home workspace is arranged', 'exit 0', f'exit {arranged_home.returncode}: {arranged_home.stderr[-200:]}', arranged_home.returncode == 0)
+        cases.arrange('the home workspace', arranged_home)
         artifacts = {**artifacts, 'AUTOBOTS_TEST_HOME_EMAIL': email_k, 'AUTOBOTS_TEST_HOME_PASSWORD': password_k,
                      'AUTOBOTS_TEST_HOME_RUNS': ','.join(home_runs), 'AUTOBOTS_TEST_HOME_APPROVALS': ','.join(approvals_k)}
         # US-15.13, arranged: an owner with a US$10.00 daily cap and two Experts. "Weekly brief" has versions 1
@@ -667,7 +674,7 @@ def qualify(root: Path) -> int:
               f"(gen_random_uuid(), '{flows_ws}', '{flow_runs[0]}', '{flow_runs[0]}', 'executor', 'openrouter_terra', 'w', 1, current_date - 1, 0, 120000, 'succeeded', null), "
               f"(gen_random_uuid(), '{flows_ws}', '{flow_runs[1]}', '{flow_runs[1]}', 'executor', 'openrouter_terra', 'w', 1, current_date - 1, 40000, null, 'uncertain', 'charge_not_reported'), "
               f"(gen_random_uuid(), '{flows_ws}', '{flow_runs[2]}', '{flow_runs[2]}', 'executor', 'openrouter_terra', 'w', 1, current_date - 1, 50000, null, 'reserved', null);\n")
-        cases.check('the workflows workspace is arranged', 'exit 0', f'exit {arranged_flows.returncode}: {arranged_flows.stderr[-300:]}', arranged_flows.returncode == 0)
+        cases.arrange('the workflows workspace', arranged_flows)
         artifacts = {**artifacts, 'AUTOBOTS_TEST_FLOWS_EMAIL': email_l, 'AUTOBOTS_TEST_FLOWS_PASSWORD': password_l,
                      'AUTOBOTS_TEST_FLOWS_BRIEF': brief, 'AUTOBOTS_TEST_FLOWS_PLAIN': plain, 'AUTOBOTS_TEST_FLOWS_RUNS': ','.join(flow_runs)}
         # US-15.18, arranged: an owner whose workspace has one job that lost its worker, one leased and one
@@ -690,8 +697,7 @@ def qualify(root: Path) -> int:
             + ';\n')
         # US-15.19: its jobs chart reads hours in Costa Rica's time, which has no daylight saving.
         zoned = stack.sql(f"update public.workspaces set timezone = 'America/Costa_Rica' where id = '{ops_ws}';\n")
-        cases.check('the operations workspace is arranged', 'exit 0', f'exit {arranged_ops.returncode}: {arranged_ops.stderr[-300:]}',
-                    arranged_ops.returncode == 0 and zoned.returncode == 0)
+        cases.arrange('the operations workspace', arranged_ops, zoned)
         artifacts = {**artifacts, 'AUTOBOTS_TEST_OPS_EMAIL': email_n, 'AUTOBOTS_TEST_OPS_PASSWORD': password_n, 'AUTOBOTS_TEST_OPS_WORKSPACE': ops_ws,
                      'AUTOBOTS_TEST_OPS_HELPER': str(root / 'tests/db/operations_live.py')}
         # US-16.3, arranged: a member of two workspaces, their own P and runs-g's G, with a run only in P.
@@ -702,8 +708,7 @@ def qualify(root: Path) -> int:
             f"insert into public.workspace_members (workspace_id, user_id, role) values ('{listed}', '{multi['user_id']}', 'member');\n"
             f"insert into public.runs (id, workspace_id, status, goal_summary, limit_micro_usd, policy_snapshot) values "
             f"(gen_random_uuid(), '{multi['workspace_id']}', 'succeeded', 'Only in workspace P', 1000000, '{{}}');\n")
-        cases.check('the two-workspace member is arranged', 'exit 0', f'exit {arranged_multi.returncode}: {arranged_multi.stderr[-300:]}',
-                    arranged_multi.returncode == 0)
+        cases.arrange('the two-workspace member', arranged_multi)
         artifacts = {**artifacts, 'AUTOBOTS_TEST_MULTI_EMAIL': email_p, 'AUTOBOTS_TEST_MULTI_PASSWORD': password_p,
                      'AUTOBOTS_TEST_MULTI_WORKSPACE_P': multi['workspace_id'], 'AUTOBOTS_TEST_MULTI_WORKSPACE_G': listed,
                      'AUTOBOTS_TEST_FOREIGN_WORKSPACE': ops_ws}
@@ -722,29 +727,25 @@ def qualify(root: Path) -> int:
             f"('{search_ids['expert']}', 1, '{{\"tools\": [\"calculate\"]}}', '{operator['user_id']}'), "
             f"('{search_ids['other_expert']}', 1, '{{\"tools\": [\"calculate\"]}}', '{flows_user}');\n"
             f"insert into public.workflows (id, workspace_id, name, description, latest_version) values ('{search_ids['workflow']}', '{ops_ws}', 'Read and summarize', null, 0);\n")
-        cases.check('the search records are arranged', 'exit 0', f'exit {arranged_search.returncode}: {arranged_search.stderr[-300:]}', arranged_search.returncode == 0)
+        cases.arrange('the search records', arranged_search)
         artifacts = {**artifacts, 'AUTOBOTS_TEST_SEARCH_IDS': json.dumps(search_ids)}
         # US-15.25: the concept seed, run twice into a fresh workspace with no GitHub variables.
         email_o, password_o = 'seed-o@example.invalid', secrets.token_urlsafe(24)
         seeded_ws = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_o, password_o)['workspace_id']
-        seeded = subprocess.run([str(root / PYTHON), str(root / 'tests/db/concept_seed_check.py'), seeded_ws], capture_output=True, text=True, errors='replace',
-                                timeout=240, check=False, cwd=root,
-                                env={**tool_env(), 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1', 'AUTOBOTS_DATABASE_URL': runtime_url})
-        if seeded.returncode or not seeded.stdout.strip():
-            cases.check('the concept seed check ran', 'exit 0', f'exit {seeded.returncode}: {seeded.stderr.strip()[-380:]}', False)
-        else:
-            for case in json.loads(seeded.stdout.strip().splitlines()[-1])['cases']:
-                cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+        run_child_check(cases, root, 'concept_seed_check.py', seeded_ws, label='the concept seed check', env=service_env(root, runtime_url),
+                        timeout=240, cwd=root, err_dir=root / ERR_DIR)
         # Its own workspace with no key, as the one above asserts that it holds exactly one run.
         email_e, password_e = 'owner-e@example.invalid', secrets.token_urlsafe(24)
         owner_e = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], runtime_url, email_e, password_e)
-        arranged_runs = subprocess.run([str(root / PYTHON), str(root / 'tests/db/browser_runs.py'), owner_a['workspace_id'], owner_e['workspace_id']], capture_output=True, text=True, errors='replace', timeout=120, check=False, cwd=root,
-                                       env={**tool_env(), 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1', 'AUTOBOTS_DATABASE_URL': runtime_url, 'AUTOBOTS_STORAGE_BASE': base, 'AUTOBOTS_STORAGE_SERVICE': stack.values['SERVICE_ROLE_KEY']})
-        if arranged_runs.returncode:
-            raise Unavailable(f'the browser runs could not be arranged: {arranged_runs.stderr[-500:]}')
-        arranged_ids = json.loads(arranged_runs.stdout.strip().splitlines()[-1])
-        cases.check('the browser runs are arranged', 'waiting_approval and succeeded', str(arranged_ids['states']), arranged_ids['states'] == {'waiting': 'waiting_approval', 'finished': 'succeeded'})
-        artifacts = {**artifacts, 'AUTOBOTS_TEST_STALE_SESSION': arranged_ids['stale_session'], 'AUTOBOTS_TEST_STALE_EXPERT': arranged_ids['stale_expert'], 'AUTOBOTS_TEST_WAITING_RUN': arranged_ids['waiting_run'], 'AUTOBOTS_TEST_FILES_RUN': arranged_ids['keyless_run'], 'AUTOBOTS_TEST_FILES_EMAIL': email_e, 'AUTOBOTS_TEST_FILES_PASSWORD': password_e}
+        browser_runs = run_arrangement(cases, root, 'browser_runs.py', owner_a['workspace_id'], owner_e['workspace_id'], label='the browser runs',
+                                       env=service_env(root, runtime_url, AUTOBOTS_STORAGE_BASE=base, AUTOBOTS_STORAGE_SERVICE=stack.values['SERVICE_ROLE_KEY']),
+                                       timeout=120, cwd=root)
+        cases.arranged('the browser runs waiting and finished', 'waiting_approval and succeeded', browser_runs.get('states'),
+                       browser_runs.get('states') == {'waiting': 'waiting_approval', 'finished': 'succeeded'})
+        artifacts = {**artifacts, **{name: str(browser_runs.get(key, '')) for name, key in (
+            ('AUTOBOTS_TEST_STALE_SESSION', 'stale_session'), ('AUTOBOTS_TEST_STALE_EXPERT', 'stale_expert'),
+            ('AUTOBOTS_TEST_WAITING_RUN', 'waiting_run'), ('AUTOBOTS_TEST_FILES_RUN', 'keyless_run'))},
+                     'AUTOBOTS_TEST_FILES_EMAIL': email_e, 'AUTOBOTS_TEST_FILES_PASSWORD': password_e}
         browser_cases(root, cases, stack, base, db_port, email_a, password_a, owner_a['workspace_id'], owner_b['workspace_id'],
                       email_b, password_b, email_c, password_c, artifacts)
     finally:
@@ -755,14 +756,11 @@ def qualify(root: Path) -> int:
     cases.check('cleanup removed the owned containers and volumes', 'none left', left or 'none', not left)
     after = other_resources(project)
     cases.check('other Docker resources are untouched', 'same', f'{len(before)} before, {len(after)} after', before == after)
-    passed = all(record['status'] == 'passed' for record in cases.records)
-    path = root / REPORT
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({'schema_version': 'autobots.identity-qualification/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
-                                'duration_seconds': round(time.monotonic() - started_at, 1), 'input_fingerprint': fingerprint(root),
-                                'status': 'passed' if passed else 'failed', 'target_class': 'disposable', 'project': project, 'cases': cases.records,
-                                'not_established': ['H1', 'product acceptance', 'the persistent stack', 'a running Realtime service']}, indent=2) + '\n')
-    return 0 if passed else 1
+    write_report(root / REPORT, {'schema_version': 'autobots.identity-qualification/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
+                                 'duration_seconds': round(time.monotonic() - started_at, 1), 'input_fingerprint': fingerprint(root),
+                                 'status': cases.status, 'target_class': 'disposable', 'project': project, 'cases': cases.records,
+                                 'not_established': ['H1', 'product acceptance', 'the persistent stack', 'a running Realtime service']})
+    return 0 if cases.status == 'passed' else 1
 
 
 def main() -> int:

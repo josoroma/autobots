@@ -11,9 +11,7 @@ Exit codes: 0 passed, 1 a case failed, 2 a prerequisite is missing.
 """
 from __future__ import annotations
 
-import json
 import secrets
-import subprocess
 import sys
 import time
 from datetime import UTC, datetime
@@ -34,22 +32,15 @@ from disposable_db import (
     tool_env,
 )
 from harness_lib import project_root
+from qualification.children import run_child_check, service_env
+from qualification.records import write_report
+from qualify_browser_executor import IMAGES, executor_fingerprint
+from qualify_browser_executor import REPORT as EXECUTOR_REPORT
 from supabase_stack import generated_values, require_images, require_rendered
 
 REPORT = Path('.checks/browse-goal/check.json')
-EXECUTOR_REPORT = Path('.checks/browser-executor/qualification.json')
-IMAGES = ('autobots-browser:local', 'autobots-egress:local')
-PYTHON = Path('services/agent/.venv/bin/python')
-
-
-def executor_fingerprint(root: Path) -> dict[str, str]:
-    completed = subprocess.run([str(root / PYTHON), '-c', 'import json, sys; from pathlib import Path; '
-                                'from autobots.adapters.browser_executor import images_fingerprint; '
-                                'print(json.dumps(images_fingerprint(Path(sys.argv[1]))))', str(root)],
-                               env={**tool_env(), 'PYTHONPATH': str(root / 'services/agent/src')}, capture_output=True, text=True, check=False)
-    if completed.returncode:
-        raise Unavailable('the executor fingerprint could not be computed')
-    return json.loads(completed.stdout)
+# The model is scripted: no inference provider is called.
+MODEL_TRANSPORT = 'mock'
 
 
 def qualify(root: Path) -> int:
@@ -68,7 +59,7 @@ def qualify(root: Path) -> int:
     (root / REPORT).unlink(missing_ok=True)
     rendered = require_rendered(stack)
     require_images({'services': {'db': rendered['services']['db']}})
-    cases = Cases()
+    cases = Cases(model_transport=MODEL_TRANSPORT)
     before = other_resources(project)
     started_at = time.monotonic()
     try:
@@ -77,22 +68,12 @@ def qualify(root: Path) -> int:
             raise Unavailable(f'the disposable database did not start: {started.stderr[-300:]}')
         bootstrap(stack, root)
         applied, failure = apply_migrations(stack, root / MIGRATIONS)
-        cases.check('the disposable database is migrated', 'no failure', failure or f'{applied} migrations', failure is None)
-        seeded = seed(stack, root)
-        workspace = stack.migrator(f"insert into public.workspaces (id, name) values ('{WORKSPACE_A}', 'Workspace A');")
-        cases.check('the disposable database is seeded', 'exit 0', f'{seeded.returncode}, {workspace.returncode}', seeded.returncode == 0 == workspace.returncode)
+        cases.arranged('the disposable database migrated', 'no failure', failure or f'{applied} migrations', failure is None)
+        cases.arrange('the disposable database seeded, with workspace A', seed(stack, root),
+                      stack.migrator(f"insert into public.workspaces (id, name) values ('{WORKSPACE_A}', 'Workspace A');"))
         url = f'postgresql://autobots_runtime:{stack.runtime_password}@127.0.0.1:{db_port}/postgres'
-        result = subprocess.run([str(root / PYTHON), str(root / 'tests/db/browse_goal_check.py'), WORKSPACE_A],
-                                env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'PYTHONPATH': str(root / 'services/agent/src'),
-                                     'PYTHONDONTWRITEBYTECODE': '1'},
-                                capture_output=True, text=True, timeout=900, check=False, cwd=root)
-        if result.returncode or not result.stdout.strip():
-            (root / REPORT).parent.mkdir(parents=True, exist_ok=True)
-            (root / REPORT).with_suffix('.err').write_text(result.stderr)
-            cases.check('the browse_goal check ran', 'exit 0', f'exit {result.returncode}: {result.stderr.strip()[-600:]}', False)
-        else:
-            for case in json.loads(result.stdout.strip().splitlines()[-1])['cases']:
-                cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+        run_child_check(cases, root, 'browse_goal_check.py', WORKSPACE_A, label='the browse_goal check', env=service_env(root, url), timeout=900,
+                        cwd=root, err_dir=root / REPORT.parent, err_name=REPORT.stem)
     finally:
         remove_stack(stack)
         leftover = run(['docker', 'ps', '-a', '--filter', 'label=autobots.browser=1', '--format', '{{.Names}}'], tool_env()).stdout.split()
@@ -105,15 +86,13 @@ def qualify(root: Path) -> int:
                 not leftover and not networks)
     after = other_resources(project)
     cases.check('other Docker resources are untouched', 'same', f'{len(before)} before, {len(after)} after', before == after)
-    passed = all(record['status'] == 'passed' for record in cases.records)
-    path = root / REPORT
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({
+    passed = cases.status == 'passed'
+    write_report(root / REPORT, {
         'schema_version': 'autobots.browse-goal-check/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
-        'duration_seconds': round(time.monotonic() - started_at, 1), 'status': 'passed' if passed else 'failed',
+        'duration_seconds': round(time.monotonic() - started_at, 1), 'status': cases.status,
         'executor_fingerprint': executor_fingerprint(root), 'target_class': 'disposable', 'driver': 'scripted',
         'network': 'outbound to https://example.com/ only', 'model': 'scripted, no provider', 'cases': cases.records,
-        'not_established': ['H1', 'product acceptance', 'browsing with a real model', 'the persistent database']}, indent=2) + '\n')
+        'not_established': ['H1', 'product acceptance', 'browsing with a real model', 'the persistent database']})
     print(f"{'PASS' if passed else 'FAIL'}: {sum(r['status'] == 'passed' for r in cases.records)} of {len(cases.records)} browse_goal cases passed.")
     return 0 if passed else 1
 

@@ -24,7 +24,6 @@ from urllib import error, request
 from app_db import AppStack, apply_migrations, bootstrap, seed
 from disposable_db import (
     PROJECT_PREFIX,
-    Cases,
     Refused,
     Target,
     Unavailable,
@@ -36,17 +35,20 @@ from disposable_db import (
     tool_env,
 )
 from harness_lib import fingerprint, project_root
+from qualification.children import run_child_check, service_env
+from qualification.records import Cases, write_report
 from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner, http, password_token
 from supabase_stack import generated_values, require_images, require_rendered
 
 REPORT = Path('.checks/operations/qualification.json')
+# Where a failed child check's stderr is kept (qualification/children.py).
+ERR_DIR = Path('.checks/operations')
 LOG_SECRET = 'sk-or-v1-planted-log-secret'
 TRACE_KEY = 'lsv2-planted-trace-key'
-
-
-class Checks(Cases):
-    def check(self, case_id: str, expected: str, observed: object, passed: object) -> None:
-        super().check(case_id, expected, str(observed), bool(passed))
+# The operations, backup and upgrade qualifiers' fixture workers run a scripted model (verify.STEP_CLASSES).
+MODEL_TRANSPORT = 'mock'
+# Cases.check shows any observed value as text and reads `passed` for its truth.
+Checks = Cases
 
 
 class Ops:
@@ -58,14 +60,11 @@ class Ops:
         self.internal = secrets.token_hex(24)
         self.processes: list[subprocess.Popen] = []
         self.handles: list[IO[str]] = []
-        self.env = {**tool_env(), 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1',
-                    'AUTOBOTS_DATABASE_URL': self.url, 'AUTOBOTS_SUPABASE_URL': base,
-                    'AUTOBOTS_SERVICE_ROLE_KEY': stack.values['SERVICE_ROLE_KEY'],
-                    'AUTOBOTS_STORAGE_BASE': base, 'AUTOBOTS_STORAGE_SERVICE': stack.values['SERVICE_ROLE_KEY'],
-                    'AUTOBOTS_MIN_FREE_BYTES': '1',
-                    # Arranged: what a host might have exported. The bootstrap has to turn it off.
-                    'LANGSMITH_TRACING': 'true', 'LANGCHAIN_TRACING_V2': 'true', 'LANGSMITH_API_KEY': TRACE_KEY,
-                    'LANGSMITH_ENDPOINT': 'https://collector.example.invalid'}
+        self.env = service_env(root, self.url, AUTOBOTS_SUPABASE_URL=base, AUTOBOTS_SERVICE_ROLE_KEY=stack.values['SERVICE_ROLE_KEY'],
+                               AUTOBOTS_STORAGE_BASE=base, AUTOBOTS_STORAGE_SERVICE=stack.values['SERVICE_ROLE_KEY'], AUTOBOTS_MIN_FREE_BYTES='1',
+                               # Arranged: what a host might have exported. The bootstrap has to turn it off.
+                               LANGSMITH_TRACING='true', LANGCHAIN_TRACING_V2='true', LANGSMITH_API_KEY=TRACE_KEY,
+                               LANGSMITH_ENDPOINT='https://collector.example.invalid')
 
     def spawn(self, name: str, argv: list[str], extra: dict[str, str] | None = None) -> subprocess.Popen:
         handle = (self.logs / f'{name}.log').open('a')
@@ -93,9 +92,10 @@ class Ops:
     def admit(self, workspace: str) -> str:
         result = subprocess.run([str(self.root / PYTHON), str(self.root / 'tests/db/operations_check.py'), 'admit', workspace], env=self.env,
                                 capture_output=True, text=True, timeout=60, check=False)
-        if result.returncode:
-            raise Unavailable(f'the fixture job was not admitted: {result.stderr.strip()[-300:]}')
-        return result.stdout.strip().splitlines()[-1]
+        lines = result.stdout.strip().splitlines()
+        if result.returncode or not lines:
+            raise Unavailable(f'the fixture job was not admitted: exit {result.returncode}: {result.stderr.strip()[-300:]}')
+        return lines[-1]
 
     def stop_all(self) -> None:
         for process in self.processes:
@@ -160,7 +160,7 @@ def qualify(root: Path) -> int:
     (root / REPORT).unlink(missing_ok=True)
     rendered = require_rendered(stack)
     require_images(rendered)
-    cases = Checks()
+    cases = Checks(model_transport=MODEL_TRANSPORT)
     before = other_resources(project)
     started_at = time.monotonic()
     base = f'http://127.0.0.1:{gateway_port}'
@@ -189,7 +189,8 @@ def qualify(root: Path) -> int:
         owner_b = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], ops.url, email_b, password_b)
         owner_c = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], ops.url, email_c, password_c)
         workspace_a, workspace_b = owner_a['workspace_id'], owner_b['workspace_id']
-        stack.runtime(f"insert into public.workspace_members (workspace_id, user_id, role) values ('{workspace_a}', '{owner_c['user_id']}', 'member');")
+        cases.arrange('member C in workspace A',
+                      stack.runtime(f"insert into public.workspace_members (workspace_id, user_id, role) values ('{workspace_a}', '{owner_c['user_id']}', 'member');"))
         token_a = password_token(base, anon, email_a, password_a)[1]
         token_b = password_token(base, anon, email_b, password_b)[1]
         token_c = password_token(base, anon, email_c, password_c)[1]
@@ -271,7 +272,7 @@ def qualify(root: Path) -> int:
         code, reply = api_call(api_port, ops.internal, token_a, 'POST', '/v1/runs', goal, {'Idempotency-Key': secrets.token_hex(8)})
         after = ops.sql('select count(*) from app_private.run_jobs;')
         cases.check('admission stops with Storage down', '503 not_ready, no new job', f'{code}, {jobs} then {after}', code == 503 and 'not_ready' in reply and jobs == after)
-        stack.compose('start', 'storage', timeout=120)
+        cases.arrange('Storage started again', stack.compose('start', 'storage', timeout=120))
         back = wait(lambda: json.loads(api_call(api_port, ops.internal, token_a)[1])['ready'] is True, 90)
         cases.check('readiness returns when Storage does', 'ready true', back, back)
         ops.api(low_port, config_root, {'AUTOBOTS_MIN_FREE_BYTES': str(2**62)})
@@ -285,7 +286,8 @@ def qualify(root: Path) -> int:
         content = secrets.token_bytes(64)
         put, _ = http('POST', f'{base}/storage/v1/object/workspace-artifacts/{path}', {'apikey': stack.values['SERVICE_ROLE_KEY'], 'Authorization': f"Bearer {stack.values['SERVICE_ROLE_KEY']}", 'Content-Type': 'application/octet-stream'}, content)
         counts = durable_counts(ops)
-        stack.runtime("insert into app_private.retention_log (workspace_id, action) select id, 'lifecycle_marker' from public.workspaces limit 1;")
+        cases.arrange('a row written just before shutdown',
+                      stack.runtime("insert into app_private.retention_log (workspace_id, action) select id, 'lifecycle_marker' from public.workspaces limit 1;"))
         halted = stack.compose('stop', timeout=180)
         volumes = run(['docker', 'volume', 'ls', '--filter', f'label=com.docker.compose.project={project}', '--format', '{{.Name}}'], tool_env()).stdout.split()
         cases.check('stopping the stack keeps its volumes', 'exit 0, volumes remain', f'{halted.returncode}, {len(volumes)} volumes', halted.returncode == 0 and len(volumes) > 0)
@@ -330,14 +332,8 @@ def qualify(root: Path) -> int:
         cases.check('the interrupted job resumes after the restart', 'succeeded, exit 0, no repeated effect', f'resume exit {resumed.returncode}, {finished}, {exit_code}, {receipts_before} before, {duplicates} repeated, {state[:220]}', finished and exit_code == 0 and duplicates == '0')
 
         # Retention, on the real run finished above.
-        checked = subprocess.run([str(root / PYTHON), str(root / 'tests/db/operations_check.py'), 'retention', workspace_a, workspace_b, real_run], env=ops.env,
-                                 capture_output=True, text=True, errors='replace', timeout=240, check=False)
-        if checked.returncode:
-            (root / '.checks/operations/retention.err').write_text(checked.stderr)
-            cases.check('the retention check ran', 'exit 0', f'exit {checked.returncode}: {checked.stderr.strip()[-380:]}', False)
-        if checked.stdout.strip():
-            for case in json.loads(checked.stdout.strip().splitlines()[-1])['cases']:
-                cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+        run_child_check(cases, root, 'operations_check.py', 'retention', workspace_a, workspace_b, real_run, label='the retention check',
+                        env=ops.env, timeout=240, err_dir=root / ERR_DIR, err_name='retention')
         code, _ = api_call(api_port, ops.internal, token_b, 'PUT', '/v1/operations/retention', json.dumps({'run_days': 30, 'receipt_days': 7}).encode())
         cases.check('a key window shorter than run content is refused', '422', code, code == 422)
         code, reply = api_call(api_port, ops.internal, token_b, 'PUT', '/v1/operations/retention', json.dumps({'run_days': 30, 'receipt_days': 30}).encode())
@@ -383,13 +379,11 @@ def qualify(root: Path) -> int:
     cases.check('cleanup removed the owned containers and volumes', 'none left', left or 'none', not left)
     after_resources = other_resources(project)
     cases.check('other Docker resources are untouched', 'same', f'{len(before)} before, {len(after_resources)} after', before == after_resources)
-    passed = all(record['status'] == 'passed' for record in cases.records)
-    path_report = root / REPORT
-    path_report.parent.mkdir(parents=True, exist_ok=True)
-    path_report.write_text(json.dumps({'schema_version': 'autobots.operations-qualification/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
-                                       'duration_seconds': round(time.monotonic() - started_at, 1), 'input_fingerprint': fingerprint(root),
-                                       'status': 'passed' if passed else 'failed', 'target_class': 'disposable', 'project': project, 'cases': cases.records,
-                                       'not_established': ['H1', 'product acceptance', 'the persistent stack', 'a real model call', 'Mac sleep', 'resource use under load']}, indent=2))
+    passed = cases.status == 'passed'
+    write_report(root / REPORT, {'schema_version': 'autobots.operations-qualification/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
+                                 'duration_seconds': round(time.monotonic() - started_at, 1), 'input_fingerprint': fingerprint(root),
+                                 'status': cases.status, 'target_class': 'disposable', 'project': project, 'cases': cases.records,
+                                 'not_established': ['H1', 'product acceptance', 'the persistent stack', 'a real model call', 'Mac sleep', 'resource use under load']})
     print(f'{"PASS" if passed else "FAIL"}: operations qualification, {round(time.monotonic() - started_at)}s, report {REPORT}')
     return 0 if passed else 1
 

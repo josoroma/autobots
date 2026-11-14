@@ -35,6 +35,8 @@ from disposable_db import (
     tool_env,
 )
 from harness_lib import project_root
+from qualification.children import run_child_check, service_env
+from qualification.records import write_report
 from supabase_stack import generated_values, require_images, require_rendered
 
 REPORT = Path('.checks/browser-executor/qualification.json')
@@ -47,9 +49,13 @@ def executor_fingerprint(root: Path) -> dict[str, str]:
                                 'from autobots.adapters.browser_executor import images_fingerprint; '
                                 'print(json.dumps(images_fingerprint(Path(sys.argv[1]))))', str(root)],
                                env={**tool_env(), 'PYTHONPATH': str(root / 'services/agent/src')}, capture_output=True, text=True, check=False)
-    if completed.returncode:
+    try:
+        printed = json.loads(completed.stdout) if completed.returncode == 0 else None
+    except ValueError:
+        printed = None
+    if not isinstance(printed, dict):
         raise Unavailable('the executor fingerprint could not be computed')
-    return json.loads(completed.stdout)
+    return printed
 
 
 def qualify(root: Path) -> int:
@@ -75,22 +81,12 @@ def qualify(root: Path) -> int:
             raise Unavailable(f'the disposable database did not start: {started.stderr[-300:]}')
         bootstrap(stack, root)
         applied, failure = apply_migrations(stack, root / MIGRATIONS)
-        cases.check('the disposable database is migrated', 'no failure', failure or f'{applied} migrations', failure is None)
-        seeded = seed(stack, root)
-        workspace = stack.migrator(f"insert into public.workspaces (id, name) values ('{WORKSPACE_A}', 'Workspace A');")
-        cases.check('the disposable database is seeded', 'exit 0', f'{seeded.returncode}, {workspace.returncode}', seeded.returncode == 0 == workspace.returncode)
+        cases.arranged('the disposable database migrated', 'no failure', failure or f'{applied} migrations', failure is None)
+        cases.arrange('the disposable database seeded, with workspace A', seed(stack, root),
+                      stack.migrator(f"insert into public.workspaces (id, name) values ('{WORKSPACE_A}', 'Workspace A');"))
         url = f'postgresql://autobots_runtime:{stack.runtime_password}@127.0.0.1:{db_port}/postgres'
-        result = subprocess.run([str(root / PYTHON), str(root / 'tests/db/browser_executor_check.py'), WORKSPACE_A, str(db_port), str(gateway_port)],
-                                env={**tool_env(), 'AUTOBOTS_DATABASE_URL': url, 'PYTHONPATH': str(root / 'services/agent/src'),
-                                     'PYTHONDONTWRITEBYTECODE': '1'},
-                                capture_output=True, text=True, timeout=900, check=False, cwd=root)
-        if result.returncode or not result.stdout.strip():
-            (root / REPORT).parent.mkdir(parents=True, exist_ok=True)
-            (root / REPORT).with_suffix('.err').write_text(result.stderr)
-            cases.check('the executor check ran', 'exit 0', f'exit {result.returncode}: {result.stderr.strip()[-600:]}', False)
-        else:
-            for case in json.loads(result.stdout.strip().splitlines()[-1])['cases']:
-                cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+        run_child_check(cases, root, 'browser_executor_check.py', WORKSPACE_A, str(db_port), str(gateway_port), label='the executor check',
+                        env=service_env(root, url), timeout=900, cwd=root, err_dir=root / REPORT.parent, err_name=REPORT.stem)
     finally:
         remove_stack(stack)
         leftover = run(['docker', 'ps', '-a', '--filter', 'label=autobots.browser=1', '--format', '{{.Names}}'], tool_env()).stdout.split()
@@ -103,15 +99,13 @@ def qualify(root: Path) -> int:
                 not leftover and not networks)
     after = other_resources(project)
     cases.check('other Docker resources are untouched', 'same', f'{len(before)} before, {len(after)} after', before == after)
-    passed = all(record['status'] == 'passed' for record in cases.records)
-    path = root / REPORT
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({
+    passed = cases.status == 'passed'
+    write_report(root / REPORT, {
         'schema_version': 'autobots.browser-executor-qualification/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
-        'duration_seconds': round(time.monotonic() - started_at, 1), 'status': 'passed' if passed else 'failed',
+        'duration_seconds': round(time.monotonic() - started_at, 1), 'status': cases.status,
         'executor_fingerprint': executor_fingerprint(root), 'target_class': 'disposable', 'driver': 'scripted',
         'network': 'outbound to https://example.com/ only for the allowed case', 'cases': cases.records,
-        'not_established': ['H1', 'product acceptance', 'browsing with a real model', 'a server-side redirect to a private address']}, indent=2) + '\n')
+        'not_established': ['H1', 'product acceptance', 'browsing with a real model', 'a server-side redirect to a private address']})
     print(f"{'PASS' if passed else 'FAIL'}: {sum(r['status'] == 'passed' for r in cases.records)} of {len(cases.records)} executor cases passed.")
     return 0 if passed else 1
 

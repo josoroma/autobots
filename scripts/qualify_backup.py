@@ -33,11 +33,24 @@ from disposable_db import (
 )
 from harness_lib import fingerprint, project_root
 from local_backup import restored_values
+from qualification.children import last_json, parse_report, run_child_check
+from qualification.records import write_report
 from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner, http, password_token
-from qualify_operations import Checks, Ops, api_call, conditions, durable_counts, exited, wait
+from qualify_operations import (
+    MODEL_TRANSPORT,
+    Checks,
+    Ops,
+    api_call,
+    conditions,
+    durable_counts,
+    exited,
+    wait,
+)
 from supabase_stack import generated_values, require_images, require_rendered
 
 REPORT = Path('.checks/backup/qualification.json')
+# Where a failed child check's stderr is kept (qualification/children.py).
+ERR_DIR = Path('.checks/backup')
 FAKE_CREDENTIAL = 'sk-or-arranged-' + secrets.token_hex(24)
 
 
@@ -66,7 +79,7 @@ def qualify(root: Path) -> int:
         raise Unavailable('the Docker engine is not reachable')
     (root / REPORT).unlink(missing_ok=True)
     require_images(require_rendered(stack))
-    cases = Checks()
+    cases = Checks(model_transport=MODEL_TRANSPORT)
     before = other_resources(project)
     started_at = time.monotonic()
     base = f'http://127.0.0.1:{gateway_port}'
@@ -119,6 +132,7 @@ def qualify(root: Path) -> int:
         master_key.parent.mkdir(parents=True, mode=0o700)
         seeded = subprocess.run([str(root / PYTHON), str(root / 'tests/db/restore_check.py'), 'seed', workspace_a, str(master_key), FAKE_CREDENTIAL], env=ops.env,
                                 capture_output=True, text=True, timeout=60, check=False)
+        cases.arrange('a fake credential sealed with the provider key', seeded)
         cases.check('the source holds real content (arranged credential)', 'finished, paused, queued, a sealed fake key', f'{finished}, {paused}, seed exit {seeded.returncode}', finished and paused and seeded.returncode == 0)
         env_file.write_text(env_text(stack) + f'AUTOBOTS_MIGRATOR_PASSWORD={stack.migrator_password}\nAUTOBOTS_RUNTIME_PASSWORD={stack.runtime_password}\n')
         env_file.chmod(0o600)
@@ -186,14 +200,17 @@ def qualify(root: Path) -> int:
         back = backup_tool(root, 'restore', '--backup', str(backup_dir), '--backup-key', str(backup_key), '--project', restored_project, '--gateway-port', str(restored_gateway), '--db-port', str(restored_db))
         if back.returncode:
             raise Unavailable(f'the restore failed: {back.stderr[-500:]}')
-        result = json.loads(back.stdout.strip().splitlines()[-1])
+        result = last_json(back.stdout)
+        if result is None:
+            raise Unavailable(f'the restore printed no result: {back.stdout.strip()[-200:]}')
         held_at = run(['docker', 'exec', f"{restored_project}-db-1", 'psql', '-U', 'supabase_admin', '-d', 'postgres', '-X', '-A', '-t', '-c', "select to_char(created_at at time zone 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS.US') from app_private.installation_holds;"], tool_env()).stdout.strip()
         rest_started = run(['docker', 'inspect', '-f', '{{.State.StartedAt}}', f'{restored_project}-rest-1'], tool_env()).stdout.strip()[:26]
         cases.check('the hold is written before other services start', 'hold earlier than the REST service', f'{held_at}, {rest_started}', bool(held_at) and bool(rest_started) and held_at < rest_started)
         verified = backup_tool(root, 'verify', '--backup', str(backup_dir), '--backup-key', str(backup_key), '--key-dir', str(key_dir), '--project', restored_project)
-        report = json.loads(verified.stdout.strip().splitlines()[-1]) if verified.stdout.strip() else {'cases': []}
-        failed = [case['id'] for case in report['cases'] if not case['passed']]
-        cases.check("the operator's own verify command passes on the restore", 'exit 0, all facts match', f"exit {verified.returncode}, {len(report['cases'])} facts, failed {failed or 'none'}", verified.returncode == 0 and report['cases'] and not failed)
+        printed = parse_report(verified.stdout)
+        facts = printed[0]['cases'] if printed is not None else []
+        failed = [fact['id'] for fact in facts if not fact['passed']]
+        cases.check("the operator's own verify command passes on the restore", 'exit 0, all facts match', f"exit {verified.returncode}, {len(facts)} facts, failed {failed or 'none'}", verified.returncode == 0 and facts and not failed)
         records = [json.loads(line) for line in (backup_dir / 'restores.jsonl').read_text().splitlines()]
         last = records[-1] if records else {}
         cases.check('each restore and its verification are recorded where Operations reads them', 'not_verified, then passed, with counts and no instance name',
@@ -228,14 +245,8 @@ def qualify(root: Path) -> int:
         wrong_provider = work / 'wrong-provider.key'
         wrong_provider.write_bytes(secrets.token_bytes(len(master_key.read_bytes())))
         wrong_provider.chmod(0o600)
-        checked = subprocess.run([str(root / PYTHON), str(root / 'tests/db/restore_check.py'), 'verify', workspace_a, str(kept_key), str(backup_dir / 'manifest.json'), expected_sha, str(wrong_provider)], env=restored_ops.env,
-                                 capture_output=True, text=True, errors='replace', timeout=240, check=False)
-        if checked.returncode:
-            (root / '.checks/backup/restore.err').write_text(checked.stderr)
-            cases.check('the restore check ran', 'exit 0', f'exit {checked.returncode}: {checked.stderr.strip()[-380:]}', False)
-        if checked.stdout.strip():
-            for case in json.loads(checked.stdout.strip().splitlines()[-1])['cases']:
-                cases.check(case['id'], case['expected'], case['observed'], case['passed'])
+        run_child_check(cases, root, 'restore_check.py', 'verify', workspace_a, str(kept_key), str(backup_dir / 'manifest.json'), expected_sha, str(wrong_provider),
+                        label='the restore check', env=restored_ops.env, timeout=240, err_dir=root / ERR_DIR, err_name='restore')
 
         # The product worker and API on the restore, still held.
         states_before = restored_ops.sql("select string_agg(status || attempts, ',' order by run_id) from app_private.run_jobs;")
@@ -291,13 +302,11 @@ def qualify(root: Path) -> int:
         cases.check('cleanup removed the owned containers and volumes', 'none left', left or 'none', not left)
     after_resources = other_resources(project)
     cases.check('other Docker resources are untouched', 'same', f'{len(before)} before, {len(after_resources)} after', before == after_resources)
-    passed = all(record['status'] == 'passed' for record in cases.records)
-    path_report = root / REPORT
-    path_report.parent.mkdir(parents=True, exist_ok=True)
-    path_report.write_text(json.dumps({'schema_version': 'autobots.backup-qualification/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
-                                       'duration_seconds': round(time.monotonic() - started_at, 1), 'input_fingerprint': fingerprint(root),
-                                       'status': 'passed' if passed else 'failed', 'target_class': 'disposable', 'cases': cases.records,
-                                       'not_established': ['H1', 'product acceptance', 'the persistent stack', 'a real model call', 'a real credential', 'protection from losing this Mac']}, indent=2))
+    passed = cases.status == 'passed'
+    write_report(root / REPORT, {'schema_version': 'autobots.backup-qualification/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
+                                 'duration_seconds': round(time.monotonic() - started_at, 1), 'input_fingerprint': fingerprint(root),
+                                 'status': cases.status, 'target_class': 'disposable', 'cases': cases.records,
+                                 'not_established': ['H1', 'product acceptance', 'the persistent stack', 'a real model call', 'a real credential', 'protection from losing this Mac']})
     print(f'{"PASS" if passed else "FAIL"}: backup qualification, {round(time.monotonic() - started_at)}s, report {REPORT}')
     return 0 if passed else 1
 

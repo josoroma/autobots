@@ -34,6 +34,8 @@ from harness_lib import (
     reduced_env,
     scope_paths,
 )
+from qualification.errors import Unavailable
+from qualification.records import ModelTransport, StepClass, VerificationClass
 from suites import (
     API_CLIENT_TESTS,
     DB_QUALIFIERS,
@@ -45,7 +47,6 @@ from suites import (
 from toolchain import (
     LONG,
     Step,
-    Unavailable,
     check_steps,
     child_env,
     find_tools,
@@ -61,8 +62,9 @@ IMPLEMENTED_PROFILES = ('harness', 'fast', 'full', 'db', 'operations')
 SELF_REPORTING_STEPS = frozenset({'contract_drift', 'browser_qualification', 'fault_qualification', 'disposable_qualification', 'supabase_stack_qualification',
                                   'app_db_qualification', 'identity_qualification', 'persistent_apply_qualification', 'operations_qualification',
                                   'backup_qualification', 'upgrade_qualification'})
-# DH-09.2 class and model transport by step. Evidence reads these, and a plan cannot override them.
-STEP_CLASSES = {'harness_behavior_tests': ('mock', 'none'), 'pytest': ('mock', 'mock'), 'api_client_tests': ('mock', 'none'),
+# DH-09.2 class and model transport by step, in the vocabulary of qualification/records.py. Evidence reads
+# these, and a plan cannot override them.
+STEP_CLASSES: dict[str, tuple[VerificationClass, ModelTransport]] = {'harness_behavior_tests': ('mock', 'none'), 'pytest': ('mock', 'mock'), 'api_client_tests': ('mock', 'none'),
                 'web_unit_tests': ('mock', 'none'), 'browser_qualification': ('local_runtime', 'none'),
                 'fault_qualification': ('mock', 'mock'), 'disposable_qualification': ('disposable', 'none'),
                 'supabase_stack_qualification': ('disposable', 'none'), 'app_db_qualification': ('disposable', 'mock'),
@@ -81,7 +83,7 @@ OPERATIONS_NOT_TESTED = ['H1', 'product acceptance', 'the persistent stack', 'a 
                          'protection from losing this Mac', 'Claude event delivery', 'OpenRouter inference']
 
 
-def classify(step_id: str) -> dict[str, str]:
+def classify(step_id: str) -> StepClass:
     klass, transport = STEP_CLASSES.get(step_id, ('static', 'none'))
     return {'class': klass, 'model_transport': transport}
 

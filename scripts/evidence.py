@@ -23,10 +23,12 @@ from typing import Any
 
 from harness_lib import input_manifest, project_root, read_report
 
+# The verification classes and model transports (DH-09.2), which the verifier's step classes and the
+# qualifiers' case records use too (SCRP-10).
+from qualification.records import CLASSES, TRANSPORTS
+
 SCHEMA = 'autobots.work-evidence/v1'
 REPORT_SCHEMA = 'autobots.harness-result/v1'
-CLASSES = {'static', 'mock', 'disposable', 'local_runtime', 'live'}
-TRANSPORTS = {'none', 'mock', 'openrouter_live'}
 STATUSES = {'passed', 'failed', 'error', 'skipped', 'not_run'}
 AVAILABILITY = {'not_created', 'available', 'deleted', 'unavailable'}
 SECTIONS = ('Plan', 'Implementation', 'Review', 'Verification', 'Runbook')

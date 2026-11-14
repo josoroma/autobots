@@ -28,6 +28,10 @@ from typing import Any
 
 from harness_lib import project_root, reduced_env
 
+# A pinned tool, manifest or prepared environment is missing: exit code 2. One class for every script
+# (SCRP-08), so a script that imports it from here catches what disposable_db.py raises too.
+from qualification.errors import Unavailable as Unavailable
+
 
 def git_paths(root: Path, *arguments: str) -> list[str]:
     result = subprocess.run(['git', '-C', str(root), *arguments, '-z'], capture_output=True, check=False)
@@ -74,10 +78,6 @@ SHORT = 120.0
 LONG = 600.0
 SEMVER = re.compile(r'\d+\.\d+\.\d+')
 OUTPUT_LIMIT = 16000
-
-
-class Unavailable(Exception):
-    """A pinned tool, manifest or prepared environment is missing. Maps to exit code 2."""
 
 
 @dataclass(frozen=True)

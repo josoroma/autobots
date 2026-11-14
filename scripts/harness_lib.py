@@ -57,7 +57,8 @@ SHARED_CHECK_PREFIXES = ('contracts/', 'tests/toolchain/', 'tests/faults/', 'tes
 RUNNER_FILES = frozenset({'scripts/verify.py', 'scripts/harness_lib.py'})
 DB_CHECK_FILES = frozenset({'scripts/disposable_db.py', 'scripts/supabase_stack.py', 'scripts/app_db.py', 'scripts/qualify_identity.py',
                             'scripts/persistent_install.py', 'scripts/qualify_persistent_apply.py'})
-DB_CHECK_PREFIXES = ('infra/', 'supabase/', 'tests/db/', 'packages/db-types/')
+# scripts/qualification/ runs every qualifier's child checks (R-39), so a change there needs db.
+DB_CHECK_PREFIXES = ('infra/', 'supabase/', 'tests/db/', 'packages/db-types/', 'scripts/qualification/')
 HARNESS_CHECKS = frozenset({'project_configuration', 'backlog_validation', 'harness_behavior_tests'})
 APPLICATION_PROFILES = ('fast', 'full')
 PYTHON_STEPS = frozenset({'python_lock', 'python_env', 'ruff_check', 'ruff_format', 'mypy', 'pytest', 'contract_drift'})

@@ -35,8 +35,24 @@ def pytest_paths(root: Path) -> tuple[str, ...]:
     return tuple(f'services/agent/{path}/' for path in paths)
 
 
+def imported_modules(node: ast.AST) -> list[str]:
+    """The dotted module names an import statement may load: `from a.b import c` may load a.b or a.b.c."""
+    if isinstance(node, ast.Import):
+        return [alias.name for alias in node.names]
+    if isinstance(node, ast.ImportFrom) and node.module and not node.level:
+        return [node.module, *(f'{node.module}.{alias.name}' for alias in node.names)]
+    return []
+
+
+def module_files(root: Path, name: str) -> list[Path]:
+    """Where a module of scripts/ lives, as a file or a package, with each enclosing package (R-39)."""
+    parts = name.split('.')
+    packages = [root / 'scripts' / Path(*parts[:depth]) / '__init__.py' for depth in range(1, len(parts) + 1)]
+    return [root / 'scripts' / Path(*parts[:-1], f'{parts[-1]}.py'), *packages]
+
+
 def profile_scripts(root: Path) -> set[Path]:
-    """The qualifier scripts a profile runs, and every sibling script they import, transitively."""
+    """The qualifier scripts a profile runs, and every sibling script or package module they import, transitively."""
     pending = [root / argv[0] for _step, *argv in (*suites.DB_QUALIFIERS, *suites.OPERATIONS_QUALIFIERS)]
     pending += [root / path for path in suites.FULL_QUALIFIERS]
     found: set[Path] = set()
@@ -46,9 +62,7 @@ def profile_scripts(root: Path) -> set[Path]:
             continue
         found.add(path)
         for node in ast.walk(ast.parse(path.read_text())):
-            names = ([alias.name for alias in node.names] if isinstance(node, ast.Import)
-                     else [node.module] if isinstance(node, ast.ImportFrom) and node.module else [])
-            pending += [root / 'scripts' / f'{name}.py' for name in names]
+            pending += [file for name in imported_modules(node) for file in module_files(root, name)]
     return found
 
 
@@ -86,10 +100,13 @@ class SuiteClaims(unittest.TestCase):
                          'tests/db/known_check.py', 'tests/db/new_check.py', 'tests/harness/test_new.py'):
                 (root / path).parent.mkdir(parents=True, exist_ok=True)
                 (root / path).write_text('')
-            (root / 'scripts').mkdir()
-            # The db profile runs app_db.py, which imports runner.py, which names known_check.
-            (root / 'scripts/app_db.py').write_text('import runner\n')
+            (root / 'scripts/qualification').mkdir(parents=True)
+            # The db profile runs app_db.py, which imports runner.py, which names known_check, and a module
+            # of a package, which names packaged_check.
+            (root / 'scripts/app_db.py').write_text('import runner\nfrom qualification.tables import CHILDREN\n')
             (root / 'scripts/runner.py').write_text("CHECKS = ['known_check.py']\n")
+            (root / 'scripts/qualification/tables.py').write_text("CHILDREN = ['packaged_check.py']\n")
+            (root / 'tests/db/packaged_check.py').write_text('')
             # A live qualifier that no profile runs names live_check, so it isn't claimed.
             (root / 'tests/db/live_check.py').write_text('')
             (root / 'scripts/qualify_live.py').write_text("CHECK = 'live_check.py'\n")

@@ -30,7 +30,12 @@ from urllib import error as urlerror
 from urllib import request as urlrequest
 from urllib.parse import urlsplit
 
-from harness_lib import fingerprint, project_root, reduced_env
+from harness_lib import fingerprint, project_root
+
+# Shared by every qualifier (refactor plan R-39); a script that imports these from here gets the same objects.
+from qualification.children import tool_env
+from qualification.errors import Refused, Unavailable
+from qualification.records import Cases, write_report
 
 PROJECT_PREFIX = 'autobots-disposable-'
 PROJECT = re.compile(r'autobots-disposable-[a-z0-9]{1,24}')
@@ -48,14 +53,6 @@ WORKSPACE_A = 'a0000000-0000-4000-8000-000000000001'
 NOTE_A = 'a3333333-3333-4333-8333-333333333333'
 COMMAND_TIMEOUT = 180.0
 EXPECTED_MIGRATIONS = 2
-
-
-class Refused(Exception):
-    """The target is not a marked disposable one. Nothing was changed."""
-
-
-class Unavailable(Exception):
-    """Docker, Compose or a pinned image is missing."""
 
 
 @dataclass(frozen=True)
@@ -98,15 +95,6 @@ class Stack:
         claims = json.dumps({'role': role, **({'sub': user} if user else {})})
         return self.sql(f"begin;\nset local role {role};\nselect set_config('request.jwt.claims', '{claims}', true), "
                         f"set_config('request.jwt.claim.sub', '{user or ''}', true);\n{statement};\nrollback;\n")
-
-
-def tool_env() -> dict[str, str]:
-    """No inherited credential, and no inherited target: only what Docker needs to find its engine."""
-    env = reduced_env()
-    for name in ('HOME', 'DOCKER_HOST', 'DOCKER_CONTEXT', 'DOCKER_CONFIG'):
-        if name in os.environ:
-            env[name] = os.environ[name]
-    return env
 
 
 def run(argv: Sequence[str], env: Mapping[str, str], timeout: float = COMMAND_TIMEOUT,
@@ -335,21 +323,6 @@ def other_resources(project: str) -> list[str]:
     return sorted(line for line in (*containers.splitlines(), *volumes.stdout.splitlines()) if project not in line)
 
 
-class Cases:
-    def __init__(self, model_transport: str = 'none') -> None:
-        self.records: list[dict] = []
-        self.model_transport = model_transport
-
-    def check(self, case_id: str, expected: str, observed: str, passed: bool) -> None:
-        print(f"{'PASS' if passed else 'FAIL'}: {case_id}: {observed[:140]}")
-        self.records.append({'id': case_id, 'class': 'disposable', 'model_transport': self.model_transport, 'expected': expected,
-                             'observed': observed[:400], 'status': 'passed' if passed else 'failed'})
-
-    def denied(self, case_id: str, result: subprocess.CompletedProcess[str], marker: str) -> None:
-        self.check(case_id, f'refused with {marker}', (result.stderr or result.stdout).strip()[-140:] or f'exit {result.returncode}',
-                   result.returncode != 0 and marker in result.stderr)
-
-
 def rows(stack: Stack, statement: str) -> str:
     result = stack.sql(statement)
     return result.stdout.strip() if result.returncode == 0 else f'ERROR: {result.stderr.strip()[-120:]}'
@@ -393,19 +366,24 @@ def migration_cases(stack: Stack, cases: Cases, root: Path) -> None:
                           "+ (select count(*) from autobots_disposable.migrations where name like '0099%');")
     cases.check('a failing migration rolls back', 'error, no table and no history row', f'{bad_applied} applied, {bad_error}, {remains} remain',
                 bad_applied == 0 and bool(bad_error) and remains == '0')
-    stack.sql("update autobots_disposable.migrations set sha256 = 'edited' where name = '0001_workspaces.sql';")
+    cases.arrange('an applied migration edited in the history',
+                  stack.sql("update autobots_disposable.migrations set sha256 = 'edited' where name = '0001_workspaces.sql';"))
     _, error = apply_migrations(stack, migrations)
     cases.check('an edited applied migration is refused', 'refused by checksum', str(error), bool(error and 'never edit' in error))
     reset_fixture_schema(stack)
     applied, error = apply_migrations(stack, migrations, upto=1)
-    stack.sql(f"insert into app.workspaces values ('{WORKSPACE_A}', 'prior');\n"
-              f"insert into app.notes (id, workspace_id, body) values ('{NOTE_A}', '{WORKSPACE_A}', 'prior body');\n")
+    cases.arranged('the prior fixture schema', '1 applied', f'{applied} applied, error {error}', applied == 1 and error is None)
+    cases.arrange('rows written under the prior fixture',
+                  stack.sql(f"insert into app.workspaces values ('{WORKSPACE_A}', 'prior');\n"
+                            f"insert into app.notes (id, workspace_id, body) values ('{NOTE_A}', '{WORKSPACE_A}', 'prior body');\n"))
     applied_next, error = apply_migrations(stack, migrations)
     prior = rows(stack, f"select body || '|' || title from app.notes where id = '{NOTE_A}';")
     cases.check('upgrade from the prior fixture keeps data', 'prior body kept, default title', f'{applied_next} applied, {prior}',
                 applied_next == 1 and error is None and prior == 'prior body|untitled')
     reset_fixture_schema(stack)
-    apply_migrations(stack, migrations)
+    applied, error = apply_migrations(stack, migrations)
+    cases.arranged('the fixture schema for the cases after these', f'{EXPECTED_MIGRATIONS} applied', f'{applied} applied, error {error}',
+                   applied == EXPECTED_MIGRATIONS and error is None)
 
 
 def seed_cases(stack: Stack, cases: Cases, root: Path) -> None:
@@ -416,10 +394,11 @@ def seed_cases(stack: Stack, cases: Cases, root: Path) -> None:
     after = rows(stack, FINGERPRINT_QUERY)
     cases.check('a second seed run changes nothing', 'same rows', f'{before} then {after}',
                 first.returncode == 0 and second.returncode == 0 and before == after and len(before) == 32)
-    stack.sql(f"update app.notes set body = 'edited by a user' where id = '{NOTE_A}';")
-    apply_sql_file(stack, seed)
+    cases.arrange('a user edit', stack.sql(f"update app.notes set body = 'edited by a user' where id = '{NOTE_A}';"))
+    third = apply_sql_file(stack, seed)
     edited = rows(stack, f"select body from app.notes where id = '{NOTE_A}';")
-    cases.check('a repeated seed keeps a user edit', 'edit survives', edited, edited == 'edited by a user')
+    cases.check('a repeated seed keeps a user edit', 'the seed exits 0 and the edit survives', f'exit {third.returncode}, {edited}',
+                third.returncode == 0 and edited == 'edited by a user')
 
 
 def authorization_cases(stack: Stack, cases: Cases) -> None:
@@ -546,7 +525,7 @@ def guard_cases_on_real_target(stack: Stack, cases: Cases) -> None:
         cases.check('a project without containers is refused', 'refused', 'not refused', False)
     except Refused as refusal:
         cases.check('a project without containers is refused', 'refused', str(refusal), True)
-    stack.sql("update autobots_disposable.marker set run_id = 'something-else';")
+    cases.arrange('a marker naming another run', stack.sql("update autobots_disposable.marker set run_id = 'something-else';"))
     before = rows(stack, 'select count(*) from app.notes;')
     try:
         reset_fixture_schema(stack)
@@ -554,7 +533,7 @@ def guard_cases_on_real_target(stack: Stack, cases: Cases) -> None:
     except Refused as refusal:
         cases.check('a wrong marker refuses reset', 'refused, rows remain',
                     f"{refusal}; {rows(stack, 'select count(*) from app.notes;')} notes", rows(stack, 'select count(*) from app.notes;') == before)
-    stack.sql(f"update autobots_disposable.marker set run_id = '{stack.target.project}';")
+    cases.arrange('the marker restored', stack.sql(f"update autobots_disposable.marker set run_id = '{stack.target.project}';"))
 
 
 def qualify(root: Path) -> int:
@@ -598,18 +577,15 @@ def qualify(root: Path) -> int:
     cases.check('cleanup removed the owned containers and volumes', 'none left', left or 'none', not left)
     after = other_resources(project)
     cases.check('other Docker resources are untouched', 'same containers and volumes', f'{len(before)} before, {len(after)} after', before == after)
-    passed = all(record['status'] == 'passed' for record in cases.records)
-    path = root / REPORT
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({'schema_version': 'autobots.disposable-qualification/v1',
-                                'completed_at_utc': datetime.now(UTC).isoformat(),
-                                'duration_seconds': round(time.monotonic() - started_at, 1),
-                                'input_fingerprint': fingerprint(root),
-                                'status': 'passed' if passed else 'failed', 'target_class': 'disposable',
-                                'project': project, 'cases': cases.records,
-                                'not_established': ['H1', 'product acceptance', 'the persistent stack',
-                                                    'the pinned self-hosted release']}, indent=2) + '\n')
-    return 0 if passed else 1
+    write_report(root / REPORT, {'schema_version': 'autobots.disposable-qualification/v1',
+                                 'completed_at_utc': datetime.now(UTC).isoformat(),
+                                 'duration_seconds': round(time.monotonic() - started_at, 1),
+                                 'input_fingerprint': fingerprint(root),
+                                 'status': cases.status, 'target_class': 'disposable',
+                                 'project': project, 'cases': cases.records,
+                                 'not_established': ['H1', 'product acceptance', 'the persistent stack',
+                                                     'the pinned self-hosted release']})
+    return 0 if cases.status == 'passed' else 1
 
 
 def guarded_stack(args: argparse.Namespace, root: Path) -> Stack:
