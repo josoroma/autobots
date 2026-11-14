@@ -201,7 +201,10 @@ def qualify(root: Path) -> int:
         cases.check('readiness is reported once processes are up', '200 and ready', f'{status_code}, {up}', status_code == 200 and json.loads(body)['ready'] is True)
         cases.check('no worker reads as visibly absent', 'worker_absent', conditions(body).get('worker'), conditions(body).get('worker') == 'worker_absent')
         cases.check('inherited tracing settings are turned off at bootstrap', 'disabled', json.loads(body)['remote_tracing'], json.loads(body)['remote_tracing'] == 'disabled')
-        lowered = body.lower()
+        # The declared checkpoint adapter (Decision 0022 D5) names its package, langgraph-checkpoint-postgres.
+        # Only that one value is set aside; 'postgres' anywhere else, such as in an address, still fails.
+        adapter = str(json.loads(body).get('values', {}).get('checkpoint_adapter', '')).lower()
+        lowered = body.lower().replace(adapter, '') if adapter else body.lower()
         leaked = [word for word in ('127.0.0.1', 'postgres', stack.runtime_password.lower(), 'service_role', 'langsmith', 'jwt', workspace_a) if word in lowered]
         cases.check('the status body has no address, secret or identifier', 'none', leaked or 'none', not leaked)
         code, reply = api_call(api_port, ops.internal, token_a, 'POST', '/v1/runs', goal, {'Idempotency-Key': secrets.token_hex(8)})

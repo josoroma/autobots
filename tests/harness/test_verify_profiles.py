@@ -30,7 +30,9 @@ def python_step(root: Path, name: str, code: str, timeout: float = 20.0) -> Step
 def passing_full_steps(root: Path) -> list[Step]:
     # The scope tests are judged by unittest's summary, so their fixture prints one.
     summary = "print('Ran 1 test in 0.1s'); print('OK')"
-    return [python_step(root, name, summary if name == 'toolchain_scope_tests' else 'pass')
+    node = "print('# tests 1'); print('# pass 1')"
+    return [python_step(root, name, summary if name == 'toolchain_scope_tests'
+                        else node if name in verify.NODE_TEST_STEPS else 'pass')
             for name in sorted(harness_lib.FULL_CHECKS)]
 
 
@@ -99,6 +101,13 @@ class Profiles(unittest.TestCase):
             self.assertNotIn('OPENROUTER_API_KEY', harness_lib.reduced_env())
         self.assertEqual(code, 0)
         self.assertNotIn('fixture-not-a-key', (self.root / '.checks/fast/latest.json').read_text())
+
+    def test_node_reporting_no_tests_fails(self):
+        passed = {'id': 'web_unit_tests', 'status': 'passed', 'output': '# tests 0\n# pass 0\n'}
+        self.assertEqual(verify.judge_node(passed)['status'], 'failed')
+        self.assertEqual(verify.judge_node({**passed, 'output': ''})['status'], 'failed')
+        counted = verify.judge_node({**passed, 'output': '# tests 55\n# pass 55\n'})
+        self.assertEqual(counted, {'tests_executed': 55})
 
     def test_fast_scope_selection(self):
         step_ids = sorted(verify.PYTHON_STEPS | verify.WEB_STEPS | {'build'})

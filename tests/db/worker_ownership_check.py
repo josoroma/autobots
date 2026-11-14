@@ -56,7 +56,7 @@ async def main() -> None:
         async def rejected(attempt) -> str:  # type: ignore[no-untyped-def]
             try:
                 await attempt()
-            except Exception as error:  # noqa: BLE001
+            except Exception as error:  # noqa: BLE001 - the outcome is named, and only 'stale owner' satisfies a case
                 return 'stale owner' if is_stale_owner(error) else type(error).__name__
             return 'accepted'
 

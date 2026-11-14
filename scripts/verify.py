@@ -34,7 +34,14 @@ from harness_lib import (
     reduced_env,
     scope_paths,
 )
-from suites import API_CLIENT_TESTS, HARNESS_PATTERN, TOOLCHAIN_OFFLINE, WEB_UNIT_TESTS
+from suites import (
+    API_CLIENT_TESTS,
+    DB_QUALIFIERS,
+    HARNESS_PATTERN,
+    OPERATIONS_QUALIFIERS,
+    TOOLCHAIN_OFFLINE,
+    WEB_UNIT_TESTS,
+)
 from toolchain import (
     LONG,
     Step,
@@ -63,6 +70,7 @@ STEP_CLASSES = {'harness_behavior_tests': ('mock', 'none'), 'pytest': ('mock', '
                 'operations_qualification': ('disposable', 'mock'),
                 'backup_qualification': ('disposable', 'mock'), 'upgrade_qualification': ('disposable', 'mock')}
 OUTSIDE_SCOPE = 'outside the changed scope of this fast run'
+NODE_TEST_STEPS = frozenset({'web_unit_tests', 'api_client_tests'})
 NOT_TESTED = ['Claude event delivery', 'Supabase', 'Docker', 'OpenRouter inference', 'complete H0/H1']
 APPLICATION_NOT_TESTED: list[str] = []
 DB_NOT_TESTED = ['the persistent database',
@@ -125,6 +133,16 @@ def judge_unittest(check: Mapping[str, Any]) -> dict[str, Any]:
     return result
 
 
+def judge_node(record: Mapping[str, Any]) -> dict[str, Any]:
+    """Node's runner passes a glob that matched nothing, so its own count is read (R-01)."""
+    found = re.search(r'^# tests (\d+)$', record.get('output', ''), re.M)
+    executed = int(found.group(1)) if found else 0
+    if record['status'] == 'passed' and executed < 1:
+        return {'tests_executed': 0, 'status': 'failed',
+                'output': record.get('output', '') + '\nNode ran no tests; an empty suite is not a pass.'}
+    return {'tests_executed': executed}
+
+
 def judge_pytest(record: Mapping[str, Any]) -> dict[str, Any]:
     """A pytest skip exits 0, so its summary is read too."""
     skipped = sum(int(count) for count in re.findall(r'\b(\d+) (?:skipped|xfailed)\b', record.get('output', '')))
@@ -154,17 +172,9 @@ def tool_plan(root: Path, profile: str, changed: Sequence[str] | None) -> tuple[
         missing = missing_prepared_paths(root, find_tools(root))
         if missing:
             raise Unavailable('not prepared, run scripts/toolchain.py bootstrap explicitly; missing: ' + ', '.join(missing))
-    if profile == 'db':
-        steps = [Step('disposable_qualification', (sys.executable, 'scripts/disposable_db.py', 'qualify'), root, LONG),
-                 Step('supabase_stack_qualification', (sys.executable, 'scripts/supabase_stack.py', 'qualify'), root, LONG),
-                 Step('app_db_qualification', (sys.executable, 'scripts/app_db.py', 'qualify'), root, LONG),
-                 Step('identity_qualification', (sys.executable, 'scripts/qualify_identity.py'), root, LONG),
-                 Step('persistent_apply_qualification', (sys.executable, 'scripts/qualify_persistent_apply.py'), root, LONG)]
-        return ToolPlan(steps, docker_env), []
-    if profile == 'operations':
-        steps = [Step('operations_qualification', (sys.executable, 'scripts/qualify_operations.py'), root, LONG),
-                 Step('backup_qualification', (sys.executable, 'scripts/qualify_backup.py'), root, LONG),
-                 Step('upgrade_qualification', (sys.executable, 'scripts/qualify_upgrade.py'), root, LONG)]
+    if profile in ('db', 'operations'):
+        qualifiers = DB_QUALIFIERS if profile == 'db' else OPERATIONS_QUALIFIERS
+        steps = [Step(step_id, (sys.executable, *argv), root, LONG) for step_id, *argv in qualifiers]
         return ToolPlan(steps, docker_env), []
     known = set(FULL_CHECKS)
     chosen = selected_steps(profile, sorted(known), changed)
@@ -203,6 +213,8 @@ def toolchain_checks(root: Path, profile: str, plan: Callable[..., tuple[ToolPla
     for record in records:
         if record['id'] in SELF_REPORTING_STEPS and record['exit_code'] == EXIT_UNAVAILABLE:
             record['status'] = 'error'
+        if record['id'] in NODE_TEST_STEPS:
+            record.update(judge_node(record))
         if record['id'] == 'pytest':
             record.update(judge_pytest(record))
         if record['id'] == 'toolchain_scope_tests':

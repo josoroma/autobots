@@ -30,6 +30,8 @@ export const ANNOTATIONS = [
   "examples",
   "title",
 ] as const;
+/** The string formats `check` enforces. The generator refuses a contract that uses another. */
+export const IMPLEMENTED_FORMATS = ["date", "date-time", "uuid"] as const;
 
 export interface Schema {
   $ref?: string;
@@ -68,6 +70,7 @@ const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DATE_TIME =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function checkString(schema: Schema, value: string, path: string): void {
   if (schema.format === "uuid" && !UUID.test(value)) {
@@ -78,6 +81,12 @@ function checkString(schema: Schema, value: string, path: string): void {
     (!DATE_TIME.test(value) || Number.isNaN(Date.parse(value)))
   ) {
     throw new ContractError(path, "not a timestamp with an offset");
+  }
+  if (
+    schema.format === "date" &&
+    (!DATE.test(value) || Number.isNaN(Date.parse(value)))
+  ) {
+    throw new ContractError(path, "not a date");
   }
   if (schema.pattern !== undefined && !new RegExp(schema.pattern).test(value)) {
     throw new ContractError(path, "does not match its pattern");

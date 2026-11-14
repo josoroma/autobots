@@ -30,10 +30,15 @@ def scope_errors(rules: Path, files: list[str]) -> list[str]:
     errors = []
     for rule in sorted(rules.glob('*.md')):
         match = FRONTMATTER.match(rule.read_text())
-        for glob in re.findall(r'^\s*-\s+"([^"]+)"', match.group(1), re.M) if match else ():
+        for glob in globs(match.group(1)) if match else ():
             if not any(glob_pattern(glob).match(path) for path in files):
                 errors.append(f'{rule.name}: {glob} matches no tracked file')
     return errors
+
+
+def globs(frontmatter: str) -> list[str]:
+    """A `paths:` list's entries, double-quoted, single-quoted or bare."""
+    return [item.strip().strip('"\'') for item in re.findall(r'^\s*-\s+(.+?)\s*$', frontmatter, re.M)]
 
 
 def tracked(root: Path) -> list[str]:
@@ -47,15 +52,16 @@ class RuleScopes(unittest.TestCase):
     def test_a_glob_that_matches_nothing_is_caught(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             rules = Path(folder)
-            (rules / 'fixture.md').write_text('---\npaths:\n  - "apps/web/**/*"\n  - "services/agent/graphs/**/*"\n---\n')
+            (rules / 'fixture.md').write_text("---\npaths:\n  - \"apps/web/**/*\"\n  - 'services/agent/graphs/**/*'\n"
+                                              "  - docs/gone/*.md\n---\n")
             self.assertEqual(scope_errors(rules, ['apps/web/app/page.tsx']),
-                             ['fixture.md: services/agent/graphs/**/* matches no tracked file'])
+                             ['fixture.md: services/agent/graphs/**/* matches no tracked file',
+                              'fixture.md: docs/gone/*.md matches no tracked file'])
 
     def test_the_model_gateway_rule_covers_the_model_admission_adapter(self) -> None:
         text = (ROOT / '.claude/rules/model-gateway.md').read_text()
-        globs = re.findall(r'^\s*-\s+"([^"]+)"', FRONTMATTER.match(text).group(1), re.M)
         path = 'services/agent/src/autobots/adapters/loop_middleware.py'
-        self.assertTrue(any(glob_pattern(glob).match(path) for glob in globs))
+        self.assertTrue(any(glob_pattern(glob).match(path) for glob in globs(FRONTMATTER.match(text).group(1))))
 
 
 if __name__ == '__main__':

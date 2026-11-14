@@ -36,13 +36,15 @@ def crossings(source: Path) -> Counter[tuple[str, str]]:
             continue
         layer = parts[0]
         for node in ast.walk(ast.parse(path.read_text())):
-            names = (
-                [node.module]
-                if isinstance(node, ast.ImportFrom) and node.module
-                else [alias.name for alias in node.names]
-                if isinstance(node, ast.Import)
-                else []
-            )
+            if isinstance(node, ast.ImportFrom) and node.module == "autobots":
+                # `from autobots import application` names its layers one by one.
+                names = [f"autobots.{alias.name}" for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                names = [node.module]
+            elif isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            else:
+                names = []
             for name in names:
                 pieces = name.split(".")
                 if pieces[0] != "autobots" or len(pieces) < 2:
@@ -64,4 +66,5 @@ def test_a_planted_violation_is_caught(tmp_path: Path) -> None:
     )
     (tmp_path / "contracts").mkdir()
     (tmp_path / "contracts/views.py").write_text("import autobots.persistence.rows\n")
-    assert dict(crossings(tmp_path)) == {("domain", "api"): 1}
+    (tmp_path / "domain/more.py").write_text("from autobots import application\n")
+    assert dict(crossings(tmp_path)) == {("domain", "api"): 1, ("domain", "application"): 1}

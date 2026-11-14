@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 import sys
 import tomllib
 import unittest
@@ -17,14 +18,30 @@ import toolchain  # noqa: E402
 
 RUFF_RULES = {'E', 'F', 'W', 'I', 'B', 'UP', 'ASYNC', 'RUF',
               # R-05's ratchets: size, complexity, Any and broad catches.
-              'C90', 'PLR0911', 'PLR0912', 'PLR0913', 'PLR0915', 'ANN401', 'BLE001', 'S110', 'S112'}
+              'C90', 'PLR0911', 'PLR0912', 'PLR0913', 'PLR0915', 'ANN401', 'BLE001', 'S110', 'S112',
+              'DTZ', 'S602', 'S604', 'S605', 'FAST002', 'FAST003', 'TID251'}
+# Repository Python (R-07): the shared families, broad catches, the subprocess and time rules, and the SDK ban.
+REPO_RUFF_RULES = {'E', 'F', 'W', 'I', 'B', 'UP', 'ASYNC', 'RUF', 'BLE001', 'S110', 'S112', 'DTZ', 'S602', 'S604',
+                   'S605', 'TID251'}
+# R-05's Any baseline: files may only leave it, and it ignores nothing but ANN401.
+ANN401_BASELINE_FILES = 75
+BANNED_SDKS = {'anthropic', 'langchain_anthropic', 'google', 'langchain_google_genai', 'openai', 'langchain_openai'}
+# R-06's ESLint ratchets, as their configuration states them.
+ESLINT_RULES = (r'complexity:\s*\[\s*"error",\s*15\s*\]', r'"max-depth":\s*\[\s*"error",\s*4\s*\]',
+                r'"max-lines-per-function":\s*\[\s*"error",\s*\{\s*max:\s*150\b',
+                r'"max-lines":\s*\[\s*"error",\s*\{\s*max:\s*400\b', r'"import/no-cycle":\s*"error"',
+                r'"@typescript-eslint/consistent-type-assertions":\s*\[\s*"error"',
+                r'"no-restricted-syntax":\s*\[\s*"error"')
 # Upper limits. A refactor may lower one; raising it fails here.
 RUFF_LIMITS = {('mccabe', 'max-complexity'): 15, ('pylint', 'max-branches'): 15, ('pylint', 'max-returns'): 8,
                ('pylint', 'max-statements'): 60, ('pylint', 'max-args'): 8}
 TS_FLAGS = ('strict', 'noUncheckedIndexedAccess', 'exactOptionalPropertyTypes')
 TSCONFIGS = ('apps/web/tsconfig.json', 'packages/api-client/tsconfig.json')
 ESLINT_PRESETS = ('eslint-config-next/core-web-vitals', 'eslint-config-next/typescript')
-WEB_SCRIPTS = {'lint': 'eslint --max-warnings=0 .', 'typecheck': 'tsc --noEmit'}
+WEB_SCRIPTS = {'lint': 'eslint --max-warnings=0 .', 'typecheck': 'tsc --noEmit',
+               'format:check': 'prettier --check app components lib tests eslint.config.mjs next.config.ts '
+                               'playwright.config.ts postcss.config.mjs package.json tsconfig.json '
+                               '../../packages/api-client/src/runtime.ts ../../packages/api-client/tests'}
 # Each step's arguments after its executable. Anything added could narrow what the step checks.
 STEP_ARGUMENTS = {'ruff_check': ('check',), 'ruff_format': ('format', '--check'), 'mypy': (), 'pytest': (),
                   'repo_ruff_check': ('check', 'scripts', 'tests', '.claude/hooks'), 'repo_mypy': ()}
@@ -38,9 +55,15 @@ def python_errors(pyproject: dict) -> list[str]:
         errors.append('mypy no longer checks src and tests')
     missing = RUFF_RULES - set(tool.get('ruff', {}).get('lint', {}).get('select', []))
     errors += [f'ruff no longer selects {rule}' for rule in sorted(missing)]
-    lint = tool.get('ruff', {}).get('lint', {})
-    if lint.get('ignore'):
-        errors.append('ruff ignores rules')
+    ruff = tool.get('ruff', {})
+    lint = ruff.get('lint', {})
+    if lint.get('ignore') or lint.get('extend-ignore') or ruff.get('exclude') or ruff.get('extend-exclude'):
+        errors.append('ruff ignores rules or excludes files')
+    ignores = lint.get('per-file-ignores', {})
+    if any(codes != ['ANN401'] for codes in ignores.values()) or len(ignores) > ANN401_BASELINE_FILES:
+        errors.append('the per-file ignores reach beyond the shrinking ANN401 baseline')
+    if set(lint.get('flake8-tidy-imports', {}).get('banned-api', {})) != BANNED_SDKS:
+        errors.append('the provider SDK ban changed')
     for (section, name), limit in RUFF_LIMITS.items():
         if not lint.get(section, {}).get(name, limit + 1) <= limit:
             errors.append(f'ruff {section} {name} is above {limit}')
@@ -53,7 +76,23 @@ def typescript_errors(name: str, config: dict) -> list[str]:
 
 
 def eslint_errors(config: str) -> list[str]:
-    return [f'ESLint no longer extends {preset}' for preset in ESLINT_PRESETS if f'"{preset}"' not in config]
+    # Comments don't count, so a rule commented out reads as gone.
+    code = re.sub(r'^\s*//[^\n]*', '', config, flags=re.M)
+    errors = [f'ESLint no longer extends {preset}' for preset in ESLINT_PRESETS if f'"{preset}"' not in code]
+    return errors + [f'ESLint no longer enforces {rule}' for rule in ESLINT_RULES if not re.search(rule, code)]
+
+
+def repo_ruff_errors(config: dict) -> list[str]:
+    lint = config.get('lint', {})
+    errors = [f'ruff.toml no longer selects {rule}' for rule in sorted(REPO_RUFF_RULES - set(lint.get('select', [])))]
+    allowed = {'tests/faults/**': ['ALL'], 'scripts/**': ['E501'], 'tests/**': ['E501'], '.claude/hooks/**': ['E501']}
+    if any(allowed.get(path) != codes for path, codes in lint.get('per-file-ignores', {}).items()):
+        errors.append('ruff.toml ignores more than the fault fixtures and, until reformatting, long lines')
+    if lint.get('ignore') or lint.get('extend-ignore'):
+        errors.append('ruff.toml ignores rules')
+    if set(lint.get('flake8-tidy-imports', {}).get('banned-api', {})) != BANNED_SDKS:
+        errors.append('ruff.toml changed the provider SDK ban')
+    return errors
 
 
 def script_errors(scripts: dict) -> list[str]:
@@ -78,9 +117,11 @@ class GateSettings(unittest.TestCase):
         self.tsconfigs = {name: json.loads((ROOT / name).read_text()) for name in TSCONFIGS}
         self.eslint = (ROOT / 'apps/web/eslint.config.mjs').read_text()
         self.scripts = json.loads((ROOT / 'apps/web/package.json').read_text())['scripts']
+        self.repo_ruff = tomllib.loads((ROOT / 'ruff.toml').read_text())
 
     def test_the_gates_are_as_strict_as_recorded(self) -> None:
-        errors = python_errors(self.pyproject) + eslint_errors(self.eslint) + script_errors(self.scripts)
+        errors = (python_errors(self.pyproject) + eslint_errors(self.eslint) + script_errors(self.scripts)
+                  + repo_ruff_errors(self.repo_ruff))
         for name, config in self.tsconfigs.items():
             errors += typescript_errors(name, config)
         self.assertEqual(errors + step_errors(placeholder_steps()), [])
@@ -92,7 +133,11 @@ class GateSettings(unittest.TestCase):
                        lambda d: d['tool']['ruff']['lint'].__setitem__('ignore', ['E501']),
                        lambda d: d['tool']['ruff']['lint']['mccabe'].__setitem__('max-complexity', 20),
                        lambda d: d['tool']['ruff']['lint']['pylint'].pop('max-args'),
-                       lambda d: d['tool']['ruff']['lint']['select'].remove('ANN401')):
+                       lambda d: d['tool']['ruff']['lint']['select'].remove('ANN401'),
+                       lambda d: d['tool']['ruff']['lint'].__setitem__('extend-ignore', ['B']),
+                       lambda d: d['tool']['ruff'].__setitem__('extend-exclude', ['src/autobots/api']),
+                       lambda d: d['tool']['ruff']['lint']['per-file-ignores'].__setitem__('src/new.py', ['ANN401', 'B']),
+                       lambda d: d['tool']['ruff']['lint']['flake8-tidy-imports']['banned-api'].pop('openai')):
             altered = copy.deepcopy(self.pyproject)
             weaken(altered)
             self.assertTrue(python_errors(altered))
@@ -105,6 +150,17 @@ class GateSettings(unittest.TestCase):
         self.assertTrue(eslint_errors(self.eslint.replace('eslint-config-next/typescript', 'nothing')))
         self.assertTrue(script_errors({**self.scripts, 'lint': 'eslint .'}))
         self.assertTrue(script_errors({**self.scripts, 'typecheck': 'tsc --noEmit || true'}))
+        self.assertTrue(script_errors({**self.scripts, 'format:check': 'prettier --check app'}))
+        self.assertTrue(eslint_errors(self.eslint.replace('"import/no-cycle": "error"', '// "import/no-cycle": "error"')))
+        self.assertTrue(eslint_errors(self.eslint.replace('complexity: ["error", 15]', 'complexity: ["error", 25]')))
+
+    def test_a_weakened_repository_gate_is_caught(self) -> None:
+        for weaken in (lambda d: d['lint']['select'].remove('BLE001'),
+                       lambda d: d['lint']['per-file-ignores'].__setitem__('scripts/**', ['E501', 'B']),
+                       lambda d: d['lint'].__setitem__('ignore', ['S602'])):
+            altered = copy.deepcopy(self.repo_ruff)
+            weaken(altered)
+            self.assertTrue(repo_ruff_errors(altered))
 
     def test_a_narrowed_step_is_caught(self) -> None:
         steps = placeholder_steps()

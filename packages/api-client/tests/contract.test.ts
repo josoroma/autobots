@@ -159,3 +159,11 @@ test("a call can add headers and an abort signal", async () => {
 test("an unknown schema is an error", () => {
   assert.throws(() => parseWith({}, "Missing", {}), ContractError);
 });
+
+test("a date field is checked as a date", () => {
+  const schemas = { Day: { type: "string", format: "date" } } as const;
+  assert.equal(parseWith(schemas, "Day", "2026-11-14"), "2026-11-14");
+  for (const value of ["2026-11-14T00:00:00Z", "14/11/2026", "2026-13-01"]) {
+    assert.throws(() => parseWith(schemas, "Day", value), ContractError);
+  }
+});

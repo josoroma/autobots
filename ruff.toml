@@ -1,11 +1,23 @@
-# R-07: the shared Python standard. services/agent/pyproject.toml extends it and adds the service's
-# own ratchets; scripts/, tests/ and .claude/hooks/ are checked against it from the repository root.
+# R-07: the Python standard for scripts/, tests/ and .claude/hooks/, checked from the repository root.
+# services/agent/pyproject.toml keeps its own configuration with the same rule families and its own
+# ratchets: extending this file would also inherit its exclusion of services/.
 target-version = "py312"
 line-length = 100
 extend-exclude = ["services", "research", "apps", "packages", "docs", "openspec", ".checks", "node_modules"]
 
 [lint]
-select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "RUF", "BLE001", "S110", "S112"]
+select = [
+    "E", "F", "W", "I", "B", "UP", "ASYNC", "RUF",
+    "BLE001", "S110", "S112", "DTZ", "S602", "S604", "S605", "TID251",
+]
+
+[lint.flake8-tidy-imports.banned-api]
+"anthropic".msg = "Owned code never imports the unused provider SDKs (user decision, 2026-11-05)."
+"langchain_anthropic".msg = "Owned code never imports the unused provider SDKs (user decision, 2026-11-05)."
+"google".msg = "Owned code never imports the unused provider SDKs (user decision, 2026-11-05)."
+"langchain_google_genai".msg = "Owned code never imports the unused provider SDKs (user decision, 2026-11-05)."
+"openai".msg = "Application inference is OpenRouter only (AGENTS.md)."
+"langchain_openai".msg = "Application inference is OpenRouter only (AGENTS.md)."
 
 [lint.per-file-ignores]
 # Deliberately broken fixtures that the fault qualification expects to fail.

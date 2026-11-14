@@ -5,6 +5,7 @@ how schema-value.test.ts and the offline toolchain pins went unrun before.
 """
 from __future__ import annotations
 
+import ast
 import sys
 import tempfile
 import tomllib
@@ -34,12 +35,30 @@ def pytest_paths(root: Path) -> tuple[str, ...]:
     return tuple(f'services/agent/{path}/' for path in paths)
 
 
+def profile_scripts(root: Path) -> set[Path]:
+    """The qualifier scripts a profile runs, and every sibling script they import, transitively."""
+    pending = [root / argv[0] for _step, *argv in (*suites.DB_QUALIFIERS, *suites.OPERATIONS_QUALIFIERS)]
+    pending += [root / path for path in suites.FULL_QUALIFIERS]
+    found: set[Path] = set()
+    while pending:
+        path = pending.pop()
+        if path in found or not path.is_file():
+            continue
+        found.add(path)
+        for node in ast.walk(ast.parse(path.read_text())):
+            names = ([alias.name for alias in node.names] if isinstance(node, ast.Import)
+                     else [node.module] if isinstance(node, ast.ImportFrom) and node.module else [])
+            pending += [root / 'scripts' / f'{name}.py' for name in names]
+    return found
+
+
 def unclaimed(root: Path) -> list[str]:
     """Test files under `root` that no verification step runs and that aren't manual."""
     claimed = relative(root, suites.WEB_UNIT_TESTS) | relative(root, suites.API_CLIENT_TESTS)
     claimed |= relative(root, f'tests/harness/{suites.HARNESS_PATTERN}')
     offline = {name.split('.')[0] for name in suites.TOOLCHAIN_OFFLINE}
-    scripts = ' '.join(path.read_text() for path in sorted((root / 'scripts').glob('*.py')))
+    # Only scripts a profile runs count: a check named by a live or manual qualifier runs in no profile.
+    scripts = ' '.join(path.read_text() for path in sorted(profile_scripts(root)))
     left = []
     for path in sorted(set().union(*(relative(root, pattern) for pattern in TEST_FILES))):
         name = Path(path).stem
@@ -68,9 +87,26 @@ class SuiteClaims(unittest.TestCase):
                 (root / path).parent.mkdir(parents=True, exist_ok=True)
                 (root / path).write_text('')
             (root / 'scripts').mkdir()
+            # The db profile runs app_db.py, which imports runner.py, which names known_check.
+            (root / 'scripts/app_db.py').write_text('import runner\n')
             (root / 'scripts/runner.py').write_text("CHECKS = ['known_check.py']\n")
-            self.assertEqual(unclaimed(root), ['apps/web/tests/browser/zzz-new.spec.ts', 'tests/db/new_check.py',
-                                               'tests/toolchain/test_new_pins.py'])
+            # A live qualifier that no profile runs names live_check, so it isn't claimed.
+            (root / 'tests/db/live_check.py').write_text('')
+            (root / 'scripts/qualify_live.py').write_text("CHECK = 'live_check.py'\n")
+            self.assertEqual(unclaimed(root), ['apps/web/tests/browser/zzz-new.spec.ts', 'tests/db/live_check.py',
+                                               'tests/db/new_check.py', 'tests/toolchain/test_new_pins.py'])
+
+    def test_each_unit_test_glob_selects_files(self) -> None:
+        # Node passes an empty glob with no tests, so an emptied folder must fail here.
+        for pattern in (suites.WEB_UNIT_TESTS, suites.API_CLIENT_TESTS):
+            with self.subTest(pattern):
+                self.assertTrue(relative(ROOT, pattern))
+
+    def test_verify_builds_the_db_and_operations_steps_from_suites(self) -> None:
+        text = (ROOT / 'scripts/verify.py').read_text()
+        self.assertIn('DB_QUALIFIERS if profile ==', text)
+        for path in suites.FULL_QUALIFIERS:
+            self.assertIn(f"'{path}'", text)
 
     def test_every_suite_filter_selects_a_spec(self) -> None:
         specs = [path.removeprefix(BROWSER_ROOT) for path in relative(ROOT, 'apps/web/tests/browser/**/*.spec.ts')]

@@ -5,7 +5,7 @@ Applies to all source, tests, scripts and migrations. The [code-quality standard
 ## Comments
 
 - State what holds now, then cite its source after the statement: `(Decision 0026 G2)`, `PRD-Studio SR-01`, `US-14.19`. Cite a decision with rows by its row. Name the document, never a bare "PRD x.y", since three PRDs number their sections.
-- No delivery narrative ("a later story", "first", "nothing else exists yet") and no review-round IDs. When a decision amends a requirement row, update every comment that cites the row in the same change.
+- No delivery narrative ("a later story", "first", "nothing else exists yet") and no IDs from a transient review round, such as B1 or M21. IDs from a review committed under `docs/reviews/`, such as WSYS-01 or R-13, resolve there and may be cited. When a decision amends a requirement row, update every comment that cites the row in the same change.
 - A suppression names a code and a reason: `# noqa: RUF009 - frozen, so sharing the default is safe.`, `# type: ignore[attr-defined]  # <reason>`, `// eslint-disable-next-line <rule> -- <reason>`. Remove one that nothing needs.
 
 ## Names

@@ -65,7 +65,7 @@ async def main() -> None:
             try:
                 await store.load_active(other)
                 check('a row moved to another workspace fails to decrypt', 'refused', 'decrypted', False)
-            except Exception as error:  # noqa: BLE001
+            except Exception as error:  # noqa: BLE001 - judged by its type, so only CredentialDecryptionError passes
                 check('a row moved to another workspace fails to decrypt', 'refused', type(error).__name__, type(error).__name__ == 'CredentialDecryptionError')
             await connection.execute(
                 "update app_private.provider_credentials set workspace_id = %s where workspace_id = %s", (workspace, other))

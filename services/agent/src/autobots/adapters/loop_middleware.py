@@ -527,7 +527,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
                         provider_failure.reason,
                     )
                 raise
-            except Exception as error:  # noqa: BLE001 - every provider failure is classified and re-raised as ProviderFailure
+            except Exception as error:  # noqa: BLE001 - any failure of a model call becomes a classified ProviderFailure
                 status = getattr(error, "status_code", None)
                 failure = (
                     classify_status(status)

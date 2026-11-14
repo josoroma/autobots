@@ -54,9 +54,12 @@ def runtime_keywords(root: Path) -> frozenset[str]:
     """IMPLEMENTED_KEYWORDS and ANNOTATIONS from the hand-written runtime, the one place they're listed."""
     text = (root / RUNTIME).read_text()
     lists = re.findall(r'export const (?:IMPLEMENTED_KEYWORDS|ANNOTATIONS) = \[(.*?)\] as const;', text, re.S)
-    if len(lists) != 2:
-        raise ValueError(f'{RUNTIME} must export IMPLEMENTED_KEYWORDS and ANNOTATIONS')
-    return frozenset(re.findall(r'"([^"]+)"', ''.join(lists)))
+    formats = re.findall(r'export const IMPLEMENTED_FORMATS = \[(.*?)\] as const;', text, re.S)
+    if len(lists) != 2 or len(formats) != 1:
+        raise ValueError(f'{RUNTIME} must export IMPLEMENTED_KEYWORDS, ANNOTATIONS and IMPLEMENTED_FORMATS')
+    keywords = frozenset(re.findall(r'"([^"]+)"', ''.join(lists)))
+    # A format value counts as `format:<value>`, so an unenforced format is refused like a keyword.
+    return keywords | {f'format:{value}' for value in re.findall(r'"([^"]+)"', formats[0])}
 
 
 def unknown_keywords(document: Mapping, known: frozenset[str]) -> list[str]:
@@ -67,6 +70,8 @@ def unknown_keywords(document: Mapping, known: frozenset[str]) -> list[str]:
         if not isinstance(node, Mapping):
             return
         found.update(node)
+        if isinstance(node.get('format'), str):
+            found.add(f"format:{node['format']}")
         for key in ('items', 'additionalProperties'):
             walk(node.get(key))
         for option in node.get('anyOf', ()):

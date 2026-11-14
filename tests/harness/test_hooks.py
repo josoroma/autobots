@@ -401,10 +401,14 @@ class HookTests(unittest.TestCase):
             for path, expected, profile in (('apps/web/app/page.tsx', 'web', 'fast'),
                                             ('pnpm-lock.yaml', 'python, web', 'fast'),
                                             ('docs/note.md', 'harness', 'harness'),
-                                            ('tests/db/seeds/fixtures.sql', 'db', 'db')):
+                                            ('tests/db/seeds/fixtures.sql', 'db', 'db'),
+                                            # A db check is repository Python too, so it needs both profiles.
+                                            ('tests/db/memory_check.py', 'db, repo_python', 'db')):
                 context = self.post_edit(root, path)
                 self.assertIn(f'Affected check domains: {expected}.', context)
                 self.assertIn(f'--profile {profile}', context)
+            both = self.post_edit(root, 'tests/db/memory_check.py')
+            self.assertIn('--profile fast, then python3.12 scripts/verify.py --profile db', both)
             self.assertNotIn('Affected check domains', self.post_edit(root, '/outside/file.py'))
 
     def test_syntax_error_diagnostic_never_runs_the_tool(self):

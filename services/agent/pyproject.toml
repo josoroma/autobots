@@ -50,8 +50,16 @@ select = [
     "E", "F", "W", "I", "B", "UP", "ASYNC", "RUF",
     "C90", "PLR0911", "PLR0912", "PLR0913", "PLR0915",
     "BLE001", "S110", "S112", "DTZ", "S602", "S604", "S605", "FAST002", "FAST003",
-    "ANN401",
+    "ANN401", "TID251",
 ]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"anthropic".msg = "Owned code never imports the unused provider SDKs (user decision, 2026-11-05)."
+"langchain_anthropic".msg = "Owned code never imports the unused provider SDKs (user decision, 2026-11-05)."
+"google".msg = "Owned code never imports the unused provider SDKs (user decision, 2026-11-05)."
+"langchain_google_genai".msg = "Owned code never imports the unused provider SDKs (user decision, 2026-11-05)."
+"openai".msg = "Application inference is OpenRouter only (AGENTS.md)."
+"langchain_openai".msg = "Application inference is OpenRouter only (AGENTS.md)."
 
 # R-05: the Any baseline. api/ and domain/ start at zero; delete a file's line once it has no Any.
 [tool.ruff.lint.per-file-ignores]

@@ -28,6 +28,17 @@ class RepositoryPython(unittest.TestCase):
             with self.subTest(path):
                 self.assertNotIn('repo_python', harness_lib.check_domains(path))
 
+    def test_the_gate_configuration_is_an_input_of_what_it_gates(self) -> None:
+        # The review of wave 0: weakening a gate's configuration must make its reports stale.
+        manifest = harness_lib.input_manifest(ROOT)
+        for path, domains in (('ruff.toml', {'repo_python'}), ('mypy.ini', {'repo_python'}),
+                              ('.prettierrc.json', {'web'})):
+            with self.subTest(path):
+                self.assertIn(path, manifest)
+                self.assertEqual(harness_lib.check_domains(path), domains)
+                self.assertTrue(harness_lib.REPO_PYTHON_STEPS & verify.selected_steps('fast', sorted(harness_lib.FULL_CHECKS), [path])
+                                or 'web' in domains)
+
     def test_fast_runs_the_repository_steps_for_those_files(self) -> None:
         step_ids = sorted(harness_lib.FULL_CHECKS)
         self.assertEqual(verify.selected_steps('fast', step_ids, ['tests/harness/test_hooks.py']),

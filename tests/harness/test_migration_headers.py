@@ -23,7 +23,8 @@ def header_errors(migrations: Path) -> list[str]:
             if not line.startswith('--'):
                 break
             opening.append(line)
-        missing = [label for label in HEADER if not any(line.startswith(label) for line in opening)]
+        missing = [label for label in HEADER
+                   if not any(line.startswith(label) and line[len(label):].strip() for line in opening)]
         if missing:
             errors.append(f'{path.name}: its opening comment has no {", ".join(missing)} line')
     return errors
@@ -41,8 +42,11 @@ class MigrationHeaders(unittest.TestCase):
                 '-- R-17: why.\n-- Locks: catalog only.\n-- Data: none.\n-- Recovery: rerun.\nselect 1;\n')
             (migrations / '20261114000055_bad.sql').write_text('-- R-17: why.\n-- Locks: catalog only.\nselect 1;\n'
                                                                '-- Data: too late, after the statement.\n')
+            (migrations / '20261114000056_empty.sql').write_text('-- Why.\n-- Locks:\n-- Data: none.\n'
+                                                                 '-- Recovery: rerun.\nselect 1;\n')
             self.assertEqual(header_errors(migrations),
-                             ['20261114000055_bad.sql: its opening comment has no -- Data:, -- Recovery: line'])
+                             ['20261114000055_bad.sql: its opening comment has no -- Data:, -- Recovery: line',
+                              '20261114000056_empty.sql: its opening comment has no -- Locks: line'])
 
 
 if __name__ == '__main__':

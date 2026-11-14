@@ -44,7 +44,8 @@ RECORD_FILES = {'SPECS.md', 'CODEBASE.md'}
 RECORD_PREFIXES = ('docs/engineering/work-items/', 'docs/engineering/runbooks/')
 LOCKFILES = ('pnpm-lock.yaml', 'services/agent/uv.lock')
 CONFIG_FILES = {'.gitignore', 'package.json', 'pnpm-workspace.yaml', '.node-version',
-                'services/agent/pyproject.toml', 'services/agent/.python-version'}
+                'services/agent/pyproject.toml', 'services/agent/.python-version',
+                'ruff.toml', 'mypy.ini', '.prettierrc.json'}
 VERIFIER_PREFIXES = ('scripts/', 'tests/harness/', 'tests/toolchain/', 'tests/faults/')
 
 

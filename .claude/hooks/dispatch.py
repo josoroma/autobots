@@ -150,9 +150,12 @@ def post_edit_diagnostic(root: Path, raw: object) -> str:
     if path is None or not path.is_relative_to(root.resolve()):
         return diagnostic
     domains = check_domains(path.relative_to(root.resolve()).as_posix())
-    profile = {frozenset({'harness'}): 'harness', frozenset({'db'}): 'db'}.get(frozenset(domains), 'fast')
+    # Each profile the edit needs: fast for code and repository Python, db for the database checks.
+    needed = domains - {'harness'}
+    profiles = (['fast'] if needed - {'db'} else []) + (['db'] if 'db' in needed else []) or ['harness']
+    runs = ', then '.join(f'python3.12 scripts/verify.py --profile {profile}' for profile in profiles)
     diagnostic = (f"Affected check domains: {', '.join(sorted(domains))}. This invalidates earlier check evidence. "
-                  f'Run python3.12 scripts/verify.py --profile {profile} when the bounded change is ready.')
+                  f'Run {runs} when the bounded change is ready.')
     if path.suffix != '.py' or not path.is_file() or path.stat().st_size > 262144:
         return diagnostic
     try:

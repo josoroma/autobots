@@ -73,9 +73,11 @@ class Generation(unittest.TestCase):
     def test_a_keyword_the_runtime_does_not_enforce_is_refused(self):
         document = {'components': {'schemas': {'Tags': {
             'type': 'object', 'properties': {'tags': {'type': 'array', 'uniqueItems': True,
-                                                      'items': {'type': 'string', 'multipleOf': 2}}}}}}}
+                                                      'items': {'type': 'string', 'multipleOf': 2}},
+                                             'mail': {'type': 'string', 'format': 'email'},
+                                             'day': {'type': 'string', 'format': 'date'}}}}}}
         self.assertEqual(generate.unknown_keywords(document, generate.runtime_keywords(ROOT)),
-                         ['multipleOf', 'uniqueItems'])
+                         ['format:email', 'multipleOf', 'uniqueItems'])
 
     def test_a_missing_environment_is_a_prerequisite_error(self):
         with tempfile.TemporaryDirectory() as directory:
