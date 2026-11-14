@@ -224,3 +224,16 @@ test("US-14.1: a member reads the tool catalog through the BFF, and nothing else
     ).status(),
   ).toBe(403);
 });
+
+// R-19: one double-submit token per browser session, so overlapping writes can't refuse each other.
+test("overlapping CSRF requests return the session's one token", async ({
+  request,
+}) => {
+  const first = await (await request.get("/api/csrf")).json();
+  const [a, b] = await Promise.all([
+    request.get("/api/csrf"),
+    request.get("/api/csrf"),
+  ]);
+  expect((await a.json()).token).toBe(first.token);
+  expect((await b.json()).token).toBe(first.token);
+});
