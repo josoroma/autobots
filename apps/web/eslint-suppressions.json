@@ -1,0 +1,280 @@
+{
+  "components/account-form.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "components/approvals-panel.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    },
+    "complexity": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "components/continue-run.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    }
+  },
+  "components/expert-editor.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    },
+    "complexity": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "components/experts-panel.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 3
+    },
+    "complexity": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "components/goal-composer.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 3
+    },
+    "complexity": {
+      "count": 2
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "components/home-activity.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "components/jobs-chart.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "components/keys-and-vars-panel.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "components/model-policy-panel.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 3
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "components/operations-panel.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    },
+    "complexity": {
+      "count": 2
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "components/provider-settings-panel.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "components/run-controls.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "components/run-disclosure.tsx": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "components/run-inspector.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "components/run-list.tsx": {
+    "import/no-cycle": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "components/run-panel.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    },
+    "import/no-cycle": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "components/run-workspace.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 5
+    },
+    "complexity": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "components/search-palette.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "components/session-panel.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "components/tool-catalog.tsx": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "components/unknown-effects.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "components/workflow-editor.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 6
+    },
+    "complexity": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "components/workflow-monitor.tsx": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "components/workflows-panel.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "lib/csrf-fetch.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "lib/service-status.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "tests/browser/appearance.spec.ts": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "tests/browser/approvals.spec.ts": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "tests/browser/experts.spec.ts": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "tests/browser/run-workspace.spec.ts": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "tests/browser/saved-choice.spec.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "tests/browser/slice-run-details.spec.ts": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "tests/browser/slice-visual.spec.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  }
+}

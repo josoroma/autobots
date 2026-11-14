@@ -24,7 +24,12 @@ export const IMPLEMENTED_KEYWORDS = [
   "required",
   "type",
 ] as const;
-export const ANNOTATIONS = ["default", "description", "examples", "title"] as const;
+export const ANNOTATIONS = [
+  "default",
+  "description",
+  "examples",
+  "title",
+] as const;
 
 export interface Schema {
   $ref?: string;
@@ -59,14 +64,19 @@ export class ContractError extends Error {
 
 type Schemas = Readonly<Record<string, Schema>>;
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const DATE_TIME =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 
 function checkString(schema: Schema, value: string, path: string): void {
   if (schema.format === "uuid" && !UUID.test(value)) {
     throw new ContractError(path, "not a UUID");
   }
-  if (schema.format === "date-time" && (!DATE_TIME.test(value) || Number.isNaN(Date.parse(value)))) {
+  if (
+    schema.format === "date-time" &&
+    (!DATE_TIME.test(value) || Number.isNaN(Date.parse(value)))
+  ) {
     throw new ContractError(path, "not a timestamp with an offset");
   }
   if (schema.pattern !== undefined && !new RegExp(schema.pattern).test(value)) {
@@ -81,15 +91,26 @@ function checkString(schema: Schema, value: string, path: string): void {
 }
 
 function checkNumber(schema: Schema, value: number, path: string): void {
-  if (!Number.isFinite(value) || (schema.type === "integer" && !Number.isSafeInteger(value))) {
+  if (
+    !Number.isFinite(value) ||
+    (schema.type === "integer" && !Number.isSafeInteger(value))
+  ) {
     throw new ContractError(path, "not an exact integer");
   }
-  if ((schema.minimum !== undefined && value < schema.minimum) || (schema.maximum !== undefined && value > schema.maximum)) {
+  if (
+    (schema.minimum !== undefined && value < schema.minimum) ||
+    (schema.maximum !== undefined && value > schema.maximum)
+  ) {
     throw new ContractError(path, "out of range");
   }
 }
 
-function checkObject(schemas: Schemas, schema: Schema, value: object, path: string): void {
+function checkObject(
+  schemas: Schemas,
+  schema: Schema,
+  value: object,
+  path: string,
+): void {
   const record = value as Record<string, unknown>;
   for (const name of schema.required ?? []) {
     if (!(name in record)) {
@@ -109,7 +130,12 @@ function checkObject(schemas: Schemas, schema: Schema, value: object, path: stri
   }
 }
 
-function check(schemas: Schemas, schema: Schema, value: unknown, path: string): void {
+function check(
+  schemas: Schemas,
+  schema: Schema,
+  value: unknown,
+  path: string,
+): void {
   if (schema.$ref !== undefined) {
     const target = schemas[schema.$ref.slice(schema.$ref.lastIndexOf("/") + 1)];
     if (target === undefined) {
@@ -139,16 +165,19 @@ function check(schemas: Schemas, schema: Schema, value: unknown, path: string): 
   }
   switch (schema.type) {
     case "string":
-      if (typeof value !== "string") throw new ContractError(path, "not a string");
+      if (typeof value !== "string")
+        throw new ContractError(path, "not a string");
       checkString(schema, value, path);
       return;
     case "integer":
     case "number":
-      if (typeof value !== "number") throw new ContractError(path, "not a number");
+      if (typeof value !== "number")
+        throw new ContractError(path, "not a number");
       checkNumber(schema, value, path);
       return;
     case "boolean":
-      if (typeof value !== "boolean") throw new ContractError(path, "not a boolean");
+      if (typeof value !== "boolean")
+        throw new ContractError(path, "not a boolean");
       return;
     case "null":
       if (value !== null) throw new ContractError(path, "not null");
@@ -162,7 +191,8 @@ function check(schemas: Schemas, schema: Schema, value: unknown, path: string): 
         throw new ContractError(path, "too many items");
       }
       value.forEach((item, index) => {
-        if (schema.items !== undefined) check(schemas, schema.items, item, `${path}[${index}]`);
+        if (schema.items !== undefined)
+          check(schemas, schema.items, item, `${path}[${index}]`);
       });
       return;
     case "object":
@@ -176,7 +206,11 @@ function check(schemas: Schemas, schema: Schema, value: unknown, path: string): 
   }
 }
 
-export function parseWith(schemas: Schemas, name: string, value: unknown): unknown {
+export function parseWith(
+  schemas: Schemas,
+  name: string,
+  value: unknown,
+): unknown {
   const schema = schemas[name];
   if (schema === undefined) {
     throw new ContractError(name, "unknown schema");
@@ -252,7 +286,11 @@ export async function requestJson(
     ...(request?.signal === undefined ? {} : { signal: request.signal }),
   });
   if (!response.ok) {
-    throw new HttpFailure(path, response.status, await readEnvelope(response, parseError));
+    throw new HttpFailure(
+      path,
+      response.status,
+      await readEnvelope(response, parseError),
+    );
   }
   try {
     return (await response.json()) as unknown;

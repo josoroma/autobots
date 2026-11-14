@@ -14,9 +14,11 @@
     "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true,
     "skipLibCheck": true,
-    "types": []
+    "types": ["node"],
+    "typeRoots": ["../../apps/web/node_modules/@types"]
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "tests/**/*.ts"
   ]
 }

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "lint": "eslint --max-warnings=0 .",
-    "format:check": "prettier --check app components lib tests eslint.config.mjs next.config.ts playwright.config.ts postcss.config.mjs package.json tsconfig.json",
+    "format:check": "prettier --check app components lib tests eslint.config.mjs next.config.ts playwright.config.ts postcss.config.mjs package.json tsconfig.json ../../packages/api-client/src/runtime.ts ../../packages/api-client/tests",
     "typegen": "next typegen",
     "typecheck": "tsc --noEmit",
     "build": "next build"
