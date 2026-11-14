@@ -20,6 +20,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { HeldNote } from "@/components/held-note";
 import { RunDisclosure } from "@/components/run-disclosure";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ import { SectionLabel } from "@/components/ui/page-header";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
 import { readErrorResponse } from "@/lib/replies";
+import { withHeld } from "@/lib/submit";
 import { useSubmit } from "@/lib/use-submit";
 
 const STARTER = JSON.stringify(
@@ -104,6 +106,20 @@ function withLabel(text: string, nodeId: string, label: string): string {
   }
   return JSON.stringify(graph, null, 2);
 }
+
+// The draft writes' refusals, in this screen's words (R-19 step 4).
+const DRAFT_REFUSALS: Readonly<Record<string, string>> = {
+  owner_required: "Only the workspace owner can change the draft.",
+  workflow_version_conflict:
+    "A newer version was published, so the draft wasn't. Reload and try again.",
+};
+
+type DraftReply = {
+  view: WorkflowView | null;
+  code?: string;
+  message?: string;
+  held?: boolean;
+};
 
 export function WorkflowEditor({ workflowId }: { workflowId: string }) {
   // One write at a time, and one key per intent until its outcome is known (Decision 0027 D2).
@@ -235,18 +251,23 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
     setMessage(
       result.outcome === "unknown"
         ? "The reply was lost, so it may have been published. Pressing again won't publish it twice."
-        : result.refusal?.code === "owner_required"
-          ? "Only the workspace owner can publish."
-          : (result.refusal?.message ?? "That could not be published."),
+        : withHeld(
+            result.refusal?.code === "owner_required"
+              ? "Only the workspace owner can publish."
+              : (result.refusal?.message ?? "That could not be published."),
+            result.held,
+          ),
     );
   }
 
-  // PRD-Studio WF-02: one saved draft, published under the expected version or discarded.
+  // PRD-Studio WF-02: one saved draft, published under the expected version or discarded. Only
+  // publishing carries a key; a save or a discard replaces the draft whole, so each press sends the
+  // latest and nothing is held (Decision 0027 D2).
   async function draftRequest(
     method: "PUT" | "DELETE" | "POST",
     suffix: string,
     body?: unknown,
-  ): Promise<{ view: WorkflowView | null; code?: string; message?: string }> {
+  ): Promise<DraftReply> {
     if (workflow === null) return { view: null };
     const writes = {
       PUT: draftSaves,
@@ -268,6 +289,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
           },
         ),
       parse: parseWorkflowView,
+      keyed: method === "POST",
     });
     if (result === null) return { view: null, code: "pending" };
     if (result.outcome === "accepted") return { view: result.value };
@@ -278,18 +300,24 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
           "The reply was lost, so this may have applied. Pressing again won't repeat it.",
       };
     }
-    return { view: null, ...result.refusal };
+    return { view: null, ...result.refusal, held: result.held };
   }
 
-  function refused(code: string | undefined, message: string | undefined) {
+  function refused({ code, message, held = false }: DraftReply) {
     // A press while the same write is pending sends nothing, so it says nothing.
     if (code === "pending") return;
+    // An unknown outcome carries its own message and no code.
+    if (code === undefined) {
+      setMessage(message ?? "That could not be done. Nothing changed.");
+      return;
+    }
     setMessage(
-      code === "owner_required"
-        ? "Only the workspace owner can change the draft."
-        : code === "workflow_version_conflict"
-          ? "A newer version was published, so the draft wasn't. Reload and try again."
-          : (message ?? "That could not be done. Nothing changed."),
+      withHeld(
+        DRAFT_REFUSALS[code] ??
+          message ??
+          "That could not be done. Nothing changed.",
+        held,
+      ),
     );
   }
 
@@ -300,33 +328,24 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
       setMessage("That isn't valid JSON.");
       return;
     }
-    const {
-      view,
-      code,
-      message: reason,
-    } = await draftRequest("PUT", "", {
-      graph,
-    });
-    if (view === null) {
-      refused(code, reason);
+    const reply = await draftRequest("PUT", "", { graph });
+    if (reply.view === null) {
+      refused(reply);
       return;
     }
-    setWorkflow(view);
+    setWorkflow(reply.view);
     setMessage("Draft saved. Runs keep using the published versions.");
   }
 
   async function publishDraft(): Promise<void> {
     if (workflow === null) return;
     setMessage(null);
-    const {
-      view,
-      code,
-      message: reason,
-    } = await draftRequest("POST", "/publish", {
+    const reply = await draftRequest("POST", "/publish", {
       expected_version: workflow.latest_version,
     });
+    const view = reply.view;
     if (view === null) {
-      refused(code, reason);
+      refused(reply);
       return;
     }
     setWorkflow(view);
@@ -338,9 +357,10 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
 
   async function discardDraft(): Promise<void> {
     setMessage(null);
-    const { view, code, message: reason } = await draftRequest("DELETE", "");
+    const reply = await draftRequest("DELETE", "");
+    const view = reply.view;
     if (view === null) {
-      refused(code, reason);
+      refused(reply);
       return;
     }
     setWorkflow(view);
@@ -423,7 +443,10 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
     setMessage(
       result.outcome === "unknown"
         ? "The reply was lost, so it may have started. Pressing again won't start a second one."
-        : (result.refusal?.message ?? "That could not be started."),
+        : withHeld(
+            result.refusal?.message ?? "That could not be started.",
+            result.held,
+          ),
     );
   }
 
@@ -441,6 +464,9 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
       </p>
     );
   }
+  // While a publish or a run is held, what it sent stays as sent (Decision 0027 D2).
+  const publishHeld = publishing.holding();
+  const runHeld = executions.holding();
   return (
     <div
       className={cn(
@@ -501,6 +527,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
             rows={16}
             spellCheck={false}
             value={draft}
+            readOnly={publishHeld}
             onChange={(event) => {
               setDraft(event.target.value);
               setCheck(null);
@@ -529,6 +556,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
                 <Input
                   id={`label-${node.id}`}
                   maxLength={80}
+                  readOnly={publishHeld}
                   value={typeof node.label === "string" ? node.label : ""}
                   onChange={(event) => {
                     setDraft(withLabel(draft, node.id, event.target.value));
@@ -550,6 +578,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
             Publish
           </Button>
         </div>
+        {publishHeld ? <HeldNote /> : null}
         <div
           role="group"
           aria-label="Draft"
@@ -652,6 +681,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
               <Select
                 id="version"
                 value={chosen ?? ""}
+                disabled={runHeld}
                 onChange={(event) => setChosen(Number(event.target.value))}
                 className="sm:max-w-md"
               >
@@ -674,6 +704,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
                 rows={3}
                 spellCheck={false}
                 value={inputs}
+                readOnly={runHeld}
                 onChange={(event) => setInputs(event.target.value)}
                 className="font-mono text-[12.5px] leading-relaxed"
               />
@@ -686,7 +717,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
                 <Select
                   id="execution-budget"
                   value={budgets.length === 0 ? "" : String(budget)}
-                  disabled={budgets.length === 0}
+                  disabled={budgets.length === 0 || runHeld}
                   onChange={(event) => setBudget(Number(event.target.value))}
                   className="tabular-nums sm:max-w-40"
                 >
@@ -711,6 +742,7 @@ export function WorkflowEditor({ workflowId }: { workflowId: string }) {
                   ?.graph.nodes?.some((node) => node.block === "agent") ?? false
               }
             />
+            {runHeld ? <HeldNote /> : null}
             <div className="flex justify-end border-t pt-4">
               <Button onClick={() => void run()} disabled={executions.pending}>
                 <Play aria-hidden="true" />

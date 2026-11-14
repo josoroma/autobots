@@ -20,6 +20,7 @@ from uuid import UUID
 
 from autobots.adapters.checkpoints import adapter_identity, adapter_qualified
 from autobots.application.schema_release import SHIPPED_MIGRATIONS
+from autobots.domain.runs import NEEDS_YOU, TERMINAL, RunStatus
 from autobots.operations.logs import log_event
 
 logger = logging.getLogger("autobots.operations")
@@ -458,17 +459,17 @@ with zone as (
 ), latest as (
   select distinct on (e.run_id) e.run_id, e.occurred_at
   from public.run_events e join public.runs r on r.id = e.run_id
-  where r.workspace_id = %(workspace)s and r.status in ('running', 'paused')
+  where r.workspace_id = %(workspace)s and r.status = any(%(moving)s)
     and e.payload ->> 'type' = 'run.status_changed'
   order by e.run_id, e.sequence desc
 )
 select h.starts_at, h.hour,
-  (select count(distinct c.run_id) from changes c where c.status = 'succeeded'
+  (select count(distinct c.run_id) from changes c where c.status = %(succeeded)s
      and c.occurred_at >= h.starts_at and c.occurred_at < h.starts_at + interval '1 hour'),
   (select count(distinct c.run_id) from changes c
-     where c.status in ('waiting_approval', 'waiting_input')
+     where c.status = any(%(needs_you)s)
      and c.occurred_at >= h.starts_at and c.occurred_at < h.starts_at + interval '1 hour'),
-  (select count(distinct c.run_id) from changes c where c.status in ('failed', 'cancelled')
+  (select count(distinct c.run_id) from changes c where c.status = any(%(unsuccessful)s)
      and c.occurred_at >= h.starts_at and c.occurred_at < h.starts_at + interval '1 hour'),
   (select count(*) from latest l
      where l.occurred_at >= h.starts_at and l.occurred_at < h.starts_at + interval '1 hour')
@@ -483,7 +484,16 @@ async def job_hours(connection: Any, workspace_id: UUID) -> tuple[str, list[JobH
         (workspace_id,),
     )
     zone = await cursor.fetchone()
-    cursor = await connection.execute(_JOB_HOURS, {"workspace": workspace_id})
+    cursor = await connection.execute(
+        _JOB_HOURS,
+        {
+            "workspace": workspace_id,
+            "succeeded": RunStatus.SUCCEEDED.value,
+            "needs_you": sorted(NEEDS_YOU),
+            "unsuccessful": sorted(TERMINAL - {RunStatus.SUCCEEDED}),
+            "moving": [RunStatus.RUNNING.value, RunStatus.PAUSED.value],
+        },
+    )
     rows = [
         JobHourCounts(row[0], str(row[1]), int(row[2]), int(row[3]), int(row[4]), int(row[5]))
         for row in await cursor.fetchall()

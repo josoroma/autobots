@@ -1,49 +1,63 @@
-"""Run work that can hold the interpreter lock in a child process a timeout can stop (R-20).
+"""Run work that can hold the interpreter lock in a child interpreter a timeout can stop (R-20).
 
 A regular expression holds the lock while it matches, so `asyncio.to_thread` can't be stopped: the
-event loop, the lease keeper and the status beat stall until it ends (PTOL-01). A spawned process
-is terminated when its time runs out, and the loop only waits on a pipe meanwhile.
+event loop, the lease keeper and the status beat stall until it ends (PTOL-01). A child interpreter
+is killed when its time runs out. It starts isolated (`-I`) and runs only the named module, so it
+never re-imports the parent's main module, and the event loop writes and reads its pipes without
+blocking (Decision 0017 C7).
 """
 
 import asyncio
-import multiprocessing
-from collections.abc import Callable
-from multiprocessing.connection import Connection
-from typing import Any
+import contextlib
+import math
+import sys
+from pathlib import Path
+
+# The directory holding the `autobots` package, so the child runs this same source tree whatever
+# put it on the parent's path.
+SOURCE_ROOT = str(Path(__file__).resolve().parents[2])
+# The child also caps its own CPU time, so the kernel stops it even if the parent is killed first.
+_BOOTSTRAP = (
+    "import resource, runpy, sys; "
+    "resource.setrlimit(resource.RLIMIT_CPU, (int(sys.argv[3]), int(sys.argv[3]))); "
+    "sys.path.insert(0, sys.argv[1]); "
+    "runpy.run_module(sys.argv[2], run_name='__main__', alter_sys=True)"
+)
 
 
 class BoundExceeded(Exception):
-    """The work ran past its time, and its process was stopped."""
+    """The work ran past its time, and its process was killed."""
 
 
-def _child(sender: Connection, work: Callable[..., Any], args: tuple[Any, ...]) -> None:
+class ChildFailed(Exception):
+    """The child ended without an answer."""
+
+
+async def run_module(module: str, payload: bytes, seconds: float) -> bytes:
+    """`python -m module` given `payload` on stdin, returning its stdout. Raises BoundExceeded
+    after `seconds`, with the child killed and reaped, and ChildFailed when it exits non-zero."""
+    process = await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-I",
+        "-c",
+        _BOOTSTRAP,
+        SOURCE_ROOT,
+        module,
+        str(math.ceil(seconds) + 1),
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
     try:
-        sender.send((True, work(*args)))
-    except Exception as error:  # noqa: BLE001 - the parent re-raises it as it was
-        sender.send((False, error))
+        output, _ = await asyncio.wait_for(process.communicate(payload), seconds)
+    except TimeoutError:
+        raise BoundExceeded from None
     finally:
-        sender.close()
-
-
-async def run_in_child[T](work: Callable[..., T], *args: object, seconds: float) -> T:
-    """`work(*args)` in a spawned process, or BoundExceeded after `seconds`. `work` must be
-    importable from a light module, and its arguments and result picklable."""
-    context = multiprocessing.get_context("spawn")
-    receiver, sender = context.Pipe(duplex=False)
-    process = context.Process(target=_child, args=(sender, work, args), daemon=True)
-    process.start()
-    sender.close()
-    try:
-        # Waiting on the pipe releases the lock, so the event loop keeps running meanwhile.
-        if not await asyncio.to_thread(receiver.poll, seconds):
-            raise BoundExceeded
-        succeeded, value = receiver.recv()
-    finally:
-        if process.is_alive():
-            process.terminate()
-        await asyncio.to_thread(process.join, 1.0)
-        receiver.close()
-    if not succeeded:
-        raise value
-    result: T = value
-    return result
+        # Also on cancellation, so no child outlives the call that started it.
+        if process.returncode is None:
+            with contextlib.suppress(ProcessLookupError):
+                process.kill()
+            await process.wait()
+    if process.returncode != 0:
+        raise ChildFailed(process.returncode)
+    return output

@@ -14,8 +14,9 @@ import { Button } from "@/components/ui/button";
 import { Card, IconTile } from "@/components/ui/card";
 import { Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { refusalText } from "@/lib/submit";
+import { useSubmit } from "@/lib/use-submit";
 import { cn } from "@/lib/utils";
-import { readErrorResponse } from "@/lib/replies";
 
 const AUTH_LABELS: Record<ProviderStatus["auth_status"], string> = {
   missing:
@@ -79,6 +80,16 @@ function StatusDot({ tone }: { tone: Tone }) {
     />
   );
 }
+
+// R-19 step 4: this screen's words for a refusal's code. Any other keeps the service's own, which
+// are fixed per code and never echo a key.
+const REFUSALS: Readonly<Record<string, string>> = {
+  not_signed_in:
+    "Your session ended. Sign in, then try again. Nothing changed.",
+  owner_required: "Only the workspace owner can change the OpenRouter key.",
+};
+const LOST =
+  "The reply was lost, so this may have applied. The status above is reloaded.";
 
 // A labeled cell of the connection bar.
 const CELL = "min-w-0 px-[18px] py-3.5";
@@ -156,8 +167,10 @@ function RouteQualifications({ routes }: { routes: RouteQualification[] }) {
 export function ProviderSettingsPanel() {
   const [status, setStatus] = useState<ProviderStatus | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
+  // One write at a time. None sends a key, and each replaces state whole, so none is held (R-19).
+  const writes = useSubmit();
+  const busy = writes.pending;
 
   const load = useCallback(async () => {
     const reply = await fetch("/api/settings/model-providers", {
@@ -197,26 +210,27 @@ export function ProviderSettingsPanel() {
     body?: unknown,
     done = "Saved.",
   ): Promise<void> {
-    setBusy(true);
     setMessage(null);
-    const reply = await csrfFetch(path, {
-      method,
-      ...(body === undefined
-        ? {}
-        : {
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          }),
-    }).catch(() => null);
-    setBusy(false);
-    if (reply?.ok === true) {
-      setStatus(parseProviderStatus(await reply.json()));
+    const result = await writes.submit({
+      body: () => (body === undefined ? "" : JSON.stringify(body)),
+      send: ({ body: text }) =>
+        csrfFetch(path, {
+          method,
+          ...(text === ""
+            ? {}
+            : { headers: { "Content-Type": "application/json" }, body: text }),
+        }),
+      parse: parseProviderStatus,
+      keyed: false,
+    });
+    if (result === null) return;
+    if (result.outcome === "accepted" && result.value !== null) {
+      setStatus(result.value);
       setMessage(done);
-    } else {
-      const failure = await readErrorResponse(reply);
-      setMessage(failure?.message ?? "That did not work. Nothing changed.");
-      await load();
+      return;
     }
+    setMessage(refusalText(REFUSALS, result.refusal, LOST));
+    await load();
   }
 
   async function saveKey(event: FormEvent<HTMLFormElement>): Promise<void> {

@@ -336,12 +336,25 @@ test("after a lost reply, Run resends the same request under the same key", asyn
   await goal.fill("A reply that never arrives");
   await page.getByRole("button", { name: "Run", exact: true }).click();
   await expect(page.getByText(/won't start a second one/)).toBeVisible();
-  // An edit after an unknown outcome doesn't change what's resent.
-  await goal.fill("An edited goal");
+  // Decision 0027 D2: what was sent stays as sent while its outcome is unknown, so no edit can be
+  // mistaken for what the resend carries.
+  await expect(goal).not.toBeEditable();
+  await expect(goal).toHaveValue("A reply that never arrives");
+  await expect(page.getByLabel("Model for this run")).toBeDisabled();
+  await expect(page.getByLabel("Budget")).toBeDisabled();
+  await expect(page.locator("[data-held-note]")).toContainText(
+    "may already have gone through",
+  );
   await page.getByRole("button", { name: "Run", exact: true }).click();
   await expect(page.getByText(/Your goal is queued/)).toBeVisible();
   expect(sent).toHaveLength(2);
   expect(sent[1]?.key).toBe(sent[0]?.key);
   expect(sent[1]?.body).toBe(sent[0]?.body);
+  expect(JSON.parse(sent[1]?.body ?? "{}").goal_text).toBe(
+    "A reply that never arrives",
+  );
+  // An accepted reply settles it, so the goal can be edited again.
+  await expect(goal).toBeEditable();
+  await expect(page.locator("[data-held-note]")).toHaveCount(0);
   await page.unroute("**/api/v1/runs");
 });

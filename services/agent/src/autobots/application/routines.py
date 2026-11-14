@@ -31,6 +31,7 @@ from autobots.domain.routines import (
     occurrences_dropped,
     validate_trigger,
 )
+from autobots.domain.runs import TERMINAL
 from autobots.domain.tools import EXPERT_TOOLS, PLAN_TOOLS
 from autobots.operations.logs import log_event
 
@@ -302,9 +303,8 @@ async def run_routine_now(
 async def _has_active_run(connection: Any, routine_id: UUID) -> bool:
     cursor = await connection.execute(
         "select exists (select 1 from public.routine_occurrences o join public.runs r "
-        "on r.id = o.run_id where o.routine_id = %s and r.status not in "
-        "('succeeded', 'failed', 'cancelled'))",
-        (routine_id,),
+        "on r.id = o.run_id where o.routine_id = %s and r.status <> all(%s))",
+        (routine_id, sorted(TERMINAL)),
     )
     return bool((await cursor.fetchone())[0])
 

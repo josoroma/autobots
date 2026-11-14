@@ -471,3 +471,43 @@ test("a shortcut needs a second press, and never acts while typing", async ({
     MARKDOWN,
   );
 });
+
+// Decision 0027 D2: a decision whose reply is lost stays held, so the other one sends nothing.
+// The route answers for the API, so the arranged request is never decided.
+test("after a lost Approve, Reject sends nothing and says the first choice may be recorded", async ({
+  page,
+}) => {
+  await signIn(page, EMAIL_A, PASSWORD_A);
+  await page.goto("/approvals");
+  const sent: { decision: string; key: string }[] = [];
+  await page.route(`**/api/v1/approvals/${LOUD}/decision`, async (route) => {
+    sent.push({
+      decision: route.request().postDataJSON().decision,
+      key: route.request().headers()["idempotency-key"] ?? "",
+    });
+    await route.abort("connectionreset");
+  });
+  const card = await open(page, LOUD);
+  const said = page.locator('[data-message="decision"]');
+  await card.getByRole("button", { name: "Approve" }).click();
+  await expect(said).toContainText("may have been decided");
+  await card.getByRole("button", { name: "Reject" }).click();
+  await expect(said).toContainText(
+    'Nothing was sent. Your first choice, "Approve"',
+  );
+  await expect(said).toContainText(
+    "Reload to see it before choosing differently.",
+  );
+  expect(sent.map((item) => item.decision)).toEqual(["approve"]);
+  expect(sent[0]?.key).not.toBe("");
+  // The same choice again resends the held request, under its key.
+  await card.getByRole("button", { name: "Approve" }).click();
+  await expect(said).toContainText("may have been decided");
+  expect(sent).toHaveLength(2);
+  expect(sent[1]).toEqual(sent[0]);
+  await page.unroute(`**/api/v1/approvals/${LOUD}/decision`);
+  const listed = await (await page.request.get("/api/v1/approvals")).json();
+  expect(
+    listed.approvals.some((item: { id: string }) => item.id === LOUD),
+  ).toBe(true);
+});

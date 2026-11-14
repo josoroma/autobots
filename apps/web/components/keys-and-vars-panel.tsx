@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { refusalText } from "@/lib/submit";
+import { useSubmit } from "@/lib/use-submit";
 
 // Decisions 0024 and 0025, PRD-Tool-Catalog PK-04 to PK-08. A value saved here wins over the
 // environment and .env, for this workspace only. A secret is never shown, only where it comes from.
@@ -33,6 +35,16 @@ const USES: Record<Name, string> = {
   browser_executor:
     "Browse goal, once the browser executor is qualified. Every call still waits for approval",
 };
+
+// R-19 step 4: this screen's words for a refusal's code. Any other keeps the service's own, which
+// are fixed per item and never echo what was submitted.
+const REFUSALS: Readonly<Record<string, string>> = {
+  not_signed_in:
+    "Your session ended. Sign in, then try again. Nothing changed.",
+  owner_required: "Only the workspace owner can save or remove one.",
+};
+const LOST =
+  "The reply was lost, so this may have applied. What's shown is reloaded.";
 
 function sourceLabel(item: KeyOrVar): string {
   if (item.source === "settings") {
@@ -162,8 +174,10 @@ function ItemCard({
 export function KeysAndVarsPanel() {
   const [items, setItems] = useState<KeysAndVars | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
+  // One write at a time. None sends a key, and each replaces an item whole, so none is held (R-19).
+  const writes = useSubmit();
+  const busy = writes.pending;
 
   const load = useCallback(async () => {
     const reply = await fetch("/api/settings/keys-and-vars", {
@@ -205,24 +219,26 @@ export function KeysAndVarsPanel() {
     method: "PUT" | "DELETE",
     body: Record<string, unknown>,
   ): Promise<void> {
-    setBusy(true);
     setMessage(null);
-    const reply = await csrfFetch(`/api/settings/keys-and-vars/${name}`, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }).catch(() => null);
-    setBusy(false);
-    if (reply?.ok === true) {
-      setItems(parseKeysAndVars(await reply.json()));
+    const result = await writes.submit({
+      body: () => JSON.stringify(body),
+      send: ({ body: text }) =>
+        csrfFetch(`/api/settings/keys-and-vars/${name}`, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: text,
+        }),
+      parse: parseKeysAndVars,
+      keyed: false,
+    });
+    if (result === null) return;
+    if (result.outcome === "accepted" && result.value !== null) {
+      setItems(result.value);
       setMessage(method === "PUT" ? "Saved." : "Removed.");
-    } else {
-      const failure = (await reply?.json().catch(() => null)) as {
-        message?: string;
-      } | null;
-      setMessage(failure?.message ?? "That did not work. Nothing changed.");
-      await load();
+      return;
     }
+    setMessage(refusalText(REFUSALS, result.refusal, LOST));
+    await load();
   }
 
   if (loadFailed) {

@@ -12,26 +12,80 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 import app_db  # noqa: E402
 
 PRIVATE_RUN_COLUMNS = ('lease_generation', 'checkpoint_thread_id')
-GRANT = re.compile(r'grant\s+(.*?)\s+on\s+(?:table\s+)?(.*?)\s+to\s+(.*?);', re.I | re.S)
+# Whoever is granted reads, as a role or through PUBLIC.
+READERS = frozenset({'authenticated', 'public'})
+GRANT = re.compile(r'grant (?P<privileges>.+?) on (?P<objects>.+?) to (?P<grantees>.+?)'
+                   r'(?P<option> with grant option)?(?: granted by \S+)?')
+DEFAULT_GRANT = re.compile(r'alter default privileges(?P<scope>.*?) grant (?P<privileges>.+?) on tables to (?P<grantees>.+?)'
+                           r'(?P<option> with grant option)?')
+NOT_TABLES = ('function', 'functions', 'all functions', 'procedure', 'all procedures', 'routine', 'all routines', 'schema',
+              'sequence', 'all sequences', 'type', 'domain', 'database', 'language', 'large object', 'foreign', 'tablespace')
+Privilege = tuple[str, tuple[str, ...] | None]
 
 
-def run_grants(files: list[Path]) -> list[tuple[str, str]]:
-    """R-10: every grant on public.runs to authenticated, in name order, as (file, privileges)."""
+def statements(text: str) -> list[str]:
+    """Each statement in lower case on one line, without comments or identifier quotes."""
+    text = re.sub(r'/\*.*?\*/', ' ', text, flags=re.S)
+    text = re.sub(r'--[^\n]*', ' ', text)
+    return [' '.join(part.replace('"', '').lower().split()) for part in text.split(';')]
+
+
+def privileges(text: str) -> list[Privilege]:
+    """Each privilege with its column list, or None when it covers every column."""
+    items, depth, current = [], 0, ''
+    for char in text:
+        if char == ',' and depth == 0:
+            items.append(current)
+            current = ''
+            continue
+        depth += (char == '(') - (char == ')')
+        current += char
+    items.append(current)
+    parsed: list[Privilege] = []
+    for item in items:
+        name, _, columns = item.partition('(')
+        parsed.append((name.strip(), tuple(column.strip() for column in columns.rstrip(') ').split(',')) if columns else None))
+    return parsed
+
+
+def covers_runs(objects: str) -> bool:
+    objects = objects.removeprefix('table ').strip()
+    if objects.startswith(NOT_TABLES):
+        return False
+    if objects.startswith('all tables in schema '):
+        return 'public' in {name.strip() for name in objects.removeprefix('all tables in schema ').split(',')}
+    return bool({'runs', 'public.runs'} & {name.strip() for name in objects.split(',')})
+
+
+def run_grants(files: list[Path]) -> list[tuple[str, list[Privilege], bool]]:
+    """R-10: every grant that reaches public.runs for authenticated, in name order, as (file, privileges, grant option).
+
+    Schema-wide and default grants reach it too, as do unqualified, quoted and PUBLIC forms.
+    """
     found = []
     for path in files:
-        for privileges, tables, grantees in GRANT.findall(path.read_text()):
-            if ('public.runs' in {name.strip() for name in tables.split(',')}
-                    and 'authenticated' in {name.strip() for name in grantees.split(',')}):
-                found.append((path.name, privileges))
+        for statement in statements(path.read_text()):
+            grant, default = GRANT.fullmatch(statement), DEFAULT_GRANT.fullmatch(statement)
+            if grant and covers_runs(grant['objects']):
+                match = grant
+            elif default and (' in schema ' not in default['scope'] or 'public' in default['scope'].split()):
+                match = default
+            else:
+                continue
+            if READERS & {name.strip() for name in match['grantees'].split(',')}:
+                found.append((path.name, privileges(match['privileges']), match['option'] is not None))
     return found
 
 
 def private_run_grants(files: list[Path]) -> list[str]:
     problems = []
-    for name, privileges in run_grants(files):
-        if '(' not in privileges:
+    for name, granted, option in run_grants(files):
+        if option:
+            problems.append(f'{name}: with grant option')
+        if any(columns is None for _, columns in granted):
             problems.append(f'{name}: every column')
-        problems += [f'{name}: {column}' for column in PRIVATE_RUN_COLUMNS if column in privileges]
+        problems += [f'{name}: {column}' for column in PRIVATE_RUN_COLUMNS
+                     if any(columns and column in columns for _, columns in granted)]
     return problems
 
 
@@ -85,6 +139,33 @@ class Migrations(unittest.TestCase):
             table.write_text('grant select on public.runs, public.run_events to authenticated, service_role;\n')
             self.assertEqual(private_run_grants([first, later, table]),
                              ['0060_more.sql: checkpoint_thread_id', '0061_all.sql: every column'])
+
+    def test_each_form_that_reaches_the_runs_table_is_caught(self):
+        forms = {
+            'grant select on all tables in schema public to authenticated;': ['every column'],
+            'alter default privileges in schema public grant select on tables to authenticated;': ['every column'],
+            'alter default privileges grant all on tables to public;': ['every column'],
+            'grant select, update (status) on public.runs to authenticated;': ['every column'],
+            'grant select (id) on public.runs to authenticated with grant option;': ['with grant option'],
+            'grant select on runs to authenticated;': ['every column'],
+            'GRANT SELECT\n  ON TABLE "public"."runs"\n  TO "authenticated";': ['every column'],
+            'grant select ("checkpoint_thread_id") on "public"."runs" to authenticated;': ['checkpoint_thread_id'],
+            'grant select on public.runs to public;': ['every column'],
+            'grant update (lease_generation) on public.runs to service_role, authenticated;': ['lease_generation'],
+            # None of these reaches it.
+            '-- grant select on public.runs to authenticated;': [],
+            'grant execute on function public.runs_view() to authenticated;': [],
+            'grant select on public.runs_archive to authenticated;': [],
+            'grant select on all tables in schema app_private to authenticated;': [],
+            'grant select on public.runs to service_role;': [],
+            'grant select (id, status) on public.runs to authenticated;': [],
+        }
+        with tempfile.TemporaryDirectory() as folder:
+            for index, (form, expected) in enumerate(forms.items()):
+                with self.subTest(form):
+                    path = Path(folder) / f'{index:04d}_form.sql'
+                    path.write_text(form + '\n')
+                    self.assertEqual(private_run_grants([path]), [f'{path.name}: {problem}' for problem in expected])
 
     def test_service_code_owns_no_schema(self):
         for path in (ROOT / 'services/agent/src').rglob('*.py'):

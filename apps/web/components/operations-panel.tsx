@@ -37,8 +37,9 @@ import { Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { parseDays } from "@/lib/retention";
 import { schemaValue } from "@/lib/schema-value";
+import { refusalText } from "@/lib/submit";
+import { useSubmit } from "@/lib/use-submit";
 import { cn } from "@/lib/utils";
-import { readErrorResponse } from "@/lib/replies";
 
 const CONDITIONS: Record<string, string> = {
   database_ready: "The database is answering.",
@@ -171,6 +172,14 @@ function allowed(
 
 const RETENTION_ERROR = "retention-days-error";
 
+// R-19 step 4: this screen's words for a refusal's code. The page already refuses malformed and
+// out-of-range days, so an invalid request is the pairing rule.
+const RETENTION_REFUSALS: Readonly<Record<string, string>> = {
+  invalid_request: "Retry keys need a run content window at least as short.",
+};
+const RETENTION_LOST =
+  "The reply was lost, so this may have saved. Saving again sends these windows again.";
+
 export function OperationsPanel() {
   const [status, setStatus] = useState<LocalStatus | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -178,6 +187,8 @@ export function OperationsPanel() {
   const [receiptDays, setReceiptDays] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [invalid, setInvalid] = useState({ run: false, receipt: false });
+  // One save at a time. It sends no key and replaces the windows whole, so it's never held (R-19).
+  const saves = useSubmit();
 
   const load = useCallback(async (): Promise<void> => {
     const reply = await fetch("/api/v1/operations/local-status", {
@@ -222,8 +233,8 @@ export function OperationsPanel() {
     };
   }, []);
 
-  async function save(): Promise<void> {
-    setMessage(null);
+  // WSYS-01: a misread window would feed an irreversible pass, so nothing malformed is sent.
+  function windows(): string | null {
     const run = parseDays(runDays);
     const receipt = parseDays(receiptDays);
     const refused = {
@@ -231,26 +242,32 @@ export function OperationsPanel() {
       receipt: !receipt.valid || !allowed("receipt_days", receipt.days),
     };
     setInvalid(refused);
-    // WSYS-01: a misread window would feed an irreversible pass, so nothing malformed is sent.
-    if (refused.run || refused.receipt || !run.valid || !receipt.valid) return;
-    const reply = await csrfFetch("/api/v1/operations/retention", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        run_days: run.days,
-        receipt_days: receipt.days,
-      }),
-    }).catch(() => null);
+    if (refused.run || refused.receipt || !run.valid || !receipt.valid) {
+      return null;
+    }
+    return JSON.stringify({ run_days: run.days, receipt_days: receipt.days });
+  }
+
+  async function save(): Promise<void> {
+    setMessage(null);
+    const result = await saves.submit({
+      body: windows,
+      send: ({ body }) =>
+        csrfFetch("/api/v1/operations/retention", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body,
+        }),
+      parse: parseRetentionSettings,
+      keyed: false,
+    });
+    if (result === null) return;
     // A refused save keeps what was typed, so it can be corrected.
-    if (reply === null || !reply.ok) {
-      const refusal = await readErrorResponse(reply);
+    if (result.outcome !== "accepted") {
       setMessage(
-        // The page already refuses malformed and out-of-range days, so a 422 is the pairing rule.
-        reply?.status === 422
-          ? "Not saved. Retry keys need a run content window at least as short."
-          : typeof refusal?.message === "string"
-            ? `Not saved. ${refusal.message}`
-            : "Not saved. The service didn't answer, so try again.",
+        result.refusal === null
+          ? RETENTION_LOST
+          : `Not saved. ${refusalText(RETENTION_REFUSALS, result.refusal, RETENTION_LOST)}`,
       );
       return;
     }
@@ -573,7 +590,11 @@ export function OperationsPanel() {
                 ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-3">
-                <Button size="sm" onClick={() => void save()}>
+                <Button
+                  size="sm"
+                  disabled={saves.pending}
+                  onClick={() => void save()}
+                >
                   Save retention
                 </Button>
                 {message === null ? null : (

@@ -14,11 +14,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
+import { HeldNote } from "@/components/held-note";
 import { Button } from "@/components/ui/button";
 import { IconTile } from "@/components/ui/card";
 import { Choice, Input } from "@/components/ui/field";
 import { SectionLabel } from "@/components/ui/page-header";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { withHeld } from "@/lib/submit";
 import { cn } from "@/lib/utils";
 import { useSubmit } from "@/lib/use-submit";
 
@@ -26,6 +28,11 @@ const CREATE_REFUSALS: Readonly<Record<string, string>> = {
   owner_required: "Only the workspace owner can create an Expert.",
   expert_name_taken: "That name is already used.",
 };
+const SESSION_LOST =
+  "The reply was lost, so the session may have started. Pressing again won't start a second one.";
+const SESSION_REFUSED = "That session could not be started.";
+// The coordinator session's target, whose Experts are its body.
+const COORDINATOR = "coordinator";
 
 export function ExpertsPanel() {
   // One write at a time, and one key per intent until its outcome is known (Decision 0027 D2).
@@ -118,8 +125,8 @@ export function ExpertsPanel() {
     }
     setMessage(
       result.outcome === "unknown"
-        ? "The reply was lost, so the session may have started. Pressing again won't start a second one."
-        : "That session could not be started.",
+        ? SESSION_LOST
+        : withHeld(SESSION_REFUSED, result.held),
     );
   }
 
@@ -147,8 +154,11 @@ export function ExpertsPanel() {
     setMessage(
       result.outcome === "unknown"
         ? "The reply was lost, so it may have been created. Pressing again won't create a second one."
-        : (CREATE_REFUSALS[result.refusal?.code ?? ""] ??
-            "That could not be saved."),
+        : withHeld(
+            CREATE_REFUSALS[result.refusal?.code ?? ""] ??
+              "That could not be saved.",
+            result.held,
+          ),
     );
   }
 
@@ -169,7 +179,7 @@ export function ExpertsPanel() {
           body,
         }),
       parse: parseSessionView,
-      scope: "coordinator",
+      scope: COORDINATOR,
     });
     if (result === null) return;
     if (result.outcome === "accepted" && result.value !== null) {
@@ -178,8 +188,8 @@ export function ExpertsPanel() {
     }
     setMessage(
       result.outcome === "unknown"
-        ? "The reply was lost, so the session may have started. Pressing again won't start a second one."
-        : "That session could not be started.",
+        ? SESSION_LOST
+        : withHeld(SESSION_REFUSED, result.held),
     );
   }
 
@@ -206,6 +216,8 @@ export function ExpertsPanel() {
       </p>
     );
   }
+  // While a coordinator session is held, the Experts it names stay as sent (Decision 0027 D2).
+  const routing = sessions.holding(COORDINATOR);
   return (
     <>
       <section aria-labelledby="list-heading" className="space-y-4">
@@ -261,17 +273,20 @@ export function ExpertsPanel() {
                 expert={expert}
                 catalog={catalog}
                 checked={routed.has(expert.id)}
+                locked={routing}
+                busy={sessions.pending}
                 onToggle={() => toggle(expert.id)}
                 onStart={() => void startRun(expert.id)}
               />
             ))}
           </ul>
         )}
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {routing ? <HeldNote /> : null}
           <Button
             className="rounded-full"
             onClick={() => void coordinate()}
-            disabled={routed.size === 0}
+            disabled={routed.size === 0 || sessions.pending}
           >
             Start a coordinator session
             <ArrowRight aria-hidden="true" />
@@ -356,12 +371,17 @@ function ExpertCard({
   expert,
   catalog,
   checked,
+  locked,
+  busy,
   onToggle,
   onStart,
 }: {
   expert: ExpertView;
   catalog: ReadonlyMap<string, ToolDescriptor>;
   checked: boolean;
+  // A held coordinator session names these Experts, so they stay as sent.
+  locked: boolean;
+  busy: boolean;
   onToggle: () => void;
   onStart: () => void;
 }) {
@@ -404,6 +424,7 @@ function ExpertCard({
           variant="outline"
           size="sm"
           className="shrink-0"
+          disabled={busy}
           onClick={onStart}
         >
           Start run
@@ -413,6 +434,7 @@ function ExpertCard({
           type="checkbox"
           id={`route-${expert.id}`}
           checked={checked}
+          disabled={locked}
           onChange={onToggle}
           aria-label={`Include ${expert.name} in a coordinator session`}
           className="mt-0.5 shrink-0"

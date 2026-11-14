@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Card, INNER_BOX } from "@/components/ui/card";
 import { Select } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { refusalText } from "@/lib/submit";
+import { useSubmit } from "@/lib/use-submit";
 import { cn } from "@/lib/utils";
 
 const WORKSPACE_DEFAULT = "";
@@ -60,6 +62,18 @@ function sameForm(
   );
 }
 const SUMMARIZER = "summarizer";
+
+// R-19 step 4: this screen's words for a refusal's code, per action. Any other keeps the service's.
+const SAVE_REFUSALS: Readonly<Record<string, string>> = {
+  stale_version:
+    "This policy changed after you opened it, so nothing was saved. Reload the page and try again.",
+};
+const RESET_REFUSALS: Readonly<Record<string, string>> = {
+  stale_version:
+    "This policy changed after you opened it, so nothing was reset. Reload the page and try again.",
+};
+const LOST =
+  "The reply was lost, so this may have applied. Reload the page to see the policy now.";
 
 // One role per row: its name on the left and its native select on the right (Decision 0021).
 const ROW = "border-border flex items-center gap-2.5 border-t py-[7px]";
@@ -121,8 +135,11 @@ export function ModelPolicyPanel() {
   const [defaultProfile, setDefaultProfile] = useState("");
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  // One write at a time. Neither sends a key, and each replaces the policy whole, so none is held
+  // (R-19).
+  const writes = useSubmit();
+  const busy = writes.pending;
 
   const adopt = useCallback((next: ModelPolicyState) => {
     setState(next);
@@ -155,64 +172,60 @@ export function ModelPolicyPanel() {
     };
   }, [adopt]);
 
+  async function write(
+    path: string,
+    method: "PUT" | "POST",
+    body: unknown,
+    done: string,
+    refusals: Readonly<Record<string, string>>,
+  ): Promise<void> {
+    setMessage(null);
+    const result = await writes.submit({
+      body: () => JSON.stringify(body),
+      send: ({ body: text }) =>
+        csrfFetch(path, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: text,
+        }),
+      parse: parseModelPolicyState,
+      keyed: false,
+    });
+    if (result === null) return;
+    if (result.outcome === "accepted" && result.value !== null) {
+      adopt(result.value);
+      setMessage(done);
+      return;
+    }
+    setMessage(refusalText(refusals, result.refusal, LOST));
+  }
+
   async function save(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (state === null) return;
-    setBusy(true);
-    setMessage(null);
-    const reply = await csrfFetch("/api/settings/model-policy", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    await write(
+      "/api/settings/model-policy",
+      "PUT",
+      {
         expected_version: state.version,
         default_profile:
           defaultProfile === BUILTIN_DEFAULT ? null : defaultProfile,
         role_overrides: overrides,
-      }),
-    }).catch(() => null);
-    setBusy(false);
-    if (reply?.ok === true) {
-      adopt(parseModelPolicyState(await reply.json()));
-      setMessage("Saved. New runs freeze this, and admitted runs keep theirs.");
-      return;
-    }
-    const failure = (await reply?.json().catch(() => null)) as {
-      code?: string;
-      message?: string;
-    } | null;
-    setMessage(
-      failure?.code === "stale_version"
-        ? "This policy changed after you opened it, so nothing was saved. Reload the page and try again."
-        : (failure?.message ?? "That did not save. Nothing changed."),
+      },
+      "Saved. New runs freeze this, and admitted runs keep theirs.",
+      SAVE_REFUSALS,
     );
   }
 
   // MD-03: clears every role override under the version this screen loaded.
   async function resetAll(): Promise<void> {
     if (state === null) return;
-    setBusy(true);
-    setMessage(null);
-    const reply = await csrfFetch("/api/settings/model-policy/reset", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ expected_version: state.version }),
-    }).catch(() => null);
-    setBusy(false);
-    if (reply?.ok === true) {
-      adopt(parseModelPolicyState(await reply.json()));
-      setMessage(
-        "Every role override is cleared. New runs freeze this, and admitted runs keep theirs.",
-      );
-      return;
-    }
-    const failure = (await reply?.json().catch(() => null)) as {
-      code?: string;
-      message?: string;
-    } | null;
-    setMessage(
-      failure?.code === "stale_version"
-        ? "This policy changed after you opened it, so nothing was reset. Reload the page and try again."
-        : (failure?.message ?? "That did not reset. Nothing changed."),
+    await write(
+      "/api/settings/model-policy/reset",
+      "POST",
+      { expected_version: state.version },
+      "Every role override is cleared. New runs freeze this, and admitted runs keep theirs.",
+      RESET_REFUSALS,
     );
   }
 

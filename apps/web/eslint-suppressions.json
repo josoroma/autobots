@@ -1,9 +1,4 @@
 {
-  "components/account-form.tsx": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
-    }
-  },
   "components/approvals-panel.tsx": {
     "@typescript-eslint/consistent-type-assertions": {
       "count": 1
@@ -58,14 +53,9 @@
       "count": 1
     }
   },
-  "components/keys-and-vars-panel.tsx": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
-    }
-  },
   "components/model-policy-panel.tsx": {
     "@typescript-eslint/consistent-type-assertions": {
-      "count": 3
+      "count": 1
     },
     "max-lines": {
       "count": 1

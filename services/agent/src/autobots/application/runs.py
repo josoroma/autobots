@@ -10,6 +10,7 @@ from autobots.contracts.plans import GoalSpec, InputDocument, RequiredArtifact
 from autobots.domain.execution import current_contract
 from autobots.domain.models import PROFILES, RolePolicy
 from autobots.domain.runs import (
+    INTERRUPTING,
     TERMINAL,
     Actor,
     CommandRefused,
@@ -342,9 +343,8 @@ async def _has_unsettled_work(connection: Any, run_id: UUID) -> bool:
 async def _cancel_children(connection: Any, workspace_id: UUID, run_id: UUID) -> None:
     """In the parent's transaction, so a cancel fences the whole tree at once."""
     cursor = await connection.execute(
-        "select id, version from public.runs where parent_run_id = %s "
-        "and status not in ('succeeded', 'failed', 'cancelled', 'cancelling')",
-        (run_id,),
+        "select id, version from public.runs where parent_run_id = %s and status <> all(%s)",
+        (run_id, sorted(INTERRUPTING)),
     )
     for child_id, version in await cursor.fetchall():
         await apply_command(

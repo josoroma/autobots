@@ -6,10 +6,11 @@ new versions with an operation ID, like `save_artifact`. A patch is exact string
 absent `old_string`, or one found more than once without `replace_all`, writes nothing.
 """
 
+import json
 from collections.abc import Mapping
 
 from autobots.application import code_search
-from autobots.application.bounded import BoundExceeded, run_in_child
+from autobots.application.bounded import BoundExceeded, ChildFailed, run_module
 from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed
 from autobots.application.tools import write_run_file
 from autobots.contracts.code_tools import (
@@ -41,13 +42,19 @@ def search(files: Mapping[str, str], arguments: SearchFilesInput) -> SearchFiles
 async def bounded_search(
     files: Mapping[str, str], arguments: SearchFilesInput, seconds: float = SEARCH_SECONDS
 ) -> SearchFilesOutput:
-    """The search in a child process that is stopped after `seconds` (R-20)."""
+    """The search in a child interpreter that is killed after `seconds` (R-20)."""
+    request = {"files": dict(files), "arguments": arguments.model_dump(mode="json")}
     try:
-        return await run_in_child(code_search.search, dict(files), arguments, seconds=seconds)
-    except code_search.InvalidPattern:
-        raise ToolFailed("invalid_pattern") from None
+        reply = await run_module(code_search.__name__, json.dumps(request).encode("utf-8"), seconds)
+        answer = json.loads(reply)
     except BoundExceeded:
         raise ToolFailed("search_timeout") from None
+    except (ChildFailed, ValueError):
+        # A read-only search that ended without an answer had no effect.
+        raise ToolFailed("search_failed") from None
+    if answer.get("error") == "invalid_pattern":
+        raise ToolFailed("invalid_pattern")
+    return SearchFilesOutput.model_validate(answer["output"])
 
 
 async def _latest_files(context: ToolContext) -> dict[str, str]:

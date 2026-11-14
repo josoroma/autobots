@@ -12,12 +12,14 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 
+import { HeldNote } from "@/components/held-note";
 import { Button } from "@/components/ui/button";
 import { Card, INNER_BOX } from "@/components/ui/card";
 import { Choice, Input, Select, Textarea } from "@/components/ui/field";
 import { SectionLabel } from "@/components/ui/page-header";
 import { AVAILABILITY, repair } from "@/components/tool-catalog";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { withHeld } from "@/lib/submit";
 import { cn } from "@/lib/utils";
 import { useSubmit } from "@/lib/use-submit";
 
@@ -189,9 +191,12 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
     }
     const failure = result.refusal;
     setMessage(
-      failure?.code === "model_not_offered"
-        ? failure.message
-        : (SAVE_REFUSALS[failure?.code ?? ""] ?? "That could not be saved."),
+      withHeld(
+        failure?.code === "model_not_offered"
+          ? failure.message
+          : (SAVE_REFUSALS[failure?.code ?? ""] ?? "That could not be saved."),
+        result.held,
+      ),
     );
   }
 
@@ -222,7 +227,7 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
     setMessage(
       result.outcome === "unknown"
         ? "The reply was lost, so the session may have started. Pressing again won't start a second one."
-        : "That session could not be started.",
+        : withHeld("That session could not be started.", result.held),
     );
   }
 
@@ -241,6 +246,8 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
     );
   }
   const granted = expansion(catalog, draft);
+  // While a revision is held, the fields it sent stay as sent (Decision 0027 D2).
+  const held = revisions.holding();
   return (
     <div className="grid items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_300px]">
       <Card aria-labelledby="config-heading" className="space-y-6 p-6">
@@ -267,6 +274,7 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
               <Input
                 id="purpose"
                 value={draft.purpose}
+                readOnly={held}
                 onChange={(event) =>
                   setDraft({ ...draft, purpose: event.target.value })
                 }
@@ -280,6 +288,7 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
                 id="instructions"
                 rows={5}
                 value={draft.instructions}
+                readOnly={held}
                 onChange={(event) =>
                   setDraft({ ...draft, instructions: event.target.value })
                 }
@@ -317,7 +326,7 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
                           id={`grant-group-${group.group}`}
                           type="checkbox"
                           checked={checked}
-                          disabled={blocked && !checked}
+                          disabled={held || (blocked && !checked)}
                           className="mt-0.5 shrink-0"
                           onChange={(event) =>
                             setDraft({
@@ -364,7 +373,7 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
                         }
                         type="checkbox"
                         checked={named || fromGroup}
-                        disabled={unavailable && !named && !fromGroup}
+                        disabled={held || (unavailable && !named && !fromGroup)}
                         className="mt-0.5 shrink-0"
                         onChange={(event) =>
                           setDraft({
@@ -423,6 +432,7 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
             <Select
               id="executor"
               value={draft.executor}
+              disabled={held}
               className="sm:max-w-xs"
               onChange={(event) =>
                 setDraft({ ...draft, executor: event.target.value })
@@ -451,6 +461,7 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
               runs for {dropped.join(", ")}. Saving removes that.
             </p>
           )}
+          {held ? <HeldNote /> : null}
           <div className="flex flex-wrap gap-2 border-t pt-5">
             <Button type="submit" disabled={revisions.pending}>
               Save revision
@@ -458,6 +469,7 @@ export function ExpertEditor({ expertId }: { expertId: string }) {
             <Button
               type="button"
               variant="outline"
+              disabled={sessions.pending}
               onClick={() => void startSession()}
             >
               Start a session

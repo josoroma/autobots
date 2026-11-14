@@ -9,9 +9,11 @@ import {
 import { CircleAlert, CircleDollarSign, Pause, Play } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
+import { HeldNote } from "@/components/held-note";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { withHeld } from "@/lib/submit";
 import { useSubmit } from "@/lib/use-submit";
 
 type Command = "pause" | "resume" | "cancel";
@@ -63,6 +65,8 @@ export function RunControls({
   const commandWrites = useSubmit();
   const charges = useSubmit();
   const busy = commandWrites.pending || charges.pending;
+  // While a charge is held, its amount stays as sent (Decision 0027 D2).
+  const chargeHeld = charges.holding();
   const [charge, setCharge] = useState("");
   const base = `/api/v1/runs/${encodeURIComponent(runId)}`;
   const commands = commandsFor(status);
@@ -98,7 +102,7 @@ export function RunControls({
     if (result === null) return;
     if (result.outcome === "unknown") setRefusal(UNKNOWN);
     else if (result.outcome === "refused")
-      setRefusal(refusalOf(result.refusal));
+      setRefusal(withHeld(refusalOf(result.refusal), result.held));
     onChanged();
   }
 
@@ -147,7 +151,7 @@ export function RunControls({
     } else if (result.outcome === "unknown") {
       setRefusal(UNKNOWN);
     } else {
-      setRefusal(refusalOf(result.refusal));
+      setRefusal(withHeld(refusalOf(result.refusal), result.held));
     }
     onChanged();
   }
@@ -202,6 +206,7 @@ export function RunControls({
               <Input
                 id="model-call-charge"
                 value={charge}
+                readOnly={chargeHeld}
                 onChange={(event) => setCharge(event.target.value)}
                 inputMode="decimal"
                 autoComplete="off"
@@ -211,6 +216,7 @@ export function RunControls({
                 Record the charge
               </Button>
             </div>
+            {chargeHeld ? <HeldNote /> : null}
           </div>
         </form>
       )}

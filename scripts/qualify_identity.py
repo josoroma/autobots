@@ -383,7 +383,11 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
             qualification_codes.append(ran.returncode)
             if ran.returncode:
                 print(ran.stdout[-1500:], file=sys.stderr)
-        stack.runtime("delete from app_private.worker_heartbeats where worker_id = 'arranged-readiness';\n")
+        # As the admin: the runtime role holds DELETE on workflow drafts only (R-17).
+        cleared = stack.sql("delete from app_private.worker_heartbeats where worker_id = 'arranged-readiness'; "
+                            "select count(*) from app_private.worker_heartbeats where worker_id = 'arranged-readiness';\n")
+        cases.check('the arranged readiness heartbeat is removed before the slice', 'exit 0, 0 rows',
+                    f'exit {cleared.returncode}, {cleared.stdout.strip()} rows', cleared.returncode == 0 and cleared.stdout.strip() == '0')
         # The slice runs last, with a worker, so nothing above sees its jobs claimed.
         stack.runtime("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done';\n")
         # Arranged: the settings suite changed the workspace default, and the fixture worker's route is the original.

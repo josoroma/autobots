@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { changedChoice, withHeld } from "@/lib/submit";
 import { useSubmit } from "@/lib/use-submit";
 
 type Operation = {
@@ -13,6 +14,19 @@ type Operation = {
   tool_id: string;
   generation: number;
 };
+type Seen = "delivered" | "not_delivered";
+
+// Each choice in the words of its button, for a message that names it.
+const CHOICES: Record<Seen, string> = {
+  delivered: "It happened",
+  not_delivered: "It did not happen",
+};
+
+function choiceLabel(choice: string | null): string {
+  return choice === "delivered" || choice === "not_delivered"
+    ? CHOICES[choice]
+    : (choice ?? "");
+}
 
 const REFUSALS: Record<string, string> = {
   owner_required: "Only the workspace owner can record this.",
@@ -38,7 +52,7 @@ export function UnknownEffects({
   async function record(
     operationId: string,
     generation: number,
-    outcome: string,
+    outcome: Seen,
   ): Promise<void> {
     setMessage(null);
     const result = await writes.submit({
@@ -57,8 +71,14 @@ export function UnknownEffects({
         ),
       parse: parseReconciliationResult,
       scope: operationId,
+      // A press for the other answer while this one is held sends nothing (Decision 0027 D2).
+      choice: outcome,
     });
     if (result === null) return;
+    if (result.outcome === "changed") {
+      setMessage(changedChoice(choiceLabel(result.heldChoice)));
+      return;
+    }
     if (result.outcome === "accepted") {
       setEvidence("");
       setMessage("Recorded. Resume the run to continue.");
@@ -68,8 +88,11 @@ export function UnknownEffects({
     setMessage(
       result.outcome === "unknown"
         ? "This may have been recorded. The reply was lost, so pressing again won't record it twice."
-        : (REFUSALS[result.refusal?.code ?? ""] ??
-            "That couldn't be recorded."),
+        : withHeld(
+            REFUSALS[result.refusal?.code ?? ""] ??
+              "That couldn't be recorded.",
+            result.held,
+          ),
     );
   }
 

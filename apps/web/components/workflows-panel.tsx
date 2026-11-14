@@ -22,6 +22,7 @@ import { Input, Select } from "@/components/ui/field";
 import { SectionLabel } from "@/components/ui/page-header";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
+import { withHeld } from "@/lib/submit";
 import { useSubmit } from "@/lib/use-submit";
 
 type Tab = "all" | "published" | "drafts";
@@ -155,8 +156,11 @@ export function WorkflowsPanel() {
     setMessage(
       result.outcome === "unknown"
         ? "The reply was lost, so it may have been created. Pressing again won't create a second one."
-        : (CREATE_REFUSALS[result.refusal?.code ?? ""] ??
-            "That could not be saved."),
+        : withHeld(
+            CREATE_REFUSALS[result.refusal?.code ?? ""] ??
+              "That could not be saved.",
+            result.held,
+          ),
     );
   }
 

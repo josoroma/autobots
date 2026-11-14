@@ -1,10 +1,14 @@
-"""The code search, with light imports, so a spawned child can run it (R-20, Decision 0017 C7).
+"""The code search, with light imports, so a child interpreter can run it (R-20, Decision 0017 C7).
 
-Pure Python over the files it's given: no shell, no binary and no host path.
+Pure Python over the files it's given: no shell, no binary and no host path. Run as a module, it
+reads `{"files": ..., "arguments": ...}` on stdin and writes `{"output": ...}` or
+`{"error": "invalid_pattern"}` on stdout.
 """
 
 import fnmatch
+import json
 import re
+import sys
 from collections.abc import Mapping
 
 from autobots.contracts.code_tools import (
@@ -82,3 +86,19 @@ def search(files: Mapping[str, str], arguments: SearchFilesInput) -> SearchFiles
         total_count=total,
         truncated=end < total,
     )
+
+
+def main() -> None:
+    request = json.loads(sys.stdin.buffer.read().decode("utf-8"))
+    arguments = SearchFilesInput.model_validate(request["arguments"])
+    try:
+        output = search(request["files"], arguments)
+    except InvalidPattern:
+        answer: dict[str, object] = {"error": "invalid_pattern"}
+    else:
+        answer = {"output": output.model_dump(mode="json")}
+    sys.stdout.buffer.write(json.dumps(answer).encode("utf-8"))
+
+
+if __name__ == "__main__":
+    main()

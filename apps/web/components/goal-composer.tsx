@@ -9,6 +9,7 @@ import {
   parseRunAccepted,
   parseRunPreview,
   parseSessionView,
+  type RunAccepted,
   type RunPreview,
   type RunRequest,
   type SessionCreate,
@@ -18,6 +19,8 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { FileText, Paperclip, Play, X } from "lucide-react";
 
+import { AdmissionMessage } from "@/components/admission-message";
+import { HeldNote } from "@/components/held-note";
 import { Button } from "@/components/ui/button";
 import {
   DEFAULT_BUDGET_MICRO_USD,
@@ -36,7 +39,15 @@ import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
 import { readReply } from "@/lib/replies";
 import { profileField } from "@/lib/model-profile";
-import { useSubmit } from "@/lib/use-submit";
+import {
+  ADMISSION_UNKNOWN,
+  admissionKind,
+  admissionRefusal,
+  type AdmissionRefusal,
+  CHOICE_NOT_OFFERED,
+} from "@/lib/run-admission";
+import { type Outcome, withHeld } from "@/lib/submit";
+import { type Submitted, useSubmit } from "@/lib/use-submit";
 
 // The draft survives setup in this tab only; the profile, Expert and budget choices are plain state.
 // Restoring the draft never starts anything: the one admission below happens only when Run is pressed.
@@ -111,17 +122,53 @@ function inputPath(name: string, taken: readonly Attached[]): string {
   return candidate;
 }
 
-type Outcome =
-  | "queued"
-  | "credentials_required"
-  | "credential_invalid"
-  | "credential_unavailable"
-  | "model_refused"
-  | "error"
-  | "model_not_offered"
-  | "budget_refused"
-  | "session_failed"
-  | "unknown";
+// What the card says after Run, from run-admission's one table (R-18). `kind` is the screen's own
+// name for it, which tests read.
+type Said = {
+  kind:
+    | AdmissionRefusal
+    | "queued"
+    | "unknown"
+    | "session_failed"
+    | "choice_not_offered";
+  outcome: Outcome;
+  text: string;
+  // A refusal settings can fix, which links there.
+  fix?: AdmissionRefusal;
+};
+const KEPT = "Your draft is kept.";
+const SESSION_FAILED: Said = {
+  kind: "session_failed",
+  outcome: "refused",
+  text: `The Expert's session could not be started, so no run started. ${KEPT}`,
+};
+
+function saidFor(result: Submitted<RunAccepted>): Said {
+  if (result.outcome === "accepted") {
+    return {
+      kind: "queued",
+      outcome: "accepted",
+      text: "Your goal is queued.",
+    };
+  }
+  if (result.outcome === "unknown") {
+    return {
+      kind: "unknown",
+      outcome: "unknown",
+      text: `${ADMISSION_UNKNOWN} ${KEPT}`,
+    };
+  }
+  const kind = admissionKind(result.refusal, result.status);
+  return {
+    kind,
+    outcome: "refused",
+    fix: kind,
+    text: withHeld(
+      `${admissionRefusal(result.refusal, result.status)} ${KEPT}`,
+      result.held,
+    ),
+  };
+}
 
 export function GoalComposer() {
   // One key until the outcome is known, and one press at a time (Decision 0027 D2).
@@ -141,7 +188,7 @@ export function GoalComposer() {
     );
   }, []);
   const [edited, setEdited] = useState<string | null>(null);
-  const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const [said, setSaid] = useState<Said | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const [profile, setProfile] = useState("");
   const [files, setFiles] = useState<readonly Attached[]>([]);
@@ -152,8 +199,9 @@ export function GoalComposer() {
   const [models, setModels] = useState<ModelList | null>(null);
   const [preview, setPreview] = useState<RunPreview | null>(null);
   const [previewFailed, setPreviewFailed] = useState(false);
-  const [refusal, setRefusal] = useState<string | null>(null);
   const draft = edited ?? restored;
+  // While a request is held, everything it sent stays as sent (Decision 0027 D2).
+  const held = admission.holding();
 
   useEffect(() => {
     let active = true;
@@ -289,17 +337,25 @@ export function GoalComposer() {
   }
 
   async function run(): Promise<void> {
-    setOutcome(null);
-    setRefusal(null);
-    const session = { failed: false };
+    setSaid(null);
+    const local: { said: Said | null } = { said: null };
     const result = await admission.submit({
-      // Skipped while an earlier outcome is unknown: that first request, session included, is resent.
+      // Skipped while a request is held: that first request, session included, is resent.
       body: async () => {
+        const field = profileField(profile);
+        if (field === null) {
+          local.said = {
+            kind: "choice_not_offered",
+            outcome: "refused",
+            text: CHOICE_NOT_OFFERED,
+          };
+          return null;
+        }
         let sessionId: string | null = null;
         if (expertId !== NO_EXPERT) {
           sessionId = await startSession();
           if (sessionId === null) {
-            session.failed = true;
+            local.said = SESSION_FAILED;
             return null;
           }
         }
@@ -307,7 +363,7 @@ export function GoalComposer() {
           goal_text: draft,
           budget_micro_usd: budget,
           ...(sessionId === null ? {} : { session_id: sessionId }),
-          ...profileField(profile),
+          ...field,
           ...(files.length === 0
             ? {}
             : {
@@ -330,42 +386,17 @@ export function GoalComposer() {
         }),
       parse: parseRunAccepted,
     });
-    if (session.failed) {
-      setOutcome("session_failed");
+    if (local.said !== null) {
+      setSaid(local.said);
       return;
     }
-    if (result === null) return;
+    if (result === null || result.outcome === "changed") return;
     if (result.outcome === "accepted" && result.value !== null) {
       setRunId(result.value.run_id);
-      setOutcome("queued");
       setFiles([]);
       setRefusals([]);
-      return;
     }
-    if (result.outcome === "unknown") {
-      setOutcome("unknown");
-      return;
-    }
-    const failure = result.refusal;
-    if (failure?.code.startsWith("budget_") === true) {
-      setRefusal(failure.message);
-      setOutcome("budget_refused");
-      return;
-    }
-    if (failure?.code === "model_not_offered") {
-      setOutcome("model_not_offered");
-      return;
-    }
-    if (result.status === 422) {
-      setOutcome("model_refused");
-      return;
-    }
-    const known: Outcome[] = [
-      "credentials_required",
-      "credential_invalid",
-      "credential_unavailable",
-    ];
-    setOutcome(known.find((code) => code === failure?.code) ?? "error");
+    setSaid(saidFor(result));
   }
 
   return (
@@ -395,6 +426,7 @@ export function GoalComposer() {
         <Textarea
           id="goal"
           value={draft}
+          readOnly={held}
           onChange={(event) => update(event.target.value)}
           rows={4}
           className="min-h-28 resize-y text-base leading-relaxed"
@@ -414,6 +446,7 @@ export function GoalComposer() {
             <Select
               id="run-model"
               value={profile}
+              disabled={held}
               onChange={(event) => setProfile(event.target.value)}
               className={CHIP_SELECT}
             >
@@ -436,6 +469,7 @@ export function GoalComposer() {
             <Select
               id="run-expert"
               value={expertId}
+              disabled={held}
               onChange={(event) => setExpertId(event.target.value)}
               className={CHIP_SELECT}
             >
@@ -456,7 +490,7 @@ export function GoalComposer() {
             <Select
               id="run-budget"
               value={budgetLeft ? String(budget) : ""}
-              disabled={!budgetLeft}
+              disabled={!budgetLeft || held}
               onChange={(event) => setChosenBudget(Number(event.target.value))}
               className={cn(CHIP_SELECT, "tabular-nums")}
             >
@@ -555,6 +589,7 @@ export function GoalComposer() {
           multiple
           accept=".txt,.text,.md,.markdown,.json,.csv,text/plain,text/markdown,application/json,text/csv"
           aria-describedby="attachments-help"
+          disabled={held}
           className="min-w-0 file:mr-3 file:border-0 file:bg-transparent file:font-medium"
           onChange={(event) => {
             void attach(event.target.files);
@@ -597,6 +632,7 @@ export function GoalComposer() {
                   size="icon"
                   className="size-7 shrink-0"
                   aria-label={`Remove ${file.name}`}
+                  disabled={held}
                   onClick={() =>
                     setFiles(files.filter((item) => item.path !== file.path))
                   }
@@ -615,6 +651,7 @@ export function GoalComposer() {
           ))}
         </div>
       </div>
+      {held ? <HeldNote className="px-5 pt-2" /> : null}
       <div className="flex justify-end px-5 pt-2 pb-4">
         <Button
           onClick={() => void run()}
@@ -626,57 +663,23 @@ export function GoalComposer() {
           Run
         </Button>
       </div>
-      {outcome === null ? null : (
-        <p
-          role="alert"
-          data-outcome={outcome}
+      {said === null ? null : (
+        <AdmissionMessage
+          outcome={said.outcome}
+          fix={said.fix}
+          data-outcome={said.kind}
           className={cn(INNER_BOX, "mx-5 mb-5 text-sm")}
         >
-          {outcome === "credentials_required" ? (
+          {said.text}
+          {said.kind === "queued" && runId !== null ? (
             <>
-              Model-backed work needs an OpenRouter key. Your draft is kept.{" "}
-              <Link href="/settings/models" className="font-medium underline">
-                Set up OpenRouter
+              {" "}
+              <Link href={`/runs/${runId}`} className="font-medium underline">
+                Open this run
               </Link>
             </>
-          ) : outcome === "credential_invalid" ? (
-            <>
-              The configured key was rejected. Your draft is kept.{" "}
-              <Link href="/settings/models" className="font-medium underline">
-                Fix it in settings
-              </Link>
-            </>
-          ) : outcome === "credential_unavailable" ? (
-            "Credential storage is unavailable, so model-backed work is blocked. Your draft is kept."
-          ) : outcome === "model_not_offered" ? (
-            <>
-              A saved model choice isn&apos;t offered for new runs until
-              it&apos;s qualified, so no run started. Your draft is kept.{" "}
-              <Link href="/settings/models" className="font-medium underline">
-                Change it in settings
-              </Link>
-            </>
-          ) : outcome === "budget_refused" ? (
-            <>{refusal} No run started. Your draft is kept.</>
-          ) : outcome === "session_failed" ? (
-            "The Expert's session could not be started, so no run started. Your draft is kept."
-          ) : outcome === "unknown" ? (
-            "The reply was lost, so the run may have started. Pressing Run again won't start a second one. Your draft is kept."
-          ) : outcome === "model_refused" ? (
-            "That model or request isn't approved, so no run started. Your draft is kept."
-          ) : outcome === "queued" ? (
-            <>
-              Your goal is queued.{" "}
-              {runId === null ? null : (
-                <Link href={`/runs/${runId}`} className="font-medium underline">
-                  Open this run
-                </Link>
-              )}
-            </>
-          ) : (
-            "That could not be started. Your draft is kept."
-          )}
-        </p>
+          ) : null}
+        </AdmissionMessage>
       )}
     </Card>
   );

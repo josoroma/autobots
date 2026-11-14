@@ -399,11 +399,17 @@ test("a refusal clears the key to continue with, and a refusal after a lost repl
     name: "Run",
   });
   const keys: string[] = [];
+  // Each refusal carries the service's error envelope, so it reads as refused, not unknown.
+  const refusal = (message: string) => ({
+    status: 409,
+    contentType: "application/json",
+    body: JSON.stringify({ code: "arranged", message }),
+  });
   const answers = [
-    { status: 409, body: JSON.stringify({ message: "Arranged refusal." }) },
+    refusal("Arranged refusal."),
     { status: 503, body: "{}" },
-    { status: 409, body: JSON.stringify({ message: "Arranged again." }) },
-    { status: 409, body: JSON.stringify({ message: "And again." }) },
+    refusal("Arranged again."),
+    refusal("And again."),
   ];
   await page.route("**/api/v1/runs", async (route) => {
     if (route.request().method() !== "POST") return route.continue();
@@ -417,8 +423,10 @@ test("a refusal clears the key to continue with, and a refusal after a lost repl
   await run.click();
   await expect(page.getByText(/it may have started/)).toBeVisible();
   expect(keys[1]).not.toBe(keys[0]);
+  // A refusal of the resent request doesn't show the first press failed, and says so.
   await run.click();
   await expect(page.getByText("Arranged again.")).toBeVisible();
+  await expect(page.getByText(/may still have gone through/)).toBeVisible();
   await run.click();
   await expect(page.getByText("And again.")).toBeVisible();
   // Once the outcome is unknown, no refusal proves nothing started under that key.

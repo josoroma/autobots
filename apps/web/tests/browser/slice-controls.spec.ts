@@ -220,11 +220,38 @@ test("resume is refused with its reason until an uncertain call is reconciled, a
     "Enter the charge in US dollars",
   );
 
-  await page.getByLabel("Charge seen, in US dollars").fill("0.00025");
+  // R-18 step 1, Decision 0027 D2: the charge reaches the API and its reply is lost, so the page
+  // can't tell it was recorded. The run's own reloads are lost too, so the form stays, and the
+  // next press resends the same request under the same key, which records it once.
+  const charged: { key: string; body: string | null }[] = [];
+  const snapshot = `**/api/v1/runs/${id}/workspace`;
+  await page.route(snapshot, (route) => route.abort("connectionreset"));
+  await page.route("**/model-calls/reconcile", async (route) => {
+    charged.push({
+      key: route.request().headers()["idempotency-key"] ?? "",
+      body: route.request().postData(),
+    });
+    if (charged.length > 1) return route.continue();
+    await route.fetch();
+    return route.abort("connectionreset");
+  });
+  const charge = page.getByLabel("Charge seen, in US dollars");
+  await charge.fill("0.00025");
+  await page.getByRole("button", { name: "Record the charge" }).click();
+  await expect(page.locator("[data-control-refusal]")).toContainText(
+    "This may have been recorded",
+  );
+  await expect(charge).not.toBeEditable();
+  await expect(charge).toHaveValue("0.00025");
   await page.getByRole("button", { name: "Record the charge" }).click();
   await expect(page.locator("[data-control-note]")).toContainText(
     "The charge is recorded",
   );
+  expect(charged).toHaveLength(2);
+  expect(charged[1]).toEqual(charged[0]);
+  await page.unroute("**/model-calls/reconcile");
+  await page.unroute(snapshot);
+  await page.reload();
   await expect(page.locator("[data-reconcile]")).toHaveCount(0);
   const after = await (
     await page.request.get(`/api/v1/runs/${id}/workspace`)

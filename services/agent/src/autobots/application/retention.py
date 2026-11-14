@@ -8,6 +8,7 @@ from uuid import UUID
 
 import psycopg
 
+from autobots.domain.runs import TERMINAL
 from autobots.operations.logs import log_event
 
 logger = logging.getLogger("autobots.retention")
@@ -104,11 +105,12 @@ async def apply_retention(
             cursor = await connection.execute(
                 "select id, updated_at from public.runs "
                 "where workspace_id = %s and content_purged_at is null "
-                "and status in ('succeeded', 'failed', 'cancelled') and updated_at < %s "
+                "and status = any(%s) and updated_at < %s "
                 "and (%s::timestamptz is null or (updated_at, id) > (%s::timestamptz, %s::uuid)) "
                 "order by updated_at, id limit %s",
                 (
                     workspace_id,
+                    sorted(TERMINAL),
                     cutoff,
                     position[0] if position else None,
                     position[0] if position else None,

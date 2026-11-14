@@ -237,3 +237,53 @@ test("overlapping CSRF requests return the session's one token", async ({
   expect((await a.json()).token).toBe(first.token);
   expect((await b.json()).token).toBe(first.token);
 });
+
+// R-19 step 1: once the session has its token, two writes that overlap each fetch it, as csrfFetch
+// in two tabs would, then both are sent. A token minted per fetch would refuse the first, and one
+// per session lets both through. Validation changes nothing, so the writes leave no trace.
+test("two overlapping writes both succeed with the session's one CSRF token", async ({
+  page,
+}) => {
+  await page
+    .context()
+    .addCookies([{ name: "autobots.session", value: SESSION_A, url: ORIGIN }]);
+  await page.goto("/");
+  const replies = await page.evaluate(async () => {
+    const graph = {
+      nodes: [
+        { id: "in", block: "input", version: 1, config: { type: "string" } },
+        { id: "out", block: "output", version: 1 },
+      ],
+      links: [
+        {
+          source: "in",
+          source_port: "value",
+          target: "out",
+          target_port: "value",
+        },
+      ],
+    };
+    await fetch("/api/csrf", { cache: "no-store" });
+    const tokens: { header: string; token: string }[] = await Promise.all(
+      [0, 1].map(async () =>
+        (await fetch("/api/csrf", { cache: "no-store" })).json(),
+      ),
+    );
+    return Promise.all(
+      tokens.map(async ({ header, token }) => {
+        const reply = await fetch("/api/v1/workflows/validate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", [header]: token },
+          body: JSON.stringify(graph),
+        });
+        return { status: reply.status, token, code: (await reply.json()).code };
+      }),
+    );
+  });
+  // A refused token would be a 403 with invalid_csrf; both reach the API and are answered.
+  expect(replies.map((reply) => [reply.status, reply.code])).toEqual([
+    [200, undefined],
+    [200, undefined],
+  ]);
+  expect(replies[1]?.token).toBe(replies[0]?.token);
+});

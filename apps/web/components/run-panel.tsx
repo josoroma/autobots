@@ -14,6 +14,7 @@ import { StateLine } from "@/components/run-list";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { cn } from "@/lib/utils";
+import { withHeld } from "@/lib/submit";
 import { useSubmit } from "@/lib/use-submit";
 
 type Command = "pause" | "resume" | "cancel";
@@ -113,10 +114,13 @@ export function RunPanel({
     setRefusal(
       result.outcome === "unknown"
         ? "The reply was lost, so this may have applied. Pressing again won't apply it twice."
-        : result.refusal?.code === "version_conflict"
-          ? STALE
-          : (result.refusal?.message ??
-            "That could not be done. Nothing changed."),
+        : withHeld(
+            result.refusal?.code === "version_conflict"
+              ? STALE
+              : (result.refusal?.message ??
+                  "That could not be done. Nothing changed."),
+            result.held,
+          ),
     );
   }
 

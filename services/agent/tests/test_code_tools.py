@@ -130,3 +130,73 @@ def test_a_bounded_search_gives_the_same_answer_as_the_plain_one() -> None:
             )
         )
     assert str(failed.value) == "invalid_pattern"
+
+
+# R-20: the child never re-imports the caller's main module. A spawned process did, so a script
+# with work at module level ran twice, and its second copy took the first one's leases. The request
+# here is larger than a pipe's buffer, and the event loop keeps running while it is written.
+SCRIPT = """
+import asyncio, pathlib, sys, time
+with pathlib.Path(sys.argv[1]).open("a") as marker:
+    marker.write("imported\\n")
+from autobots.application.code_tools import bounded_search
+from autobots.contracts.code_tools import SearchFilesInput
+
+async def main():
+    ticks = 0
+    stop = asyncio.Event()
+
+    async def ticker():
+        nonlocal ticks
+        while not stop.is_set():
+            ticks += 1
+            await asyncio.sleep(0.01)
+
+    task = asyncio.create_task(ticker())
+    files = {f"inputs/{index}.txt": "line\\n" * 4000 for index in range(40)}
+    arguments = SearchFilesInput.model_validate(
+        {"pattern": "line", "path": "inputs/", "output_mode": "count"}
+    )
+    began = time.monotonic()
+    found = await bounded_search(files, arguments)
+    elapsed = time.monotonic() - began
+    stop.set()
+    await task
+    print(found.total_count, ticks >= elapsed * 50)
+
+asyncio.run(main())
+"""
+
+
+def test_a_search_from_a_script_runs_that_script_once(tmp_path: object) -> None:
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    from autobots.application.bounded import SOURCE_ROOT
+
+    folder = Path(str(tmp_path))
+    script = folder / "worker_like.py"
+    marker = folder / "imports.txt"
+    script.write_text(SCRIPT)
+    finished = subprocess.run(
+        [sys.executable, str(script), str(marker)],
+        env={**os.environ, "PYTHONPATH": SOURCE_ROOT},
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert finished.returncode == 0, finished.stderr[-2000:]
+    assert finished.stdout.split() == ["160000", "True"]
+    assert marker.read_text() == "imported\n"
+
+
+def test_a_child_that_ends_without_an_answer_fails_the_search_with_no_effect() -> None:
+    import asyncio
+
+    from autobots.application.bounded import ChildFailed, run_module
+
+    with pytest.raises(ChildFailed):
+        asyncio.run(run_module("autobots.application.no_such_module", b"{}", seconds=8.0))

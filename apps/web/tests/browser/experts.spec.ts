@@ -622,3 +622,47 @@ test("a tool's detail lists who it's granted to now", async ({ page }) => {
     .analyze();
   expect(axe.violations.map((item) => item.id)).toEqual([]);
 });
+
+// R-18 step 1, Decision 0027 D2: the route answers the admission for the API, so this starts no
+// run and spends nothing.
+test("a double click on Run in a session sends one admission", async ({
+  page,
+}) => {
+  await signIn(page, EMAIL_A, PASSWORD_A);
+  await page.goto("/");
+  const created = await page.request.post("/api/v1/experts", {
+    headers: await write(page, `double-${Date.now()}`),
+    data: { name: `Pressed twice ${Date.now()}`, config: {} },
+  });
+  expect(created.status()).toBe(201);
+  const expert = (await created.json()).id;
+  const opened = await page.request.post("/api/v1/sessions", {
+    headers: await write(page, `double-session-${Date.now()}`),
+    data: { kind: "direct", experts: [{ expert_id: expert }] },
+  });
+  expect(opened.ok()).toBe(true);
+  const session = (await opened.json()).id;
+
+  let posts = 0;
+  await page.route("**/api/v1/runs", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    posts += 1;
+    await new Promise((settle) => setTimeout(settle, 400));
+    await route.fulfill({
+      status: 202,
+      json: {
+        schema_version: 1,
+        run_id: "22222222-2222-4222-8222-222222222222",
+        status: "queued",
+        version: 1,
+        replayed: false,
+      },
+    });
+  });
+  await page.goto(`/sessions/${session}`);
+  await page.getByLabel("Goal").fill("Pressed twice, admitted once");
+  await page.getByRole("button", { name: "Run", exact: true }).dblclick();
+  await expect(page.getByRole("link", { name: "Open this run" })).toBeVisible();
+  expect(posts).toBe(1);
+  await page.unroute("**/api/v1/runs");
+});

@@ -388,8 +388,9 @@ async def check_run_intent(
     settings: Settings,
     workspace_id: Annotated[UUID, Depends(current_workspace)],
 ) -> RunIntentCheck:
-    """A user's Run click checks readiness here. It admits nothing: POST /v1/runs admits (US-4.1).
-    current_workspace needs the database, so the pool is always open by now (R-11)."""
+    """A user's Run click checks readiness here. It admits nothing: POST /v1/runs admits a run
+    (US-4.1)."""
+    # current_workspace needs the database, so the pool is always open by now.
     code = await settings.run_intent(workspace_id)
     pool = request_pool(request)
     if code == "ready":

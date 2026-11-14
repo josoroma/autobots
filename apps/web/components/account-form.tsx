@@ -1,11 +1,22 @@
 "use client";
 
+import { parseProfileView } from "@autobots/api-client";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import { refusalText } from "@/lib/submit";
+import { useSubmit } from "@/lib/use-submit";
+
+// R-19 step 4: this screen's words for a refusal's code. Any other keeps the service's own.
+const REFUSALS: Readonly<Record<string, string>> = {
+  display_name_invalid:
+    "A display name needs 1 to 60 characters. Nothing changed.",
+};
+const LOST =
+  "The reply was lost, so the name may have saved. Saving again sends it again.";
 
 // PRD-Studio SE-04 and ID-01: edit only your own display name. The API refuses an empty or
 // overlong name with display_name_invalid, and the saved name stays as it was.
@@ -13,36 +24,30 @@ export function AccountForm({ initial }: { initial: string }) {
   const router = useRouter();
   const [name, setName] = useState(initial);
   const [message, setMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  // One save at a time. It sends no key and replaces the name whole, so it's never held (R-19).
+  const saves = useSubmit();
 
   async function save(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    setBusy(true);
     setMessage(null);
-    try {
-      const reply = await csrfFetch("/api/v1/profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ display_name: name }),
-      });
-      if (reply.ok) {
-        setMessage("Saved.");
-        router.refresh();
-        return;
-      }
-      const body = (await reply.json().catch(() => null)) as {
-        code?: string;
-      } | null;
-      setMessage(
-        body?.code === "display_name_invalid"
-          ? "A display name needs 1 to 60 characters. Nothing changed."
-          : "That did not save. Nothing changed.",
-      );
-    } catch {
-      setMessage("That did not save. Nothing changed.");
-    } finally {
-      setBusy(false);
+    const result = await saves.submit({
+      body: () => JSON.stringify({ display_name: name }),
+      send: ({ body }) =>
+        csrfFetch("/api/v1/profile", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body,
+        }),
+      parse: parseProfileView,
+      keyed: false,
+    });
+    if (result === null) return;
+    if (result.outcome === "accepted") {
+      setMessage("Saved.");
+      router.refresh();
+      return;
     }
+    setMessage(refusalText(REFUSALS, result.refusal, LOST));
   }
 
   return (
@@ -59,7 +64,7 @@ export function AccountForm({ initial }: { initial: string }) {
           autoComplete="nickname"
           className="sm:max-w-sm"
         />
-        <Button type="submit" disabled={busy}>
+        <Button type="submit" disabled={saves.pending}>
           Save name
         </Button>
       </div>

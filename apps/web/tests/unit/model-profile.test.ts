@@ -13,6 +13,7 @@ test("a profile is sent as the contract's ModelProfileId", () => {
   });
 });
 
-test("a value that isn't a profile is never sent", () => {
-  assert.deepEqual(profileField("gpt-5"), {});
+test("a value that isn't a profile is refused, never sent as the default", () => {
+  assert.equal(profileField("gpt-5"), null);
+  assert.equal(profileField("openai/gpt-unknown"), null);
 });

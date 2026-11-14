@@ -2,6 +2,7 @@
 
 import {
   type ApprovalList,
+  type ApprovalResult,
   type ApprovalView,
   parseApprovalList,
   parseApprovalResult,
@@ -21,8 +22,9 @@ import { Card, INNER_BOX } from "@/components/ui/card";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { chord, press, type Arm } from "@/lib/approval-shortcut";
 import { typing } from "@/lib/keyboard";
+import { changedChoice, withHeld } from "@/lib/submit";
 import { cn } from "@/lib/utils";
-import { useSubmit } from "@/lib/use-submit";
+import { type Submitted, useSubmit } from "@/lib/use-submit";
 
 const MESSAGES: Record<string, string> = {
   owner_required: "Only the workspace owner can decide.",
@@ -45,6 +47,38 @@ const OUTCOME: Record<string, string> = {
 };
 
 type Tab = "waiting" | "decided";
+type Decision = "approve" | "reject";
+
+// What a decision did, from the status the service returned, not the button pressed.
+const DECIDED: Record<string, string> = {
+  approved: "Approved. Only this exact request is released.",
+  rejected: "Rejected. The run can replan or fail, and this request won't run.",
+};
+// Each decision in the words of its button, for a message that names it.
+const BUTTONS: Record<Decision, string> = {
+  approve: "Approve",
+  reject: "Reject",
+};
+
+function decisionText(result: Submitted<ApprovalResult>): string {
+  if (result.outcome === "accepted" && result.value !== null) {
+    const status = result.value.status;
+    return DECIDED[status] ?? `${OUTCOME[status] ?? status}.`;
+  }
+  if (result.outcome === "changed") {
+    const held = result.heldChoice;
+    return changedChoice(
+      held === "approve" || held === "reject" ? BUTTONS[held] : (held ?? ""),
+    );
+  }
+  if (result.outcome === "unknown") {
+    return "The reply was lost, so this may have been decided. Deciding again won't apply it twice.";
+  }
+  return withHeld(
+    MESSAGES[result.refusal?.code ?? ""] ?? "That decision couldn't be saved.",
+    result.held,
+  );
+}
 
 // Decision 0015: who started the run, and which agent proposed the call.
 function requesterText(approval: ApprovalView): string {
@@ -190,9 +224,10 @@ export function ApprovalsPanel({
   const approvals = useMemo(() => list?.approvals ?? [], [list]);
   const current = approvals.find((item) => item.id === selected) ?? null;
 
-  // One key per decision until its outcome is known (Decision 0027 D2), scoped to the request.
+  // One key per decision until its outcome is known (Decision 0027 D2), scoped to the request. A
+  // press for the other decision while one is held sends nothing.
   const decide = useCallback(
-    async (approval: ApprovalView, decision: "approve" | "reject") => {
+    async (approval: ApprovalView, decision: Decision) => {
       setMessage(null);
       const result = await decisions.submit({
         body: () =>
@@ -211,22 +246,11 @@ export function ApprovalsPanel({
           ),
         parse: parseApprovalResult,
         scope: approval.id,
+        choice: decision,
       });
       if (result === null) return;
-      if (result.outcome === "accepted") {
-        setMessage(
-          decision === "approve"
-            ? "Approved. Only this exact request is released."
-            : "Rejected. The run can replan or fail, and this request won't run.",
-        );
-      } else {
-        setMessage(
-          result.outcome === "unknown"
-            ? "The reply was lost, so this may have been decided. Deciding again won't apply it twice."
-            : (MESSAGES[result.refusal?.code ?? ""] ??
-                "That decision couldn't be saved."),
-        );
-      }
+      setMessage(decisionText(result));
+      if (result.outcome === "changed") return;
       await load(tab);
     },
     [decisions, load, tab],
