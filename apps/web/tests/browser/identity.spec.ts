@@ -8,6 +8,8 @@ const WORKSPACE_B = process.env.AUTOBOTS_TEST_WORKSPACE_B ?? "";
 const SERVICE_KEY = process.env.AUTOBOTS_TEST_SERVICE_KEY ?? "";
 const MEMBER_EMAIL = process.env.AUTOBOTS_TEST_MEMBER_EMAIL ?? "";
 const MEMBER_PASSWORD = process.env.AUTOBOTS_TEST_MEMBER_PASSWORD ?? "";
+const SIGN_IN_UNAVAILABLE =
+  "Signing in is unavailable right now. Check that the local services are running, then try again.";
 
 async function signIn(
   page: Page,
@@ -91,6 +93,88 @@ test("signing out ends access", async ({ page }) => {
   expect(
     (await page.request.get(`/api/v1/workspaces/${WORKSPACE_A}`)).status(),
   ).toBe(401);
+});
+
+// Only a 401 is about the credentials (WSHL-07). The replies are arranged with page.route; the
+// session route's own classification of an Auth outage is covered by boundary.spec.ts.
+test("a sign-in that fails for any other reason says so, not that the password was wrong", async ({
+  page,
+  context,
+}) => {
+  let answer: "outage" | "no reply" | "refused" = "outage";
+  await page.route("**/api/session", (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    if (answer === "no reply") return route.abort("connectionrefused");
+    return route.fulfill(
+      answer === "refused"
+        ? {
+            status: 403,
+            json: {
+              code: "forbidden_origin",
+              message: "This request was refused.",
+            },
+          }
+        : {
+            status: 503,
+            json: {
+              code: "auth_unavailable",
+              message: "The sign-in service is unavailable.",
+            },
+          },
+    );
+  });
+  await page.goto("/sign-in");
+  await page.getByLabel("Email").fill(OWNER_EMAIL);
+  await page.getByLabel("Password").fill(OWNER_PASSWORD);
+  // Each case changes the sentence, so a stale one can't satisfy the next.
+  for (const [arranged, sentence] of [
+    ["outage", SIGN_IN_UNAVAILABLE],
+    [
+      "refused",
+      "This request was refused. Reload the page, then sign in again.",
+    ],
+    ["no reply", SIGN_IN_UNAVAILABLE],
+  ] as const) {
+    answer = arranged;
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.getByText(sentence)).toBeVisible();
+    await expect(
+      page.getByText("That email and password did not work."),
+    ).toHaveCount(0);
+  }
+  expect(
+    (await context.cookies()).some((item) => item.name === "autobots.session"),
+  ).toBe(false);
+});
+
+test("a sign-out that fails says so, and the person stays signed in", async ({
+  page,
+}) => {
+  await signIn(page, OWNER_EMAIL, OWNER_PASSWORD);
+  await expect(
+    page.getByText("Signed in, with access to 1 workspace."),
+  ).toBeVisible();
+  await page.route("**/api/session", (route) =>
+    route.request().method() === "DELETE"
+      ? route.fulfill({
+          status: 503,
+          json: {
+            code: "server_misconfigured",
+            message: "The web server is missing part of its configuration.",
+          },
+        })
+      : route.continue(),
+  );
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(
+    page.getByText("Signing out did not finish. Try again."),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Signed in, with access to 1 workspace."),
+  ).toBeVisible();
+  await page.unroute("**/api/session");
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page.getByText("You are not signed in.")).toBeVisible();
 });
 
 test("signing in needs the origin and CSRF checks", async ({ request }) => {

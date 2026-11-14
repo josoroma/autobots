@@ -3,19 +3,26 @@ import Link from "next/link";
 import { AccountForm } from "@/components/account-form";
 import { SignOutButton } from "@/components/sign-out-button";
 import { PageHeader } from "@/components/ui/page-header";
-import { fetchSession } from "@/lib/service-status";
+import { fetchSession, readValue } from "@/lib/service-status";
 
 export const dynamic = "force-dynamic";
 
 const ROLE = { owner: "Owner", member: "Member" } as const;
 
-// PRD-Studio SE-04: the editable display name, the read-only email, the role and Sign out.
+// PRD-Studio SE-04: the editable display name, the read-only email, the role and Sign out. Sign in
+// shows only when signed out; a session the services can't read says so instead (WSHL-02).
 export default async function AccountPage() {
-  const session = await fetchSession();
+  const read = await fetchSession();
+  const session = readValue(read);
   return (
     <div className="max-w-3xl space-y-6">
       <PageHeader title="Account" />
-      {session === null ? (
+      {read.kind === "unavailable" ? (
+        <p data-session="unavailable" className="text-sm">
+          Your account could not be loaded. Check that the local services are
+          running, then reload.
+        </p>
+      ) : session === null ? (
         <p className="text-sm">
           <Link href="/sign-in" className="font-medium underline">
             Sign in

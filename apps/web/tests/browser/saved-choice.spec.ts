@@ -53,14 +53,14 @@ test("a saved default naming DeepSeek refuses new runs with no substitute, and i
     runs.runs,
   );
 
-  const intent = await page.request.post("/api/runs/intent", {
+  const intent = await page.request.post("/api/v1/runs/intent", {
     headers: await write(page, `intent-${Date.now()}`),
   });
   expect((await intent.json()).ready).toBe(false);
   expect(
     (
       await (
-        await page.request.post("/api/runs/intent", {
+        await page.request.post("/api/v1/runs/intent", {
           headers: await write(page, `intent-again-${Date.now()}`),
         })
       ).json()

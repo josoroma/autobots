@@ -1,21 +1,14 @@
 import "server-only";
 
-export interface ServerConfig {
-  apiUrl: string;
-  internalToken: string;
-  allowedOrigin: string;
-  supabaseUrl: string;
-  supabaseAnonKey: string;
-}
+import { configFrom, type ServerConfig } from "@/lib/server-env";
 
-/** Read per call, so a value is never compiled into a build. `server-only` keeps it out of client bundles. */
+export type { ServerConfig };
+
+/**
+ * Read per call, so a value is never compiled into a build. `server-only` keeps it out of client
+ * bundles. Throws `ConfigurationError`, naming the variables only, when a secret is missing or an
+ * address is malformed (WSHL-20).
+ */
 export function serverConfig(): ServerConfig {
-  return {
-    apiUrl: process.env.AUTOBOTS_API_URL ?? "http://127.0.0.1:8001",
-    internalToken: process.env.AUTOBOTS_INTERNAL_TOKEN ?? "",
-    allowedOrigin:
-      process.env.AUTOBOTS_ALLOWED_ORIGIN ?? "http://127.0.0.1:3000",
-    supabaseUrl: process.env.AUTOBOTS_SUPABASE_URL ?? "http://127.0.0.1:54321",
-    supabaseAnonKey: process.env.AUTOBOTS_SUPABASE_ANON_KEY ?? "",
-  };
+  return configFrom(process.env);
 }

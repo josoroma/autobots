@@ -1,4 +1,5 @@
 import { chosenWorkspace, currentWorkspace } from "@/lib/workspace-choice";
+import type { SessionSummary } from "@autobots/api-client";
 import { Server, UserRound } from "lucide-react";
 import Link from "next/link";
 
@@ -16,6 +17,8 @@ import {
   fetchReadiness,
   fetchServiceStatus,
   fetchSession,
+  readValue,
+  type MemberRead,
 } from "@/lib/service-status";
 import { cn } from "@/lib/utils";
 
@@ -29,13 +32,53 @@ const LOWER_HEAD = "mb-2 flex items-center gap-2";
 const LOWER_ITEM = "border-t py-3 text-sm";
 const LOWER_ACTION = "mt-auto pt-2";
 
+// Sign in shows only when signed out; a session the services can't read says so instead (WSHL-02).
+const ACCOUNT_BADGE = {
+  ok: { variant: "success", words: "Signed in" },
+  signed_out: { variant: "muted", words: "Signed out" },
+  unavailable: { variant: "attention", words: "Unavailable" },
+} as const;
+
+function AccountState({ read }: { read: MemberRead<SessionSummary> }) {
+  if (read.kind === "ok") {
+    const count = read.value.workspace_ids.length;
+    return (
+      <p data-session="signed-in">
+        Signed in, with access to {count} workspace{count === 1 ? "" : "s"}.
+      </p>
+    );
+  }
+  return read.kind === "signed_out" ? (
+    <p data-session="signed-out">You are not signed in.</p>
+  ) : (
+    <p data-session="unavailable">
+      Your session could not be checked. Check that the local services are
+      running, then reload.
+    </p>
+  );
+}
+
+function AccountAction({ read }: { read: MemberRead<SessionSummary> }) {
+  if (read.kind === "ok") return <SignOutButton />;
+  return read.kind === "signed_out" ? (
+    <Link
+      href="/sign-in"
+      className={buttonVariants({ variant: "outline", size: "sm" })}
+    >
+      Sign in
+    </Link>
+  ) : null;
+}
+
 export default async function HomePage() {
-  const [status, session, readiness, chosen] = await Promise.all([
+  const [status, read, readiness, chosen] = await Promise.all([
     fetchServiceStatus(),
     fetchSession(),
     fetchReadiness(),
     chosenWorkspace(),
   ]);
+  const session = readValue(read);
+  const badge = ACCOUNT_BADGE[read.kind];
   return (
     <div className="mx-auto w-full max-w-[780px] md:pt-10">
       <header className="mb-8 space-y-3 text-center">
@@ -67,36 +110,15 @@ export default async function HomePage() {
             <SectionLabel id="account-heading" className="text-[12.5px]">
               Account
             </SectionLabel>
-            <Badge
-              variant={session === null ? "muted" : "success"}
-              dot
-              className="ml-auto"
-            >
-              {session === null ? "Signed out" : "Signed in"}
+            <Badge variant={badge.variant} dot className="ml-auto">
+              {badge.words}
             </Badge>
           </div>
           <div className={LOWER_ITEM}>
-            {session === null ? (
-              <p data-session="signed-out">You are not signed in.</p>
-            ) : (
-              <p data-session="signed-in">
-                Signed in, with access to {session.workspace_ids.length}{" "}
-                workspace
-                {session.workspace_ids.length === 1 ? "" : "s"}.
-              </p>
-            )}
+            <AccountState read={read} />
           </div>
           <div className={LOWER_ACTION}>
-            {session === null ? (
-              <Link
-                href="/sign-in"
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-              >
-                Sign in
-              </Link>
-            ) : (
-              <SignOutButton />
-            )}
+            <AccountAction read={read} />
           </div>
         </section>
         <section aria-labelledby="services-heading" className={LOWER_SECTION}>
@@ -115,7 +137,9 @@ export default async function HomePage() {
           </p>
           <div className={LOWER_ITEM}>
             <ServiceStatusBadge status={status} />
-            {readiness === null ? null : <ServiceChips readiness={readiness} />}
+            {readiness.kind === "ok" ? (
+              <ServiceChips readiness={readiness.value} />
+            ) : null}
           </div>
           <div className={LOWER_ACTION}>
             <AboutServices />

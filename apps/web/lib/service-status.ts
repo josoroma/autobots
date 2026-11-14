@@ -8,78 +8,100 @@ import {
   type MemberReadiness,
   type SessionSummary,
 } from "@autobots/api-client";
+import type { ClientOptions } from "@autobots/api-client/runtime";
+import { unstable_rethrow } from "next/navigation";
 
+import { apiHeaders } from "@/lib/bff-policy";
+import { readFailure } from "@/lib/failure";
 import { serverConfig } from "@/lib/server-config";
+import { logFailure } from "@/lib/server-log";
 import { accessToken } from "@/lib/session";
-import { chosenWorkspace, WORKSPACE_HEADER } from "@/lib/workspace-choice";
+import { chosenWorkspace } from "@/lib/workspace-choice";
 
 export type ServiceStatus = "available" | "unavailable";
 
-function client(headers: Record<string, string>) {
-  const config = serverConfig();
+/**
+ * A server read for the signed-in person (WSHL-02). Signed out means there is no session or the API
+ * answered 401. Anything else, such as a stopped API, a timeout, missing configuration or a reply
+ * that has drifted from its contract, is unavailable, and its cause is logged on the server.
+ */
+export type MemberRead<T> =
+  { kind: "ok"; value: T } | { kind: "signed_out" } | { kind: "unavailable" };
+
+const SIGNED_OUT: { kind: "signed_out" } = { kind: "signed_out" };
+const UNAVAILABLE: { kind: "unavailable" } = { kind: "unavailable" };
+
+/** The value of a read that succeeded, or null, for views that show nothing otherwise. */
+export function readValue<T>(read: MemberRead<T>): T | null {
+  return read.kind === "ok" ? read.value : null;
+}
+
+function client(headers: Record<string, string>): ClientOptions {
   return {
-    baseUrl: config.apiUrl,
+    baseUrl: serverConfig().apiUrl,
     fetch: ((input, init) =>
       fetch(input, {
         ...init,
         cache: "no-store",
         signal: AbortSignal.timeout(3_000),
       })) as typeof fetch,
-    headers: { "X-Autobots-Internal": config.internalToken, ...headers },
+    headers,
   };
 }
 
-/** A member read, with the chosen workspace when there is one (Decision 0023 E3). */
-async function memberClient(token: string) {
-  const workspace = await chosenWorkspace();
-  return client({
-    Authorization: `Bearer ${token}`,
-    ...(workspace === null ? {} : { [WORKSPACE_HEADER]: workspace }),
-  });
+/**
+ * Next's own control flow, such as the bail-out a request-time API throws while a page is being
+ * prerendered, is rethrown rather than read or logged as a failure.
+ */
+async function memberRead<T>(
+  operation: string,
+  call: (options: ClientOptions) => Promise<T>,
+  withWorkspace: boolean,
+): Promise<MemberRead<T>> {
+  try {
+    const token = await accessToken();
+    if (token === null) return SIGNED_OUT;
+    // A member read carries the chosen workspace when there is one (Decision 0023 E3).
+    const workspace = withWorkspace ? await chosenWorkspace() : null;
+    const headers = apiHeaders(serverConfig().internalToken, token, workspace);
+    return { kind: "ok", value: await call(client(headers)) };
+  } catch (error) {
+    unstable_rethrow(error);
+    if (readFailure(error) === "signed_out") return SIGNED_OUT;
+    logFailure(operation, error);
+    return UNAVAILABLE;
+  }
 }
 
-/** An unreachable or invalid API is a visible state, and its details stay on the server. */
+/** An unreachable or invalid API is a visible state, and its details stay in the server's log. */
 export async function fetchServiceStatus(): Promise<ServiceStatus> {
   try {
-    await getHealth(client({}));
+    await getHealth(
+      client(apiHeaders(serverConfig().internalToken, null, null)),
+    );
     return "available";
-  } catch {
+  } catch (error) {
+    unstable_rethrow(error);
+    logFailure("health.read", error);
     return "unavailable";
   }
 }
 
-/** The verified session as the API sees it, or null when signed out or refused. */
-export async function fetchSession(): Promise<SessionSummary | null> {
-  try {
-    const token = await accessToken();
-    return token === null
-      ? null
-      : await getSession(client({ Authorization: `Bearer ${token}` }));
-  } catch {
-    return null;
-  }
+/** The verified session as the API sees it. */
+export function fetchSession(): Promise<MemberRead<SessionSummary>> {
+  return memberRead("session.read", getSession, false);
 }
 
-/** PRD-Studio SH-04: readiness any member may read, or null when signed out or unreachable. */
-export async function fetchReadiness(): Promise<MemberReadiness | null> {
-  try {
-    const token = await accessToken();
-    return token === null
-      ? null
-      : await getReadiness(await memberClient(token));
-  } catch {
-    return null;
-  }
+/** PRD-Studio SH-04: readiness any member may read. */
+export function fetchReadiness(): Promise<MemberRead<MemberReadiness>> {
+  return memberRead("readiness.read", getReadiness, true);
 }
 
 /** PRD-Studio SH-03: the number of pending approvals, from a count rather than a listed page. */
-export async function fetchPendingApprovals(): Promise<number | null> {
-  try {
-    const token = await accessToken();
-    return token === null
-      ? null
-      : (await countPendingApprovals(await memberClient(token))).pending;
-  } catch {
-    return null;
-  }
+export function fetchPendingApprovals(): Promise<MemberRead<number>> {
+  return memberRead(
+    "approvals.count",
+    async (options) => (await countPendingApprovals(options)).pending,
+    true,
+  );
 }

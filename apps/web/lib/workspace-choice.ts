@@ -5,7 +5,6 @@ import { cookies } from "next/headers";
 // Decision 0023 E3: which workspace a member of several is working in. Kept in an HttpOnly cookie that
 // only /api/workspace sets, after checking membership. The API checks membership again on every call.
 export const WORKSPACE_COOKIE = "autobots.workspace";
-export const WORKSPACE_HEADER = "x-autobots-workspace";
 
 const IDENTIFIER =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

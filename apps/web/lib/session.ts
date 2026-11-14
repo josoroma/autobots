@@ -1,9 +1,13 @@
 import "server-only";
 
 import { createServerClient } from "@supabase/ssr";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  isAuthRetryableFetchError,
+  type SupabaseClient,
+} from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
+import { cookieOptions } from "@/lib/bff-policy";
 import { SESSION_COOKIE } from "@/lib/request-guard";
 import { serverConfig } from "@/lib/server-config";
 
@@ -14,10 +18,7 @@ export async function sessionClient(): Promise<SupabaseClient> {
   return createServerClient(config.supabaseUrl, config.supabaseAnonKey, {
     cookieOptions: {
       name: SESSION_COOKIE,
-      httpOnly: true,
-      sameSite: "strict",
-      secure: false,
-      path: "/",
+      ...cookieOptions(config.allowedOrigin, true),
     },
     cookies: {
       getAll: () => store.getAll(),
@@ -34,9 +35,16 @@ export async function sessionClient(): Promise<SupabaseClient> {
   });
 }
 
-/** The token for the Python API, which verifies it itself. Nothing here trusts its contents. */
+/**
+ * The token for the Python API, which verifies it itself. Nothing here trusts its contents. Null
+ * means signed out. An expired token that can't be refreshed because Auth is unreachable throws
+ * instead, so an outage never reads as a sign-out (WSHL-02).
+ */
 export async function accessToken(): Promise<string | null> {
   const client = await sessionClient();
-  const { data } = await client.auth.getSession();
+  const { data, error } = await client.auth.getSession();
+  if (error !== null && isAuthRetryableFetchError(error)) {
+    throw error;
+  }
   return data.session?.access_token ?? null;
 }

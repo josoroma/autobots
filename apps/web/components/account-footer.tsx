@@ -19,12 +19,16 @@ function initials(name: string): string {
 
 // PRD-Studio SH-05: the display name, the role in the current workspace and "this Mac", with a
 // menu offering Settings → Account and Sign out. The current workspace is the only one, or the one chosen
-// (Decision 0023 E3); a member of several, or whose choice is stale, gets the chooser.
+// (Decision 0023 E3); a member of several, or whose choice is stale, gets the chooser. Sign in shows
+// only when signed out; a session the services can't read says so instead (WSHL-02).
 export async function AccountFooter() {
-  const session = await fetchSession();
-  if (session === null) {
+  const read = await fetchSession();
+  if (read.kind === "signed_out") {
     return (
-      <div className="border-sidebar-border border-t px-2 pt-3">
+      <div
+        data-account-state="signed-out"
+        className="border-sidebar-border border-t px-2 pt-3"
+      >
         <Link
           href="/sign-in"
           className="text-sidebar-foreground text-sm font-medium underline"
@@ -34,6 +38,23 @@ export async function AccountFooter() {
       </div>
     );
   }
+  if (read.kind === "unavailable") {
+    return (
+      <div
+        data-account-state="unavailable"
+        className="border-sidebar-border space-y-0.5 border-t px-2 pt-3"
+      >
+        <p className="text-sidebar-foreground text-sm font-medium">
+          Account unavailable
+        </p>
+        <p className="text-muted-foreground text-xs">
+          Your session could not be checked. Check that the local services are
+          running, then reload.
+        </p>
+      </div>
+    );
+  }
+  const session = read.value;
   const chosen = await chosenWorkspace();
   const workspace = currentWorkspace(session.workspaces, chosen) ?? undefined;
   const choosing =

@@ -10,6 +10,8 @@ const SESSION_FORGED = process.env.AUTOBOTS_TEST_SESSION_FORGED ?? "";
 const TOKEN_A = process.env.AUTOBOTS_TEST_TOKEN_A ?? "";
 const WORKSPACE_A = process.env.AUTOBOTS_TEST_WORKSPACE_A ?? "";
 const path = `/api/v1/workspaces/${WORKSPACE_A}`;
+const SIGN_IN_UNAVAILABLE =
+  "Signing in is unavailable right now. Check that the local services are running, then try again.";
 
 function session(token: string): { Cookie: string } {
   return { Cookie: `autobots.session=${token}` };
@@ -175,6 +177,94 @@ test("an unavailable API is a visible, safe state", async ({ page }) => {
   await page.screenshot({
     path: `${process.env.AUTOBOTS_WEB_SCREENSHOTS ?? "test-results/screenshots"}/api-unavailable.png`,
   });
+});
+
+// A session read that fails for any reason but a 401 is unavailable, never signed out (WSHL-02).
+test("a session the API cannot read shows the account as unavailable, not Sign in", async ({
+  page,
+}) => {
+  await page
+    .context()
+    .addCookies([
+      { name: "autobots.session", value: SESSION_A, url: UNAVAILABLE },
+    ]);
+  await page.goto(`${UNAVAILABLE}/`);
+  await expect(page.locator('[data-account-state="unavailable"]')).toHaveText(
+    /Account unavailable/,
+  );
+  await expect(page.locator('[data-session="unavailable"]')).toBeVisible();
+  await expect(page.getByRole("link", { name: "Sign in" })).toHaveCount(0);
+  await expect(page.getByText("You are not signed in.")).toHaveCount(0);
+  expect(await page.locator("body").innerText()).not.toContain("ECONNREFUSED");
+  await page.screenshot({
+    path: `${process.env.AUTOBOTS_WEB_SCREENSHOTS ?? "test-results/screenshots"}/session-unavailable.png`,
+  });
+});
+
+test("choosing a workspace while the API is unavailable is a 503, not a sign-in prompt", async ({
+  request,
+}) => {
+  const token = await (await request.get(`${UNAVAILABLE}/api/csrf`)).json();
+  const reply = await request.post(`${UNAVAILABLE}/api/workspace`, {
+    headers: {
+      Cookie: `autobots.session=${SESSION_A}; autobots.csrf=${token.token}`,
+      Origin: UNAVAILABLE,
+      [token.header]: token.token,
+    },
+    data: { workspace_id: WORKSPACE_A },
+  });
+  expect(reply.status()).toBe(503);
+  expect((await reply.json()).code).toBe("service_unavailable");
+});
+
+// scripts/qualify_web.py arranges the Auth address as a closed port, so these reach a real Auth
+// outage through the session route (WSHL-07).
+test("an unreachable sign-in service is reported as unavailable, not as a wrong password", async ({
+  page,
+  request,
+}) => {
+  const email = "member@example.test";
+  const password = "never-echoed-password";
+  const token = await (await request.get("/api/csrf")).json();
+  const reply = await request.post("/api/session", {
+    headers: {
+      Cookie: `autobots.csrf=${token.token}`,
+      Origin: ORIGIN,
+      [token.header]: token.token,
+    },
+    data: { email, password },
+  });
+  expect(reply.status()).toBe(503);
+  const text = await reply.text();
+  expect(JSON.parse(text).code).toBe("auth_unavailable");
+  expect(text).not.toContain(password);
+  expect(text).not.toContain(email);
+  await page.goto("/sign-in");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(password);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByText(SIGN_IN_UNAVAILABLE)).toBeVisible();
+  await expect(
+    page.getByText("That email and password did not work."),
+  ).toHaveCount(0);
+});
+
+test("signing out with the sign-in service unreachable still ends the session on this device", async ({
+  page,
+}) => {
+  await page
+    .context()
+    .addCookies([{ name: "autobots.session", value: SESSION_A, url: ORIGIN }]);
+  const token = await (await page.request.get("/api/csrf")).json();
+  const reply = await page.request.delete("/api/session", {
+    headers: { Origin: ORIGIN, [token.header]: token.token },
+  });
+  expect(reply.status()).toBe(200);
+  expect(
+    (await page.context().cookies()).some(
+      (cookie) => cookie.name === "autobots.session",
+    ),
+  ).toBe(false);
 });
 
 test("US-14.1: a member reads the tool catalog through the BFF, and nothing else does", async ({

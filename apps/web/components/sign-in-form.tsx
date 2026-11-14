@@ -7,16 +7,23 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { csrfFetch } from "@/lib/csrf-fetch";
+import {
+  SIGN_IN_FAILURE_TEXT,
+  signInFailure,
+  type SignInFailure,
+} from "@/lib/sign-in-failure";
 
+// The credential sentence is only for the session route's 401. A refusal or an outage, including
+// no reply at all, has its own sentence (WSHL-07).
 export function SignInForm() {
   const router = useRouter();
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<SignInFailure | null>(null);
   const [pending, setPending] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setPending(true);
-    setFailed(false);
+    setFailed(null);
     const form = new FormData(event.currentTarget);
     const reply = await csrfFetch("/api/session", {
       method: "POST",
@@ -31,7 +38,7 @@ export function SignInForm() {
       router.push("/");
       router.refresh();
     } else {
-      setFailed(true);
+      setFailed(signInFailure(reply?.status ?? null));
     }
   }
 
@@ -61,15 +68,19 @@ export function SignInForm() {
           required
         />
       </div>
-      {failed ? (
-        <p role="alert" className="flex items-start gap-2 text-sm font-medium">
+      {failed === null ? null : (
+        <p
+          role="alert"
+          data-sign-in-failure={failed}
+          className="flex items-start gap-2 text-sm font-medium"
+        >
           <CircleAlert
             aria-hidden="true"
             className="text-destructive mt-0.5 size-4 shrink-0"
           />
-          That email and password did not work.
+          {SIGN_IN_FAILURE_TEXT[failed]}
         </p>
-      ) : null}
+      )}
       <Button type="submit" size="lg" disabled={pending} className="w-full">
         {pending ? "Signing in" : "Sign in"}
       </Button>
