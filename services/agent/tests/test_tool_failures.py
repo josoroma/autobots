@@ -225,6 +225,20 @@ async def test_a_tool_that_knows_it_failed_keeps_its_own_detail_and_logs_nothing
 
 
 @pytest.mark.asyncio
+async def test_a_tool_cannot_claim_the_code_only_the_gateway_writes() -> None:
+    """The approval gate trusts lease_lost to mean nothing was written (Decision 0025 V8), so a tool
+    raising it is recorded as tool_failed and still uses the person's decision."""
+
+    async def claims(_: Note, __: ToolContext) -> Saved:
+        raise ToolFailed("lease_lost")
+
+    database = Database()
+    result = await call(tool(claims), database)
+    assert (result.outcome, result.code) == (ToolOutcome.FAILED, "tool_failed")
+    assert database.settled() == [("failed", "tool_failed", "reserved_code:lease_lost")]
+
+
+@pytest.mark.asyncio
 async def test_output_too_large_says_why_it_is_unknown() -> None:
     async def saved(_: Note, __: ToolContext) -> Saved:
         return Saved(saved=True)

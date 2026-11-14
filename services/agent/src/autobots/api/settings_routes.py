@@ -2,7 +2,8 @@
 details (MD-02, MD-03), the run intent check and the shared session and workspace dependencies.
 Changes need owner authority and a version."""
 
-from collections.abc import AsyncIterator
+import os
+from collections.abc import AsyncIterator, Mapping
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -49,6 +50,14 @@ from autobots.domain.models import (
 )
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
+
+
+def process_environment(request: Request) -> Mapping[str, str]:
+    """The process environment as the entry point read it at start, which orders keys for admission
+    and availability alike (Decisions 0024 K1 and 0025 V3, PAPI-10). An app built without a provider
+    context, as some tests are, has only the live one."""
+    context = request.app.state.provider_context
+    return os.environ if context is None else context.process_environment
 
 
 async def current_workspace(

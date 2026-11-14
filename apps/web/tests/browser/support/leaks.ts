@@ -65,6 +65,19 @@ export interface CapturedBody {
   body: string;
 }
 
+// A Next.js router payload (an RSC request) whose page was navigated away from before its body could
+// be read. The browser drops that body; the page it would have rendered is read when it's visited.
+function droppedRouterPayload(response: Response, error: unknown): boolean {
+  const request = response.request();
+  const routerPayload =
+    request.headers()["rsc"] === "1" ||
+    new URL(response.url()).searchParams.has("_rsc");
+  return (
+    routerPayload &&
+    /navigated away|No data found for resource/.test(String(error))
+  );
+}
+
 function hasNoBody(response: Response): boolean {
   const status = response.status();
   const type = response.headers()["content-type"] ?? "";
@@ -75,13 +88,13 @@ function hasNoBody(response: Response): boolean {
 /**
  * Starts reading each body `keep` accepts as its response arrives. The returned function awaits
  * every read started so far, so a body still arriving is never skipped, and rejects naming any
- * response whose body couldn't be read.
+ * response whose body couldn't be read, except a router payload dropped by a navigation.
  */
 export function captureBodies(
   page: Page,
   keep: (response: Response) => boolean = () => true,
 ): () => Promise<CapturedBody[]> {
-  const reads: Promise<CapturedBody>[] = [];
+  const reads: Promise<CapturedBody | null>[] = [];
   page.on("response", (response) => {
     if (!keep(response) || hasNoBody(response)) return;
     const method = response.request().method();
@@ -93,6 +106,7 @@ export function captureBodies(
         body,
       }),
       (error: unknown) => {
+        if (droppedRouterPayload(response, error)) return null;
         throw new Error(
           `${method} ${response.url()}: its body couldn't be read, so it can't be checked: ${String(error)}`,
         );
@@ -102,5 +116,8 @@ export function captureBodies(
     read.catch(() => undefined);
     reads.push(read);
   });
-  return () => Promise.all(reads);
+  return async () =>
+    (await Promise.all(reads)).filter(
+      (body): body is CapturedBody => body !== null,
+    );
 }

@@ -348,7 +348,7 @@ test("a decided request shows its run, task, expiry and who decided", async ({
     "Approved by you at",
   );
   await expect(card).toContainText(
-    /Expires \d.*\((in \d|in less than a minute|\d+ (minute|hour|day)s? ago|just now|yesterday)\)/,
+    /Expires \d.*\((in \d+ (minute|hour|day)s?|in less than a minute|\d+ (minute|hour|day)s? ago|just now|yesterday)\)/,
   );
 });
 

@@ -58,6 +58,14 @@ def _log(level: int, event: str, request: Request, error: Exception) -> None:
     logger.log(level, event, extra={"fields": fields})
 
 
+def transient(error: psycopg.OperationalError) -> bool:
+    """Whether a retry can succeed: a lost or refused connection (no SQLSTATE, or class 08), a pool
+    wait that ran out, a serialization conflict or deadlock (class 40), or a server shutting down
+    (57P0x). A full disk (class 53), a program limit (54) or a cancelled statement can't."""
+    state = error.sqlstate
+    return state is None or state.startswith(("08", "40", "57P0"))
+
+
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ApiError)
     async def api_error(_request: Request, error: ApiError) -> JSONResponse:
@@ -74,6 +82,10 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(psycopg.OperationalError)
     async def database_unavailable(request: Request, error: Exception) -> JSONResponse:
+        if isinstance(error, psycopg.OperationalError) and not transient(error):
+            # A full disk or a program limit won't clear on a retry, so it isn't offered one.
+            _log(logging.ERROR, "api.unhandled", request, error)
+            return _response(500, "internal_error", "Something went wrong.")
         # The code the no-pool path answers with, so a person is offered a retry (XERR-06).
         _log(logging.WARNING, "api.database_unavailable", request, error)
         return _response(503, "service_unavailable", DATABASE_RETRY)

@@ -114,7 +114,7 @@ export class RunConnection {
   #view: RunView = EMPTY_VIEW;
   /** The newest event sequence the stream and replays have covered. */
   #cursor = 0;
-  /** Failed attempts in a row. The stream opening resets it. */
+  /** Failed attempts in a row. A frame on the stream resets it, as an open that drops at once proves nothing. */
   #failures = 0;
   #stream: Stream | null = null;
   /** Counts streams opened, so frames from a replaced one are ignored. */
@@ -265,16 +265,17 @@ export class RunConnection {
       `${this.#base}/events/stream?after=${this.#cursor}`,
       {
         open: () => {
-          if (!current()) return;
-          this.#failures = 0;
-          this.#setConnection("live");
+          if (current()) this.#setConnection("live");
         },
         // The browser's own retry would resume from a stale URL, so this uses the current cursor.
         error: () => {
           if (current()) this.#fail({ kind: "unavailable", status: null });
         },
         frame: (type, data) => {
-          if (current()) this.#frame(type, data);
+          if (!current()) return;
+          // A stream that delivered something is working, so the next drop starts the backoff over.
+          this.#failures = 0;
+          this.#frame(type, data);
         },
       },
     );

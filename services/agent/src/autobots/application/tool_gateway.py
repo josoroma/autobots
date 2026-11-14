@@ -12,7 +12,6 @@ from uuid import UUID
 from pydantic import BaseModel, ValidationError
 
 from autobots.application.approvals import (
-    LEASE_LOST,
     approval_gate,
     approved_request,
     receipt_may_have_sent,
@@ -48,6 +47,10 @@ class OutcomeUnknown(Exception):
     def __init__(self, detail: str) -> None:
         super().__init__(detail)
         self.detail = detail
+
+
+# Codes the gateway alone records on a receipt; a tool raising one is recorded as tool_failed.
+GATEWAY_ONLY = frozenset({GatewayCode.LEASE_LOST, GatewayCode.RUN_NOT_RUNNING})
 
 
 class ToolFailed(Exception):
@@ -584,13 +587,18 @@ class ToolGateway:
             output = await asyncio.wait_for(tool.handler(parsed, context), tool.timeout_seconds)
         except ToolFailed as error:
             code = str(error) or GatewayCode.TOOL_FAILED
-            await _record(context, operation_id, "failed", None, code, error.detail)
+            detail = error.detail
+            if code in GATEWAY_ONLY:
+                # Only the gateway may say the lease refused an attempt: the approval gate trusts
+                # that code to mean nothing was written (Decision 0025 V8).
+                code, detail = GatewayCode.TOOL_FAILED, f"reserved_code:{code}"
+            await _record(context, operation_id, "failed", None, code, detail)
             return ToolResult(ToolOutcome.FAILED, code, operation_id=operation_id)
         except LeaseLost:
             # The write's transaction refused it, so nothing happened. The code tells the approval
             # gate that this attempt didn't use a person's decision.
-            await _record(context, operation_id, "failed", None, LEASE_LOST)
-            return ToolResult(ToolOutcome.DENIED, LEASE_LOST, operation_id=operation_id)
+            await _record(context, operation_id, "failed", None, GatewayCode.LEASE_LOST)
+            return ToolResult(ToolOutcome.DENIED, GatewayCode.LEASE_LOST, operation_id=operation_id)
         except Exception as error:  # noqa: BLE001 - an unexpected failure leaves the outcome unknown for reconciliation
             _log_failure("tool.operation.unknown", tool, operation_id, error)
             await _record(context, operation_id, "unknown", None, failure_detail=_diagnosis(error))

@@ -1,7 +1,8 @@
 /**
  * Signing in, and the disposable roles the runners arrange (TWEB-02, TWEB-18). Each role's email
  * and password are read when a test first uses it, so a missing role fails with its variable's
- * name. Every spec signs in through the real form, as identity.spec.ts must.
+ * name. Specs sign in through the real form, as identity.spec.ts must; boundary.spec.ts also sets
+ * session cookies to test the request guard itself.
  */
 import { expect, type Page } from "@playwright/test";
 

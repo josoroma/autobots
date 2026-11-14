@@ -52,7 +52,7 @@ test("refreshes in flight coalesce, and a snapshot older than the one shown is d
   assert.equal(connection.view.gap, true);
 });
 
-test("a stream error reconnects from the current cursor after a backoff, and opening resets it", async () => {
+test("a stream error reconnects from the current cursor after a backoff, and a frame resets it", async () => {
   const { run, base, server, connection, streams, waiting, fire } =
     await live(2);
   streams[0]?.on.frame("cursor", JSON.stringify({ cursor: 5 }));
@@ -72,8 +72,23 @@ test("a stream error reconnects from the current cursor after a backoff, and ope
   fire();
   await until(() => streams.length === 2, "the stream reopened");
   assert.equal(streams[1]?.url, `${base}/events/stream?after=5`);
+  // Opening and dropping at once proves nothing, so the backoff keeps growing.
   streams[1]?.on.open();
   streams[1]?.on.error();
+  assert.deepEqual(
+    waiting().map((timer) => timer.ms),
+    [2000],
+  );
+  server.answer(`${base}/workspace`, () => json(200, snapshot(run, 5)));
+  server.answer(`${base}/events?after=5`, () =>
+    json(200, eventPage(run, [], 5)),
+  );
+  fire();
+  await until(() => streams.length === 3, "the stream reopened again");
+  // A frame shows the stream works, so the next drop starts over at 1 s.
+  streams[2]?.on.open();
+  streams[2]?.on.frame("cursor", JSON.stringify({ cursor: 5 }));
+  streams[2]?.on.error();
   assert.deepEqual(
     waiting().map((timer) => timer.ms),
     [1000],

@@ -22,10 +22,11 @@ from autobots.application.runs import (
 )
 from autobots.application.worker_leases import LeaseHolder, hold_lease
 from autobots.domain.runs import RunCommand, RunStatus
+from autobots.domain.stops import GatewayCode
 
 DEFAULT_TTL_SECONDS = 86_400
 # The failure code of an attempt the lease refused before it wrote anything.
-LEASE_LOST = "lease_lost"
+LEASE_LOST = GatewayCode.LEASE_LOST
 
 
 # What a reviewer can be shown whole. Anything longer can be rejected, not approved.

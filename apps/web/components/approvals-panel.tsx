@@ -179,6 +179,14 @@ export function ApprovalsPanel({
     setNow(Date.now());
   }, []);
 
+  // Time left before an expiry is read against a clock that keeps moving, so a page left open never
+  // says more time remains than does (Decision 0028 E5).
+  useEffect(() => {
+    if (tab !== "waiting") return;
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
+  }, [tab]);
+
   useEffect(() => {
     let active = true;
     const url =
@@ -191,7 +199,6 @@ export function ApprovalsPanel({
         if (reply.ok) {
           const parsed = parseApprovalList(await reply.json());
           setList(parsed);
-          setCounts(parsed.counts);
           setCounts(parsed.counts);
           setSelected((current) =>
             parsed.approvals.some((item) => item.id === current)

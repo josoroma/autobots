@@ -52,10 +52,13 @@ test("an owner saves revisions in the editor, and a session shows what it really
     page.getByRole("heading", { name: "Writer, version 1" }),
   ).toBeVisible();
 
+  // The options come from /api/models, so wait for an offered one before checking DeepSeek is absent.
+  const models = page.getByLabel("Model for its work");
+  await expect(models.locator('option[value="openrouter_terra"]')).toHaveCount(
+    1,
+  );
   await expect(
-    page
-      .getByLabel("Model for its work")
-      .locator('option[value="openrouter_deepseek_flash"]'),
+    models.locator('option[value="openrouter_deepseek_flash"]'),
   ).toHaveCount(0);
   await page.getByLabel("Purpose").fill("Writes reports");
   await page.getByLabel("Instructions").fill("Be concise.");

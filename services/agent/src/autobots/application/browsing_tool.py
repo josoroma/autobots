@@ -153,11 +153,14 @@ async def _browse(
             return _output(BrowseOutcome("", (), 0, 0, "cancelled"))
         raise ToolFailed("browser_unreachable" if reason is None else f"browser_{reason}") from None
     finally:
-        if cdp is not None:
-            with contextlib.suppress(Exception):
-                await cdp.close()
-        await stop_task(watcher)
-        await runtime.executor.stop(session)
+        try:
+            if cdp is not None:
+                with contextlib.suppress(Exception):
+                    await cdp.close()
+            await stop_task(watcher)
+        finally:
+            # The session stops even when a cancellation lands during the cleanup above.
+            await runtime.executor.stop(session)
     return _output(outcome)
 
 

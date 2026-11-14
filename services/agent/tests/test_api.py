@@ -221,6 +221,31 @@ def test_a_database_failure_during_a_request_is_a_retryable_503() -> None:
     assert "hunter2" not in json.dumps(line)
 
 
+def test_a_database_error_a_retry_cant_clear_is_a_500_not_a_retry() -> None:
+    """A full disk or a program limit stays a 500, so no one is told to try again; a serialization
+    conflict or a shutdown is retried."""
+    from psycopg import errors
+
+    from autobots.api.errors import transient
+
+    assert not transient(errors.DiskFull("disk full"))
+    assert not transient(errors.ProgramLimitExceeded("program limit exceeded"))
+    assert transient(errors.SerializationFailure("could not serialize access"))
+    assert transient(errors.AdminShutdown("terminating connection"))
+
+    class Full(Membership):
+        async def is_member(self, user_id: UUID, workspace_id: UUID) -> bool:
+            raise errors.DiskFull("could not extend file")
+
+    app = create_app(SETTINGS, membership=Full())
+    with api_lines() as lines:
+        reply = TestClient(app, raise_server_exceptions=False).get(
+            f"/v1/workspaces/{WORKSPACE}", headers=headers(token())
+        )
+    assert reply.status_code == 500
+    assert [line["event"] for line in lines][:1] == ["api.unhandled"]
+
+
 def test_a_pool_that_runs_out_of_time_answers_503_too() -> None:
     class Exhausted:
         async def open(self) -> None:

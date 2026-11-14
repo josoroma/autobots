@@ -1,6 +1,5 @@
 """PRD-Studio SR-01: ⌘K's one search endpoint, for any member of the workspace."""
 
-import os
 from typing import Annotated
 from uuid import UUID
 
@@ -8,7 +7,7 @@ from fastapi import APIRouter, Depends, Query, Request
 
 from autobots.api.errors import ApiError
 from autobots.api.security import require_internal
-from autobots.api.settings_routes import current_workspace
+from autobots.api.settings_routes import current_workspace, process_environment
 from autobots.application.run_projection import public_text
 from autobots.application.search import search
 from autobots.application.tool_keys import key_sources
@@ -31,7 +30,7 @@ async def get_search(
     if pool is None:
         raise ApiError(503, "service_unavailable", "The database is unavailable.")
     async with pool.connection() as connection:
-        keys = await key_sources(connection, workspace_id, os.environ)
+        keys = await key_sources(connection, workspace_id, process_environment(request))
         hits = await search(connection, workspace_id, query, keys)
     return SearchResults(
         schema_version=1,

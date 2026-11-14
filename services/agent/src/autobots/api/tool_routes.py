@@ -1,6 +1,5 @@
 """Tool discovery, PRD-Tool-Catalog TC-05. Read-only, member-readable, and never a secret."""
 
-import os
 from collections.abc import Mapping
 from typing import Annotated
 from uuid import UUID
@@ -9,7 +8,7 @@ from fastapi import APIRouter, Depends, Request
 
 from autobots.api.errors import ApiError
 from autobots.api.security import require_internal
-from autobots.api.settings_routes import current_workspace
+from autobots.api.settings_routes import current_workspace, process_environment
 from autobots.application.tool_catalog import all_descriptors, tool_catalog
 from autobots.application.tool_grants import tool_grants
 from autobots.application.tool_keys import key_sources
@@ -31,10 +30,11 @@ Member = Annotated[UUID, Depends(current_workspace)]
 async def _keys(request: Request, workspace: UUID) -> Mapping[str, str]:
     """PK-04: availability is the workspace's, since it may have saved a tool's key in Settings."""
     pool = request.app.state.pool
+    environment = process_environment(request)
     if pool is None:
-        return os.environ
+        return environment
     async with pool.connection() as connection:
-        return await key_sources(connection, workspace, os.environ)
+        return await key_sources(connection, workspace, environment)
 
 
 @router.get("/tools", operation_id="listTools", response_model=ToolCatalog)
