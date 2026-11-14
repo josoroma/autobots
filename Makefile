@@ -30,7 +30,7 @@ LOG_DIR  := $(INSTALL_DIR)/logs
 .NOTPARALLEL:
 .PHONY: help first-time toolchain images install owner build migrate \
 	start start-stack start-api start-web start-worker wait-ready \
-	stop stop-app stop-web stop-api stop-worker stop-stack status logs check
+	stop stop-app stop-web stop-api stop-worker stop-stack status logs check check-fast check-full
 
 help:
 	@echo 'First time:'
@@ -49,6 +49,8 @@ help:
 	@echo '  make stop-worker && make start-worker INFERENCE=enabled'
 	@echo 'Checks:'
 	@echo '  make check        repository checks, with no services'
+	@echo '  make check-fast   plus lint, types and unit tests for what changed'
+	@echo '  make check-full   plus every lint, type and unit check, the build and browser checks'
 
 # --- First time -------------------------------------------------------------------------
 
@@ -232,3 +234,10 @@ logs:
 check:
 	python3.12 scripts/specs.py validate
 	python3.12 scripts/verify.py --profile harness
+
+# The db and operations profiles start disposable Docker projects, so they stay explicit commands.
+check-fast:
+	python3.12 scripts/verify.py --profile fast
+
+check-full:
+	python3.12 scripts/verify.py --profile full

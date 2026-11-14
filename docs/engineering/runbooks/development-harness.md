@@ -55,7 +55,9 @@ python3.12 scripts/verify.py --profile full
 
 Reports are `.checks/<profile>/latest.json`. Each binds to a fingerprint of the harness files plus application sources, manifests and locks, but not environments, caches, build output or the other checkouts under `.claude/worktrees/`. Links count by target name, and secret files, evidence output and build output never count. A change to those inputs makes every profile's report stale. `fast` chooses steps from what differs since the newest passing `fast` or `full` report, not from Git, so committing a change does not hide it, and with no passing report it runs both domains. The `Stop` hook likewise wants a current `fast` or `full` report for application or shared inputs, a current `db` report for database inputs, and otherwise any current report. It never requires `operations`, which is run on purpose. A skipped test fails its profile.
 
-Not run by any profile: most of `tests/toolchain`, whose copies bootstrap from registries; `full` runs only its offline scope tests.
+Every test file is run by a profile step or listed as manual, with its reason, in `scripts/suites.py`; `tests/harness/test_suite_claims.py` fails on any other. Web and API-client unit tests are selected by glob. `full` runs the offline part of `tests/toolchain` (scope, manifest pins and launchers). The rest of `tests/toolchain` bootstraps copies from package registries and stays manual, as do the three browser specs that read the persistent install or time a release.
+
+`make check-fast` and `make check-full` run those profiles. `git config core.hooksPath .githooks` turns on an opt-in pre-commit hook that runs `fast`.
 
 ## Disposable operations qualification
 

@@ -1,0 +1,5 @@
+#!/bin/sh
+# Opt-in (R-01): enable it once with `git config core.hooksPath .githooks`.
+# Runs the fast profile, which checks what changed with prepared environments and installs nothing.
+# The db and operations profiles start disposable Docker projects, so they stay explicit commands.
+exec python3.12 scripts/verify.py --profile fast

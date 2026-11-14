@@ -21,6 +21,7 @@ import time
 
 from harness_lib import (FULL_CHECKS, PYTHON_STEPS, WEB_STEPS, adapter_status, check_domains, config_errors,
                          fingerprint, input_manifest, project_root, reduced_env, scope_paths)
+from suites import API_CLIENT_TESTS, HARNESS_PATTERN, TOOLCHAIN_OFFLINE, WEB_UNIT_TESTS
 from toolchain import (LONG, Step, Unavailable, check_steps, child_env, find_tools, missing_prepared_paths,
                        run_step, snapshot, snapshot_differences)
 
@@ -83,7 +84,7 @@ def harness_checks(root: Path) -> list[dict]:
               run_check(root, 'backlog_validation', [sys.executable, 'scripts/specs.py', 'validate']),
               run_check(root, 'harness_behavior_tests',
                         [sys.executable, '-m', 'unittest', 'discover', '-s',
-                         'tests/harness', '-p', 'test_*.py', '-v'])]
+                         'tests/harness', '-p', HARNESS_PATTERN, '-v'])]
     checks[-1].update(judge_unittest(checks[-1]))
     return checks
 
@@ -151,17 +152,16 @@ def tool_plan(root: Path, profile: str, changed: Sequence[str] | None) -> tuple[
     if missing:
         raise Unavailable('not prepared, run scripts/toolchain.py bootstrap explicitly; missing: ' + ', '.join(missing))
     qualification = Step('fault_qualification', (sys.executable, 'scripts/qualify_faults.py'), root, LONG)
-    # The offline part of `tests/toolchain`. Its copies bootstrap from registries, so the rest stays manual.
-    scope_tests = Step('toolchain_scope_tests', (sys.executable, '-m', 'unittest', 'discover', '-s', 'tests/toolchain',
-                                                 '-p', 'test_scaffold_scope.py'), root)
+    # The offline part of `tests/toolchain`: scope, manifest pins and launchers. `suites.MANUAL` says why the rest
+    # stays manual.
+    scope_tests = Step('toolchain_scope_tests', (sys.executable, '-m', 'unittest', *TOOLCHAIN_OFFLINE),
+                       root / 'tests/toolchain')
     web_bin = root / 'apps/web/node_modules/.bin'
     contracts = (Step('contract_drift', (sys.executable, 'scripts/generate_contracts.py', 'check'), root),
                  Step('api_client_typecheck', (str(web_bin / 'tsc'), '-p', 'packages/api-client'), root),
-                 Step('api_client_tests', (str(Path(tools.node_dir) / 'node'), '--test', 'packages/api-client/tests/contract.test.ts'), root),
-                 Step('web_unit_tests', (str(Path(tools.node_dir) / 'node'), '--test', 'apps/web/tests/unit/request-guard.test.ts',
-                                        'apps/web/tests/unit/credential-precedence.test.ts',
-                                        'apps/web/tests/unit/retention.test.ts',
-                                        'apps/web/tests/unit/approval-shortcut.test.ts'), root),
+                 # Globs, which Node expands itself, so a new test file can't be left out (R-01).
+                 Step('api_client_tests', (str(Path(tools.node_dir) / 'node'), '--test', API_CLIENT_TESTS), root),
+                 Step('web_unit_tests', (str(Path(tools.node_dir) / 'node'), '--test', WEB_UNIT_TESTS), root),
                  Step('browser_qualification', (sys.executable, 'scripts/qualify_web.py'), root, LONG))
     steps = [step for step in (*check_steps(root, tools), *contracts, qualification, scope_tests) if step.id in chosen]
     return ToolPlan(steps, child_env(root, tools, verifying=True)), left_out

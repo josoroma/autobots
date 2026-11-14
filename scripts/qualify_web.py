@@ -29,6 +29,7 @@ import hashlib
 import hmac
 
 from harness_lib import fingerprint, project_root, reduced_env
+from suites import WEB_SUITES
 from toolchain import Unavailable, child_env, find_tools
 
 REPORT = Path('.checks/web/qualification.json')
@@ -166,7 +167,7 @@ def qualify(root: Path, retain: Path | None) -> int:
                     'AUTOBOTS_TEST_SESSION_FORGED': session_cookie(session_token('wrong-secret-of-a-similar-length', USER_A)),
                     'AUTOBOTS_TEST_WORKSPACE_A': WORKSPACE_A,
                     'AUTOBOTS_WEB_REPORT': str(report), 'AUTOBOTS_WEB_OUTPUT': str(output / 'results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots)}
-        result = subprocess.run([str(playwright), 'test', 'appearance', 'boundary', 'browser/tools.spec', '--config', 'playwright.config.ts'], env=test_env, cwd=web,
+        result = subprocess.run([str(playwright), 'test', *WEB_SUITES, '--config', 'playwright.config.ts'], env=test_env, cwd=web,
                                 capture_output=True, text=True, errors='replace', timeout=500, check=False)
     finally:
         for process in processes:

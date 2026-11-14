@@ -28,6 +28,7 @@ from disposable_db import (PROJECT_PREFIX, Cases, Refused, Target, Unavailable, 
                            remove_stack, require_identity, rows, run, tool_env)
 from harness_lib import fingerprint, project_root
 from qualify_web import BROWSERS, run_problems, start, stop, summarize, wait_until_up
+from suites import IDENTITY_SUITES, QUALIFICATION_SUITE, READINESS_SUITE, SAVED_CHOICE_SUITE, SLICE_SUITES
 from supabase_stack import generated_values, require_images, require_rendered
 from toolchain import child_env, find_tools
 
@@ -314,7 +315,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
                                      'AUTOBOTS_TEST_SERVICE_KEY': stack.values['SERVICE_ROLE_KEY'], 'AUTOBOTS_WEB_REPORT': str(report),
                                      'AUTOBOTS_WEB_OUTPUT': str(root / '.checks/identity/results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots),
                                      'AUTOBOTS_TEST_VISUAL_DIR': str(root / '.checks/identity/visual')}
-        result = subprocess.run([str(playwright), 'test', 'browser/workflows.spec', 'browser/operations', 'approvals', 'effects', 'experts', 'models', 'composer', 'home', 'workflow-list', 'identity', 'settings', 'runs', 'run-panel', 'search', 'new-run', 'stream-result', 'workspace-choice', 'artifacts', 'run-workspace', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=660, check=False,
+        result = subprocess.run([str(playwright), 'test', *IDENTITY_SUITES, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=660, check=False,
                                 env=browser_env)
         # A real restart, then Settings reads the stored records. Then one is removed, under the same key.
         stop(processes[0])
@@ -326,7 +327,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
             report_path.unlink(missing_ok=True)
             if title == 'a route with no record':
                 stack.sql("create table public.arranged_route_rows as select * from agent_runtime.route_qualifications;\ndelete from agent_runtime.route_qualifications where profile = 'openrouter_terra';\n")
-            ran = subprocess.run([str(playwright), 'test', 'browser/qualification', '-g', title, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=120, check=False,
+            ran = subprocess.run([str(playwright), 'test', QUALIFICATION_SUITE, '-g', title, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=120, check=False,
                                  env={**browser_env, 'AUTOBOTS_WEB_REPORT': str(report_path)})
             qualification_codes.append(ran.returncode)
             if ran.returncode:
@@ -343,7 +344,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
             qualification_reports.append(report_path)
             arranged = stack.runtime(f"update app_private.model_policies set version = version + 1, {setting} where workspace_id = '{workspace_a}';\n")
             cases.check(f'the saved choice is arranged: {title}', 'exit 0', f'exit {arranged.returncode}', arranged.returncode == 0)
-            ran = subprocess.run([str(playwright), 'test', 'browser/saved-choice', '-g', title, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=120, check=False,
+            ran = subprocess.run([str(playwright), 'test', SAVED_CHOICE_SUITE, '-g', title, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=120, check=False,
                                  env={**browser_env, 'AUTOBOTS_WEB_REPORT': str(report_path)})
             qualification_codes.append(ran.returncode)
             if ran.returncode:
@@ -357,7 +358,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
             if index == 2:
                 stack.runtime("insert into app_private.worker_heartbeats (worker_id, state, claims_inference, beat_at) "
                               "values ('arranged-readiness', 'running', true, clock_timestamp() + interval '15 minutes');\n")
-            ran = subprocess.run([str(playwright), 'test', 'browser/readiness', '-g', title, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=180, check=False,
+            ran = subprocess.run([str(playwright), 'test', READINESS_SUITE, '-g', title, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=180, check=False,
                                  env={**browser_env, 'AUTOBOTS_WEB_REPORT': str(report_path)})
             qualification_codes.append(ran.returncode)
             if ran.returncode:
@@ -373,7 +374,7 @@ def browser_cases(root: Path, cases: Cases, stack: AppStack, base: str, db_port:
                       'AUTOBOTS_STORAGE_BASE': base, 'AUTOBOTS_STORAGE_SERVICE': stack.values['SERVICE_ROLE_KEY'],
                       'AUTOBOTS_TEST_DIED_MARKER': str(config_root / 'worker-died')}
         processes.append(start([str(root / PYTHON), str(root / 'tests/web/fixture_worker.py')], worker_env, root))
-        slice_result = subprocess.run([str(playwright), 'test', 'slice', '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=900, check=False,
+        slice_result = subprocess.run([str(playwright), 'test', *SLICE_SUITES, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=900, check=False,
                                       env={**browser_env, 'AUTOBOTS_WEB_REPORT': str(slice_report)})
         if slice_result.returncode:
             print(slice_result.stdout[-2500:], file=sys.stderr)
