@@ -27,6 +27,7 @@ from pydantic import SecretStr
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.api.main import provider_context_from_environment
 from autobots.application.approvals import expire_due
+from autobots.application.bounded import stop_task
 from autobots.application.goal_loop import UNBOUND, LoopConfig, process_next
 from autobots.application.provider_settings import CatalogFetcher, ProviderSettings
 from autobots.application.readiness import (
@@ -40,7 +41,7 @@ from autobots.application.retention import apply_all
 from autobots.application.routines import evaluate_routines
 from autobots.application.worker_inference import CatalogCache, InferenceSource
 from autobots.application.worker_leases import is_held
-from autobots.operations.logs import configure_logging, forbid_remote_tracing, log_event
+from autobots.operations.logs import Repeated, configure_logging, forbid_remote_tracing, log_event
 
 logger = logging.getLogger("autobots.worker")
 Step = Callable[[Any], Awaitable[bool]]
@@ -74,6 +75,7 @@ async def _write_beat(connection: Any, config: WorkerConfig, state: str) -> None
 
 async def _beat(config: WorkerConfig, status: _Status) -> None:
     """On its own connection, so a long step can't make a live worker look dead."""
+    lost = Repeated()
     while True:
         try:
             async with await psycopg.AsyncConnection.connect(
@@ -81,14 +83,23 @@ async def _beat(config: WorkerConfig, status: _Status) -> None:
             ) as connection:
                 while True:
                     await _write_beat(connection, config, status.state)
+                    lost.cleared()
                     status.changed.clear()
                     try:
                         async with asyncio.timeout(config.beat_seconds):
                             await status.changed.wait()
                     except TimeoutError:
                         pass
-        except Exception as error:  # noqa: BLE001 - a lost heartbeat is logged by type and retried
-            log_event(logger, "worker.heartbeat_lost", logging.WARNING, error=type(error).__name__)
+        except Exception as error:  # noqa: BLE001 - a lost heartbeat is logged without its message and retried
+            # Retried every 2 s while the database is away, so only some attempts are logged.
+            if lost.failed():
+                log_event(
+                    logger,
+                    "worker.heartbeat_lost",
+                    logging.WARNING,
+                    error=error,
+                    failures=lost.count,
+                )
             await asyncio.sleep(min(config.beat_seconds, 2.0))
 
 
@@ -116,8 +127,7 @@ async def _run_step(
         log_event(logger, "worker.draining", worker=config.worker_id, seconds=config.drain_seconds)
         await asyncio.wait({task}, timeout=config.drain_seconds)
     if not task.done():
-        task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
+        await stop_task(task)
         log_event(logger, "worker.drain_cut_short", logging.WARNING, worker=config.worker_id)
         return False
     return bool(task.result())
@@ -141,24 +151,16 @@ async def serve(config: WorkerConfig, step: Step, stop: asyncio.Event) -> None:
                             worked = await _run_step(step, connection, stop, config, status)
                         except psycopg.OperationalError:
                             raise
-                        except Exception as error:  # noqa: BLE001 - a failed step is logged by type, and the worker keeps serving
-                            log_event(
-                                logger,
-                                "worker.step_failed",
-                                logging.ERROR,
-                                error=type(error).__name__,
-                            )
+                        except Exception as error:  # noqa: BLE001 - a failed step is logged without its message, and the worker keeps serving
+                            log_event(logger, "worker.step_failed", logging.ERROR, error=error)
                             worked = False
                         if not worked:
                             await _pause(stop, config.idle_seconds)
             except psycopg.OperationalError as error:
-                log_event(
-                    logger, "worker.database_lost", logging.WARNING, error=type(error).__name__
-                )
+                log_event(logger, "worker.database_lost", logging.WARNING, error=error)
                 await _pause(stop, config.idle_seconds)
     finally:
-        beat.cancel()
-        await asyncio.gather(beat, return_exceptions=True)
+        await stop_task(beat)
         try:
             async with await psycopg.AsyncConnection.connect(
                 config.database_url, autocommit=True
@@ -166,7 +168,7 @@ async def serve(config: WorkerConfig, step: Step, stop: asyncio.Event) -> None:
                 await _write_beat(connection, config, "stopped")
         except psycopg.OperationalError as error:
             # The stack may be stopping too. The stale heartbeat reads as absent anyway.
-            log_event(logger, "worker.last_beat_lost", logging.WARNING, error=type(error).__name__)
+            log_event(logger, "worker.last_beat_lost", logging.WARNING, error=error)
         log_event(logger, "worker.stopped", worker=config.worker_id)
 
 
@@ -277,8 +279,8 @@ def both(first: Step, second: Step) -> Step:
             worked = await first(connection)
         except psycopg.OperationalError:
             raise
-        except Exception as error:  # noqa: BLE001 - a failed step is logged by type, and the worker keeps serving
-            log_event(logger, "worker.step_failed", logging.ERROR, error=type(error).__name__)
+        except Exception as error:  # noqa: BLE001 - a failed step is logged without its message, and the worker keeps serving
+            log_event(logger, "worker.step_failed", logging.ERROR, error=error)
             worked = False
         return await second(connection) or worked
 

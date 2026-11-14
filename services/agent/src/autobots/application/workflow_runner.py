@@ -13,6 +13,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from autobots.application.assignments import Delegation
+from autobots.application.bounded import stop_task
 from autobots.application.goal_loop import (
     LoopConfig,
     LoopResult,
@@ -316,7 +317,7 @@ async def run_workflow(
     except LeaseLost:
         code = "lease_lost"
     finally:
-        beating.cancel()
+        await stop_task(beating)
     if code is not None:
         return await _finish(connection, lease, goal, code)
     statuses, _ = await _load_state(connection, execution_id)

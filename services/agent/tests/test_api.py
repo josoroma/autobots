@@ -1,18 +1,27 @@
 """The app's boundaries in process. Real processes and a browser run in scripts/qualify_web.py."""
 
 import ast
+import contextlib
+import io
+import json
+import logging
 import time
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import jwt
+import psycopg
 import pytest
 from fastapi.testclient import TestClient
+from psycopg_pool import PoolTimeout
 from pydantic import SecretStr
 
-from autobots.api.app import Pool, create_app
+from autobots.api.app import Pool, create_app, default_pool
 from autobots.api.main import create_configured_app
+from autobots.api.pool import POOL_WAIT_SECONDS
 from autobots.api.settings import Settings, load_settings
+from autobots.operations.logs import JsonFormatter
 
 INTERNAL = "fixture-internal"
 SECRET = "fixture-jwt-secret-with-enough-length"
@@ -146,11 +155,102 @@ def test_an_unexpected_error_exposes_nothing() -> None:
             return None
 
     app = create_app(SETTINGS, membership=Broken())
-    reply = TestClient(app, raise_server_exceptions=False).get(
-        f"/v1/workspaces/{WORKSPACE}", headers=headers(token())
-    )
+    with api_lines() as lines:
+        reply = TestClient(app, raise_server_exceptions=False).get(
+            f"/v1/workspaces/{WORKSPACE}", headers=headers(token())
+        )
     assert reply.status_code == 500
     assert reply.json() == {"code": "internal_error", "message": "Something went wrong."}
+    # R-25, XERR-01: one private line with the route template, the cause's type and frames.
+    [line] = lines
+    assert (line["event"], line["level"], line["method"], line["route"]) == (
+        "api.unhandled",
+        "error",
+        "GET",
+        "/v1/workspaces/{workspace_id}",
+    )
+    assert line["error_type"] == "builtins.RuntimeError"
+    frames = line["frames"]
+    assert isinstance(frames, list) and str(frames[-1]).endswith(".Broken.is_member")
+    assert "password" not in json.dumps(line)
+    assert str(WORKSPACE) not in json.dumps(line)
+
+
+@contextlib.contextmanager
+def api_lines() -> Iterator[list[dict[str, object]]]:
+    """The API's private log lines, as the service's own formatter writes them."""
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(JsonFormatter())
+    logger = logging.getLogger("autobots.api")
+    logger.addHandler(handler)
+    written: list[dict[str, object]] = []
+    try:
+        yield written
+    finally:
+        logger.removeHandler(handler)
+        written.extend(json.loads(line) for line in stream.getvalue().splitlines())
+
+
+UNAVAILABLE = {
+    "code": "service_unavailable",
+    "message": "The database couldn't complete this request. Try again.",
+}
+
+
+def test_a_database_failure_during_a_request_is_a_retryable_503() -> None:
+    """XERR-06: the code the no-pool path uses, with wording that doesn't claim an outage."""
+
+    class Lost(Membership):
+        async def is_member(self, user_id: UUID, workspace_id: UUID) -> bool:
+            raise psycopg.OperationalError("connection failed: password=hunter2")
+
+    app = create_app(SETTINGS, membership=Lost())
+    with api_lines() as lines:
+        reply = TestClient(app, raise_server_exceptions=False).get(
+            f"/v1/workspaces/{WORKSPACE}", headers=headers(token())
+        )
+    assert (reply.status_code, reply.json()) == (503, UNAVAILABLE)
+    [line] = lines
+    assert (line["event"], line["level"], line["route"], line["error_type"]) == (
+        "api.database_unavailable",
+        "warning",
+        "/v1/workspaces/{workspace_id}",
+        "psycopg.OperationalError",
+    )
+    assert "hunter2" not in json.dumps(line)
+
+
+def test_a_pool_that_runs_out_of_time_answers_503_too() -> None:
+    class Exhausted:
+        async def open(self) -> None:
+            return None
+
+        async def close(self) -> None:
+            return None
+
+        @contextlib.asynccontextmanager
+        async def connection(self) -> AsyncIterator[None]:
+            raise PoolTimeout("couldn't get a connection after 10.00 sec")
+            yield
+
+    settings = Settings(
+        internal_token=SecretStr(INTERNAL),
+        jwt_secret=SecretStr(SECRET),
+        database_url=SecretStr("postgresql://fixture"),
+        allowed_hosts=("testserver",),
+    )
+    app = create_app(settings, membership=Membership(), pool_factory=lambda _url: Exhausted())
+    with TestClient(app, raise_server_exceptions=False) as test_client:
+        reply = test_client.get(f"/v1/runs/{uuid4()}", headers=headers(token()))
+    assert (reply.status_code, reply.json()) == (503, UNAVAILABLE)
+
+
+def test_the_pool_gives_up_before_the_bffs_own_abort() -> None:
+    """psycopg_pool's default wait is 30 s, the same as the BFF's abort (XERR-06)."""
+    assert POOL_WAIT_SECONDS < 30
+    pool = default_pool("postgresql://fixture")
+    assert pool.timeout == POOL_WAIT_SECONDS  # type: ignore[attr-defined]  # Pool is the lifespan's protocol; the default is psycopg_pool's
 
 
 def test_the_pool_belongs_to_the_lifespan() -> None:

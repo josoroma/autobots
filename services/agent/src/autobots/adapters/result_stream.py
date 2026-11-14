@@ -209,7 +209,7 @@ class ResultTap:
         """PADP-01: live text is a courtesy, so a tap failure ends it and never reaches the call,
         where it would read as a failed stream and stop a paid run."""
         self._broken = True
-        log_event(logger, "result_text.unavailable", logging.WARNING, error=type(error).__name__)
+        log_event(logger, "result_text.unavailable", logging.WARNING, error=error)
 
     async def flush(self) -> None:
         self._last_flush = time.monotonic()
@@ -227,7 +227,7 @@ class ResultTap:
                     logger,
                     "result_text.unavailable",
                     logging.WARNING,
-                    error=type(error).__name__,
+                    error=error,
                     reason="malformed_arguments",
                 )
                 continue
@@ -272,9 +272,7 @@ class ResultTap:
         except Exception as error:  # noqa: BLE001 - live text is a courtesy, so a send failure never stops the run (Decision 0022 D4)
             # Live text is a courtesy. The stored artifact is the record, so the run goes on.
             self._broken = True
-            log_event(
-                logger, "result_text.unavailable", logging.WARNING, error=type(error).__name__
-            )
+            log_event(logger, "result_text.unavailable", logging.WARNING, error=error)
 
     async def close(self) -> None:
         connection, self._connection = self._connection, None
@@ -284,6 +282,4 @@ class ResultTap:
             await connection.close()
         except Exception as error:  # noqa: BLE001 - in the run's cleanup, a close failure must not replace the run's outcome
             # Called from the run's own cleanup, where a failure would replace the run's outcome.
-            log_event(
-                logger, "result_text.close_failed", logging.WARNING, error=type(error).__name__
-            )
+            log_event(logger, "result_text.close_failed", logging.WARNING, error=error)

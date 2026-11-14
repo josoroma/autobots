@@ -11,6 +11,7 @@ It is granted only through an Expert, and every call waits for a person's approv
 
 import asyncio
 import contextlib
+import logging
 import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -32,12 +33,16 @@ from autobots.adapters.browser_executor import (
 from autobots.adapters.browser_page import CdpPage, PageUnavailable
 from autobots.adapters.loop_middleware import LoopStopped, ModelRoute, current_middleware
 from autobots.adapters.provider_http import fit
+from autobots.application.bounded import stop_task
 from autobots.application.browsing_loop import BrowseOutcome, admitted_steps, browse
 from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed
 from autobots.contracts.browsing import BrowseGoalInput, BrowseGoalOutput, within
 from autobots.domain.tool_catalog import CostClass, ToolGroup, ToolProvider
 from autobots.domain.tools import OperationClass
 
+# The standard logger, as STD-01 keeps this layer from importing operations/logs.py, whose
+# formatter and conventions apply.
+logger = logging.getLogger("autobots.tools")
 REPOSITORY = Path(__file__).resolve().parents[5]
 # Past the call's own limit, for the container start, the request guard and the last step.
 GRACE_SECONDS = 60
@@ -76,6 +81,14 @@ def permitted(url: str, domains: list[str]) -> bool:
     )
 
 
+def _watched(watcher: asyncio.Task[str]) -> str | None:
+    """Why the watcher removed the session, or None while it runs or if it failed itself, so its
+    own failure never replaces the browsing error being reported (PTOL-10)."""
+    if not watcher.done() or watcher.cancelled() or watcher.exception() is not None:
+        return None
+    return watcher.result()
+
+
 def _output(outcome: BrowseOutcome) -> BrowseGoalOutput:
     (summary,), truncated = fit([outcome.summary])
     return BrowseGoalOutput(
@@ -96,9 +109,14 @@ async def _browse(
     if middleware is None:
         raise ToolFailed("browsing_unavailable")
     scope = context.scope
-    # Sessions a crashed worker left are removed first, by their run's lease (BX-04).
-    with contextlib.suppress(Exception):
+    # Sessions a crashed worker left are removed first, by their run's lease (BX-04). That's best
+    # effort, and a failure is logged once per call, which a person approved (XERR-11).
+    try:
         await runtime.executor.sweep(lease_alive(context.connection))
+    except Exception as error:  # noqa: BLE001 - the sweep is best effort and never stops this call
+        logger.warning(
+            "browser.sweep_failed", extra={"fields": {"run": scope.run_id, "error": error}}
+        )
     try:
         session = await runtime.executor.start(
             str(scope.run_id), scope.generation, tuple(args.allowed_domains)
@@ -130,17 +148,15 @@ async def _browse(
         # The loop stops once this call returns. The tool reports the same code meanwhile.
         raise ToolFailed(stopped.code) from None
     except (ConnectionError, OSError, TimeoutError, PageUnavailable, websockets.WebSocketException):
-        reason = watcher.result() if watcher.done() else "browser_unreachable"
+        reason = _watched(watcher)
         if reason == "attempt_ended":
             return _output(BrowseOutcome("", (), 0, 0, "cancelled"))
-        raise ToolFailed(f"browser_{reason}" if watcher.done() else reason) from None
+        raise ToolFailed("browser_unreachable" if reason is None else f"browser_{reason}") from None
     finally:
         if cdp is not None:
             with contextlib.suppress(Exception):
                 await cdp.close()
-        watcher.cancel()
-        with contextlib.suppress(BaseException):
-            await watcher
+        await stop_task(watcher)
         await runtime.executor.stop(session)
     return _output(outcome)
 

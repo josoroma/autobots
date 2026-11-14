@@ -74,7 +74,7 @@ INTENT_FAILURES = {
 
 def _log_refusal(what: str, error: Exception) -> None:
     """These all fail closed, and the type is what's safe to say about why."""
-    log_event(logger, "inference.refused", logging.WARNING, what=what, error=type(error).__name__)
+    log_event(logger, "inference.refused", logging.WARNING, what=what, error=error)
 
 
 class CatalogCache:

@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import json
+import logging
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -26,9 +27,26 @@ from autobots.domain.runs import RunStatus
 from autobots.domain.tool_catalog import CostClass, KeyRequirement, ToolGroup, ToolProvider
 from autobots.domain.tools import EFFECTFUL, OperationClass, ToolOutcome, path_granted
 
+# Written through the standard logger, as STD-01 keeps this layer from importing
+# operations/logs.py; that module's formatter renders the record and its conventions apply.
+logger = logging.getLogger("autobots.tools")
+
 
 class NotDelivered(Exception):
     """A readback found the effect never reached the destination, so one new attempt is safe."""
+
+
+class OutcomeUnknown(Exception):
+    """The tool can't tell whether its effect happened, so the outcome stays unknown for a person
+    or a readback to settle.
+
+    `detail` is a category the tool chose, such as `github_unclear_502`, never text from the
+    destination or the model. It's stored on the receipt (R-25, XERR-02).
+    """
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(detail)
+        self.detail = detail
 
 
 class ToolFailed(Exception):
@@ -249,6 +267,29 @@ def _denied(code: str) -> ToolResult:
     return ToolResult(ToolOutcome.DENIED, code)
 
 
+def _diagnosis(error: BaseException) -> str:
+    """Why an effect's outcome is unknown, for its receipt: the tool's own category, the gateway's
+    timeout, or the type of a defect. Never the message, which can hold a reply or a key."""
+    if isinstance(error, OutcomeUnknown):
+        return error.detail
+    if isinstance(error, TimeoutError):
+        return "timeout"
+    kind = type(error)
+    return f"defect:{kind.__module__}.{kind.__qualname__}"
+
+
+def _log_failure(
+    event: str, tool: ToolDefinition, operation_id: str | None, error: BaseException
+) -> None:
+    """One private line for a failure the tool didn't choose, in PRD-LangChain-Deep-Agents 12.2's
+    `tool.operation.*`. A defect needs someone to look; a timeout or unclear reply is degraded."""
+    fields: dict[str, object] = {"tool": tool.tool_id, "version": tool.version, "error": error}
+    if operation_id is not None:
+        fields["operation"] = operation_id
+    level = logging.ERROR if _diagnosis(error).startswith("defect:") else logging.WARNING
+    logger.log(level, event, extra={"fields": fields})
+
+
 async def _expert_behind(connection: Any, scope: ToolScope) -> bool:
     """The run was admitted from an Expert's binding, the only place such a grant comes from."""
     cursor = await connection.execute(
@@ -364,7 +405,11 @@ class ToolGateway:
                     )
                 except ToolFailed as error:
                     return _denied(str(error) or "review_unavailable")
-                except Exception:  # noqa: BLE001 - a review that can't be built denies the call, so nothing runs
+                except Exception as error:  # noqa: BLE001 - a review that can't be built denies the call, so nothing runs
+                    # A denial keeps no receipt, so the log line is all that's kept.
+                    _log_failure(
+                        "tool.operation.review_failed", tool, reviewing.operation_id, error
+                    )
                     return _denied("review_unavailable")
             code = await approval_gate(
                 connection,
@@ -414,7 +459,9 @@ class ToolGateway:
                 code = "tool_timeout"
             except ToolFailed as error:
                 return ToolResult(ToolOutcome.FAILED, str(error) or "tool_failed")
-            except Exception:  # noqa: BLE001 - any tool failure is recorded as tool_failed
+            except Exception as error:  # noqa: BLE001 - any tool failure is recorded as tool_failed
+                # A read keeps no receipt, so the log line is all that's kept.
+                _log_failure("tool.operation.failed", tool, None, error)
                 code = "tool_failed"
             else:
                 visible, too_large = _visible(tool, output)
@@ -499,6 +546,8 @@ class ToolGateway:
             )
         if status == "failed":
             return None
+        # An earlier attempt was interrupted, and this is why its outcome stays unknown.
+        detail = "interrupted"
         if tool.reconcile is not None:
             try:
                 found = await asyncio.wait_for(
@@ -506,7 +555,9 @@ class ToolGateway:
                 )
             except NotDelivered:
                 return None
-            except Exception:  # noqa: BLE001 - a failed reconcile leaves the effect unknown, never assumed
+            except Exception as error:  # noqa: BLE001 - a failed reconcile leaves the effect unknown, never assumed
+                _log_failure("tool.operation.readback_failed", tool, operation_id, error)
+                detail = f"readback:{_diagnosis(error)}"
                 found = None
             if found is not None:
                 visible, _ = _visible(tool, found)
@@ -516,7 +567,7 @@ class ToolGateway:
                 )
         if tool.safe_to_repeat:
             return None
-        await _record(context, operation_id, "unknown", None)
+        await _record(context, operation_id, "unknown", None, failure_detail=detail)
         return ToolResult(
             ToolOutcome.UNKNOWN, "outcome_unknown", operation_id=operation_id, replayed=True
         )
@@ -535,12 +586,13 @@ class ToolGateway:
             # gate that this attempt didn't use a person's decision.
             await _record(context, operation_id, "failed", None, LEASE_LOST)
             return ToolResult(ToolOutcome.DENIED, LEASE_LOST, operation_id=operation_id)
-        except Exception:  # noqa: BLE001 - an unexpected failure leaves the outcome unknown for reconciliation
-            await _record(context, operation_id, "unknown", None)
+        except Exception as error:  # noqa: BLE001 - an unexpected failure leaves the outcome unknown for reconciliation
+            _log_failure("tool.operation.unknown", tool, operation_id, error)
+            await _record(context, operation_id, "unknown", None, failure_detail=_diagnosis(error))
             return ToolResult(ToolOutcome.UNKNOWN, "outcome_unknown", operation_id=operation_id)
         visible, too_large = _visible(tool, output)
         if too_large:
-            await _record(context, operation_id, "unknown", None)
+            await _record(context, operation_id, "unknown", None, failure_detail="output_too_large")
             return ToolResult(ToolOutcome.UNKNOWN, "output_too_large", operation_id=operation_id)
         # The effect happened, so it is recorded whoever owns the run now.
         await _record(context, operation_id, "succeeded", visible)

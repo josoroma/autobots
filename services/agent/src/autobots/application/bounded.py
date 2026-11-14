@@ -1,4 +1,4 @@
-"""Run work that can hold the interpreter lock in a child interpreter a timeout can stop (R-20).
+"""Bounded work: a child interpreter a timeout can stop (R-20), and stopping a helper task (R-25).
 
 A regular expression holds the lock while it matches, so `asyncio.to_thread` can't be stopped: the
 event loop, the lease keeper and the status beat stall until it ends (PTOL-01). A child interpreter
@@ -13,6 +13,7 @@ import math
 import signal
 import sys
 from pathlib import Path
+from typing import Any
 
 # The directory holding the `autobots` package, so the child runs this same source tree whatever
 # put it on the parent's path.
@@ -70,3 +71,17 @@ async def run_module(module: str, payload: bytes, seconds: float) -> bytes:
     if process.returncode != 0:
         raise ChildFailed(process.returncode)
     return output
+
+
+async def stop_task(task: asyncio.Future[Any]) -> None:
+    """Cancels a helper task and waits for it to end, without raising what it raised.
+
+    `asyncio.wait` doesn't raise the task's exception and lets a cancellation aimed at the caller
+    through, so a cleanup can't swallow the cancellation that bounds its caller: the gateway's
+    timeout around a tool, or a worker's drain cut (XERR-13, DH-06). The task's own exception is
+    retrieved, so asyncio doesn't report it as never retrieved.
+    """
+    task.cancel()
+    await asyncio.wait({task})
+    if not task.cancelled():
+        task.exception()

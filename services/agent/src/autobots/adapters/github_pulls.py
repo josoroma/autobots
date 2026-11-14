@@ -20,6 +20,7 @@ import httpx
 from autobots.adapters.github_issues import (
     GITHUB_KEY,
     TARGET_PREFIX,
+    UnclearReply,
     approval_target,
     attempt_target,
     github_client,
@@ -42,10 +43,6 @@ from autobots.domain.tools import OperationClass
 TOOL_ID = "github_open_pull_request"
 BRANCH_PREFIX = "autobots/"
 _REFUSED = frozenset({400, 401, 403, 404, 409, 410, 422, 429})
-
-
-class UnclearReply(Exception):
-    """GitHub's reply doesn't say whether the write happened."""
 
 
 def branch_for(operation_id: str | None) -> str:

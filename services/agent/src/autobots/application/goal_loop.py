@@ -42,6 +42,7 @@ from autobots.adapters.tool_middleware import GatewayMiddleware, visible_tools
 from autobots.application.approvals import expire_due
 from autobots.application.artifacts import publish_tool, reconcile_run
 from autobots.application.assignments import Delegation, assign_tool
+from autobots.application.bounded import stop_task
 from autobots.application.code_tools import CODE_TOOLS
 from autobots.application.compaction import CompactionPolicy
 from autobots.application.cronjob_tool import CRONJOB
@@ -86,7 +87,7 @@ from autobots.contracts.plans import GoalSpec
 from autobots.domain.execution import INCOMPATIBLE, incompatibility
 from autobots.domain.runs import Actor, CommandRefused, RunCommand, RunStatus
 from autobots.domain.tools import DELEGATION_TOOL
-from autobots.operations.logs import forbid_remote_tracing, log_event
+from autobots.operations.logs import Repeated, forbid_remote_tracing, log_event
 
 # Waiting can resolve these: a person adds budget or a key, or reconciles an uncertain call.
 PAUSE_FOR = frozenset(
@@ -375,7 +376,7 @@ async def run_goal(
             raise
         code = "lease_lost"
     finally:
-        beating.cancel()
+        await stop_task(beating)
         await end_segment(connection, lease.run_id)
     return await _finish(connection, lease, goal, code)
 
@@ -452,7 +453,7 @@ async def _settle_candidate(
     except LeaseLost:
         return await _result(connection, lease, goal, "lost", "lease_lost", None)
     finally:
-        beating.cancel()
+        await stop_task(beating)
     code = None if report.passed else "criteria_unmet"
     cursor = await connection.execute(
         "select version from public.runs where id = %s", (lease.run_id,)
@@ -500,7 +501,7 @@ async def _keep_lease(
     look = min(WAKE_LOOK_SECONDS, config.heartbeat_seconds)
     since_beat = 0.0
     undiscounted = 0.0
-    failures = 0
+    failures = Repeated()
     while True:
         try:
             async with await psycopg.AsyncConnection.connect(
@@ -531,16 +532,16 @@ async def _keep_lease(
                     if undiscounted:
                         await discount_sleep(connection, lease, undiscounted)
                         undiscounted = 0.0
-                    failures = 0
+                    failures.cleared()
         except Exception as error:  # noqa: BLE001 - a dropped connection or any other failure is counted and retried
             # A sleep can drop this connection, among other things.
-            failures += 1
-            if failures == 1 or failures % 30 == 0:
+            if failures.failed():
                 log_event(
                     logger,
                     "worker.keeper_reconnecting",
-                    error=type(error).__name__,
-                    failures=failures,
+                    logging.WARNING,
+                    error=error,
+                    failures=failures.count,
                 )
             await asyncio.sleep(look)
             # An outage used up lease time with no beat, so the first look after it beats.

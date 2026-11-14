@@ -10,6 +10,11 @@ from autobots.api.errors import ApiError
 
 # Rows stay untyped until the SQL boundary is typed (R-54).
 ConnectionPool = AsyncConnectionPool[AsyncConnection[Any]]
+# How long a request waits for a pooled connection. psycopg_pool's default is 30 s, the same as the
+# BFF's own abort in apps/web/lib/bff.ts, so the BFF's timer could fire first and a stopped
+# database would read as its timeout. Shorter, so it reaches the person as this service's
+# retryable 503 (XERR-06).
+POOL_WAIT_SECONDS = 10.0
 
 
 def request_pool(request: Request) -> ConnectionPool:

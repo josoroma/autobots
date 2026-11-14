@@ -16,6 +16,7 @@ import httpx
 from autobots.application.approvals import approved_request
 from autobots.application.tool_gateway import (
     NotDelivered,
+    OutcomeUnknown,
     ToolContext,
     ToolDefinition,
     ToolFailed,
@@ -53,8 +54,13 @@ _READBACK_ISSUES = 100
 READBACK_SETTLE_SECONDS = (1.0, 2.0, 4.0, 8.0)
 
 
-class UnclearReply(Exception):
-    """The destination's reply doesn't say whether the issue exists."""
+class UnclearReply(OutcomeUnknown):
+    """GitHub's reply doesn't say whether the write happened. Both GitHub connectors raise it, and
+    the receipt keeps the status as its category (R-25, XERR-02)."""
+
+    def __init__(self, status_code: int) -> None:
+        super().__init__(f"github_unclear_{status_code}")
+        self.status_code = status_code
 
 
 def marker(operation_id: str | None) -> str:

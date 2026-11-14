@@ -73,15 +73,27 @@ async def _remove_expired_objects(
     )
     rows = await cursor.fetchall()
     await _commit(connection)
+    # Storage being down fails every object in the batch, so the first failure in a pass is logged
+    # and `retention.applied` counts the rest (XERR-11).
+    said = False
     for artifact_id, path in rows:
         if store is None:
             report.objects_pending += 1
             continue
         try:
             await store.remove(path)
-        except Exception:  # noqa: BLE001 - any failure waits for the next pass
+        except Exception as error:  # noqa: BLE001 - any failure waits for the next pass
             # Any failure here waits for the next pass. Storage being down isn't a retention error.
             report.objects_pending += 1
+            if not said:
+                said = True
+                log_event(
+                    logger,
+                    "retention.object_kept",
+                    logging.WARNING,
+                    workspace=workspace_id,
+                    error=error,
+                )
             continue
         await connection.execute(
             "update public.artifacts set bytes_removed_at = now() where id = %s", (artifact_id,)
@@ -170,5 +182,7 @@ async def apply_all(connection: Any, store: Any) -> None:
             await apply_retention(connection, store, workspace_id)
         except psycopg.OperationalError:
             raise
-        except Exception as error:  # noqa: BLE001 - a failed pass is logged by type and retried at the next interval
-            log_event(logger, "retention.failed", logging.WARNING, error=type(error).__name__)
+        except Exception as error:  # noqa: BLE001 - a failed pass is logged without its message and retried at the next interval
+            log_event(
+                logger, "retention.failed", logging.WARNING, workspace=workspace_id, error=error
+            )

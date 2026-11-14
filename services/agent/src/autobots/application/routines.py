@@ -484,6 +484,6 @@ async def evaluate_routines(
                 "routine.evaluation_failed",
                 logging.ERROR,
                 routine=routine_id,
-                error=type(error).__name__,
+                error=error,
             )
     return admitted

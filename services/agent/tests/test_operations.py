@@ -7,6 +7,7 @@ import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import pytest
 from deepagents import create_deep_agent
@@ -14,6 +15,7 @@ from deepagents import graph as graph_module
 from langchain_core.language_models import FakeListChatModel
 from langchain_core.messages import ToolMessage
 
+from autobots.application import retention
 from autobots.application.compaction import StoredSummary, summary_request, summary_text
 from autobots.application.goal_loop import SummarizationOff
 from autobots.application.operations import (
@@ -26,13 +28,20 @@ from autobots.application.operations import (
     storage_condition,
 )
 from autobots.contracts.operations import RetentionSettings
+from autobots.operations import worker
 from autobots.operations.logs import (
+    CAUSES_KEPT,
+    FRAMES_KEPT,
+    Repeated,
     configure_logging,
+    error_fields,
     forbid_remote_tracing,
     log_event,
     redact,
     remote_tracing_disabled,
 )
+
+WORKSPACE = UUID("a0000000-0000-4000-8000-000000000001")
 
 
 @pytest.mark.parametrize(
@@ -77,6 +86,170 @@ def test_log_records_are_json_with_fields_redacted_and_no_exception_text() -> No
     assert second["error"] == "RuntimeError"
     assert "hunter2" not in stream.getvalue()
     assert "sk-or-v1" not in stream.getvalue()
+
+
+def _raise_from_a_hidden_cause() -> None:
+    password = "hunter2"  # A local, which no line may show.
+    try:
+        raise ValueError(f"postgresql://user:{password}@host/db")
+    except ValueError as cause:
+        raise KeyError("sk-or-v1-abcdef0123 planted") from cause
+
+
+def _lines(stream: io.StringIO) -> list[dict[str, Any]]:
+    return [json.loads(line) for line in stream.getvalue().splitlines()]
+
+
+def test_a_failure_line_locates_the_failure_without_its_text_or_locals() -> None:
+    """R-25, XERR-01: the qualified type, causes and last frames, never a message or a local."""
+    stream = io.StringIO()
+    configure_logging(stream)
+    logger = logging.getLogger("autobots.test")
+    try:
+        _raise_from_a_hidden_cause()
+    except KeyError as error:
+        log_event(logger, "worker.step_failed", logging.ERROR, error=error)
+        logger.exception("Exception in ASGI application")
+    lines = _lines(stream)
+    assert [line["event"] for line in lines] == [
+        "worker.step_failed",
+        "Exception in ASGI application",
+    ]
+    for line in lines:
+        assert line["error"] == "KeyError"
+        assert line["error_type"] == "builtins.KeyError"
+        assert line["causes"] == ["builtins.ValueError"]
+        frames = line["frames"]
+        assert isinstance(frames, list) and 0 < len(frames) <= FRAMES_KEPT
+        path, number, function = frames[-1].split(":")
+        assert path.endswith("test_operations.py") and not path.startswith("/")
+        assert int(number) > 0
+        assert function == "_raise_from_a_hidden_cause"
+    written = stream.getvalue()
+    assert "hunter2" not in written
+    assert "sk-or-v1" not in written
+    assert "planted" not in written
+    assert str(Path.home()) not in written
+
+
+def test_a_cause_chain_is_bounded_and_ends_where_python_ends_it() -> None:
+    error: BaseException = RuntimeError("first")
+    for _ in range(CAUSES_KEPT + 3):
+        try:
+            raise ValueError("next") from error
+        except ValueError as raised:
+            error = raised
+    assert error_fields(error)["causes"] == ["builtins.ValueError"] * CAUSES_KEPT
+    looped = ValueError("a")
+    looped.__context__ = KeyError("b")
+    looped.__context__.__context__ = looped
+    assert error_fields(looped)["causes"] == ["builtins.KeyError"]
+    try:
+        try:
+            raise ValueError("hidden")
+        except ValueError:
+            raise KeyError("shown") from None
+    except KeyError as suppressed:
+        assert "causes" not in error_fields(suppressed)
+    assert error_fields(KeyError("never raised"))["frames"] == []
+
+
+def test_a_repeating_failure_is_logged_first_and_then_every_nth_time() -> None:
+    repeats = Repeated(every=3)
+    assert [repeats.failed() for _ in range(7)] == [True, False, True, False, False, True, False]
+    assert repeats.count == 7
+    repeats.cleared()
+    assert repeats.failed() is True
+
+
+def test_a_failed_worker_step_says_where_it_failed() -> None:
+    stream = io.StringIO()
+    configure_logging(stream)
+
+    async def broken(_: object) -> bool:
+        reply: dict[str, bool] = {}
+        return reply["sk-or-v1-abcdef0123"]
+
+    async def working(_: object) -> bool:
+        return False
+
+    async def step() -> bool:
+        return await worker.both(broken, working)(None)
+
+    assert asyncio.run(step()) is False
+    [line] = _lines(stream)
+    assert (line["event"], line["level"], line["error_type"]) == (
+        "worker.step_failed",
+        "error",
+        "builtins.KeyError",
+    )
+    assert line["frames"][-1].endswith(
+        ":test_a_failed_worker_step_says_where_it_failed.<locals>.broken"
+    )
+    assert "sk-or-v1" not in stream.getvalue()
+
+
+def test_a_failed_retention_pass_names_its_workspace(monkeypatch: pytest.MonkeyPatch) -> None:
+    stream = io.StringIO()
+    configure_logging(stream)
+
+    async def broken(_connection: object, _store: object, _workspace: UUID) -> None:
+        raise KeyError("password=hunter2")
+
+    class Connection:
+        async def execute(self, _query: str, _params: object = None) -> "Rows":
+            return Rows([(WORKSPACE,)])
+
+    monkeypatch.setattr(retention, "apply_retention", broken)
+    asyncio.run(retention.apply_all(Connection(), None))
+    [line] = _lines(stream)
+    assert (line["event"], line["workspace"], line["error_type"]) == (
+        "retention.failed",
+        "a0000000…",
+        "builtins.KeyError",
+    )
+    assert "hunter2" not in stream.getvalue()
+
+
+class Rows:
+    def __init__(self, rows: list[tuple[Any, ...]]) -> None:
+        self._rows = rows
+
+    async def fetchone(self) -> tuple[Any, ...] | None:
+        return None
+
+    async def fetchall(self) -> list[tuple[Any, ...]]:
+        return self._rows
+
+
+def test_bytes_storage_keeps_are_counted_with_one_warning_per_pass() -> None:
+    """XERR-11: the bytes wait for the next pass, as before, and the cause is now kept once."""
+    stream = io.StringIO()
+    configure_logging(stream)
+
+    class Connection:
+        autocommit = True
+
+        async def execute(self, query: str, _params: object = None) -> Rows:
+            if "from public.artifacts" in query:
+                return Rows([(1, "a/one"), (2, "a/two"), (3, "a/three")])
+            return Rows([])
+
+    class Storage:
+        async def remove(self, _path: str) -> None:
+            raise ConnectionError("http://user:hunter2@storage.invalid")
+
+    now = datetime(2026, 11, 14, tzinfo=UTC)
+    report = asyncio.run(retention.apply_retention(Connection(), Storage(), WORKSPACE, now))
+    assert (report.objects_removed, report.objects_pending) == (0, 3)
+    kept = [line for line in _lines(stream) if line["event"] == "retention.object_kept"]
+    assert len(kept) == 1
+    assert (kept[0]["level"], kept[0]["workspace"], kept[0]["error_type"]) == (
+        "warning",
+        "a0000000…",
+        "builtins.ConnectionError",
+    )
+    assert "hunter2" not in stream.getvalue()
 
 
 def test_inherited_tracing_is_turned_off_and_its_key_is_dropped() -> None:

@@ -16,6 +16,7 @@ from autobots.api.expert_routes import router as expert_router
 from autobots.api.improvement_routes import router as improvement_router
 from autobots.api.memory_routes import router as memory_router
 from autobots.api.operation_routes import router as operation_router
+from autobots.api.pool import POOL_WAIT_SECONDS
 from autobots.api.routes import router
 from autobots.api.routine_routes import router as routine_router
 from autobots.api.run_routes import router as run_router
@@ -34,7 +35,12 @@ class Pool(Protocol):
 
 def default_pool(url: str) -> Pool:
     return AsyncConnectionPool(
-        url, open=False, min_size=1, max_size=5, check=AsyncConnectionPool.check_connection
+        url,
+        open=False,
+        min_size=1,
+        max_size=5,
+        check=AsyncConnectionPool.check_connection,
+        timeout=POOL_WAIT_SECONDS,
     )
 
 

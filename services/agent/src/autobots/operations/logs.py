@@ -1,11 +1,36 @@
-"""Local structured logs, PRD 12.2 and LM-07. Nothing here sends a record off this machine."""
+"""Local structured logs, PRD-LangChain-Deep-Agents 12.2 and LM-07. Nothing here sends a record
+off this machine.
+
+Conventions for every service log line (R-25, XERR-12):
+
+- Event names are dotted and lower case. A new event takes the PRD-LangChain-Deep-Agents 12.2
+  category its condition belongs to, such as `tool.operation.unknown`. A process condition with no
+  category takes its component: `worker.*`, `api.*`, `retention.*`, `routine.*`. Existing names
+  stay as they are, since the qualification scripts count them (`worker.step_failed`).
+- Context keys name what the line is about: `workspace`, `run`, `operation`, `tool`, `version`,
+  `routine`, `worker`, and `method` and `route` in the API. The route is the template, never the
+  path, which holds whole run IDs. The formatter shortens any identifier.
+- A caught exception goes in as `error=error`. The formatter writes `error_fields(error)`, the same
+  as for a record's `exc_info`, and never the message or a local, which can carry a connection
+  string, a key or a provider's reply.
+- Levels follow the audience. ERROR: someone has to look, such as a defect or a failed unattended
+  step. WARNING: degraded, tolerated or retrying by itself. INFO: lifecycle.
+- A failure that can recur on every pass goes through `Repeated`, which logs its first occurrence
+  and then every Nth, with the count.
+- A module that STD-01 keeps from importing this one, such as the tool gateway or the API's error
+  handlers, writes the same record with its own logger:
+  `logger.log(level, event, extra={"fields": {...}})`.
+"""
 
 import json
 import logging
 import os
 import re
 import sys
+import traceback
+from collections import deque
 from collections.abc import MutableMapping
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, TextIO
 
@@ -41,6 +66,72 @@ def redact(text: str) -> str:
     return _IDENTIFIER.sub(r"\1…", mask(text, _SHAPES))
 
 
+# How much of a failure a line keeps: enough to find it, bounded so one line stays short.
+CAUSES_KEPT = 4
+FRAMES_KEPT = 6
+
+
+def _qualified_name(error: BaseException) -> str:
+    kind = type(error)
+    return f"{kind.__module__}.{kind.__qualname__}"
+
+
+def _cause(error: BaseException) -> BaseException | None:
+    """The exception this one was raised from, as Python's own traceback follows the chain."""
+    if error.__cause__ is not None:
+        return error.__cause__
+    return None if error.__suppress_context__ else error.__context__
+
+
+def _source(filename: str) -> str:
+    """Relative to the import root the file came from, so no home or checkout directory shows."""
+    roots = [
+        root
+        for root in (os.path.join(os.path.abspath(entry), "") for entry in sys.path if entry)
+        if filename.startswith(root)
+    ]
+    return filename[len(max(roots, key=len)) :] if roots else os.path.basename(filename)
+
+
+def error_fields(error: BaseException) -> dict[str, Any]:
+    """Where a failure happened and what it came from, without its text (R-25, XERR-01).
+
+    The class name, the module-qualified type, the types of up to CAUSES_KEPT causes, and the last
+    FRAMES_KEPT frames of its traceback as path:line:function. Frames are read from code objects,
+    so no source line, message or local is ever read.
+    """
+    causes: list[str] = []
+    seen = {id(error)}
+    cause = _cause(error)
+    while cause is not None and id(cause) not in seen and len(causes) < CAUSES_KEPT:
+        seen.add(id(cause))
+        causes.append(_qualified_name(cause))
+        cause = _cause(cause)
+    frames = deque(
+        (
+            f"{_source(frame.f_code.co_filename)}:{line}:{frame.f_code.co_qualname}"
+            for frame, line in traceback.walk_tb(error.__traceback__)
+        ),
+        maxlen=FRAMES_KEPT,
+    )
+    fields: dict[str, Any] = {
+        "error": type(error).__name__,
+        "error_type": _qualified_name(error),
+        "frames": list(frames),
+    }
+    if causes:
+        fields["causes"] = causes
+    return fields
+
+
+def _shown(value: Any) -> Any:
+    if isinstance(value, bool | int | float):
+        return value
+    if isinstance(value, list | tuple):
+        return [_shown(item) for item in value]
+    return redact(str(value))
+
+
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         entry: dict[str, Any] = {
@@ -49,11 +140,16 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "event": redact(record.getMessage()),
         }
+        failures: list[BaseException] = []
         for name, value in getattr(record, "fields", {}).items():
-            entry[name] = value if isinstance(value, bool | int | float) else redact(str(value))
-        if record.exc_info and record.exc_info[0] is not None:
-            # The type only: a message can carry a connection string or a provider's reply.
-            entry["error"] = record.exc_info[0].__name__
+            if isinstance(value, BaseException):
+                failures.append(value)
+            else:
+                entry[name] = _shown(value)
+        if record.exc_info and record.exc_info[1] is not None:
+            failures.append(record.exc_info[1])
+        for failure in failures:
+            entry.update({name: _shown(value) for name, value in error_fields(failure).items()})
         return json.dumps(entry, ensure_ascii=False, sort_keys=True)
 
 
@@ -77,7 +173,24 @@ def configure_logging(stream: TextIO | None = None) -> None:
 
 
 def log_event(logger: logging.Logger, event: str, level: int = logging.INFO, **fields: Any) -> None:
+    """One line, by the conventions at the top of this module."""
     logger.log(level, event, extra={"fields": fields})
+
+
+@dataclass
+class Repeated:
+    """A failure that can recur on every pass, such as a lost connection. Its first occurrence and
+    every `every`-th are worth a line; `cleared` starts the count again once it works."""
+
+    every: int = 30
+    count: int = 0
+
+    def failed(self) -> bool:
+        self.count += 1
+        return self.count == 1 or self.count % self.every == 0
+
+    def cleared(self) -> None:
+        self.count = 0
 
 
 def forbid_remote_tracing(environ: MutableMapping[str, str]) -> None:
