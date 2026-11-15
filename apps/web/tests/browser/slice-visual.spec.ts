@@ -39,8 +39,8 @@ import {
   type Theme,
 } from "./support/visual/surfaces.ts";
 
-// US-11.11: every named surface in both themes, on the final screens. Its name puts it with the slice
-// suites, so the scripted worker can finish a run. WCAG 2.1 AA is the pass line, by Decision 0010.
+// US-11.11: every named surface in both themes, on the final screens. It's in the slice project, so
+// the scripted worker can finish a run. WCAG 2.1 AA is the pass line, by Decision 0010.
 const OUT = optional("AUTOBOTS_TEST_VISUAL_DIR", "test-results/visual");
 
 // The screens the zoom test loads at each zoom's width.
@@ -298,6 +298,7 @@ test("changing appearance sends no model or task request, and changes no run or 
     .check();
   await page.getByLabel("Dark").check();
   await expect(page.locator("html")).toHaveClass(/dark/);
+  // A negative observation: none of these choices sends a request within 500 ms.
   await page.waitForTimeout(500);
   expect(requests).toEqual([]);
   expect(await state()).toEqual(before);

@@ -7,8 +7,9 @@ import { users } from "./support/auth.ts";
 import { expect, test } from "./support/fixtures.ts";
 import { disconnectProviderKey, submitProviderKey } from "./support/keys.ts";
 
-// US-15.3: readiness a member who isn't the owner can read. scripts/qualify_identity.py runs each
-// test on its own: first with no worker heartbeat, then with an arranged one.
+// US-15.3: readiness a member who isn't the owner can read. In the arranged project,
+// scripts/qualify_identity.py runs each test on its own, by title: first with no worker heartbeat,
+// then with an arranged one.
 
 function chip(page: Page, name: string) {
   return page.locator(`[data-service="${name}"]`);

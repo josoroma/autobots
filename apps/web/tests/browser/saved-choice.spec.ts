@@ -16,8 +16,9 @@ import { expect, test } from "./support/fixtures.ts";
 const DEEPSEEK = "openrouter_deepseek_flash";
 const TERRA = "openrouter_terra";
 
-// Run by scripts/qualify_identity.py, which arranges each test's saved policy in the database first,
-// since a saved choice naming DeepSeek can't be made through the product any more.
+// In the arranged project, scripts/qualify_identity.py runs each test on its own, by title, after it
+// arranges that test's saved policy in the database, since a saved choice naming DeepSeek can't be
+// made through the product any more.
 
 function policy(page: Page) {
   return getJson(page, {
@@ -42,120 +43,133 @@ test("a saved default naming DeepSeek refuses new runs with no substitute, and i
   page,
 }) => {
   await signIn(page, users.owner);
-  await page.goto("/settings/models");
-  await expect(page.locator('[data-field="not-offered"]')).toContainText(
-    "isn't offered for new runs",
-  );
   const choice = page.getByLabel("Workspace default");
-  await expect(choice).toHaveValue(DEEPSEEK);
-  await expect(choice.locator(`option[value="${DEEPSEEK}"]`)).toBeDisabled();
-
+  await test.step("Settings says the saved default isn't offered", async () => {
+    await page.goto("/settings/models");
+    await expect(page.locator('[data-field="not-offered"]')).toContainText(
+      "isn't offered for new runs",
+    );
+    await expect(choice).toHaveValue(DEEPSEEK);
+    await expect(choice.locator(`option[value="${DEEPSEEK}"]`)).toBeDisabled();
+  });
   const before = await policy(page);
-  const runs = await runList(page);
-  const body = await refusedRun(page, `saved-${Date.now()}`, {
-    goal_text: "saved default",
-  });
-  expect(body.message).toContain("isn't offered for new runs");
-  expect((await runList(page)).runs).toEqual(runs.runs);
-
-  const intent = (key: string) =>
-    send(page, {
-      path: "/api/v1/runs/intent",
-      key,
-      status: 200,
-      parse: parseRunIntentCheck,
+  await test.step("admission and intent refuse, and the run list is unchanged", async () => {
+    const runs = await runList(page);
+    const body = await refusedRun(page, `saved-${Date.now()}`, {
+      goal_text: "saved default",
     });
-  expect((await intent(`intent-${Date.now()}`)).ready).toBe(false);
-  expect((await intent(`intent-again-${Date.now()}`)).code).toBe(
-    "model_not_offered",
-  );
+    expect(body.message).toContain("isn't offered for new runs");
+    expect((await runList(page)).runs).toEqual(runs.runs);
 
-  await page.goto("/");
-  // Before anyone presses Run, the page says this would start nothing, and names no route.
-  const disclosure = page.locator('[data-disclosure="not-offered"]');
-  await expect(disclosure).toContainText("pressing Run would start nothing");
-  await expect(page.locator('[data-disclosure="model"]')).toHaveCount(0);
-  await page.getByLabel("Model for this run").selectOption(TERRA);
-  await expect(disclosure).toHaveCount(0);
-  await expect(page.locator('[data-disclosure="model"]')).toContainText(
-    "terra",
-  );
-  await page.getByLabel("Model for this run").selectOption("");
-  await expect(disclosure).toBeVisible();
-  await page.getByRole("textbox", { name: "Goal" }).fill("kept draft");
-  await page.getByRole("button", { name: "Run", exact: true }).click();
-  await expect(
-    page.getByText(/isn't offered for new runs/).first(),
-  ).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "Goal" })).toHaveValue(
-    "kept draft",
-  );
-
-  const after = await policy(page);
-  expect(after.version).toBe(before.version);
-  expect(after.default_profile).toBe(DEEPSEEK);
-
-  // A workflow's editor says this only for a version that would call a model.
-  const stamp = Date.now();
-  const flow = await send(page, {
-    path: "/api/v1/workflows",
-    key: `saved-flow-${stamp}`,
-    data: { name: `Saved ${stamp}` },
-    status: 201,
-    parse: parseWorkflowView,
+    const intent = (key: string) =>
+      send(page, {
+        path: "/api/v1/runs/intent",
+        key,
+        status: 200,
+        parse: parseRunIntentCheck,
+      });
+    expect((await intent(`intent-${Date.now()}`)).ready).toBe(false);
+    expect((await intent(`intent-again-${Date.now()}`)).code).toBe(
+      "model_not_offered",
+    );
   });
-  const input = node("in", "input", { type: "string" });
-  const output = node("out", "output");
-  const versions = `/api/v1/workflows/${flow.id}/versions`;
-  const plain = await page.request.post(versions, {
-    headers: await writeHeaders(page, `saved-plain-${stamp}`),
-    data: {
-      expected_version: 0,
-      graph: {
-        nodes: [input, output],
-        links: [link("in", "value", "out", "value")],
+  await test.step("Home says pressing Run would start nothing", async () => {
+    await page.goto("/");
+    // Before anyone presses Run, the page says this would start nothing, and names no route.
+    const disclosure = page.locator('[data-disclosure="not-offered"]');
+    await expect(disclosure).toContainText("pressing Run would start nothing");
+    await expect(page.locator('[data-disclosure="model"]')).toHaveCount(0);
+    await page.getByLabel("Model for this run").selectOption(TERRA);
+    await expect(disclosure).toHaveCount(0);
+    await expect(page.locator('[data-disclosure="model"]')).toContainText(
+      "terra",
+    );
+    await page.getByLabel("Model for this run").selectOption("");
+    await expect(disclosure).toBeVisible();
+    await page.getByRole("textbox", { name: "Goal" }).fill("kept draft");
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await expect(
+      page.getByText(/isn't offered for new runs/).first(),
+    ).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Goal" })).toHaveValue(
+      "kept draft",
+    );
+  });
+  await test.step("the saved default isn't rewritten", async () => {
+    const after = await policy(page);
+    expect(after.version).toBe(before.version);
+    expect(after.default_profile).toBe(DEEPSEEK);
+  });
+  await test.step("a workflow version that calls a model says so", async () => {
+    // A workflow's editor says this only for a version that would call a model.
+    const stamp = Date.now();
+    const flow = await send(page, {
+      path: "/api/v1/workflows",
+      key: `saved-flow-${stamp}`,
+      data: { name: `Saved ${stamp}` },
+      status: 201,
+      parse: parseWorkflowView,
+    });
+    const input = node("in", "input", { type: "string" });
+    const output = node("out", "output");
+    const versions = `/api/v1/workflows/${flow.id}/versions`;
+    const plain = await page.request.post(versions, {
+      headers: await writeHeaders(page, `saved-plain-${stamp}`),
+      data: {
+        expected_version: 0,
+        graph: {
+          nodes: [input, output],
+          links: [link("in", "value", "out", "value")],
+        },
       },
-    },
-  });
-  expect(plain.status()).toBeLessThan(300);
-  await page.goto(`/workflows/${flow.id}`);
-  await expect(page.locator('[data-disclosure="consent"]')).toBeVisible();
-  await expect(page.locator('[data-disclosure="not-offered"]')).toHaveCount(0);
-  const expert = await send(page, {
-    path: "/api/v1/experts",
-    key: `saved-helper-${stamp}`,
-    data: { name: `Saved helper ${stamp}`, config: { tools: ["calculate"] } },
-    status: 201,
-    parse: parseExpertView,
-  });
-  const withAgent = await page.request.post(versions, {
-    headers: await writeHeaders(page, `saved-agent-${stamp}`),
-    data: {
-      expected_version: 1,
-      graph: {
-        nodes: [input, node("ask", "agent", { expert_id: expert.id }), output],
-        links: [
-          link("in", "value", "ask", "goal"),
-          link("ask", "result", "out", "value"),
-        ],
+    });
+    expect(plain.status()).toBeLessThan(300);
+    await page.goto(`/workflows/${flow.id}`);
+    await expect(page.locator('[data-disclosure="consent"]')).toBeVisible();
+    await expect(page.locator('[data-disclosure="not-offered"]')).toHaveCount(
+      0,
+    );
+    const expert = await send(page, {
+      path: "/api/v1/experts",
+      key: `saved-helper-${stamp}`,
+      data: { name: `Saved helper ${stamp}`, config: { tools: ["calculate"] } },
+      status: 201,
+      parse: parseExpertView,
+    });
+    const withAgent = await page.request.post(versions, {
+      headers: await writeHeaders(page, `saved-agent-${stamp}`),
+      data: {
+        expected_version: 1,
+        graph: {
+          nodes: [
+            input,
+            node("ask", "agent", { expert_id: expert.id }),
+            output,
+          ],
+          links: [
+            link("in", "value", "ask", "goal"),
+            link("ask", "result", "out", "value"),
+          ],
+        },
       },
-    },
+    });
+    expect(withAgent.status()).toBeLessThan(300);
+    await page.goto(`/workflows/${flow.id}`);
+    await page.getByLabel("Version", { exact: true }).selectOption("2");
+    await expect(page.locator('[data-disclosure="not-offered"]')).toContainText(
+      "Change it in settings",
+    );
   });
-  expect(withAgent.status()).toBeLessThan(300);
-  await page.goto(`/workflows/${flow.id}`);
-  await page.getByLabel("Version", { exact: true }).selectOption("2");
-  await expect(page.locator('[data-disclosure="not-offered"]')).toContainText(
-    "Change it in settings",
-  );
-
-  // The way out is the owner's: choosing an offered model, on the screen.
-  await page.goto("/settings/models");
-  await choice.selectOption(TERRA);
-  // Choosing isn't saving, so the warning stays until it is.
-  await expect(page.locator('[data-field="not-offered"]')).toBeVisible();
-  await page.getByRole("button", { name: "Save policy" }).click();
-  await expect(page.locator("[data-policy-message]")).toContainText("Saved.");
-  await expect(page.locator('[data-field="not-offered"]')).toHaveCount(0);
+  await test.step("choosing an offered model clears it", async () => {
+    // The way out is the owner's: choosing an offered model, on the screen.
+    await page.goto("/settings/models");
+    await choice.selectOption(TERRA);
+    // Choosing isn't saving, so the warning stays until it is.
+    await expect(page.locator('[data-field="not-offered"]')).toBeVisible();
+    await page.getByRole("button", { name: "Save policy" }).click();
+    await expect(page.locator("[data-policy-message]")).toContainText("Saved.");
+    await expect(page.locator('[data-field="not-offered"]')).toHaveCount(0);
+  });
 });
 
 test("a saved override on another role reads as not taking effect, and still refuses", async ({

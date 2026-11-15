@@ -2,10 +2,23 @@
  * The workspace's OpenRouter key, saved and removed through Settings → Models as a person would
  * (TWEB-02). The disposable stacks' fake upstream accepts a key starting `sk-or-valid-`.
  */
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /** The arranged key most suites save, which the fake upstream authenticates. */
 export const VALID_PROVIDER_KEY = "sk-or-valid-arranged-first";
+
+/**
+ * The provider card's own message, by its role. The policy panel beside it can show its loading line,
+ * also a status, while a write is answered, so the lookup is scoped to the card its heading labels.
+ */
+export async function providerMessage(page: Page): Promise<Locator> {
+  const card = page.locator('[aria-labelledby="openrouter-heading"]');
+  await expect(
+    card,
+    "the provider card is labelled by its heading",
+  ).toHaveCount(1);
+  return card.getByRole("status");
+}
 
 /** Fills Models' key field and presses Save & validate, asserting nothing about the outcome. */
 export async function submitProviderKey(
@@ -32,7 +45,7 @@ export async function ensureProviderKey(
   }
 }
 
-/** Opens Models and disconnects the saved key, which the suites that follow expect gone. */
+/** Opens Models and disconnects the saved key. */
 export async function disconnectProviderKey(page: Page): Promise<void> {
   await page.goto("/settings/models");
   await expect(page.locator('[data-field="auth"]')).toBeVisible();

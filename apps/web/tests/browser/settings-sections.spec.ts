@@ -1,5 +1,6 @@
 import type { BrowserContext, Page } from "@playwright/test";
 
+import { EVERY_MS } from "../../lib/waiting.ts";
 import { expectNoA11yViolations, WCAG_22_AA } from "./support/a11y.ts";
 import { signIn, users, type Credentials } from "./support/auth.ts";
 import { need, webOrigin } from "./support/env.ts";
@@ -129,15 +130,20 @@ test("Data on this Mac is read-only for a member and the owner, and only the own
 
 // Headless Chromium reports notification permission as denied whatever is granted, so the browser's
 // permission is arranged here: the stub answers with the state each test sets, and records each
-// notification instead of showing it.
+// notification instead of showing it. It also counts each read of the permission. The notifier reads
+// it as each poll starts and again once the poll's reply is in, before it tells of anything
+// (components/waiting-notifier.tsx), so a count two higher means a poll was handled.
 const SPY = (permission: string) => {
   const notes: { title: string; tag: string | undefined }[] = [];
-  (window as unknown as { __notes: typeof notes }).__notes = notes;
+  const spied = window as unknown as { __notes: typeof notes; __asked: number };
+  spied.__notes = notes;
+  spied.__asked = 0;
   class Spy {
     constructor(title: string, options?: { tag?: string }) {
       notes.push({ title, tag: options?.tag });
     }
     static get permission(): string {
+      spied.__asked += 1;
       return permission;
     }
     static requestPermission(): Promise<string> {
@@ -161,7 +167,18 @@ function arrangeWaiting(
   );
 }
 
-/** A signed-in page whose notifications the spy records, on Home after its first poll. */
+/** How many times the page's notifier has read the permission, as the spy counts it. */
+function asked(page: Page): Promise<number> {
+  return page.evaluate(
+    () => (window as unknown as { __asked: number }).__asked,
+  );
+}
+
+/**
+ * A signed-in page whose notifications the spy records, on Home after its first poll. Its clock is
+ * Playwright's, which runs in real time until a test moves it on to a poll instead of waiting the
+ * poll out (TWEB-06).
+ */
 async function watching(
   context: BrowserContext,
   user: Credentials,
@@ -169,6 +186,7 @@ async function watching(
 ): Promise<{ page: Page; requests: string[] }> {
   await context.addInitScript(SPY, granted ? "granted" : "denied");
   const page = await context.newPage();
+  await page.clock.install();
   const requests: string[] = [];
   page.on("request", (request) => requests.push(request.url()));
   await signIn(page, user);
@@ -182,8 +200,13 @@ async function watching(
     );
   }
   await page.goto("/");
-  // One poll notes what already waits, so only what newly waits is told.
-  await page.waitForTimeout(5_000);
+  // One poll notes what already waits, so only what newly waits is told. The notifier polls only with
+  // the setting on and the permission granted, and its first poll is handled once it has asked twice.
+  if (granted && settingOn) {
+    await expect
+      .poll(() => asked(page), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(2);
+  }
   return { page, requests };
 }
 
@@ -221,8 +244,13 @@ test("with the setting on and permission granted, each run that starts waiting r
       `${made.waiting_input}:waiting_input`,
     ].sort(),
   );
-  // Polling again tells nothing twice.
-  await page.waitForTimeout(5_000);
+  // Polling again tells nothing twice. The clock moves on to the next poll, which is handled once the
+  // notifier has asked twice more.
+  const before = await asked(page);
+  await page.clock.runFor(EVERY_MS);
+  await expect
+    .poll(() => asked(page), { timeout: 15_000 })
+    .toBeGreaterThanOrEqual(before + 2);
   expect(
     await page.evaluate(
       () => (window as unknown as { __notes: unknown[] }).__notes.length,
@@ -243,8 +271,12 @@ for (const [label, granted, settingOn] of [
       granted,
       settingOn,
     });
+    const before = await asked(page);
     await arrangeWaiting(label.replaceAll(" ", "-"));
-    await page.waitForTimeout(10_000);
+    // Two polls' time and more passes on the page's clock. The notifier schedules no poll without the
+    // setting and the permission, so it asks nothing more, and nothing it could tell of is missed.
+    await page.clock.runFor(2 * EVERY_MS + 2_000);
+    expect(await asked(page), "no poll ran").toBe(before);
     expect(
       await page.evaluate(
         () => (window as unknown as { __notes: unknown[] }).__notes.length,

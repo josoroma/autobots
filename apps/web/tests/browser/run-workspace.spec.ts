@@ -505,7 +505,8 @@ test("a signed-out stream is refused, and Run links to the new run", async ({
   await expect(
     page.getByRole("region", { name: "Goal" }).getByRole("paragraph"),
   ).toHaveText("Open what I started");
-  // The settings spec, which runs after this one, expects no key.
+  // Disconnected again. A later test here saves it once more, and runs.spec.ts removes that one
+  // before settings.spec.ts checks that workspace A has none (TWEB-01).
   await disconnectProviderKey(page);
 });
 

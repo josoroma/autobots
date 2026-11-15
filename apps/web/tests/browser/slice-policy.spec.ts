@@ -6,14 +6,19 @@ import {
 import type { Page } from "@playwright/test";
 
 import { expectNoA11yViolations } from "./support/a11y.ts";
-import { getJson, send } from "./support/api.ts";
+import { getJson } from "./support/api.ts";
 import { signIn, users } from "./support/auth.ts";
 import { WorkerScenario } from "./support/builders.ts";
 import { expect, test } from "./support/fixtures.ts";
 import { ensureProviderKey } from "./support/keys.ts";
 import { admitRun, cancelUnlessTerminal } from "./support/runs.ts";
+import {
+  restoreModelPolicy,
+  restoreModelPolicyIfChanged,
+} from "./support/state.ts";
 
-// The model policy on Settings. Its name runs it with the slice suites, after settings.spec's versions.
+// The model policy on Settings, in the slice project, after the main project's settings.spec.ts saved
+// its versions.
 const TERRA = "openrouter_terra";
 const DEEPSEEK = "openrouter_deepseek_flash";
 const POLICY = "/api/settings/model-policy";
@@ -22,22 +27,11 @@ function storedPolicy(page: Page): Promise<ModelPolicyState> {
   return getJson(page, { path: POLICY, parse: parseModelPolicyState });
 }
 
-// The worker's scripted route is Terra, so later suites start from the original policy.
-async function restore(page: Page): Promise<void> {
-  const current = await storedPolicy(page);
-  await send(page, {
-    method: "PUT",
-    path: POLICY,
-    key: null,
-    data: {
-      expected_version: current.version,
-      default_profile: TERRA,
-      role_overrides: {},
-    },
-    status: 200,
-    parse: parseModelPolicyState,
-  });
-}
+// The worker's scripted route is Terra, so the slice suites after this one start from the original
+// policy. Each test restores it as it ends, and this restores it whatever a failure left (TWEB-01).
+test.afterAll(async ({ browser }) => {
+  await restoreModelPolicyIfChanged(browser);
+});
 
 /** Admits a run the scripted worker fails at once, as it only claims to be done. */
 function admit(page: Page, label: string): Promise<string> {
@@ -71,7 +65,7 @@ test("an owner saves a default of what is offered, and DeepSeek is listed but no
   test.setTimeout(90_000);
   await signIn(page, users.owner);
   await ensureProviderKey(page);
-  await restore(page);
+  await restoreModelPolicy(page);
   await page.goto("/");
   const before = await admit(page, "before-the-change");
   expect(await frozenExecutor(page, before)).toBe(TERRA);
@@ -111,14 +105,14 @@ test("an owner saves a default of what is offered, and DeepSeek is listed but no
   await page.goto("/settings/models");
   await expect(page.getByLabel("Workspace default")).toHaveValue(TERRA);
   await expectNoA11yViolations(page);
-  await restore(page);
+  await restoreModelPolicy(page);
 });
 
 test("the screen says only the executor dispatches, and a same-binding override reads as the same", async ({
   page,
 }) => {
   await signIn(page, users.owner);
-  await restore(page);
+  await restoreModelPolicy(page);
   await page.goto("/settings/models");
   const effect = page.locator('[data-field="role-effect"]');
   await expect(effect).toContainText(
@@ -137,7 +131,7 @@ test("the screen says only the executor dispatches, and a same-binding override 
   const stored = await storedPolicy(page);
   expect(stored.default_profile).toBe(TERRA);
   expect(stored.role_overrides).toEqual({ coder: TERRA });
-  await restore(page);
+  await restoreModelPolicy(page);
 });
 
 test("a stale save is refused with a reload message, and the stored policy is unchanged", async ({
@@ -145,7 +139,7 @@ test("a stale save is refused with a reload message, and the stored policy is un
   signedInPage,
 }) => {
   await signIn(page, users.owner);
-  await restore(page);
+  await restoreModelPolicy(page);
   await page.goto("/settings/models");
   await expect(page.getByLabel("Workspace default")).toHaveValue(TERRA);
 
@@ -164,5 +158,5 @@ test("a stale save is refused with a reload message, and the stored policy is un
     "Reload the page",
   );
   expect(await storedPolicy(page)).toEqual(stored);
-  await restore(page);
+  await restoreModelPolicy(page);
 });

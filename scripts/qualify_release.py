@@ -61,6 +61,7 @@ from release_scoring import (
     summarize,
     summarize_resources,
 )
+from suites import RELEASE_PROJECT
 from supabase_stack import generated_values, require_images, require_rendered
 from toolchain import child_env, find_tools
 
@@ -442,7 +443,7 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
         if arguments.ui:
             latency_file = out / 'ui-latency.json'
             latency_file.unlink(missing_ok=True)
-            played = subprocess.run([str(web_dir / 'node_modules/.bin/playwright'), 'test', 'release-latency', '--config', 'playwright.config.ts'], cwd=web_dir, capture_output=True, text=True, errors='replace', timeout=300, check=False,
+            played = subprocess.run([str(web_dir / 'node_modules/.bin/playwright'), 'test', '--project', RELEASE_PROJECT, '--config', 'playwright.config.ts'], cwd=web_dir, capture_output=True, text=True, errors='replace', timeout=300, check=False,
                                     env={**browser_env, 'AUTOBOTS_WEB_URL': web_url, 'AUTOBOTS_TEST_OWNER_EMAIL': email, 'AUTOBOTS_TEST_OWNER_PASSWORD': password, 'AUTOBOTS_RELEASE_LATENCY_OUT': str(latency_file),
                                          'AUTOBOTS_WEB_REPORT': str(out / 'playwright.json'), 'AUTOBOTS_WEB_OUTPUT': str(out / 'playwright-results')})
             (logs / 'playwright.log').write_text(played.stdout[-4000:] + played.stderr[-4000:])

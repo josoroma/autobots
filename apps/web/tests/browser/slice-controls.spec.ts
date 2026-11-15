@@ -12,7 +12,7 @@ import { expect, test } from "./support/fixtures.ts";
 import { ensureProviderKey } from "./support/keys.ts";
 import { admitRun, readRun, runCommand } from "./support/runs.ts";
 
-// A run's controls, with the scripted worker running. Its name puts it with the slice suites.
+// A run's controls, in the slice project, with the scripted worker running.
 
 /** Admits the two-counts run for `scenario` from Home. */
 async function admit(page: Page, scenario: string): Promise<string> {
@@ -171,126 +171,135 @@ test("resume is refused with its reason until an uncertain call is reconciled, a
   await ensureProviderKey(page);
   const id = await admit(page, WorkerScenario.uncertain);
   await page.goto(`/runs/${id}`);
-  // The scripted worker dies inside a model call, and recovery stops at the unknown.
-  await expect(status(page)).toHaveAttribute("data-run-status", "paused", {
-    timeout: 60_000,
-  });
-  await expect(page.locator("[data-stop-reason]")).toContainText(
-    "uncertain model call",
-  );
-
-  const before = await workspace(page, id);
-  expect(before.outstanding.uncertain_calls).toBe(1);
-
-  await button(page, "Resume").click();
-  await expect(page.locator("[data-control-refusal]")).toContainText(
-    "A model call's outcome must be reconciled first.",
-  );
-  await page.waitForTimeout(3000);
-  await expectState(page, id, "paused", "Paused.");
-  const refused = await workspace(page, id);
-  expect(refused.usage.model_calls).toBe(before.usage.model_calls);
-
-  // Someone who isn't the owner is refused, by the route and on the screen.
-  const member = await signedInPage(users.member);
-  const denied = await member.request.post(
-    `/api/v1/runs/${id}/model-calls/reconcile`,
-    {
-      headers: {
-        ...(await writeHeaders(member, "member-reconcile")),
-        "X-Autobots-Workspace": need("AUTOBOTS_TEST_WORKSPACE_A"),
-      },
-      data: { charged_micro_usd: 1 },
-    },
-  );
-  await expectRefusal(denied, { status: 403, code: "owner_required" });
-
-  await page.route("**/model-calls/reconcile", (route) =>
-    route.fulfill({
-      status: 403,
-      contentType: "application/json",
-      body: JSON.stringify({
-        code: "owner_required",
-        message: "Only the workspace owner can change this.",
-      }),
-    }),
-  );
-  await page.getByLabel("Charge seen, in US dollars").fill("0.00025");
-  await page.getByRole("button", { name: "Record the charge" }).click();
-  await expect(page.locator("[data-control-refusal]")).toContainText(
-    "Only the workspace owner",
-  );
-  await page.unroute("**/model-calls/reconcile");
-
-  await page.getByLabel("Charge seen, in US dollars").fill("not a number");
-  await page.getByRole("button", { name: "Record the charge" }).click();
-  await expect(page.locator("[data-control-refusal]")).toContainText(
-    "Enter the charge in US dollars",
-  );
-
-  // R-18 step 1, Decision 0027 D2: the charge reaches the API and its reply is lost, so the page
-  // can't tell it was recorded. The run's own reloads are lost too, so the form stays, and the
-  // next press resends the same request under the same key, which records it once.
-  const charged: { key: string; body: string | null }[] = [];
-  const snapshot = `**/api/v1/runs/${id}/workspace`;
-  await page.route(snapshot, (route) => route.abort("connectionreset"));
-  await page.route("**/model-calls/reconcile", async (route) => {
-    charged.push({
-      key: route.request().headers()["idempotency-key"] ?? "",
-      body: route.request().postData(),
+  await test.step("recovery stops at the uncertain call", async () => {
+    // The scripted worker dies inside a model call, and recovery stops at the unknown.
+    await expect(status(page)).toHaveAttribute("data-run-status", "paused", {
+      timeout: 60_000,
     });
-    if (charged.length > 1) return route.continue();
-    await route.fetch();
-    return route.abort("connectionreset");
+    await expect(page.locator("[data-stop-reason]")).toContainText(
+      "uncertain model call",
+    );
   });
-  const charge = page.getByLabel("Charge seen, in US dollars");
-  await charge.fill("0.00025");
-  await page.getByRole("button", { name: "Record the charge" }).click();
-  await expect(page.locator("[data-control-refusal]")).toContainText(
-    "This may have been recorded",
-  );
-  await expect(charge).not.toBeEditable();
-  await expect(charge).toHaveValue("0.00025");
-  await page.getByRole("button", { name: "Record the charge" }).click();
-  await expect(page.locator("[data-control-note]")).toContainText(
-    "The charge is recorded",
-  );
-  expect(charged).toHaveLength(2);
-  expect(charged[1]).toEqual(charged[0]);
-  await page.unroute("**/model-calls/reconcile");
-  await page.unroute(snapshot);
-  await page.reload();
-  await expect(page.locator("[data-reconcile]")).toHaveCount(0);
-  const after = await workspace(page, id);
-  expect(after.outstanding.uncertain_calls).toBe(0);
-  expect(
-    after.run.budget.spent_micro_usd - before.run.budget.spent_micro_usd,
-  ).toBe(250);
-
-  await button(page, "Resume").click();
-  await expect(status(page)).toHaveAttribute("data-run-status", "succeeded", {
-    timeout: 60_000,
+  const before = await workspace(page, id);
+  await test.step("resume is refused until the call is reconciled", async () => {
+    expect(before.outstanding.uncertain_calls).toBe(1);
+    await button(page, "Resume").click();
+    await expect(page.locator("[data-control-refusal]")).toContainText(
+      "A model call's outcome must be reconciled first.",
+    );
+    // A negative observation: the refused resume starts no model call within 3 s.
+    await page.waitForTimeout(3000);
+    await expectState(page, id, "paused", "Paused.");
+    const refused = await workspace(page, id);
+    expect(refused.usage.model_calls).toBe(before.usage.model_calls);
   });
-  expect(await apiStatus(page, id)).toBe("succeeded");
-  await expectNoControls(page);
+  await test.step("someone who isn't the owner is refused", async () => {
+    // Someone who isn't the owner is refused, by the route and on the screen.
+    const member = await signedInPage(users.member);
+    const denied = await member.request.post(
+      `/api/v1/runs/${id}/model-calls/reconcile`,
+      {
+        headers: {
+          ...(await writeHeaders(member, "member-reconcile")),
+          "X-Autobots-Workspace": need("AUTOBOTS_TEST_WORKSPACE_A"),
+        },
+        data: { charged_micro_usd: 1 },
+      },
+    );
+    await expectRefusal(denied, { status: 403, code: "owner_required" });
 
-  // E-2: the audit screen doesn't call that call a success, or the owner's figure a report.
-  await page.goto(`/runs/${id}/inspector`);
-  const entered = page.locator('[data-cost="entered"]');
-  await expect(entered).toContainText("Charge entered by the owner");
-  await expect(entered).toContainText("US$0.00025");
-  await expect(
-    page.locator("[data-call]").filter({ has: entered }),
-  ).toContainText("outcome unknown");
-
-  // E-6: a stale tab is told nothing was recorded.
-  await page.goto(`/runs/${id}`);
-  const stale = await send(page, {
-    path: `/api/v1/runs/${id}/model-calls/reconcile`,
-    key: `stale-${id}`,
-    data: { charged_micro_usd: 5 },
-    status: 200,
-    parse: parseReconciliationResult,
+    await page.route("**/model-calls/reconcile", (route) =>
+      route.fulfill({
+        status: 403,
+        contentType: "application/json",
+        body: JSON.stringify({
+          code: "owner_required",
+          message: "Only the workspace owner can change this.",
+        }),
+      }),
+    );
+    await page.getByLabel("Charge seen, in US dollars").fill("0.00025");
+    await page.getByRole("button", { name: "Record the charge" }).click();
+    await expect(page.locator("[data-control-refusal]")).toContainText(
+      "Only the workspace owner",
+    );
+    await page.unroute("**/model-calls/reconcile");
   });
-  expect(stale.reconciled_calls).toBe(0);
+  await test.step("a charge that isn't a number is refused", async () => {
+    await page.getByLabel("Charge seen, in US dollars").fill("not a number");
+    await page.getByRole("button", { name: "Record the charge" }).click();
+    await expect(page.locator("[data-control-refusal]")).toContainText(
+      "Enter the charge in US dollars",
+    );
+  });
+  await test.step("a charge whose reply is lost is recorded once", async () => {
+    // R-18 step 1, Decision 0027 D2: the charge reaches the API and its reply is lost, so the page
+    // can't tell it was recorded. The run's own reloads are lost too, so the form stays, and the
+    // next press resends the same request under the same key, which records it once.
+    const charged: { key: string; body: string | null }[] = [];
+    const snapshot = `**/api/v1/runs/${id}/workspace`;
+    await page.route(snapshot, (route) => route.abort("connectionreset"));
+    await page.route("**/model-calls/reconcile", async (route) => {
+      charged.push({
+        key: route.request().headers()["idempotency-key"] ?? "",
+        body: route.request().postData(),
+      });
+      if (charged.length > 1) return route.continue();
+      await route.fetch();
+      return route.abort("connectionreset");
+    });
+    const charge = page.getByLabel("Charge seen, in US dollars");
+    await charge.fill("0.00025");
+    await page.getByRole("button", { name: "Record the charge" }).click();
+    await expect(page.locator("[data-control-refusal]")).toContainText(
+      "This may have been recorded",
+    );
+    await expect(charge).not.toBeEditable();
+    await expect(charge).toHaveValue("0.00025");
+    await page.getByRole("button", { name: "Record the charge" }).click();
+    await expect(page.locator("[data-control-note]")).toContainText(
+      "The charge is recorded",
+    );
+    expect(charged).toHaveLength(2);
+    expect(charged[1]).toEqual(charged[0]);
+    await page.unroute("**/model-calls/reconcile");
+    await page.unroute(snapshot);
+    await page.reload();
+    await expect(page.locator("[data-reconcile]")).toHaveCount(0);
+    const after = await workspace(page, id);
+    expect(after.outstanding.uncertain_calls).toBe(0);
+    expect(
+      after.run.budget.spent_micro_usd - before.run.budget.spent_micro_usd,
+    ).toBe(250);
+  });
+  await test.step("resume is accepted, and the run succeeds", async () => {
+    await button(page, "Resume").click();
+    await expect(status(page)).toHaveAttribute("data-run-status", "succeeded", {
+      timeout: 60_000,
+    });
+    expect(await apiStatus(page, id)).toBe("succeeded");
+    await expectNoControls(page);
+  });
+  await test.step("the audit screen doesn't call it a success", async () => {
+    // E-2: the audit screen doesn't call that call a success, or the owner's figure a report.
+    await page.goto(`/runs/${id}/inspector`);
+    const entered = page.locator('[data-cost="entered"]');
+    await expect(entered).toContainText("Charge entered by the owner");
+    await expect(entered).toContainText("US$0.00025");
+    await expect(
+      page.locator("[data-call]").filter({ has: entered }),
+    ).toContainText("outcome unknown");
+  });
+  await test.step("a stale tab is told nothing was recorded", async () => {
+    // E-6: a stale tab is told nothing was recorded.
+    await page.goto(`/runs/${id}`);
+    const stale = await send(page, {
+      path: `/api/v1/runs/${id}/model-calls/reconcile`,
+      key: `stale-${id}`,
+      data: { charged_micro_usd: 5 },
+      status: 200,
+      parse: parseReconciliationResult,
+    });
+    expect(stale.reconciled_calls).toBe(0);
+  });
 });

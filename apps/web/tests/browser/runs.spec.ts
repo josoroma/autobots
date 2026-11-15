@@ -11,8 +11,15 @@ import { signIn, users } from "./support/auth.ts";
 import { expect, test } from "./support/fixtures.ts";
 import { disconnectProviderKey, ensureProviderKey } from "./support/keys.ts";
 import { admitRun, readRun, runCommand } from "./support/runs.ts";
+import { removeProviderKeyIfAny } from "./support/state.ts";
 
-// Admission needs a usable key. The last test here removes it, and the settings spec expects none.
+// Admission needs a usable key. "a workspace with no key cannot admit a run" removes it, and so does
+// the afterAll below whatever happens, since settings.spec.ts checks that workspace A has none
+// (TWEB-01). run-workspace.spec.ts, before this file, leaves one.
+test.afterAll(async ({ browser }) => {
+  await removeProviderKeyIfAny(browser);
+});
+
 async function signInWithKey(page: Page): Promise<void> {
   await signIn(page, users.owner);
   await ensureProviderKey(page);
@@ -39,6 +46,8 @@ test("Run admits exactly once through the real form, and a reload starts nothing
   ).toHaveAttribute("href", /^\/runs\/[0-9a-f-]+$/);
   expect(posts).toHaveLength(1);
   await page.reload();
+  // A negative observation: the reloaded page settles with no second POST. No element marks the point
+  // where it would have sent one, so this waits for the network to go quiet.
   await page.waitForLoadState("networkidle");
   expect(posts).toHaveLength(1);
 });

@@ -11,7 +11,7 @@ import { ensureProviderKey } from "./support/keys.ts";
 import { expectNoPrivateValues } from "./support/leaks.ts";
 import { admitRun, readRun } from "./support/runs.ts";
 
-// The run list and inspector, with the scripted worker running. Its name puts it with the slice suites.
+// The run list and inspector, in the slice project, with the scripted worker running.
 const TERRA = "openai/gpt-6.1-terra-20261026";
 const noKeyRun = () => need("AUTOBOTS_TEST_NO_KEY_RUN");
 

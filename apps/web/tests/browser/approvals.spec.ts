@@ -184,52 +184,86 @@ test("the inbox shows the exact request, and a tampered decision releases nothin
   expect(summary.status).toBe("waiting_approval");
 });
 
-test("an owner approves and rejects through the inbox, and a repeat changes nothing", async ({
-  page,
-}) => {
-  await signIn(page, users.owner);
-  await page.goto("/approvals");
-  await (
-    await open(page, approval.approve)
-  )
-    .getByRole("button", { name: "Approve" })
-    .click();
-  await expect(page.locator('[data-message="decision"]')).toContainText(
-    "Only this exact request",
-  );
-  await expect(
-    page.locator(`[data-approval="${approval.approve}"]`),
-  ).toHaveCount(0);
-  await (
-    await open(page, approval.reject)
-  )
-    .getByRole("button", { name: "Reject" })
-    .click();
-  await expect(page.locator('[data-message="decision"]')).toContainText(
-    "won't run",
-  );
+// The decision in the first test is what the second, US-15.5's decided card, reads under Decided, so
+// the second is skipped if the first fails (TWEB-07). The tests above read both requests still
+// waiting, so they come first.
+test.describe(() => {
+  test.describe.configure({ mode: "serial" });
 
-  const summary = await readRun(page, approval.run);
-  expect(summary.status).toBe("queued");
-  const decision = `/api/v1/approvals/${approval.approve}/decision`;
-  const again = await send(page, {
-    path: decision,
-    key: "again",
-    data: { decision: "approve", argument_hash: approval.hash },
-    status: 200,
-    parse: parseApprovalResult,
+  test("an owner approves and rejects through the inbox, and a repeat changes nothing", async ({
+    page,
+  }) => {
+    await signIn(page, users.owner);
+    await page.goto("/approvals");
+    await (
+      await open(page, approval.approve)
+    )
+      .getByRole("button", { name: "Approve" })
+      .click();
+    await expect(page.locator('[data-message="decision"]')).toContainText(
+      "Only this exact request",
+    );
+    await expect(
+      page.locator(`[data-approval="${approval.approve}"]`),
+    ).toHaveCount(0);
+    await (
+      await open(page, approval.reject)
+    )
+      .getByRole("button", { name: "Reject" })
+      .click();
+    await expect(page.locator('[data-message="decision"]')).toContainText(
+      "won't run",
+    );
+
+    const summary = await readRun(page, approval.run);
+    expect(summary.status).toBe("queued");
+    const decision = `/api/v1/approvals/${approval.approve}/decision`;
+    const again = await send(page, {
+      path: decision,
+      key: "again",
+      data: { decision: "approve", argument_hash: approval.hash },
+      status: 200,
+      parse: parseApprovalResult,
+    });
+    expect(again.replayed).toBe(true);
+    const opposite = await page.request.post(decision, {
+      headers: await writeHeaders(page, "opposite"),
+      data: { decision: "reject", argument_hash: approval.hash },
+    });
+    await expectRefusal(opposite, {
+      status: 409,
+      code: "approval_already_decided",
+    });
+    const history = await approvals(page, "?status=approved");
+    expect(history.approvals.map((item) => item.id)).toContain(
+      approval.approve,
+    );
   });
-  expect(again.replayed).toBe(true);
-  const opposite = await page.request.post(decision, {
-    headers: await writeHeaders(page, "opposite"),
-    data: { decision: "reject", argument_hash: approval.hash },
+
+  test("a decided request shows its run, task, expiry and who decided", async ({
+    page,
+  }) => {
+    await signIn(page, users.owner);
+    await page.goto("/approvals");
+    const loaded = page.waitForResponse((reply) =>
+      reply.url().includes("/api/v1/approvals?status=decided"),
+    );
+    await page.locator('[data-tab="decided"]').click();
+    await loaded;
+    const card = await open(page, approval.approve);
+    await expect(card.locator("[data-approval-task]")).toHaveText(
+      "For task: Send the team note",
+    );
+    await expect(card.locator("[data-approval-run]")).not.toContainText(
+      "not recorded",
+    );
+    await expect(card.locator("[data-approval-decided]")).toContainText(
+      "Approved by you at",
+    );
+    await expect(card).toContainText(
+      /Expires \d.*\((in \d+ (minute|hour|day)s?|in less than a minute|\d+ (minute|hour|day)s? ago|just now|yesterday)\)/,
+    );
   });
-  await expectRefusal(opposite, {
-    status: 409,
-    code: "approval_already_decided",
-  });
-  const history = await approvals(page, "?status=approved");
-  expect(history.approvals.map((item) => item.id)).toContain(approval.approve);
 });
 
 test("a long request is shown whole, and one too long can't be approved", async ({
@@ -330,31 +364,6 @@ test("Waiting and Decided tabs with counts, J and K, and the badge", async ({
     );
 });
 
-test("a decided request shows its run, task, expiry and who decided", async ({
-  page,
-}) => {
-  await signIn(page, users.owner);
-  await page.goto("/approvals");
-  const loaded = page.waitForResponse((reply) =>
-    reply.url().includes("/api/v1/approvals?status=decided"),
-  );
-  await page.locator('[data-tab="decided"]').click();
-  await loaded;
-  const card = await open(page, approval.approve);
-  await expect(card.locator("[data-approval-task]")).toHaveText(
-    "For task: Send the team note",
-  );
-  await expect(card.locator("[data-approval-run]")).not.toContainText(
-    "not recorded",
-  );
-  await expect(card.locator("[data-approval-decided]")).toContainText(
-    "Approved by you at",
-  );
-  await expect(card).toContainText(
-    /Expires \d.*\((in \d+ (minute|hour|day)s?|in less than a minute|\d+ (minute|hour|day)s? ago|just now|yesterday)\)/,
-  );
-});
-
 test("the exact request whole, in Fields and JSON views", async ({ page }) => {
   await signIn(page, users.owner);
   await page.goto("/approvals");
@@ -392,7 +401,7 @@ test("a shortcut needs a second press, and never acts while typing", async ({
   await page.locator("h1").click();
   await page.keyboard.press("Meta+Enter");
   await expect(said).toContainText("again within 2 seconds to approve");
-  await page.waitForTimeout(2_500);
+  // The arm lapses after 2 seconds on its own, which this waits for.
   await expect(said).toHaveText("Nothing was decided.");
   const pending = async () =>
     (await approvals(page)).approvals.some(

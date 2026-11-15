@@ -193,6 +193,7 @@ test("an explicit light choice persists across navigation and reload, before pai
   );
   await page.getByRole("radio", { name: "Light" }).check();
   await expect(page.locator("html")).toHaveClass(/light/);
+  // A negative observation: no request follows the change within 300 ms.
   await page.waitForTimeout(300);
   expect(requests, "changing appearance issues no request at all").toEqual([]);
   expect(
@@ -435,6 +436,7 @@ test("serif documents, density and forced reduced motion apply, survive a reload
   expect(chosen.font).toMatch(/sans-serif|system-ui/);
   expect(chosen.padding).toBe(16);
   expect(chosen.transition).toBe("1e-05s");
+  // A negative observation: no request follows the choices within 300 ms.
   await page.waitForTimeout(300);
   expect(requests, "presentation choices issue no request").toEqual([]);
 

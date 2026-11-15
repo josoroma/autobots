@@ -83,6 +83,7 @@ test("after the stream is cut while the result is written, the view is rebuilt f
   });
   // The stream drops mid-result, and the browser reconnects from its cursor.
   await context.setOffline(true);
+  // The browser stays offline for 2.5 s, long enough for the stream to drop.
   await page.waitForTimeout(2_500);
   await context.setOffline(false);
   const outcome = await done;
@@ -116,6 +117,7 @@ test("with Stream text as it's written off, no live text is shown, and the store
   });
   while (!finished) {
     shown += await page.locator('[data-field="live-result"]').count();
+    // Samples the page every 200 ms until the helper ends, so live text shown at any point is counted.
     await page.waitForTimeout(200);
   }
   const stored = await outcome;

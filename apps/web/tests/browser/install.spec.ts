@@ -5,8 +5,9 @@ import { arranged } from "./support/env.ts";
 import { expect, test } from "./support/fixtures.ts";
 import { expectNoPrivateValues } from "./support/leaks.ts";
 
-// Run by hand on the persistent install, as the upgrade and operations runbooks say. No other suite
-// runs it, and it writes nothing: it signs in and reads what the install already holds.
+// The install project, run by hand on the persistent install with `--project install`, as US-11.3 ran
+// it for its local app and upgrade checks. No profile runs it, and it writes nothing: it signs in and
+// reads what the install already holds.
 const install = arranged({
   run: "AUTOBOTS_TEST_RUN",
   artifactSha: "AUTOBOTS_TEST_ARTIFACT_SHA",

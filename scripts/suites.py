@@ -17,17 +17,21 @@ API_CLIENT_TESTS = 'packages/api-client/tests/**/*.test.ts'
 # from package registries, so it stays manual.
 TOOLCHAIN_OFFLINE = ('test_scaffold_scope', 'test_manifests', 'test_non_mutating.Launchers')
 
-# Playwright filters. Each one selects the spec files whose path contains it.
-WEB_SUITES = ('appearance', 'boundary', 'browser/tools.spec')
-IDENTITY_SUITES = ('browser/workflows.spec', 'browser/operations', 'approvals', 'effects', 'experts', 'models',
-                   'composer', 'home', 'workflow-list', 'identity', 'settings', 'runs', 'run-panel', 'search',
-                   'new-run', 'stream-result', 'workspace-choice', 'artifacts', 'run-workspace')
+# Playwright projects, one per environment (R-58). BROWSER_PROJECTS lists each project's spec files, which
+# apps/web/playwright.config.ts turns into its testMatch, and each runner passes its project with --project.
+BROWSER_PROJECTS = 'apps/web/tests/browser/projects.json'
+WEB_PROJECT = 'web'
+IDENTITY_PROJECT = 'main'
 # Run one test at a time, by title, while qualify_identity arranges each one's state.
-QUALIFICATION_SUITE = 'browser/qualification'
-SAVED_CHOICE_SUITE = 'browser/saved-choice'
-READINESS_SUITE = 'browser/readiness'
-IDENTITY_TITLED_SUITES = (QUALIFICATION_SUITE, SAVED_CHOICE_SUITE, READINESS_SUITE)
-SLICE_SUITES = ('slice',)
+ARRANGED_PROJECT = 'arranged'
+SLICE_PROJECT = 'slice'
+# The projects the full and db profiles run, through qualify_web and qualify_identity.
+PROFILE_PROJECTS = (WEB_PROJECT, IDENTITY_PROJECT, ARRANGED_PROJECT, SLICE_PROJECT)
+# In no profile: qualify_release.py --ui, persistent_install.py screens, and by hand. MANUAL says why.
+RELEASE_PROJECT = 'release'
+INSTALL_CURRENT_PROJECT = 'install-current'
+INSTALL_PROJECT = 'install'
+MANUAL_PROJECTS = (RELEASE_PROJECT, INSTALL_CURRENT_PROJECT, INSTALL_PROJECT)
 
 # The qualifiers the db and operations profiles run, as (step id, script, arguments...). verify.py
 # builds those steps from these, and the claim test follows them and their imports, and nothing
@@ -54,12 +58,14 @@ MANUAL = {
                                      'gateway and the isolated browser (Decision 0020).',
     'tests/db/product_inference_check.py': 'Run by `qualify_worker_inference.py` and `qualify_mac_sleep.py`, which '
                                            'qualify the worker entry point and a real Mac sleep, on purpose.',
-    'apps/web/tests/browser/install.spec.ts': 'Read-only on the persistent install, run by hand as the upgrade and '
-                                              'operations runbooks say.',
+    'apps/web/tests/browser/install.spec.ts': 'Read-only on the persistent install, run by hand with `--project '
+                                              'install`, as US-11.3 ran it for its local app and upgrade checks.',
     'apps/web/tests/browser/install-current.spec.ts': 'Read-only on the persistent install, run by '
-                                                      '`persistent_install.py screens` (Decision 0023).',
+                                                      '`persistent_install.py screens` with `--project '
+                                                      'install-current` (Decision 0023).',
     'apps/web/tests/browser/release-latency.spec.ts': "US-10.1's timing, run only by `qualify_release.py --ui` "
-                                                      'against the real API with the worker stopped.',
+                                                      'with `--project release`, against the real API with the '
+                                                      'worker stopped.',
     'tests/toolchain/test_reproducible.py': 'Builds copies from package registries, so it needs the network.',
     'tests/toolchain/test_non_mutating.py': 'Its launcher checks (N7) run offline in full. Its other classes '
                                              'build or need a prepared disposable copy, so they stay manual.',

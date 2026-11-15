@@ -387,16 +387,22 @@ class BrowserLaunches(Arranged):
         web, checks = self.root / 'apps/web', self.root / '.checks/identity'
         playwright = str(web / 'node_modules/.bin/playwright')
         config = ['--config', 'playwright.config.ts']
+        # The arranged project's tests, each selected by its spec file and its title (R-58).
+        arranged = ['--project', 'arranged', '-g']
         expected = [([str(web / 'node_modules/.bin/next'), 'build'], 300, None),
-                    ([playwright, 'test', *suites.IDENTITY_SUITES, *config], 660, 'playwright.json'),
-                    ([playwright, 'test', suites.QUALIFICATION_SUITE, '-g', 'after an API restart', *config], 120, 'playwright-qualification-1.json'),
-                    ([playwright, 'test', suites.QUALIFICATION_SUITE, '-g', 'a route with no record', *config], 120, 'playwright-qualification-2.json'),
-                    *(([playwright, 'test', suites.SAVED_CHOICE_SUITE, '-g', title, *config], 120, f'playwright-saved-choice-{index}.json')
+                    ([playwright, 'test', '--project', 'main', *config], 660, 'playwright.json'),
+                    ([playwright, 'test', 'qualification.spec.ts', *arranged, 'after an API restart', *config], 120,
+                     'playwright-qualification-1.json'),
+                    ([playwright, 'test', 'qualification.spec.ts', *arranged, 'a route with no record', *config], 120,
+                     'playwright-qualification-2.json'),
+                    *(([playwright, 'test', 'saved-choice.spec.ts', *arranged, title, *config], 120, f'playwright-saved-choice-{index}.json')
                       for index, title in enumerate(('a saved default naming DeepSeek', 'a saved override on another role',
                                                      'a saved executor override', 'a saved Expert binding'), start=1)),
-                    ([playwright, 'test', suites.READINESS_SUITE, '-g', "names the service that isn't ready", *config], 180, 'playwright-readiness-1.json'),
-                    ([playwright, 'test', suites.READINESS_SUITE, '-g', 'all local services ready', *config], 180, 'playwright-readiness-2.json'),
-                    ([playwright, 'test', *suites.SLICE_SUITES, *config], 900, 'playwright-slice.json')]
+                    ([playwright, 'test', 'readiness.spec.ts', *arranged, "names the service that isn't ready", *config], 180,
+                     'playwright-readiness-1.json'),
+                    ([playwright, 'test', 'readiness.spec.ts', *arranged, 'all local services ready', *config], 180,
+                     'playwright-readiness-2.json'),
+                    ([playwright, 'test', '--project', 'slice', *config], 900, 'playwright-slice.json')]
         observed = [(launch['argv'], launch['timeout'], Path(launch['env']['AUTOBOTS_WEB_REPORT']).name if 'AUTOBOTS_WEB_REPORT' in launch['env'] else None)
                     for launch in self.launches]
         self.assertEqual(observed, expected)
@@ -420,6 +426,14 @@ class BrowserLaunches(Arranged):
                           ([str(web / 'node_modules/.bin/next'), 'start', '-H', '127.0.0.1', '-p', '56002'], web),
                           ([python, str(self.root / 'tests/web/fixture_upstream_api.py'), '56001'], self.root),
                           ([python, str(self.root / 'tests/web/fixture_worker.py')], self.root)])
+
+
+class ArrangedSpecs(unittest.TestCase):
+    def test_the_spec_files_named_are_the_arranged_projects(self) -> None:
+        # Each arranged test is selected by its spec file and title (R-58), so the files must be the project's.
+        projects = json.loads((ROOT / suites.BROWSER_PROJECTS).read_text())
+        named = (qualify_identity.QUALIFICATION_SPEC, qualify_identity.SAVED_CHOICE_SPEC, qualify_identity.READINESS_SPEC)
+        self.assertEqual(sorted(named), sorted(projects[suites.ARRANGED_PROJECT]))
 
 
 if __name__ == '__main__':

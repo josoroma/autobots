@@ -49,7 +49,7 @@ test.beforeAll(async () => {
   expect((await heartbeats("start")).live).toBe(2);
 });
 
-// A later suite expects no worker, so the two stop whatever happens here.
+// operations.spec.ts, after this file, expects no worker, so the two stop whatever happens here.
 test.afterAll(async () => {
   await heartbeats("stop");
 });

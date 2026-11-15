@@ -2,6 +2,13 @@ import { expectNoA11yViolations } from "./support/a11y.ts";
 import { signIn, users } from "./support/auth.ts";
 import { expect, test } from "./support/fixtures.ts";
 import { expectNoPrivateValues } from "./support/leaks.ts";
+import { restoreRetentionIfSaved } from "./support/state.ts";
+
+// Workspace A keeps everything, as the suites after this one expect. The retention test saves and
+// clears its windows itself, and this clears whatever a failure left saved (TWEB-01).
+test.afterAll(async ({ browser }) => {
+  await restoreRetentionIfSaved(browser);
+});
 
 test("the owner sees conditions, and no address or secret", async ({
   page,
@@ -11,7 +18,8 @@ test("the owner sees conditions, and no address or secret", async ({
   await expect(page.getByRole("heading", { name: "Operations" })).toBeVisible();
   await expect(page.getByText("Ready. New work can start.")).toBeVisible();
   await expect(page.getByText("The database is answering.")).toBeVisible();
-  // This suite runs before the slice starts its worker, so none is running.
+  // The main project runs before the slice starts its worker, and operations-values.spec.ts stops
+  // the heartbeats it arranges, so none is running.
   await expect(page.getByText(/No worker is running/)).toBeVisible();
   await expect(page.getByText(/Remote tracing: off/)).toBeVisible();
   await expect(page.getByText(/Last backup: none found/)).toBeVisible();

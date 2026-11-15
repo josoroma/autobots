@@ -1,0 +1,47 @@
+{
+  "web": ["appearance.spec.ts", "boundary.spec.ts", "tools.spec.ts"],
+  "main": [
+    "approvals.spec.ts",
+    "artifacts.spec.ts",
+    "composer.spec.ts",
+    "effects.spec.ts",
+    "experts.spec.ts",
+    "home.spec.ts",
+    "identity.spec.ts",
+    "models.spec.ts",
+    "new-run.spec.ts",
+    "operations-history.spec.ts",
+    "operations-jobs.spec.ts",
+    "operations-values.spec.ts",
+    "operations.spec.ts",
+    "run-panel.spec.ts",
+    "run-workspace.spec.ts",
+    "runs.spec.ts",
+    "search.spec.ts",
+    "settings-keys-and-vars.spec.ts",
+    "settings-sections.spec.ts",
+    "settings.spec.ts",
+    "stream-result.spec.ts",
+    "workflow-list.spec.ts",
+    "workflows.spec.ts",
+    "workspace-choice.spec.ts"
+  ],
+  "arranged": [
+    "qualification.spec.ts",
+    "readiness.spec.ts",
+    "saved-choice.spec.ts"
+  ],
+  "slice": [
+    "slice-closure.spec.ts",
+    "slice-controls.spec.ts",
+    "slice-inspector.spec.ts",
+    "slice-policy.spec.ts",
+    "slice-run-details.spec.ts",
+    "slice-visual.spec.ts",
+    "slice-workflows.spec.ts",
+    "slice.spec.ts"
+  ],
+  "release": ["release-latency.spec.ts"],
+  "install-current": ["install-current.spec.ts"],
+  "install": ["install.spec.ts"]
+}

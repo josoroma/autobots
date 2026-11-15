@@ -5,8 +5,9 @@ import { optional } from "./support/env.ts";
 import { expect, test } from "./support/fixtures.ts";
 import { expectNoPrivateValues } from "./support/leaks.ts";
 
-// Decision 0023, read-only on the persistent install: `persistent_install.py screens` runs it, signed in as
-// the owner from the install's own record. It writes nothing. No other suite runs it.
+// Decision 0023, read-only on the persistent install: `persistent_install.py screens` runs the
+// install-current project, signed in as the owner from the install's own record. It writes nothing,
+// and no profile runs it.
 
 // scripts/persistent_install.py names this directory, and a run by hand takes no screenshot.
 async function shoot(page: Page, file: string): Promise<void> {

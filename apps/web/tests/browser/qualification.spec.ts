@@ -2,11 +2,18 @@ import type { Page } from "@playwright/test";
 
 import { signIn, users } from "./support/auth.ts";
 import { expect, test } from "./support/fixtures.ts";
+import { expectAuthenticatedProviderKey } from "./support/state.ts";
 
 const TERRA = "openrouter_terra";
 const DEEPSEEK = "openrouter_deepseek_flash";
 
-// Run by scripts/qualify_identity.py, after the settings suite left workspace A a valid key.
+// The arranged project: scripts/qualify_identity.py runs each test on its own, by title, after it
+// arranges that test's route records. Both read the key settings.spec.ts leaves workspace A, which
+// this checks first (TWEB-01).
+test.beforeAll(async ({ browser }) => {
+  await expectAuthenticatedProviderKey(browser);
+});
+
 async function openSettings(page: Page): Promise<void> {
   await signIn(page, users.owner);
   await page.goto("/settings/models");

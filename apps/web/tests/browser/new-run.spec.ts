@@ -72,6 +72,7 @@ test("⇧⌘O in a text field does nothing, and the field keeps its content and 
   await filter.fill("kept text");
   await filter.focus();
   await page.keyboard.press(`Shift+${MODIFIER}+KeyO`);
+  // A negative observation: the shortcut navigates nowhere within 400 ms.
   await page.waitForTimeout(400);
   await expect(page).toHaveURL(/\/runs$/);
   await expect(filter).toBeFocused();

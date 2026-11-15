@@ -46,10 +46,16 @@
   "tests/browser/appearance.spec.ts": {
     "max-lines": {
       "count": 1
+    },
+    "no-restricted-properties": {
+      "count": 2
     }
   },
   "tests/browser/approvals.spec.ts": {
     "max-lines": {
+      "count": 1
+    },
+    "no-restricted-properties": {
       "count": 1
     }
   },
@@ -58,9 +64,42 @@
       "count": 1
     }
   },
+  "tests/browser/new-run.spec.ts": {
+    "no-restricted-properties": {
+      "count": 1
+    }
+  },
   "tests/browser/run-workspace.spec.ts": {
     "max-lines": {
       "count": 1
+    },
+    "no-restricted-properties": {
+      "count": 3
+    }
+  },
+  "tests/browser/search.spec.ts": {
+    "no-restricted-properties": {
+      "count": 1
+    }
+  },
+  "tests/browser/settings.spec.ts": {
+    "no-restricted-properties": {
+      "count": 1
+    }
+  },
+  "tests/browser/slice-controls.spec.ts": {
+    "no-restricted-properties": {
+      "count": 1
+    }
+  },
+  "tests/browser/slice-visual.spec.ts": {
+    "no-restricted-properties": {
+      "count": 1
+    }
+  },
+  "tests/browser/stream-result.spec.ts": {
+    "no-restricted-properties": {
+      "count": 2
     }
   }
 }

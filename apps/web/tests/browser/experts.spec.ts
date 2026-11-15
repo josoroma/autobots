@@ -13,7 +13,8 @@ import { expectRefusal, getJson, send, writeHeaders } from "./support/api.ts";
 import { signIn, users } from "./support/auth.ts";
 import { arranged, need } from "./support/env.ts";
 import { expect, test } from "./support/fixtures.ts";
-import { disconnectProviderKey, ensureProviderKey } from "./support/keys.ts";
+import { ensureProviderKey } from "./support/keys.ts";
+import { removeProviderKeyIfAny } from "./support/state.ts";
 
 function createExpert(
   page: Page,
@@ -246,15 +247,8 @@ test("a member can't save, and another workspace sees nothing", async ({
 });
 
 test.afterAll(async ({ browser }) => {
-  // The settings spec, which runs after this one, expects no key.
-  const context = await browser.newContext();
-  try {
-    const page = await context.newPage();
-    await signIn(page, users.owner);
-    await disconnectProviderKey(page);
-  } finally {
-    await context.close();
-  }
+  // Workspace A is left with no key, as settings.spec.ts checks before it starts (TWEB-01).
+  await removeProviderKeyIfAny(browser);
 });
 
 test("a member can't pin an earlier Expert version through a session, and an owner can", async ({

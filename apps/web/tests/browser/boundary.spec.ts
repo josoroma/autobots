@@ -169,6 +169,8 @@ test("no privileged value reaches the browser", async ({ page }) => {
     response.url().startsWith(origin),
   );
   await page.goto("/");
+  // Every reply the page loads is read before the check. The page names no last reply to wait on, so
+  // this waits for the network to go quiet.
   await page.waitForLoadState("networkidle");
   const read = await bodies();
   expect(read.length).toBeGreaterThan(1);

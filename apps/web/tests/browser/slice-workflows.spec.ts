@@ -34,73 +34,75 @@ test("a graph is validated, published, run and monitored, and the monitor only r
   test.setTimeout(90_000);
   await signIn(page, users.owner);
   await page.goto("/workflows");
-  await page.getByLabel("Name").fill("Monitored flow");
-  await page.getByRole("button", { name: "Create" }).click();
-  await expect(page).toHaveURL(/\/workflows\/[0-9a-f-]{36}/);
-  await expect(page.locator('[data-block="foreach"]')).toContainText(
-    "foreach v1",
-  );
+  await test.step("the editor shows typed errors before anything publishes", async () => {
+    await page.getByLabel("Name").fill("Monitored flow");
+    await page.getByRole("button", { name: "Create" }).click();
+    await expect(page).toHaveURL(/\/workflows\/[0-9a-f-]{36}/);
+    await expect(page.locator('[data-block="foreach"]')).toContainText(
+      "foreach v1",
+    );
 
-  // Typed errors are visible before anything can publish.
-  const broken = {
-    ...LOOP,
-    nodes: LOOP.nodes.map((item) =>
-      item.id === "each" ? node("each", "foreach") : item,
-    ),
-  };
-  await page.getByLabel("Graph").fill(JSON.stringify(broken));
-  await page.getByRole("button", { name: "Validate" }).click();
-  await expect(
-    page.locator('[data-error="foreach_bound_required"]'),
-  ).toContainText("at each");
-  await page.getByRole("button", { name: "Publish what is shown" }).click();
-  await expect(page.locator('[data-message="editor"]')).toContainText(
-    "foreach_bound_required",
-  );
-  await expect(
-    page.getByRole("heading", { name: "Run a version" }).locator(".."),
-  ).toContainText("Publish a version first");
+    // Typed errors are visible before anything can publish.
+    const broken = {
+      ...LOOP,
+      nodes: LOOP.nodes.map((item) =>
+        item.id === "each" ? node("each", "foreach") : item,
+      ),
+    };
+    await page.getByLabel("Graph").fill(JSON.stringify(broken));
+    await page.getByRole("button", { name: "Validate" }).click();
+    await expect(
+      page.locator('[data-error="foreach_bound_required"]'),
+    ).toContainText("at each");
+    await page.getByRole("button", { name: "Publish what is shown" }).click();
+    await expect(page.locator('[data-message="editor"]')).toContainText(
+      "foreach_bound_required",
+    );
+    await expect(
+      page.getByRole("heading", { name: "Run a version" }).locator(".."),
+    ).toContainText("Publish a version first");
+  });
+  await test.step("a valid graph publishes as version 1, and runs", async () => {
+    await page.getByLabel("Graph").fill(JSON.stringify(LOOP));
+    await page.getByRole("button", { name: "Validate" }).click();
+    await expect(page.locator('[data-validation="valid"]')).toBeVisible();
+    await expectNoA11yViolations(page);
+    await page.getByRole("button", { name: "Publish what is shown" }).click();
+    await expect(page.locator('[data-message="editor"]')).toContainText(
+      "Published as version 1",
+    );
 
-  await page.getByLabel("Graph").fill(JSON.stringify(LOOP));
-  await page.getByRole("button", { name: "Validate" }).click();
-  await expect(page.locator('[data-validation="valid"]')).toBeVisible();
-  await expectNoA11yViolations(page);
-  await page.getByRole("button", { name: "Publish what is shown" }).click();
-  await expect(page.locator('[data-message="editor"]')).toContainText(
-    "Published as version 1",
-  );
-
-  await page.getByLabel("Inputs").fill(JSON.stringify({ in: ["a", "b"] }));
-  await page.getByRole("button", { name: "Run this version" }).click();
-  await expect(page).toHaveURL(/\/workflow-executions\//);
-  await expect(page.locator("[data-binding]")).toContainText("Version 1");
-
-  // The fixture worker runs it up to the approval step.
-  await expect(page.locator('[data-instance="up#1"]')).toHaveAttribute(
-    "data-status",
-    "succeeded",
-    { timeout: 30_000 },
-  );
-  await expect(page.locator('[data-emission="up#0.value.0"]')).toContainText(
-    "A",
-  );
-  await expect(page.locator('[data-emission="up#1.value.0"]')).toContainText(
-    "B",
-  );
-  await expect(page.locator('[data-emission="all.items.0"]')).toContainText(
-    '["A", "B"]',
-  );
-  await expect(page.locator("[data-run-status]")).toHaveAttribute(
-    "data-run-status",
-    "waiting_approval",
-    { timeout: 15_000 },
-  );
-  await expect(page.locator('[data-instance="out"]')).toHaveAttribute(
-    "data-status",
-    "waiting",
-  );
-
-  // A dropped connection and a reconnect read saved state, and start nothing.
+    await page.getByLabel("Inputs").fill(JSON.stringify({ in: ["a", "b"] }));
+    await page.getByRole("button", { name: "Run this version" }).click();
+    await expect(page).toHaveURL(/\/workflow-executions\//);
+    await expect(page.locator("[data-binding]")).toContainText("Version 1");
+  });
+  await test.step("the worker runs it up to the approval step", async () => {
+    // The fixture worker runs it up to the approval step.
+    await expect(page.locator('[data-instance="up#1"]')).toHaveAttribute(
+      "data-status",
+      "succeeded",
+      { timeout: 30_000 },
+    );
+    await expect(page.locator('[data-emission="up#0.value.0"]')).toContainText(
+      "A",
+    );
+    await expect(page.locator('[data-emission="up#1.value.0"]')).toContainText(
+      "B",
+    );
+    await expect(page.locator('[data-emission="all.items.0"]')).toContainText(
+      '["A", "B"]',
+    );
+    await expect(page.locator("[data-run-status]")).toHaveAttribute(
+      "data-run-status",
+      "waiting_approval",
+      { timeout: 15_000 },
+    );
+    await expect(page.locator('[data-instance="out"]')).toHaveAttribute(
+      "data-status",
+      "waiting",
+    );
+  });
   const url = page.url();
   const id = url.split("/").at(-1) ?? "";
   const execution = () =>
@@ -108,74 +110,78 @@ test("a graph is validated, published, run and monitored, and the monitor only r
       path: `/api/v1/workflow-executions/${id}`,
       parse: parseExecutionView,
     });
-  const before = await execution();
-  await page.route("**/api/v1/workflow-executions/**", (route) =>
-    route.abort(),
-  );
-  await expect(page.locator("[data-connection]")).toHaveAttribute(
-    "data-connection",
-    "reconnecting",
-    { timeout: 10_000 },
-  );
-  await page.unroute("**/api/v1/workflow-executions/**");
-  await expect(page.locator("[data-connection]")).toHaveAttribute(
-    "data-connection",
-    "live",
-    { timeout: 10_000 },
-  );
-  // A reply that isn't what was asked for doesn't stop polling or read as live. R-27: it says the
-  // page and the service disagree, beside the last known state.
-  await page.route("**/api/v1/workflow-executions/**", (route) =>
-    route.fulfill({ status: 200, body: "<html>not it</html>" }),
-  );
-  await expect(page.locator("[data-connection]")).toHaveAttribute(
-    "data-connection",
-    "reconnecting",
-    { timeout: 10_000 },
-  );
-  await expect(page.locator('[data-reason="out_of_date"]')).toHaveText(
-    "This page and the local service disagree. Reload after updating.",
-  );
-  await expect(page.locator("[data-binding]")).toContainText("Version 1");
-  await page.unroute("**/api/v1/workflow-executions/**");
-  await expect(page.locator("[data-connection]")).toHaveAttribute(
-    "data-connection",
-    "live",
-    { timeout: 10_000 },
-  );
-  await expect(page.locator("[data-reason]")).toHaveCount(0);
-  await page.reload();
-  await expect(page.locator('[data-emission="up#0.value.0"]')).toContainText(
-    "A",
-  );
-  const after = await execution();
-  expect(after.emissions).toEqual(before.emissions);
-  expect(after.instances).toEqual(before.instances);
-
-  // Approving continues it through the inbox.
-  await page.goto("/approvals");
-  await page
-    .locator("[data-approval-item]")
-    .filter({ hasText: "workflow_approval" })
-    .first()
-    .click();
-  await page
-    .locator("[data-approval]")
-    .getByRole("button", { name: "Approve" })
-    .click();
-  await expect(page.locator('[data-message="decision"]')).toContainText(
-    "Only this exact request",
-  );
-  await page.goto(url);
-  await expect(page.locator("[data-run-status]")).toHaveAttribute(
-    "data-run-status",
-    "succeeded",
-    { timeout: 30_000 },
-  );
-  await expect(page.locator('[data-emission="out.value.0"]')).toContainText(
-    '["A", "B"]',
-  );
-  await expectNoA11yViolations(page);
+  await test.step("a dropped connection and a reconnect start nothing", async () => {
+    // A dropped connection and a reconnect read saved state, and start nothing.
+    const before = await execution();
+    await page.route("**/api/v1/workflow-executions/**", (route) =>
+      route.abort(),
+    );
+    await expect(page.locator("[data-connection]")).toHaveAttribute(
+      "data-connection",
+      "reconnecting",
+      { timeout: 10_000 },
+    );
+    await page.unroute("**/api/v1/workflow-executions/**");
+    await expect(page.locator("[data-connection]")).toHaveAttribute(
+      "data-connection",
+      "live",
+      { timeout: 10_000 },
+    );
+    // A reply that isn't what was asked for doesn't stop polling or read as live. R-27: it says the
+    // page and the service disagree, beside the last known state.
+    await page.route("**/api/v1/workflow-executions/**", (route) =>
+      route.fulfill({ status: 200, body: "<html>not it</html>" }),
+    );
+    await expect(page.locator("[data-connection]")).toHaveAttribute(
+      "data-connection",
+      "reconnecting",
+      { timeout: 10_000 },
+    );
+    await expect(page.locator('[data-reason="out_of_date"]')).toHaveText(
+      "This page and the local service disagree. Reload after updating.",
+    );
+    await expect(page.locator("[data-binding]")).toContainText("Version 1");
+    await page.unroute("**/api/v1/workflow-executions/**");
+    await expect(page.locator("[data-connection]")).toHaveAttribute(
+      "data-connection",
+      "live",
+      { timeout: 10_000 },
+    );
+    await expect(page.locator("[data-reason]")).toHaveCount(0);
+    await page.reload();
+    await expect(page.locator('[data-emission="up#0.value.0"]')).toContainText(
+      "A",
+    );
+    const after = await execution();
+    expect(after.emissions).toEqual(before.emissions);
+    expect(after.instances).toEqual(before.instances);
+  });
+  await test.step("approving through the inbox continues it", async () => {
+    // Approving continues it through the inbox.
+    await page.goto("/approvals");
+    await page
+      .locator("[data-approval-item]")
+      .filter({ hasText: "workflow_approval" })
+      .first()
+      .click();
+    await page
+      .locator("[data-approval]")
+      .getByRole("button", { name: "Approve" })
+      .click();
+    await expect(page.locator('[data-message="decision"]')).toContainText(
+      "Only this exact request",
+    );
+    await page.goto(url);
+    await expect(page.locator("[data-run-status]")).toHaveAttribute(
+      "data-run-status",
+      "succeeded",
+      { timeout: 30_000 },
+    );
+    await expect(page.locator('[data-emission="out.value.0"]')).toContainText(
+      '["A", "B"]',
+    );
+    await expectNoA11yViolations(page);
+  });
 });
 
 test("a failed branch is shown as failed, with what it blocked", async ({

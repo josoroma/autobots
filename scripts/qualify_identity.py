@@ -55,13 +55,7 @@ from qualification.children import (
 )
 from qualification.records import write_report
 from qualify_web import BROWSERS, run_problems, start, stop, summarize, wait_until_up
-from suites import (
-    IDENTITY_SUITES,
-    QUALIFICATION_SUITE,
-    READINESS_SUITE,
-    SAVED_CHOICE_SUITE,
-    SLICE_SUITES,
-)
+from suites import ARRANGED_PROJECT, IDENTITY_PROJECT, SLICE_PROJECT
 from supabase_stack import generated_values, require_images, require_rendered
 from toolchain import child_env, find_tools
 
@@ -115,7 +109,10 @@ SEARCH_IDS = {'run': '99999999-9999-4999-8999-0000000000d1', 'expert': '99999999
               'workflow': '99999999-9999-4999-8999-0000000000d3', 'other_run': '88888888-8888-4888-8888-0000000000d4',
               'other_expert': '88888888-8888-4888-8888-0000000000d5'}
 DELAYED_ROUTINE = '44444444-4444-4444-8444-444444444444'
-# The browser tests run one at a time, by title, each after its own arrangement (suites.IDENTITY_TITLED_SUITES).
+# The arranged project's tests run one at a time, each after its own arrangement (suites.ARRANGED_PROJECT). Each
+# is selected by its spec file and its title, so a title that another arranged spec repeats can't select a second
+# test (R-58). The spec comes before --project, which would read it as another project's name.
+QUALIFICATION_SPEC, SAVED_CHOICE_SPEC, READINESS_SPEC = 'qualification.spec.ts', 'saved-choice.spec.ts', 'readiness.spec.ts'
 QUALIFICATION_TITLES = ('after an API restart', 'a route with no record')
 # A saved choice naming DeepSeek can't be made through the product now, so each is arranged: its title, the
 # saved default and the saved role overrides.
@@ -596,10 +593,10 @@ ARRANGEMENTS: tuple[Arrangement, ...] = (
 )
 
 
-def titled_run(playwright: Path, web: Path, suite: str, title: str, timeout: float, browser_env: Mapping[str, str], report: Path) -> int:
-    """Run the one test of `suite` with `title`, reporting to `report`. Returns its exit code."""
+def titled_run(playwright: Path, web: Path, spec: str, title: str, timeout: float, browser_env: Mapping[str, str], report: Path) -> int:
+    """Run the one test of the arranged project's `spec` with `title`, reporting to `report`. Returns its exit code."""
     report.unlink(missing_ok=True)
-    ran = subprocess.run([str(playwright), 'test', suite, '-g', title, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=timeout, check=False,
+    ran = subprocess.run([str(playwright), 'test', spec, '--project', ARRANGED_PROJECT, '-g', title, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=timeout, check=False,
                          env={**browser_env, 'AUTOBOTS_WEB_REPORT': str(report)})
     if ran.returncode:
         print(ran.stdout[-1500:], file=sys.stderr)
@@ -608,7 +605,7 @@ def titled_run(playwright: Path, web: Path, suite: str, title: str, timeout: flo
 
 def browser_cases(run: IdentityRun, cases: Cases, fixtures: Mapping[str, str]) -> None:
     """Build the web app, start the API fixture and the BFF, and run the browser suites with the arranged
-    `fixtures`: the main list, each titled test after its own arrangement, then the slice with a worker."""
+    `fixtures`: the main project, each arranged test after its own arrangement, then the slice with a worker."""
     root, stack = run.root, run.stack
     owner_a, owner_b = run.bootstrapped(OWNER_A), run.bootstrapped(OWNER_B)
     tools = find_tools(root)
@@ -675,7 +672,7 @@ def browser_cases(run: IdentityRun, cases: Cases, fixtures: Mapping[str, str]) -
                        'AUTOBOTS_TEST_SERVICE_KEY': run.service_key, 'AUTOBOTS_WEB_REPORT': str(report),
                        'AUTOBOTS_WEB_OUTPUT': str(out / 'results'), 'AUTOBOTS_WEB_SCREENSHOTS': str(screenshots),
                        'AUTOBOTS_TEST_VISUAL_DIR': str(out / 'visual')}
-        result = subprocess.run([str(playwright), 'test', *IDENTITY_SUITES, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=660, check=False,
+        result = subprocess.run([str(playwright), 'test', '--project', IDENTITY_PROJECT, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=660, check=False,
                                 env=browser_env)
         # A real restart, then Settings reads the stored records. Then one is removed, under the same key.
         stop(processes[0])
@@ -684,15 +681,15 @@ def browser_cases(run: IdentityRun, cases: Cases, fixtures: Mapping[str, str]) -
         qualification_reports: list[Path] = []
         qualification_codes: list[int] = []
 
-        def titled(suite: str, title: str, timeout: float, report_path: Path) -> None:
+        def titled(spec: str, title: str, timeout: float, report_path: Path) -> None:
             qualification_reports.append(report_path)
-            qualification_codes.append(titled_run(playwright, web, suite, title, timeout, browser_env, report_path))
+            qualification_codes.append(titled_run(playwright, web, spec, title, timeout, browser_env, report_path))
 
         for index, title in enumerate(QUALIFICATION_TITLES, start=1):
             if title == 'a route with no record':
                 cases.arrange('a route with no record', stack.sql("create table public.arranged_route_rows as select * from agent_runtime.route_qualifications;\n"
                                                                   "delete from agent_runtime.route_qualifications where profile = 'openrouter_terra';\n"))
-            titled(QUALIFICATION_SUITE, title, 120, out / f'playwright-qualification-{index}.json')
+            titled(QUALIFICATION_SPEC, title, 120, out / f'playwright-qualification-{index}.json')
         cases.arrange('the route records restored', stack.sql("delete from agent_runtime.route_qualifications;\n"
                                                               "insert into agent_runtime.route_qualifications select * from public.arranged_route_rows;\n"
                                                               "drop table public.arranged_route_rows;\n"))
@@ -700,7 +697,7 @@ def browser_cases(run: IdentityRun, cases: Cases, fixtures: Mapping[str, str]) -
             cases.arrange(f'the saved choice: {title}', stack.runtime(
                 f'update app_private.model_policies set version = version + 1, default_profile = {sql_literal(profile)}, '
                 f'role_overrides = {sql_literal(json.dumps(overrides))} where workspace_id = {workspace_a_sql};\n'))
-            titled(SAVED_CHOICE_SUITE, title, 120, out / f'playwright-saved-choice-{index}.json')
+            titled(SAVED_CHOICE_SPEC, title, 120, out / f'playwright-saved-choice-{index}.json')
         # US-15.3: readiness as a member. First with no worker heartbeat, then with an arranged one
         # dated ahead, so it stays fresh for the whole run, and removed afterwards.
         for index, title in enumerate(READINESS_TITLES, start=1):
@@ -708,7 +705,7 @@ def browser_cases(run: IdentityRun, cases: Cases, fixtures: Mapping[str, str]) -
                 cases.arrange('a worker heartbeat that stays fresh for the readiness run',
                               stack.runtime("insert into app_private.worker_heartbeats (worker_id, state, claims_inference, beat_at) "
                                             "values ('arranged-readiness', 'running', true, clock_timestamp() + interval '15 minutes');\n"))
-            titled(READINESS_SUITE, title, 180, out / f'playwright-readiness-{index}.json')
+            titled(READINESS_SPEC, title, 180, out / f'playwright-readiness-{index}.json')
         # As the admin: the runtime role holds DELETE on workflow drafts only (R-17).
         cleared = stack.sql("delete from app_private.worker_heartbeats where worker_id = 'arranged-readiness'; "
                             "select count(*) from app_private.worker_heartbeats where worker_id = 'arranged-readiness';\n")
@@ -726,7 +723,7 @@ def browser_cases(run: IdentityRun, cases: Cases, fixtures: Mapping[str, str]) -
                       'AUTOBOTS_STORAGE_BASE': run.base, 'AUTOBOTS_STORAGE_SERVICE': run.service_key,
                       'AUTOBOTS_TEST_DIED_MARKER': str(config_root / 'worker-died')}
         processes.append(start([str(root / PYTHON), str(root / 'tests/web/fixture_worker.py')], worker_env, root))
-        slice_result = subprocess.run([str(playwright), 'test', *SLICE_SUITES, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=900, check=False,
+        slice_result = subprocess.run([str(playwright), 'test', '--project', SLICE_PROJECT, '--config', 'playwright.config.ts'], cwd=web, capture_output=True, text=True, errors='replace', timeout=900, check=False,
                                       env={**browser_env, 'AUTOBOTS_WEB_REPORT': str(slice_report)})
         if slice_result.returncode:
             print(slice_result.stdout[-2500:], file=sys.stderr)

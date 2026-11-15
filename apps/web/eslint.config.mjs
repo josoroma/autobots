@@ -55,6 +55,22 @@ const config = [
       ],
     },
   },
+  // R-58, TWEB-06: a browser spec waits on a condition, a response or page.clock. The fixed sleeps
+  // left are negative observations, each with a comment saying why, and eslint-suppressions.json
+  // records them, so a new one fails.
+  {
+    files: ["tests/browser/**/*.ts"],
+    rules: {
+      "no-restricted-properties": [
+        "error",
+        {
+          property: "waitForTimeout",
+          message:
+            "Wait on a condition, a response or page.clock, not a fixed time.",
+        },
+      ],
+    },
+  },
 ];
 
 export default config;

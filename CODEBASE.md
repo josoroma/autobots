@@ -346,15 +346,15 @@ These evidence classes aren't interchangeable, and later code doesn't inherit ea
 - **`harness`:** configuration, backlog validation, deterministic harness tests.
 - **`fast`:** adds the Python and web steps for what changed. Since R-07, after the analyzed revision, it also runs `repo_ruff_check` (root `ruff.toml`) and `repo_mypy` (strict, root `mypy.ini`, over the hook's six trust-boundary modules) when scripts, tests or hooks change.
 - **`full`:** every static and unit step, `next build`, `contract_drift`, `qualify_faults.py`, the offline `tests/toolchain` modules (since R-01, after the analyzed revision) (scope, manifest pins and launchers), and `qualify_web.py`. Per-story records report 41 browser tests.
-- **Selections:** since R-01, after the analyzed revision, `scripts/suites.py` names every step's tests: web and API-client unit tests by glob, the db and operations qualifiers, the Playwright filters, and the manual files with their reasons. `tests/harness/test_suite_claims.py` fails on a test file nothing runs. `make check-fast` and `make check-full` run those profiles; `.githooks/pre-commit` is opt-in.
+- **Selections:** since R-01, after the analyzed revision, `scripts/suites.py` names every step's tests: web and API-client unit tests by glob, the db and operations qualifiers, the Playwright projects, and the manual files with their reasons. `tests/harness/test_suite_claims.py` fails on a test file nothing runs. `make check-fast` and `make check-full` run those profiles; `.githooks/pre-commit` is opt-in.
 - **`db`:** disposable targets for `disposable_db`, `supabase_stack`, `app_db`, `qualify_identity` (including `tests/db/*_check.py` such as `result_stream_check`, `task_timing_check`, `pull_request_check`, `concept_seed_check`) and `qualify_persistent_apply`.
 - **`operations`:** `qualify_operations`, `qualify_backup`, `qualify_upgrade`, on disposable projects with a scripted model.
 
-**Browser specs.** This mapping of the 38 spec files is inferred from the Playwright filters in `scripts/`:
-- 33 run through `qualify_identity.py`: 22 in the main list, 3 by title (`qualification`, `saved-choice`, `readiness`) and 8 `slice*`.
-- 3 run through `qualify_web.py`: `appearance`, `boundary`, `tools`.
-- `release-latency` runs only under `qualify_release.py --ui`.
-- `install.spec.ts` runs by hand, and `install-current` through `persistent_install.py screens`.
+**Browser specs.** Since R-58, after the analyzed revision, `apps/web/tests/browser/projects.json` assigns the 41 spec files to seven Playwright projects, and each runner passes its own with `--project`:
+- `qualify_identity.py` runs `main` (24 files, 131 tests), `arranged` (3 files, 8 tests, one at a time by title) and `slice` (8 files, 36 tests).
+- `qualify_web.py` runs `web` (`appearance`, `boundary`, `tools`: 50 tests).
+- `qualify_release.py --ui` runs `release`, `persistent_install.py screens` runs `install-current`, and `install` runs by hand.
+- `support/state.ts` checks a shared state before a suite that needs it and restores it after one that changes it (provider key, retention, model policy, keys and values).
 
 **In no profile:** `qualify_worker_inference.py`, `qualify_github_connector.py` (`--suite studio`, review then apply, ledger-capped), `qualify_browser_executor.py`, `qualify_browse_goal.py`, `browse_trial.py`, `qualify_mac_sleep.py`, `qualify_release.py`, `live_goal.py`, and `tests/toolchain` other than its offline modules. `scripts/suites.py` lists the manual test files with their reasons.
 

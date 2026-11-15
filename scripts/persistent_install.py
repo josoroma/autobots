@@ -611,6 +611,7 @@ def screens(root: Path, record: Record, requested: str, grep: str) -> int:
     require_install(stack, record, requested)
     sys.path.insert(0, str(root / 'scripts'))
     from qualify_web import BROWSERS
+    from suites import INSTALL_CURRENT_PROJECT
     from toolchain import child_env, find_tools
     browsers = root / BROWSERS
     if not any(browsers.glob('chromium-*')):
@@ -623,7 +624,7 @@ def screens(root: Path, record: Record, requested: str, grep: str) -> int:
     env = {**child_env(root, find_tools(root), verifying=True), 'PLAYWRIGHT_BROWSERS_PATH': str(browsers),
            'AUTOBOTS_WEB_URL': f'http://127.0.0.1:{record.web_port}', 'AUTOBOTS_WEB_REPORT': str(report), 'AUTOBOTS_WEB_OUTPUT': str(out / 'results'),
            'AUTOBOTS_TEST_SCREENSHOTS': str(out), 'AUTOBOTS_TEST_OWNER_EMAIL': owner['OWNER_EMAIL'], 'AUTOBOTS_TEST_OWNER_PASSWORD': owner['OWNER_PASSWORD']}
-    argv = [str(root / 'apps/web/node_modules/.bin/playwright'), 'test', 'browser/install-current', '--config', 'playwright.config.ts']
+    argv = [str(root / 'apps/web/node_modules/.bin/playwright'), 'test', '--project', INSTALL_CURRENT_PROJECT, '--config', 'playwright.config.ts']
     if grep:
         argv += ['-g', grep]
     done = subprocess.run(argv, env=env, cwd=root / 'apps/web', capture_output=True, text=True, errors='replace', timeout=600, check=False)

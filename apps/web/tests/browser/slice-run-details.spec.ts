@@ -15,7 +15,7 @@ import { ensureProviderKey } from "./support/keys.ts";
 import { expectNoPrivateValues } from "./support/leaks.ts";
 import { admitRun, cancelUnlessTerminal, readRun } from "./support/runs.ts";
 
-// What a run discloses, freezes and reports. Its name puts it with the slice suites.
+// What a run discloses, freezes and reports, in the slice project, with the scripted worker running.
 const TERRA = "openrouter_terra";
 const DEEPSEEK = "openrouter_deepseek_flash";
 const TERRA_CANONICAL = "openai/gpt-6.1-terra-20261026";

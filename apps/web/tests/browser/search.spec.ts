@@ -96,6 +96,7 @@ test("⌘K and the Search button after the skip link open the palette, and ⌘K 
   await filter.focus();
   await expect(filter).toBeFocused();
   await page.keyboard.press(`${MODIFIER}+k`);
+  // A negative observation: ⌘K opens no dialog within 300 ms.
   await page.waitForTimeout(300);
   await expect(dialog).toBeHidden();
 });
