@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { PageHeader } from "@/components/ui/page-header";
-import { WorkflowsPanel } from "@/components/workflows-panel";
+import { WorkflowsPanel } from "@/components/workflows/workflows-panel";
 
 export const metadata: Metadata = { title: "Workflows" };
 

@@ -1,7 +1,8 @@
 /**
  * Pins the tool catalog's words, which the Tools page and the Expert editor share (R-37, WTAP-07):
- * the label tables keyed by the contract's unions, where a key comes from (PRD-Tool-Catalog PK-05)
- * and each repair sentence (TS-03).
+ * the label tables keyed by the contract's unions, where a key comes from (PRD-Tool-Catalog PK-05),
+ * each repair sentence (TS-03), and a row's facts and a detail's cost, limits and field constraints
+ * (TS-01, WTAP-08).
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -12,12 +13,18 @@ import {
   APPROVAL_TEXT,
   AVAILABILITY_FILTERS,
   AVAILABILITY_LABEL,
+  constraintText,
   COST_LABEL,
+  costText,
+  grantorText,
   keyOrigin,
   keySource,
+  limitsText,
+  networkText,
   OPERATION_CLASS_LABEL,
   PROVIDER_LABEL,
   repairText,
+  rowFacts,
   type ToolState,
 } from "../../lib/tools/text.ts";
 
@@ -193,4 +200,56 @@ test("an available tool, or one disabled for another reason, needs no repair", (
   assert.equal(repairText(tool({ availability: "disabled_by_policy" })), null);
   // A missing key with no requirement recorded has nothing to name.
   assert.equal(repairText(tool({ availability: "key_missing" })), null);
+});
+
+test("a catalog row's facts name provider, class, where it runs and cost, then the key's origin", () => {
+  const row = {
+    provider: "autobots",
+    operation_class: "pure",
+    network: false,
+    cost_class: "free_local",
+  } as const;
+  assert.equal(
+    rowFacts({ ...row, ...tool() }),
+    "· Autobots, on this Mac · Pure · Stays on this Mac · No provider charge",
+  );
+  assert.equal(
+    rowFacts({
+      ...row,
+      provider: "tavily",
+      operation_class: "read_only",
+      network: true,
+      cost_class: "metered_provider",
+      ...tool({ key_requirement: requirement({ source: "settings" }) }),
+    }),
+    "· Tavily · Read only · Leaves this Mac · Metered by its provider · Key from Settings",
+  );
+});
+
+test("a tool's cost, network, limits and grantors are said in words", () => {
+  assert.equal(networkText(true), "Leaves this Mac");
+  assert.equal(networkText(false), "Stays on this Mac");
+  assert.equal(
+    costText({ cost_class: "free_local", cost_note: null }),
+    "No provider charge",
+  );
+  assert.equal(
+    costText({ cost_class: "metered_provider", cost_note: "per search" }),
+    "Metered by its provider, per search",
+  );
+  assert.equal(limitsText(null), "Not registered");
+  assert.equal(
+    limitsText({ timeout_seconds: 30, retries: 2, max_output_bytes: 65536 }),
+    "30 s, 2 retries, 65536 output bytes",
+  );
+  assert.equal(grantorText("workflow_node"), "workflow node");
+  assert.equal(grantorText("expert"), "expert");
+});
+
+test("a field's constraints read as the schema states them, or None", () => {
+  assert.equal(constraintText({}), "None");
+  assert.equal(
+    constraintText({ minimum: 0, enum: ["sum", "mean"] }),
+    'minimum 0, enum ["sum","mean"]',
+  );
 });

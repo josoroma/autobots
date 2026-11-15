@@ -1,55 +1,4 @@
 {
-  "components/expert-editor.tsx": {
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "components/experts-panel.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "components/jobs-chart.tsx": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "components/model-policy-panel.tsx": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "components/operations-panel.tsx": {
-    "complexity": {
-      "count": 2
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "components/provider-settings-panel.tsx": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "components/run-controls.tsx": {
     "max-lines-per-function": {
       "count": 1
@@ -84,33 +33,9 @@
       "count": 1
     }
   },
-  "components/search-palette.tsx": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "components/session-panel.tsx": {
     "max-lines-per-function": {
       "count": 1
-    }
-  },
-  "components/tool-catalog.tsx": {
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
-    }
-  },
-  "components/workflows-panel.tsx": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
     }
   },
   "lib/service-status.ts": {

@@ -1,4 +1,4 @@
-import { KeysAndVarsPanel } from "@/components/keys-and-vars-panel";
+import { KeysAndVarsPanel } from "@/components/keys-and-vars/keys-and-vars-panel";
 import { PageHeader } from "@/components/ui/page-header";
 
 export default function KeysAndVarsSettingsPage() {

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
-import { ToolCatalogPanel } from "@/components/tool-catalog";
+import { ToolCatalogPanel } from "@/components/tools/tool-catalog-panel";
 import { PageHeader } from "@/components/ui/page-header";
 
 export const metadata: Metadata = { title: "Tools" };

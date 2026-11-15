@@ -15,12 +15,15 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { currentHref } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
 interface Item {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** A count shown beside the link: the approvals waiting for a decision (PRD-Studio SH-03). */
+  count?: "pending";
 }
 
 // PRD-Studio SH-01 and Decision 0022 D2: the same nine links, grouped by what the person is doing,
@@ -33,7 +36,12 @@ const GROUPS: { label: string; shown: boolean; items: Item[] }[] = [
     items: [
       { href: "/", label: "Home", icon: House },
       { href: "/runs", label: "Runs", icon: Play },
-      { href: "/approvals", label: "Approvals", icon: ShieldCheck },
+      {
+        href: "/approvals",
+        label: "Approvals",
+        icon: ShieldCheck,
+        count: "pending",
+      },
     ],
   },
   {
@@ -58,17 +66,62 @@ const GROUPS: { label: string; shown: boolean; items: Item[] }[] = [
 
 const HREFS = GROUPS.flatMap((group) => group.items.map((item) => item.href));
 
-// The longest matching entry is the current one, so /settings/models marks Models and not Settings.
-function current(pathname: string): string | undefined {
-  return HREFS.filter(
-    (href) =>
-      pathname === href || (href !== "/" && pathname.startsWith(`${href}/`)),
-  ).sort((a, b) => b.length - a.length)[0];
+function PendingBadge({ count }: { count: number }) {
+  return (
+    <span
+      data-approvals-badge
+      className="bg-attention text-attention-foreground ml-auto grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11.5px] font-semibold tabular-nums"
+    >
+      {count}
+      <span className="sr-only"> waiting</span>
+    </span>
+  );
 }
 
 // The current page is marked by its fill, its weight and aria-current, not by color alone.
+function NavItem({
+  item,
+  here,
+  pending,
+}: {
+  item: Item;
+  here: boolean;
+  pending: number | null;
+}) {
+  const Icon = item.icon;
+  const count = item.count === "pending" ? pending : null;
+  return (
+    <li>
+      <Link
+        href={item.href}
+        aria-current={here ? "page" : undefined}
+        className={cn(
+          "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-sidebar-ring text-sidebar-foreground flex h-9 items-center gap-3 rounded-lg px-3 text-sm",
+          here &&
+            "bg-sidebar-accent text-sidebar-accent-foreground font-medium",
+        )}
+      >
+        <Icon
+          aria-hidden="true"
+          className={cn(
+            "size-4 shrink-0",
+            here ? "text-sidebar-primary" : "text-muted-foreground",
+          )}
+        />
+        {item.label}
+        {count !== null && count > 0 ? (
+          <>
+            {" "}
+            <PendingBadge count={count} />
+          </>
+        ) : null}
+      </Link>
+    </li>
+  );
+}
+
 export function SidebarNav({ pending = null }: { pending?: number | null }) {
-  const active = current(usePathname());
+  const active = currentHref(usePathname(), HREFS);
   return (
     <div className="space-y-4">
       {GROUPS.map(({ label, shown, items }) => (
@@ -86,45 +139,14 @@ export function SidebarNav({ pending = null }: { pending?: number | null }) {
             className="space-y-0.5"
             aria-labelledby={`nav-${label.toLowerCase()}`}
           >
-            {items.map(({ href, label: text, icon: Icon }) => {
-              const here = href === active;
-              return (
-                <li key={href}>
-                  <Link
-                    href={href}
-                    aria-current={here ? "page" : undefined}
-                    className={cn(
-                      "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-sidebar-ring text-sidebar-foreground flex h-9 items-center gap-3 rounded-lg px-3 text-sm",
-                      here &&
-                        "bg-sidebar-accent text-sidebar-accent-foreground font-medium",
-                    )}
-                  >
-                    <Icon
-                      aria-hidden="true"
-                      className={cn(
-                        "size-4 shrink-0",
-                        here ? "text-sidebar-primary" : "text-muted-foreground",
-                      )}
-                    />
-                    {text}
-                    {href === "/approvals" &&
-                    pending !== null &&
-                    pending > 0 ? (
-                      <>
-                        {" "}
-                        <span
-                          data-approvals-badge
-                          className="bg-attention text-attention-foreground ml-auto grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11.5px] font-semibold tabular-nums"
-                        >
-                          {pending}
-                          <span className="sr-only"> waiting</span>
-                        </span>
-                      </>
-                    ) : null}
-                  </Link>
-                </li>
-              );
-            })}
+            {items.map((item) => (
+              <NavItem
+                key={item.href}
+                item={item}
+                here={item.href === active}
+                pending={pending}
+              />
+            ))}
           </ul>
         </div>
       ))}

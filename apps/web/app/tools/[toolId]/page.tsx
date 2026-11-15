@@ -2,7 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { ToolDetail } from "@/components/tool-catalog";
+import { ToolDetail } from "@/components/tools/tool-detail";
 import { PageHeader } from "@/components/ui/page-header";
 
 export const metadata: Metadata = { title: "Tool" };

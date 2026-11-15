@@ -3,11 +3,10 @@ import Link from "next/link";
 import { AccountForm } from "@/components/account-form";
 import { SignOutButton } from "@/components/sign-out-button";
 import { PageHeader } from "@/components/ui/page-header";
+import { ROLE_LABEL } from "@/lib/account";
 import { fetchSession, readValue } from "@/lib/service-status";
 
 export const dynamic = "force-dynamic";
-
-const ROLE = { owner: "Owner", member: "Member" } as const;
 
 // PRD-Studio SE-04: the editable display name, the read-only email, the role and Sign out. Sign in
 // shows only when signed out; a session the services can't read says so instead (WSHL-02).
@@ -69,7 +68,7 @@ export default async function AccountPage() {
                     {workspace.name}
                   </dt>
                   <dd data-workspace-role={workspace.id}>
-                    {ROLE[workspace.role]}
+                    {ROLE_LABEL[workspace.role]}
                   </dd>
                 </div>
               ))}

@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { AccountFooter } from "@/components/account-footer";
 import { NewRun } from "@/components/new-run";
 import { HealthLine } from "@/components/readiness";
-import { SearchPalette } from "@/components/search-palette";
+import { SearchPalette } from "@/components/search/search-palette";
 import { SidebarNav } from "@/components/sidebar-nav";
 import {
   fetchPendingApprovals,

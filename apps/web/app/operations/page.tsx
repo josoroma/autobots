@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { OperationsPanel } from "@/components/operations-panel";
+import { OperationsPanel } from "@/components/operations/operations-panel";
 import { PageHeader } from "@/components/ui/page-header";
 
 export const metadata: Metadata = { title: "Operations" };

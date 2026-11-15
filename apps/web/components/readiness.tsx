@@ -1,32 +1,37 @@
-import { CircleAlert, CircleCheck, CircleHelp } from "lucide-react";
-
 import type { MemberReadiness } from "@autobots/api-client";
+import {
+  CircleAlert,
+  CircleCheck,
+  CircleHelp,
+  type LucideIcon,
+} from "lucide-react";
+
+import {
+  healthLine,
+  READINESS,
+  SERVICE_LABEL,
+  stateWords,
+  type Service,
+  type Tone,
+} from "@/lib/readiness";
 import { cn } from "@/lib/utils";
 
-type Service = MemberReadiness["services"][number];
-
-export const SERVICE_LABEL: Record<Service["name"], string> = {
-  api: "Python API",
-  worker: "Worker",
-  database: "Database",
-  openrouter: "OpenRouter",
+// Decorative: the words beside each icon and dot carry the meaning; they only repeat it (DS-03).
+const ICON: Readonly<Record<Service["state"], LucideIcon>> = {
+  ready: CircleCheck,
+  not_ready: CircleAlert,
+  unknown: CircleHelp,
 };
-
-// The words carry the meaning; the icon and its tone only repeat them (DS-03).
-export function stateWords(service: Service): string {
-  if (service.name === "openrouter") {
-    return service.state === "ready"
-      ? "authenticated"
-      : service.state === "unknown"
-        ? "unknown"
-        : "not authenticated";
-  }
-  return service.state === "ready"
-    ? "ready"
-    : service.state === "unknown"
-      ? "unknown"
-      : "not ready";
-}
+const TEXT: Readonly<Record<Tone, string>> = {
+  success: "text-success-text",
+  attention: "text-attention",
+  muted: "text-muted-foreground",
+};
+const DOT: Readonly<Record<Tone, string>> = {
+  success: "bg-success-text",
+  attention: "bg-attention",
+  muted: "bg-muted-foreground",
+};
 
 // PRD-Studio SH-04: one line in the shell. It names the first service that isn't ready.
 export function HealthLine({
@@ -35,22 +40,17 @@ export function HealthLine({
   readiness: MemberReadiness | null;
 }) {
   if (readiness === null) return null;
-  const first = readiness.services.find((item) => item.state !== "ready");
+  const line = healthLine(readiness);
   return (
     <p
-      data-health={first === undefined ? "ready" : first.name}
+      data-health={line.field}
       className="text-muted-foreground flex items-center gap-2 px-2 text-xs"
     >
       <span
         aria-hidden="true"
-        className={cn(
-          "size-1.5 shrink-0 rounded-full",
-          first === undefined ? "bg-success-text" : "bg-attention",
-        )}
+        className={cn("size-1.5 shrink-0 rounded-full", DOT[line.tone])}
       />
-      {first === undefined
-        ? "All local services ready"
-        : `${SERVICE_LABEL[first.name]} ${stateWords(first)}`}
+      {line.words}
     </p>
   );
 }
@@ -60,12 +60,7 @@ export function ServiceChips({ readiness }: { readiness: MemberReadiness }) {
   return (
     <ul aria-label="Local services" className="flex flex-wrap gap-2">
       {readiness.services.map((service) => {
-        const Icon =
-          service.state === "ready"
-            ? CircleCheck
-            : service.state === "unknown"
-              ? CircleHelp
-              : CircleAlert;
+        const Icon = ICON[service.state];
         return (
           <li
             key={service.name}
@@ -77,11 +72,7 @@ export function ServiceChips({ readiness }: { readiness: MemberReadiness }) {
               aria-hidden="true"
               className={cn(
                 "size-3.5 shrink-0",
-                service.state === "ready"
-                  ? "text-success-text"
-                  : service.state === "unknown"
-                    ? "text-muted-foreground"
-                    : "text-attention",
+                TEXT[READINESS[service.state].tone],
               )}
             />
             <span className="font-medium">{SERVICE_LABEL[service.name]}</span>{" "}

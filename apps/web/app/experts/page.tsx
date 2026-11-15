@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { ExpertsPanel } from "@/components/experts-panel";
+import { ExpertsPanel } from "@/components/experts/experts-panel";
 import { PageHeader } from "@/components/ui/page-header";
 
 export const metadata: Metadata = { title: "Experts" };

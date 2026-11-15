@@ -117,3 +117,55 @@ export function repairText(tool: ToolState): string | null {
   }
   return null;
 }
+
+/** Where a tool's calls go, in words (PRD-Tool-Catalog TS-01). */
+export function networkText(network: boolean): string {
+  return network ? "Leaves this Mac" : "Stays on this Mac";
+}
+
+/** A tool's cost class, with its provider's note when it has one. */
+export function costText(
+  tool: Pick<ToolDescriptor, "cost_class" | "cost_note">,
+): string {
+  return `${COST_LABEL[tool.cost_class]}${tool.cost_note ? `, ${tool.cost_note}` : ""}`;
+}
+
+/**
+ * A catalog row's facts after its ID: provider, class, where it runs, cost and, for an available
+ * tool, where its key comes from (PRD-Tool-Catalog TS-01).
+ */
+export function rowFacts(
+  tool: Pick<
+    ToolDescriptor,
+    "provider" | "operation_class" | "network" | "cost_class"
+  > &
+    ToolState,
+): string {
+  const origin = keyOrigin(tool);
+  return `· ${PROVIDER_LABEL[tool.provider]} · ${OPERATION_CLASS_LABEL[tool.operation_class]} · ${networkText(tool.network)} · ${COST_LABEL[tool.cost_class]}${origin === null ? "" : ` · ${origin}`}`;
+}
+
+/** A registered tool's limits, or that it has none registered. */
+export function limitsText(limits: ToolDescriptor["limits"]): string {
+  return limits
+    ? `${limits.timeout_seconds} s, ${limits.retries} retries, ${limits.max_output_bytes} output bytes`
+    : "Not registered";
+}
+
+/** What can grant a tool, such as "workflow node". */
+export function grantorText(
+  grantor: ToolDescriptor["grantable_to"][number],
+): string {
+  return grantor.replaceAll("_", " ");
+}
+
+/** A field's constraints as the schema states them, such as `minimum 0, maxItems 100`, or None. */
+export function constraintText(
+  constraints: Readonly<Record<string, unknown>>,
+): string {
+  const entries = Object.entries(constraints);
+  if (entries.length === 0) return "None";
+  return entries
+    .map(([key, value]) => `${key} ${JSON.stringify(value)}`)
+    .join(", ");
+}

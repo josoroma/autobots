@@ -252,7 +252,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
   - The account footer shows the display name and role (`/v1/session`, `/v1/profile`).
   - The health line comes from `/v1/readiness`, which any member can read.
   - The approvals count badge comes from `/v1/approvals/count`.
-  - After the skip link come New run (⇧⌘O, `new-run.tsx`) and Search (⌘K, `search-palette.tsx`).
+  - After the skip link come New run (⇧⌘O, `new-run.tsx`) and Search (⌘K, `search/search-palette.tsx`).
   - `WaitingNotifier` polls every 4 s while `autobots.notify` is on and notification permission is granted.
 - **Home:**
   - A greeting in the workspace's timezone, then "What should we work on?".
@@ -282,7 +282,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
     - the provider tools above.
   - `browse_goal` (`application/browsing_tool.py`) is registered only while `AUTOBOTS_BROWSER_EXECUTOR=enabled` and the executor's qualification is current. It is approved on every call and runs the read-only loop in `browsing_loop.py` on the `researcher` route.
   - Every gateway dispatch writes a `tool_uses` row, and the API serves `GET /v1/runs/{id}/tool-uses`.
-  - `/v1/tools/{id}/grants` lists the Experts and published workflows using a tool. The Tools page has group counts and a filter. Since US-14.20, after the analyzed revision, choosing a tool opens a native `dialog` modal (`components/tool-catalog.tsx` `ToolDialog`). It holds each tool's What, When and Why guide (`domain/tool_guides.py`, exposed as the descriptor's `guide`), its inputs and outputs, Granted to and Copy schema.
+  - `/v1/tools/{id}/grants` lists the Experts and published workflows using a tool. The Tools page has group counts and a filter. Since US-14.20, after the analyzed revision, choosing a tool opens a native `dialog` modal (`components/tools/tool-dialog.tsx`, with the detail in `tool-detail.tsx`). It holds each tool's What, When and Why guide (`domain/tool_guides.py`, exposed as the descriptor's `guide`), its inputs and outputs, Granted to and Copy schema.
 - **Approvals:** `/v1/approvals` lists pending or decided requests with goal, task, decider and argument size. The screen pairs a list with the selected request's detail (JSON or Fields view, a PR diff from `review_detail`), and decides with ⌘↵ or ⌘⌫ pressed twice.
 - **Experts:**
   - Cards show the executor's profile, tools with "+N", `run_count` and `last_run_at`, an approval note, and Start run.
@@ -314,13 +314,14 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
     - leased and queued jobs, the checkpoint adapter release, the catalog check's duration;
     - a loopback-only bind check over the API's listening sockets (descriptors only);
     - live workers.
-  - `GET /v1/operations/jobs` (owner) returns 24 hourly buckets from `run.status_changed` events, which `jobs-chart.tsx` renders with a legend, tooltip and disclosed table.
+  - `GET /v1/operations/jobs` (owner) returns 24 hourly buckets from `run.status_changed` events, which `operations/jobs-chart.tsx` renders with a legend, tooltip and disclosed table.
   - Logs are redacted JSON lines, and retention is per workspace (`GET /v1/retention` for any member).
 - **Search:** `GET /v1/search?q=` (`application/search.py`) returns up to five each of runs by goal and of Experts and workflows by name, scoped to the workspace in SQL, plus catalog tools. The palette is a modal combobox over a listbox using `aria-activedescendant`.
 - **Appearance:**
   - System, Light and Dark (`theme-provider.tsx`, `enableSystem`, dark by default).
   - The before-paint script in `app/layout.tsx` applies `data-serif`, `data-density`, `data-motion` and `data-stream` from `autobots.*` keys.
   - `globals.css` adds `--document`, compact `--spacing: 0.2rem`, and a forced reduced-motion rule.
+- **Screen layout:** since R-43 to R-45 and R-59, after the analyzed revision, each large screen is a folder under `apps/web/components/` (`approvals/`, `composer/`, `workflow-editor/`, `operations/`, `model-policy/`, `provider-settings/`, `keys-and-vars/`, `search/`, `expert-editor/`, `experts/`, `workflows/`, `tools/`): a composing panel, a data hook on `lib/use-resource.ts`, an actions hook on `lib/use-submit.ts`, and presentational sections. Their pure rules are in `apps/web/lib/` with `node:test` cases. The Experts and Workflows lists share `components/list-detail/` and one filter, `lib/list-filter.ts`.
 - **Design:** Luma tokens and the Studio presentation ([Decision 0021](docs/engineering/decisions/0021-studio-interface-redesign.md), [Decision 0022](docs/engineering/decisions/0022-studio-product-surfaces.md)), with a serif `PageHeader` and an attention tone. No workflow canvas component exists (grep for `canvas` in `apps/web/components` finds none). The model-assisted features stay out of scope under Decision 0022 D13.
 
 ## Product implementation status
@@ -435,7 +436,7 @@ Hooks are guardrails, not OS confinement ([the harness runbook](docs/engineering
 - `services/agent/src/autobots/application/search.py`, `domain/budgets.py`, `domain/workflows.py`: search, budgets, workflow IR.
 - `supabase/migrations/20261107000036_…` to `20261108000049_applied_migration_count.sql`: schema since the last refresh.
 - `contracts/generated/openapi.json`: 66 `/v1` paths.
-- `apps/web/components/` (`search-palette.tsx`, `new-run.tsx`, `waiting-notifier.tsx`, `jobs-chart.tsx`, `run-panel.tsx`, `settings-nav.tsx`, `sidebar-nav.tsx`, `appearance-control.tsx`), `apps/web/app/layout.tsx`, `apps/web/app/globals.css`: Studio surfaces.
+- `apps/web/components/` (`search/`, `new-run.tsx`, `waiting-notifier.tsx`, `operations/jobs-chart.tsx`, `run-panel.tsx`, `settings-nav.tsx`, `sidebar-nav.tsx`, `appearance-control.tsx`), `apps/web/app/layout.tsx`, `apps/web/app/globals.css`: Studio surfaces.
 - `scripts/verify.py`, `scripts/qualify_identity.py:276–335`, `scripts/qualify_web.py:169`, `scripts/harness_lib.py`: verifier and browser-spec mapping.
 - `openspec/changes/archive/2026-11-07-us-14-*/`, `2026-11-08-us-15-*/verification.md`: per-story records (pointers only).
 - `docs/engineering/decisions/0019-sol-profile-and-browser-use.md`, `0022-studio-product-surfaces.md`: paid authority, Studio scope.
