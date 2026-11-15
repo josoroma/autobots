@@ -28,7 +28,7 @@ LOG_DIR  := $(INSTALL_DIR)/logs
 .DEFAULT_GOAL := help
 # Every sequence here depends on its order, including under an inherited -j.
 .NOTPARALLEL:
-.PHONY: help first-time toolchain images install owner build migrate \
+.PHONY: help first-time toolchain images browser-images install owner build migrate \
 	start start-stack start-api start-web start-worker wait-ready \
 	stop stop-app stop-web stop-api stop-worker stop-stack status logs check check-fast check-full
 
@@ -70,6 +70,12 @@ toolchain:
 images:
 	@grep -E '^[[:space:]]+image:' infra/supabase/compose.overlay.yaml | sed -E 's/.*image:[[:space:]]*//' | \
 		while read -r image; do docker pull "$$image" || exit 1; done
+
+# The browser executor's two images, each labelled with the fingerprint of its sources (refactor plan
+# R-57, SQLI-02). Built only when asked for. browse_goal stays off until scripts/qualify_browser_executor.py
+# passes at that fingerprint, as docs/engineering/runbooks/operations.md says.
+browser-images:
+	python3.12 scripts/browser_images.py build
 
 install:
 	$(INSTALL) init --project $(PROJECT) --gateway-port $(GATEWAY_PORT) --db-port $(DB_PORT) --api-port $(API_PORT) --web-port $(WEB_PORT)

@@ -1,26 +1,32 @@
 #!/usr/bin/env python3
 """Qualify the isolated browser executor live, US-14.13, PRD-Tool-Catalog BX-05 and Decision 0018.
 
-Needs Docker, the two images built from infra/browser (see the operations runbook), and outbound
+Needs Docker, the two images built by `make browser-images` (scripts/browser_images.py), and outbound
 network to the one qualification host, https://example.com/. A disposable database gives the
 cancel, lease and sweeper cases real runs. A scripted driver, never a model, uses the browser.
-The report binds the result to the image definitions and the proxy's code; the executor reports
-qualified only from a passing report at today's fingerprint.
+It refuses images whose fingerprint label isn't today's before it starts anything (refactor plan R-57),
+and the report binds the result to the fingerprint it started with. The executor reports qualified only
+from a passing report at today's fingerprint, while both images carry that fingerprint's label.
 
 In no verification profile: it needs network and images a check never builds or fetches.
 Exit codes: 0 qualified, 1 a case failed, 2 a prerequisite is missing.
 """
 from __future__ import annotations
 
-import json
 import secrets
-import subprocess
 import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
 
 from app_db import MIGRATIONS, WORKSPACE_A, AppStack, apply_migrations, bootstrap, seed
+from browser_images import (
+    TAGS,
+    fingerprint_digest,
+    image_states,
+    images_fingerprint,
+    require_current_images,
+)
 from disposable_db import (
     PROJECT_PREFIX,
     Cases,
@@ -40,28 +46,21 @@ from qualification.records import write_report
 from supabase_stack import generated_values, require_images, require_rendered
 
 REPORT = Path('.checks/browser-executor/qualification.json')
-IMAGES = ('autobots-browser:local', 'autobots-egress:local')
-PYTHON = Path('services/agent/.venv/bin/python')
+# The images the executor starts; qualify_browse_goal checks the same tags.
+IMAGES = TAGS
 
 
 def executor_fingerprint(root: Path) -> dict[str, str]:
-    completed = subprocess.run([str(root / PYTHON), '-c', 'import json, sys; from pathlib import Path; '
-                                'from autobots.adapters.browser_executor import images_fingerprint; '
-                                'print(json.dumps(images_fingerprint(Path(sys.argv[1]))))', str(root)],
-                               env={**tool_env(), 'PYTHONPATH': str(root / 'services/agent/src')}, capture_output=True, text=True, check=False)
+    """The service's fingerprint of the images' sources, which a report binds; qualify_browse_goal records it too."""
     try:
-        printed = json.loads(completed.stdout) if completed.returncode == 0 else None
-    except ValueError:
-        printed = None
-    if not isinstance(printed, dict):
-        raise Unavailable('the executor fingerprint could not be computed')
-    return printed
+        return images_fingerprint(root)
+    except OSError as error:
+        raise Unavailable(f'the executor fingerprint could not be computed: {error}') from error
 
 
 def qualify(root: Path) -> int:
-    for image in IMAGES:
-        if run(['docker', 'image', 'inspect', image], tool_env()).returncode:
-            raise Unavailable(f'{image} is not built; build it as the operations runbook says')
+    fingerprint = executor_fingerprint(root)
+    require_current_images(fingerprint)
     project = f'{PROJECT_PREFIX}{secrets.token_hex(4)}'
     gateway_port = free_port()
     db_port = free_port([gateway_port])
@@ -99,11 +98,14 @@ def qualify(root: Path) -> int:
                 not leftover and not networks)
     after = other_resources(project)
     cases.check('other Docker resources are untouched', 'same', f'{len(before)} before, {len(after)} after', before == after)
+    states = image_states(fingerprint)
+    cases.check('the images still carry the fingerprint the check started with', 'both current',
+                ', '.join(f'{tag}: {state}' for tag, state in states.items()), all(state == 'current' for state in states.values()))
     passed = cases.status == 'passed'
     write_report(root / REPORT, {
         'schema_version': 'autobots.browser-executor-qualification/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
         'duration_seconds': round(time.monotonic() - started_at, 1), 'status': cases.status,
-        'executor_fingerprint': executor_fingerprint(root), 'target_class': 'disposable', 'driver': 'scripted',
+        'executor_fingerprint': fingerprint, 'image_label': fingerprint_digest(fingerprint), 'target_class': 'disposable', 'driver': 'scripted',
         'network': 'outbound to https://example.com/ only for the allowed case', 'cases': cases.records,
         'not_established': ['H1', 'product acceptance', 'browsing with a real model', 'a server-side redirect to a private address']})
     print(f"{'PASS' if passed else 'FAIL'}: {sum(r['status'] == 'passed' for r in cases.records)} of {len(cases.records)} executor cases passed.")

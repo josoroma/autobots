@@ -1,4 +1,5 @@
-"""The isolated browser executor, US-14.13, PRD-Tool-Catalog BX-01 to BX-05 and Decision 0018.
+"""The isolated browser executor's Docker sessions, US-14.13, PRD-Tool-Catalog BX-01 to BX-05 and
+Decision 0018.
 
 One browsing call gets one session: a hardened Chromium container on an internal Docker network,
 and an egress sidecar that is its only way out and the only door to its DevTools, published on this
@@ -6,34 +7,47 @@ Mac's loopback behind a per-session token. Nothing of the worker's environment i
 session belongs to one attempt: losing the lease, cancelling the run or reaching the time cap
 removes it, and a sweeper removes any a crashed worker left, by their labels.
 
-A request guard attached over CDP refuses what the proxy can't see inside TLS: any request that
-isn't a GET or HEAD, or that carries a body, and any scheme but https, data, blob and about.
-Downloads are denied over CDP. The Docker CLI is driven directly, so no Docker SDK is installed.
+The DevTools client and request guard are in `browser_cdp`, and what a qualification binds is in
+`browser_qualification`. This module, those two and the images' sources are all in the images'
+fingerprint. The Docker CLI is driven directly, so no Docker SDK is installed.
 """
 
 import asyncio
-import hashlib
 import json
 import os
 import secrets
 import time
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
-from pathlib import Path
+from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
 import httpx
-import websockets
+
+from autobots.adapters.browser_cdp import Cdp, RequestGuard
+from autobots.adapters.browser_qualification import (
+    BROWSER,
+    DOCKER_ENV_NAMES,
+    PROXY,
+    executor_qualified,
+)
+
+# Cdp, RequestGuard and executor_qualified are named here too, because browsing_tool, browser_page
+# and tests/db/browser_executor_check.py import them from this module.
+__all__ = [
+    "LABEL",
+    "BrowserExecutor",
+    "BrowserSession",
+    "Cdp",
+    "ExecutorConfig",
+    "ExecutorUnavailable",
+    "RequestGuard",
+    "attempt_alive",
+    "executor_qualified",
+    "lease_alive",
+]
 
 LABEL = "autobots.browser"
-BROWSER_IMAGE = "autobots-browser:local"
-PROXY_IMAGE = "autobots-egress:local"
-READ_METHODS = frozenset({"GET", "HEAD"})
-# Everything else, file and plain http included, is refused before it loads.
-ALLOWED_SCHEMES = frozenset({"https", "data", "blob", "about"})
-# Only what Docker itself needs. A container gets nothing from here except what `-e` names.
-DOCKER_ENV_NAMES = ("PATH", "HOME", "DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG")
 
 
 class ExecutorUnavailable(Exception):
@@ -44,8 +58,9 @@ class ExecutorUnavailable(Exception):
 class ExecutorConfig:
     """Decision 0018 B2. Tests narrow the caps; nothing widens them."""
 
-    browser_image: str = BROWSER_IMAGE
-    proxy_image: str = PROXY_IMAGE
+    # The images whose fingerprint label `executor_qualified` checks (refactor plan R-57).
+    browser_image: str = BROWSER.tag
+    proxy_image: str = PROXY.tag
     cpus: str = "1"
     memory: str = "1g"
     pids: int = 256
@@ -54,7 +69,6 @@ class ExecutorConfig:
     max_requests: int = 500
     max_bytes: int = 50 * 1024 * 1024
     docker: str = "docker"
-    environ: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -309,135 +323,6 @@ class BrowserExecutor:
         return reason
 
 
-class Cdp:
-    """A small DevTools client: commands by id, events by method and session."""
-
-    def __init__(self, socket: Any) -> None:
-        self._socket = socket
-        self._next = 0
-        self._waiting: dict[int, asyncio.Future[dict[str, Any]]] = {}
-        self.handlers: list[Callable[[dict[str, Any]], Awaitable[None]]] = []
-        self._tasks: set[asyncio.Future[None]] = set()
-        self._reader = asyncio.create_task(self._read())
-
-    @classmethod
-    async def connect(cls, url: str) -> "Cdp":
-        socket = await websockets.connect(url, max_size=64 * 1024 * 1024, proxy=None)
-        return cls(socket)
-
-    async def _read(self) -> None:
-        try:
-            async for raw in self._socket:
-                message = json.loads(raw)
-                if "id" in message and message["id"] in self._waiting:
-                    self._waiting.pop(message["id"]).set_result(message)
-                elif "method" in message:
-                    for handler in list(self.handlers):
-                        task = asyncio.ensure_future(handler(message))
-                        self._tasks.add(task)
-                        task.add_done_callback(self._tasks.discard)
-        except websockets.ConnectionClosed:
-            pass
-        finally:
-            for future in self._waiting.values():
-                if not future.done():
-                    future.set_exception(ConnectionError("cdp_closed"))
-
-    async def send(
-        self, method: str, params: dict[str, Any] | None = None, session: str | None = None
-    ) -> dict[str, Any]:
-        self._next += 1
-        message: dict[str, Any] = {"id": self._next, "method": method, "params": params or {}}
-        if session is not None:
-            message["sessionId"] = session
-        future: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
-        self._waiting[self._next] = future
-        await self._socket.send(json.dumps(message))
-        return await asyncio.wait_for(future, 30)
-
-    async def close(self) -> None:
-        await self._socket.close()
-        self._reader.cancel()
-
-
-@dataclass
-class RequestGuard:
-    """Refuses requests the proxy can't see inside TLS, on every page, frame and worker."""
-
-    cdp: Cdp
-    refused: list[dict[str, str]] = field(default_factory=list)
-
-    async def start(self) -> None:
-        self.cdp.handlers.append(self._event)
-        await self.cdp.send(
-            "Browser.setDownloadBehavior", {"behavior": "deny", "eventsEnabled": True}
-        )
-        await self.cdp.send(
-            "Target.setAutoAttach",
-            {"autoAttach": True, "waitForDebuggerOnStart": True, "flatten": True},
-        )
-        targets = (await self.cdp.send("Target.getTargets"))["result"]["targetInfos"]
-        for target in targets:
-            if target["type"] in ("page", "iframe"):
-                attached = await self.cdp.send(
-                    "Target.attachToTarget", {"targetId": target["targetId"], "flatten": True}
-                )
-                await self._guard(attached["result"]["sessionId"])
-
-    async def _guard(self, session: str) -> None:
-        await self.cdp.send("Fetch.enable", {"patterns": [{"urlPattern": "*"}]}, session)
-        await self.cdp.send(
-            "Target.setAutoAttach",
-            {"autoAttach": True, "waitForDebuggerOnStart": True, "flatten": True},
-            session,
-        )
-        await self.cdp.send("Runtime.runIfWaitingForDebugger", {}, session)
-
-    async def _event(self, message: dict[str, Any]) -> None:
-        method, params = message["method"], message.get("params", {})
-        session = message.get("sessionId")
-        try:
-            if method == "Target.attachedToTarget":
-                await self._guard(params["sessionId"])
-            elif method == "Fetch.requestPaused" and session is not None:
-                request = params["request"]
-                scheme = request["url"].split(":", 1)[0].lower()
-                if (
-                    scheme in ALLOWED_SCHEMES
-                    and request["method"] in READ_METHODS
-                    and not request.get("hasPostData")
-                ):
-                    await self.cdp.send(
-                        "Fetch.continueRequest", {"requestId": params["requestId"]}, session
-                    )
-                else:
-                    host = request["url"].split("://", 1)[-1].split("/", 1)[0]
-                    self.refused.append(
-                        {"method": request["method"], "scheme": scheme, "host": host}
-                    )
-                    await self.cdp.send(
-                        "Fetch.failRequest",
-                        {"requestId": params["requestId"], "errorReason": "BlockedByClient"},
-                        session,
-                    )
-        except (ConnectionError, TimeoutError, KeyError):
-            return
-
-
-def images_fingerprint(root: Path) -> dict[str, str]:
-    """What a qualification is bound to: the image definitions and the proxy's code."""
-    paths = [
-        root / "infra/browser/browser.Dockerfile",
-        root / "infra/browser/proxy.Dockerfile",
-        root / "infra/browser/browser-entrypoint.js",
-        root / "services/agent/src/autobots/adapters/egress_proxy.py",
-        root / "services/agent/src/autobots/adapters/browser_executor.py",
-    ]
-    return {
-        str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths
-    }
-
-
 async def attempt_alive(connection: Any, scope: Any) -> bool:
     """The attempt still owns a running run, by database time, as the gateway decides it."""
     from autobots.application.tool_gateway import ownership_refusal
@@ -458,43 +343,3 @@ def lease_alive(connection: Any) -> Callable[[str, int], Awaitable[bool]]:
         return await cursor.fetchone() is not None
 
     return alive
-
-
-QUALIFICATION = Path(".checks/browser-executor/qualification.json")
-# Every case the live check must observe before the executor is reported qualified (BX-05).
-REQUIRED_CASES = (
-    "an allowed page loads through the proxy, connected to the address it checked",
-    "only the hosts a call names are reached",
-    "loopback, the Docker host and the stack's ports are refused",
-    "private, metadata and loopback-resolving names are refused",
-    "a script-driven redirect to a private address is refused",
-    "subresources and a WebSocket to private addresses are refused",
-    "a file URL is refused",
-    "a download is refused",
-    "a request with a body is refused",
-    "the request and byte caps are enforced",
-    "the proxy logs hosts, never paths or queries",
-    "nothing of the host enters the container",
-    "the CDP gate needs the session token",
-    "the memory cap ends the session",
-    "the process cap ends the session",
-    "the time cap ends the session",
-    "a cancelled run ends the session",
-    "a lost lease ends the session",
-    "the sweeper removes what a crashed worker left",
-    "no host outside the qualification hosts was reached",
-)
-
-
-def executor_qualified(root: Path, report: Path = QUALIFICATION) -> bool:
-    """Only after a passing live check, bound to today's image definitions and proxy code."""
-    try:
-        data = json.loads((root / report).read_text())
-    except (OSError, ValueError):
-        return False
-    passed = {case.get("id") for case in data.get("cases", []) if case.get("status") == "passed"}
-    return (
-        data.get("status") == "passed"
-        and all(case in passed for case in REQUIRED_CASES)
-        and data.get("executor_fingerprint") == images_fingerprint(root)
-    )

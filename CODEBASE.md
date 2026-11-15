@@ -93,7 +93,7 @@ Layers under `services/agent/src/autobots/`:
   - Storage and checkpoints: `checkpoints.py`, `object_storage.py`.
   - Live text: `result_stream.py`.
   - Outbound HTTP: `provider_http.py`, `url_guard.py`, `remote_files.py`, `tavily.py`, `jina.py`, `market_data.py`, `github_issues.py`, `github_reads.py`, `github_pulls.py`.
-  - Browser: `browser_executor.py`, `browser_page.py`, `egress_proxy.py`.
+  - Browser: `browser_executor.py`, `browser_cdp.py`, `browser_qualification.py` (the images' source fingerprint), `browser_page.py`, `egress_proxy.py`.
   - Models: `models/` (`catalog.py`, `factory.py`, `openrouter_metadata.py`).
 - **`api/`:** `app.py` (factory), `main.py` (configured entry), 14 route modules, `security.py`, `membership.py` and `errors.py`.
   - `contracts/generated/openapi.json` lists 66 paths under `/v1`.

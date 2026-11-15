@@ -1,26 +1,22 @@
-"""US-14.13 offline: the egress proxy's decisions, the CDP gate and the qualification gate.
+"""US-14.13 offline: the egress proxy's decisions, the CDP gate, the request guard and the session.
 
 The live behaviour is qualified by scripts/qualify_browser_executor.py on Docker; these pin the
-logic without a socket, a container or a network.
+logic without a socket, a container or a network. test_browser_qualification.py covers what a
+qualification binds.
 """
 
 import asyncio
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from autobots.adapters import egress_proxy
-from autobots.adapters.browser_executor import (
-    REQUIRED_CASES,
-    BrowserExecutor,
-    ExecutorUnavailable,
-    executor_qualified,
-    images_fingerprint,
-)
+from autobots.adapters import browser_cdp, browser_executor, browser_qualification, egress_proxy
+from autobots.adapters.browser_cdp import RequestGuard
+from autobots.adapters.browser_executor import BrowserExecutor, ExecutorConfig, ExecutorUnavailable
 from autobots.adapters.egress_proxy import Session, decide, handle_cdp, handle_egress
 
-ROOT = Path(__file__).resolve().parents[3]
 NAMES = {
     "example.com": ["93.184.215.14"],
     "rebind.example.com": ["93.184.215.14", "127.0.0.1"],
@@ -166,24 +162,56 @@ async def test_a_malformed_allowed_host_is_refused_before_docker(host: str) -> N
         await BrowserExecutor(environ={}).start("run", 1, (host,))
 
 
-def report(tmp_path: Path, **changes: object) -> Path:
-    data: dict[str, object] = {
-        "status": "passed",
-        "executor_fingerprint": images_fingerprint(ROOT),
-        "cases": [{"id": case, "status": "passed"} for case in REQUIRED_CASES],
-    }
-    data.update(changes)
-    path = tmp_path / "qualification.json"
-    path.write_text(json.dumps(data))
-    return path
+def test_the_executor_starts_the_images_the_qualification_binds() -> None:
+    """The label check reads the very images a session starts (refactor plan R-57)."""
+    config = ExecutorConfig()
+    assert (config.browser_image, config.proxy_image) == (
+        browser_qualification.BROWSER.tag,
+        browser_qualification.PROXY.tag,
+    )
 
 
-def test_qualified_only_from_a_passing_report_at_todays_fingerprint(tmp_path: Path) -> None:
-    assert executor_qualified(ROOT, report(tmp_path))
-    assert not executor_qualified(ROOT, tmp_path / "missing.json")
-    assert not executor_qualified(ROOT, report(tmp_path, status="failed"))
-    missing_one = [{"id": case, "status": "passed"} for case in REQUIRED_CASES[1:]]
-    assert not executor_qualified(ROOT, report(tmp_path, cases=missing_one))
-    one_failed = [{"id": REQUIRED_CASES[0], "status": "failed"}, *missing_one]
-    assert not executor_qualified(ROOT, report(tmp_path, cases=one_failed))
-    assert not executor_qualified(ROOT, report(tmp_path, executor_fingerprint={"x": "y"}))
+def test_the_executor_module_still_offers_what_its_importers_name() -> None:
+    assert browser_executor.Cdp is browser_cdp.Cdp
+    assert browser_executor.RequestGuard is browser_cdp.RequestGuard
+    assert browser_executor.executor_qualified is browser_qualification.executor_qualified
+
+
+class Sent:
+    """Records the commands a request guard sends, in place of a DevTools connection."""
+
+    def __init__(self) -> None:
+        self.commands: list[tuple[str, dict[str, Any] | None, str | None]] = []
+        self.handlers: list[Any] = []
+
+    async def send(
+        self, method: str, params: dict[str, Any] | None = None, session: str | None = None
+    ) -> dict[str, Any]:
+        self.commands.append((method, params, session))
+        return {}
+
+
+@pytest.mark.parametrize(
+    ("method", "url", "body", "answer"),
+    [
+        ("GET", "https://example.com/", False, "Fetch.continueRequest"),
+        ("HEAD", "data:text/plain,x", False, "Fetch.continueRequest"),
+        ("GET", "about:blank", False, "Fetch.continueRequest"),
+        ("POST", "https://example.com/form", True, "Fetch.failRequest"),
+        ("GET", "https://example.com/", True, "Fetch.failRequest"),
+        ("GET", "http://example.com/", False, "Fetch.failRequest"),
+        ("GET", "file:///etc/hosts", False, "Fetch.failRequest"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_the_request_guard_lets_through_only_bodiless_reads_of_allowed_schemes(
+    method: str, url: str, body: bool, answer: str
+) -> None:
+    sent = Sent()
+    guard = RequestGuard(sent)  # type: ignore[arg-type]
+    request = {"method": method, "url": url, "hasPostData": body}
+    paused = {"requestId": "r1", "request": request}
+    await guard._event({"method": "Fetch.requestPaused", "sessionId": "s1", "params": paused})
+    assert [(command, session) for command, _, session in sent.commands] == [(answer, "s1")]
+    assert bool(guard.refused) == (answer == "Fetch.failRequest")
+    assert all("/" not in entry["host"] for entry in guard.refused)

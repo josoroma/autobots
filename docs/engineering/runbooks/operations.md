@@ -101,20 +101,33 @@ Nothing checks a key against its provider automatically, because that costs a re
 
 The isolated browser executor ([Decision 0018](../decisions/0018-browser-executor.md), US-14.13) runs one disposable Chromium container per browsing call, behind an egress sidecar that is its only way out and the only door to its DevTools. `browse_goal` uses it, and stays disabled until the executor is qualified at the current code and turned on (below).
 
-Build both images on this Mac. The browser image starts from the Playwright image pinned by digest, and the proxy from a Python image pinned by digest, so a build pulls them once:
+Build both images on this Mac, through the one build entry point. The browser image starts from the Playwright 1.64.1 image pinned by digest, and the proxy from the Python 3.12.16 image (`python:3.12.16-slim-bookworm`) pinned by digest, so a build pulls a base only if it is absent:
 
 ```sh
-docker build -t autobots-browser:local -f infra/browser/browser.Dockerfile infra/browser
-docker build -t autobots-egress:local -f infra/browser/proxy.Dockerfile services/agent/src/autobots/adapters
+make browser-images
 ```
 
-Then qualify it. This starts a disposable database, drives the browser with a scripted driver, never a model, and needs outbound network to `https://example.com/` (and `example.org` for the request cap), the only hosts it reaches:
+It runs `scripts/browser_images.py build`. Each Dockerfile's own `<Dockerfile>.dockerignore` narrows its build context to the one file it copies, and each image gets the label `autobots.fingerprint`: a digest of the executor's fingerprint, which hashes the two Dockerfiles and their ignore files, the entrypoint, `egress_proxy.py` and the executor's three modules, `browser_executor.py` (the Docker session and the lease checks), `browser_cdp.py` (the DevTools client and request guard) and `browser_qualification.py` (what a qualification binds). To see whether the local images carry the current fingerprint, without changing anything:
+
+```sh
+python3.12 scripts/browser_images.py check
+```
+
+It exits 0 when both are current, 1 when either is missing or was built from other sources, and 2 without Docker.
+
+Then qualify it. This starts a disposable database, drives the browser with a scripted driver, never a model, and needs outbound network to `https://example.com/` (and `example.org` for the request cap), the only hosts it reaches. It refuses, before starting anything, images whose label isn't the current fingerprint's:
 
 ```sh
 python3.12 scripts/qualify_browser_executor.py
 ```
 
-It writes `.checks/browser-executor/qualification.json`, bound to the image definitions and the proxy's code. The executor reports qualified only from a passing report at the current fingerprint, so rebuild and requalify after changing anything under `infra/browser/` or the executor's code. It's in no verification profile, since it needs network and images a check never builds.
+It writes `.checks/browser-executor/qualification.json`, bound to the fingerprint it started with. The executor reports qualified only from a passing report at the current fingerprint, and only while both images it starts carry that fingerprint's label, so after changing any file the fingerprint names, run both commands again. Until then `browse_goal` is off. It's in no verification profile, since it needs network and images a check never builds.
+
+**Re-qualification owed.** The executor's split into three modules and the image labels changed the fingerprint, so the qualification recorded on 2026-11-07 reads as stale and `browse_goal` is off, the safe state. Re-qualifying is the owner's step ([Decision 0029](../decisions/0029-refactor-decisions-delegated-r41-r68.md) F4, [Decision 0018](../decisions/0018-browser-executor.md) B8). It needs Docker, the base images (pulled once if absent) and outbound network to the qualification host:
+
+```sh
+make browser-images && python3.12 scripts/qualify_browser_executor.py
+```
 
 What a session is: a non-root container from the pinned image with all capabilities dropped, `no-new-privileges`, a read-only root, a 256 MiB `/tmp`, 1 CPU, 1 GiB, 256 processes and 300 seconds, on an internal network. The sidecar allows only `CONNECT` to port 443 of the hosts the call names, refuses any address that isn't public and connects to the one it checked, and caps requests and bytes. DevTools are published on `127.0.0.1` only, on a random port, behind a per-session token. Losing the lease, cancelling the run or reaching a cap removes the session; a sweeper removes containers labelled `autobots.browser` that a crashed worker left:
 

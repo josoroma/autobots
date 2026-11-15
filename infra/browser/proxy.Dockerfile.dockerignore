@@ -1,0 +1,5 @@
+# The proxy's build context is the service's adapters package, and the image copies only
+# egress_proxy.py, so nothing else is sent (Decision 0018 B3, refactor plan R-57). This file is in the
+# images' fingerprint.
+*
+!egress_proxy.py
