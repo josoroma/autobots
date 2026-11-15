@@ -11,12 +11,22 @@ from pydantic import BaseModel, ValidationError
 
 from autobots.api.openapi_export import openapi_document
 from autobots.contracts.adapters import run_from_row, run_summary_from_domain
-from autobots.contracts.experts import SessionCreate
-from autobots.contracts.operations import JobsChart
+from autobots.contracts.approvals import ApprovalResult, ApprovalView
+from autobots.contracts.experts import SessionCreate, SessionExpert
+from autobots.contracts.improvements import CandidateView, RollbackRequest
+from autobots.contracts.operations import JobsChart, RetentionSettings
+from autobots.contracts.routines import OccurrenceView, RoutineEnabled
 from autobots.contracts.run_commands import RunRequest
+from autobots.contracts.run_workspace import ModelCallView, ToolAttemptView
 from autobots.contracts.runs import ErrorResponse, RunEvent, RunSummary
 from autobots.contracts.settings import ModelPolicyState, ModelPolicyUpdate
-from autobots.contracts.workflows import WorkflowGraph
+from autobots.contracts.workflows import (
+    ExecutionCreate,
+    WorkflowExecutionSummary,
+    WorkflowGraph,
+    WorkflowPublish,
+    WorkflowVersionView,
+)
 from autobots.domain.runs import (
     NORMAL_EXITS,
     TERMINAL,
@@ -42,6 +52,20 @@ MODELS: dict[str, type[BaseModel]] = {
     "JobsChart": JobsChart,
     "RunRequest": RunRequest,
     "SessionCreate": SessionCreate,
+    "RoutineEnabled": RoutineEnabled,
+    "OccurrenceView": OccurrenceView,
+    "ApprovalView": ApprovalView,
+    "ApprovalResult": ApprovalResult,
+    "ModelCallView": ModelCallView,
+    "ToolAttemptView": ToolAttemptView,
+    "CandidateView": CandidateView,
+    "WorkflowVersionView": WorkflowVersionView,
+    "WorkflowExecutionSummary": WorkflowExecutionSummary,
+    "ExecutionCreate": ExecutionCreate,
+    "SessionExpert": SessionExpert,
+    "WorkflowPublish": WorkflowPublish,
+    "RollbackRequest": RollbackRequest,
+    "RetentionSettings": RetentionSettings,
 }
 RUN_ID = UUID("11111111-1111-4111-8111-111111111111")
 WORKSPACE_ID = UUID("22222222-2222-4222-8222-222222222222")

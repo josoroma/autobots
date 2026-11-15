@@ -12,7 +12,7 @@ import httpx
 from autobots.adapters.url_guard import Resolver, guarded_fetch, system_resolver
 from autobots.application import run_files
 from autobots.application.tool_definitions import ToolContext, ToolDefinition, ToolFailed
-from autobots.contracts.tools import StoreRemoteFileInput, StoreRemoteFileOutput
+from autobots.contracts.file_tools import StoreRemoteFileInput, StoreRemoteFileOutput
 from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import OperationClass
 

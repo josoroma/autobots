@@ -1,8 +1,11 @@
 """The canonical run state machine from SP-010, and the domain view of a run."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
+from types import MappingProxyType
+from typing import Final
 from uuid import UUID
 
 from autobots.domain.errors import FixedRefusal
@@ -28,25 +31,28 @@ IN_PROGRESS = frozenset(RunStatus) - TERMINAL - NEEDS_YOU
 # A run in one of these has stopped, or is stopping, so a model call in it ends early.
 INTERRUPTING = TERMINAL | {RunStatus.CANCELLING}
 
-NORMAL_EXITS: dict[RunStatus, frozenset[RunStatus]] = {
-    RunStatus.QUEUED: frozenset({RunStatus.RUNNING, RunStatus.PAUSED}),
-    RunStatus.RUNNING: frozenset(
-        {
-            RunStatus.WAITING_INPUT,
-            RunStatus.WAITING_APPROVAL,
-            RunStatus.PAUSED,
-            RunStatus.VERIFYING,
-            RunStatus.FAILED,
-        }
-    ),
-    RunStatus.WAITING_INPUT: frozenset({RunStatus.QUEUED, RunStatus.PAUSED}),
-    RunStatus.WAITING_APPROVAL: frozenset({RunStatus.QUEUED, RunStatus.PAUSED}),
-    RunStatus.PAUSED: frozenset({RunStatus.QUEUED}),
-    RunStatus.VERIFYING: frozenset(
-        {RunStatus.SUCCEEDED, RunStatus.RUNNING, RunStatus.FAILED, RunStatus.PAUSED}
-    ),
-    RunStatus.CANCELLING: frozenset({RunStatus.CANCELLED}),
-}
+# The tables here are read-only, as domain/models.py's are (PDOM-20).
+NORMAL_EXITS: Final[Mapping[RunStatus, frozenset[RunStatus]]] = MappingProxyType(
+    {
+        RunStatus.QUEUED: frozenset({RunStatus.RUNNING, RunStatus.PAUSED}),
+        RunStatus.RUNNING: frozenset(
+            {
+                RunStatus.WAITING_INPUT,
+                RunStatus.WAITING_APPROVAL,
+                RunStatus.PAUSED,
+                RunStatus.VERIFYING,
+                RunStatus.FAILED,
+            }
+        ),
+        RunStatus.WAITING_INPUT: frozenset({RunStatus.QUEUED, RunStatus.PAUSED}),
+        RunStatus.WAITING_APPROVAL: frozenset({RunStatus.QUEUED, RunStatus.PAUSED}),
+        RunStatus.PAUSED: frozenset({RunStatus.QUEUED}),
+        RunStatus.VERIFYING: frozenset(
+            {RunStatus.SUCCEEDED, RunStatus.RUNNING, RunStatus.FAILED, RunStatus.PAUSED}
+        ),
+        RunStatus.CANCELLING: frozenset({RunStatus.CANCELLED}),
+    }
+)
 
 
 def can_transition(current: RunStatus, following: RunStatus) -> bool:
@@ -97,49 +103,55 @@ _WORKER = frozenset({Actor.WORKER})
 _USER_OR_SYSTEM = frozenset({Actor.USER, Actor.SYSTEM})
 # Exactly who may apply each command, as SP-010's command table states it. A completion can never
 # come from a person, and the system applies only cancel, pause and resume (Decision 0029 F5).
-ACTORS: dict[RunCommand, frozenset[Actor]] = {
-    RunCommand.SUBMIT_INPUT: _USER,
-    RunCommand.DECIDE_APPROVAL: _USER,
-    RunCommand.PAUSE: _USER_OR_SYSTEM,
-    RunCommand.RESUME: _USER_OR_SYSTEM,
-    RunCommand.CANCEL: _USER_OR_SYSTEM,
-    RunCommand.CLAIM: _WORKER,
-    RunCommand.REQUEST_INPUT: _WORKER,
-    RunCommand.REQUEST_APPROVAL: _WORKER,
-    RunCommand.VERIFY: _WORKER,
-    RunCommand.REPAIR: _WORKER,
-    RunCommand.COMPLETE: _WORKER,
-    RunCommand.FAIL: _WORKER,
-    RunCommand.FINISH_CANCEL: _WORKER,
-    RunCommand.SUSPEND: _WORKER,
-}
+ACTORS: Final[Mapping[RunCommand, frozenset[Actor]]] = MappingProxyType(
+    {
+        RunCommand.SUBMIT_INPUT: _USER,
+        RunCommand.DECIDE_APPROVAL: _USER,
+        RunCommand.PAUSE: _USER_OR_SYSTEM,
+        RunCommand.RESUME: _USER_OR_SYSTEM,
+        RunCommand.CANCEL: _USER_OR_SYSTEM,
+        RunCommand.CLAIM: _WORKER,
+        RunCommand.REQUEST_INPUT: _WORKER,
+        RunCommand.REQUEST_APPROVAL: _WORKER,
+        RunCommand.VERIFY: _WORKER,
+        RunCommand.REPAIR: _WORKER,
+        RunCommand.COMPLETE: _WORKER,
+        RunCommand.FAIL: _WORKER,
+        RunCommand.FINISH_CANCEL: _WORKER,
+        RunCommand.SUSPEND: _WORKER,
+    }
+)
 # What each command moves to. A cancel isn't here: it reaches cancelling or cancelled, by what is
 # still open.
-TARGETS: dict[RunCommand, RunStatus] = {
-    RunCommand.SUBMIT_INPUT: RunStatus.QUEUED,
-    RunCommand.DECIDE_APPROVAL: RunStatus.QUEUED,
-    RunCommand.PAUSE: RunStatus.PAUSED,
-    RunCommand.RESUME: RunStatus.QUEUED,
-    RunCommand.CLAIM: RunStatus.RUNNING,
-    RunCommand.REQUEST_INPUT: RunStatus.WAITING_INPUT,
-    RunCommand.REQUEST_APPROVAL: RunStatus.WAITING_APPROVAL,
-    RunCommand.VERIFY: RunStatus.VERIFYING,
-    RunCommand.REPAIR: RunStatus.RUNNING,
-    RunCommand.COMPLETE: RunStatus.SUCCEEDED,
-    RunCommand.FAIL: RunStatus.FAILED,
-    RunCommand.FINISH_CANCEL: RunStatus.CANCELLED,
-    RunCommand.SUSPEND: RunStatus.PAUSED,
-}
+TARGETS: Final[Mapping[RunCommand, RunStatus]] = MappingProxyType(
+    {
+        RunCommand.SUBMIT_INPUT: RunStatus.QUEUED,
+        RunCommand.DECIDE_APPROVAL: RunStatus.QUEUED,
+        RunCommand.PAUSE: RunStatus.PAUSED,
+        RunCommand.RESUME: RunStatus.QUEUED,
+        RunCommand.CLAIM: RunStatus.RUNNING,
+        RunCommand.REQUEST_INPUT: RunStatus.WAITING_INPUT,
+        RunCommand.REQUEST_APPROVAL: RunStatus.WAITING_APPROVAL,
+        RunCommand.VERIFY: RunStatus.VERIFYING,
+        RunCommand.REPAIR: RunStatus.RUNNING,
+        RunCommand.COMPLETE: RunStatus.SUCCEEDED,
+        RunCommand.FAIL: RunStatus.FAILED,
+        RunCommand.FINISH_CANCEL: RunStatus.CANCELLED,
+        RunCommand.SUSPEND: RunStatus.PAUSED,
+    }
+)
 # The states each command can start from, where the target alone doesn't say. Without its source a
 # claim of a verifying run would reach running, as a repair does.
-COMMAND_SOURCES: dict[RunCommand, frozenset[RunStatus]] = {
-    RunCommand.SUBMIT_INPUT: frozenset({RunStatus.WAITING_INPUT}),
-    RunCommand.DECIDE_APPROVAL: frozenset({RunStatus.WAITING_APPROVAL}),
-    RunCommand.RESUME: frozenset({RunStatus.PAUSED}),
-    RunCommand.CLAIM: frozenset({RunStatus.QUEUED}),
-    RunCommand.REPAIR: frozenset({RunStatus.VERIFYING}),
-    RunCommand.FINISH_CANCEL: frozenset({RunStatus.CANCELLING}),
-}
+COMMAND_SOURCES: Final[Mapping[RunCommand, frozenset[RunStatus]]] = MappingProxyType(
+    {
+        RunCommand.SUBMIT_INPUT: frozenset({RunStatus.WAITING_INPUT}),
+        RunCommand.DECIDE_APPROVAL: frozenset({RunStatus.WAITING_APPROVAL}),
+        RunCommand.RESUME: frozenset({RunStatus.PAUSED}),
+        RunCommand.CLAIM: frozenset({RunStatus.QUEUED}),
+        RunCommand.REPAIR: frozenset({RunStatus.VERIFYING}),
+        RunCommand.FINISH_CANCEL: frozenset({RunStatus.CANCELLING}),
+    }
+)
 
 
 def next_status(

@@ -8,9 +8,7 @@ from typing import Literal
 
 from autobots.application import run_files
 from autobots.application.tool_definitions import ToolContext, ToolDefinition, ToolFailed
-from autobots.contracts.tools import (
-    CalculateInput,
-    CalculateOutput,
+from autobots.contracts.file_tools import (
     CsvColumn,
     ReadCsvInput,
     ReadCsvOutput,
@@ -21,6 +19,7 @@ from autobots.contracts.tools import (
     SaveArtifactInput,
     SaveArtifactOutput,
 )
+from autobots.contracts.tools import CalculateInput, CalculateOutput
 from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import OperationClass
 

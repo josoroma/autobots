@@ -8,7 +8,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from autobots.contracts.tools import MAX_FILE_CHARACTERS, TOOL_CONTRACT
+from autobots.contracts.primitives import MAX_FILE_CHARACTERS, TOOL_CONTRACT
+from autobots.contracts.tool_fields import OutputPath, RunFilePath
 
 MATCH_CHARACTERS = 500
 
@@ -48,7 +49,7 @@ class SearchFilesOutput(BaseModel):
 class ReadCodeFileInput(BaseModel):
     model_config = TOOL_CONTRACT
 
-    path: str = Field(min_length=1, max_length=500)
+    path: RunFilePath
     offset: int = Field(default=0, ge=0, description="The first line, from 0.")
     limit: int = Field(default=400, ge=1, le=2000)
 
@@ -73,14 +74,14 @@ class ReadCodeFileOutput(BaseModel):
 class WriteCodeFileInput(BaseModel):
     model_config = TOOL_CONTRACT
 
-    path: str = Field(min_length=1, max_length=500, pattern=r"^outputs/")
+    path: OutputPath
     content: str = Field(max_length=MAX_FILE_CHARACTERS)
 
 
 class PatchCodeFileInput(BaseModel):
     model_config = TOOL_CONTRACT
 
-    path: str = Field(min_length=1, max_length=500, pattern=r"^outputs/")
+    path: OutputPath
     old_string: str = Field(min_length=1, max_length=MAX_FILE_CHARACTERS)
     new_string: str = Field(max_length=MAX_FILE_CHARACTERS)
     replace_all: bool = False

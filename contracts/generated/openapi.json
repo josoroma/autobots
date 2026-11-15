@@ -250,8 +250,7 @@
             "type": "integer"
           },
           "status": {
-            "title": "Status",
-            "type": "string"
+            "$ref": "#/components/schemas/ApprovalStatus"
           }
         },
         "required": [
@@ -317,6 +316,17 @@
         "title": "ApprovalScope",
         "type": "object"
       },
+      "ApprovalStatus": {
+        "enum": [
+          "pending",
+          "approved",
+          "rejected",
+          "expired",
+          "withdrawn"
+        ],
+        "title": "ApprovalStatus",
+        "type": "string"
+      },
       "ApprovalView": {
         "additionalProperties": false,
         "description": "What a reviewer decides on. The hash they saw comes back with the decision.",
@@ -340,6 +350,8 @@
           "decided_at": {
             "anyOf": [
               {
+                "format": "date-time",
+                "pattern": "^.+(Z|[+-]00:00)$",
                 "type": "string"
               },
               {
@@ -375,6 +387,8 @@
             "title": "Decided By Name"
           },
           "expires_at": {
+            "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
             "title": "Expires At",
             "type": "string"
           },
@@ -482,8 +496,7 @@
             ]
           },
           "status": {
-            "title": "Status",
-            "type": "string"
+            "$ref": "#/components/schemas/ApprovalStatus"
           },
           "task_title": {
             "anyOf": [
@@ -814,22 +827,32 @@
         "description": "US$0.25 to US$5.00 in US$0.25 steps, never above what's left of the daily cap (D11).",
         "properties": {
           "default_micro_usd": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "title": "Default Micro Usd",
             "type": "integer"
           },
           "max_micro_usd": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "title": "Max Micro Usd",
             "type": "integer"
           },
           "min_micro_usd": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "title": "Min Micro Usd",
             "type": "integer"
           },
           "remaining_daily_micro_usd": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "title": "Remaining Daily Micro Usd",
             "type": "integer"
           },
           "step_micro_usd": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "title": "Step Micro Usd",
             "type": "integer"
           }
@@ -902,6 +925,10 @@
             "type": "string"
           },
           "kind": {
+            "enum": [
+              "memory",
+              "skill"
+            ],
             "title": "Kind",
             "type": "string"
           },
@@ -928,6 +955,13 @@
             ]
           },
           "status": {
+            "enum": [
+              "proposed",
+              "regression_failed",
+              "regression_passed",
+              "rejected",
+              "promoted"
+            ],
             "title": "Status",
             "type": "string"
           }
@@ -1087,6 +1121,7 @@
         "properties": {
           "occurrence_time": {
             "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
             "title": "Occurrence Time",
             "type": "string"
           },
@@ -1404,6 +1439,7 @@
           "budget_micro_usd": {
             "anyOf": [
               {
+                "maximum": 9007199254740991.0,
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -1486,8 +1522,7 @@
             "type": "string"
           },
           "run_status": {
-            "title": "Run Status",
-            "type": "string"
+            "$ref": "#/components/schemas/RunStatus"
           },
           "schema_version": {
             "const": 1,
@@ -1496,6 +1531,9 @@
           },
           "stop_reason": {
             "anyOf": [
+              {
+                "$ref": "#/components/schemas/StopCode"
+              },
               {
                 "type": "string"
               },
@@ -1631,7 +1669,7 @@
               ],
               "type": "string"
             },
-            "maxItems": 12,
+            "maxItems": 13,
             "title": "Tool Groups",
             "type": "array"
           },
@@ -2345,6 +2383,10 @@
             "type": "string"
           },
           "kind": {
+            "enum": [
+              "memory",
+              "skill"
+            ],
             "title": "Kind",
             "type": "string"
           },
@@ -2611,6 +2653,8 @@
           "input_per_million_micro_usd": {
             "anyOf": [
               {
+                "maximum": 9007199254740991.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -2626,6 +2670,8 @@
           "output_per_million_micro_usd": {
             "anyOf": [
               {
+                "maximum": 9007199254740991.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -2660,6 +2706,7 @@
         "description": "What the provider reported, from its own records. A charge is never invented.",
         "properties": {
           "charged_micro_usd": {
+            "maximum": 9007199254740991.0,
             "minimum": 0.0,
             "title": "Charged Micro Usd",
             "type": "integer"
@@ -2694,6 +2741,8 @@
             "type": "string"
           },
           "estimated_micro_usd": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "title": "Estimated Micro Usd",
             "type": "integer"
           },
@@ -2777,6 +2826,8 @@
           "reported_micro_usd": {
             "anyOf": [
               {
+                "maximum": 9007199254740991.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -2795,6 +2846,14 @@
             "type": "string"
           },
           "status": {
+            "enum": [
+              "reserved",
+              "dispatched",
+              "succeeded",
+              "failed_before_acceptance",
+              "uncertain",
+              "cancelled"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -2849,6 +2908,7 @@
             "anyOf": [
               {
                 "format": "date-time",
+                "pattern": "^.+(Z|[+-]00:00)$",
                 "type": "string"
               },
               {
@@ -2989,6 +3049,8 @@
         "additionalProperties": false,
         "properties": {
           "occurrence_time": {
+            "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
             "title": "Occurrence Time",
             "type": "string"
           },
@@ -3020,6 +3082,12 @@
             "title": "Run Id"
           },
           "status": {
+            "enum": [
+              "admitted",
+              "missed",
+              "skipped_overlap",
+              "blocked"
+            ],
             "title": "Status",
             "type": "string"
           }
@@ -3487,6 +3555,7 @@
             "anyOf": [
               {
                 "format": "date-time",
+                "pattern": "^.+(Z|[+-]00:00)$",
                 "type": "string"
               },
               {
@@ -3638,8 +3707,7 @@
             "type": "string"
           },
           "status": {
-            "title": "Status",
-            "type": "string"
+            "$ref": "#/components/schemas/RunStatus"
           }
         },
         "required": [
@@ -3715,6 +3783,7 @@
         "properties": {
           "at": {
             "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
             "title": "At",
             "type": "string"
           },
@@ -4823,6 +4892,8 @@
         "description": "One run's facts for the list (PRD-Studio RN-01). Spend is from the ledger: `charged` is\nreported or entered, `reserved` is held for calls not yet settled, and `unreported` marks a call\nwhose charge was never reported. Either of the last two makes the amount an estimate.",
         "properties": {
           "charged_micro_usd": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "title": "Charged Micro Usd",
             "type": "integer"
           },
@@ -4863,6 +4934,8 @@
             "type": "string"
           },
           "limit_micro_usd": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "title": "Limit Micro Usd",
             "type": "integer"
           },
@@ -4886,6 +4959,8 @@
             "type": "array"
           },
           "reserved_micro_usd": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "title": "Reserved Micro Usd",
             "type": "integer"
           },
@@ -4894,6 +4969,9 @@
           },
           "stop_reason": {
             "anyOf": [
+              {
+                "$ref": "#/components/schemas/StopCode"
+              },
               {
                 "type": "string"
               },
@@ -5322,6 +5400,9 @@
           "stop_reason": {
             "anyOf": [
               {
+                "$ref": "#/components/schemas/StopCode"
+              },
+              {
                 "type": "string"
               },
               {
@@ -5585,6 +5666,7 @@
           "version": {
             "anyOf": [
               {
+                "minimum": 1.0,
                 "type": "integer"
               },
               {
@@ -5733,6 +5815,63 @@
         ],
         "title": "SessionWorkspace",
         "type": "object"
+      },
+      "StopCode": {
+        "description": "Why a run's pass stopped: each code a pass can stop with, and those the cancel settlement\nwrites. One other stored form exists, a spent repair: `repair_limit:` followed by the\nrepairable code, such as `repair_limit:plan_out_of_scope`.",
+        "enum": [
+          "credentials_required",
+          "credential_unavailable",
+          "model_unavailable",
+          "cost_unavailable",
+          "invalid_credential",
+          "insufficient_credits",
+          "rate_limited",
+          "provider_error",
+          "network_before_acceptance",
+          "partial_stream",
+          "uncertain_acceptance",
+          "incomplete_output",
+          "other",
+          "admission_refused",
+          "budget_exceeded",
+          "no_inference_slot",
+          "uncertain_model_call",
+          "unadmitted_model_call",
+          "request_unencodable",
+          "route_not_bound",
+          "compaction_failed",
+          "incompatible_version",
+          "model_calls_limit",
+          "tool_dispatches_limit",
+          "repairs_limit",
+          "plan_revisions_limit",
+          "children_limit",
+          "active_time_limit",
+          "step_limit",
+          "lease_lost",
+          "run_not_running",
+          "run_not_found",
+          "approval_pending",
+          "parent_not_running",
+          "assignment_paused",
+          "assignment_lost",
+          "assignment_busy",
+          "outcome_unknown",
+          "output_too_large",
+          "command_refused",
+          "worker_failed",
+          "plan_missing",
+          "plan_incomplete",
+          "criteria_unmet",
+          "workflow_invalid",
+          "workflow_node_failed",
+          "workflow_stalled",
+          "cancelled",
+          "cancelled_with_unknown_outcomes",
+          "children_settling"
+        ],
+        "title": "StopCode",
+        "type": "string"
       },
       "StreamCursor": {
         "additionalProperties": false,
@@ -5913,6 +6052,12 @@
             "type": "string"
           },
           "status": {
+            "enum": [
+              "started",
+              "succeeded",
+              "failed",
+              "unknown"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -6950,6 +7095,8 @@
             "$ref": "#/components/schemas/WorkflowGraph"
           },
           "saved_at": {
+            "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
             "title": "Saved At",
             "type": "string"
           }
@@ -7027,6 +7174,8 @@
         "description": "PRD-Studio WF-04: one execution's version, state, ledger spend and duration. Spend is an\nestimate while a reservation is held or a charge was never reported.",
         "properties": {
           "charged_micro_usd": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "title": "Charged Micro Usd",
             "type": "integer"
           },
@@ -7047,6 +7196,8 @@
             "type": "string"
           },
           "reserved_micro_usd": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "title": "Reserved Micro Usd",
             "type": "integer"
           },
@@ -7056,12 +7207,13 @@
             "type": "string"
           },
           "started_at": {
+            "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
             "title": "Started At",
             "type": "string"
           },
           "status": {
-            "title": "Status",
-            "type": "string"
+            "$ref": "#/components/schemas/RunStatus"
           },
           "unreported": {
             "title": "Unreported",
@@ -7424,6 +7576,10 @@
             "type": "string"
           },
           "source": {
+            "enum": [
+              "user",
+              "model_proposal"
+            ],
             "title": "Source",
             "type": "string"
           },

@@ -9,9 +9,8 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, Field, model_validator
 
-from autobots.contracts.primitives import Identifier
+from autobots.contracts.primitives import TOOL_CONTRACT, Identifier
 from autobots.contracts.routines import CronjobSchedule, IanaTimezone
-from autobots.contracts.tools import TOOL_CONTRACT
 from autobots.domain.routines import DEFAULT_TIMEZONE, MODEL_ROUTINE_LIMIT_MICRO_USD
 
 CronjobAction = Literal["list", "create", "update", "pause", "resume", "run", "remove"]

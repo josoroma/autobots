@@ -2,12 +2,9 @@
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
-from autobots.contracts.primitives import Identifier
-from autobots.contracts.tools import TOOL_CONTRACT
-
-VIEW = ConfigDict(extra="forbid", frozen=True)
+from autobots.contracts.primitives import LAX_CONTRACT, TOOL_CONTRACT, Identifier
 
 
 class SearchMemory(BaseModel):
@@ -17,7 +14,7 @@ class SearchMemory(BaseModel):
 
 
 class SearchHit(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     kind: Literal["memory", "evidence"]
     title: str
@@ -26,20 +23,20 @@ class SearchHit(BaseModel):
 
 
 class SearchResults(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     hits: list[SearchHit]
 
 
 class MemorySearchView(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     hits: list[SearchHit]
 
 
 class MemoryCreate(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     title: str = Field(min_length=1, max_length=200)
     content: str = Field(min_length=1, max_length=20000)
@@ -48,7 +45,7 @@ class MemoryCreate(BaseModel):
 
 
 class MemoryCreated(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     id: str

@@ -5,46 +5,51 @@ preserving behavior. Listing one is a decision for a review, not a way to keep t
 """
 
 from collections.abc import Mapping
-from typing import Any
+from types import MappingProxyType
+from typing import Any, Final
 
 # The shape of graph state and how the loop reads it.
 GRAPH_STATE_VERSION = 1
 COMPATIBLE_GRAPH_STATES = frozenset({1})
 
-# Every tool the loop can offer. tests/test_execution_contract.py keeps this equal to the registry.
-TOOL_VERSIONS: Mapping[str, int] = {
-    "assign_specialist": 1,
-    "calculate": 1,
-    "complete_task": 1,
-    "create_github_issue": 2,
-    "cronjob": 1,
-    "extract_website_content": 1,
-    "github_list_pull_requests": 1,
-    "github_list_workflow_runs": 1,
-    "github_open_pull_request": 1,
-    "github_read_file": 1,
-    "github_search_issues": 1,
-    "inflation_rates": 1,
-    "market_history": 1,
-    "patch_code_file": 1,
-    "propose_improvement": 1,
-    "propose_plan": 1,
-    "publish_artifact": 1,
-    "read_offload": 1,
-    "read_code_file": 1,
-    "read_csv": 1,
-    "read_run_file": 2,
-    "save_artifact": 1,
-    "search_files": 1,
-    "search_memory": 1,
-    "search_web": 1,
-    "store_remote_file": 1,
-    "tavily_crawl": 1,
-    "tavily_extract": 1,
-    "tavily_map": 1,
-    "tavily_search": 1,
-    "write_code_file": 1,
-}
+# Every tool the loop can offer, read-only (PDOM-20). tests/test_execution_contract.py keeps this
+# equal to the registry, and tests/test_tool_schema_versions.py keeps each version's published
+# schemas as they were, so a changed schema is a new version here (Decision 0029 F13).
+TOOL_VERSIONS: Final[Mapping[str, int]] = MappingProxyType(
+    {
+        "assign_specialist": 1,
+        "calculate": 1,
+        "complete_task": 1,
+        "create_github_issue": 2,
+        "cronjob": 1,
+        "extract_website_content": 1,
+        "github_list_pull_requests": 1,
+        "github_list_workflow_runs": 1,
+        "github_open_pull_request": 1,
+        "github_read_file": 1,
+        "github_search_issues": 1,
+        "inflation_rates": 1,
+        "market_history": 1,
+        "patch_code_file": 1,
+        "propose_improvement": 1,
+        "propose_plan": 1,
+        "publish_artifact": 1,
+        "read_offload": 1,
+        "read_code_file": 1,
+        "read_csv": 1,
+        "read_run_file": 2,
+        "save_artifact": 1,
+        "search_files": 1,
+        "search_memory": 1,
+        "search_web": 1,
+        "store_remote_file": 1,
+        "tavily_crawl": 1,
+        "tavily_extract": 1,
+        "tavily_map": 1,
+        "tavily_search": 1,
+        "write_code_file": 1,
+    }
+)
 # (tool, recorded version, current version), only where old checkpoints keep their meaning.
 # read_run_file 1 stays registered, and a run that pinned it keeps calling it (US-14.9).
 # create_github_issue 1 stays registered too, unchanged, beside version 2's labels (US-15.14).

@@ -7,7 +7,7 @@ occurrence takes its version's frozen configuration, so an edit can't reach a ru
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import UTC, datetime
 from types import MappingProxyType
 from typing import Any
 from uuid import UUID, uuid4
@@ -193,7 +193,7 @@ async def _view(connection: Any, row: Any) -> RoutineView:
     )
     history = [
         OccurrenceView(
-            occurrence_time=item[0].isoformat(),
+            occurrence_time=item[0].astimezone(UTC).isoformat(),
             routine_version=item[1],
             status=item[2],
             reason=item[3],

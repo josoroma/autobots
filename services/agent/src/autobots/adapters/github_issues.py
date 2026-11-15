@@ -30,7 +30,7 @@ from autobots.application.tool_definitions import (
     ToolContext,
     ToolDefinition,
 )
-from autobots.contracts.tools import (
+from autobots.contracts.github_tools import (
     CreateGithubIssueInput,
     CreateGithubIssueOutput,
     CreateGithubIssueV2Input,

@@ -2,41 +2,41 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
-from autobots.contracts.primitives import Identifier, UtcTimestamp
-from autobots.contracts.tools import ToolGroupName
+from autobots.contracts.primitives import LAX_CONTRACT, Identifier, UtcTimestamp, Version
+from autobots.contracts.tool_catalog import ToolGroupName
 from autobots.domain.models import ModelProfileId
-
-VIEW = ConfigDict(extra="forbid", frozen=True)
+from autobots.domain.tool_catalog import ToolGroup
 
 
 class ExpertConfig(BaseModel):
     # Not strict, so JSON strings become enums. Unknown fields and values are still refused.
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     purpose: str = Field(default="", max_length=1000)
     instructions: str = Field(default="", max_length=20000)
     tools: list[str] = Field(default_factory=list, max_length=20)
     # Groups granted whole, PRD-Tool-Catalog TC-06. Saving expands them into `tools`, so a saved
-    # version names explicit tools, and this keeps where they came from for display.
-    tool_groups: list[ToolGroupName] = Field(default_factory=list, max_length=12)
+    # version names explicit tools, and this keeps where they came from for display. The bound is
+    # the vocabulary's size, so a new group raises it (PDOM-06).
+    tool_groups: list[ToolGroupName] = Field(default_factory=list, max_length=len(ToolGroup))
     skills: list[str] = Field(default_factory=list, max_length=50)
     role_bindings: dict[str, ModelProfileId] = Field(default_factory=dict)
 
 
 class ExpertCreate(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     name: str = Field(min_length=1, max_length=100)
     config: ExpertConfig
 
 
 class ExpertRevision(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
-    expected_version: int = Field(ge=1)
+    expected_version: Version
     config: ExpertConfig
 
 
@@ -45,7 +45,7 @@ class ExpertConfigView(BaseModel):
     """A saved version as stored. It has no request limits, since tool groups can expand a saved
     version past one."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     # ExpertConfig's defaults, so the generated client types both alike.
     purpose: str = ""
@@ -57,14 +57,14 @@ class ExpertConfigView(BaseModel):
 
 
 class ExpertVersionView(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     version: int
     config: ExpertConfigView
 
 
 class ExpertView(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     id: Identifier
@@ -77,21 +77,21 @@ class ExpertView(BaseModel):
 
 
 class ExpertList(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     experts: list[ExpertView]
 
 
 class SessionExpert(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     expert_id: Identifier
-    version: int | None = None
+    version: Version | None = None
 
 
 class SessionCreate(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     kind: Literal["direct", "coordinator"]
     experts: list[SessionExpert] = Field(min_length=1, max_length=20)
@@ -100,7 +100,7 @@ class SessionCreate(BaseModel):
 class RouteOption(BaseModel):
     """What a user sees before starting work. Nothing beyond this is granted."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     expert_id: Identifier
     name: str
@@ -111,7 +111,7 @@ class RouteOption(BaseModel):
 
 
 class SessionView(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     id: Identifier

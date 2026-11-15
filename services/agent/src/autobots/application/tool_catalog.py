@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, cast
 
 from autobots.application.tool_definitions import ToolDefinition, ToolRegistry
-from autobots.contracts.tools import (
+from autobots.contracts.tool_catalog import (
     FieldDescriptor,
     GrantSiteName,
     KeyRequirementView,

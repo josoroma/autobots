@@ -6,7 +6,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { ApprovalResult } from "@autobots/api-client";
+import type {
+  ApprovalResult,
+  ApprovalStatus,
+  ApprovalView,
+} from "@autobots/api-client";
 
 import {
   armedText,
@@ -47,7 +51,7 @@ function submitted(
   };
 }
 
-function result(status: string): ApprovalResult {
+function result(status: ApprovalStatus): ApprovalResult {
   return { approval_id: "a", replayed: false, schema_version: 1, status };
 }
 
@@ -124,9 +128,12 @@ test("an outcome reads in words, and a status without words stays as sent", () =
 test("a decided request says who decided it, and when", () => {
   const at = "2026-11-15T10:00:00Z";
   const when = new Date(at).toLocaleString();
-  const decided = {
+  const decided: Pick<
+    ApprovalView,
+    "status" | "decided_by" | "decided_by_name" | "decided_at"
+  > = {
     status: "approved",
-    decided_by: "you" as const,
+    decided_by: "you",
     decided_by_name: null,
     decided_at: at,
   };
@@ -156,7 +163,7 @@ test("a decided request says who decided it, and when", () => {
 });
 
 test("a decision's words come from the status the service returned, not the button pressed", () => {
-  const accepted = (status: string) =>
+  const accepted = (status: ApprovalStatus) =>
     decisionText(submitted({ value: result(status) }));
   assert.equal(
     accepted("approved"),
@@ -167,7 +174,8 @@ test("a decision's words come from the status the service returned, not the butt
     "Rejected. The run can replan or fail, and this request won't run.",
   );
   assert.equal(accepted("expired"), "Expired, so it was not approved.");
-  assert.equal(accepted("superseded"), "superseded.");
+  // A status with no words of its own reads as its code.
+  assert.equal(accepted("pending"), "pending.");
 });
 
 test("another choice while one is held sends nothing, and names the held one by its button", () => {

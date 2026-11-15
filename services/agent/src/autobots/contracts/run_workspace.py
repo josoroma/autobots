@@ -2,20 +2,24 @@
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel
+from pydantic import BaseModel, Field, RootModel
 
 from autobots.contracts.artifacts import ArtifactSummary
-from autobots.contracts.primitives import MAX_SAFE_INTEGER, Identifier, UtcTimestamp
-from autobots.contracts.runs import RunEvent, RunSummary
+from autobots.contracts.primitives import (
+    LAX_CONTRACT,
+    MAX_SAFE_INTEGER,
+    Identifier,
+    MicroUsd,
+    UtcTimestamp,
+)
+from autobots.contracts.runs import RunEvent, RunSummary, StopReason
 from autobots.domain.runs import RunStatus
-
-VIEW = ConfigDict(extra="forbid", frozen=True)
 
 
 class EventPage(BaseModel):
     """`gap` means retained events can't fill the range, so the client needs a snapshot."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     run_id: Identifier
@@ -39,7 +43,7 @@ class StreamFrame(RootModel[StreamFrameName]):
 class StreamCursor(BaseModel):
     """The newest sequence the stream has covered, so a reconnect resumes after it."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     cursor: StreamPosition
 
@@ -48,7 +52,7 @@ class StreamGap(BaseModel):
     """Retained events can't fill the range after `after`, so the client reads a snapshot
     (SP-011)."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     after: StreamPosition
 
@@ -56,10 +60,20 @@ class StreamGap(BaseModel):
 # The run commands a person sends from a run's page (SP-010). Workers' commands and the input and
 # approval commands, which have their own screens, are not among them.
 UserRunCommand = Literal["pause", "resume", "cancel"]
+# Binding sources as BindingSource names them (tests/test_contract_vocabularies.py).
+BindingSourceName = Literal[
+    "run_override", "workspace_override", "workspace_default", "builtin_default"
+]
+# app_private.model_invocations.status, as its check constraint and InvocationStatus allow.
+ModelCallStatus = Literal[
+    "reserved", "dispatched", "succeeded", "failed_before_acceptance", "uncertain", "cancelled"
+]
+# app_private.tool_receipts.status, as its check constraint and ReceiptStatus allow.
+ReceiptStatusName = Literal["started", "succeeded", "failed", "unknown"]
 
 
 class CriterionView(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     id: str
     text: str
@@ -71,7 +85,7 @@ class TaskView(BaseModel):
     path. `wall_seconds` runs from start to finish, or to now for an open task that has started.
     `tools` are the tools uses served it, in first-use order, planning tools excepted."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     id: str
     title: str
@@ -86,7 +100,7 @@ class TaskView(BaseModel):
 
 
 class PlanSummary(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     version: int
     revision_reason: str | None
@@ -95,7 +109,7 @@ class PlanSummary(BaseModel):
 
 
 class UsageSummary(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     model_calls: int
     tool_dispatches: int
@@ -106,7 +120,7 @@ class UsageSummary(BaseModel):
 
 
 class VerificationSummary(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     passed: bool
     unmet: list[str]
@@ -116,7 +130,7 @@ class VerificationSummary(BaseModel):
 class OutstandingSummary(BaseModel):
     """Known unknowns. These stay visible, even on a finished run."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     uncertain_calls: int
     unknown_effects: int
@@ -126,7 +140,7 @@ class OutstandingSummary(BaseModel):
 class ExpertBinding(BaseModel):
     """What this run was given. It can't use anything that isn't listed here."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     name: str
     version: int
@@ -135,7 +149,7 @@ class ExpertBinding(BaseModel):
 
 
 class AssignmentView(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     id: Identifier
     child_run_id: Identifier
@@ -145,7 +159,7 @@ class AssignmentView(BaseModel):
 
 
 class UnknownEffect(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     operation_id: str
     tool_id: str
@@ -157,7 +171,7 @@ class UnknownEffect(BaseModel):
 class RunBudgets(BaseModel):
     """MP-07's limits this run works under. Spend is on the run itself."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     context_tokens: int
     max_output_tokens_per_call: int
@@ -166,20 +180,19 @@ class RunBudgets(BaseModel):
 class FrozenBinding(BaseModel):
     """One role's binding as this run froze it at admission, which later settings don't change."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
+    # Text as the run's policy snapshot froze it, where a role or profile since retired still reads.
     role: str
     profile: str
     canonical_id: str
     wire_id: str
     # Which step of MP-01's order chose it. None for a run admitted before sources were recorded.
-    source: (
-        Literal["run_override", "workspace_override", "workspace_default", "builtin_default"] | None
-    )
+    source: BindingSourceName | None
 
 
 class RunWorkspace(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     run: RunSummary
@@ -188,7 +201,7 @@ class RunWorkspace(BaseModel):
     plan: PlanSummary | None
     artifacts: list[ArtifactSummary]
     usage: UsageSummary
-    stop_reason: str | None
+    stop_reason: StopReason | None
     verification: VerificationSummary | None
     expert: ExpertBinding | None
     assignments: list[AssignmentView]
@@ -215,7 +228,7 @@ class RunListItem(BaseModel):
     reported or entered, `reserved` is held for calls not yet settled, and `unreported` marks a call
     whose charge was never reported. Either of the last two makes the amount an estimate."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     id: Identifier
     parent_run_id: Identifier | None
@@ -225,18 +238,19 @@ class RunListItem(BaseModel):
     updated_at: UtcTimestamp
     label_kind: Literal["goal", "expert", "session", "workflow"]
     label: str | None
-    stop_reason: str | None
+    stop_reason: StopReason | None
     tasks_complete: int
     tasks_total: int
+    # Profiles as the run's calls recorded them, where one since retired still reads.
     profiles: list[str]
-    charged_micro_usd: int
-    reserved_micro_usd: int
+    charged_micro_usd: MicroUsd
+    reserved_micro_usd: MicroUsd
     unreported: bool
-    limit_micro_usd: int
+    limit_micro_usd: MicroUsd
 
 
 class RunGroupCounts(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     all: int
     active: int
@@ -251,7 +265,7 @@ class RunList(BaseModel):
     after this page's last row, and `has_more` says that more rows exist.
     """
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     runs: list[RunListItem]
@@ -264,13 +278,14 @@ class RunList(BaseModel):
 class ModelCallView(BaseModel):
     """One attempt's facts. Its partial output and any reasoning stay out of this view."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     id: Identifier
     run_id: Identifier
+    # The role and profile as the call recorded them, where one since retired still reads.
     role: str
     attempt: int
-    status: str
+    status: ModelCallStatus
     provider: Literal["openrouter"]
     profile: str
     canonical_id: str
@@ -280,8 +295,8 @@ class ModelCallView(BaseModel):
     output_tokens: int | None
     reasoning_tokens: int | None
     # What the provider reported, and the most this call could have cost. Never added together.
-    reported_micro_usd: int | None
-    estimated_micro_usd: int
+    reported_micro_usd: MicroUsd | None
+    estimated_micro_usd: MicroUsd
     # The owner entered this charge. A late report from the provider doesn't count.
     reconciled: bool
     # The call was lost, so an owner's charge is all that's known of it.
@@ -296,12 +311,12 @@ class ModelCallView(BaseModel):
 class ToolAttemptView(BaseModel):
     """What a tool operation did. Its arguments and result stay out of this view."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     operation_id: str
     tool_id: str
     tool_version: int
-    status: str
+    status: ReceiptStatusName
     failure_code: str | None
     created_at: UtcTimestamp
 
@@ -309,7 +324,7 @@ class ToolAttemptView(BaseModel):
 class CheckpointView(BaseModel):
     """That a checkpoint exists, and where. Never what it holds."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     checkpoint_id: str
     parent_checkpoint_id: str | None
@@ -320,9 +335,11 @@ class CheckpointView(BaseModel):
 class EvidenceView(BaseModel):
     """What a completed task cited. The artifact, if it names one, is what to link."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     task_id: str
+    # Read from the stored evidence documents as written (app_private.plan_evidence), which no
+    # check constraint holds, so an older document's kind still reads.
     kind: str
     reference: str
     summary: str
@@ -330,7 +347,7 @@ class EvidenceView(BaseModel):
 
 
 class RunInspector(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     run: RunSummary

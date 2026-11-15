@@ -251,8 +251,7 @@ export const schemas = {
         "type": "integer"
       },
       "status": {
-        "title": "Status",
-        "type": "string"
+        "$ref": "#/components/schemas/ApprovalStatus"
       }
     },
     "required": [
@@ -318,6 +317,17 @@ export const schemas = {
     "title": "ApprovalScope",
     "type": "object"
   },
+  "ApprovalStatus": {
+    "enum": [
+      "pending",
+      "approved",
+      "rejected",
+      "expired",
+      "withdrawn"
+    ],
+    "title": "ApprovalStatus",
+    "type": "string"
+  },
   "ApprovalView": {
     "additionalProperties": false,
     "description": "What a reviewer decides on. The hash they saw comes back with the decision.",
@@ -341,6 +351,8 @@ export const schemas = {
       "decided_at": {
         "anyOf": [
           {
+            "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
             "type": "string"
           },
           {
@@ -376,6 +388,8 @@ export const schemas = {
         "title": "Decided By Name"
       },
       "expires_at": {
+        "format": "date-time",
+        "pattern": "^.+(Z|[+-]00:00)$",
         "title": "Expires At",
         "type": "string"
       },
@@ -483,8 +497,7 @@ export const schemas = {
         ]
       },
       "status": {
-        "title": "Status",
-        "type": "string"
+        "$ref": "#/components/schemas/ApprovalStatus"
       },
       "task_title": {
         "anyOf": [
@@ -815,22 +828,32 @@ export const schemas = {
     "description": "US$0.25 to US$5.00 in US$0.25 steps, never above what's left of the daily cap (D11).",
     "properties": {
       "default_micro_usd": {
+        "maximum": 9007199254740991.0,
+        "minimum": 0.0,
         "title": "Default Micro Usd",
         "type": "integer"
       },
       "max_micro_usd": {
+        "maximum": 9007199254740991.0,
+        "minimum": 0.0,
         "title": "Max Micro Usd",
         "type": "integer"
       },
       "min_micro_usd": {
+        "maximum": 9007199254740991.0,
+        "minimum": 0.0,
         "title": "Min Micro Usd",
         "type": "integer"
       },
       "remaining_daily_micro_usd": {
+        "maximum": 9007199254740991.0,
+        "minimum": 0.0,
         "title": "Remaining Daily Micro Usd",
         "type": "integer"
       },
       "step_micro_usd": {
+        "maximum": 9007199254740991.0,
+        "minimum": 0.0,
         "title": "Step Micro Usd",
         "type": "integer"
       }
@@ -903,6 +926,10 @@ export const schemas = {
         "type": "string"
       },
       "kind": {
+        "enum": [
+          "memory",
+          "skill"
+        ],
         "title": "Kind",
         "type": "string"
       },
@@ -929,6 +956,13 @@ export const schemas = {
         ]
       },
       "status": {
+        "enum": [
+          "proposed",
+          "regression_failed",
+          "regression_passed",
+          "rejected",
+          "promoted"
+        ],
         "title": "Status",
         "type": "string"
       }
@@ -1088,6 +1122,7 @@ export const schemas = {
     "properties": {
       "occurrence_time": {
         "format": "date-time",
+        "pattern": "^.+(Z|[+-]00:00)$",
         "title": "Occurrence Time",
         "type": "string"
       },
@@ -1405,6 +1440,7 @@ export const schemas = {
       "budget_micro_usd": {
         "anyOf": [
           {
+            "maximum": 9007199254740991.0,
             "minimum": 0.0,
             "type": "integer"
           },
@@ -1487,8 +1523,7 @@ export const schemas = {
         "type": "string"
       },
       "run_status": {
-        "title": "Run Status",
-        "type": "string"
+        "$ref": "#/components/schemas/RunStatus"
       },
       "schema_version": {
         "const": 1,
@@ -1497,6 +1532,9 @@ export const schemas = {
       },
       "stop_reason": {
         "anyOf": [
+          {
+            "$ref": "#/components/schemas/StopCode"
+          },
           {
             "type": "string"
           },
@@ -1632,7 +1670,7 @@ export const schemas = {
           ],
           "type": "string"
         },
-        "maxItems": 12,
+        "maxItems": 13,
         "title": "Tool Groups",
         "type": "array"
       },
@@ -2346,6 +2384,10 @@ export const schemas = {
         "type": "string"
       },
       "kind": {
+        "enum": [
+          "memory",
+          "skill"
+        ],
         "title": "Kind",
         "type": "string"
       },
@@ -2612,6 +2654,8 @@ export const schemas = {
       "input_per_million_micro_usd": {
         "anyOf": [
           {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "type": "integer"
           },
           {
@@ -2627,6 +2671,8 @@ export const schemas = {
       "output_per_million_micro_usd": {
         "anyOf": [
           {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "type": "integer"
           },
           {
@@ -2661,6 +2707,7 @@ export const schemas = {
     "description": "What the provider reported, from its own records. A charge is never invented.",
     "properties": {
       "charged_micro_usd": {
+        "maximum": 9007199254740991.0,
         "minimum": 0.0,
         "title": "Charged Micro Usd",
         "type": "integer"
@@ -2695,6 +2742,8 @@ export const schemas = {
         "type": "string"
       },
       "estimated_micro_usd": {
+        "maximum": 9007199254740991.0,
+        "minimum": 0.0,
         "title": "Estimated Micro Usd",
         "type": "integer"
       },
@@ -2778,6 +2827,8 @@ export const schemas = {
       "reported_micro_usd": {
         "anyOf": [
           {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "type": "integer"
           },
           {
@@ -2796,6 +2847,14 @@ export const schemas = {
         "type": "string"
       },
       "status": {
+        "enum": [
+          "reserved",
+          "dispatched",
+          "succeeded",
+          "failed_before_acceptance",
+          "uncertain",
+          "cancelled"
+        ],
         "title": "Status",
         "type": "string"
       },
@@ -2850,6 +2909,7 @@ export const schemas = {
         "anyOf": [
           {
             "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
             "type": "string"
           },
           {
@@ -2990,6 +3050,8 @@ export const schemas = {
     "additionalProperties": false,
     "properties": {
       "occurrence_time": {
+        "format": "date-time",
+        "pattern": "^.+(Z|[+-]00:00)$",
         "title": "Occurrence Time",
         "type": "string"
       },
@@ -3021,6 +3083,12 @@ export const schemas = {
         "title": "Run Id"
       },
       "status": {
+        "enum": [
+          "admitted",
+          "missed",
+          "skipped_overlap",
+          "blocked"
+        ],
         "title": "Status",
         "type": "string"
       }
@@ -3488,6 +3556,7 @@ export const schemas = {
         "anyOf": [
           {
             "format": "date-time",
+            "pattern": "^.+(Z|[+-]00:00)$",
             "type": "string"
           },
           {
@@ -3639,8 +3708,7 @@ export const schemas = {
         "type": "string"
       },
       "status": {
-        "title": "Status",
-        "type": "string"
+        "$ref": "#/components/schemas/RunStatus"
       }
     },
     "required": [
@@ -3716,6 +3784,7 @@ export const schemas = {
     "properties": {
       "at": {
         "format": "date-time",
+        "pattern": "^.+(Z|[+-]00:00)$",
         "title": "At",
         "type": "string"
       },
@@ -4824,6 +4893,8 @@ export const schemas = {
     "description": "One run's facts for the list (PRD-Studio RN-01). Spend is from the ledger: `charged` is\nreported or entered, `reserved` is held for calls not yet settled, and `unreported` marks a call\nwhose charge was never reported. Either of the last two makes the amount an estimate.",
     "properties": {
       "charged_micro_usd": {
+        "maximum": 9007199254740991.0,
+        "minimum": 0.0,
         "title": "Charged Micro Usd",
         "type": "integer"
       },
@@ -4864,6 +4935,8 @@ export const schemas = {
         "type": "string"
       },
       "limit_micro_usd": {
+        "maximum": 9007199254740991.0,
+        "minimum": 0.0,
         "title": "Limit Micro Usd",
         "type": "integer"
       },
@@ -4887,6 +4960,8 @@ export const schemas = {
         "type": "array"
       },
       "reserved_micro_usd": {
+        "maximum": 9007199254740991.0,
+        "minimum": 0.0,
         "title": "Reserved Micro Usd",
         "type": "integer"
       },
@@ -4895,6 +4970,9 @@ export const schemas = {
       },
       "stop_reason": {
         "anyOf": [
+          {
+            "$ref": "#/components/schemas/StopCode"
+          },
           {
             "type": "string"
           },
@@ -5323,6 +5401,9 @@ export const schemas = {
       "stop_reason": {
         "anyOf": [
           {
+            "$ref": "#/components/schemas/StopCode"
+          },
+          {
             "type": "string"
           },
           {
@@ -5586,6 +5667,7 @@ export const schemas = {
       "version": {
         "anyOf": [
           {
+            "minimum": 1.0,
             "type": "integer"
           },
           {
@@ -5734,6 +5816,63 @@ export const schemas = {
     ],
     "title": "SessionWorkspace",
     "type": "object"
+  },
+  "StopCode": {
+    "description": "Why a run's pass stopped: each code a pass can stop with, and those the cancel settlement\nwrites. One other stored form exists, a spent repair: `repair_limit:` followed by the\nrepairable code, such as `repair_limit:plan_out_of_scope`.",
+    "enum": [
+      "credentials_required",
+      "credential_unavailable",
+      "model_unavailable",
+      "cost_unavailable",
+      "invalid_credential",
+      "insufficient_credits",
+      "rate_limited",
+      "provider_error",
+      "network_before_acceptance",
+      "partial_stream",
+      "uncertain_acceptance",
+      "incomplete_output",
+      "other",
+      "admission_refused",
+      "budget_exceeded",
+      "no_inference_slot",
+      "uncertain_model_call",
+      "unadmitted_model_call",
+      "request_unencodable",
+      "route_not_bound",
+      "compaction_failed",
+      "incompatible_version",
+      "model_calls_limit",
+      "tool_dispatches_limit",
+      "repairs_limit",
+      "plan_revisions_limit",
+      "children_limit",
+      "active_time_limit",
+      "step_limit",
+      "lease_lost",
+      "run_not_running",
+      "run_not_found",
+      "approval_pending",
+      "parent_not_running",
+      "assignment_paused",
+      "assignment_lost",
+      "assignment_busy",
+      "outcome_unknown",
+      "output_too_large",
+      "command_refused",
+      "worker_failed",
+      "plan_missing",
+      "plan_incomplete",
+      "criteria_unmet",
+      "workflow_invalid",
+      "workflow_node_failed",
+      "workflow_stalled",
+      "cancelled",
+      "cancelled_with_unknown_outcomes",
+      "children_settling"
+    ],
+    "title": "StopCode",
+    "type": "string"
   },
   "StreamCursor": {
     "additionalProperties": false,
@@ -5914,6 +6053,12 @@ export const schemas = {
         "type": "string"
       },
       "status": {
+        "enum": [
+          "started",
+          "succeeded",
+          "failed",
+          "unknown"
+        ],
         "title": "Status",
         "type": "string"
       },
@@ -6951,6 +7096,8 @@ export const schemas = {
         "$ref": "#/components/schemas/WorkflowGraph"
       },
       "saved_at": {
+        "format": "date-time",
+        "pattern": "^.+(Z|[+-]00:00)$",
         "title": "Saved At",
         "type": "string"
       }
@@ -7028,6 +7175,8 @@ export const schemas = {
     "description": "PRD-Studio WF-04: one execution's version, state, ledger spend and duration. Spend is an\nestimate while a reservation is held or a charge was never reported.",
     "properties": {
       "charged_micro_usd": {
+        "maximum": 9007199254740991.0,
+        "minimum": 0.0,
         "title": "Charged Micro Usd",
         "type": "integer"
       },
@@ -7048,6 +7197,8 @@ export const schemas = {
         "type": "string"
       },
       "reserved_micro_usd": {
+        "maximum": 9007199254740991.0,
+        "minimum": 0.0,
         "title": "Reserved Micro Usd",
         "type": "integer"
       },
@@ -7057,12 +7208,13 @@ export const schemas = {
         "type": "string"
       },
       "started_at": {
+        "format": "date-time",
+        "pattern": "^.+(Z|[+-]00:00)$",
         "title": "Started At",
         "type": "string"
       },
       "status": {
-        "title": "Status",
-        "type": "string"
+        "$ref": "#/components/schemas/RunStatus"
       },
       "unreported": {
         "title": "Unreported",
@@ -7425,6 +7577,10 @@ export const schemas = {
         "type": "string"
       },
       "source": {
+        "enum": [
+          "user",
+          "model_proposal"
+        ],
         "title": "Source",
         "type": "string"
       },
@@ -7637,7 +7793,7 @@ export interface ApprovalResult {
   approval_id: string;
   replayed: boolean;
   schema_version: 1;
-  status: string;
+  status: ApprovalStatus;
 }
 
 export function parseApprovalResult(value: unknown): ApprovalResult {
@@ -7663,6 +7819,12 @@ export function parseApprovalScope(value: unknown): ApprovalScope {
   return parseWith(schemas, "ApprovalScope", value) as ApprovalScope;
 }
 
+export type ApprovalStatus = "pending" | "approved" | "rejected" | "expired" | "withdrawn";
+
+export function parseApprovalStatus(value: unknown): ApprovalStatus {
+  return parseWith(schemas, "ApprovalStatus", value) as ApprovalStatus;
+}
+
 export interface ApprovalView {
   argument_hash: string;
   arguments: string;
@@ -7683,7 +7845,7 @@ export interface ApprovalView {
   run_goal: string | null;
   run_id: string;
   scope_snapshot: ApprovalScope | null;
-  status: string;
+  status: ApprovalStatus;
   task_title: string | null;
   tool_id: string;
   tool_version: number;
@@ -7818,10 +7980,10 @@ export interface CandidateView {
   content: string;
   id: string;
   key: string;
-  kind: string;
+  kind: "memory" | "skill";
   regression_results: Record<string, unknown> | null;
   replay: ReplayView | null;
-  status: string;
+  status: "proposed" | "regression_failed" | "regression_passed" | "rejected" | "promoted";
 }
 
 export function parseCandidateView(value: unknown): CandidateView {
@@ -7984,9 +8146,9 @@ export interface ExecutionView {
   id: string;
   instances: InstanceView[];
   run_id: string;
-  run_status: string;
+  run_status: RunStatus;
   schema_version: 1;
-  stop_reason: string | null;
+  stop_reason: StopCode | string | null;
   workflow_id: string;
   workflow_version: number;
 }
@@ -8225,7 +8387,7 @@ export function parseKeysAndVars(value: unknown): KeysAndVars {
 export interface KnowledgeHead {
   active_version: number | null;
   key: string;
-  kind: string;
+  kind: "memory" | "skill";
   schema_version: 1;
 }
 
@@ -8333,7 +8495,7 @@ export interface ModelCallView {
   reported_micro_usd: number | null;
   role: string;
   run_id: string;
-  status: string;
+  status: "reserved" | "dispatched" | "succeeded" | "failed_before_acceptance" | "uncertain" | "cancelled";
   upstream_provider: string;
   wire_id: string;
 }
@@ -8392,7 +8554,7 @@ export interface OccurrenceView {
   reason: string | null;
   routine_version: number;
   run_id: string | null;
-  status: string;
+  status: "admitted" | "missed" | "skipped_overlap" | "blocked";
 }
 
 export function parseOccurrenceView(value: unknown): OccurrenceView {
@@ -8554,7 +8716,7 @@ export function parseReplayRequest(value: unknown): ReplayRequest {
 export interface ReplayRunView {
   goal_text: string;
   run_id: string;
-  status: string;
+  status: RunStatus;
 }
 
 export function parseReplayRunView(value: unknown): ReplayRunView {
@@ -8907,7 +9069,7 @@ export interface RunListItem {
   profiles: string[];
   reserved_micro_usd: number;
   status: RunStatus;
-  stop_reason: string | null;
+  stop_reason: StopCode | string | null;
   tasks_complete: number;
   tasks_total: number;
   unreported: boolean;
@@ -8996,7 +9158,7 @@ export interface RunWorkspace {
   role_map: FrozenBinding[];
   run: RunSummary;
   schema_version: 1;
-  stop_reason: string | null;
+  stop_reason: StopCode | string | null;
   unknown_operations: UnknownEffect[];
   usage: UsageSummary;
   verification: VerificationSummary | null;
@@ -9112,6 +9274,12 @@ export function parseSessionWorkspace(value: unknown): SessionWorkspace {
   return parseWith(schemas, "SessionWorkspace", value) as SessionWorkspace;
 }
 
+export type StopCode = "credentials_required" | "credential_unavailable" | "model_unavailable" | "cost_unavailable" | "invalid_credential" | "insufficient_credits" | "rate_limited" | "provider_error" | "network_before_acceptance" | "partial_stream" | "uncertain_acceptance" | "incomplete_output" | "other" | "admission_refused" | "budget_exceeded" | "no_inference_slot" | "uncertain_model_call" | "unadmitted_model_call" | "request_unencodable" | "route_not_bound" | "compaction_failed" | "incompatible_version" | "model_calls_limit" | "tool_dispatches_limit" | "repairs_limit" | "plan_revisions_limit" | "children_limit" | "active_time_limit" | "step_limit" | "lease_lost" | "run_not_running" | "run_not_found" | "approval_pending" | "parent_not_running" | "assignment_paused" | "assignment_lost" | "assignment_busy" | "outcome_unknown" | "output_too_large" | "command_refused" | "worker_failed" | "plan_missing" | "plan_incomplete" | "criteria_unmet" | "workflow_invalid" | "workflow_node_failed" | "workflow_stalled" | "cancelled" | "cancelled_with_unknown_outcomes" | "children_settling";
+
+export function parseStopCode(value: unknown): StopCode {
+  return parseWith(schemas, "StopCode", value) as StopCode;
+}
+
 export interface StreamCursor {
   cursor: number;
 }
@@ -9155,7 +9323,7 @@ export interface ToolAttemptView {
   created_at: string;
   failure_code: string | null;
   operation_id: string;
-  status: string;
+  status: "started" | "succeeded" | "failed" | "unknown";
   tool_id: string;
   tool_version: number;
 }
@@ -9425,7 +9593,7 @@ export interface WorkflowExecutionSummary {
   reserved_micro_usd: number;
   run_id: string;
   started_at: string;
-  status: string;
+  status: RunStatus;
   unreported: boolean;
   version: number;
 }
@@ -9526,7 +9694,7 @@ export interface WorkflowVersionView {
   block_versions: Record<string, string>;
   graph: WorkflowGraph;
   graph_hash: string;
-  source: string;
+  source: "user" | "model_proposal";
   version: number;
 }
 

@@ -7,6 +7,7 @@ from decimal import ROUND_CEILING, Decimal, InvalidOperation
 from typing import Any
 
 from autobots.application.model_admission import Pricing
+from autobots.contracts.primitives import MAX_SAFE_INTEGER
 
 # Defined with the other budgets in domain/models.py, and imported from here by worker_inference.py
 # and the tests.
@@ -109,11 +110,13 @@ def parse_pricing(item: Mapping[str, Any]) -> Pricing | None:
 
 
 def _listed(value: object) -> int | None:
-    """USD per token as listed, in micro-USD per 1M tokens. A negative or unreadable one is None."""
+    """USD per token as listed, in micro-USD per 1M tokens. A negative or unreadable one is None,
+    and so is one past what the browser holds exactly, which `MicroUsd` refuses (refactor plan
+    R-61)."""
     if value is None:
         return None
     price = _scaled(value, 1_000_000 * 1_000_000)
-    return price if price is not None and price >= 0 else None
+    return price if price is not None and 0 <= price <= MAX_SAFE_INTEGER else None
 
 
 def parse_catalog(

@@ -2,10 +2,10 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
-from autobots.contracts.primitives import Identifier
-from autobots.contracts.tools import TOOL_CONTRACT
+from autobots.contracts.primitives import LAX_CONTRACT, TOOL_CONTRACT, Identifier
+from autobots.contracts.tool_fields import RunFilePath
 
 
 class PublishArtifact(BaseModel):
@@ -13,7 +13,7 @@ class PublishArtifact(BaseModel):
 
     model_config = TOOL_CONTRACT
 
-    path: str = Field(min_length=1, max_length=500)
+    path: RunFilePath
     version: int = Field(ge=1)
 
 
@@ -31,7 +31,7 @@ class ArtifactSummary(BaseModel):
 
     # Not strict, since it is built from database values.
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = LAX_CONTRACT
 
     id: Identifier
     run_id: Identifier
@@ -43,7 +43,7 @@ class ArtifactSummary(BaseModel):
 
 
 class ArtifactList(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     artifacts: list[ArtifactSummary]

@@ -8,17 +8,24 @@ saved version is read back through its stored record (persistence/records.py) an
 from collections.abc import Mapping
 from typing import Annotated, Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
-from autobots.contracts.primitives import Identifier, MicroUsd
-from autobots.contracts.tools import TOOL_CONTRACT
+from autobots.contracts.primitives import (
+    LAX_CONTRACT,
+    TOOL_CONTRACT,
+    Flag,
+    Identifier,
+    MicroUsd,
+    UtcTimestamp,
+    Version,
+)
 from autobots.domain.routines import DEFAULT_TIMEZONE, MAX_INTERVAL_MINUTES
-
-VIEW = ConfigDict(extra="forbid", frozen=True)
 
 # An IANA zone's name. The routine service checks that the zone exists, and refuses one that
 # doesn't with `timezone_unknown`, for either caller (Decision 0026 C5).
 IanaTimezone = Annotated[str, Field(min_length=1, max_length=64)]
+# routine_occurrences.status, as its check constraint allows (tests/test_contract_vocabularies.py).
+OccurrenceStatus = Literal["admitted", "missed", "skipped_overlap", "blocked"]
 
 
 # Named for the tool that introduced it: the name is the title in `cronjob` v1's input schema, which
@@ -42,18 +49,18 @@ class CronjobSchedule(BaseModel):
 
 
 class RoutineTarget(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     kind: Literal["expert", "workflow"]
     id: Identifier
     # "draft" is accepted here only to be refused with `draft_not_runnable` (PRD-Studio WF-02).
-    version: Annotated[int, Field(ge=1)] | Literal["draft"]
+    version: Version | Literal["draft"]
 
 
 class RoutineConfig(BaseModel):
     """A version as a request sets it."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     target: RoutineTarget
     trigger: CronjobSchedule
@@ -80,23 +87,23 @@ class RoutineConfig(BaseModel):
 
 
 class RoutineCreate(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     name: str = Field(min_length=1, max_length=100)
     config: RoutineConfig
 
 
 class RoutineRevision(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
-    expected_version: int = Field(ge=1)
+    expected_version: Version
     config: RoutineConfig
 
 
 class RoutineEnabled(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
-    enabled: bool
+    enabled: Flag
 
 
 class RoutineScheduleView(BaseModel):
@@ -105,7 +112,7 @@ class RoutineScheduleView(BaseModel):
     with them, such as `07:30:45`. `time` is null for an older daily version whose stored time isn't
     text, which never runs."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     kind: Literal["interval", "daily"]
     minutes: int | None
@@ -115,7 +122,7 @@ class RoutineScheduleView(BaseModel):
 class RoutineConfigView(BaseModel):
     """A saved version, read from its stored record."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     target: RoutineTarget
     trigger: RoutineScheduleView
@@ -128,17 +135,17 @@ class RoutineConfigView(BaseModel):
 
 
 class OccurrenceView(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
-    occurrence_time: str
+    occurrence_time: UtcTimestamp
     routine_version: int
-    status: str
+    status: OccurrenceStatus
     reason: str | None
     run_id: Identifier | None
 
 
 class RoutineView(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     id: Identifier
@@ -150,7 +157,7 @@ class RoutineView(BaseModel):
 
 
 class RoutineList(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     routines: list[RoutineView]

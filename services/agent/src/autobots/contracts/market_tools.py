@@ -1,14 +1,12 @@
 """Inputs and outputs of the market data tools, PRD-Tool-Catalog "Market data" and Decision 0017
 C11, Q5 and Q6. Every output names its source and when it was read."""
 
-import re
 from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from autobots.contracts.tools import TOOL_CONTRACT
-
-Symbol = str
+from autobots.contracts.primitives import TOOL_CONTRACT
+from autobots.contracts.tool_fields import Symbol
 
 
 class MarketHistoryInput(BaseModel):
@@ -20,9 +18,6 @@ class MarketHistoryInput(BaseModel):
 
     @model_validator(mode="after")
     def _symbols(self) -> "MarketHistoryInput":
-        for symbol in self.symbols:
-            if not re.fullmatch(r"[A-Z0-9.^=-]{1,20}", symbol):
-                raise ValueError("a symbol is 1 to 20 of A-Z, 0-9 and . ^ = -")
         if len(set(self.symbols)) != len(self.symbols):
             raise ValueError("each symbol once")
         return self
@@ -53,6 +48,7 @@ class MarketHistoryOutput(BaseModel):
 
     histories: list[SymbolHistory]
     source: str
+    # Text, as v1's output schema states it (Decision 0029 F13).
     retrieved_at: str
     symbol_count: int
 
@@ -99,4 +95,5 @@ class InflationOutput(BaseModel):
     countries: list[CountryInflation]
     indicator: Literal["FP.CPI.TOTL.ZG"] = "FP.CPI.TOTL.ZG"
     source: str
+    # Text, as v1's output schema states it (Decision 0029 F13).
     retrieved_at: str

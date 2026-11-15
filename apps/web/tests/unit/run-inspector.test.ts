@@ -30,7 +30,7 @@ function call(patch: Partial<ModelCallView> = {}): ModelCallView {
     reported_micro_usd: null,
     role: "executor",
     run_id: "11111111-1111-4111-8111-111111111111",
-    status: "settled_reported",
+    status: "failed_before_acceptance",
     upstream_provider: "Vendor",
     wire_id: "vendor/model",
     ...patch,
@@ -44,7 +44,7 @@ test("a token count is a number, or says it wasn't reported", () => {
 });
 
 test("an unknown outcome and an unattributed reconciliation say so before the status", () => {
-  assert.equal(callOutcome(call()), "settled reported");
+  assert.equal(callOutcome(call()), "failed before acceptance");
   assert.equal(callOutcome(call({ outcome_unknown: true })), "outcome unknown");
   assert.equal(
     callOutcome(call({ charge_source_unknown: true })),

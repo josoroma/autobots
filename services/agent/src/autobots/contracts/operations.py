@@ -1,19 +1,17 @@
 """Local Operations, SP-018: conditions and counts only. No address, path, identifier or secret."""
 
-from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, Field, model_validator
 
-from autobots.contracts.primitives import UtcTimestamp
+from autobots.contracts.primitives import LAX_CONTRACT, Count, UtcTimestamp
 from autobots.contracts.settings import RouteQualification
 
-VIEW = ConfigDict(extra="forbid", frozen=True)
 Name = Literal["database", "schema", "hold", "adapter", "storage", "disk", "queue", "worker"]
 
 
 class OperationCondition(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     name: Name
     state: Literal["ok", "degraded", "unavailable"]
@@ -23,7 +21,7 @@ class OperationCondition(BaseModel):
 class QueueStatus(BaseModel):
     """This workspace's jobs."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     queued: int = Field(ge=0)
     claimed: int = Field(ge=0)
@@ -34,10 +32,10 @@ class QueueStatus(BaseModel):
 class RetentionSettings(BaseModel):
     """A null window keeps everything. Keys must outlive the run content they can answer for."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
-    run_days: int | None = Field(default=None, ge=1, le=36500)
-    receipt_days: int | None = Field(default=None, ge=1, le=36500)
+    run_days: Count | None = Field(default=None, ge=1, le=36500)
+    receipt_days: Count | None = Field(default=None, ge=1, le=36500)
 
     @model_validator(mode="after")
     def keys_outlive_content(self) -> "RetentionSettings":
@@ -54,7 +52,7 @@ class RetentionSummary(BaseModel):
     """PRD-Studio SE-06: the workspace's retention windows, which any member may read, and the
     reader's own role, so a page offers Operations to the owner only. Nothing here changes them."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     run_days: int | None = Field(ge=1)
@@ -65,10 +63,10 @@ class RetentionSummary(BaseModel):
 class DelayedOccurrence(BaseModel):
     """A routine occurrence that didn't run at its time, and the code for why."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     routine: str
-    occurrence_time: datetime
+    occurrence_time: UtcTimestamp
     status: Literal["missed", "skipped_overlap", "blocked"]
     reason: str | None
 
@@ -76,9 +74,9 @@ class DelayedOccurrence(BaseModel):
 class RestoreRecord(BaseModel):
     """One restore drill: when, and what its verification found. Never which instance or where."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
-    at: datetime
+    at: UtcTimestamp
     result: Literal["passed", "failed", "not_verified"]
     checks_passed: int | None = Field(ge=0)
     checks_total: int | None = Field(ge=0)
@@ -88,7 +86,7 @@ class OperationValues(BaseModel):
     """Decision 0022 D5's measured values, and nothing more: numbers, a release name and a flag.
     No path, address, identifier or secret. Each is null when it can't be measured."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     # The p95 of the last readiness probes' database answer times, and how many probes it covers.
     database_p95_ms: int | None = Field(ge=0)
@@ -113,7 +111,7 @@ class OperationValues(BaseModel):
 class LocalStatus(BaseModel):
     """`scope` is `installation` when the database is down, as no workspace can be verified."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     ready: bool
@@ -133,7 +131,7 @@ class LocalStatus(BaseModel):
 class JobHour(BaseModel):
     """One hour of the workspace's jobs (PRD-Studio OP-03, Decision 0022 D14). Counts only."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     starts_at: UtcTimestamp
     # The hour's start in the workspace's timezone, as 14:00.
@@ -147,7 +145,7 @@ class JobHour(BaseModel):
 class JobsChart(BaseModel):
     """The last 24 hours, oldest first, in the workspace's timezone. No identifier, no goal text."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     timezone: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_+/-]+$")
@@ -155,7 +153,7 @@ class JobsChart(BaseModel):
 
 
 class RetentionApplied(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     purged_runs: int = Field(ge=0)
@@ -171,7 +169,7 @@ ServiceName = Literal["api", "worker", "database", "openrouter"]
 class ServiceReadiness(BaseModel):
     """One service's readiness for members (PRD-Studio SH-04): a state and a code, nothing more."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     name: ServiceName
     state: Literal["ready", "not_ready", "unknown"]
@@ -181,7 +179,7 @@ class ServiceReadiness(BaseModel):
 class MemberReadiness(BaseModel):
     """Readiness any member may read. No counts, no paths, no identifiers, no secrets."""
 
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     ready: bool

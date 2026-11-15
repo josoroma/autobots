@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-from autobots.contracts.tools import TOOL_CONTRACT
+from autobots.contracts.primitives import TOOL_CONTRACT
 
 MAX_INPUT_BYTES = 1_048_576
 InputMediaType = Literal["text/plain", "text/markdown", "application/json", "text/csv"]

@@ -63,7 +63,7 @@ class ApprovalRefused(Refusal):
 @dataclass(frozen=True)
 class DecisionResult:
     approval_id: UUID
-    status: str
+    status: ApprovalStatus
     replayed: bool
 
 
@@ -504,7 +504,7 @@ async def decide(
     async with connection.transaction():
         existing = await command.replayed(connection, ApprovalDecisionReceipt)
         if existing is not None:
-            return DecisionResult(approval_id, existing.status.value, True)
+            return DecisionResult(approval_id, existing.status, True)
         # A request's run never changes, so it is read before any lock. Then the job's row, the
         # run's and the request's, in the order a person's cancel takes them as it withdraws
         # pending requests, so a decision and a cancel can't deadlock (SP-012).
@@ -535,7 +535,7 @@ async def decide(
             raise ApprovalRefused("approval_too_large")
         if not pending:
             if status == wanted:
-                return DecisionResult(approval_id, status, True)
+                return DecisionResult(approval_id, wanted, True)
             raise ApprovalRefused("approval_already_decided")
         if expired:
             # Read pending under this row's lock, so the expiry always moves it.
@@ -577,7 +577,7 @@ async def decide(
             await command.store(connection, ApprovalDecisionReceipt(status=wanted))
     if expired_row:
         raise ApprovalRefused("approval_expired")
-    return DecisionResult(approval_id, wanted.value, False)
+    return DecisionResult(approval_id, wanted, False)
 
 
 # The settled statuses the decided list shows (PRD-Studio AP-02), as stored strings.

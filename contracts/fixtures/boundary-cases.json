@@ -2564,5 +2564,596 @@
         "coordinator": "openrouter_unapproved"
       }
     }
+  },
+  {
+    "name": "bad money: a numeric string in a run request",
+    "model": "RunRequest",
+    "valid": false,
+    "value": {
+      "goal_text": "Summarize the report",
+      "limit_micro_usd": "5000000"
+    }
+  },
+  {
+    "name": "bad money: a boolean in a run request",
+    "model": "RunRequest",
+    "valid": false,
+    "value": {
+      "goal_text": "Summarize the report",
+      "budget_micro_usd": true
+    }
+  },
+  {
+    "name": "routine enabled flag",
+    "model": "RoutineEnabled",
+    "valid": true,
+    "value": {
+      "enabled": false
+    }
+  },
+  {
+    "name": "bad flag: routine enabled as text",
+    "model": "RoutineEnabled",
+    "valid": false,
+    "value": {
+      "enabled": "no"
+    }
+  },
+  {
+    "name": "valid routine occurrence",
+    "model": "OccurrenceView",
+    "valid": true,
+    "value": {
+      "occurrence_time": "2026-11-05T07:30:00Z",
+      "routine_version": 1,
+      "status": "missed",
+      "reason": "worker_down",
+      "run_id": null
+    }
+  },
+  {
+    "name": "bad timestamp: a routine occurrence not in UTC",
+    "model": "OccurrenceView",
+    "valid": false,
+    "value": {
+      "occurrence_time": "2026-11-05T09:30:00+02:00",
+      "routine_version": 1,
+      "status": "missed",
+      "reason": "worker_down",
+      "run_id": null
+    }
+  },
+  {
+    "name": "bad enum: a routine occurrence status its table doesn't allow",
+    "model": "OccurrenceView",
+    "valid": false,
+    "value": {
+      "occurrence_time": "2026-11-05T07:30:00Z",
+      "routine_version": 1,
+      "status": "queued",
+      "reason": "worker_down",
+      "run_id": null
+    }
+  },
+  {
+    "name": "approval waiting for a decision",
+    "model": "ApprovalView",
+    "valid": true,
+    "value": {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "run_id": "22222222-2222-4222-8222-222222222222",
+      "tool_id": "create_github_issue",
+      "tool_version": 2,
+      "operation_class": "consequential_external_write",
+      "argument_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "arguments": "{}",
+      "arguments_truncated": false,
+      "status": "pending",
+      "expires_at": "2026-11-05T01:00:00Z",
+      "policy_reason": null,
+      "resource_target": null,
+      "requester": null,
+      "scope_snapshot": null,
+      "policy_version": null,
+      "policy_rule": null,
+      "run_goal": null,
+      "task_title": null,
+      "decided_at": null,
+      "decided_by": null,
+      "decided_by_name": null,
+      "arguments_bytes": 2
+    }
+  },
+  {
+    "name": "bad enum: an approval status its table doesn't allow",
+    "model": "ApprovalView",
+    "valid": false,
+    "value": {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "run_id": "22222222-2222-4222-8222-222222222222",
+      "tool_id": "create_github_issue",
+      "tool_version": 2,
+      "operation_class": "consequential_external_write",
+      "argument_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "arguments": "{}",
+      "arguments_truncated": false,
+      "status": "decided",
+      "expires_at": "2026-11-05T01:00:00Z",
+      "policy_reason": null,
+      "resource_target": null,
+      "requester": null,
+      "scope_snapshot": null,
+      "policy_version": null,
+      "policy_rule": null,
+      "run_goal": null,
+      "task_title": null,
+      "decided_at": null,
+      "decided_by": null,
+      "decided_by_name": null,
+      "arguments_bytes": 2
+    }
+  },
+  {
+    "name": "bad timestamp: an approval deadline not in UTC",
+    "model": "ApprovalView",
+    "valid": false,
+    "value": {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "run_id": "22222222-2222-4222-8222-222222222222",
+      "tool_id": "create_github_issue",
+      "tool_version": 2,
+      "operation_class": "consequential_external_write",
+      "argument_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "arguments": "{}",
+      "arguments_truncated": false,
+      "status": "pending",
+      "expires_at": "2026-11-05T03:00:00+02:00",
+      "policy_reason": null,
+      "resource_target": null,
+      "requester": null,
+      "scope_snapshot": null,
+      "policy_version": null,
+      "policy_rule": null,
+      "run_goal": null,
+      "task_title": null,
+      "decided_at": null,
+      "decided_by": null,
+      "decided_by_name": null,
+      "arguments_bytes": 2
+    }
+  },
+  {
+    "name": "approval decision result",
+    "model": "ApprovalResult",
+    "valid": true,
+    "value": {
+      "schema_version": 1,
+      "approval_id": "11111111-1111-4111-8111-111111111111",
+      "status": "approved",
+      "replayed": false
+    }
+  },
+  {
+    "name": "bad enum: an approval result status its table doesn't allow",
+    "model": "ApprovalResult",
+    "valid": false,
+    "value": {
+      "schema_version": 1,
+      "approval_id": "11111111-1111-4111-8111-111111111111",
+      "status": "decided",
+      "replayed": false
+    }
+  },
+  {
+    "name": "model call whose outcome is uncertain",
+    "model": "ModelCallView",
+    "valid": true,
+    "value": {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "run_id": "22222222-2222-4222-8222-222222222222",
+      "role": "executor",
+      "attempt": 1,
+      "status": "uncertain",
+      "provider": "openrouter",
+      "profile": "openrouter_terra",
+      "canonical_id": "vendor/model",
+      "wire_id": "vendor/model",
+      "upstream_provider": "Vendor",
+      "input_tokens": 10,
+      "output_tokens": 5,
+      "reasoning_tokens": null,
+      "reported_micro_usd": null,
+      "estimated_micro_usd": 1200,
+      "reconciled": false,
+      "outcome_unknown": true,
+      "charge_source_unknown": false,
+      "finish_reason": null,
+      "failure_class": "partial_stream",
+      "created_at": "2026-11-05T00:00:00Z"
+    }
+  },
+  {
+    "name": "bad enum: a model call status its table doesn't allow",
+    "model": "ModelCallView",
+    "valid": false,
+    "value": {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "run_id": "22222222-2222-4222-8222-222222222222",
+      "role": "executor",
+      "attempt": 1,
+      "status": "settled_reported",
+      "provider": "openrouter",
+      "profile": "openrouter_terra",
+      "canonical_id": "vendor/model",
+      "wire_id": "vendor/model",
+      "upstream_provider": "Vendor",
+      "input_tokens": 10,
+      "output_tokens": 5,
+      "reasoning_tokens": null,
+      "reported_micro_usd": null,
+      "estimated_micro_usd": 1200,
+      "reconciled": false,
+      "outcome_unknown": true,
+      "charge_source_unknown": false,
+      "finish_reason": null,
+      "failure_class": "partial_stream",
+      "created_at": "2026-11-05T00:00:00Z"
+    }
+  },
+  {
+    "name": "bad money: a model call estimate below zero",
+    "model": "ModelCallView",
+    "valid": false,
+    "value": {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "run_id": "22222222-2222-4222-8222-222222222222",
+      "role": "executor",
+      "attempt": 1,
+      "status": "uncertain",
+      "provider": "openrouter",
+      "profile": "openrouter_terra",
+      "canonical_id": "vendor/model",
+      "wire_id": "vendor/model",
+      "upstream_provider": "Vendor",
+      "input_tokens": 10,
+      "output_tokens": 5,
+      "reasoning_tokens": null,
+      "reported_micro_usd": null,
+      "estimated_micro_usd": -1,
+      "reconciled": false,
+      "outcome_unknown": true,
+      "charge_source_unknown": false,
+      "finish_reason": null,
+      "failure_class": "partial_stream",
+      "created_at": "2026-11-05T00:00:00Z"
+    }
+  },
+  {
+    "name": "tool attempt with an unknown outcome",
+    "model": "ToolAttemptView",
+    "valid": true,
+    "value": {
+      "operation_id": "op-1",
+      "tool_id": "create_github_issue",
+      "tool_version": 2,
+      "status": "unknown",
+      "failure_code": null,
+      "created_at": "2026-11-05T00:00:00Z"
+    }
+  },
+  {
+    "name": "bad enum: a tool attempt status its table doesn't allow",
+    "model": "ToolAttemptView",
+    "valid": false,
+    "value": {
+      "operation_id": "op-1",
+      "tool_id": "create_github_issue",
+      "tool_version": 2,
+      "status": "running",
+      "failure_code": null,
+      "created_at": "2026-11-05T00:00:00Z"
+    }
+  },
+  {
+    "name": "improvement candidate that passed its regression cases",
+    "model": "CandidateView",
+    "valid": true,
+    "value": {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "kind": "memory",
+      "key": "deploy-window",
+      "content": "Deploy on Tuesdays.",
+      "status": "regression_passed",
+      "regression_results": null,
+      "replay": null
+    }
+  },
+  {
+    "name": "bad enum: an improvement candidate kind its table doesn't allow",
+    "model": "CandidateView",
+    "valid": false,
+    "value": {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "kind": "note",
+      "key": "deploy-window",
+      "content": "Deploy on Tuesdays.",
+      "status": "regression_passed",
+      "regression_results": null,
+      "replay": null
+    }
+  },
+  {
+    "name": "bad enum: an improvement candidate status its table doesn't allow",
+    "model": "CandidateView",
+    "valid": false,
+    "value": {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "kind": "memory",
+      "key": "deploy-window",
+      "content": "Deploy on Tuesdays.",
+      "status": "accepted",
+      "regression_results": null,
+      "replay": null
+    }
+  },
+  {
+    "name": "workflow version a model proposed",
+    "model": "WorkflowVersionView",
+    "valid": true,
+    "value": {
+      "version": 1,
+      "graph_hash": "abc",
+      "source": "model_proposal",
+      "graph": {
+        "nodes": [],
+        "links": []
+      },
+      "block_versions": {}
+    }
+  },
+  {
+    "name": "bad enum: a workflow version source its table doesn't allow",
+    "model": "WorkflowVersionView",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "graph_hash": "abc",
+      "source": "import",
+      "graph": {
+        "nodes": [],
+        "links": []
+      },
+      "block_versions": {}
+    }
+  },
+  {
+    "name": "workflow execution summary",
+    "model": "WorkflowExecutionSummary",
+    "valid": true,
+    "value": {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "run_id": "22222222-2222-4222-8222-222222222222",
+      "version": 1,
+      "status": "succeeded",
+      "charged_micro_usd": 0,
+      "reserved_micro_usd": 0,
+      "unreported": false,
+      "started_at": "2026-11-05T00:00:00Z",
+      "duration_seconds": 3
+    }
+  },
+  {
+    "name": "bad enum: a workflow execution status that isn't a run status",
+    "model": "WorkflowExecutionSummary",
+    "valid": false,
+    "value": {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "run_id": "22222222-2222-4222-8222-222222222222",
+      "version": 1,
+      "status": "done",
+      "charged_micro_usd": 0,
+      "reserved_micro_usd": 0,
+      "unreported": false,
+      "started_at": "2026-11-05T00:00:00Z",
+      "duration_seconds": 3
+    }
+  },
+  {
+    "name": "bad timestamp: a workflow execution start not in UTC",
+    "model": "WorkflowExecutionSummary",
+    "valid": false,
+    "value": {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "run_id": "22222222-2222-4222-8222-222222222222",
+      "version": 1,
+      "status": "succeeded",
+      "charged_micro_usd": 0,
+      "reserved_micro_usd": 0,
+      "unreported": false,
+      "started_at": "2026-11-05T02:00:00+02:00",
+      "duration_seconds": 3
+    }
+  },
+  {
+    "name": "workflow execution of the draft",
+    "model": "ExecutionCreate",
+    "valid": true,
+    "value": {
+      "version": "draft"
+    }
+  },
+  {
+    "name": "workflow execution of a version with a budget",
+    "model": "ExecutionCreate",
+    "valid": true,
+    "value": {
+      "version": 2,
+      "budget_micro_usd": 250000
+    }
+  },
+  {
+    "name": "bad version: a workflow execution version as text",
+    "model": "ExecutionCreate",
+    "valid": false,
+    "value": {
+      "version": "2"
+    }
+  },
+  {
+    "name": "bad version: a workflow execution version of zero",
+    "model": "ExecutionCreate",
+    "valid": false,
+    "value": {
+      "version": 0
+    }
+  },
+  {
+    "name": "bad money: a workflow execution budget as text",
+    "model": "ExecutionCreate",
+    "valid": false,
+    "value": {
+      "version": 2,
+      "budget_micro_usd": "250000"
+    }
+  },
+  {
+    "name": "bad money: a workflow execution budget above the exact integer range",
+    "model": "ExecutionCreate",
+    "valid": false,
+    "value": {
+      "version": 2,
+      "budget_micro_usd": 9007199254740992
+    }
+  },
+  {
+    "name": "session expert pinned to a version",
+    "model": "SessionExpert",
+    "valid": true,
+    "value": {
+      "expert_id": "11111111-1111-4111-8111-111111111111",
+      "version": 1
+    }
+  },
+  {
+    "name": "bad version: a session expert version of zero",
+    "model": "SessionExpert",
+    "valid": false,
+    "value": {
+      "expert_id": "11111111-1111-4111-8111-111111111111",
+      "version": 0
+    }
+  },
+  {
+    "name": "bad version: a session expert version as text",
+    "model": "SessionExpert",
+    "valid": false,
+    "value": {
+      "expert_id": "11111111-1111-4111-8111-111111111111",
+      "version": "1"
+    }
+  },
+  {
+    "name": "bad version: a model policy expected version as text",
+    "model": "ModelPolicyUpdate",
+    "valid": false,
+    "value": {
+      "expected_version": "3",
+      "default_profile": null,
+      "role_overrides": {}
+    }
+  },
+  {
+    "name": "bad version: a model policy expected version below zero",
+    "model": "ModelPolicyUpdate",
+    "valid": false,
+    "value": {
+      "expected_version": -1,
+      "default_profile": null,
+      "role_overrides": {}
+    }
+  },
+  {
+    "name": "first workflow publish",
+    "model": "WorkflowPublish",
+    "valid": true,
+    "value": {
+      "expected_version": 0,
+      "graph": {
+        "nodes": [],
+        "links": []
+      },
+      "source": "user"
+    }
+  },
+  {
+    "name": "bad version: a workflow publish expected version with a fraction",
+    "model": "WorkflowPublish",
+    "valid": false,
+    "value": {
+      "expected_version": 1.5,
+      "graph": {
+        "nodes": [],
+        "links": []
+      }
+    }
+  },
+  {
+    "name": "bad version: a workflow publish expected version below zero",
+    "model": "WorkflowPublish",
+    "valid": false,
+    "value": {
+      "expected_version": -1,
+      "graph": {
+        "nodes": [],
+        "links": []
+      }
+    }
+  },
+  {
+    "name": "rollback to no active version",
+    "model": "RollbackRequest",
+    "valid": true,
+    "value": {
+      "kind": "memory",
+      "key": "deploy-window",
+      "to_version": 0
+    }
+  },
+  {
+    "name": "bad version: a rollback version as text",
+    "model": "RollbackRequest",
+    "valid": false,
+    "value": {
+      "kind": "memory",
+      "key": "deploy-window",
+      "to_version": "1"
+    }
+  },
+  {
+    "name": "retention windows",
+    "model": "RetentionSettings",
+    "valid": true,
+    "value": {
+      "run_days": 30,
+      "receipt_days": 60
+    }
+  },
+  {
+    "name": "bad count: a retention window as text",
+    "model": "RetentionSettings",
+    "valid": false,
+    "value": {
+      "run_days": "30",
+      "receipt_days": null
+    }
+  },
+  {
+    "name": "bad count: a retention window of zero days",
+    "model": "RetentionSettings",
+    "valid": false,
+    "value": {
+      "run_days": 0,
+      "receipt_days": null
+    }
   }
 ]

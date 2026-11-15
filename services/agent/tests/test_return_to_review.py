@@ -21,7 +21,7 @@ import pytest
 from autobots.application.runs import LeaseLost
 from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolScope
 from autobots.application.worker_leases import Lease
-from autobots.contracts.tools import GithubOpenPullRequestInput
+from autobots.contracts.github_tools import GithubOpenPullRequestInput
 
 SOURCE = Path(__file__).resolve().parents[1] / "src/autobots"
 REPOSITORY = "owner/throwaway"

@@ -37,10 +37,7 @@ from autobots.application.tool_definitions import (
     ToolDefinition,
     ToolFailed,
 )
-from autobots.contracts.tools import (
-    GithubOpenPullRequestInput,
-    GithubOpenPullRequestOutput,
-)
+from autobots.contracts.github_tools import GithubOpenPullRequestInput, GithubOpenPullRequestOutput
 from autobots.domain.tool_catalog import ToolGroup, ToolProvider
 from autobots.domain.tools import OperationClass
 

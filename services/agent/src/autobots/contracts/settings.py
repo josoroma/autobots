@@ -1,12 +1,19 @@
 """Safe provider settings. Nothing here carries a stored key; only a request holds a draft."""
 
-from datetime import date, datetime
+from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from autobots.contracts.models import EffectiveRolePolicy
-from autobots.contracts.primitives import STRICT_CONTRACT, Identifier
+from autobots.contracts.primitives import (
+    LAX_CONTRACT,
+    STRICT_CONTRACT,
+    Count,
+    Identifier,
+    MicroUsd,
+    UtcTimestamp,
+)
 from autobots.domain.budgets import budget_choices
 from autobots.domain.models import ModelProfileId
 
@@ -43,7 +50,7 @@ class ProviderStatus(BaseModel):
     qualification: list[RouteQualification]
     credential_id: Identifier | None
     credential_version: int | None
-    validated_at: datetime | None
+    validated_at: UtcTimestamp | None
 
 
 class CredentialDraft(BaseModel):
@@ -105,8 +112,8 @@ class ModelAvailability(BaseModel):
     offered: bool
     # From the catalog only, PRD-Studio MD-01, and never a qualification. Micro-USD per 1M tokens,
     # None when this exact model isn't in a fresh catalog or its base price can't be read.
-    input_per_million_micro_usd: int | None
-    output_per_million_micro_usd: int | None
+    input_per_million_micro_usd: MicroUsd | None
+    output_per_million_micro_usd: MicroUsd | None
     capabilities: list[str]
 
 
@@ -116,16 +123,16 @@ class ModelList(BaseModel):
     schema_version: Literal[1]
     catalog_status: CatalogStatus
     # When the catalog behind these facts was fetched, or None when it couldn't be.
-    fetched_at: datetime | None
+    fetched_at: UtcTimestamp | None
     models: list[ModelAvailability]
 
 
 class ModelPolicyUpdate(BaseModel):
     # Not strict, so JSON strings become enums. Unknown fields and values are still refused.
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = LAX_CONTRACT
 
-    expected_version: int = Field(ge=0)
+    expected_version: Count
     # None names no workspace default, so each role takes its built-in default (MD-02).
     default_profile: ModelProfileId | None
     role_overrides: dict[str, ModelProfileId]
@@ -146,12 +153,12 @@ class BudgetRange(BaseModel):
 
     model_config = STRICT_CONTRACT
 
-    min_micro_usd: int
+    min_micro_usd: MicroUsd
     # Below `min_micro_usd` when nothing is left today, so no budget can be chosen.
-    max_micro_usd: int
-    step_micro_usd: int
-    default_micro_usd: int
-    remaining_daily_micro_usd: int
+    max_micro_usd: MicroUsd
+    step_micro_usd: MicroUsd
+    default_micro_usd: MicroUsd
+    remaining_daily_micro_usd: MicroUsd
 
 
 def budget_range(remaining_daily: int) -> BudgetRange:

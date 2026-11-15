@@ -1,6 +1,13 @@
-"""The tool vocabulary and its resource rule, SP-013 and PRD 9.1."""
+"""The tool vocabulary and its resource rule, SP-013 and PRD 9.1.
 
+The grant tables are read-only, as domain/models.py's are: they decide what a run may call, so no
+importer can widen them (PDOM-20).
+"""
+
+from collections.abc import Mapping
 from enum import StrEnum
+from types import MappingProxyType
+from typing import Final
 
 
 class OperationClass(StrEnum):
@@ -13,59 +20,69 @@ class OperationClass(StrEnum):
 
 # The plan tools come with any loop. An Expert chooses among the rest. General tools can't reach
 # the host or the network; provider tools reach only their provider, through the URL guard.
-PLAN_TOOLS = {"propose_plan": 1, "complete_task": 1, "read_offload": 1}
-GENERAL_TOOLS = {
-    "calculate": 1,
-    # Version 2 for new grants. Runs that pinned version 1 keep it, and it stays registered.
-    "read_run_file": 2,
-    "read_csv": 1,
-    "save_artifact": 1,
-    "publish_artifact": 1,
-    "search_memory": 1,
-}
+PLAN_TOOLS: Final[Mapping[str, int]] = MappingProxyType(
+    {"propose_plan": 1, "complete_task": 1, "read_offload": 1}
+)
+GENERAL_TOOLS: Final[Mapping[str, int]] = MappingProxyType(
+    {
+        "calculate": 1,
+        # Version 2 for new grants. Runs that pinned version 1 keep it, and it stays registered.
+        "read_run_file": 2,
+        "read_csv": 1,
+        "save_artifact": 1,
+        "publish_artifact": 1,
+        "search_memory": 1,
+    }
+)
 # Tool-provider tools, Decision 0017. Each needs its provider's key, read per attempt.
-PROVIDER_TOOLS = {
-    "tavily_search": 1,
-    "tavily_extract": 1,
-    "tavily_map": 1,
-    "tavily_crawl": 1,
-    "search_web": 1,
-    "extract_website_content": 1,
-    "market_history": 1,
-    "inflation_rates": 1,
-}
-EXPERT_TOOLS = {
-    **GENERAL_TOOLS,
-    # Proposing an improvement changes nothing by itself, but a run gets it only if an owner chose
-    # that.
-    "propose_improvement": 1,
-    # Version 2 adds labels (PRD-Studio GH-05). A run whose grants pinned version 1 keeps it.
-    "create_github_issue": 2,
-    # Read only, on the one configured repository (PRD-Studio GH-01 to GH-04).
-    "github_list_pull_requests": 1,
-    "github_list_workflow_runs": 1,
-    "github_search_issues": 1,
-    "github_read_file": 1,
-    # Consequential, with approval on every call and each file's diff (PRD-Studio GH-06).
-    "github_open_pull_request": 1,
-    # It reaches the network, so only an owner's Expert grants it, never a plain goal.
-    "store_remote_file": 1,
-    # Code tools over the run's own files, for Experts that do code-shaped work (Decision 0017).
-    "search_files": 1,
-    "read_code_file": 1,
-    "write_code_file": 1,
-    "patch_code_file": 1,
-    **PROVIDER_TOOLS,
-    # Arbitrary execution in the isolated browser, only while it's qualified (US-14.12).
-    "browse_goal": 1,
-    # Manages the workspace's routines, every action but `list` approved (Decision 0026).
-    "cronjob": 1,
-}
-LOOP_TOOL_GRANTS = {**PLAN_TOOLS, **GENERAL_TOOLS}
+PROVIDER_TOOLS: Final[Mapping[str, int]] = MappingProxyType(
+    {
+        "tavily_search": 1,
+        "tavily_extract": 1,
+        "tavily_map": 1,
+        "tavily_crawl": 1,
+        "search_web": 1,
+        "extract_website_content": 1,
+        "market_history": 1,
+        "inflation_rates": 1,
+    }
+)
+EXPERT_TOOLS: Final[Mapping[str, int]] = MappingProxyType(
+    {
+        **GENERAL_TOOLS,
+        # Proposing an improvement changes nothing by itself, but a run gets it only if an owner
+        # chose that.
+        "propose_improvement": 1,
+        # Version 2 adds labels (PRD-Studio GH-05). A run whose grants pinned version 1 keeps it.
+        "create_github_issue": 2,
+        # Read only, on the one configured repository (PRD-Studio GH-01 to GH-04).
+        "github_list_pull_requests": 1,
+        "github_list_workflow_runs": 1,
+        "github_search_issues": 1,
+        "github_read_file": 1,
+        # Consequential, with approval on every call and each file's diff (PRD-Studio GH-06).
+        "github_open_pull_request": 1,
+        # It reaches the network, so only an owner's Expert grants it, never a plain goal.
+        "store_remote_file": 1,
+        # Code tools over the run's own files, for Experts that do code-shaped work (Decision 0017).
+        "search_files": 1,
+        "read_code_file": 1,
+        "write_code_file": 1,
+        "patch_code_file": 1,
+        **PROVIDER_TOOLS,
+        # Arbitrary execution in the isolated browser, only while it's qualified (US-14.12).
+        "browse_goal": 1,
+        # Manages the workspace's routines, every action but `list` approved (Decision 0026).
+        "cronjob": 1,
+    }
+)
+LOOP_TOOL_GRANTS: Final[Mapping[str, int]] = MappingProxyType({**PLAN_TOOLS, **GENERAL_TOOLS})
 # Only a coordinator session's runs get this, and an Expert's own configuration can't name it.
 DELEGATION_TOOL = "assign_specialist"
 # What a workflow's own blocks reach. Its approval step is the only consequential one here.
-WORKFLOW_TOOLS = {**LOOP_TOOL_GRANTS, DELEGATION_TOOL: 1, "workflow_approval": 1}
+WORKFLOW_TOOLS: Final[Mapping[str, int]] = MappingProxyType(
+    {**LOOP_TOOL_GRANTS, DELEGATION_TOOL: 1, "workflow_approval": 1}
+)
 RUN_FILE_GRANTS = ("inputs", "outputs")
 
 # Only these leave an effect, so only these get an operation identity and a receipt.

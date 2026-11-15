@@ -2,6 +2,7 @@
 
 import asyncio
 import base64
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
@@ -13,6 +14,7 @@ from pydantic import ValidationError
 from autobots.adapters.github_connector import GITHUB_KEY, TOKEN_SCOPES
 from autobots.adapters.github_reads import MAX_FILE_BYTES, github_read_tools
 from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolScope
+from autobots.contracts.github_tools import GithubListPullRequestsInput, GithubListWorkflowRunsInput
 from autobots.domain.tool_catalog import ToolAvailability, key_availability
 
 REPOSITORY = "owner/configured"
@@ -199,6 +201,47 @@ def test_a_repository_or_an_out_of_bounds_input_is_refused_before_any_request(
     with pytest.raises(ValidationError):
         tools(github)[tool_id].input_model.model_validate(arguments)
     assert github.requests == []
+
+
+@pytest.mark.parametrize(
+    ("since", "numbers"),
+    [
+        ("2026-11-07", [7, 8]),
+        ("2026-11-07T09:30:00", [7, 8]),
+        ("2026-11-07T10:30:00", [8]),
+        ("2026-11-07T12:30:00+02:00", [8]),
+        ("2026-11-07T10:30:00Z", [8]),
+    ],
+)
+def test_a_since_without_an_offset_is_read_as_utc(since: str, numbers: list[int]) -> None:
+    """A date-only or offset-less `since` is UTC, and one with an offset compares as the same
+    instant, so the filter answers instead of failing (PADP-17, PDOM-03)."""
+    listed = call(FakeGithub(), "github_list_pull_requests", {"state": "closed", "since": since})
+    assert [item.number for item in listed.pull_requests] == numbers
+
+
+@pytest.mark.parametrize("model", [GithubListPullRequestsInput, GithubListWorkflowRunsInput])
+def test_a_since_is_held_in_utc(
+    model: type[GithubListPullRequestsInput] | type[GithubListWorkflowRunsInput],
+) -> None:
+    naive = model.model_validate({"since": "2026-11-07T10:30:00"}).since
+    assert naive == datetime(2026, 11, 7, 10, 30, tzinfo=UTC)
+    assert naive is not None and naive.tzinfo is UTC
+    offset = model.model_validate({"since": "2026-11-07T01:00:00+02:00"}).since
+    assert offset == datetime(2026, 11, 6, 23, 0, tzinfo=UTC)
+    assert offset is not None and offset.tzinfo is UTC
+
+
+def test_a_workflow_run_filter_takes_the_utc_date() -> None:
+    github = FakeGithub()
+    call(github, "github_list_workflow_runs", {"since": "2026-11-07T01:00:00+02:00"})
+    call(github, "github_list_workflow_runs", {"since": "2026-11-07"})
+    created = [
+        parse_qs(urlparse(str(request.url)).query)["created"]
+        for request in github.requests
+        if request.url.path.endswith("/actions/runs")
+    ]
+    assert created == [[">=2026-11-06"], [">=2026-11-07"]]
 
 
 def test_no_tool_schema_offers_a_repository_input() -> None:

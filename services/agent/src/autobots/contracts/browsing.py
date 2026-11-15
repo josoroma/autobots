@@ -5,16 +5,15 @@ call. Nothing here carries a credential (PK-01). The start URL must already be i
 own domains, so the first navigation can't be the one that leaves them.
 """
 
-import re
 from typing import Literal
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, Field, model_validator
 
-from autobots.contracts.tools import TOOL_CONTRACT
+from autobots.contracts.primitives import TOOL_CONTRACT
+from autobots.contracts.tool_fields import DomainName
 from autobots.contracts.web_tools import WebOutput
 
-DOMAIN_PATTERN = r"^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$"
 Stopped = Literal[
     "done", "max_steps", "max_seconds", "refused_action", "invalid_action", "cancelled"
 ]
@@ -31,7 +30,7 @@ class BrowseGoalInput(BaseModel):
 
     task: str = Field(min_length=1, max_length=2000)
     start_url: str = Field(min_length=9, max_length=2048)
-    allowed_domains: list[str] = Field(min_length=1, max_length=10)
+    allowed_domains: list[DomainName] = Field(min_length=1, max_length=10)
     max_steps: int = Field(default=10, ge=1, le=20)
     max_seconds: int = Field(default=120, ge=10, le=300)
 
@@ -39,8 +38,6 @@ class BrowseGoalInput(BaseModel):
     def _inside(self) -> "BrowseGoalInput":
         if len(set(self.allowed_domains)) != len(self.allowed_domains):
             raise ValueError("allowed_domains repeats a domain")
-        if not all(re.fullmatch(DOMAIN_PATTERN, domain) for domain in self.allowed_domains):
-            raise ValueError("allowed_domains must be lowercase domain names")
         parts = urlsplit(self.start_url)
         if parts.scheme != "https" or parts.username or parts.password or not parts.hostname:
             raise ValueError("start_url must be a plain https URL")

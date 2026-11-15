@@ -24,6 +24,7 @@ from autobots.contracts.improvements import (
     CandidateView,
     ImprovementProposal,
     KnowledgeHead,
+    KnowledgeKind,
     ProposalAccepted,
     ReplayRunView,
     ReplayView,
@@ -275,7 +276,7 @@ async def decide(
 
 
 async def rollback(
-    connection: Any, workspace_id: UUID, kind: str, key: str, to_version: int
+    connection: Any, workspace_id: UUID, kind: KnowledgeKind, key: str, to_version: int
 ) -> KnowledgeHead:
     """Points back at an earlier version, or at none with 0, since a first promotion has nothing
     before it. Every version stays. Admitted work keeps its pinned skill, and reads memory live."""

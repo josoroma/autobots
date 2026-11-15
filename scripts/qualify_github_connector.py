@@ -55,7 +55,7 @@ async def qualify(repository: str, token: str) -> tuple[int, dict]:
         marker,
     )
     from autobots.application.tool_definitions import NotDelivered, ToolContext, ToolScope
-    from autobots.contracts.tools import CreateGithubIssueInput
+    from autobots.contracts.github_tools import CreateGithubIssueInput
 
     headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}
     cases: list[dict] = []
@@ -271,7 +271,7 @@ async def studio_review(repository: str, token: str, authorization: dict, ledger
     from autobots.adapters.github_issues import API_URL, REPOSITORY_VARIABLE, TOKEN_VARIABLE
     from autobots.adapters.github_pulls import branch_for, github_pull_request_tool
     from autobots.application.tool_definitions import ToolFailed
-    from autobots.contracts.tools import GithubOpenPullRequestInput
+    from autobots.contracts.github_tools import GithubOpenPullRequestInput
 
     transport = counting_transport(authorization['max_requests'], ledger)
     environ = {REPOSITORY_VARIABLE: repository, TOKEN_VARIABLE: token}
@@ -312,7 +312,7 @@ async def studio_apply(repository: str, token: str, authorization: dict, review:
     from autobots.adapters.github_reads import github_read_tools
     from autobots.application.approvals import ApprovedRequest
     from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolScope
-    from autobots.contracts.tools import CreateGithubIssueV2Input, GithubOpenPullRequestInput
+    from autobots.contracts.github_tools import CreateGithubIssueV2Input, GithubOpenPullRequestInput
 
     if review.get('repository') != repository:
         raise Refused('the approved review is for another repository')

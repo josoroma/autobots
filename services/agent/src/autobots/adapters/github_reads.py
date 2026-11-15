@@ -24,7 +24,7 @@ from autobots.adapters.github_connector import (
 )
 from autobots.adapters.provider_http import Objects, ProviderReply, Text
 from autobots.application.tool_definitions import ToolContext, ToolDefinition, ToolFailed
-from autobots.contracts.tools import (
+from autobots.contracts.github_tools import (
     GithubFailingJob,
     GithubIssue,
     GithubListPullRequestsInput,

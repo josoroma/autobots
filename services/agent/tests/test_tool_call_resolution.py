@@ -13,7 +13,8 @@ from pydantic import BaseModel
 
 from autobots.application.tool_definitions import ToolDefinition, ToolRegistry, ToolScope
 from autobots.application.tool_gateway import Call, Refused, _hash, _operation_id, resolve
-from autobots.contracts.tools import CalculateInput, CalculateOutput, ReadRunFileInput
+from autobots.contracts.file_tools import ReadRunFileInput
+from autobots.contracts.tools import CalculateInput, CalculateOutput
 from autobots.domain.stops import GatewayCode
 from autobots.domain.tools import OperationClass
 

@@ -27,7 +27,7 @@ from autobots.application.tool_definitions import (
     ToolFailed,
     ToolScope,
 )
-from autobots.contracts.tools import GithubOpenPullRequestInput, GithubOpenPullRequestOutput
+from autobots.contracts.github_tools import GithubOpenPullRequestInput, GithubOpenPullRequestOutput
 
 REPOSITORY = "owner/configured"
 ENV = {"GITHUB_REPOSITORY": REPOSITORY, "GITHUB_TOKEN": "github_pat_fixture0001"}

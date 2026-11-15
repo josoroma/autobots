@@ -6,12 +6,20 @@ from pydantic import BaseModel, Field
 
 from autobots.contracts.primitives import (
     STRICT_CONTRACT,
+    EventSequence,
     Identifier,
     MicroUsd,
-    Sequence,
     UtcTimestamp,
 )
 from autobots.domain.runs import RunStatus
+from autobots.domain.stops import StopCode
+
+# Why a run's last pass stopped: a StopCode, published so the client can name each one, or another
+# stored code, such as the repair-limit family or one a later release retired, which still reads
+# (domain/stops.py, XERR-08).
+StopReason = StopCode | str
+# How a tool use ended, as ToolOutcome names it (tests/test_contract_vocabularies.py).
+ToolOutcomeName = Literal["succeeded", "failed", "unknown", "denied"]
 
 
 class BudgetCounters(BaseModel):
@@ -91,9 +99,10 @@ class ToolUseStarted(BaseModel):
     model_config = STRICT_CONTRACT
 
     type: Literal["tool.use.started"]
-    tool_use_id: Sequence
+    tool_use_id: EventSequence
     tool_id: str
     tool_version: int | None
+    # Stored events read through this type, so a group since renamed still reads (persisted.py).
     group: str | None
     task_id: str | None
 
@@ -102,10 +111,10 @@ class ToolUseCompleted(BaseModel):
     model_config = STRICT_CONTRACT
 
     type: Literal["tool.use.completed"]
-    tool_use_id: Sequence
+    tool_use_id: EventSequence
     tool_id: str
     tool_version: int | None
-    outcome: Literal["succeeded", "failed", "unknown", "denied"]
+    outcome: ToolOutcomeName
     code: str | None
     duration_ms: int = Field(ge=0)
     operation_id: str | None
@@ -131,7 +140,7 @@ class RunEvent(BaseModel):
 
     schema_version: Literal[1]
     run_id: Identifier
-    sequence: Sequence
+    sequence: EventSequence
     causal_ids: list[Identifier]
     occurred_at: UtcTimestamp
     payload: (
@@ -159,11 +168,12 @@ class ToolUseView(BaseModel):
 
     model_config = STRICT_CONTRACT
 
-    id: Sequence
+    id: EventSequence
     run_id: Identifier
     sequence_in_run: int
     tool_id: str
     tool_version: int | None
+    # As the tool use recorded them, so a group or provider since retired still reads.
     group: str | None
     provider: str | None
     plan_version: int | None
@@ -172,7 +182,7 @@ class ToolUseView(BaseModel):
     requested_at: UtcTimestamp
     finished_at: UtcTimestamp | None
     duration_ms: int | None
-    outcome: Literal["succeeded", "failed", "unknown", "denied"] | None
+    outcome: ToolOutcomeName | None
     code: str | None
     input_public: dict[str, Any]
     output_public: dict[str, Any] | None

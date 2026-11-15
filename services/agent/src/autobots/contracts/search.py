@@ -2,14 +2,15 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
-VIEW = ConfigDict(extra="forbid", frozen=True)
+from autobots.contracts.primitives import LAX_CONTRACT
+
 SearchKind = Literal["run", "expert", "workflow", "tool"]
 
 
 class SearchResult(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     kind: SearchKind
     id: str = Field(min_length=1, max_length=100)
@@ -21,7 +22,7 @@ class SearchResult(BaseModel):
 
 
 class SearchResults(BaseModel):
-    model_config = VIEW
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     query: str

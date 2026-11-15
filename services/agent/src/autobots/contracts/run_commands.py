@@ -2,23 +2,29 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from autobots.contracts.plans import InputDocument, RequiredArtifact
-from autobots.contracts.primitives import STRICT_CONTRACT, Identifier, MicroUsd
+from autobots.contracts.primitives import (
+    LAX_CONTRACT,
+    STRICT_CONTRACT,
+    Identifier,
+    MicroUsd,
+    Version,
+)
 from autobots.domain.models import ModelProfileId
 from autobots.domain.runs import RunStatus
 
 
 class RunRequest(BaseModel):
-    # Not strict, since a UUID arrives here as a JSON string.
+    # Lax, since a UUID arrives here as a JSON string. Money and versions are strict values.
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = LAX_CONTRACT
 
     continues_run_id: Identifier | None = None
     session_id: Identifier | None = None
     expert_id: Identifier | None = None
-    expert_version: int | None = Field(default=None, ge=1)
+    expert_version: Version | None = None
     # Left out, a continued run repeats the earlier run's stored goal. Otherwise required.
     goal_text: str | None = Field(default=None, min_length=1, max_length=20000)
     limit_micro_usd: MicroUsd = 1_000_000
@@ -41,7 +47,7 @@ class RunRequest(BaseModel):
 class RunAccepted(BaseModel):
     # Not strict, since it is built from database values. It is validated as it is built.
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     run_id: Identifier
@@ -82,18 +88,18 @@ class ModelCallReconciliation(BaseModel):
 
     model_config = STRICT_CONTRACT
 
-    charged_micro_usd: int = Field(ge=0)
+    charged_micro_usd: MicroUsd
 
 
 class ReconciliationResult(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     reconciled_calls: int
 
 
 class RunCommandResult(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = LAX_CONTRACT
 
     schema_version: Literal[1]
     run_id: Identifier

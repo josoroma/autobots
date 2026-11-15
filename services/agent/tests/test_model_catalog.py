@@ -2,13 +2,15 @@
 starts (MP-02, MP-07). Split from test_worker_inference.py by module (PTST-04)."""
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
-from autobots.adapters.models.catalog import RESERVED_PROMPT_TOKENS, parse_pricing
+from autobots.adapters.models.catalog import RESERVED_PROMPT_TOKENS, parse_catalog, parse_pricing
 from autobots.application.model_admission import Pricing, worst_case_cost
-from autobots.domain.models import MAX_OUTPUT_TOKENS
+from autobots.contracts.settings import ModelAvailability
+from autobots.domain.models import MAX_OUTPUT_TOKENS, ModelProfileId
 from fake_openrouter import DEEPSEEK_WIRE_ID, PRICE, TERRA_WIRE_ID
 
 
@@ -63,3 +65,30 @@ def test_an_override_this_app_can_reach_still_counts() -> None:
 def test_a_per_request_price_counts_wherever_it_is_listed() -> None:
     pricing = {"prompt": "0", "completion": "0", "overrides": [{"request": "0.002"}]}
     assert parse_pricing({"pricing": pricing}) == Pricing(0, 0, 2000)
+
+
+@pytest.mark.parametrize(
+    ("listed", "shown"),
+    [("9007.199254740991", 9_007_199_254_740_991), ("9007.199254740992", None)],
+)
+def test_a_listed_price_past_the_exact_integer_range_is_no_price(
+    listed: str, shown: int | None
+) -> None:
+    """The model list shows such a price as unknown, rather than failing whole (refactor plan
+    R-61)."""
+    item = {"id": "a/b", "canonical_slug": "a/b", "pricing": {"prompt": listed, "completion": "0"}}
+    entry = parse_catalog(
+        {"data": [item]}, retrieved_at=datetime(2026, 11, 5, tzinfo=UTC), revision="test"
+    ).entries[0]
+    assert (entry.listed_input_per_million, entry.listed_output_per_million) == (shown, 0)
+    shown_model = ModelAvailability(
+        profile=ModelProfileId.TERRA,
+        canonical_id="a/b",
+        wire_id="a/b",
+        available=True,
+        offered=True,
+        input_per_million_micro_usd=entry.listed_input_per_million,
+        output_per_million_micro_usd=entry.listed_output_per_million,
+        capabilities=[],
+    )
+    assert shown_model.input_per_million_micro_usd == shown

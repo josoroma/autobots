@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, Field
 
-from autobots.contracts.tools import TOOL_CONTRACT
+from autobots.contracts.primitives import TOOL_CONTRACT
 
 
 class AssignSpecialist(BaseModel):

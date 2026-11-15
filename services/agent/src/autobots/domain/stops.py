@@ -39,9 +39,11 @@ class Disposition(_Code):
     RELEASE = "release"
 
 
+# Its docstring is the StopCode schema's description in the OpenAPI document (contracts/runs.py).
 class StopCode(_Code):
-    """Every code a pass can stop with, apart from the repair-limit family (`repair_limit` below),
-    and those the cancel settlement writes."""
+    """Why a run's pass stopped: each code a pass can stop with, and those the cancel settlement
+    writes. One other stored form exists, a spent repair: `repair_limit:` followed by the
+    repairable code, such as `repair_limit:plan_out_of_scope`."""
 
     # FailureClass values, from a model call or a refusal before dispatch (model_attempts.py).
     CREDENTIALS_REQUIRED = "credentials_required"
