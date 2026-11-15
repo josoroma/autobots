@@ -1,0 +1,22 @@
+{
+  "written_by": "create_expert or add_version: ExpertConfig.model_dump_json() after expand_groups, captured 2026-11-15",
+  "stored": {
+    "purpose": "Answers billing questions",
+    "instructions": "Be brief.",
+    "tools": [
+      "calculate",
+      "read_run_file",
+      "search_files"
+    ],
+    "tool_groups": [
+      "files"
+    ],
+    "skills": [
+      "style-guide"
+    ],
+    "role_bindings": {
+      "executor": "openrouter_deepseek_flash",
+      "researcher": "openrouter_sol"
+    }
+  }
+}

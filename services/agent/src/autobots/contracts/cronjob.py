@@ -1,7 +1,8 @@
 """`cronjob` v1's input and output, Decision 0026 C1 and C8, PRD-Tool-Catalog CJ-01 to CJ-04.
 
-The schedule is typed for the model rather than a free mapping, and becomes a routine trigger.
-Each action takes only its own fields, so a call can't carry anything its action ignores.
+The schedule and timezone are the Routines API's own (contracts/routines.py), typed for the model
+rather than a free mapping. Each action takes only its own fields, so a call can't carry anything
+its action ignores.
 """
 
 from typing import Literal, Self
@@ -9,30 +10,13 @@ from typing import Literal, Self
 from pydantic import BaseModel, Field, model_validator
 
 from autobots.contracts.primitives import Identifier
+from autobots.contracts.routines import CronjobSchedule, IanaTimezone
 from autobots.contracts.tools import TOOL_CONTRACT
-from autobots.domain.routines import MAX_INTERVAL_MINUTES
+from autobots.domain.routines import DEFAULT_TIMEZONE, MODEL_ROUTINE_LIMIT_MICRO_USD
 
 CronjobAction = Literal["list", "create", "update", "pause", "resume", "run", "remove"]
-# Per occurrence, as the Routines API's default: a scheduled task can't spend more than US$1.
-MAX_LIMIT_MICRO_USD = 1_000_000
-
-
-class CronjobSchedule(BaseModel):
-    """Every `minutes`, or `daily` at a wall-clock `time` (`HH:MM`) in the routine's timezone."""
-
-    model_config = TOOL_CONTRACT
-
-    kind: Literal["interval", "daily"]
-    minutes: int | None = Field(default=None, ge=1, le=MAX_INTERVAL_MINUTES)
-    time: str | None = Field(default=None, pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
-
-    @model_validator(mode="after")
-    def _shape(self) -> Self:
-        if self.kind == "interval" and (self.minutes is None or self.time is not None):
-            raise ValueError("an interval takes minutes only")
-        if self.kind == "daily" and (self.time is None or self.minutes is not None):
-            raise ValueError("a daily schedule takes a time only")
-        return self
+# Per occurrence: a task the model schedules can't spend more than US$1 (Decision 0029 F2).
+MAX_LIMIT_MICRO_USD = MODEL_ROUTINE_LIMIT_MICRO_USD
 
 
 class CronjobTask(BaseModel):
@@ -44,7 +28,7 @@ class CronjobTask(BaseModel):
     target_id: Identifier
     target_version: int = Field(ge=1)
     schedule: CronjobSchedule
-    timezone: str = Field(default="America/Costa_Rica", min_length=1, max_length=64)
+    timezone: IanaTimezone = DEFAULT_TIMEZONE
     goal: str = Field(default="", max_length=20_000)
     inputs: dict[str, str | int | float | bool] = Field(default_factory=dict)
     tools: list[str] | None = Field(default=None, max_length=64)

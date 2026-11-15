@@ -1,0 +1,8 @@
+{
+  "written_by": "tests/db/review_check.py inserts a version with only role_bindings",
+  "stored": {
+    "role_bindings": {
+      "executor": "openrouter_deepseek_flash"
+    }
+  }
+}

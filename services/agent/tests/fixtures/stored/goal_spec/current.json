@@ -1,0 +1,30 @@
+{
+  "written_by": "application/runs.py _insert_goal_spec: GoalSpec.model_dump_json(), captured 2026-11-15",
+  "stored": {
+    "objective": "Sum the figures",
+    "original_request": "Sum the figures in inputs/q3.csv",
+    "criteria": {
+      "c1": "The total is saved",
+      "c2": "Sources are cited"
+    },
+    "allowed_tools": {
+      "propose_plan": 1,
+      "complete_task": 1,
+      "calculate": 1,
+      "read_run_file": 2
+    },
+    "allowed_paths": [
+      "inputs/",
+      "outputs/"
+    ],
+    "required_artifacts": [
+      {
+        "name": "outputs/total.md",
+        "must_contain": [
+          "Total"
+        ]
+      }
+    ],
+    "instructions": "Be brief."
+  }
+}

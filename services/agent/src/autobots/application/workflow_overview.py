@@ -6,14 +6,14 @@ from typing import Any
 from uuid import UUID
 
 from autobots.application.run_admission import saved_workspace_policy
-from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.workflows import (
     WorkflowExecutionSummary,
     WorkflowStepView,
 )
 from autobots.domain.models import PROFILES, ModelRole
 from autobots.domain.runs import TERMINAL, RunStatus
-from autobots.domain.workflows import step_order
+from autobots.domain.workflows import AgentConfig, block_config, step_order
+from autobots.persistence.records import ExpertConfigRecord, read_expert_config
 
 # One execution per row, with the root run's ledger, as the run list counts it (RN-01).
 _EXECUTIONS = (
@@ -68,7 +68,7 @@ async def run_count(connection: Any, workspace_id: UUID, workflow_id: UUID) -> i
 
 async def _experts(
     connection: Any, workspace_id: UUID, expert_ids: list[str]
-) -> dict[str, tuple[str, ExpertConfig]]:
+) -> dict[str, tuple[str, ExpertConfigRecord]]:
     """Each named Expert's name and latest configuration, in this workspace only."""
     if not expert_ids:
         return {}
@@ -78,19 +78,22 @@ async def _experts(
         "where e.workspace_id = %s and e.id::text = any(%s)",
         (workspace_id, expert_ids),
     )
-    return {
-        row[0]: (str(row[1]), ExpertConfig.model_validate(row[2]))
-        for row in await cursor.fetchall()
-    }
+    return {row[0]: (str(row[1]), read_expert_config(row[2])) for row in await cursor.fetchall()}
+
+
+def _agent_expert(node: Mapping[str, Any]) -> str | None:
+    """The Expert an agent step names, or None for any other step, or one that names none. Only an
+    agent step's configuration is read, so another step's draft value can't fail a preview."""
+    if node["block"] != "agent":
+        return None
+    config = block_config(node)
+    return config.expert_id if isinstance(config, AgentConfig) else None
 
 
 def _agent_experts(graph: Mapping[str, Any]) -> list[str]:
     nodes = {node["id"]: node for node in graph.get("nodes", [])}
-    return [
-        str(nodes[name].get("config", {}).get("expert_id"))
-        for name in step_order(graph)
-        if nodes[name]["block"] == "agent" and nodes[name].get("config", {}).get("expert_id")
-    ]
+    named = (_agent_expert(nodes[name]) for name in step_order(graph))
+    return [expert_id for expert_id in named if expert_id is not None]
 
 
 async def expert_chain(
@@ -130,14 +133,14 @@ async def preview_steps(
     steps = []
     for name in step_order(graph):
         node = nodes[name]
-        expert_id = node.get("config", {}).get("expert_id") if node["block"] == "agent" else None
-        found = known.get(str(expert_id)) if expert_id else None
+        expert_id = _agent_expert(node)
+        found = known.get(expert_id) if expert_id is not None else None
         steps.append(
             WorkflowStepView(
                 id=name,
                 block=node["block"],
                 label=node.get("label"),
-                expert_id=UUID(str(expert_id)) if found is not None else None,
+                expert_id=UUID(expert_id) if expert_id is not None and found is not None else None,
                 expert_name=found[0] if found is not None else None,
                 model=executor if found is not None else None,
                 tools=sorted(found[1].tools) if found is not None else [],

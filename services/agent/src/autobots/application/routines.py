@@ -4,6 +4,7 @@ Only a routine someone created and left enabled can start work. A saved key star
 occurrence takes its version's frozen configuration, so an edit can't reach a run already admitted.
 """
 
+import json
 import logging
 import os
 from datetime import datetime
@@ -11,7 +12,7 @@ from types import MappingProxyType
 from typing import Any
 from uuid import UUID, uuid4
 
-from autobots.application.experts import ExpertRefused, get_expert
+from autobots.application.experts import ExpertRefused, saved_version
 from autobots.application.improvements import active_skill_text
 from autobots.application.run_admission import (
     CredentialCheck,
@@ -32,19 +33,36 @@ from autobots.application.runs import (
     store_receipt,
 )
 from autobots.application.workflows import WorkflowRefused, create_execution
-from autobots.contracts.experts import ExpertConfig
-from autobots.contracts.routines import OccurrenceView, RoutineConfig, RoutineView
+from autobots.contracts.primitives import MAX_SAFE_INTEGER
+from autobots.contracts.routines import (
+    OccurrenceView,
+    RoutineConfig,
+    RoutineConfigView,
+    RoutineScheduleView,
+    RoutineTarget,
+    RoutineView,
+)
 from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.models import ProfileNotOffered
 from autobots.domain.routines import (
+    IntervalTrigger,
+    SavedTrigger,
     TriggerInvalid,
+    UnscheduledTrigger,
     occurrences,
     occurrences_dropped,
     validate_trigger,
+    wall_clock,
 )
 from autobots.domain.runs import TERMINAL
 from autobots.domain.tools import EXPERT_TOOLS, PLAN_TOOLS
 from autobots.operations.logs import log_event
+from autobots.persistence.records import (
+    ExpertConfigRecord,
+    RoutineConfigRecord,
+    RoutineTargetRecord,
+    read_routine_config,
+)
 
 logger = logging.getLogger("autobots.routines")
 
@@ -65,16 +83,13 @@ class RoutineRefused(Refusal):
 
 
 async def _expert_config(
-    connection: Any, workspace_id: UUID, config: RoutineConfig
-) -> ExpertConfig:
-    try:
-        expert = await get_expert(connection, workspace_id, config.target.id)
-    except ExpertRefused:
-        raise RoutineRefused("routine_target_not_found") from None
-    version = next((v for v in expert.versions if v.version == config.target.version), None)
-    if version is None:
+    connection: Any, workspace_id: UUID, config: RoutineConfigRecord
+) -> ExpertConfigRecord:
+    target = config.target
+    expert = await saved_version(connection, workspace_id, target.id, target.version)
+    if expert is None:
         raise RoutineRefused("routine_target_not_found")
-    return version.config
+    return expert
 
 
 def pinned_version(config: RoutineConfig) -> int:
@@ -84,36 +99,90 @@ def pinned_version(config: RoutineConfig) -> int:
     return config.target.version
 
 
-async def _validate(connection: Any, workspace_id: UUID, config: RoutineConfig) -> None:
-    """A routine can only narrow what its pinned target has."""
-    pinned_version(config)
+def routine_record(config: RoutineConfig) -> RoutineConfigRecord:
+    """What a version stores, with its trigger and timezone checked. The trigger keeps the shape
+    triggers were always stored in, its kind and the one field that kind uses, so stored bytes and
+    receipt fingerprints don't change (refactor plan R-52)."""
+    version = pinned_version(config)
     try:
-        validate_trigger(config.trigger, config.timezone)
+        trigger = validate_trigger(config.trigger.model_dump(exclude_none=True), config.timezone)
     except TriggerInvalid as invalid:
         raise RoutineRefused(invalid.code) from None
-    if config.target.kind == "expert":
-        expert = await _expert_config(connection, workspace_id, config)
-        if not config.goal.strip():
+    return RoutineConfigRecord(
+        target=RoutineTargetRecord(kind=config.target.kind, id=config.target.id, version=version),
+        trigger=trigger,
+        timezone=config.timezone,
+        goal=config.goal,
+        inputs=config.inputs,
+        tools=tuple(config.tools) if config.tools is not None else None,
+        limit_micro_usd=config.limit_micro_usd,
+        overlap=config.overlap,
+    )
+
+
+def _schedule_view(trigger: SavedTrigger) -> RoutineScheduleView:
+    """Daily at the wall-clock time its occurrences use, so a view never misstates when it runs,
+    and with no time for one that never runs."""
+    if isinstance(trigger, IntervalTrigger):
+        return RoutineScheduleView(kind="interval", minutes=trigger.minutes, time=None)
+    if isinstance(trigger, UnscheduledTrigger):
+        return RoutineScheduleView(kind="daily", minutes=None, time=None)
+    return RoutineScheduleView(kind="daily", minutes=None, time=wall_clock(trigger))
+
+
+def routine_view_config(record: RoutineConfigRecord) -> RoutineConfigView:
+    """A saved version as the Routines API shows it. A limit beyond what a JavaScript client can
+    hold shows as that maximum, while admission uses the stored value, which the workspace's run
+    limit caps (Decision 0029 F2)."""
+    target = record.target
+    return RoutineConfigView(
+        target=RoutineTarget(kind=target.kind, id=target.id, version=target.version),
+        trigger=_schedule_view(record.trigger),
+        timezone=record.timezone,
+        goal=record.goal,
+        inputs=dict(record.inputs),
+        tools=list(record.tools) if record.tools is not None else None,
+        limit_micro_usd=min(record.limit_micro_usd, MAX_SAFE_INTEGER),
+        overlap=record.overlap,
+    )
+
+
+async def _validate(
+    connection: Any, workspace_id: UUID, config: RoutineConfig, budget_cap: int | None
+) -> RoutineConfigRecord:
+    """A routine can only narrow what its pinned target has, and a capped caller's routine can't
+    spend more than its cap a run (Decision 0029 F2)."""
+    record = routine_record(config)
+    if budget_cap is not None and record.limit_micro_usd > budget_cap:
+        raise RoutineRefused("routine_limit_too_high")
+    if record.target.kind == "expert":
+        expert = await _expert_config(connection, workspace_id, record)
+        if not record.goal.strip():
             raise RoutineRefused("routine_goal_required")
-        if config.tools is not None and not set(config.tools) <= set(expert.tools):
+        if record.tools is not None and not set(record.tools) <= set(expert.tools):
             raise RoutineRefused("routine_scope_widened")
-        return
+        return record
     cursor = await connection.execute(
         "select 1 from public.workflow_versions v join public.workflows w on w.id = v.workflow_id "
         "where v.workflow_id = %s and v.version = %s and w.workspace_id = %s",
-        (config.target.id, pinned_version(config), workspace_id),
+        (record.target.id, record.target.version, workspace_id),
     )
     if await cursor.fetchone() is None:
         raise RoutineRefused("routine_target_not_found")
+    return record
+
+
+async def _stored_config(connection: Any, routine_id: UUID, version: int) -> RoutineConfigRecord:
+    cursor = await connection.execute(
+        "select config from public.routine_versions where routine_id = %s and version = %s",
+        (routine_id, version),
+    )
+    return read_routine_config((await cursor.fetchone())[0])
 
 
 async def _view(connection: Any, row: Any) -> RoutineView:
     routine_id, name, enabled, latest = row
-    cursor = await connection.execute(
-        "select config from public.routine_versions where routine_id = %s and version = %s",
-        (routine_id, latest),
-    )
-    config = RoutineConfig.model_validate((await cursor.fetchone())[0])
+    config = routine_view_config(await _stored_config(connection, routine_id, latest))
     cursor = await connection.execute(
         "select occurrence_time, routine_version, status, reason, run_id "
         "from public.routine_occurrences where routine_id = %s "
@@ -173,11 +242,16 @@ async def create_routine(
     idempotency_key: str,
     name: str,
     config: RoutineConfig,
+    budget_cap: int | None,
     now: datetime | None = None,
 ) -> RoutineView:
-    """It starts counting from now, so creating one never reaches back into the past."""
-    await _validate(connection, workspace_id, config)
-    fingerprint = request_hash({"name": name, "config": config.model_dump(mode="json")})
+    """It starts counting from now, so creating one never reaches back into the past. Every caller
+    states `budget_cap`: None for a person's routine, whose runs the workspace's run limit caps,
+    and the cronjob tool's own cap for the model's (Decision 0029 F2)."""
+    stored = (await _validate(connection, workspace_id, config, budget_cap)).stored()
+    # Over the stored record, so a trigger sent with an explicit null hashes as its normalized
+    # form, and such a retry across R-52 is refused as a conflict (refactor plan R-52).
+    fingerprint = request_hash({"name": name, "config": json.loads(stored)})
     scope = (workspace_id, actor_id, "create_routine", str(workspace_id), idempotency_key)
     async with connection.transaction():
         existing = await existing_receipt(connection, scope, fingerprint)
@@ -199,7 +273,7 @@ async def create_routine(
         await connection.execute(
             "insert into public.routine_versions (routine_id, version, config, created_by) "
             "values (%s, 1, %s, %s)",
-            (routine_id, config.model_dump_json(), actor_id),
+            (routine_id, stored, actor_id),
         )
         await store_receipt(connection, scope, fingerprint, {"routine_id": str(routine_id)})
     return await get_routine(connection, workspace_id, routine_id)
@@ -214,11 +288,12 @@ async def add_routine_version(
     idempotency_key: str,
     expected_version: int,
     config: RoutineConfig,
+    budget_cap: int | None,
 ) -> RoutineView:
-    await _validate(connection, workspace_id, config)
-    fingerprint = request_hash(
-        {"expected": expected_version, "config": config.model_dump(mode="json")}
-    )
+    """A new version, under `budget_cap` as for `create_routine`."""
+    stored = (await _validate(connection, workspace_id, config, budget_cap)).stored()
+    # Over the stored record, as for `create_routine`.
+    fingerprint = request_hash({"expected": expected_version, "config": json.loads(stored)})
     scope = (workspace_id, actor_id, "edit_routine", str(routine_id), idempotency_key)
     async with connection.transaction():
         existing = await existing_receipt(connection, scope, fingerprint)
@@ -238,7 +313,7 @@ async def add_routine_version(
         await connection.execute(
             "insert into public.routine_versions (routine_id, version, config, created_by) "
             "values (%s, %s, %s, %s)",
-            (routine_id, version, config.model_dump_json(), actor_id),
+            (routine_id, version, stored, actor_id),
         )
         await connection.execute(
             "update public.routines set latest_version = %s where id = %s", (version, routine_id)
@@ -295,11 +370,7 @@ async def run_routine_now(
         if not enabled:
             raise RoutineRefused("routine_paused")
         moment = (await (await connection.execute("select clock_timestamp()")).fetchone())[0]
-        cursor = await connection.execute(
-            "select config from public.routine_versions where routine_id = %s and version = %s",
-            (routine_id, version),
-        )
-        config = RoutineConfig.model_validate((await cursor.fetchone())[0])
+        config = await _stored_config(connection, routine_id, version)
         if await _has_active_run(connection, routine_id):
             await _record(connection, routine_id, moment, version, "skipped_overlap", "run_active")
             return "skipped_overlap", "run_active", None
@@ -352,7 +423,7 @@ async def admit_occurrence(
     workspace_id: UUID,
     routine_id: UUID,
     version: int,
-    config: RoutineConfig,
+    config: RoutineConfigRecord,
     moment: datetime,
 ) -> UUID:
     """Admits the run one occurrence starts: the workflow's execution, or the Expert's run under its
@@ -367,10 +438,10 @@ async def admit_occurrence(
             actor_id=actor,
             workflow_id=config.target.id,
             idempotency_key=key,
-            version=pinned_version(config),
-            inputs=config.inputs,
+            version=config.target.version,
+            inputs=dict(config.inputs),
             limit_micro_usd=config.limit_micro_usd,
-            tools=config.tools,
+            tools=list(config.tools) if config.tools is not None else None,
         )
         return binding.run_id
     expert = await _expert_config(connection, workspace_id, config)
@@ -396,9 +467,9 @@ async def admit_occurrence(
         raise RoutineRefused(refused.code) from None
     grant = RunGrant(
         expert_id=config.target.id,
-        version=pinned_version(config),
+        version=config.target.version,
         instructions=expert.instructions
-        + await active_skill_text(connection, workspace_id, expert.skills),
+        + await active_skill_text(connection, workspace_id, list(expert.skills)),
         tools={**PLAN_TOOLS, **{tool: EXPERT_TOOLS[tool] for tool in tools}},
     )
     # No started_by: a routine's run has none, Decision 0015.
@@ -416,12 +487,12 @@ async def admit_occurrence(
     return admitted.run_id
 
 
-async def _needs_model(config: RoutineConfig, connection: Any) -> bool:
+async def _needs_model(config: RoutineConfigRecord, connection: Any) -> bool:
     if config.target.kind == "expert":
         return True
     cursor = await connection.execute(
         "select graph from public.workflow_versions where workflow_id = %s and version = %s",
-        (config.target.id, pinned_version(config)),
+        (config.target.id, config.target.version),
     )
     graph = (await cursor.fetchone())[0]
     return any(node["block"] == "agent" for node in graph["nodes"])
@@ -449,11 +520,7 @@ async def _evaluate_one(
         moment_now = now or (await cursor.fetchone())[0]
         if moment_now <= until:
             return 0
-        cursor = await connection.execute(
-            "select config from public.routine_versions where routine_id = %s and version = %s",
-            (routine_id, version),
-        )
-        config = RoutineConfig.model_validate((await cursor.fetchone())[0])
+        config = await _stored_config(connection, routine_id, version)
         due = occurrences(config.trigger, config.timezone, until, moment_now)
         await connection.execute(
             "update public.routines set evaluated_until = %s where id = %s",

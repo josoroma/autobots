@@ -1,0 +1,43 @@
+{
+  "written_by": "create_expert after expand_groups and validate_config: nine groups expand to 21 tools, past ExpertConfig's request bound of 20, because expand_groups uses model_copy. Produced 2026-11-15 by that code with Tavily and Jina keys",
+  "stored": {
+    "purpose": "Covers every source it can reach",
+    "instructions": "",
+    "tools": [
+      "calculate",
+      "search_memory",
+      "extract_website_content",
+      "tavily_extract",
+      "inflation_rates",
+      "market_history",
+      "patch_code_file",
+      "read_code_file",
+      "search_files",
+      "write_code_file",
+      "publish_artifact",
+      "read_csv",
+      "read_run_file",
+      "save_artifact",
+      "store_remote_file",
+      "search_web",
+      "tavily_search",
+      "tavily_crawl",
+      "tavily_map",
+      "propose_improvement",
+      "cronjob"
+    ],
+    "tool_groups": [
+      "general",
+      "web_extraction",
+      "market_data",
+      "code",
+      "files",
+      "web_search",
+      "web_crawling",
+      "learning",
+      "automation"
+    ],
+    "skills": [],
+    "role_bindings": {}
+  }
+}

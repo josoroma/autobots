@@ -505,8 +505,14 @@ EXPERTS = [
     ),
 ]
 
-# The codes the routine routes can raise: _validate with validate_trigger's codes, the name and
-# version checks, get_routine and set_enabled (routines.py, domain/routines.py).
+# The codes the routine routes can raise: _validate, the name and version checks, get_routine and
+# set_enabled (routines.py). Of the domain's trigger codes (domain/routines.py), only
+# timezone_unknown reaches a route. A malformed trigger is a malformed body, refused as
+# invalid_request before the service (Decision 0029 F9), and every caller of the service, these
+# routes and the cronjob tool, sends a typed schedule, which always parses. So no caller today gets
+# interval_invalid, daily_time_invalid or trigger_unknown as a reply. validate_trigger still raises
+# them for a trigger mapping, and the scheduler raises daily_time_invalid, which it logs, for a
+# stored daily time that isn't text. Their wording stays here.
 ROUTINE_CODES = [
     ("routine_not_found", 404, "That is not available."),
     ("routine_target_not_found", 404, "That is not available."),
@@ -613,6 +619,36 @@ def test_each_route_answers_a_refusal_as_it_always_has(
 ) -> None:
     _patched(monkeypatch, case)
     assert answer(client, case.request, case.body) == case.expected
+
+
+@pytest.mark.parametrize(
+    "trigger",
+    [
+        {"kind": "cron"},
+        {"kind": "interval", "minutes": 0},
+        {"kind": "interval", "minutes": True},
+        {"kind": "interval", "minutes": "15"},
+        {"kind": "interval", "minutes": 60, "note": "x"},
+        {"kind": "daily"},
+        {"kind": "daily", "time": "25:00"},
+        {"kind": "daily", "time": "07:30:45"},
+        {"kind": "daily", "time": "09:00", "minutes": 5},
+    ],
+)
+def test_a_malformed_trigger_is_a_malformed_request_body(
+    client: ApiClient, monkeypatch: pytest.MonkeyPatch, trigger: dict[str, object]
+) -> None:
+    """Decision 0029 F9: the trigger is typed, so a person's malformed one is refused like any other
+    strict field, before the routine service runs."""
+    for name in ("create_routine", "add_routine_version"):
+        monkeypatch.setattr(routine_routes, name, raising(AssertionError("reached the service")))
+    config = {**ROUTINE_CONFIG, "trigger": trigger}
+    for request, body in (
+        ("POST /v1/routines", {"name": "Fixture", "config": config}),
+        (f"POST /v1/routines/{ROUTINE}/versions", {"expected_version": 1, "config": config}),
+    ):
+        reply = answer(client, request, body)
+        assert reply == (422, "invalid_request", "The request is not valid.")
 
 
 # Settings: each write's refusals, the same for every operation that can raise them.

@@ -1,0 +1,19 @@
+{
+  "written_by": "ExpertConfig from US-5.1 (78d8759) until US-14.2 (d96d488) added tool_groups; the upgrade qualifier's prior release, 8cba043, writes this shape",
+  "stored": {
+    "purpose": "Answers billing questions",
+    "instructions": "Be brief.",
+    "tools": [
+      "calculate",
+      "read_run_file",
+      "search_files"
+    ],
+    "skills": [
+      "style-guide"
+    ],
+    "role_bindings": {
+      "executor": "openrouter_deepseek_flash",
+      "researcher": "openrouter_sol"
+    }
+  }
+}

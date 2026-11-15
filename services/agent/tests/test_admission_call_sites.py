@@ -20,14 +20,14 @@ import pytest
 from autobots.application.assignments import Delegation, assign_tool
 from autobots.application.experts import RunBinding
 from autobots.application.improvements import request_replay
-from autobots.application.routines import admit_occurrence
+from autobots.application.routines import admit_occurrence, routine_record
 from autobots.application.run_usage import RootLimits
 from autobots.application.tool_gateway import ToolContext, ToolScope
 from autobots.application.worker_leases import Lease
 from autobots.application.workflows import create_execution
 from autobots.contracts.assignments import AssignSpecialist
 from autobots.contracts.improvements import HeldOutTask
-from autobots.contracts.routines import RoutineConfig, RoutineTarget
+from autobots.contracts.routines import CronjobSchedule, RoutineConfig, RoutineTarget
 from autobots.domain.stops import PassOutcome
 from autobots.domain.tools import DELEGATION_TOOL, LOOP_TOOL_GRANTS
 from fake_api import WORKSPACE, ApiClient, FakeConnection, FakeDatabase
@@ -129,17 +129,16 @@ def test_a_routines_expert_occurrence_admits_with_the_golden_fingerprint() -> No
     expert = options["binding"]
     database = scripted()
     database.answer(
-        "from public.experts where id", (expert.expert_id, "Routine Expert", expert.version)
+        "select v.config from public.experts e join public.expert_versions v",
+        ({"tools": ["calculate"]},),
     )
-    database.answer(
-        "from public.expert_versions where expert_id", (expert.version, {"tools": ["calculate"]})
-    )
-    database.answer("count(*), max(created_at) from public.runs", (0, None))
-    config = RoutineConfig(
-        target=RoutineTarget(kind="expert", id=expert.expert_id, version=expert.version),
-        trigger={"kind": "interval", "minutes": 60},
-        goal=options["goal_text"],
-        limit_micro_usd=options["limit_micro_usd"],
+    config = routine_record(
+        RoutineConfig(
+            target=RoutineTarget(kind="expert", id=expert.expert_id, version=expert.version),
+            trigger=CronjobSchedule(kind="interval", minutes=60),
+            goal=options["goal_text"],
+            limit_micro_usd=options["limit_micro_usd"],
+        )
     )
     digest = admitted_through(
         database,

@@ -70,7 +70,7 @@ async def main() -> None:
 
         async def routine(name: str, **options: Any) -> Any:
             await clear_active()
-            return await create_routine(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=f'r-{name}', name=name, config=config(**options), now=START)
+            return await create_routine(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=f'r-{name}', name=name, config=config(**options), budget_cap=None, now=START)
 
         # One due occurrence, from concurrent workers.
         made = await routine('Hourly')
@@ -107,7 +107,7 @@ async def main() -> None:
         # An edit reaches only future occurrences.
         await db.execute("update public.runs r set status = 'cancelled' from public.routine_occurrences o where o.run_id = r.id and o.routine_id = %s", (made.id,))
         latest_run = await value("select run_id from public.routine_occurrences where routine_id = %s and status = 'admitted' order by occurrence_time desc limit 1", made.id)
-        await add_routine_version(db, workspace_id=WORKSPACE, actor_id=ACTOR, routine_id=made.id, idempotency_key='v2', expected_version=1, config=config('A different goal', tools=['calculate'], limit_micro_usd=500))
+        await add_routine_version(db, workspace_id=WORKSPACE, actor_id=ACTOR, routine_id=made.id, idempotency_key='v2', expected_version=1, config=config('A different goal', tools=['calculate'], limit_micro_usd=500), budget_cap=None)
         unchanged = await value('select spec from app_private.goal_specs where run_id = %s', latest_run)
         check('an edit does not change a run already admitted', 'the old goal and tools', unchanged['objective'], unchanged['objective'] == 'Summarize the day' and 'save_artifact' in unchanged['allowed_tools'])
         await evaluate_routines(db, ready, START + timedelta(hours=9))
@@ -123,17 +123,17 @@ async def main() -> None:
                 ('a timezone that doesn\'t exist', lambda: config(timezone='Mars/Olympus'), 'timezone_unknown'),
                 ('no goal', lambda: config(goal='  '), 'routine_goal_required')):
             try:
-                await create_routine(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), name=f'Bad {code}', config=change(), now=START)
+                await create_routine(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), name=f'Bad {code}', config=change(), budget_cap=None, now=START)
                 check(f'{label} is refused', code, 'created', False)
             except RoutineRefused as error:
                 check(f'{label} is refused', code, error.code, error.code == code)
         try:
-            await create_routine(db, workspace_id=OTHER, actor_id=ACTOR, idempotency_key=str(uuid4()), name='Foreign', config=config(), now=START)
+            await create_routine(db, workspace_id=OTHER, actor_id=ACTOR, idempotency_key=str(uuid4()), name='Foreign', config=config(), budget_cap=None, now=START)
             check('another workspace\'s Expert is refused', 'routine_target_not_found', 'created', False)
         except RoutineRefused as error:
             check('another workspace\'s Expert is refused', 'routine_target_not_found', error.code, error.code == 'routine_target_not_found')
         try:
-            await add_routine_version(db, workspace_id=WORKSPACE, actor_id=ACTOR, routine_id=made.id, idempotency_key='stale', expected_version=1, config=config())
+            await add_routine_version(db, workspace_id=WORKSPACE, actor_id=ACTOR, routine_id=made.id, idempotency_key='stale', expected_version=1, config=config(), budget_cap=None)
             check('a stale edit conflicts', 'routine_version_conflict', 'saved', False)
         except RoutineRefused as error:
             check('a stale edit conflicts', 'routine_version_conflict', error.code, error.code == 'routine_version_conflict')
@@ -160,14 +160,14 @@ async def main() -> None:
             'links': [{'source': 'in', 'source_port': 'value', 'target': 'out', 'target_port': 'value'}]})
         await publish_version(db, workspace_id=WORKSPACE, actor_id=ACTOR, workflow_id=flow.id, idempotency_key='r-wp', expected_version=0, graph=graph, source='user')
         await clear_active()
-        scheduled = await create_routine(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='r-flow', name='Flow routine', config=RoutineConfig(target=RoutineTarget(kind='workflow', id=flow.id, version=1), trigger={'kind': 'interval', 'minutes': 30}, inputs={'in': 'hello'}), now=START)
+        scheduled = await create_routine(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='r-flow', name='Flow routine', config=RoutineConfig(target=RoutineTarget(kind='workflow', id=flow.id, version=1), trigger={'kind': 'interval', 'minutes': 30}, inputs={'in': 'hello'}), budget_cap=None, now=START)
         due = await evaluate_routines(db, no_key, START + timedelta(minutes=30))
         bound = await value('select workflow_version from public.workflow_executions e join public.routine_occurrences o on o.run_id = e.run_id where o.routine_id = %s', scheduled.id)
         check('a workflow routine binds its exact version, and needs no key without an agent step', '1, version 1', (due, bound), due == 1 and bound == 1)
 
         # A daily routine in its own timezone.
         await clear_active()
-        daily = await create_routine(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='r-day', name='Daily', config=RoutineConfig(target=RoutineTarget(kind='expert', id=expert.id, version=1), trigger={'kind': 'daily', 'time': '09:00'}, timezone='America/Costa_Rica', goal='Morning'), now=datetime(2026, 11, 5, 14, 0, tzinfo=UTC))
+        daily = await create_routine(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='r-day', name='Daily', config=RoutineConfig(target=RoutineTarget(kind='expert', id=expert.id, version=1), trigger={'kind': 'daily', 'time': '09:00'}, timezone='America/Costa_Rica', goal='Morning'), budget_cap=None, now=datetime(2026, 11, 5, 14, 0, tzinfo=UTC))
         await evaluate_routines(db, ready, datetime(2026, 11, 5, 15, 30, tzinfo=UTC))
         when = await value('select occurrence_time from public.routine_occurrences where routine_id = %s', daily.id)
         check('a daily occurrence is stored as a UTC instant for its local time', '15:00 UTC for 09:00 in Costa Rica', when.astimezone(UTC).isoformat(), when.astimezone(UTC) == datetime(2026, 11, 5, 15, 0, tzinfo=UTC))

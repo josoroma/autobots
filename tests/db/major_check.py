@@ -522,7 +522,7 @@ async def workflows_routines_memory(db: Any, cases: Cases) -> None:
     await clear()
     config = RoutineConfig(target=RoutineTarget(kind='workflow', id=flow.id, version=1), trigger={'kind': 'interval', 'minutes': 60}, limit_micro_usd=500, tools=['calculate'], inputs={'in': 'x'})
     routine_id = uuid4()
-    run = await admit_occurrence(db, WORKSPACE, routine_id, 1, config, datetime(2026, 1, 1, tzinfo=UTC))
+    run = await admit_occurrence(db, WORKSPACE, routine_id, 1, routines_module.routine_record(config), datetime(2026, 1, 1, tzinfo=UTC))
     limit = await value('select limit_micro_usd from public.runs where id = %s', run)
     goal = await load_goal(db, run)
     check("a routine's limit and tools reach its workflow's run", '500, no save or publish tools', (limit, sorted(goal.allowed_tools)), limit == 500 and 'calculate' in goal.allowed_tools and 'save_artifact' not in goal.allowed_tools)
@@ -543,9 +543,9 @@ async def workflows_routines_memory(db: Any, cases: Cases) -> None:
 
     # M24 and M25: time only moves forward, and one bad routine doesn't stop the rest.
     await clear()
-    good = await create_routine(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), name=f'Good {uuid4().hex[:6]}', config=config)
-    bad_config = config.model_copy(update={'trigger': {'kind': 'interval', 'minutes': 61}})
-    bad = await create_routine(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), name=f'Bad {uuid4().hex[:6]}', config=bad_config)
+    good = await create_routine(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), name=f'Good {uuid4().hex[:6]}', config=config, budget_cap=None)
+    bad_config = config.model_copy(update={'trigger': config.trigger.model_copy(update={'minutes': 61})})
+    bad = await create_routine(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), name=f'Bad {uuid4().hex[:6]}', config=bad_config, budget_cap=None)
     await db.execute("update public.routines set evaluated_until = clock_timestamp() - interval '3 hours' where id in (%s, %s)", (good.id, bad.id))
 
     async def ready(_: UUID) -> str:
@@ -555,7 +555,7 @@ async def workflows_routines_memory(db: Any, cases: Cases) -> None:
 
     def raises_for_one(trigger: Any, *rest: Any) -> Any:
         # Arranged: what a routine stored before the bound existed could still raise.
-        if trigger['minutes'] == 61:
+        if getattr(trigger, 'minutes', None) == 61:
             raise OverflowError
         return real_occurrences(trigger, *rest)
 

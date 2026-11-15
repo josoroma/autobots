@@ -17,7 +17,7 @@ from autobots.application.experts import create_expert
 from autobots.application.model_admission import ModelAdmission
 from autobots.application.operations import REQUIRED_COLUMNS, database_conditions
 from autobots.application.plans import load_goal
-from autobots.application.routines import RoutineRefused, admit_occurrence
+from autobots.application.routines import RoutineRefused, admit_occurrence, routine_record
 from autobots.application.run_lifecycle import LoopConfig, settle_children
 from autobots.application.run_projection import read_inspector, read_summary, read_workspace
 from autobots.application.runs import LinkRefused, admit_run
@@ -232,7 +232,7 @@ async def main() -> None:
         kept = (await (await db.execute('select default_profile, version from app_private.model_policies where workspace_id = %s', (chooser,))).fetchone())
         check('no run started, and the saved choice stands', "0 runs, still DeepSeek at version 1", (started, kept), started == 0 and kept == ('openrouter_deepseek_flash', 1))
         lover = await create_expert(db, workspace_id=WORKSPACE, actor_id=actor, idempotency_key=str(uuid4()), name=f'Saved binding {uuid4().hex[:6]}', config=ExpertConfig(tools=['calculate'], role_bindings={'executor': 'openrouter_deepseek_flash'}))
-        routine = RoutineConfig(target=RoutineTarget(kind='expert', id=lover.id, version=1), goal='Scheduled work', trigger={'kind': 'interval', 'minutes': 60}, limit_micro_usd=500)
+        routine = routine_record(RoutineConfig(target=RoutineTarget(kind='expert', id=lover.id, version=1), goal='Scheduled work', trigger={'kind': 'interval', 'minutes': 60}, limit_micro_usd=500))
         before_runs = (await (await db.execute('select count(*) from public.runs where workspace_id = %s', (WORKSPACE,))).fetchone())[0]
         try:
             await admit_occurrence(db, WORKSPACE, uuid4(), 1, routine, datetime(2026, 1, 1, tzinfo=UTC))

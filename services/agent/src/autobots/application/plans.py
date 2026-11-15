@@ -15,11 +15,18 @@ from autobots.contracts.plans import (
     PlanCommitted,
     PlanProposal,
     PlanTask,
+    RequiredArtifact,
     TaskCompleted,
 )
 from autobots.domain.stops import GatewayCode
 from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import OperationClass
+from autobots.persistence.records import (
+    GoalSpecRecord,
+    PlanTaskRecord,
+    read_goal_spec,
+    read_plan_tasks,
+)
 
 
 class PlanRejected(Exception):
@@ -80,6 +87,46 @@ def validate_proposal(
             raise PlanRejected(GatewayCode.PLAN_CHANGES_COMPLETED)
 
 
+def goal_spec(record: GoalSpecRecord) -> GoalSpec:
+    """The admitted goal as the loop reads it, from its stored record (refactor plan R-52)."""
+    return GoalSpec(
+        objective=record.objective,
+        original_request=record.original_request,
+        criteria=dict(record.criteria),
+        allowed_tools=dict(record.allowed_tools),
+        allowed_paths=list(record.allowed_paths),
+        required_artifacts=[
+            RequiredArtifact(name=artifact.name, must_contain=list(artifact.must_contain))
+            for artifact in record.required_artifacts
+        ],
+        instructions=record.instructions,
+    )
+
+
+def plan_task(record: PlanTaskRecord) -> PlanTask:
+    """A committed task, from its stored record."""
+    return PlanTask(
+        id=record.id,
+        title=record.title,
+        depends_on=list(record.depends_on),
+        criteria=list(record.criteria),
+        tools=list(record.tools),
+        expected_evidence=record.expected_evidence,
+    )
+
+
+def plan_task_record(task: PlanTask) -> PlanTaskRecord:
+    """What a committed task stores, in the shape tasks always had."""
+    return PlanTaskRecord(
+        id=task.id,
+        title=task.title,
+        depends_on=tuple(task.depends_on),
+        criteria=tuple(task.criteria),
+        tools=tuple(task.tools),
+        expected_evidence=task.expected_evidence,
+    )
+
+
 class GoalMissing(LookupError):
     """No goal is stored for this run. Named, so a defect while reading one isn't taken for this
     (refactor plan R-41, PRUN-13)."""
@@ -92,7 +139,7 @@ async def load_goal(connection: Any, run_id: UUID) -> GoalSpec:
     row = await cursor.fetchone()
     if row is None:
         raise GoalMissing("this run has no goal")
-    return GoalSpec.model_validate(row[0])
+    return goal_spec(read_goal_spec(row[0]))
 
 
 async def latest_plan(connection: Any, run_id: UUID) -> tuple[int, list[PlanTask]] | None:
@@ -104,7 +151,7 @@ async def latest_plan(connection: Any, run_id: UUID) -> tuple[int, list[PlanTask
     row = await cursor.fetchone()
     if row is None:
         return None
-    return row[0], [PlanTask.model_validate(task) for task in row[1]]
+    return row[0], [plan_task(task) for task in read_plan_tasks(row[1])]
 
 
 async def completed_tasks(connection: Any, run_id: UUID) -> frozenset[str]:
@@ -197,7 +244,7 @@ async def propose_plan(
                 (
                     run_id,
                     version,
-                    json.dumps([task.model_dump() for task in arguments.tasks]),
+                    json.dumps([plan_task_record(task).document() for task in arguments.tasks]),
                     arguments.revision_reason,
                 ),
             )

@@ -1,0 +1,32 @@
+{
+  "written_by": "POST /v1/routines before R-52: the trigger was stored as sent, and validate_trigger accepted any time that time.fromisoformat reads, and extra keys",
+  "stored": {
+    "target": {
+      "kind": "workflow",
+      "id": "22222222-2222-4222-8222-222222222222",
+      "version": 1
+    },
+    "trigger": {
+      "kind": "interval",
+      "minutes": 60,
+      "time": null,
+      "note": "every hour"
+    },
+    "timezone": "America/Costa_Rica",
+    "goal": "",
+    "inputs": {
+      "in": "hello",
+      "count": 3,
+      "items": [
+        1,
+        2
+      ],
+      "nested": {
+        "a": true
+      }
+    },
+    "tools": null,
+    "limit_micro_usd": 1000000,
+    "overlap": "skip"
+  }
+}

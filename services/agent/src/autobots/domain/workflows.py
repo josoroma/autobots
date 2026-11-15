@@ -7,7 +7,7 @@ published, and nothing about who wrote it changes what is accepted.
 import hashlib
 import json
 from collections import defaultdict, deque
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -73,56 +73,149 @@ TRANSFORM_OUTPUTS = {
 PASS_THROUGH = frozenset({"approval", "condition"})
 
 
+# Each block's configuration, typed once from the graph's mapping (refactor plan R-52, XTYP-08).
+# The graph IR stays the stored format; these are what readers take from it.
+@dataclass(frozen=True)
+class InputConfig:
+    type: str
+
+
+@dataclass(frozen=True)
+class TransformConfig:
+    operation: str
+
+
+@dataclass(frozen=True)
+class ConditionConfig:
+    predicate: str
+    operand: object
+
+
+@dataclass(frozen=True)
+class ForeachConfig:
+    max_items: int
+    item_type: str
+
+
+@dataclass(frozen=True)
+class ArtifactConfig:
+    path: str
+
+
+@dataclass(frozen=True)
+class AgentConfig:
+    expert_id: str
+
+
+@dataclass(frozen=True)
+class PlainConfig:
+    """output, join, read and approval, which read no configuration."""
+
+
+BlockConfig = (
+    InputConfig
+    | TransformConfig
+    | ConditionConfig
+    | ForeachConfig
+    | ArtifactConfig
+    | AgentConfig
+    | PlainConfig
+)
+
+
+def _named(value: object, names: frozenset[str]) -> str | None:
+    """`value` if it is one of `names`. A draft can hold any JSON there, such as a list."""
+    return value if isinstance(value, str) and value in names else None
+
+
+def _input(config: Mapping[str, Any]) -> BlockConfig | str:
+    kind = _named(config.get("type"), INPUT_TYPES)
+    return InputConfig(kind) if kind is not None else "input_type_invalid"
+
+
+def _transform(config: Mapping[str, Any]) -> BlockConfig | str:
+    operation = _named(config.get("operation"), TRANSFORMS)
+    return TransformConfig(operation) if operation is not None else "transform_operation_unknown"
+
+
+def _condition(config: Mapping[str, Any]) -> BlockConfig | str:
+    predicate = _named(config.get("predicate"), PREDICATES)
+    if predicate is None or "operand" not in config:
+        return "condition_invalid"
+    return ConditionConfig(predicate, config["operand"])
+
+
+def _foreach(config: Mapping[str, Any]) -> BlockConfig | str:
+    bound = config.get("max_items")
+    if not isinstance(bound, int) or isinstance(bound, bool) or bound < 1:
+        return "foreach_bound_required"
+    if bound > MAX_FOREACH_ITEMS:
+        return "foreach_bound_too_large"
+    item_type = _named(config.get("item_type", "json"), INPUT_TYPES)
+    return ForeachConfig(bound, item_type) if item_type is not None else "foreach_item_type_invalid"
+
+
+def _artifact(config: Mapping[str, Any]) -> BlockConfig | str:
+    path = str(config.get("path", ""))
+    return ArtifactConfig(path) if path.startswith("outputs/") else "artifact_path_invalid"
+
+
+def _agent(config: Mapping[str, Any]) -> BlockConfig | str:
+    expert_id = config.get("expert_id")
+    return AgentConfig(str(expert_id)) if expert_id else "agent_expert_required"
+
+
+_CONFIGS: Mapping[str, Callable[[Mapping[str, Any]], BlockConfig | str]] = {
+    "input": _input,
+    "transform": _transform,
+    "condition": _condition,
+    "foreach": _foreach,
+    "artifact": _artifact,
+    "agent": _agent,
+}
+
+
+def block_config(node: Mapping[str, Any]) -> BlockConfig | GraphError:
+    """A node's configuration, typed, or the node-level error validation reports for it."""
+    if node["block"] not in BLOCKS:
+        return GraphError("unknown_block", node["id"])
+    parse = _CONFIGS.get(node["block"])
+    if parse is None:
+        return PlainConfig()
+    config = node.get("config", {})
+    # A configuration that isn't an object holds none of its block's keys.
+    parsed = parse(config if isinstance(config, Mapping) else {})
+    return GraphError(parsed, node["id"]) if isinstance(parsed, str) else parsed
+
+
 def _resolved_type(
     nodes: Mapping[str, Mapping[str, Any]],
     specs: Mapping[str, BlockSpec],
+    configs: Mapping[str, BlockConfig],
     feeds: Mapping[str, tuple[str, str]],
     name: str,
     port: str,
     seen: frozenset[str] = frozenset(),
 ) -> str:
-    node = nodes[name]
-    passes_along = node["block"] in PASS_THROUGH or (
-        node["block"] == "transform" and node.get("config", {}).get("operation") == "identity"
+    config = configs[name]
+    passes_along = nodes[name]["block"] in PASS_THROUGH or (
+        isinstance(config, TransformConfig) and config.operation == "identity"
     )
     if passes_along and name in feeds and name not in seen:
         source, source_port = feeds[name]
-        return _resolved_type(nodes, specs, feeds, source, source_port, seen | {name})
-    if node["block"] == "transform":
-        return TRANSFORM_OUTPUTS.get(str(node.get("config", {}).get("operation")), "json")
-    return _output_type(node, port, specs[name])
+        return _resolved_type(nodes, specs, configs, feeds, source, source_port, seen | {name})
+    if isinstance(config, TransformConfig):
+        return TRANSFORM_OUTPUTS.get(config.operation, "json")
+    return _output_type(config, port, specs[name])
 
 
-def _output_type(node: Mapping[str, Any], port: str, spec: BlockSpec) -> str:
+def _output_type(config: BlockConfig, port: str, spec: BlockSpec) -> str:
     declared = spec.outputs[port]
-    config = node.get("config", {})
     if declared == "config":
-        return str(config.get("type", "json"))
-    return str(config.get("item_type", "json")) if declared == "config_item" else declared
-
-
-def _config_errors(node: Mapping[str, Any]) -> list[GraphError]:  # noqa: PLR0911 - baseline 2026-11-14, shrink only (STD-06)
-    block, config, name = node["block"], node.get("config", {}), node["id"]
-    if block == "input" and config.get("type") not in INPUT_TYPES:
-        return [GraphError("input_type_invalid", name)]
-    if block == "transform" and config.get("operation") not in TRANSFORMS:
-        return [GraphError("transform_operation_unknown", name)]
-    if block == "condition":
-        if config.get("predicate") not in PREDICATES or "operand" not in config:
-            return [GraphError("condition_invalid", name)]
-    if block == "foreach":
-        bound = config.get("max_items")
-        if not isinstance(bound, int) or isinstance(bound, bool) or bound < 1:
-            return [GraphError("foreach_bound_required", name)]
-        if bound > MAX_FOREACH_ITEMS:
-            return [GraphError("foreach_bound_too_large", name)]
-        if config.get("item_type", "json") not in INPUT_TYPES:
-            return [GraphError("foreach_item_type_invalid", name)]
-    if block == "artifact" and not str(config.get("path", "")).startswith("outputs/"):
-        return [GraphError("artifact_path_invalid", name)]
-    if block == "agent" and not config.get("expert_id"):
-        return [GraphError("agent_expert_required", name)]
-    return []
+        return config.type if isinstance(config, InputConfig) else "json"
+    if declared == "config_item":
+        return config.item_type if isinstance(config, ForeachConfig) else "json"
+    return declared
 
 
 def _has_cycle(names: list[str], successors: Mapping[str, set[str]]) -> bool:
@@ -229,6 +322,7 @@ def validate_graph(graph: Mapping[str, Any]) -> list[GraphError]:  # noqa: C901,
             errors.append(GraphError("duplicate_node", node["id"]))
         nodes[node["id"]] = node
     specs: dict[str, BlockSpec] = {}
+    configs: dict[str, BlockConfig] = {}
     for name, node in nodes.items():
         versions = BLOCKS.get(node["block"])
         if versions is None:
@@ -239,7 +333,11 @@ def validate_graph(graph: Mapping[str, Any]) -> list[GraphError]:  # noqa: C901,
             errors.append(GraphError("unknown_block_version", name))
             continue
         specs[name] = spec
-        errors.extend(_config_errors(node))
+        config = block_config(node)
+        if isinstance(config, GraphError):
+            errors.append(config)
+        else:
+            configs[name] = config
     if errors:
         return errors
     linked: dict[tuple[str, str], int] = defaultdict(int)
@@ -263,7 +361,7 @@ def validate_graph(graph: Mapping[str, Any]) -> list[GraphError]:  # noqa: C901,
         if link["target_port"] not in specs[target].inputs:
             errors.append(GraphError("unknown_port", target, link["target_port"]))
             continue
-        kind = _resolved_type(nodes, specs, feeds, source, link["source_port"])
+        kind = _resolved_type(nodes, specs, configs, feeds, source, link["source_port"])
         wanted = specs[target].inputs[link["target_port"]]
         if not _compatible(kind, wanted):
             errors.append(GraphError("link_type_mismatch", target, link["target_port"]))

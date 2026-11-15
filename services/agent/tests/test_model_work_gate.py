@@ -17,6 +17,7 @@ import pytest
 
 from autobots.api.operation_routes import require_ready
 from autobots.api.settings_routes import provider_settings
+from autobots.application.experts import expert_record
 from autobots.application.routines import run_routine_now
 from autobots.application.run_admission import (
     ModelNotReady,
@@ -34,7 +35,7 @@ from autobots.application.tool_catalog import ToolsUnavailable
 from autobots.application.workflow_overview import preview_steps
 from autobots.application.workflows import create_execution
 from autobots.contracts.experts import ExpertConfig
-from autobots.contracts.routines import RoutineConfig, RoutineTarget
+from autobots.contracts.routines import CronjobSchedule, RoutineConfig, RoutineTarget
 from autobots.domain.budgets import BudgetRefused
 from autobots.domain.models import (
     PROFILES,
@@ -177,11 +178,11 @@ def test_workspace_role_policy_reads_then_resolves() -> None:
 
 def test_an_experts_role_bindings_become_run_role_overrides() -> None:
     config = ExpertConfig(role_bindings={"executor": DEEPSEEK, "researcher": ModelProfileId.SOL})
-    assert expert_overrides(config) == {
+    assert expert_overrides(expert_record(config)) == {
         "executor": "openrouter_deepseek_flash",
         "researcher": "openrouter_sol",
     }
-    assert expert_overrides(ExpertConfig()) == {}
+    assert expert_overrides(expert_record(ExpertConfig())) == {}
 
 
 # The chosen limit
@@ -427,6 +428,31 @@ def test_every_agent_step_shows_the_workflow_runs_executor_from_one_policy_read(
     assert (gone["ask"].expert_name, gone["ask"].model) == (None, None)
 
 
+def test_a_draft_preview_reads_only_its_agent_steps_configuration() -> None:
+    """A draft can hold any JSON in another step's configuration, such as a list for an input's
+    type, and its preview still shows every step (refactor plan R-52)."""
+    database, connection = fresh()
+    database.answer(
+        "select e.id::text, e.name, v.config from public.experts e",
+        (str(EXPERT), "Researcher", {"tools": ["calculate"]}),
+    )
+    draft = {
+        "nodes": [
+            {"id": "in", "block": "input", "version": 1, "config": {"type": ["string"]}},
+            {"id": "ask", "block": "agent", "version": 1, "config": {"expert_id": str(EXPERT)}},
+            {"id": "out", "block": "output", "version": 1, "config": "not an object"},
+        ],
+        "links": [],
+    }
+    steps = {step.id: step for step in run(preview_steps(connection, WORKSPACE, draft))}
+    assert list(steps) == ["in", "ask", "out"]
+    assert (steps["ask"].expert_name, steps["ask"].tools, steps["in"].expert_id) == (
+        "Researcher",
+        ["calculate"],
+        None,
+    )
+
+
 def test_the_workflow_preview_names_the_model_its_agent_steps_child_will_use() -> None:
     """Decision 0028 E6: an agent step's child inherits the workflow run's frozen policy, which is
     resolved without the step Expert's role bindings, so the preview shows that policy's executor
@@ -600,7 +626,9 @@ def routine_database(
 ) -> FakeDatabase:
     database = FakeDatabase([])
     config = RoutineConfig(
-        target=target, goal="Check the figures", trigger={"kind": "interval", "minutes": 60}
+        target=target,
+        goal="Check the figures",
+        trigger=CronjobSchedule(kind="interval", minutes=60),
     )
     database.answer("event_sequence = event_sequence + 1", (1,))
     database.answer("select latest_version, enabled from public.routines", (1, True))
@@ -608,9 +636,10 @@ def routine_database(
     database.answer("select config from public.routine_versions", (config.model_dump(mode="json"),))
     database.answer("from public.routine_occurrences o join public.runs", (False,))
     database.answer("select graph from public.workflow_versions", (PLAIN_GRAPH,))
-    database.answer("from public.experts where id", (EXPERT, "Routine Expert", 1))
-    database.answer("from public.expert_versions where expert_id", (1, dict(expert or {})))
-    database.answer("count(*), max(created_at) from public.runs", (0, None))
+    database.answer(
+        "select v.config from public.experts e join public.expert_versions v",
+        (dict(expert or {}),),
+    )
     return database
 
 

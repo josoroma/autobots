@@ -1,0 +1,31 @@
+{
+  "written_by": "application/plans.py propose_plan: [PlanTask.model_dump()], unchanged since US-4.3 (0df1b6d), captured 2026-11-15",
+  "stored": [
+    {
+      "id": "t1",
+      "title": "Read the figures",
+      "depends_on": [],
+      "criteria": [
+        "c2"
+      ],
+      "tools": [
+        "read_run_file"
+      ],
+      "expected_evidence": "the file read"
+    },
+    {
+      "id": "t2",
+      "title": "Add and save the total",
+      "depends_on": [
+        "t1"
+      ],
+      "criteria": [
+        "c1"
+      ],
+      "tools": [
+        "calculate"
+      ],
+      "expected_evidence": "outputs/total.md"
+    }
+  ]
+}

@@ -53,6 +53,8 @@ async def post_routine(
             idempotency_key=key,
             name=body.name,
             config=body.config,
+            # A person's routine: the workspace's run limit caps each run (Decision 0029 F2).
+            budget_cap=None,
         )
 
 
@@ -85,6 +87,7 @@ async def post_version(
             idempotency_key=key,
             expected_version=body.expected_version,
             config=body.config,
+            budget_cap=None,
         )
 
 

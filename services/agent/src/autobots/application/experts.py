@@ -12,6 +12,7 @@ from autobots.application.improvements import active_skill_text
 from autobots.application.runs import existing_receipt, request_hash, store_receipt
 from autobots.contracts.experts import (
     ExpertConfig,
+    ExpertConfigView,
     ExpertVersionView,
     ExpertView,
     RouteOption,
@@ -21,12 +22,39 @@ from autobots.contracts.experts import (
 from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.models import UnknownModelProfile, approved_role
 from autobots.domain.tools import DELEGATION_TOOL, EXPERT_TOOLS, PLAN_TOOLS
+from autobots.persistence.records import ExpertConfigRecord, read_expert_config
 
 
-def expert_overrides(config: ExpertConfig) -> dict[str, str]:
-    """An Expert's role bindings as run role overrides, the first step of MP-01's order
+def expert_overrides(config: ExpertConfigRecord) -> dict[str, str]:
+    """A saved version's role bindings as run role overrides, the first step of MP-01's order
     (PRD-Model-Providers MP-01)."""
-    return {role: profile.value for role, profile in config.role_bindings.items()}
+    return dict(config.role_bindings)
+
+
+def expert_record(config: ExpertConfig) -> ExpertConfigRecord:
+    """What a saved version stores, in the shape versions always had (refactor plan R-52)."""
+    return ExpertConfigRecord(
+        purpose=config.purpose,
+        instructions=config.instructions,
+        tools=tuple(config.tools),
+        tool_groups=tuple(config.tool_groups),
+        skills=tuple(config.skills),
+        role_bindings={role: profile.value for role, profile in config.role_bindings.items()},
+    )
+
+
+def expert_view_config(record: ExpertConfigRecord) -> ExpertConfigView:
+    """A saved version as the Experts API shows it, with no request bounds."""
+    return ExpertConfigView.model_validate(
+        {
+            "purpose": record.purpose,
+            "instructions": record.instructions,
+            "tools": list(record.tools),
+            "tool_groups": list(record.tool_groups),
+            "skills": list(record.skills),
+            "role_bindings": dict(record.role_bindings),
+        }
+    )
 
 
 class ExpertRefused(Refusal):
@@ -96,7 +124,7 @@ async def _view(connection: Any, expert_id: UUID, name: str, latest: int) -> Exp
         (expert_id,),
     )
     versions = [
-        ExpertVersionView(version=row[0], config=ExpertConfig.model_validate(row[1]))
+        ExpertVersionView(version=row[0], config=expert_view_config(read_expert_config(row[1])))
         for row in await cursor.fetchall()
     ]
     cursor = await connection.execute(
@@ -165,7 +193,7 @@ async def create_expert(
         await connection.execute(
             "insert into public.expert_versions (expert_id, version, config, created_by) "
             "values (%s, 1, %s, %s)",
-            (expert_id, config.model_dump_json(), actor_id),
+            (expert_id, expert_record(config).stored(), actor_id),
         )
         await store_receipt(connection, scope, fingerprint, {"expert_id": str(expert_id)})
     return await get_expert(connection, workspace_id, expert_id)
@@ -207,7 +235,7 @@ async def add_version(
         await connection.execute(
             "insert into public.expert_versions (expert_id, version, config, created_by) "
             "values (%s, %s, %s, %s)",
-            (expert_id, version, config.model_dump_json(), actor_id),
+            (expert_id, version, expert_record(config).stored(), actor_id),
         )
         await connection.execute(
             "update public.experts set latest_version = %s where id = %s", (version, expert_id)
@@ -227,15 +255,28 @@ async def _option(
     row = await cursor.fetchone()
     if row is None:
         raise ExpertRefused("expert_not_found")
-    config = ExpertConfig.model_validate(row[1])
+    config = read_expert_config(row[1])
     return RouteOption(
         expert_id=expert_id,
         name=row[0],
         version=version,
         purpose=config.purpose,
-        tools=config.tools,
+        tools=list(config.tools),
         role_bindings=expert_overrides(config),
     )
+
+
+async def saved_version(
+    connection: Any, workspace_id: UUID, expert_id: UUID, version: int
+) -> ExpertConfigRecord | None:
+    """One saved version's configuration, if this workspace has that Expert and version."""
+    cursor = await connection.execute(
+        "select v.config from public.experts e join public.expert_versions v "
+        "on v.expert_id = e.id where e.id = %s and e.workspace_id = %s and v.version = %s",
+        (expert_id, workspace_id, version),
+    )
+    row = await cursor.fetchone()
+    return None if row is None else read_expert_config(row[0])
 
 
 async def create_session(
@@ -333,8 +374,8 @@ async def resolve_binding(
     found = await cursor.fetchone()
     if found is None:
         raise ExpertRefused("expert_version_not_found")
-    config = ExpertConfig.model_validate(found[0])
-    references = await active_skill_text(connection, workspace_id, config.skills)
+    config = read_expert_config(found[0])
+    references = await active_skill_text(connection, workspace_id, list(config.skills))
     return RunBinding(
         session_id=session_id,
         expert_id=UUID(entry["expert_id"]),

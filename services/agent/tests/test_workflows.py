@@ -128,6 +128,11 @@ def test_every_documented_block_is_available() -> None:
         (lambda g: g["links"].pop(), "required_input_unlinked"),
         (lambda g: g["nodes"][0]["config"].update(type="shell"), "input_type_invalid"),
         (lambda g: g["nodes"][1]["config"].update(operation="eval"), "transform_operation_unknown"),
+        # A draft can hold any JSON in a configuration; a value that isn't text is refused, not
+        # raised on (refactor plan R-52).
+        (lambda g: g["nodes"][0]["config"].update(type=["string"]), "input_type_invalid"),
+        (lambda g: g["nodes"][1]["config"].update(operation={}), "transform_operation_unknown"),
+        (lambda g: g["nodes"][0].update(config=["string"]), "input_type_invalid"),
     ],
 )
 def test_typed_errors(change: Any, code: str) -> None:

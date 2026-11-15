@@ -28,6 +28,7 @@ from autobots.application.tool_gateway import (
 )
 from autobots.application.workflows import WorkflowRefused
 from autobots.contracts.cronjob import (
+    MAX_LIMIT_MICRO_USD,
     CronjobInput,
     CronjobOutput,
     CronjobRoutine,
@@ -48,14 +49,10 @@ async def _environment_check(connection: Any, workspace_id: UUID) -> str:
 
 
 def routine_config(task: CronjobTask) -> RoutineConfig:
-    trigger: dict[str, Any] = {"kind": task.schedule.kind}
-    if task.schedule.kind == "interval":
-        trigger["minutes"] = task.schedule.minutes
-    else:
-        trigger["time"] = task.schedule.time
+    """The Routines API's configuration, whose schedule is the task's own (Decision 0026 C5)."""
     return RoutineConfig(
         target=RoutineTarget(kind=task.target_kind, id=task.target_id, version=task.target_version),
-        trigger=trigger,
+        trigger=task.schedule,
         timezone=task.timezone,
         goal=task.goal,
         inputs=dict(task.inputs),
@@ -125,6 +122,7 @@ def cronjob_tool(credential_check: CredentialCheck | None = None) -> ToolDefinit
                         idempotency_key=key,
                         name=_required(arguments.name),
                         config=routine_config(_required(arguments.task)),
+                        budget_cap=MAX_LIMIT_MICRO_USD,
                     )
                     return CronjobOutput(
                         action=action,
@@ -141,6 +139,7 @@ def cronjob_tool(credential_check: CredentialCheck | None = None) -> ToolDefinit
                         idempotency_key=key,
                         expected_version=_required(arguments.expected_version),
                         config=routine_config(_required(arguments.task)),
+                        budget_cap=MAX_LIMIT_MICRO_USD,
                     )
                     return CronjobOutput(
                         action=action,

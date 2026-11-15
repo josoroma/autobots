@@ -1,0 +1,29 @@
+{
+  "written_by": "GoalSpec from US-4.8 (e99143f) until US-5.1 (78d8759) added instructions",
+  "stored": {
+    "objective": "Sum the figures",
+    "original_request": "Sum the figures in inputs/q3.csv",
+    "criteria": {
+      "c1": "The total is saved",
+      "c2": "Sources are cited"
+    },
+    "allowed_tools": {
+      "propose_plan": 1,
+      "complete_task": 1,
+      "calculate": 1,
+      "read_run_file": 2
+    },
+    "allowed_paths": [
+      "inputs/",
+      "outputs/"
+    ],
+    "required_artifacts": [
+      {
+        "name": "outputs/total.md",
+        "must_contain": [
+          "Total"
+        ]
+      }
+    ]
+  }
+}

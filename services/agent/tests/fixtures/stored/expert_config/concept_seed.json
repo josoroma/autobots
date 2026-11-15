@@ -1,0 +1,16 @@
+{
+  "written_by": "operations/concept_seed.py through create_expert: ExpertConfig(purpose, tools), captured 2026-11-15",
+  "stored": {
+    "purpose": "Watches a market and saves a dated brief.",
+    "instructions": "",
+    "tools": [
+      "calculate",
+      "read_csv",
+      "save_artifact",
+      "publish_artifact"
+    ],
+    "tool_groups": [],
+    "skills": [],
+    "role_bindings": {}
+  }
+}

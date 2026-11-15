@@ -1038,6 +1038,50 @@ export const schemas = {
     "title": "CriterionView",
     "type": "object"
   },
+  "CronjobSchedule": {
+    "additionalProperties": false,
+    "description": "Every `minutes`, or `daily` at a wall-clock `time` (`HH:MM`) in the routine's timezone.",
+    "properties": {
+      "kind": {
+        "enum": [
+          "interval",
+          "daily"
+        ],
+        "title": "Kind",
+        "type": "string"
+      },
+      "minutes": {
+        "anyOf": [
+          {
+            "maximum": 527040.0,
+            "minimum": 1.0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Minutes"
+      },
+      "time": {
+        "anyOf": [
+          {
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Time"
+      }
+    },
+    "required": [
+      "kind"
+    ],
+    "title": "CronjobSchedule",
+    "type": "object"
+  },
   "DelayedOccurrence": {
     "additionalProperties": false,
     "description": "A routine occurrence that didn't run at its time, and the code for why.",
@@ -1604,6 +1648,67 @@ export const schemas = {
     "title": "ExpertConfig",
     "type": "object"
   },
+  "ExpertConfigView": {
+    "additionalProperties": false,
+    "description": "A saved version as stored. It has no request limits, since tool groups can expand a saved\nversion past one.",
+    "properties": {
+      "instructions": {
+        "default": "",
+        "title": "Instructions",
+        "type": "string"
+      },
+      "purpose": {
+        "default": "",
+        "title": "Purpose",
+        "type": "string"
+      },
+      "role_bindings": {
+        "additionalProperties": {
+          "$ref": "#/components/schemas/ModelProfileId"
+        },
+        "title": "Role Bindings",
+        "type": "object"
+      },
+      "skills": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Skills",
+        "type": "array"
+      },
+      "tool_groups": {
+        "items": {
+          "enum": [
+            "planning",
+            "general",
+            "web_search",
+            "web_extraction",
+            "web_crawling",
+            "files",
+            "market_data",
+            "browsing",
+            "code",
+            "connectors",
+            "delegation",
+            "learning",
+            "automation"
+          ],
+          "type": "string"
+        },
+        "title": "Tool Groups",
+        "type": "array"
+      },
+      "tools": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Tools",
+        "type": "array"
+      }
+    },
+    "title": "ExpertConfigView",
+    "type": "object"
+  },
   "ExpertCreate": {
     "additionalProperties": false,
     "properties": {
@@ -1670,7 +1775,7 @@ export const schemas = {
     "additionalProperties": false,
     "properties": {
       "config": {
-        "$ref": "#/components/schemas/ExpertConfig"
+        "$ref": "#/components/schemas/ExpertConfigView"
       },
       "version": {
         "title": "Version",
@@ -3998,6 +4103,7 @@ export const schemas = {
   },
   "RoutineConfig": {
     "additionalProperties": false,
+    "description": "A version as a request sets it.",
     "properties": {
       "goal": {
         "default": "",
@@ -4012,6 +4118,7 @@ export const schemas = {
       },
       "limit_micro_usd": {
         "default": 1000000,
+        "maximum": 9007199254740991.0,
         "minimum": 0.0,
         "title": "Limit Micro Usd",
         "type": "integer"
@@ -4027,6 +4134,8 @@ export const schemas = {
       },
       "timezone": {
         "default": "America/Costa_Rica",
+        "maxLength": 64,
+        "minLength": 1,
         "title": "Timezone",
         "type": "string"
       },
@@ -4045,9 +4154,7 @@ export const schemas = {
         "title": "Tools"
       },
       "trigger": {
-        "additionalProperties": true,
-        "title": "Trigger",
-        "type": "object"
+        "$ref": "#/components/schemas/CronjobSchedule"
       }
     },
     "required": [
@@ -4055,6 +4162,68 @@ export const schemas = {
       "trigger"
     ],
     "title": "RoutineConfig",
+    "type": "object"
+  },
+  "RoutineConfigView": {
+    "additionalProperties": false,
+    "description": "A saved version, read from its stored record.",
+    "properties": {
+      "goal": {
+        "title": "Goal",
+        "type": "string"
+      },
+      "inputs": {
+        "additionalProperties": true,
+        "title": "Inputs",
+        "type": "object"
+      },
+      "limit_micro_usd": {
+        "maximum": 9007199254740991.0,
+        "minimum": 0.0,
+        "title": "Limit Micro Usd",
+        "type": "integer"
+      },
+      "overlap": {
+        "const": "skip",
+        "title": "Overlap",
+        "type": "string"
+      },
+      "target": {
+        "$ref": "#/components/schemas/RoutineTarget"
+      },
+      "timezone": {
+        "title": "Timezone",
+        "type": "string"
+      },
+      "tools": {
+        "anyOf": [
+          {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Tools"
+      },
+      "trigger": {
+        "$ref": "#/components/schemas/RoutineScheduleView"
+      }
+    },
+    "required": [
+      "target",
+      "trigger",
+      "timezone",
+      "goal",
+      "inputs",
+      "tools",
+      "limit_micro_usd",
+      "overlap"
+    ],
+    "title": "RoutineConfigView",
     "type": "object"
   },
   "RoutineCreate": {
@@ -4133,6 +4302,49 @@ export const schemas = {
     "title": "RoutineRevision",
     "type": "object"
   },
+  "RoutineScheduleView": {
+    "additionalProperties": false,
+    "description": "A saved schedule as it runs: every `minutes`, or `daily` at the wall-clock `time` its\noccurrences use. That is `HH:MM`, with seconds and any fraction only for an older version saved\nwith them, such as `07:30:45`. `time` is null for an older daily version whose stored time isn't\ntext, which never runs.",
+    "properties": {
+      "kind": {
+        "enum": [
+          "interval",
+          "daily"
+        ],
+        "title": "Kind",
+        "type": "string"
+      },
+      "minutes": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Minutes"
+      },
+      "time": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Time"
+      }
+    },
+    "required": [
+      "kind",
+      "minutes",
+      "time"
+    ],
+    "title": "RoutineScheduleView",
+    "type": "object"
+  },
   "RoutineTarget": {
     "additionalProperties": false,
     "properties": {
@@ -4175,7 +4387,7 @@ export const schemas = {
     "additionalProperties": false,
     "properties": {
       "config": {
-        "$ref": "#/components/schemas/RoutineConfig"
+        "$ref": "#/components/schemas/RoutineConfigView"
       },
       "enabled": {
         "title": "Enabled",
@@ -7581,6 +7793,16 @@ export function parseCriterionView(value: unknown): CriterionView {
   return parseWith(schemas, "CriterionView", value) as CriterionView;
 }
 
+export interface CronjobSchedule {
+  kind: "interval" | "daily";
+  minutes?: number | null;
+  time?: string | null;
+}
+
+export function parseCronjobSchedule(value: unknown): CronjobSchedule {
+  return parseWith(schemas, "CronjobSchedule", value) as CronjobSchedule;
+}
+
 export interface DelayedOccurrence {
   occurrence_time: string;
   reason: string | null;
@@ -7741,6 +7963,19 @@ export function parseExpertConfig(value: unknown): ExpertConfig {
   return parseWith(schemas, "ExpertConfig", value) as ExpertConfig;
 }
 
+export interface ExpertConfigView {
+  instructions?: string;
+  purpose?: string;
+  role_bindings?: Record<string, ModelProfileId>;
+  skills?: string[];
+  tool_groups?: ("planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning" | "automation")[];
+  tools?: string[];
+}
+
+export function parseExpertConfigView(value: unknown): ExpertConfigView {
+  return parseWith(schemas, "ExpertConfigView", value) as ExpertConfigView;
+}
+
 export interface ExpertCreate {
   config: ExpertConfig;
   name: string;
@@ -7769,7 +8004,7 @@ export function parseExpertRevision(value: unknown): ExpertRevision {
 }
 
 export interface ExpertVersionView {
-  config: ExpertConfig;
+  config: ExpertConfigView;
   version: number;
 }
 
@@ -8392,11 +8627,26 @@ export interface RoutineConfig {
   target: RoutineTarget;
   timezone?: string;
   tools?: string[] | null;
-  trigger: Record<string, unknown>;
+  trigger: CronjobSchedule;
 }
 
 export function parseRoutineConfig(value: unknown): RoutineConfig {
   return parseWith(schemas, "RoutineConfig", value) as RoutineConfig;
+}
+
+export interface RoutineConfigView {
+  goal: string;
+  inputs: Record<string, unknown>;
+  limit_micro_usd: number;
+  overlap: "skip";
+  target: RoutineTarget;
+  timezone: string;
+  tools: string[] | null;
+  trigger: RoutineScheduleView;
+}
+
+export function parseRoutineConfigView(value: unknown): RoutineConfigView {
+  return parseWith(schemas, "RoutineConfigView", value) as RoutineConfigView;
 }
 
 export interface RoutineCreate {
@@ -8434,6 +8684,16 @@ export function parseRoutineRevision(value: unknown): RoutineRevision {
   return parseWith(schemas, "RoutineRevision", value) as RoutineRevision;
 }
 
+export interface RoutineScheduleView {
+  kind: "interval" | "daily";
+  minutes: number | null;
+  time: string | null;
+}
+
+export function parseRoutineScheduleView(value: unknown): RoutineScheduleView {
+  return parseWith(schemas, "RoutineScheduleView", value) as RoutineScheduleView;
+}
+
 export interface RoutineTarget {
   id: string;
   kind: "expert" | "workflow";
@@ -8445,7 +8705,7 @@ export function parseRoutineTarget(value: unknown): RoutineTarget {
 }
 
 export interface RoutineView {
-  config: RoutineConfig;
+  config: RoutineConfigView;
   enabled: boolean;
   id: string;
   latest_version: number;

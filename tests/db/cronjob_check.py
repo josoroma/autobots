@@ -66,11 +66,11 @@ async def main() -> None:
         config = RoutineConfig(target=RoutineTarget(kind='expert', id=target, version=1),
                                trigger={'kind': 'interval', 'minutes': 60}, goal='Existing')
         mine = [await create_routine(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()),
-                                     name=f'Mine {tag} {n}', config=config) for n in (1, 2)]
+                                     name=f'Mine {tag} {n}', config=config, budget_cap=None) for n in (1, 2)]
         theirs_config = RoutineConfig(target=RoutineTarget(kind='expert', id=foreign, version=1),
                                       trigger={'kind': 'interval', 'minutes': 60}, goal='Theirs')
         await create_routine(db, workspace_id=other, actor_id=ACTOR, idempotency_key=str(uuid4()),
-                             name=f'Theirs {tag}', config=theirs_config)
+                             name=f'Theirs {tag}', config=theirs_config, budget_cap=None)
 
         async def start(expert: UUID | None = manager.id) -> ToolScope:
             await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null "

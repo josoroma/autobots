@@ -32,7 +32,6 @@ from autobots.application.run_admission import (
 )
 from autobots.application.run_projection import public_text, read_summary
 from autobots.application.runs import apply_command, existing_receipt, request_hash, store_receipt
-from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.run_commands import (
     EffectEvidence,
     ModelCallReconciliation,
@@ -48,6 +47,7 @@ from autobots.contracts.settings import PreviewProfile, RunPreview, budget_range
 from autobots.domain.models import PROFILES, ModelProfileId
 from autobots.domain.runs import Actor, RunCommand
 from autobots.domain.tools import LOOP_TOOL_GRANTS, PLAN_TOOLS
+from autobots.persistence.records import read_expert_config
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 Key = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)]
@@ -84,7 +84,7 @@ async def preview_run(
             ).fetchone()
             if found is None:
                 raise ApiError(404, "expert_not_found", "That Expert is not available.")
-            config = ExpertConfig.model_validate(found[0])
+            config = read_expert_config(found[0])
             role_bindings = expert_overrides(config)
             tools = sorted(config.tools)
         remaining = await remaining_daily_micro_usd(connection, workspace_id)

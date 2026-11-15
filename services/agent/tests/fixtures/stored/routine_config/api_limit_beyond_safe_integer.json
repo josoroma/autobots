@@ -1,0 +1,22 @@
+{
+  "written_by": "POST /v1/routines before R-52, whose limit had no upper bound (ge=0 only)",
+  "stored": {
+    "target": {
+      "kind": "expert",
+      "id": "11111111-1111-4111-8111-111111111111",
+      "version": 2
+    },
+    "trigger": {
+      "kind": "interval",
+      "minutes": 60
+    },
+    "timezone": "America/New_York",
+    "goal": "Hourly check",
+    "inputs": {},
+    "tools": [
+      "calculate"
+    ],
+    "limit_micro_usd": 1152921504606846976,
+    "overlap": "skip"
+  }
+}

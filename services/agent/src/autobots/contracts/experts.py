@@ -40,11 +40,27 @@ class ExpertRevision(BaseModel):
     config: ExpertConfig
 
 
+# Read from the version's stored record (persistence/records.py, refactor plan R-52).
+class ExpertConfigView(BaseModel):
+    """A saved version as stored. It has no request limits, since tool groups can expand a saved
+    version past one."""
+
+    model_config = VIEW
+
+    # ExpertConfig's defaults, so the generated client types both alike.
+    purpose: str = ""
+    instructions: str = ""
+    tools: list[str] = Field(default_factory=list)
+    tool_groups: list[ToolGroupName] = Field(default_factory=list)
+    skills: list[str] = Field(default_factory=list)
+    role_bindings: dict[str, ModelProfileId] = Field(default_factory=dict)
+
+
 class ExpertVersionView(BaseModel):
     model_config = VIEW
 
     version: int
-    config: ExpertConfig
+    config: ExpertConfigView
 
 
 class ExpertView(BaseModel):
