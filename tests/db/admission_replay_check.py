@@ -29,7 +29,7 @@ from autobots.application.runs import (
 )
 from autobots.contracts.plans import InputDocument, RequiredArtifact
 from autobots.domain.models import resolve_role_policy
-from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.runs import RunCommand
 from checklib import Cases, Db, run_check
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
@@ -187,7 +187,7 @@ async def main(cases: Cases) -> None:
             await stored_receipts_replay(db, way, call, admitted[0])
         # These runs exist only for their receipts, so none is left for a later check's worker to claim.
         for run in admitted:
-            await db.command(run, RunCommand.CANCEL, Actor.USER)
+            await db.command(run, RunCommand.CANCEL)
 
 
 run_check(main)

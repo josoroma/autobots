@@ -1,14 +1,40 @@
 """Slots and spend, MP-07. Admission happens under a workspace lock, before any provider call."""
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
 
+
+class InvocationStatus(StrEnum):
+    """A model call's ledger row, apart from its run's status (SP-008, SP-010). This module is its
+    only writer."""
+
+    RESERVED = "reserved"
+    DISPATCHED = "dispatched"
+    SUCCEEDED = "succeeded"
+    FAILED_BEFORE_ACCEPTANCE = "failed_before_acceptance"
+    UNCERTAIN = "uncertain"
+    CANCELLED = "cancelled"
+
+
+class SettlementReason(StrEnum):
+    """Why the ledger closed a call, or left its cost open, where no provider failure says: kept
+    in `failure_class` beside `model_attempts.FailureClass` (PRUN-09)."""
+
+    # Its worker died: one never sent costs nothing, and one sent may have happened.
+    WORKER_LOST = "worker_lost"
+    CANCELLED = "cancelled"
+    CANCELLED_AFTER_DISPATCH = "cancelled_after_dispatch"
+    # The call worked and the provider named no charge, so only the amount is open.
+    CHARGE_NOT_REPORTED = "charge_not_reported"
+
+
 # What still holds a slot. A settled or uncertain attempt no longer does.
-ACTIVE = ("reserved", "dispatched")
+ACTIVE = (InvocationStatus.RESERVED, InvocationStatus.DISPATCHED)
 # What still counts against a budget, in full, because its cost isn't settled.
-OUTSTANDING = ("reserved", "dispatched", "uncertain")
+OUTSTANDING = (*ACTIVE, InvocationStatus.UNCERTAIN)
 # The ledger's column default, for a workspace whose limits row doesn't exist yet.
 DEFAULT_DAILY_LIMIT_MICRO_USD = 5_000_000
 WARNING_PERCENT = 80
@@ -102,6 +128,114 @@ def _percent(used: int, limit: int) -> int:
     return 100 if limit <= 0 else used * 100 // limit
 
 
+def _values(statuses: tuple[InvocationStatus, ...]) -> list[str]:
+    return [status.value for status in statuses]
+
+
+# The ledger's spend, defined once and shared by admission, the run projection and the workflow
+# overview (Decision 0029 F10, PRUN-09, XDUP-05). Each fragment takes the ledger's table alias, or
+# none. A statement using them binds LEDGER_PARAMS.
+LEDGER_PARAMS: dict[str, list[str]] = {"outstanding": _values(OUTSTANDING)}
+
+
+def _column(alias: str, name: str) -> str:
+    return f"{alias}.{name}" if alias else name
+
+
+def cost_open(alias: str = "") -> str:
+    """Whether a row's cost is still open, so its reservation counts rather than a charge."""
+    return f"{_column(alias, 'status')} = any(%(outstanding)s)"
+
+
+def reservation(alias: str = "") -> str:
+    return _column(alias, "reserved_micro_usd")
+
+
+def charge(alias: str = "") -> str:
+    return f"coalesce({_column(alias, 'charged_micro_usd')}, 0)"
+
+
+def spend(alias: str = "") -> str:
+    """What one row counts against a budget: its reservation while its cost is open, and its
+    reported charge once settled (MP-07)."""
+    return f"case when {cost_open(alias)} then {reservation(alias)} else {charge(alias)} end"
+
+
+def under_root(root: str, alias: str = "") -> str:
+    """The rows a root's budget counts: every call whose root is `root`, its own and every
+    descendant's, as admission scopes them (SP-008)."""
+    return f"{_column(alias, 'root_run_id')} = {root}"
+
+
+def shown_for(run: str, alias: str = "i") -> str:
+    """The rows a run's own figures show, for a `public.runs` row aliased `run`: its root's, as
+    admission counts them, and for a child, which no budget is scoped by, the calls it made itself
+    (US-11.12 N-9, Decision 0029 F10)."""
+    return (
+        f"({under_root(f'{run}.id', alias)} or "
+        f"({run}.parent_run_id is not null and {alias}.run_id = {run}.id))"
+    )
+
+
+def spend_columns(run: str) -> str:
+    """A run's charged and reserved figures, two select-list columns that add up to what admission
+    counts for the same rows."""
+    rows = f"from app_private.model_invocations i where {shown_for(run)}"
+    return (
+        f"(select coalesce(sum({charge('i')}) filter (where not ({cost_open('i')})), 0)::bigint "
+        f"{rows}), "
+        f"(select coalesce(sum({reservation('i')}) filter (where {cost_open('i')}), 0)::bigint "
+        f"{rows})"
+    )
+
+
+def unreported_column(run: str) -> str:
+    """Whether a call the run's figures show worked with no charge reported, so its amount is
+    still open."""
+    return (
+        f"exists (select 1 from app_private.model_invocations i where {shown_for(run)} "
+        f"and i.status = '{InvocationStatus.UNCERTAIN.value}' and i.reconciled_at is null "
+        f"and i.failure_class = '{SettlementReason.CHARGE_NOT_REPORTED.value}')"
+    )
+
+
+@dataclass(frozen=True)
+class LedgerUsage:
+    """What the ledger holds against one workspace and one root, as admission counts it."""
+
+    active: int
+    workspace_micro_usd: int
+    root_micro_usd: int
+
+
+# Admission's count: slots in use, the workspace's spend on the day and the root's spend.
+_USAGE = (
+    "select "
+    "count(*) filter (where status = any(%(active)s)), "
+    f"coalesce(sum({spend()}) filter (where spend_day = %(day)s), 0), "
+    f"coalesce(sum({spend()}) filter (where {under_root('%(root)s')}), 0) "
+    "from app_private.model_invocations where workspace_id = %(workspace)s"
+)
+
+
+async def ledger_usage(
+    connection: Any, workspace_id: UUID, root_run_id: UUID, day: date
+) -> LedgerUsage:
+    """Read in admission's transaction, under its workspace lock, or on its own by a check."""
+    cursor = await connection.execute(
+        _USAGE,
+        {
+            "active": _values(ACTIVE),
+            **LEDGER_PARAMS,
+            "day": day,
+            "root": root_run_id,
+            "workspace": workspace_id,
+        },
+    )
+    active, workspace_used, root_used = await cursor.fetchone()
+    return LedgerUsage(int(active), int(workspace_used), int(root_used))
+
+
 class ModelAdmission:
     """Takes an open async connection with the restricted runtime role, in autocommit."""
 
@@ -129,27 +263,14 @@ class ModelAdmission:
                     (request.workspace_id,),
                 )
             ).fetchone()
-            usage = await (
-                await self._connection.execute(
-                    "select "
-                    "count(*) filter (where status = any(%(active)s)), "
-                    "coalesce(sum(case when status = any(%(outstanding)s) then reserved_micro_usd "
-                    "else coalesce(charged_micro_usd, 0) end) "
-                    "filter (where spend_day = %(day)s), 0), "
-                    "coalesce(sum(case when status = any(%(outstanding)s) then reserved_micro_usd "
-                    "else coalesce(charged_micro_usd, 0) end) "
-                    "filter (where root_run_id = %(root)s), 0) "
-                    "from app_private.model_invocations where workspace_id = %(workspace)s",
-                    {
-                        "active": list(ACTIVE),
-                        "outstanding": list(OUTSTANDING),
-                        "day": day,
-                        "root": request.root_run_id,
-                        "workspace": request.workspace_id,
-                    },
-                )
-            ).fetchone()
-            active, workspace_used, run_used = usage
+            usage = await ledger_usage(
+                self._connection, request.workspace_id, request.root_run_id, day
+            )
+            active, workspace_used, run_used = (
+                usage.active,
+                usage.workspace_micro_usd,
+                usage.root_micro_usd,
+            )
             cursor = await self._connection.execute(
                 "select limit_micro_usd from public.runs where id = %s", (request.root_run_id,)
             )
@@ -166,7 +287,7 @@ class ModelAdmission:
                 "insert into app_private.model_invocations (id, workspace_id, root_run_id, run_id, "
                 "role, profile, wire_id, attempt, credential_version, spend_day, "
                 "reserved_micro_usd, status) "
-                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'reserved')",
+                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     invocation_id,
                     request.workspace_id,
@@ -179,6 +300,7 @@ class ModelAdmission:
                     request.credential_version,
                     day,
                     cost,
+                    InvocationStatus.RESERVED.value,
                 ),
             )
         run_percent = _percent(run_after, run_limit)
@@ -192,10 +314,11 @@ class ModelAdmission:
         )
 
     async def _transition(self, invocation_id: UUID, sets: str, *values: Any) -> None:
+        """Settles an active attempt. `sets` is one of this class's own assignments, never input."""
         cursor = await self._connection.execute(
             f"update app_private.model_invocations set {sets}, finished_at = now() "
-            "where id = %s and status in ('reserved', 'dispatched') returning id",
-            (*values, invocation_id),
+            "where id = %s and status = any(%s) returning id",
+            (*values, invocation_id, _values(ACTIVE)),
         )
         if await cursor.fetchone() is None:
             raise AttemptAlreadySettled("this attempt has already been settled")
@@ -204,9 +327,9 @@ class ModelAdmission:
         """Raises AttemptAlreadySettled if recovery closed this reservation meanwhile, so nothing is
         sent."""
         cursor = await self._connection.execute(
-            "update app_private.model_invocations set status = 'dispatched' "
-            "where id = %s and status = 'reserved' returning id",
-            (invocation_id,),
+            "update app_private.model_invocations set status = %s "
+            "where id = %s and status = %s returning id",
+            (InvocationStatus.DISPATCHED.value, invocation_id, InvocationStatus.RESERVED.value),
         )
         if await cursor.fetchone() is None:
             raise AttemptAlreadySettled("this attempt was closed before it was sent")
@@ -241,7 +364,8 @@ class ModelAdmission:
         """A reported charge replaces the estimate. Estimates and charges stay separate columns."""
         await self._transition(
             invocation_id,
-            "status = 'succeeded', charged_micro_usd = %s, upstream_provider = %s",
+            "status = %s, charged_micro_usd = %s, upstream_provider = %s",
+            InvocationStatus.SUCCEEDED.value,
             charged_micro_usd,
             upstream_provider or "unknown",
         )
@@ -250,7 +374,8 @@ class ModelAdmission:
         """Only here is the reservation released: the provider is known not to have taken it."""
         await self._transition(
             invocation_id,
-            "status = 'failed_before_acceptance', failure_class = %s, charged_micro_usd = 0",
+            "status = %s, failure_class = %s, charged_micro_usd = 0",
+            InvocationStatus.FAILED_BEFORE_ACCEPTANCE.value,
             failure_class,
         )
 
@@ -260,7 +385,8 @@ class ModelAdmission:
         """Keeps the attempt and its reservation. It frees the slot, not the money."""
         await self._transition(
             invocation_id,
-            "status = 'uncertain', failure_class = %s, accumulated_output = %s",
+            "status = %s, failure_class = %s, accumulated_output = %s",
+            InvocationStatus.UNCERTAIN.value,
             failure_class,
             accumulated_output,
         )
@@ -274,15 +400,30 @@ class ModelAdmission:
         ).fetchone()
         if row is None or row[0] not in ACTIVE:
             return row[0] if row else "unknown"
-        if row[0] == "reserved":
+        if row[0] == InvocationStatus.RESERVED:
             await self._transition(
                 invocation_id,
-                "status = 'cancelled', charged_micro_usd = 0, failure_class = %s",
-                "cancelled",
+                "status = %s, charged_micro_usd = 0, failure_class = %s",
+                InvocationStatus.CANCELLED.value,
+                SettlementReason.CANCELLED.value,
             )
-            return "cancelled"
-        await self.mark_uncertain(invocation_id, "cancelled_after_dispatch")
-        return "uncertain"
+            return InvocationStatus.CANCELLED.value
+        await self.mark_uncertain(invocation_id, SettlementReason.CANCELLED_AFTER_DISPATCH.value)
+        return InvocationStatus.UNCERTAIN.value
+
+    async def close_interrupted(self, run_id: UUID) -> None:
+        """A dead owner's calls in `run_id`: one never sent costs nothing, and one sent may have
+        happened, so its cost stays open. A closed stream or a lost process doesn't prove a provider
+        stopped (SP-012, MP-08)."""
+        for status, following, charged in (
+            (InvocationStatus.RESERVED, InvocationStatus.CANCELLED, "charged_micro_usd = 0, "),
+            (InvocationStatus.DISPATCHED, InvocationStatus.UNCERTAIN, ""),
+        ):
+            await self._connection.execute(
+                f"update app_private.model_invocations set status = %s, {charged}"
+                "failure_class = %s, finished_at = now() where run_id = %s and status = %s",
+                (following.value, SettlementReason.WORKER_LOST.value, run_id, status.value),
+            )
 
     async def reconcile(
         self, invocation_id: UUID, charged_micro_usd: int, source: str = "owner"
@@ -290,10 +431,16 @@ class ModelAdmission:
         """Resolve an uncertain attempt from a reported charge. A charge is never invented."""
         cursor = await self._connection.execute(
             "update app_private.model_invocations set "
-            "charged_micro_usd = %s, status = 'succeeded', "
+            "charged_micro_usd = %s, status = %s, "
             "reconciled_at = now(), charge_source = %s "
-            "where id = %s and status = 'uncertain' returning id",
-            (charged_micro_usd, source, invocation_id),
+            "where id = %s and status = %s returning id",
+            (
+                charged_micro_usd,
+                InvocationStatus.SUCCEEDED.value,
+                source,
+                invocation_id,
+                InvocationStatus.UNCERTAIN.value,
+            ),
         )
         if await cursor.fetchone() is None:
             raise AttemptAlreadySettled("this attempt is not awaiting reconciliation")
@@ -312,10 +459,9 @@ async def remaining_daily_micro_usd(
     row = await cursor.fetchone()
     limit = int(row[0]) if row else DEFAULT_DAILY_LIMIT_MICRO_USD
     cursor = await connection.execute(
-        "select coalesce(sum(case when status = any(%(outstanding)s) then reserved_micro_usd "
-        "else coalesce(charged_micro_usd, 0) end), 0) from app_private.model_invocations "
+        f"select coalesce(sum({spend()}), 0) from app_private.model_invocations "
         "where workspace_id = %(workspace)s and spend_day = %(day)s",
-        {"outstanding": list(OUTSTANDING), "workspace": workspace_id, "day": day},
+        {**LEDGER_PARAMS, "workspace": workspace_id, "day": day},
     )
     used = await cursor.fetchone()
     return limit - int(used[0] if used else 0)

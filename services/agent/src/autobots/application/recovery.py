@@ -5,6 +5,7 @@ from typing import Any
 from uuid import UUID
 
 from autobots.application import receipts
+from autobots.application.model_admission import InvocationStatus, ModelAdmission, SettlementReason
 from autobots.application.runs import RUN_TREE
 
 
@@ -19,30 +20,23 @@ class Outstanding:
 
 
 async def classify_interrupted(connection: Any, run_id: UUID, generation: int) -> None:
-    """A dead owner's work: never sent is nothing, and sent may have happened. A closed stream or a
-    lost process doesn't prove a provider stopped."""
-    await connection.execute(
-        "update app_private.model_invocations set status = 'cancelled', charged_micro_usd = 0, "
-        "failure_class = 'worker_lost', finished_at = now() "
-        "where run_id = %s and status = 'reserved'",
-        (run_id,),
-    )
-    await connection.execute(
-        "update app_private.model_invocations set status = 'uncertain', "
-        "failure_class = 'worker_lost', finished_at = now() "
-        "where run_id = %s and status = 'dispatched'",
-        (run_id,),
-    )
+    """A dead owner's work: never sent is nothing, and sent may have happened. The ledger and the
+    receipts each keep their one writer (PRUN-09, Decision 0029 F8)."""
+    await ModelAdmission(connection).close_interrupted(run_id)
     await receipts.mark_unknown(connection, run_id, generation)
 
 
 async def outstanding(connection: Any, run_id: UUID) -> Outstanding:
     cursor = await connection.execute(
-        "select count(*) filter (where failure_class is distinct from 'charge_not_reported'), "
-        "count(*) filter (where failure_class = 'charge_not_reported') "
-        "from app_private.model_invocations where (run_id = %s or root_run_id = %s) "
-        "and status = 'uncertain' and reconciled_at is null",
-        (run_id, run_id),
+        "select count(*) filter (where failure_class is distinct from %(unreported)s), "
+        "count(*) filter (where failure_class = %(unreported)s) "
+        "from app_private.model_invocations where (run_id = %(run)s or root_run_id = %(run)s) "
+        "and status = %(uncertain)s and reconciled_at is null",
+        {
+            "unreported": SettlementReason.CHARGE_NOT_REPORTED.value,
+            "run": run_id,
+            "uncertain": InvocationStatus.UNCERTAIN.value,
+        },
     )
     calls, unreported = await cursor.fetchone()
     cursor = await connection.execute(

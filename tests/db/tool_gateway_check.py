@@ -11,12 +11,12 @@ from uuid import UUID, uuid4
 
 import psycopg
 from autobots.adapters.tool_middleware import GatewayMiddleware, visible_tools
-from autobots.application.runs import admit_run, apply_command
+from autobots.application.runs import admit_run, apply_worker_command
 from autobots.application.tool_gateway import ToolDefinition, ToolFailed, ToolGateway, ToolScope
 from autobots.application.tools import default_registry, first_grants
 from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy
-from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.runs import RunCommand
 from autobots.domain.tools import OperationClass
 from deepagents import create_deep_agent
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
@@ -85,7 +85,7 @@ async def main() -> None:
         # Run status and ownership, checked before the effect.
         registry.register(counted('guarded'))
         guarded = await running(tools={'guarded': 1})
-        await apply_command(db, workspace_id=WORKSPACE, run_id=guarded.run_id, command=RunCommand.REQUEST_INPUT, actor=Actor.WORKER, expected_version=2, generation=guarded.generation)
+        await apply_worker_command(db, guarded, RunCommand.REQUEST_INPUT)
         result = await gateway.execute(db, guarded, 'guarded', {})
         check('a run that is not owned cannot use a tool', 'lease_lost', result.code, result.code == 'lease_lost')
         guarded = await running(tools={'guarded': 1})

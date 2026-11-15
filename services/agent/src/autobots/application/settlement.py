@@ -2,7 +2,6 @@
 run's transition, so a worker that lost the run records nothing (LC-12, SP-012)."""
 
 import json
-from typing import Any, cast
 from uuid import uuid4
 
 from autobots.application.plans import load_goal
@@ -14,10 +13,10 @@ from autobots.application.run_lifecycle import (
     lease_heartbeat,
     result_of,
 )
-from autobots.application.runs import LeaseLost, VersionConflict, apply_command
+from autobots.application.runs import LeaseLost, VersionConflict, apply_worker_command
 from autobots.application.verification import verify_candidate
 from autobots.application.worker_leases import Lease
-from autobots.domain.runs import Actor, CommandRefused, RunCommand
+from autobots.domain.runs import CommandRefused, RunCommand
 from autobots.domain.stops import PassOutcome, StopCode
 
 
@@ -34,31 +33,20 @@ async def settle_candidate(
                 connection, lease, goal, PassOutcome.LOST, StopCode.LEASE_LOST, None
             )
     code = None if report.passed else StopCode.CRITERIA_UNMET
-    cursor = await connection.execute(
-        "select version from public.runs where id = %s", (lease.run_id,)
-    )
-    # The run this worker holds has its row. Rows stay untyped until the SQL boundary is (R-54).
-    version = cast(tuple[Any, ...], await cursor.fetchone())[0]
     try:
-        # The verdict commits with the transition, so a worker that lost the run records nothing.
+        # The verdict and the stop reason commit with the transition, so a worker that lost the run
+        # records nothing.
         async with connection.transaction():
-            result = await apply_command(
+            result = await apply_worker_command(
                 connection,
-                workspace_id=lease.workspace_id,
-                run_id=lease.run_id,
-                command=RunCommand.COMPLETE if report.passed else RunCommand.FAIL,
-                actor=Actor.WORKER,
-                expected_version=version,
-                generation=lease.generation,
+                lease,
+                RunCommand.COMPLETE if report.passed else RunCommand.FAIL,
+                stop_reason=code,
             )
             await connection.execute(
                 "insert into app_private.run_verifications (id, run_id, passed, unmet, checks) "
                 "values (%s, %s, %s, %s, %s)",
                 (uuid4(), lease.run_id, report.passed, json.dumps(report.unmet), report.checks),
-            )
-            await connection.execute(
-                "update app_private.run_usage set stop_reason = %s where run_id = %s",
-                (code, lease.run_id),
             )
     except CommandRefused:
         # A cancel arrived first. It wins, and this worker settles it.

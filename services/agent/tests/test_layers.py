@@ -19,9 +19,9 @@ ALLOWED = {
     "operations": {"domain", "persistence", "contracts", "application", "adapters"},
 }
 BASELINE = {
-    ("application", "adapters"): 21,
+    ("application", "adapters"): 19,
     ("application", "operations"): 5,
-    ("adapters", "operations"): 2,
+    ("adapters", "operations"): 1,
     ("api", "operations"): 2,
     ("operations", "api"): 1,
 }

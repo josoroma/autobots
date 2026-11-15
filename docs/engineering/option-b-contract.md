@@ -172,6 +172,33 @@ Cancellation is also valid from **every nonterminal state**. Move directly to `c
 
 Transition commands require expected version, actor authorization, guard evaluation and an atomic domain update/outbox event where possible. Competing completion/cancellation writes are serialized by version/fencing. Document the separate state machines for steps, tool attempts, approvals and credential connections; do not conflate them with Run status. Tests cover every permitted transition and representative invalid/concurrent cases.
 
+#### Run commands and their actors
+
+Each command lists exactly the actors that may apply it (Decision 0029 F5). `user` is a person. `worker` is the worker holding the run's lease, checked at its generation under the job's row lock. `system` is neither: a parent's cancel reaching its children, a parent's settlement cancelling a child that cascade missed, a parent's resume continuing its paused child, and an approval's expiry pausing its run. `services/agent/src/autobots/domain/runs.py` holds the table, and `application/runs.py` applies it: `apply_command` for a person, `apply_worker_command` for the lease holder and `cascade_command` for the system. A claim moves its run by `claim` in the same table.
+
+| Command | Actors | From | To |
+|---|---|---|---|
+| `submit_input` | `user` | `waiting_input` | `queued` |
+| `decide_approval` | `user` | `waiting_approval` | `queued` |
+| `pause` | `user`, `system` | `queued`, `running`, `waiting_input`, `waiting_approval`, `verifying` | `paused` |
+| `resume` | `user`, `system` | `paused` | `queued` |
+| `cancel` | `user`, `system` | `queued`, `running`, `waiting_input`, `waiting_approval`, `paused`, `verifying` | `cancelling`, `cancelled` |
+| `claim` | `worker` | `queued` | `running` |
+| `request_input` | `worker` | `running` | `waiting_input` |
+| `request_approval` | `worker` | `running` | `waiting_approval` |
+| `verify` | `worker` | `running` | `verifying` |
+| `repair` | `worker` | `verifying` | `running` |
+| `complete` | `worker` | `verifying` | `succeeded` |
+| `fail` | `worker` | `running`, `verifying` | `failed` |
+| `finish_cancel` | `worker` | `cancelling` | `cancelled` |
+| `suspend` | `worker` | `queued`, `running`, `waiting_input`, `waiting_approval`, `verifying` | `paused` |
+
+Notes:
+
+- A cancel moves to `cancelled` only when no active or unsettled work remains, and to `cancelling` otherwise. A cancel of a run already `cancelling` or `cancelled` changes nothing.
+- A pause by a person or the system leaves a live lease holder its job; that worker sees the pause at its next check and lets the job go. The worker's own `suspend` ends its claim in the same transaction.
+- A claim of a run that isn't `queued`, such as one whose lease expired while it was `running`, moves nothing: the run keeps its status, and the new lease holder goes on from it.
+
 #### Tool-attempt receipts and approval requests
 
 These states are separate from run status: a run's `waiting_approval` is the run's wait, and a request's `pending` is the request's own state (Decision 0029 F8). Stored values are the lowercase names below. `services/agent/src/autobots/domain/effects.py` holds both tables. `application/receipts.py` is the only writer of a receipt's status and `application/approvals.py` the only writer of a request's. Each status write admits only the states its command moves from, so a move outside a table matches no row. `none` means no row yet.

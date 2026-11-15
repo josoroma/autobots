@@ -22,7 +22,7 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from app_db import AppStack, apply_migrations, bootstrap, seed
+from app_db import AppStack, apply_bootstrap, apply_migrations, bootstrap, seed
 from disposable_db import (
     PROJECT_PREFIX,
     Target,
@@ -35,7 +35,7 @@ from disposable_db import (
     tool_env,
 )
 from harness_lib import project_root
-from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner, password_token
+from qualify_identity import PYTHON, bootstrap_owner, password_token
 from qualify_operations import Ops, api_call, wait
 from supabase_stack import generated_values, require_images, require_rendered
 
@@ -50,11 +50,23 @@ WAIT_FOR_SLEEP_SECONDS = 2400
 AFTER_WAKE_SECONDS = 600
 SETTLED_PAUSE_SECONDS = 60
 TERMINAL = {'succeeded', 'failed', 'cancelled'}
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'services/agent/src'))
+from autobots.application.model_admission import (  # noqa: E402
+    LEDGER_PARAMS,
+    charge,
+    cost_open,
+    reservation,
+    under_root,
+)
+
+# The ledger's spend as admission counts it (Decision 0029 F10). This statement reaches psql as text, so the open
+# statuses go in as an array rather than a parameter.
+_OPEN = cost_open('i').replace('%(outstanding)s', 'array[' + ', '.join(f"'{status}'" for status in LEDGER_PARAMS['outstanding']) + ']')
 SNAPSHOT = ("select row_to_json(t) from (select r.status, r.version, "
             "(select stop_reason from app_private.run_usage u where u.run_id = r.id) as stop_reason, "
             "(select count(*) from app_private.model_invocations i where i.root_run_id = r.id) as calls, "
-            "(select coalesce(sum(i.reserved_micro_usd) filter (where i.status in ('reserved', 'dispatched', 'uncertain') and i.reconciled_at is null), 0) from app_private.model_invocations i where i.root_run_id = r.id) as reserved, "
-            "(select coalesce(sum(i.charged_micro_usd), 0) from app_private.model_invocations i where i.root_run_id = r.id) as charged, "
+            f"(select coalesce(sum({reservation('i')}) filter (where {_OPEN}), 0) from app_private.model_invocations i where {under_root('r.id', 'i')}) as reserved, "
+            f"(select coalesce(sum({charge('i')}) filter (where not ({_OPEN})), 0) from app_private.model_invocations i where {under_root('r.id', 'i')}) as charged, "
             "(select count(*) from app_private.model_invocations i where i.root_run_id = r.id and i.status = 'uncertain' and i.reconciled_at is null) as uncertain, "
             "(select count(*) from app_private.tool_receipts x where x.run_id = r.id) as receipts, "
             "(select count(*) from app_private.tool_receipts x where x.run_id = r.id and x.status = 'unknown') as unknown_receipts, "
@@ -142,7 +154,10 @@ def observe(root: Path) -> int:
             raise Unavailable(f'the stack did not start: {started.stderr[-300:]}')
         bootstrap(stack, root)
         _, problem = apply_migrations(stack, root / 'supabase/migrations')
-        if problem or seed(stack, root).returncode or stack.sql((root / STORAGE_SQL).read_text()).returncode:
+        if problem or seed(stack, root).returncode:
+            raise Unavailable(f'the schema could not be set up: {problem}')
+        _, problem = apply_bootstrap(stack, root)
+        if problem:
             raise Unavailable(f'the schema could not be set up: {problem}')
         email, password = 'owner@example.invalid', secrets.token_urlsafe(24)
         workspace = bootstrap_owner(root, ops.base, stack.values['SERVICE_ROLE_KEY'], ops.url, email, password)['workspace_id']

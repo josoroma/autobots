@@ -4,11 +4,12 @@ import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Final, Protocol
 from uuid import UUID
 
-from autobots.application.runs import LeaseLost, record_transition
-from autobots.domain.runs import RunStatus
+from autobots.application.runs import LeaseLost, apply_claim
+from autobots.domain.runs import JobStatus, RunStatus
 
 DEFAULT_LEASE_SECONDS = 60.0
 # Over this between the two clocks is a sleep, and not a busy Mac.
@@ -129,7 +130,8 @@ async def _claim(
             return None
         run_id, workspace_id, status, version = row
         cursor = await connection.execute(
-            "update app_private.run_jobs set status = 'claimed', generation = generation + 1, "
+            f"update app_private.run_jobs set status = '{JobStatus.CLAIMED.value}', "
+            "generation = generation + 1, "
             "attempts = attempts + 1, lease_owner = %s, "
             "lease_expires_at = clock_timestamp() + make_interval(secs => %s) "
             "where run_id = %s returning generation, attempts",
@@ -140,9 +142,7 @@ async def _claim(
             "update public.runs set lease_generation = %s, checkpoint_thread_id = %s where id = %s",
             (generation, str(run_id), run_id),
         )
-        if status == RunStatus.QUEUED.value:
-            await record_transition(connection, run_id, status, RunStatus.RUNNING.value, version)
-            status = RunStatus.RUNNING.value
+        status = (await apply_claim(connection, run_id, RunStatus(status), version)).value
     return Lease(run_id, workspace_id, generation, worker_id, attempts, status)
 
 
@@ -233,17 +233,28 @@ async def release(connection: Any, lease: Lease, delay_seconds: float) -> None:
     """Requeues the job this lease claims, claimable again `delay_seconds` from now by database
     time. The lease's generation fences it."""
     await connection.execute(
-        "update app_private.run_jobs set status = 'queued', lease_owner = null, "
+        f"update app_private.run_jobs set status = '{JobStatus.QUEUED.value}', lease_owner = null, "
         "lease_expires_at = null, available_at = clock_timestamp() + make_interval(secs => %s) "
         "where run_id = %s and generation = %s and status = 'claimed'",
         (delay_seconds, lease.run_id, lease.generation),
     )
 
 
+async def release_at(connection: Any, lease: Lease, available_at: datetime) -> None:
+    """Requeues the job this lease claims, claimable again from `available_at`. The lease's
+    generation fences it."""
+    await connection.execute(
+        f"update app_private.run_jobs set status = '{JobStatus.QUEUED.value}', lease_owner = null, "
+        "lease_expires_at = null, available_at = %s "
+        "where run_id = %s and generation = %s and status = 'claimed'",
+        (available_at, lease.run_id, lease.generation),
+    )
+
+
 async def let_go(connection: Any, lease: Lease) -> None:
     """Ends this lease's claim on a run a person paused. Their resume queues the job again."""
     await connection.execute(
-        "update app_private.run_jobs set status = 'done', lease_owner = null, "
+        f"update app_private.run_jobs set status = '{JobStatus.DONE.value}', lease_owner = null, "
         "lease_expires_at = null where run_id = %s and generation = %s and status = 'claimed'",
         (lease.run_id, lease.generation),
     )

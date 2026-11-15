@@ -203,7 +203,7 @@ async def run_trial(  # noqa: PLR0915 - baseline 2026-11-14, shrink only (STD-06
             lease = await claim_next(db, worker_id="browse-trial", lease_seconds=900)
             if lease is None or lease.run_id != run:
                 raise Refused("the trial's run wasn't the one claimed")
-            await db.execute("update public.runs set status = 'running' where id = %s", (run,))
+            # The claim moved the queued run to running, by `claim` in the command table (SP-010).
             return ToolScope(workspace, run, lease.generation, grant)
 
         arguments = {

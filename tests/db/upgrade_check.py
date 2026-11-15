@@ -17,7 +17,7 @@ from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import admit_run, apply_command
 from autobots.domain.execution import current_contract
 from autobots.domain.models import resolve_role_policy
-from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.runs import RunCommand
 from autobots.operations.job_dispatch import process_next
 from goal_loop_script import DONE_A, SAVE, TASK_A, Script, calls, say
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -80,7 +80,7 @@ async def main(workspace: UUID, queued: UUID, second: UUID, before_hash: str) ->
         check('and its frozen binding is still the original', before_hash[:16], unchanged[:16], unchanged == before_hash)
         await db.execute("update app_private.model_policies set default_profile = 'openrouter_deepseek_flash' where workspace_id = %s", (workspace,))
         version = await value('select version from public.runs where id = %s', queued)
-        await apply_command(db, workspace_id=workspace, run_id=queued, command=RunCommand.RESUME, actor=Actor.USER, expected_version=version)
+        await apply_command(db, workspace_id=workspace, run_id=queued, command=RunCommand.RESUME, expected_version=version)
 
         # Compatible: the prior release's queued job runs to completion on this release.
         result = await process_next(db, URL, 'upgraded', fixture([calls(PLAN), calls(SAVE), calls(PUBLISH), calls(DONE_A), say('finished')]), config)
@@ -98,7 +98,7 @@ async def main(workspace: UUID, queued: UUID, second: UUID, before_hash: str) ->
             shown = await value('select stop_reason from app_private.run_usage where run_id = %s', run)
             check(f'{label} records why', 'incompatible_version', shown, shown == 'incompatible_version')
             version = await value('select version from public.runs where id = %s', run)
-            await apply_command(db, workspace_id=workspace, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
+            await apply_command(db, workspace_id=workspace, run_id=run, command=RunCommand.CANCEL, expected_version=version)
             check(f'{label} leaves the owner able to cancel', 'cancelled', await state(run), await state(run) == 'cancelled')
             linked = await admit_run(db, workspace_id=workspace, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='Blocked goal', limit_micro_usd=1_000_000, policy=resolve_role_policy(), continues_run_id=run) if await state(run) == 'cancelled' else None
             check(f'{label} can continue as a linked new run on current semantics', 'a new run with the current contract', bool(linked), linked is not None)

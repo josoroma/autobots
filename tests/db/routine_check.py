@@ -23,7 +23,7 @@ from autobots.application.workflows import create_workflow, publish_version
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.routines import RoutineConfig, RoutineTarget
 from autobots.contracts.workflows import WorkflowGraph
-from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.runs import RunCommand
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE, OTHER = UUID(sys.argv[1]), UUID(sys.argv[2])
@@ -92,7 +92,7 @@ async def main() -> None:
         due = await evaluate_routines(db, ready, START + timedelta(hours=2))
         check('with a run still active, the next occurrence is skipped, and says so', '0 admitted, skipped_overlap', (due, await history(made.id)), due == 0 and await history(made.id) == ['admitted', 'skipped_overlap'])
         version = await value('select version from public.runs where id = %s', run)
-        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
+        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, expected_version=version)
         due = await evaluate_routines(db, ready, START + timedelta(hours=3))
         check('once it finishes, the next one runs', '1 admitted', (due, (await history(made.id))[-1]), due == 1 and (await history(made.id))[-1] == 'admitted')
 

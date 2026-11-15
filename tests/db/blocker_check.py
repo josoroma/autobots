@@ -42,7 +42,7 @@ from autobots.application.workflows import create_execution, create_workflow, pu
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.models import resolve_role_policy
-from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.runs import RunCommand
 from autobots.domain.tools import DELEGATION_TOOL, LOOP_TOOL_GRANTS, OperationClass
 from autobots.operations.job_dispatch import drive_lease, process_next
 from checklib import Cases, Db
@@ -112,7 +112,7 @@ async def pause_inside_assignment(db: Db) -> None:
         # Read before the assignment's leased transaction opens, so the pause can't wait on its lock.
         if not seen:
             seen.append((await db.value('select status from public.runs where id = %s', run), (await db.row(receipt_sql, run, DELEGATION_TOOL))[0]))
-            await db.command(run, RunCommand.PAUSE, Actor.USER)
+            await db.command(run, RunCommand.PAUSE)
         return await real_binding(*args, **kwargs)
 
     lease = await db.claim(run, worker_id='b6-assignment')
@@ -131,7 +131,7 @@ async def pause_inside_assignment(db: Db) -> None:
                 'lost, run_not_running, job done with no owner',
                 (ended.outcome, ended.code, await db.row('select status, lease_owner from app_private.run_jobs where run_id = %s', run)),
                 lambda found: found == ('lost', 'run_not_running', ('done', None)))
-    await db.command(run, RunCommand.RESUME, Actor.USER)
+    await db.command(run, RunCommand.RESUME)
     lease = await db.claim(run, worker_id='b6-assignment-resume')
     model = Script(items=[say('never asked')])
     await run_workflow(db.connection, URL, lease, model, config, drive=drive_lease)
@@ -292,7 +292,7 @@ async def main() -> None:
         async def upload_then_pause(arguments: Note, context: ToolContext) -> Sent:
             uploads.append(arguments.text)
             version = await value('select version from public.runs where id = %s', context.scope.run_id)
-            await apply_command(db, workspace_id=WORKSPACE, run_id=context.scope.run_id, command=RunCommand.PAUSE, actor=Actor.USER, expected_version=version)
+            await apply_command(db, workspace_id=WORKSPACE, run_id=context.scope.run_id, command=RunCommand.PAUSE, expected_version=version)
             return Sent(delivered=True)
         uploader = ToolDefinition(tool_id='upload', version=1, description='Upload.', input_model=Note, output_model=Sent, operation_class=OperationClass.REVERSIBLE_INTERNAL_WRITE, handler=upload_then_pause)
         gateway = ToolGateway(ToolRegistry())
@@ -306,7 +306,7 @@ async def main() -> None:
         stored = await value('select status from app_private.tool_receipts where run_id = %s', run)
         check('and the effect is on record', 'succeeded', stored, stored == 'succeeded')
         version = await value('select version from public.runs where id = %s', run)
-        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.RESUME, actor=Actor.USER, expected_version=version)
+        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.RESUME, expected_version=version)
         await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where run_id = %s", (run,))
         lease = await claim_next(db, worker_id='b6-resume')
         output = await call_tool(gateway, db, scope_of(lease, {'upload': 1}), 'upload', {'text': 'bytes'})
@@ -325,7 +325,7 @@ async def main() -> None:
         await db.execute("insert into app_private.tool_receipts (operation_id, run_id, workspace_id, tool_id, tool_version, argument_hash, status, generation) values ('b8-open', %s, %s, 'send_once', 1, 'x', 'started', %s)", (run, WORKSPACE, lease.generation))
         await expire(run)
         version = await value('select version from public.runs where id = %s', run)
-        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
+        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, expected_version=version)
         before = await value('select status from public.runs where id = %s', run)
         result = await process_next(db, URL, 'new-release', _no_model, LoopConfig(route=ROUTE))
         after = await value('select status from public.runs where id = %s', run)
@@ -348,7 +348,7 @@ async def main() -> None:
         await expire(run)
         owner = await claim_next(db, worker_id='current-owner')
         version = await value('select version from public.runs where id = %s', run)
-        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
+        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, expected_version=version)
         lost = await finish(db, stale, await load_goal(db, run), 'budget_exceeded')
         untouched = (await value('select status from public.runs where id = %s', run), (await receipt('stale-open'))[0])
         check('a stale worker can not settle a cancelling run', 'lease_lost, cancelling, effect still started', (lost.code, untouched), lost.code == 'lease_lost' and untouched == ('cancelling', 'started'))

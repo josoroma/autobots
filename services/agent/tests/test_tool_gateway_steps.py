@@ -23,6 +23,7 @@ from autobots.application.approvals import (
     scope_hash,
     scope_snapshot,
 )
+from autobots.application.runs import WorkerClaim
 from autobots.application.tool_gateway import (
     ApprovalPolicy,
     ToolContext,
@@ -34,6 +35,7 @@ from autobots.application.tool_gateway import (
 )
 from autobots.application.tool_uses import input_digest
 from autobots.contracts.tools import CalculateInput, CalculateOutput
+from autobots.domain.runs import RunCommand
 from autobots.domain.tool_catalog import CostClass
 from autobots.domain.tools import OperationClass, ToolOutcome
 from autobots.operations.logs import JsonFormatter
@@ -313,10 +315,12 @@ async def test_a_held_call_stores_every_decision_0015_field_and_is_not_counted(
     waits for a person isn't counted against the metered budget until it is approved."""
     waits: list[dict[str, object]] = []
 
-    async def enter_wait(_: object, **fields: object) -> None:
-        waits.append(fields)
+    async def enter_wait(
+        _: object, claim: WorkerClaim, command: RunCommand, **fields: object
+    ) -> None:
+        waits.append({"command": command, "generation": claim.generation, **fields})
 
-    monkeypatch.setattr("autobots.application.approvals.apply_command", enter_wait)
+    monkeypatch.setattr("autobots.application.approvals.apply_worker_command", enter_wait)
     database = Database(request=None)
     result = await call(gated_tool(Seen()), database)
     assert (result.outcome, result.code) == (ToolOutcome.DENIED, "approval_pending")

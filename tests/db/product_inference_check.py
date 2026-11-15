@@ -13,14 +13,14 @@ from autobots.api.main import provider_context_from_environment
 from autobots.application.artifacts import read_artifact
 from autobots.application.experts import create_expert, create_session, resolve_binding
 from autobots.application.provider_settings import KeyCheck, ProviderSettings
-from autobots.application.runs import admit_run, apply_command
+from autobots.application.runs import admit_run, apply_command, apply_worker_command
 from autobots.application.worker_leases import claim_run
 from autobots.application.workflows import create_execution, create_workflow, publish_version
 from autobots.contracts.experts import ExpertConfig, SessionExpert
 from autobots.contracts.plans import RequiredArtifact
 from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.models import resolve_role_policy
-from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.runs import RunCommand
 from pydantic import SecretStr
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
@@ -96,9 +96,9 @@ async def strand(workspace: str, run: str, state: str) -> None:
         assert lease is not None, 'the run could not be claimed'
         version = (await (await db.execute('select version from public.runs where id = %s', (run,))).fetchone())[0]
         if state == 'cancel':
-            await apply_command(db, workspace_id=UUID(workspace), run_id=UUID(run), command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
+            await apply_command(db, workspace_id=UUID(workspace), run_id=UUID(run), command=RunCommand.CANCEL, expected_version=version)
         else:
-            await apply_command(db, workspace_id=UUID(workspace), run_id=UUID(run), command=RunCommand.VERIFY, actor=Actor.WORKER, expected_version=version, generation=lease.generation)
+            await apply_worker_command(db, lease, RunCommand.VERIFY)
 
 
 COMMANDS = {'workflow': workflow, 'admit': admit, 'admit-lead': admit_lead, 'save-key': save_key, 'artifact': artifact, 'strand': strand}

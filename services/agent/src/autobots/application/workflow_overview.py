@@ -5,6 +5,7 @@ from datetime import UTC
 from typing import Any
 from uuid import UUID
 
+from autobots.application.model_admission import LEDGER_PARAMS, spend_columns, unreported_column
 from autobots.application.run_admission import saved_workspace_policy
 from autobots.contracts.workflows import (
     WorkflowExecutionSummary,
@@ -15,21 +16,15 @@ from autobots.domain.runs import TERMINAL, RunStatus
 from autobots.domain.workflows import AgentConfig, block_config, step_order
 from autobots.persistence.records import ExpertConfigRecord, read_expert_config
 
-# One execution per row, with the root run's ledger, as the run list counts it (RN-01).
+# One execution per row, with the root run's ledger, as the run list and admission count it (RN-01,
+# Decision 0029 F10).
 _EXECUTIONS = (
     "select x.id, x.run_id, x.workflow_version, r.status, x.created_at, r.updated_at, "
-    "r.created_at, "
-    "(select coalesce(sum(coalesce(i.charged_micro_usd, 0)), 0)::bigint "
-    "from app_private.model_invocations i where i.root_run_id = r.id or i.run_id = r.id), "
-    "(select coalesce(sum(i.reserved_micro_usd) filter (where i.status in "
-    "('reserved', 'dispatched', 'uncertain') and i.reconciled_at is null), 0)::bigint "
-    "from app_private.model_invocations i where i.root_run_id = r.id or i.run_id = r.id), "
-    "exists (select 1 from app_private.model_invocations i where (i.root_run_id = r.id "
-    "or i.run_id = r.id) and i.status = 'uncertain' and i.reconciled_at is null "
-    "and i.failure_class = 'charge_not_reported') "
+    f"r.created_at, {spend_columns('r')}, {unreported_column('r')} "
     "from public.workflow_executions x join public.runs r on r.id = x.run_id "
     "and r.workspace_id = x.workspace_id "
-    "where x.workflow_id = %s and x.workspace_id = %s order by x.created_at desc, x.id limit %s"
+    "where x.workflow_id = %(workflow)s and x.workspace_id = %(workspace)s "
+    "order by x.created_at desc, x.id limit %(limit)s"
 )
 
 
@@ -52,7 +47,10 @@ def _summary(row: Any) -> WorkflowExecutionSummary:
 async def recent_executions(
     connection: Any, workspace_id: UUID, workflow_id: UUID, limit: int = 10
 ) -> list[WorkflowExecutionSummary]:
-    cursor = await connection.execute(_EXECUTIONS, (workflow_id, workspace_id, limit))
+    cursor = await connection.execute(
+        _EXECUTIONS,
+        {"workflow": workflow_id, "workspace": workspace_id, "limit": limit, **LEDGER_PARAMS},
+    )
     return [_summary(row) for row in await cursor.fetchall()]
 
 

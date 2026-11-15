@@ -27,7 +27,7 @@ from autobots.application.runs import admit_run, apply_command
 from autobots.application.tool_gateway import ToolScope
 from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy
-from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.runs import RunCommand
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = UUID(sys.argv[1])
@@ -274,7 +274,7 @@ async def ownership(db: Any) -> None:
     watcher = asyncio.create_task(executor.watch(session, lambda: attempt_alive(db, scope), every=0.5))
     await asyncio.sleep(1.5)
     version = (await (await db.execute('select version from public.runs where id = %s', (scope.run_id,))).fetchone())[0]
-    await apply_command(db, workspace_id=WORKSPACE, run_id=scope.run_id, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
+    await apply_command(db, workspace_id=WORKSPACE, run_id=scope.run_id, command=RunCommand.CANCEL, expected_version=version)
     reason = await asyncio.wait_for(watcher, 30)
     check('a cancelled run ends the session', 'attempt_ended, containers removed', (reason, await executor.exists(session)),
           reason == 'attempt_ended' and not await executor.exists(session))

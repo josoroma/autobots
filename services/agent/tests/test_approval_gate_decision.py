@@ -21,7 +21,9 @@ from autobots.application.approvals import (
     gate_decision,
     scope_snapshot,
 )
+from autobots.application.runs import WorkerClaim
 from autobots.domain.effects import ApprovalStatus, ReceiptStatus
+from autobots.domain.runs import RunCommand
 from autobots.domain.stops import GatewayCode
 
 APPROVAL = UUID("d0000000-0000-4000-8000-000000000004")
@@ -171,10 +173,12 @@ async def test_the_gate_writes_only_what_its_decision_needs(
 ) -> None:
     waits: list[dict[str, object]] = []
 
-    async def enter_wait(_: object, **fields: object) -> None:
-        waits.append(fields)
+    async def enter_wait(
+        _: object, claim: WorkerClaim, command: RunCommand, **fields: object
+    ) -> None:
+        waits.append({"command": command, "generation": claim.generation, **fields})
 
-    monkeypatch.setattr("autobots.application.approvals.apply_command", enter_wait)
+    monkeypatch.setattr("autobots.application.approvals.apply_worker_command", enter_wait)
     connection = Connection(row, found)
     assert await approval_gate(connection, RUN, PROPOSAL) == code
     reopened = any(

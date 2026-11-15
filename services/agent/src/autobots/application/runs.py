@@ -4,10 +4,13 @@ import hashlib
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Protocol
+from enum import Enum
+from typing import Any, Literal, Protocol
 from uuid import UUID, uuid4
 
+from autobots.application.model_admission import ACTIVE
 from autobots.contracts.plans import GoalSpec, InputDocument, RequiredArtifact
+from autobots.domain.effects import ReceiptStatus
 from autobots.domain.errors import FixedRefusal, RefusalKind
 from autobots.domain.execution import current_contract
 from autobots.domain.models import PROFILES, RolePolicy
@@ -16,8 +19,11 @@ from autobots.domain.runs import (
     TERMINAL,
     Actor,
     CommandRefused,
+    JobStatus,
+    LockedJob,
     RunCommand,
     RunStatus,
+    job_status_after,
     next_status,
 )
 from autobots.domain.tools import LOOP_TOOL_GRANTS, RUN_FILE_GRANTS
@@ -519,15 +525,6 @@ async def admit_run(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (STD-06
     )
 
 
-def _job_status(following: RunStatus) -> str | None:
-    """What a transition does to the job. A run that isn't waiting for a worker can't be claimed."""
-    if following is RunStatus.QUEUED:
-        return "queued"
-    if following in {RunStatus.RUNNING, RunStatus.VERIFYING, RunStatus.CANCELLING}:
-        return None  # The worker holding the lease still owns it.
-    return "done"
-
-
 @dataclass(frozen=True)
 class TransitionResult:
     run_id: UUID
@@ -549,35 +546,65 @@ async def record_transition(
     return new_version
 
 
+async def apply_claim(connection: Any, run_id: UUID, current: RunStatus, version: int) -> RunStatus:
+    """A claim's move, inside the claim's transaction under its job row lock: a queued run starts
+    running by `claim` in the command table (SP-010). A run its last owner left in another state
+    keeps it, and its new owner goes on from there."""
+    if current is not RunStatus.QUEUED:
+        return current
+    following = next_status(current, RunCommand.CLAIM, Actor.WORKER) or current
+    await record_transition(connection, run_id, current.value, following.value, version)
+    return following
+
+
 async def _has_unsettled_work(connection: Any, run_id: UUID) -> bool:
     """SP-010: straight to cancelled only with no attempt or effect still open. A call already
     classified uncertain stays recorded, and doesn't hold the run open."""
     cursor = await connection.execute(
         "select exists (select 1 from app_private.model_invocations where run_id = %s "
-        "and status in ('reserved', 'dispatched')) or exists (select 1 from "
-        "app_private.tool_receipts where run_id = %s and status = 'started') "
+        "and status = any(%s)) or exists (select 1 from "
+        "app_private.tool_receipts where run_id = %s and status = %s) "
         "or exists (select 1 from app_private.assignments where parent_run_id = %s "
         "and status = 'open')",
-        (run_id, run_id, run_id),
+        (
+            run_id,
+            [status.value for status in ACTIVE],
+            run_id,
+            ReceiptStatus.STARTED.value,
+            run_id,
+        ),
     )
     return bool((await cursor.fetchone())[0])
 
 
 async def _cancel_children(connection: Any, workspace_id: UUID, run_id: UUID) -> None:
-    """In the parent's transaction, so a cancel fences the whole tree at once."""
+    """In the parent's transaction, so a cancel fences the whole tree at once. The system cancels
+    each child, as no person asked for it (Decision 0029 F5)."""
     cursor = await connection.execute(
-        "select id, version from public.runs where parent_run_id = %s and status <> all(%s)",
-        (run_id, sorted(INTERRUPTING)),
+        "select id from public.runs where parent_run_id = %s and status <> all(%s)",
+        (run_id, sorted(status.value for status in INTERRUPTING)),
     )
-    for child_id, version in await cursor.fetchall():
-        await apply_command(
-            connection,
-            workspace_id=workspace_id,
-            run_id=child_id,
-            command=RunCommand.CANCEL,
-            actor=Actor.USER,
-            expected_version=version,
+    for (child_id,) in await cursor.fetchall():
+        await cascade_command(
+            connection, workspace_id=workspace_id, run_id=child_id, command=RunCommand.CANCEL
         )
+
+
+async def _withdraw_waits_and_cascade(connection: Any, workspace_id: UUID, run_id: UUID) -> None:
+    """A cancel's side effects, in its transaction: pending requests are withdrawn, open waits are
+    met, and the run's children are cancelled."""
+    # Imported here: approvals imports this module for its run commands, so importing it at module
+    # level would be circular. It stays the one writer of request status (Decision 0029 F8).
+    from autobots.application.approvals import withdraw_pending
+
+    await withdraw_pending(connection, run_id)
+    # Nothing is waiting on an answer any more, so nothing can stay open against it.
+    await connection.execute(
+        "update app_private.run_obligations set status = 'met', response = 'cancelled', "
+        "met_at = now() where run_id = %s and status = 'open'",
+        (run_id,),
+    )
+    await _cancel_children(connection, workspace_id, run_id)
 
 
 async def _record_obligation(
@@ -601,118 +628,222 @@ async def _record_obligation(
         )
 
 
-def _require_owner(job: Any, generation: int | None) -> None:
-    """Checked under the job's row lock, in the transaction that makes the change."""
-    if generation is None or job is None:
-        raise LeaseLost("this worker no longer owns the run")
-    status, current, live = job
-    if status != "claimed" or current != generation or not live:
-        raise LeaseLost("this worker no longer owns the run")
+async def _lock_job(connection: Any, workspace_id: UUID, run_id: UUID) -> LockedJob:
+    """The job's row lock, always before the run's, the same order a claim uses, so the two can't
+    deadlock."""
+    cursor = await connection.execute(
+        "select status, generation, lease_expires_at > clock_timestamp() "
+        "from app_private.run_jobs where run_id = %s and workspace_id = %s for update",
+        (run_id, workspace_id),
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        return LockedJob(None, None, False)
+    return LockedJob(JobStatus(row[0]), row[1], bool(row[2]))
 
 
-async def apply_command(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (STD-06)
+async def _lock_run(connection: Any, workspace_id: UUID, run_id: UUID) -> tuple[RunStatus, int]:
+    cursor = await connection.execute(
+        "select status, version from public.runs where id = %s and workspace_id = %s for update",
+        (run_id, workspace_id),
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        raise RunNotFound("that run is not available")
+    return RunStatus(row[0]), int(row[1])
+
+
+async def _write_job(
+    connection: Any, run_id: UUID, status: JobStatus | None, *, resumed: bool
+) -> None:
+    """Under the job's row lock, in the transaction that moved the run."""
+    if status is not None:
+        await connection.execute(
+            "update app_private.run_jobs set status = %s, lease_owner = null, "
+            "lease_expires_at = null where run_id = %s",
+            (status.value, run_id),
+        )
+    if resumed:
+        # A resume starts the job's consecutive failed passes again from none (Decision 0028 E4).
+        await connection.execute(
+            "update app_private.run_jobs set failed_attempts = 0 where run_id = %s", (run_id,)
+        )
+
+
+async def _record_stop_reason(connection: Any, run_id: UUID, code: str | None) -> None:
+    # A run can stop before its first segment, so the row may not exist yet.
+    await connection.execute(
+        "insert into app_private.run_usage (run_id, stop_reason) values (%s, %s) "
+        "on conflict (run_id) do update set stop_reason = excluded.stop_reason",
+        (run_id, code),
+    )
+
+
+class Unset(Enum):
+    """A keyword left out, where None is one of the values it takes."""
+
+    UNSET = "unset"
+
+
+@dataclass(frozen=True)
+class CommandReceipt:
+    """A person's idempotency key for one command: who sent it, under which key. The two come
+    together or not at all, so a receipt can't be skipped by passing one (SP-014, PRUN-06)."""
+
+    actor_id: UUID
+    idempotency_key: str
+
+
+class WorkerClaim(Protocol):
+    """A worker's hold on one run at one generation, such as a `Lease` or a tool call's scope."""
+
+    @property
+    def workspace_id(self) -> UUID: ...
+
+    @property
+    def run_id(self) -> UUID: ...
+
+    @property
+    def generation(self) -> int: ...
+
+
+@dataclass(frozen=True)
+class _Move:
+    """One command as `_apply` takes it: on which run, by whom, at which version."""
+
+    workspace_id: UUID
+    run_id: UUID
+    command: RunCommand
+    actor: Actor
+    expected_version: int
+    generation: int | None = None
+    receipt: Idempotent | None = None
+    detail: str = ""
+    response: str | None = None
+    stop_reason: str | Literal[Unset.UNSET] | None = Unset.UNSET
+
+
+async def _apply(connection: Any, move: _Move) -> TransitionResult:
+    """Ownership, version, actor and SP-010 are checked where the change is written, and the
+    change, its event, its job and its receipt commit together. Always the job's row, then the
+    run's."""
+    async with connection.transaction():
+        if move.receipt is not None:
+            existing = await move.receipt.replayed(connection)
+            if existing is not None:
+                return TransitionResult(move.run_id, existing["version"], existing["status"], False)
+        job = await _lock_job(connection, move.workspace_id, move.run_id)
+        if move.actor is Actor.WORKER and (
+            move.generation is None or not job.held_by(move.generation)
+        ):
+            raise LeaseLost("this worker no longer owns the run")
+        current, version = await _lock_run(connection, move.workspace_id, move.run_id)
+        has_active_work = job.live_claim or await _has_unsettled_work(connection, move.run_id)
+        following = next_status(current, move.command, move.actor, has_active_work=has_active_work)
+        if following is None:
+            # Repeating a cancellation changes nothing, and is not a conflict.
+            return TransitionResult(move.run_id, version, current.value, False)
+        if version != move.expected_version:
+            raise VersionConflict("the run changed; reload it")
+        new_version = await record_transition(
+            connection, move.run_id, current.value, following.value, version
+        )
+        await _record_obligation(connection, move.run_id, move.command, move.detail, move.response)
+        if move.command is RunCommand.CANCEL:
+            await _withdraw_waits_and_cascade(connection, move.workspace_id, move.run_id)
+        await _write_job(
+            connection,
+            move.run_id,
+            job_status_after(following, move.actor, job),
+            resumed=move.command is RunCommand.RESUME,
+        )
+        if move.stop_reason is not Unset.UNSET:
+            await _record_stop_reason(connection, move.run_id, move.stop_reason)
+        if move.receipt is not None:
+            result = {"version": new_version, "status": following.value}
+            await move.receipt.store(connection, result)
+    return TransitionResult(move.run_id, new_version, following.value, True)
+
+
+async def _version_of(connection: Any, run_id: UUID) -> int:
+    """Read before the row locks, so a person's command that lands between this read and the locks
+    is a version conflict."""
+    cursor = await connection.execute("select version from public.runs where id = %s", (run_id,))
+    row = await cursor.fetchone()
+    if row is None:
+        raise RunNotFound("that run is not available")
+    return int(row[0])
+
+
+async def apply_command(
     connection: Any,
     *,
     workspace_id: UUID,
     run_id: UUID,
     command: RunCommand,
-    actor: Actor,
     expected_version: int,
-    generation: int | None = None,
-    actor_id: UUID | None = None,
-    idempotency_key: str | None = None,
-    detail: str = "",
+    receipt: CommandReceipt | None = None,
     response: str | None = None,
 ) -> TransitionResult:
-    """Ownership, version, actor and SP-010 are checked where the change is written.
-
-    Always the job's row, then the run's, the same order a claim uses, so the two can't deadlock.
-    """
-    fingerprint = request_hash(
-        {"command": command.value, "expected_version": expected_version, "response": response}
+    """A person's command at the version they saw (SP-010, SP-014). With a receipt, a repeat of its
+    key replays the first result, and other content under it is refused."""
+    idempotent = None
+    if receipt is not None:
+        idempotent = Idempotent.of(
+            CommandKey(workspace_id, receipt.actor_id, receipt.idempotency_key),
+            command.value,
+            str(run_id),
+            {"command": command.value, "expected_version": expected_version, "response": response},
+        )
+    return await _apply(
+        connection,
+        _Move(
+            workspace_id,
+            run_id,
+            command,
+            Actor.USER,
+            expected_version,
+            receipt=idempotent,
+            response=response,
+        ),
     )
-    scope = None
-    if actor_id is not None and idempotency_key is not None:
-        scope = (workspace_id, actor_id, command.value, str(run_id), idempotency_key)
-    async with connection.transaction():
-        if scope is not None:
-            existing = await existing_receipt(connection, scope, fingerprint)
-            if existing is not None:
-                return TransitionResult(run_id, existing["version"], existing["status"], False)
-        cursor = await connection.execute(
-            "select status, generation, lease_expires_at > clock_timestamp() "
-            "from app_private.run_jobs where run_id = %s and workspace_id = %s for update",
-            (run_id, workspace_id),
-        )
-        job = await cursor.fetchone()
-        if actor is Actor.WORKER:
-            _require_owner(job, generation)
-        cursor = await connection.execute(
-            "select status, version from public.runs "
-            "where id = %s and workspace_id = %s for update",
-            (run_id, workspace_id),
-        )
-        row = await cursor.fetchone()
-        if row is None:
-            raise RunNotFound("that run is not available")
-        current, version = RunStatus(row[0]), row[1]
-        has_active_work = (job is not None and job[0] == "claimed" and bool(job[2])) or (
-            await _has_unsettled_work(connection, run_id)
-        )
-        following = next_status(current, command, actor, has_active_work=has_active_work)
-        if following is None:
-            # Repeating a cancellation changes nothing, and is not a conflict.
-            return TransitionResult(run_id, version, current.value, False)
-        if version != expected_version:
-            raise VersionConflict("the run changed; reload it")
-        new_version = await record_transition(
-            connection, run_id, current.value, following.value, version
-        )
-        await _record_obligation(connection, run_id, command, detail, response)
-        if command is RunCommand.CANCEL:
-            # Imported here: approvals imports this module for its run commands, so importing it
-            # at module level would be circular. It stays the one writer of request status.
-            from autobots.application.approvals import withdraw_pending
 
-            await withdraw_pending(connection, run_id)
-            # Nothing is waiting on an answer any more, so nothing can stay open against it.
-            await connection.execute(
-                "update app_private.run_obligations set status = 'met', response = 'cancelled', "
-                "met_at = now() where run_id = %s and status = 'open'",
-                (run_id,),
-            )
-            await _cancel_children(connection, workspace_id, run_id)
-        job_status = _job_status(following)
-        if following is RunStatus.CANCELLING and not (
-            job is not None and job[0] == "claimed" and bool(job[2])
-        ):
-            # Open work with no live owner. Something has to come back and settle it.
-            job_status = "queued"
-        if (
-            following is RunStatus.PAUSED
-            and actor is Actor.USER
-            and job is not None
-            and job[0] == "claimed"
-            and bool(job[2])
-        ):
-            # The owner sees this at its next check, saves its step and lets go.
-            job_status = None
-        if job_status is not None:
-            await connection.execute(
-                "update app_private.run_jobs set status = %s, lease_owner = null, "
-                "lease_expires_at = null where run_id = %s",
-                (job_status, run_id),
-            )
-        if command is RunCommand.RESUME:
-            # A person's resume starts the job's consecutive failed passes again from none
-            # (Decision 0028 E4).
-            await connection.execute(
-                "update app_private.run_jobs set failed_attempts = 0 where run_id = %s", (run_id,)
-            )
-        result = {"version": new_version, "status": following.value}
-        if scope is not None:
-            await store_receipt(connection, scope, fingerprint, result)
-    return TransitionResult(run_id, new_version, following.value, True)
+
+async def apply_worker_command(
+    connection: Any,
+    claim: WorkerClaim,
+    command: RunCommand,
+    *,
+    detail: str = "",
+    stop_reason: str | Literal[Unset.UNSET] | None = Unset.UNSET,
+) -> TransitionResult:
+    """A command from the worker holding `claim`, fenced by its generation under the job's row
+    lock (SP-010, SP-012). A stop reason, None included, commits with the transition, so a worker
+    that lost the run writes neither."""
+    version = await _version_of(connection, claim.run_id)
+    return await _apply(
+        connection,
+        _Move(
+            claim.workspace_id,
+            claim.run_id,
+            command,
+            Actor.WORKER,
+            version,
+            generation=claim.generation,
+            detail=detail,
+            stop_reason=stop_reason,
+        ),
+    )
+
+
+async def cascade_command(
+    connection: Any, *, workspace_id: UUID, run_id: UUID, command: RunCommand
+) -> TransitionResult:
+    """A command neither a person nor the run's leased worker applies: a parent's cancel or resume
+    reaching its child, a stray child's cancel, or an approval's expiry pausing its run. The system
+    applies only cancel, pause and resume (Decision 0029 F5, SP-010)."""
+    version = await _version_of(connection, run_id)
+    return await _apply(connection, _Move(workspace_id, run_id, command, Actor.SYSTEM, version))
 
 
 __all__ = [
@@ -720,6 +851,7 @@ __all__ = [
     "Actor",
     "AdmissionGrant",
     "CommandKey",
+    "CommandReceipt",
     "CommandRefused",
     "Fresh",
     "IdempotencyConflict",
@@ -731,12 +863,18 @@ __all__ = [
     "RunAdmission",
     "RunGrant",
     "RunNotFound",
+    "TransitionResult",
+    "Unset",
     "VersionConflict",
+    "WorkerClaim",
     "admit",
     "admit_run",
     "ancestors_running",
     "append_event",
+    "apply_claim",
     "apply_command",
+    "apply_worker_command",
+    "cascade_command",
     "current_status",
     "record_transition",
 ]

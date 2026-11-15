@@ -23,8 +23,9 @@ from autobots.application.approvals import (
     gate_decision,
     scope_snapshot,
 )
-from autobots.application.runs import LeaseLost
+from autobots.application.runs import LeaseLost, WorkerClaim
 from autobots.domain.effects import ApprovalStatus, ReceiptStatus
+from autobots.domain.runs import RunCommand
 
 APPROVAL = UUID("d0000000-0000-4000-8000-000000000004")
 BROWSE = ApprovalProposal(
@@ -179,10 +180,12 @@ async def test_repeating_a_consumed_call_waits_for_a_person_again(
 ) -> None:
     waits: list[dict[str, object]] = []
 
-    async def enter_wait(_: object, **fields: object) -> None:
-        waits.append(fields)
+    async def enter_wait(
+        _: object, claim: WorkerClaim, command: RunCommand, **fields: object
+    ) -> None:
+        waits.append({"command": command, "generation": claim.generation, **fields})
 
-    monkeypatch.setattr("autobots.application.approvals.apply_command", enter_wait)
+    monkeypatch.setattr("autobots.application.approvals.apply_worker_command", enter_wait)
     connection = Connection(request_row(consumed=True))
     assert await approval_gate(connection, RUN, BROWSE) == "approval_pending"
     [reopened] = connection.with_text("update public.approval_requests set status = %s")

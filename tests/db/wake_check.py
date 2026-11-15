@@ -16,7 +16,13 @@ import psycopg
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.application import run_lifecycle
 from autobots.application.run_lifecycle import LeaseKeeper, LoopConfig
-from autobots.application.run_usage import active_seconds_used, begin_segment, discount_sleep
+from autobots.application.run_usage import (
+    active_seconds_used,
+    begin_segment,
+    discount_sleep,
+    end_segment,
+    ensure_usage,
+)
 from autobots.application.runs import LeaseLost, admit_run
 from autobots.application.worker_leases import WakeClock, claim_run, heartbeat, revive_lease
 from autobots.domain.models import resolve_role_policy
@@ -97,7 +103,7 @@ async def main() -> None:
         # The whole keeper: a sleep revives the lease and takes itself off the active time.
         run = await admitted(db)
         lease = await claim_run(db, run, worker_id='waking')
-        await begin_segment(db, run)
+        await begin_segment(db, lease)
         await asyncio.sleep(0.2)
         clock = ArrangedClock()
         keeper = asyncio.create_task(LeaseKeeper(URL, lease, CONFIG, clock).run())
@@ -127,7 +133,7 @@ async def main() -> None:
         run = await admitted(db)
         lease = await claim_run(db, run, worker_id='lagging')
         await db.execute('insert into app_private.run_usage (run_id) values (%s) on conflict do nothing', (run,))
-        await begin_segment(db, run)
+        await begin_segment(db, lease)
         await discount_sleep(db, lease, 600)
         ahead = (await (await db.execute('select extract(epoch from segment_started_at - clock_timestamp()) from app_private.run_usage where run_id = %s', (run,))).fetchone())[0]
         check('a discount stands though the clock has not caught up yet', 'the segment starts about 600 seconds ahead', round(float(ahead)), 590 < float(ahead) <= 600)
@@ -174,12 +180,33 @@ async def main() -> None:
         run = await admitted(db)
         lost = await claim_run(db, run, worker_id='lost')
         await expire(db, run)
-        await claim_run(db, run, worker_id='new')
-        await begin_segment(db, run)
+        owner = await claim_run(db, run, worker_id='new')
+        await begin_segment(db, owner)
         before = await active_seconds_used(db, run)
         await discount_sleep(db, lost, 500)
         after = await active_seconds_used(db, run)
         check('a lost worker can\'t discount the new owner\'s time', 'unchanged', (round(before, 1), round(after, 1)), after >= before)
+
+        # PRUN-20: nor restart or end the new owner's segment, though the lost worker's own pass still ends.
+        run = await admitted(db)
+        lost = await claim_run(db, run, worker_id='lost-segment')
+        await ensure_usage(db, run)
+        await begin_segment(db, lost)
+        await expire(db, run)
+        owner = await claim_run(db, run, worker_id='new-segment')
+        await begin_segment(db, owner)
+        segment = 'select segment_started_at, active_seconds from app_private.run_usage where run_id = %s'
+        started = await (await db.execute(segment, (run,))).fetchone()
+        await begin_segment(db, lost)
+        await end_segment(db, lost)
+        kept = await (await db.execute(segment, (run,))).fetchone()
+        check("a lost worker can't restart or end the new owner's segment", 'the same open segment, nothing counted',
+              (kept[0] == started[0], float(kept[1])), kept[0] is not None and kept[0] == started[0] and float(kept[1]) == 0)
+        await asyncio.sleep(0.2)
+        await end_segment(db, owner)
+        closed = await (await db.execute(segment, (run,))).fetchone()
+        check('the owner ends its own segment and its time counts', 'closed, over 0.1 seconds counted',
+              (closed[0], round(float(closed[1]), 2)), closed[0] is None and float(closed[1]) > 0.1)
 
         # No gap between the clocks, as with SIGSTOP or a hung process: nothing changes.
         run = await admitted(db)

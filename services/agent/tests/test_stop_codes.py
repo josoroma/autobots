@@ -432,7 +432,7 @@ def test_every_code_a_pass_stops_with_by_name_has_a_disposition() -> None:
             elif (name := _named(argument, "StopCode")) is not None:
                 assert StopCode[name] in DISPOSITION or StopCode[name] in SETTLEMENT, where
                 checked += 1
-    # Every caller in the goal loop, workflow_runner.py, run_lifecycle.py and loop_middleware.py
+    # Every caller in the goal loop, workflow_runner.py, run_lifecycle.py and loop_admission.py
     # was reached.
     assert checked >= 24
 
@@ -503,17 +503,19 @@ def _finish(
     async def plan_view(*_: object) -> PlanView:
         return PlanView(1, ("t1",), (), ())
 
-    async def apply_command(_: object, **fields: object) -> TransitionResult:
-        command = fields["command"]
+    async def apply_worker_command(
+        connection: Connection, _: object, command: RunCommand, **fields: object
+    ) -> TransitionResult:
         applied.append(command)
-        assert isinstance(command, RunCommand)
+        # The stop reason commits with the transition, as the real one writes it.
+        await connection.execute("stop_reason", (LEASE.run_id, fields["stop_reason"]))
         return TransitionResult(LEASE.run_id, 5, reached[command], True)
 
     async def usage_view(*_: object) -> dict[str, object]:
         return {}
 
     monkeypatch.setattr(run_lifecycle, "plan_view", plan_view)
-    monkeypatch.setattr(run_lifecycle, "apply_command", apply_command)
+    monkeypatch.setattr(run_lifecycle, "apply_worker_command", apply_worker_command)
     monkeypatch.setattr(run_lifecycle, "usage_view", usage_view)
     connection = Connection()
     result = asyncio.run(run_lifecycle.finish(connection, LEASE, GOAL, code))

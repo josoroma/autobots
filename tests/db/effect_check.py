@@ -23,7 +23,7 @@ from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.run_projection import read_workspace
 from autobots.application.runs import admit_run, apply_command
 from autobots.domain.models import resolve_role_policy
-from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.runs import RunCommand
 from autobots.domain.tools import PLAN_TOOLS
 from autobots.operations.job_dispatch import process_next
 from effect_tools import tools
@@ -66,7 +66,7 @@ async def main() -> dict[str, str]:
 
         async def resume(run: UUID) -> None:
             version = await value('select version from public.runs where id = %s', run)
-            await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.RESUME, actor=Actor.USER, expected_version=version)
+            await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.RESUME, expected_version=version)
 
         def send(tool: str, body: str) -> tuple[str, dict[str, str]]:
             return (tool, {'body': body})

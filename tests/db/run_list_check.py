@@ -13,7 +13,9 @@ from uuid import UUID, uuid4
 
 import psycopg
 from autobots.application.experts import create_expert, create_session
-from autobots.application.run_projection import InvalidCursor, read_run_list
+from autobots.application.model_admission import ledger_usage
+from autobots.application.run_projection import InvalidCursor, read_run_list, read_summary
+from autobots.application.workflow_overview import recent_executions
 from autobots.contracts.experts import ExpertConfig, SessionExpert
 from psycopg.types.json import Jsonb
 
@@ -170,6 +172,48 @@ async def main() -> None:
         except InvalidCursor:
             refused = 'invalid_cursor'
         check('a cursor the API did not issue is refused', 'invalid_cursor', refused, refused == 'invalid_cursor')
+
+        # Decision 0029 F10: on a ledger seeded with the rows the old view formula counted apart from admission, the run
+        # list, the run's summary and the workflow overview show exactly what admission counts against the root.
+        ledger = uuid4()
+        await db.execute('insert into public.workspaces (id, name) values (%s, %s)', (ledger, 'Run list ledger'))
+        root = uuid4()
+        await db.execute(
+            'insert into public.runs (id, workspace_id, status, goal_summary, limit_micro_usd, policy_snapshot) '
+            "values (%s, %s, 'running', %s, 1000000, %s)", (root, ledger, f'Ledger {tag}', Jsonb({'bindings': bindings})))
+        for run_id, root_id, status, reserved, charged, reconciled in (
+                (root, root, 'succeeded', 500, 100, False),
+                # An open call that carries a charge: admission counts its reservation, never both.
+                (root, root, 'uncertain', 300, 25, False),
+                # An open call marked reconciled: admission still counts its reservation.
+                (root, root, 'uncertain', 200, None, True),
+                # A call this run made under another root: admission counts it against that root, not this one.
+                (root, uuid4(), 'succeeded', 0, 70, False)):
+            await db.execute(
+                'insert into app_private.model_invocations (id, workspace_id, root_run_id, run_id, role, profile, wire_id, '
+                'attempt, spend_day, reserved_micro_usd, charged_micro_usd, status, reconciled_at) '
+                "values (%s, %s, %s, %s, 'executor', 'openrouter_terra', 'openai/gpt-6.1-terra', 1, current_date, %s, %s, %s, "
+                'case when %s then now() end)',
+                (uuid4(), ledger, root_id, run_id, reserved, charged, status, reconciled))
+        ledger_flow = uuid4()
+        await db.execute('insert into public.workflows (id, workspace_id, name, latest_version) values (%s, %s, %s, 1)',
+                         (ledger_flow, ledger, f'Ledger {tag}'))
+        await db.execute("insert into public.workflow_versions (workflow_id, version, graph, graph_hash, block_versions, source, "
+                         "created_by) values (%s, 1, '{}', 'hash', '{}', 'user', %s)", (ledger_flow, uuid4()))
+        await db.execute("insert into public.workflow_executions (id, workspace_id, workflow_id, workflow_version, graph_hash, "
+                         "block_versions, inputs, created_by, run_id) values (%s, %s, %s, 1, 'hash', '{}', '{}', %s, %s)",
+                         (uuid4(), ledger, ledger_flow, uuid4(), root))
+        counted = (await ledger_usage(db, ledger, root, datetime.now(UTC).date())).root_micro_usd
+        listed = next(row for row in (await read_run_list(db, ledger)).runs if row.id == root)
+        summary = await read_summary(db, ledger, root)
+        [execution] = await recent_executions(db, ledger, ledger_flow)
+        shown = {
+            'run list': (listed.charged_micro_usd, listed.reserved_micro_usd),
+            'summary': (summary.budget.spent_micro_usd, summary.budget.reserved_micro_usd) if summary else None,
+            'workflow overview': (execution.charged_micro_usd, execution.reserved_micro_usd),
+        }
+        check('every view of a root shows what admission counts against it', f'{counted} = 600, as 100 charged and 500 reserved in each view',
+              (counted, shown), counted == 600 and all(figures == (100, 500) for figures in shown.values()))
     print(json.dumps({'cases': cases}))
 
 

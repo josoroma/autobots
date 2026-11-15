@@ -28,7 +28,7 @@ from autobots.application.workflows import (
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.plans import InputDocument
 from autobots.contracts.workflows import WorkflowGraph
-from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.runs import RunCommand
 from autobots.domain.workflows import block_versions, graph_hash
 from autobots.operations.job_dispatch import drive_lease, process_next
 from goal_loop_script import ROUTE, Script, say
@@ -221,14 +221,14 @@ async def main() -> None:
         # A cancel before any worker claims it. The stop between instances is its own case below.
         execution = await start('Cancelled', LOOP, {'in': ['a', 'b']})
         version = await value('select version from public.runs where id = %s', execution.run_id)
-        await apply_command(db, workspace_id=WORKSPACE, run_id=execution.run_id, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
+        await apply_command(db, workspace_id=WORKSPACE, run_id=execution.run_id, command=RunCommand.CANCEL, expected_version=version)
         idle = await advance()
         check('an execution cancelled while queued does not run', 'nothing to do, no instances', (idle, await statuses(execution)), idle is None and await statuses(execution) == {})
         # B5: a worker dies after VERIFY commits, and a cancel lands after the last node commits.
         no_tools = {'nodes': [node('in', 'input', type='string'), node('out', 'output')], 'links': [link('in', 'value', 'out', 'value')]}
         execution = await start('settle-verifying', no_tools, {'in': 'x'})
         run = execution.run_id
-        real_command = workflow_runner.apply_command
+        real_command = workflow_runner.apply_worker_command
 
         # A process that dies runs no handler, so the death is a BaseException the worker's failure
         # record (Decision 0028 E4) doesn't catch: the job stays claimed until its lease lapses.
@@ -237,18 +237,18 @@ async def main() -> None:
 
         async def dies_after_verify(*arguments: Any, **options: Any) -> Any:
             result = await real_command(*arguments, **options)
-            if options.get('command') is RunCommand.VERIFY:
+            if (arguments[2] if len(arguments) > 2 else options.get('command')) is RunCommand.VERIFY:
                 raise WorkerDied('the worker died here')
             return result
 
-        workflow_runner.apply_command = dies_after_verify
+        workflow_runner.apply_worker_command = dies_after_verify
         try:
             await advance()
             died = False
         except WorkerDied:
             died = True
         finally:
-            workflow_runner.apply_command = real_command
+            workflow_runner.apply_worker_command = real_command
         left = await value('select status from public.runs where id = %s', run)
         check('a worker can die between VERIFY and COMPLETE', 'died, verifying', (died, left), died and left == 'verifying')
         await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where run_id = %s", (run,))
@@ -259,7 +259,7 @@ async def main() -> None:
         lease = await claim_next(db, worker_id='cancelled-under')
         run = execution.run_id
         version = await value('select version from public.runs where id = %s', run)
-        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
+        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, expected_version=version)
         before = await value('select status from public.runs where id = %s', run)
         await workflow_runner.complete_workflow(db, lease, await load_goal(db, run))
         after = await value('select status from public.runs where id = %s', run)

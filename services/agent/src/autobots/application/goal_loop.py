@@ -20,16 +20,12 @@ from autobots.adapters.checkpoints import (
     graph_config,
     is_stale_owner,
 )
-from autobots.adapters.loop_middleware import (
-    AdmittedModel,
-    LoopMiddleware,
-    LoopStopped,
-    UnadmittedModelCall,
-)
+from autobots.adapters.loop_middleware import AdmittedModel, LoopMiddleware
 from autobots.adapters.result_stream import ResultTap, reset_tap, use_tap
 from autobots.adapters.tool_middleware import GatewayMiddleware, visible_tools
 from autobots.application.artifacts import reconcile_run
 from autobots.application.assignments import Delegation
+from autobots.application.loop_policy import LoopStopped, UnadmittedModelCall
 from autobots.application.loop_prompts import SYSTEM_PROMPT, opening, scope_guidance
 
 # `loop_registry` and `LoopConfig` are re-exported for the modules and tests that import them from
@@ -47,13 +43,13 @@ from autobots.application.run_lifecycle import (
 )
 from autobots.application.run_lifecycle import LoopConfig as LoopConfig
 from autobots.application.run_usage import begin_segment, end_segment, ensure_usage
-from autobots.application.runs import LeaseLost, apply_command
+from autobots.application.runs import LeaseLost, apply_worker_command
 from autobots.application.tool_gateway import ToolGateway, ToolScope
 from autobots.application.worker_leases import Lease
 from autobots.contracts.plans import GoalSpec
 from autobots.domain.execution import incompatibility
 from autobots.domain.models import ModelRoute
-from autobots.domain.runs import Actor, RunCommand, RunStatus
+from autobots.domain.runs import RunCommand, RunStatus
 from autobots.domain.stops import PassOutcome, StopCode
 
 # Bound to no profile, so `run_goal` leaves the run for a person instead of guessing a model.
@@ -172,7 +168,7 @@ async def run_goal(
         return await finish(connection, lease, goal, StopCode.ROUTE_NOT_BOUND)
     if config.refusal is not None:
         return await finish(connection, lease, goal, config.refusal)
-    await begin_segment(connection, lease.run_id)
+    await begin_segment(connection, lease)
     code: str | None = None
     # A bound the SDK enforces too, so a graph that loops without dispatching still stops.
     steps = 3 * (config.limits.model_calls + config.limits.tool_dispatches) + 10
@@ -217,7 +213,8 @@ async def run_goal(
             raise
         code = StopCode.LEASE_LOST
     finally:
-        await end_segment(connection, lease.run_id)
+        # Fenced by the lease, so a worker that lost the run leaves the new owner's segment.
+        await end_segment(connection, lease)
     return await finish(connection, lease, goal, code)
 
 
@@ -236,17 +233,10 @@ async def _obligation_holds(connection: Any, lease: Lease) -> bool:
     if obligation is None:
         return False
     kind, detail = obligation
-    cursor = await connection.execute(
-        "select version from public.runs where id = %s", (lease.run_id,)
-    )
-    await apply_command(
+    await apply_worker_command(
         connection,
-        workspace_id=lease.workspace_id,
-        run_id=lease.run_id,
-        command=RunCommand.REQUEST_INPUT if kind == "input" else RunCommand.REQUEST_APPROVAL,
-        actor=Actor.WORKER,
-        expected_version=(await cursor.fetchone())[0],
-        generation=lease.generation,
+        lease,
+        RunCommand.REQUEST_INPUT if kind == "input" else RunCommand.REQUEST_APPROVAL,
         detail=detail,
     )
     return True

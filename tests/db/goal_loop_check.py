@@ -20,7 +20,7 @@ from autobots.application.run_usage import LimitReached, RootLimits, consume, en
 from autobots.application.runs import admit_run, apply_command
 from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy
-from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.runs import RunCommand
 from autobots.operations.job_dispatch import drive_lease
 from goal_loop_script import DONE_A, PLAN, ROUTE, SAVE, TASK_A, TASK_B, Script, calls, say
 from langchain_core.outputs import ChatResult
@@ -205,7 +205,7 @@ async def main() -> None:
         check('the open call is classified uncertain, and blocks another paid call', 'paused, no call', (blocked.code, blocked.run_status, len(untouched.seen)), blocked.code == 'uncertain_model_call' and blocked.run_status == 'paused' and len(untouched.seen) == 0)
         invocation = await value("select id from app_private.model_invocations where run_id = %s and status = 'uncertain'", admitted.run_id)
         await ModelAdmission(db).reconcile(invocation, 90)
-        await apply_command(db, workspace_id=OTHER, run_id=admitted.run_id, command=RunCommand.RESUME, actor=Actor.USER, expected_version=await value('select version from public.runs where id = %s', admitted.run_id))
+        await apply_command(db, workspace_id=OTHER, run_id=admitted.run_id, command=RunCommand.RESUME, expected_version=await value('select version from public.runs where id = %s', admitted.run_id))
         replacement = await claim_next(db, worker_id='after-reconcile', lease_seconds=300)
         lease = replacement
         result, model = await go(replacement, [calls(DONE_A), calls(('complete_task', {'task_id': 'b', 'evidence': [{'kind': 'artifact', 'reference': 'outputs/a.md'}], 'summary': 's'})), say('done')])

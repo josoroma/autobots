@@ -18,12 +18,14 @@ from uuid import UUID, uuid4
 
 from autobots.application import receipts
 from autobots.application.runs import (
-    Actor,
     CommandKey,
     CommandRefused,
     Idempotent,
     append_event,
     apply_command,
+    apply_worker_command,
+    cascade_command,
+    current_status,
 )
 from autobots.application.worker_leases import LeaseHolder, hold_lease
 from autobots.contracts.approvals import ApprovalVerdict
@@ -193,15 +195,8 @@ async def _consume(connection: Any, approval_id: UUID) -> None:
 
 
 async def _enter_wait(connection: Any, run: Requester, approval_id: UUID) -> None:
-    await apply_command(
-        connection,
-        workspace_id=run.workspace_id,
-        run_id=run.run_id,
-        command=RunCommand.REQUEST_APPROVAL,
-        actor=Actor.WORKER,
-        expected_version=await _version(connection, run.run_id),
-        generation=run.generation,
-        detail=str(approval_id),
+    await apply_worker_command(
+        connection, run, RunCommand.REQUEST_APPROVAL, detail=str(approval_id)
     )
 
 
@@ -400,12 +395,24 @@ async def return_to_review(
     return approval_id
 
 
+async def _lock_job(connection: Any, run_id: UUID) -> None:
+    """The run's job row, in the caller's transaction: every path that moves a run or its requests
+    takes it first, as a transition does (SP-012)."""
+    await connection.execute(
+        "select 1 from app_private.run_jobs where run_id = %s for update", (run_id,)
+    )
+
+
 async def expire(connection: Any, approval_id: UUID, run_id: UUID, workspace_id: UUID) -> bool:
     """Expiry is not consent. The wait ends, the run pauses, and the operation stays unapproved.
 
     Only a pending request expires. A pass that read it pending before a person decided it or the
     run was cancelled matches no row and writes nothing else, so an expiry never overwrites a
-    decision or a withdrawal. Returns whether it expired the request."""
+    decision or a withdrawal. Returns whether it expired the request.
+
+    The run's job row is locked first, in the caller's transaction, as every transition locks it
+    before the run's row, so an expiry and a person's cancel can't deadlock (SP-012)."""
+    await _lock_job(connection, run_id)
     cursor = await connection.execute(
         "update public.approval_requests set status = %s where id = %s and status = any(%s) "
         "returning id",
@@ -427,15 +434,11 @@ async def expire(connection: Any, approval_id: UUID, run_id: UUID, workspace_id:
         run_id,
         {"type": "approval.decided", "approval_id": str(approval_id), "decision": "expired"},
     )
-    cursor = await connection.execute("select status from public.runs where id = %s", (run_id,))
-    if (await cursor.fetchone())[0] == RunStatus.WAITING_APPROVAL.value:
-        await apply_command(
-            connection,
-            workspace_id=workspace_id,
-            run_id=run_id,
-            command=RunCommand.PAUSE,
-            actor=Actor.USER,
-            expected_version=await _version(connection, run_id),
+    if await current_status(connection, run_id) is RunStatus.WAITING_APPROVAL:
+        # The system's pause, not a person's: it leaves a live owner its job, as theirs would
+        # (Decision 0029 F5).
+        await cascade_command(
+            connection, workspace_id=workspace_id, run_id=run_id, command=RunCommand.PAUSE
         )
     return True
 
@@ -500,6 +503,18 @@ async def decide(
         existing = await command.replayed(connection)
         if existing is not None:
             return DecisionResult(approval_id, existing["status"], True)
+        # A request's run never changes, so it is read before any lock. Then the job's row, the
+        # run's and the request's, in the order a person's cancel takes them as it withdraws
+        # pending requests, so a decision and a cancel can't deadlock (SP-012).
+        cursor = await connection.execute(
+            "select run_id from public.approval_requests where id = %s and workspace_id = %s",
+            (approval_id, workspace_id),
+        )
+        found = await cursor.fetchone()
+        if found is None:
+            raise ApprovalRefused("approval_not_found")
+        await _lock_job(connection, found[0])
+        await connection.execute("select 1 from public.runs where id = %s for update", (found[0],))
         cursor = await connection.execute(
             "select run_id, status, argument_hash, expires_at <= clock_timestamp(), "
             "arguments::text from public.approval_requests "
@@ -531,7 +546,6 @@ async def decide(
                     workspace_id=workspace_id,
                     run_id=run_id,
                     command=RunCommand.DECIDE_APPROVAL,
-                    actor=Actor.USER,
                     expected_version=await _version(connection, run_id),
                     response=wanted.value,
                 )

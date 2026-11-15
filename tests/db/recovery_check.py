@@ -22,11 +22,12 @@ from autobots.application.runs import (
     VersionConflict,
     admit_run,
     apply_command,
+    apply_worker_command,
 )
 from autobots.application.tool_gateway import ToolDefinition, ToolGateway, ToolRegistry, ToolScope
 from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy
-from autobots.domain.runs import Actor, CommandRefused, RunCommand
+from autobots.domain.runs import CommandRefused, RunCommand
 from autobots.domain.tools import OperationClass
 from autobots.operations.job_dispatch import drive_lease, process_next
 from goal_loop_script import DONE_A, PLAN, ROUTE, SAVE, Script, calls, say
@@ -66,10 +67,10 @@ async def main() -> None:
             return await value('select version from public.runs where id = %s', run)
 
         async def user(run: UUID, command: RunCommand, **options: Any) -> Any:
-            return await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=command, actor=Actor.USER, expected_version=await version_of(run), **options)
+            return await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=command, expected_version=await version_of(run), **options)
 
         async def worker(run: UUID, lease: Any, command: RunCommand, **options: Any) -> Any:
-            return await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=command, actor=Actor.WORKER, expected_version=await version_of(run), generation=lease.generation, **options)
+            return await apply_worker_command(db, lease, command, **options)
 
         async def expire(run: UUID) -> None:
             await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where run_id = %s", (run,))
@@ -185,7 +186,7 @@ async def main() -> None:
             async def complete() -> str:
                 async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as other:
                     try:
-                        return (await apply_command(other, workspace_id=WORKSPACE, run_id=run, command=RunCommand.COMPLETE, actor=Actor.WORKER, expected_version=version, generation=lease.generation)).status  # noqa: B023 - called within this iteration, so it reads this iteration's values
+                        return (await apply_worker_command(other, lease, RunCommand.COMPLETE)).status  # noqa: B023 - called within this iteration, so it reads this iteration's values
                     except (VersionConflict, CommandRefused, LeaseLost) as error:
                         # TDBC-07: the loser is refused. Any other failure propagates and fails the check.
                         return type(error).__name__
@@ -193,7 +194,7 @@ async def main() -> None:
             async def cancel() -> str:
                 async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as other:
                     try:
-                        return (await apply_command(other, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)).status  # noqa: B023 - called within this iteration, so it reads this iteration's values
+                        return (await apply_command(other, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, expected_version=version)).status  # noqa: B023 - called within this iteration, so it reads this iteration's values
                     except (VersionConflict, CommandRefused, LeaseLost) as error:
                         return type(error).__name__
 
@@ -255,7 +256,7 @@ async def main() -> None:
         except LinkRefused:
             check('only a terminal run can be continued', 'refused', 'refused', True)
         foreign = await admit(OTHER)
-        await apply_command(db, workspace_id=OTHER, run_id=foreign, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=1)
+        await apply_command(db, workspace_id=OTHER, run_id=foreign, command=RunCommand.CANCEL, expected_version=1)
         try:
             await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='x', limit_micro_usd=1_000_000, policy=resolve_role_policy(), continues_run_id=foreign)
             check('a run in another workspace cannot be continued', 'refused', 'admitted', False)
@@ -322,7 +323,7 @@ async def main() -> None:
 
 async def _cancel(run: UUID, version: int) -> None:
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as other:
-        await apply_command(other, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
+        await apply_command(other, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, expected_version=version)
 
 
 try:

@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from autobots.application.approvals import DecisionResult
     from autobots.application.runs import TransitionResult
     from autobots.application.worker_leases import Lease
-    from autobots.domain.runs import Actor, RunCommand
+    from autobots.domain.runs import RunCommand
 
 # The longest observation a case keeps. The parents shorten it again for their reports.
 OBSERVED_LIMIT = 900
@@ -241,12 +241,12 @@ class Db:
             raise NoClaim(run)
         return lease
 
-    async def command(self, run: UUID, command: RunCommand, actor: Actor, **options: Any) -> TransitionResult:
-        """Apply `command` at the run's current version, read just before, rather than a literal (TDBC-03)."""
+    async def command(self, run: UUID, command: RunCommand, **options: Any) -> TransitionResult:
+        """Apply a person's `command` at the run's current version, read just before, rather than a literal (TDBC-03)."""
         from autobots.application.runs import apply_command
 
         version = await self.value('select version from public.runs where id = %s', run)
-        return await apply_command(self.connection, workspace_id=self.workspace, run_id=run, command=command, actor=actor,
+        return await apply_command(self.connection, workspace_id=self.workspace, run_id=run, command=command,
                                    expected_version=version, **options)
 
     async def expire(self, run: UUID) -> None:

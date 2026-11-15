@@ -3,7 +3,7 @@
 `ROWS` lists each way a pass ends: the stop code, the run's status, whether this worker still holds
 the lease and the plan's state, then the step `decide` chooses. The pure table is checked first;
 then `finish` takes each row's step against a fake connection whose transition behaves as
-`apply_command` does under its row locks: a lost lease is refused first, then any command the
+`apply_worker_command` does under its row locks: a lost lease is refused first, then any command the
 canonical table refuses.
 """
 
@@ -22,7 +22,13 @@ from autobots.application import run_lifecycle
 from autobots.application.plans import PlanView
 from autobots.application.recovery import Outstanding
 from autobots.application.run_lifecycle import Decision, Ending, Observed, decide, outcome_of
-from autobots.application.runs import LeaseLost, TransitionResult, VersionConflict
+from autobots.application.runs import (
+    LeaseLost,
+    TransitionResult,
+    Unset,
+    VersionConflict,
+    WorkerClaim,
+)
 from autobots.application.worker_leases import Lease
 from autobots.contracts.plans import GoalSpec
 from autobots.domain.runs import Actor, CommandRefused, RunCommand, RunStatus, next_status
@@ -246,7 +252,8 @@ ROWS: dict[str, Row] = {
         StopCode.RUN_NOT_RUNNING,
         unmapped=True,
     ),
-    # Without the lease the transition is left to apply_command, which refuses it as lease_lost.
+    # Without the lease the transition is left to apply_worker_command, which refuses it as
+    # lease_lost.
     "paused, lost, suspend code": Row(
         StopCode.BUDGET_EXCEEDED,
         RunStatus.PAUSED,
@@ -255,7 +262,7 @@ ROWS: dict[str, Row] = {
         StopCode.BUDGET_EXCEEDED,
         RunCommand.SUSPEND,
     ),
-    # Any other status is left to apply_command, which re-validates under its row locks.
+    # Any other status is left to apply_worker_command, which re-validates under its row locks.
     "verifying, suspend code": Row(
         StopCode.BUDGET_EXCEEDED,
         RunStatus.VERIFYING,
@@ -328,7 +335,7 @@ def test_a_lost_lease_writes_nothing_whatever_the_run_is() -> None:
 
 def test_a_paused_run_lets_go_of_every_code_whose_command_it_would_refuse() -> None:
     """R-34: with the lease held, the job is let go as run_not_running and the run stays paused.
-    Without it, `apply_command` refuses the transition as a lost lease."""
+    Without it, `apply_worker_command` refuses the transition as a lost lease."""
     for code in EVERY_CODE:
         decided = decide(code, RUNNING)
         owner = decide(code, Observed(RunStatus.PAUSED, True, 1, True))
@@ -452,9 +459,9 @@ def _finish(
     row: Row,
     effects: Effects | None = None,
 ) -> tuple[Database, Effects, run_lifecycle.LoopResult]:
-    """`finish` on the arranged run. Its transition is refused as `apply_command` refuses it: a
-    lost lease first, then a command the canonical table refuses, unless `effects.refusal` is
-    arranged."""
+    """`finish` on the arranged run. Its transition is refused as `apply_worker_command` refuses it:
+    a lost lease first, then a command the canonical table refuses, unless `effects.refusal` is
+    arranged. An applied one writes its stop reason in its own transaction, as the real one does."""
     database = Database(row.status, row.held)
     effects = effects or Effects()
 
@@ -465,23 +472,28 @@ def _finish(
     async def usage_view(*_: object) -> dict[str, object]:
         return {}
 
-    async def apply_command(
+    async def apply_worker_command(
         _: object,
-        *,
+        claim: WorkerClaim,
         command: RunCommand,
-        actor: Actor,
-        expected_version: int,
-        generation: int | None,
+        *,
+        stop_reason: object = Unset.UNSET,
         **__: object,
     ) -> TransitionResult:
-        effects.calls.append(("apply", command, generation, actor, database.in_transaction))
+        effects.calls.append(("apply", command, claim.generation))
         if effects.refusal is not None:
             raise effects.refusal
         if not database.held:
             raise LeaseLost("this worker no longer owns the run")
-        following = next_status(database.status, command, actor)
+        following = next_status(database.status, command, Actor.WORKER)
         assert following is not None
-        return TransitionResult(LEASE.run_id, expected_version + 1, following.value, True)
+        if stop_reason is not Unset.UNSET:
+            async with database.transaction():
+                await database.execute(
+                    "insert into app_private.run_usage (run_id, stop_reason) values (%s, %s)",
+                    (claim.run_id, stop_reason),
+                )
+        return TransitionResult(LEASE.run_id, 5, following.value, True)
 
     async def settle_children(*_: object) -> datetime | None:
         effects.calls.append(("settle_children",))
@@ -495,7 +507,7 @@ def _finish(
 
     monkeypatch.setattr(run_lifecycle, "plan_view", plan_view)
     monkeypatch.setattr(run_lifecycle, "usage_view", usage_view)
-    monkeypatch.setattr(run_lifecycle, "apply_command", apply_command)
+    monkeypatch.setattr(run_lifecycle, "apply_worker_command", apply_worker_command)
     monkeypatch.setattr(run_lifecycle, "settle_children", settle_children)
     monkeypatch.setattr(run_lifecycle, "classify_interrupted", classify_interrupted)
     monkeypatch.setattr(run_lifecycle, "outstanding", outstanding)
@@ -537,7 +549,7 @@ def test_finish_takes_each_rows_step(monkeypatch: pytest.MonkeyPatch, name: str)
         assert effects.calls == [
             ("settle_children",),
             ("classify_interrupted", LEASE.run_id, LEASE.generation + 1),
-            ("apply", RunCommand.FINISH_CANCEL, LEASE.generation, Actor.WORKER, True),
+            ("apply", RunCommand.FINISH_CANCEL, LEASE.generation),
         ]
         assert database.stop_reasons == [(StopCode.CANCELLED, True)] and not database.writes
         assert (result.outcome, result.code, result.run_status) == (
@@ -546,7 +558,7 @@ def test_finish_takes_each_rows_step(monkeypatch: pytest.MonkeyPatch, name: str)
             RunStatus.CANCELLED.value,
         )
     else:
-        assert applied == [("apply", row.command, LEASE.generation, Actor.WORKER, True)]
+        assert applied == [("apply", row.command, LEASE.generation)]
         assert not database.writes
         if not row.held:
             assert not database.stop_reasons
@@ -657,7 +669,7 @@ def test_the_settlement_names_what_it_left_unknown(
 @pytest.mark.parametrize("name", list(ROWS))
 def test_finish_reads_the_run_once(monkeypatch: pytest.MonkeyPatch, name: str) -> None:
     """Status and ownership come from one statement, so they agree, and nothing reads them again
-    (PRUN-03). The transition's version is read on its own, for `apply_command` to compare."""
+    (PRUN-03). The transition's version is read on its own, by `apply_worker_command`."""
     database, _, _ = _finish(monkeypatch, ROWS[name])
     reads = [
         statement
@@ -666,7 +678,7 @@ def test_finish_reads_the_run_once(monkeypatch: pytest.MonkeyPatch, name: str) -
         or statement.startswith("select 1 from app_private.run_jobs")
     ]
     assert len(reads) == 1 and reads[0].startswith("select r.status"), reads
-    # Ownership as `apply_command` checks it: this generation, a claimed job, a live lease.
+    # Ownership as `apply_worker_command` checks it: this generation, a claimed job, a live lease.
     for predicate in (
         "j.generation = %s",
         "j.status = 'claimed'",

@@ -27,7 +27,7 @@ from autobots.application.run_lifecycle import (
     run_status,
 )
 from autobots.application.run_usage import ensure_usage
-from autobots.application.runs import LeaseLost, VersionConflict, apply_command
+from autobots.application.runs import LeaseLost, VersionConflict, apply_worker_command
 from autobots.application.tool_gateway import (
     ApprovalPolicy,
     ToolContext,
@@ -39,7 +39,7 @@ from autobots.application.tool_gateway import (
 )
 from autobots.application.worker_leases import Lease
 from autobots.contracts.plans import GoalSpec
-from autobots.domain.runs import Actor, CommandRefused, RunCommand, RunStatus
+from autobots.domain.runs import CommandRefused, RunCommand, RunStatus
 from autobots.domain.stops import STOPS, GatewayCode, PassOutcome, StopCode
 from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import DELEGATION_TOOL, OperationClass, ToolOutcome
@@ -347,18 +347,7 @@ async def complete_workflow(connection: Any, lease: Lease, goal: GoalSpec) -> Lo
     )
     try:
         for command in commands:
-            cursor = await connection.execute(
-                "select version from public.runs where id = %s", (lease.run_id,)
-            )
-            result = await apply_command(
-                connection,
-                workspace_id=lease.workspace_id,
-                run_id=lease.run_id,
-                command=command,
-                actor=Actor.WORKER,
-                expected_version=(await cursor.fetchone())[0],
-                generation=lease.generation,
-            )
+            result = await apply_worker_command(connection, lease, command)
     except LeaseLost:
         return await result_of(connection, lease, goal, PassOutcome.LOST, StopCode.LEASE_LOST, None)
     except (CommandRefused, VersionConflict):

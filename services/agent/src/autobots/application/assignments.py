@@ -16,7 +16,8 @@ from autobots.application.runs import (
     Inherited,
     RunAdmission,
     admit,
-    apply_command,
+    cascade_command,
+    current_status,
 )
 from autobots.application.tool_gateway import (
     ToolContext,
@@ -26,7 +27,7 @@ from autobots.application.tool_gateway import (
 )
 from autobots.application.worker_leases import Lease, claim_run
 from autobots.contracts.assignments import AssignmentResult, AssignSpecialist
-from autobots.domain.runs import Actor, RunCommand, RunStatus
+from autobots.domain.runs import RunCommand, RunStatus
 from autobots.domain.stops import GatewayCode, PassOutcome, StopCode
 from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import DELEGATION_TOOL, PLAN_TOOLS, OperationClass
@@ -288,22 +289,17 @@ def assign_tool(delegation: Delegation) -> ToolDefinition:  # noqa: C901 - basel
         return output
 
     async def _resume_if_paused(connection: Any, context: ToolContext, child: UUID) -> None:
-        """Resuming a parent continues its child, unless the child's own wait is still open."""
-        cursor = await connection.execute(
-            "select status, version from public.runs where id = %s", (child,)
-        )
-        status, version = await cursor.fetchone()
-        if status != RunStatus.PAUSED.value:
+        """Resuming a parent continues its child, unless the child's own wait is still open. The
+        system resumes it, as no person asked for it (Decision 0029 F5)."""
+        if await current_status(connection, child) is not RunStatus.PAUSED:
             return
         if (await outstanding(connection, child)).uncertain_calls:
             raise ToolFailed(GatewayCode.ASSIGNMENT_PAUSED)
-        await apply_command(
+        await cascade_command(
             connection,
             workspace_id=context.scope.workspace_id,
             run_id=child,
             command=RunCommand.RESUME,
-            actor=Actor.USER,
-            expected_version=version,
         )
 
     return ToolDefinition(

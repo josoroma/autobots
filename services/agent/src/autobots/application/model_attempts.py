@@ -6,7 +6,12 @@ from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import Any
 
-from autobots.application.model_admission import AdmissionRequest, ModelAdmission, Ticket
+from autobots.application.model_admission import (
+    AdmissionRequest,
+    ModelAdmission,
+    SettlementReason,
+    Ticket,
+)
 
 MAX_RETRIES = 2
 BACKOFF_SECONDS = (1.0, 2.0)
@@ -145,7 +150,9 @@ async def call_with_policy(
             continue
         if output.charged_micro_usd is None:
             # The call worked, and the provider reported no charge, so the estimate stays open.
-            await admission.mark_uncertain(ticket.invocation_id, "charge_not_reported", output.text)
+            await admission.mark_uncertain(
+                ticket.invocation_id, SettlementReason.CHARGE_NOT_REPORTED.value, output.text
+            )
         else:
             await admission.settle(
                 ticket.invocation_id,

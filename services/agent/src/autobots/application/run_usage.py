@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 from uuid import UUID
 
+from autobots.application.worker_leases import LeaseHolder
 from autobots.domain.stops import StopCode
 
 Counter = Literal["model_calls", "tool_dispatches", "repairs", "plan_revisions", "children"]
@@ -68,28 +69,34 @@ async def consume(connection: Any, run_id: UUID, counter: Counter, limit: int) -
     return used
 
 
-async def begin_segment(connection: Any, run_id: UUID) -> None:
+# Only for the worker that still owns the run, so a lost one can't start, end or move a new owner's
+# segment (PRUN-20). Its parameters are the run and the lease's generation.
+_HELD = "exists (select 1 from app_private.run_jobs j where j.run_id = %s and j.generation = %s)"
+
+
+async def begin_segment(connection: Any, lease: LeaseHolder) -> None:
     """A segment a dead worker left open is closed at its start, since its end is unknown."""
     await connection.execute(
-        "update app_private.run_usage set segment_started_at = clock_timestamp() where run_id = %s",
-        (run_id,),
+        "update app_private.run_usage set segment_started_at = clock_timestamp() "
+        f"where run_id = %s and {_HELD}",
+        (lease.run_id, lease.run_id, lease.generation),
     )
 
 
-async def end_segment(connection: Any, run_id: UUID) -> None:
+async def end_segment(connection: Any, lease: LeaseHolder) -> None:
+    """A worker that lost the run reaches its own end after the new owner began, so without the
+    fence it would count the new owner's time and close their segment."""
     await connection.execute(
         "update app_private.run_usage set active_seconds = active_seconds + "
         "greatest(extract(epoch from clock_timestamp() - segment_started_at), 0), "
         "segment_started_at = null "
-        "where run_id = %s and segment_started_at is not null",
-        (run_id,),
+        f"where run_id = %s and segment_started_at is not null and {_HELD}",
+        (lease.run_id, lease.run_id, lease.generation),
     )
 
 
-async def discount_sleep(connection: Any, lease: Any, seconds: float) -> None:
+async def discount_sleep(connection: Any, lease: LeaseHolder, seconds: float) -> None:
     """A Mac asleep isn't a run working, so an open segment doesn't count that time.
-
-    Only for the worker that still owns the run, so a lost one can't move a new owner's clock.
 
     This isn't capped at the database's now. Docker's clock can lag a wake by half a minute, then
     jump, so a cap here clamps the discount to nothing and the jump then counts the whole sleep as
@@ -100,8 +107,7 @@ async def discount_sleep(connection: Any, lease: Any, seconds: float) -> None:
     await connection.execute(
         "update app_private.run_usage "
         "set segment_started_at = segment_started_at + make_interval(secs => %s) "
-        "where run_id = %s and segment_started_at is not null and exists "
-        "(select 1 from app_private.run_jobs j where j.run_id = %s and j.generation = %s)",
+        f"where run_id = %s and segment_started_at is not null and {_HELD}",
         (seconds, lease.run_id, lease.run_id, lease.generation),
     )
 

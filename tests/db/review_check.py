@@ -10,11 +10,11 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-from autobots.adapters import loop_middleware
 from autobots.adapters.loop_middleware import ModelRoute
+from autobots.application import loop_policy
 from autobots.application.compaction import SUMMARY_MARKER, CompactionPolicy
 from autobots.application.experts import create_expert
-from autobots.application.model_admission import ModelAdmission
+from autobots.application.model_admission import ModelAdmission, ledger_usage
 from autobots.application.operations import REQUIRED_COLUMNS, database_conditions
 from autobots.application.plans import load_goal
 from autobots.application.routines import RoutineRefused, admit_occurrence, routine_record
@@ -88,6 +88,33 @@ async def main() -> None:
         check("a child's spend is its own, not 0", '25', summary.budget.spent_micro_usd, summary.budget.spent_micro_usd == 25)
         root = await read_summary(db, WORKSPACE, parent)
         check("the root still counts it, once", '25', root.budget.spent_micro_usd, root.budget.spent_micro_usd == 25)
+
+        # Decision 0029 F10: a depth-2 tree, every call carrying the top root as its children inherit it. The root shows
+        # what admission counts against it, and each child the calls it made itself (N-9). The old view formula gives the
+        # same figures for these runs, so this pins agreement and N-9; run_list_check's seeded ledger is the case that
+        # fails under the old formula. Its own workspace, finished runs with no jobs and no active call, so it holds no
+        # inference slot and leaves nothing a later check could claim.
+        depth = uuid4()
+        await db.execute('insert into public.workspaces (id, name) values (%s, %s)', (depth, f'Depth {depth.hex[:6]}'))
+        top, middle, leaf = uuid4(), uuid4(), uuid4()
+        for run, above in ((top, None), (middle, top), (leaf, middle)):
+            await db.execute("insert into public.runs (id, workspace_id, status, goal_summary, limit_micro_usd, policy_snapshot, "
+                             "parent_run_id, root_run_id) values (%s, %s, 'succeeded', 'Depth', 1000, '{}', %s, %s)",
+                             (run, depth, above, None if above is None else top))
+        for run, status, reserved, charged in ((top, 'succeeded', 50, 10), (middle, 'succeeded', 60, 20), (middle, 'uncertain', 30, None),
+                                               (leaf, 'uncertain', 40, None), (leaf, 'succeeded', 70, 5)):
+            await db.execute("insert into app_private.model_invocations (id, workspace_id, root_run_id, run_id, role, profile, wire_id, attempt, spend_day, "
+                             "reserved_micro_usd, charged_micro_usd, status) values (%s, %s, %s, %s, 'executor', 'openrouter_terra', 'fixture/model', 1, "
+                             'current_date, %s, %s, %s)', (uuid4(), depth, top, run, reserved, charged, status))
+        counted = (await ledger_usage(db, depth, top, datetime.now(UTC).date())).root_micro_usd
+        figures = {}
+        for name, run in (('top', top), ('middle', middle), ('leaf', leaf)):
+            shown = await read_summary(db, depth, run)
+            figures[name] = (shown.budget.spent_micro_usd, shown.budget.reserved_micro_usd) if shown else None
+        check('the root of a depth-2 tree shows what admission counts against it (the old formula agrees here)',
+              f'{counted} = 105, as 35 charged and 70 reserved', (counted, figures['top']), counted == 105 and figures['top'] == (35, 70))
+        check("each child's spend is its own calls, not its subtree's and not 0 (the old formula agrees here)",
+              'middle 20 and 30, leaf 5 and 40', figures, figures['middle'] == (20, 30) and figures['leaf'] == (5, 40))
 
         # N-2: settling a finished child records how it really ended.
         expert = uuid4()
@@ -186,8 +213,8 @@ async def main() -> None:
         big = await admitted('Reserve for the real request', 1_000_000)
         worst = 1_000
         route = ModelRoute('executor', 'openrouter_terra', 'fixture/model', worst, 1_000_000)
-        assumed = loop_middleware.RESERVED_PROMPT_TOKENS
-        loop_middleware.RESERVED_PROMPT_TOKENS = 1
+        assumed = loop_policy.RESERVED_PROMPT_TOKENS
+        loop_policy.RESERVED_PROMPT_TOKENS = 1
         try:
             calc = ('calculate', {'operation': 'sum', 'values': [1, 2]})
             model = Aware(items=[calls(calc), calls(calc), calls(calc), calls(calc), calls(calc), say('done')], seen=[], bound=[])
@@ -195,7 +222,7 @@ async def main() -> None:
             # This exact run, so the jobs of the suites around it stay as they are.
             ran = await drive_lease(db, URL, await claim_run(db, big, worker_id='reserving'), lambda: model, config)
         finally:
-            loop_middleware.RESERVED_PROMPT_TOKENS = assumed
+            loop_policy.RESERVED_PROMPT_TOKENS = assumed
         rows = await (await db.execute('select role, min(reserved_micro_usd) from app_private.model_invocations where run_id = %s group by role', (big,))).fetchall()
         found = dict(rows)
         check('a call larger than assumed reserves past the worst case', f'over {worst}', (found.get('executor'), ran.code, ran.run_status), (found.get('executor') or 0) > worst)

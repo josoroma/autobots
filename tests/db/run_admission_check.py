@@ -9,12 +9,15 @@ from uuid import UUID, uuid4
 
 import psycopg
 from autobots.application.runs import (
+    CommandReceipt,
     IdempotencyConflict,
     RunNotFound,
     VersionConflict,
     admit_run,
     apply_command,
+    apply_worker_command,
 )
+from autobots.application.worker_leases import Lease
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import Actor, CommandRefused, RunCommand
 
@@ -42,8 +45,8 @@ async def hold_lease(connection, run_id):  # type: ignore[no-untyped-def]
 async def command(connection, run_id, name, version, actor=Actor.USER, **options):  # type: ignore[no-untyped-def]
     if actor is Actor.WORKER:
         await hold_lease(connection, run_id)
-        options['generation'] = 1
-    return await apply_command(connection, workspace_id=WORKSPACE, run_id=run_id, command=name, actor=actor, expected_version=version, **options)
+        return await apply_worker_command(connection, Lease(run_id, WORKSPACE, 1, 'arranged', 1, ''), name, **options)
+    return await apply_command(connection, workspace_id=WORKSPACE, run_id=run_id, command=name, expected_version=version, **options)
 
 
 async def main() -> None:
@@ -151,8 +154,8 @@ async def main() -> None:
         check('concurrent commands on one version apply once', '1 applied, version 2', f'{len(wins)}, {version}', len(wins) == 1 and version == 2)
 
         target = await in_status('running')
-        first = await command(connection, target, RunCommand.PAUSE, 1, actor_id=ACTOR, idempotency_key='pause-1')
-        again = await command(connection, target, RunCommand.PAUSE, 1, actor_id=ACTOR, idempotency_key='pause-1')
+        first = await command(connection, target, RunCommand.PAUSE, 1, receipt=CommandReceipt(ACTOR, 'pause-1'))
+        again = await command(connection, target, RunCommand.PAUSE, 1, receipt=CommandReceipt(ACTOR, 'pause-1'))
         check('a repeated command key returns the original result', 'same version, unchanged', (again.version, again.changed), again.version == first.version and not again.changed)
 
         foreign = (await admit('foreign', workspace=OTHER)).run_id

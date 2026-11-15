@@ -24,7 +24,12 @@ from autobots.application.compaction import CompactionPolicy
 from autobots.application.plans import load_goal, plan_view
 from autobots.application.recovery import classify_interrupted, outstanding
 from autobots.application.run_usage import RootLimits, discount_sleep, usage_view
-from autobots.application.runs import LeaseLost, VersionConflict, apply_command
+from autobots.application.runs import (
+    LeaseLost,
+    VersionConflict,
+    apply_worker_command,
+    cascade_command,
+)
 from autobots.application.tool_gateway import ToolDefinition
 from autobots.application.worker_leases import (
     DEFAULT_LEASE_SECONDS,
@@ -37,13 +42,14 @@ from autobots.application.worker_leases import (
     heartbeat,
     let_go,
     release,
+    release_at,
     retry_delay,
     revive_lease,
 )
 from autobots.contracts.plans import GoalSpec
 from autobots.domain.models import ModelRoute
 from autobots.domain.repetition import Repeated
-from autobots.domain.runs import Actor, CommandRefused, RunCommand, RunStatus
+from autobots.domain.runs import CommandRefused, RunCommand, RunStatus
 from autobots.domain.stops import (
     COMMANDS,
     UNMAPPED,
@@ -240,17 +246,11 @@ async def lease_heartbeat(
 
 
 async def _cancel_stray_child(connection: Connection, lease: Lease, child: UUID) -> str:
-    status, version = await _row(
-        connection, "select status, version from public.runs where id = %s", (child,)
-    )
+    """The system's cancel, as no person asked for it (Decision 0029 F5)."""
+    status = (await _row(connection, "select status from public.runs where id = %s", (child,)))[0]
     try:
-        result = await apply_command(
-            connection,
-            workspace_id=lease.workspace_id,
-            run_id=child,
-            command=RunCommand.CANCEL,
-            actor=Actor.USER,
-            expected_version=version,
+        result = await cascade_command(
+            connection, workspace_id=lease.workspace_id, run_id=child, command=RunCommand.CANCEL
         )
     except (CommandRefused, VersionConflict):
         # It moved under us. The parent stays queued and looks again.
@@ -355,7 +355,7 @@ def decide(code: str | None, observed: Observed) -> Decision:
     `plan_incomplete`. A run a person paused waits for a resume: its job is let go as
     `run_not_running` when the pass stopped with that code, or with a code whose command the paused
     run would refuse while this worker holds the lease (R-34). Any other code's disposition picks
-    its command, or none, and `apply_command` re-validates it under its row locks.
+    its command, or none, and `apply_worker_command` re-validates it under its row locks.
     """
     if code == StopCode.LEASE_LOST:
         return Decision(Ending.LEAVE, StopCode.LEASE_LOST)
@@ -389,7 +389,7 @@ def outcome_of(code: str | None) -> PassOutcome:
 
 async def observe(connection: Connection, lease: Lease, goal: GoalSpec) -> Observed:
     """The run as `decide` needs it. Ownership is the lease's generation on a claimed job whose
-    lease is live by database time, as `apply_command` checks it (SP-012)."""
+    lease is live by database time, as `apply_worker_command` checks it (SP-012)."""
     view = await plan_view(connection, lease.run_id, goal)
     status, holds = await _row(
         connection,
@@ -407,12 +407,7 @@ async def _settle(connection: Connection, lease: Lease) -> str | None:
     records, or None when a child still has a live owner, and the job is requeued until then."""
     retry_at = await settle_children(connection, lease)
     if retry_at is not None:
-        await connection.execute(
-            "update app_private.run_jobs set status = 'queued', lease_owner = null, "
-            "lease_expires_at = null, available_at = %s "
-            "where run_id = %s and generation = %s and status = 'claimed'",
-            (retry_at, lease.run_id, lease.generation),
-        )
+        await release_at(connection, lease, retry_at)
         return None
     await classify_interrupted(connection, lease.run_id, lease.generation + 1)
     left = await outstanding(connection, lease.run_id)
@@ -427,26 +422,8 @@ async def _transition(
     """Applies `command` with `code` as its stop reason, in one transaction under the lease's
     generation, so a worker that lost the run writes neither (SP-012). The code the pass ends with
     and the status reached, which is None when nothing was written."""
-    version = (
-        await _row(connection, "select version from public.runs where id = %s", (lease.run_id,))
-    )[0]
     try:
-        async with connection.transaction():
-            result = await apply_command(
-                connection,
-                workspace_id=lease.workspace_id,
-                run_id=lease.run_id,
-                command=command,
-                actor=Actor.WORKER,
-                expected_version=version,
-                generation=lease.generation,
-            )
-            # A run can stop before its first segment, so the row may not exist yet.
-            await connection.execute(
-                "insert into app_private.run_usage (run_id, stop_reason) values (%s, %s) "
-                "on conflict (run_id) do update set stop_reason = excluded.stop_reason",
-                (lease.run_id, code),
-            )
+        result = await apply_worker_command(connection, lease, command, stop_reason=code)
     except CommandRefused:
         # The run moved after `finish` looked, a person's pause or cancel say (R-34).
         return StopCode.COMMAND_REFUSED, None
@@ -478,12 +455,7 @@ async def finish(
     code = decision.code
     status: str | None = None
     if decision.ending is Ending.LET_GO:
-        await connection.execute(
-            "update app_private.run_jobs set status = 'done', lease_owner = null, "
-            "lease_expires_at = null where run_id = %s and generation = %s "
-            "and status = 'claimed'",
-            (lease.run_id, lease.generation),
-        )
+        await let_go(connection, lease)
     elif decision.ending is Ending.SETTLE:
         code = await _settle(connection, lease)
         if code is None:
@@ -603,9 +575,9 @@ async def record_failure(connection: Connection, lease: Lease, error: Exception)
     One transaction under the lease's generation counts the failure and keeps its qualified type,
     never its message. A run a person paused lets its job go, and their resume resets the count.
     Below the bound the job is requeued after its backoff. At the bound the run is suspended with
-    `worker_failed` through `apply_command`, its stop reason committing with it; a run a person is
-    cancelling has its cancellation settled instead, and a lapsed lease requeues the job after the
-    longest backoff.
+    `worker_failed` through `apply_worker_command`, its stop reason committing with it; a run a
+    person is cancelling has its cancellation settled instead, and a lapsed lease requeues the job
+    after the longest backoff.
     The log names the run, and the error by type and frames only.
     """
     async with connection.transaction():

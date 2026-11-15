@@ -20,7 +20,7 @@ from autobots.application import goal_loop
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.run_projection import read_events, read_workspace
 from autobots.application.worker_leases import FAILURE_BOUND, RETRY_DELAYS_SECONDS, claim_next
-from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.runs import RunCommand
 from autobots.operations.job_dispatch import process_next
 from checklib import QUIESCE, Cases, Db, run_check
 from goal_loop_script import ROUTE, Script, say
@@ -110,7 +110,7 @@ async def bounded(db: Db, cases: Cases) -> UUID:
 
 async def resets(db: Db, cases: Cases, run: UUID) -> None:
     """A person's resume starts the count again, and so does a pass that completes."""
-    await db.command(run, RunCommand.RESUME, Actor.USER)
+    await db.command(run, RunCommand.RESUME)
     status, _, failed, _, _, run_status = await db.row(JOB, run)
     cases.check("a person's resume queues the job with the count reset", 'queued, 0 failed, run queued',
                 (status, failed, run_status), (status, failed, run_status) == ('queued', 0, 'queued'))
@@ -130,12 +130,12 @@ async def paused_meanwhile(db: Db, cases: Cases) -> None:
     """A person pauses the run while the failing pass holds it: their pause stands, and the job is let go."""
     run = await db.admit('Write the report', acceptance_criteria=('Has a summary',))
     CREATED.append(run)
-    await failing_pass(db, run, 'paused during the pass', before=lambda: db.command(run, RunCommand.PAUSE, Actor.USER))
+    await failing_pass(db, run, 'paused during the pass', before=lambda: db.command(run, RunCommand.PAUSE))
     status, claims, failed, kind, _, run_status = await db.row(JOB, run)
     cases.check("a person's pause during a failing pass stands, and the job is let go", f'paused, job done, 1 claim, 1 failed, {TYPE}',
                 (run_status, status, claims, failed, kind), (run_status, status, claims, failed, kind) == ('paused', 'done', 1, 1, TYPE))
     # Nothing waits on it after this check.
-    await db.command(run, RunCommand.CANCEL, Actor.USER)
+    await db.command(run, RunCommand.CANCEL)
 
 
 async def main(cases: Cases) -> None:

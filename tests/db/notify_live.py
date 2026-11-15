@@ -12,10 +12,10 @@ import sys
 from uuid import UUID, uuid4
 
 import psycopg
-from autobots.application.runs import admit_run, apply_command
+from autobots.application.runs import admit_run, apply_worker_command
 from autobots.application.worker_leases import claim_run
 from autobots.domain.models import resolve_role_policy
-from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.runs import RunCommand
 
 
 async def main() -> None:
@@ -27,9 +27,7 @@ async def main() -> None:
                                        goal_text=f'Notify check {label}: {command.value}', limit_micro_usd=1_000_000, policy=resolve_role_policy())
             lease = await claim_run(db, admitted.run_id, worker_id=f'notify-{label}', lease_seconds=120)
             assert lease is not None
-            version = (await (await db.execute('select version from public.runs where id = %s', (admitted.run_id,))).fetchone())[0]
-            moved = await apply_command(db, workspace_id=workspace, run_id=admitted.run_id, command=command, actor=Actor.WORKER,
-                                        expected_version=version, generation=lease.generation, detail='arranged for the notification check')
+            moved = await apply_worker_command(db, lease, command, detail='arranged for the notification check')
             made[moved.status] = str(admitted.run_id)
     print(json.dumps(made))
 

@@ -17,11 +17,11 @@ from autobots.adapters.checkpoints import (
     graph_config,
     is_stale_owner,
 )
-from autobots.application.runs import LeaseLost, admit_run, apply_command
+from autobots.application.runs import LeaseLost, admit_run, apply_command, apply_worker_command
 from autobots.application.tool_gateway import ToolScope, ownership_refusal
 from autobots.application.worker_leases import claim_next, heartbeat
 from autobots.domain.models import resolve_role_policy
-from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.runs import RunCommand
 from langgraph.checkpoint.postgres import PostgresSaver
 from worker_graph import build
 
@@ -106,7 +106,7 @@ async def main() -> None:
                 check('the stale worker cannot checkpoint after reassignment', 'stale owner, no new rows', (refused, unchanged - count), refused == 'stale owner' and unchanged == count)
                 version = await value('select version from public.runs where id = %s', run)
                 try:
-                    await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.VERIFY, actor=Actor.WORKER, expected_version=version, generation=lease.generation)
+                    await apply_worker_command(db, lease, RunCommand.VERIFY)
                     check('the stale worker cannot change the run', 'lease lost', 'applied', False)
                 except LeaseLost:
                     unchanged = await value('select version from public.runs where id = %s', run)
@@ -118,7 +118,7 @@ async def main() -> None:
                     await build(saver, log).ainvoke({'seen': []}, graph_config(replacement), durability=DURABILITY)
                     grew = await value('select count(*) from agent_runtime.checkpoints where thread_id = %s', str(run))
                     check('the replacement can checkpoint', 'more rows', grew - count, grew > count)
-                result = await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.VERIFY, actor=Actor.WORKER, expected_version=version, generation=replacement.generation)
+                result = await apply_worker_command(db, replacement, RunCommand.VERIFY)
                 check('the replacement can change the run', 'verifying', result.status, result.status == 'verifying')
 
         # A write and a claim race on the job row: the write waits for the claim, and then fails.
@@ -137,7 +137,7 @@ async def main() -> None:
         # A pause reaches a live owner at its next check, and it saves its step and lets go.
         run = await admit()
         lease = await claim_next(db, worker_id='paused', lease_seconds=60)
-        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.PAUSE, actor=Actor.USER, expected_version=2)
+        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.PAUSE, expected_version=2)
         scope = ToolScope(WORKSPACE, run, lease.generation, {})
         refusal = await ownership_refusal(db, scope)
         check('a paused run stops its owner dispatching', 'run_not_running', refusal, refusal == 'run_not_running')
@@ -151,19 +151,19 @@ async def main() -> None:
             await expire(run)
             orphaned = await claim_next(db, worker_id='x')
             check('a paused run is not claimable even once its owner dies', 'no claim', orphaned, orphaned is None)
-            await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.RESUME, actor=Actor.USER, expected_version=3)
+            await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.RESUME, expected_version=3)
             refused = await rejected(lambda: build(saver, os.devnull).ainvoke({'seen': []}, graph_config(lease), durability=DURABILITY))
             check('a resume ends the old owner', 'stale owner', refused, refused == 'stale owner')
         resumed = await claim_next(db, worker_id='after-resume', lease_seconds=60)
         check('a resumed run is claimed by a new generation', 'generation 2', resumed.generation, resumed.generation == 2)
-        cancelling = await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=5)
+        cancelling = await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, expected_version=5)
         check('cancelling a run with a live owner waits for it', 'cancelling', cancelling.status, cancelling.status == 'cancelling')
-        finished = await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.FINISH_CANCEL, actor=Actor.WORKER, expected_version=6, generation=resumed.generation)
+        finished = await apply_worker_command(db, resumed, RunCommand.FINISH_CANCEL)
         check('the owner finishes the cancellation', 'cancelled', finished.status, finished.status == 'cancelled')
         run = await admit()
         await claim_next(db, worker_id='crashed', lease_seconds=60)
         await expire(run)
-        direct = await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=2)
+        direct = await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, expected_version=2)
         check('cancelling after the owner died needs no worker', 'cancelled', direct.status, direct.status == 'cancelled')
 
         run = await admit()

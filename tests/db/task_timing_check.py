@@ -21,14 +21,14 @@ from autobots.application.experts import create_expert
 from autobots.application.plans import plan_tools
 from autobots.application.run_projection import read_workspace
 from autobots.application.run_usage import RootLimits
-from autobots.application.runs import admit_run, apply_command
+from autobots.application.runs import CommandReceipt, admit_run, apply_command
 from autobots.application.tool_gateway import ToolGateway, ToolScope
 from autobots.application.tool_uses import admit_metered
 from autobots.application.tools import default_registry
 from autobots.application.worker_leases import claim_run
 from autobots.contracts.experts import ExpertConfig
 from autobots.domain.models import resolve_role_policy
-from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.runs import RunCommand
 from autobots.domain.tools import PLAN_TOOLS
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
@@ -141,8 +141,8 @@ async def main() -> None:
         # A terminal run, cancelled through its canonical transition, for the panel with no controls.
         ended = await admit_run(db, workspace_id=WORKSPACE, actor_id=actor, idempotency_key=str(uuid4()), goal_text='An ended run for the panel',
                                 limit_micro_usd=1_000_000, policy=resolve_role_policy())
-        cancelled = await apply_command(db, workspace_id=WORKSPACE, run_id=ended.run_id, command=RunCommand.CANCEL, actor=Actor.USER,
-                                        expected_version=ended.version, actor_id=actor, idempotency_key=str(uuid4()))
+        cancelled = await apply_command(db, workspace_id=WORKSPACE, run_id=ended.run_id, command=RunCommand.CANCEL,
+                                        expected_version=ended.version, receipt=CommandReceipt(actor, str(uuid4())))
         check('the terminal panel run is cancelled', 'cancelled', cancelled.status, cancelled.status == 'cancelled')
     print(json.dumps({'cases': cases, 'browser_env': {
         'AUTOBOTS_TEST_PANEL_RUN': str(run), 'AUTOBOTS_TEST_PANEL_GENERATION': str(second.generation),

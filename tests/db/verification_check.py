@@ -23,14 +23,20 @@ from autobots.application.recovery import classify_interrupted
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.run_projection import read_workspace
 from autobots.application.run_usage import RootLimits
-from autobots.application.runs import IdempotencyConflict, admit_run, apply_command
+from autobots.application.runs import (
+    CommandReceipt,
+    IdempotencyConflict,
+    admit_run,
+    apply_command,
+    apply_worker_command,
+)
 from autobots.application.settlement import settle_candidate
 from autobots.application.tool_gateway import ToolFailed, ToolGateway, ToolScope
 from autobots.application.tools import default_registry
 from autobots.application.worker_leases import claim_next
 from autobots.contracts.plans import InputDocument, RequiredArtifact
 from autobots.domain.models import resolve_role_policy
-from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.runs import RunCommand
 from autobots.operations.job_dispatch import drive_lease, process_next
 from autobots.operations.logs import JsonFormatter, redact
 from goal_loop_script import PLAN, ROUTE, SAVE, Script, calls, say
@@ -148,7 +154,7 @@ async def main() -> None:
         lease = await claim_next(db, worker_id='retry', lease_seconds=120)
 
         async def cancel_during_backoff(_: float) -> None:
-            await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=await value('select version from public.runs where id = %s', run))
+            await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, expected_version=await value('select version from public.runs where id = %s', run))
 
         model = Script(items=[ProviderFailure(FailureClass.PROVIDER_ERROR), calls(PLAN)], seen=[], bound=[])
         result = await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE, sleep=cancel_during_backoff), drive=drive_lease)
@@ -171,8 +177,8 @@ async def main() -> None:
         ticket = await ModelAdmission(db).admit(AdmissionRequest(WORKSPACE, run, run, 'executor', 'openrouter_deepseek_flash', 'fixture/model', 1, 1000))
         await ModelAdmission(db).mark_dispatched(ticket.invocation_id)
         await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where run_id = %s", (run,))
-        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.PAUSE, actor=Actor.USER, expected_version=2)
-        cancelling = await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=3)
+        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.PAUSE, expected_version=2)
+        cancelling = await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, expected_version=3)
         job = await value('select status from app_private.run_jobs where run_id = %s', run)
         check('a cancel with open work and no owner queues it for recovery', 'cancelling, queued', (cancelling.status, job), cancelling.status == 'cancelling' and job == 'queued')
         settled = await process_next(db, URL, 'recovery', lambda: Script(items=[], seen=[], bound=[]), config)
@@ -200,7 +206,7 @@ async def main() -> None:
         async def pause_soon() -> None:
             await asyncio.sleep(0.3)
             async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as other:
-                await apply_command(other, workspace_id=WORKSPACE, run_id=run, command=RunCommand.PAUSE, actor=Actor.USER, expected_version=2)
+                await apply_command(other, workspace_id=WORKSPACE, run_id=run, command=RunCommand.PAUSE, expected_version=2)
 
         pausing = asyncio.create_task(pause_soon())
         model = Script(items=[slow, say('never')], seen=[], bound=[])
@@ -238,11 +244,11 @@ async def main() -> None:
         # A key covers its input value.
         run = await admit()
         lease = await claim_next(db, worker_id='input', lease_seconds=120)
-        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.REQUEST_INPUT, actor=Actor.WORKER, expected_version=2, generation=lease.generation, detail='Which?')
+        await apply_worker_command(db, lease, RunCommand.REQUEST_INPUT, detail='Which?')
         actor = uuid4()
-        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.SUBMIT_INPUT, actor=Actor.USER, expected_version=3, actor_id=actor, idempotency_key='same', response='first')
+        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.SUBMIT_INPUT, expected_version=3, receipt=CommandReceipt(actor, 'same'), response='first')
         try:
-            await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.SUBMIT_INPUT, actor=Actor.USER, expected_version=3, actor_id=actor, idempotency_key='same', response='second')
+            await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.SUBMIT_INPUT, expected_version=3, receipt=CommandReceipt(actor, 'same'), response='second')
             check('the same key with a different input is refused', 'conflict', 'accepted', False)
         except IdempotencyConflict:
             check('the same key with a different input is refused', 'conflict', 'conflict', True)
@@ -283,7 +289,7 @@ async def main() -> None:
         async def cancel_soon() -> None:
             await asyncio.sleep(0.5)
             async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as other:
-                await apply_command(other, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=2)
+                await apply_command(other, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, expected_version=2)
 
         started = time.monotonic()
         canceller = asyncio.create_task(cancel_soon())

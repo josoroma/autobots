@@ -3,7 +3,7 @@
 
 The job keeps the count of consecutive failed passes and the last one's module-qualified type,
 never its message. Below the bound it is requeued after 30 s, then 60 s; the third consecutive
-failure suspends the run with `worker_failed` through `apply_command`, so it is paused and
+failure suspends the run with `worker_failed` through `apply_worker_command`, so it is paused and
 resumable. A completed pass resets the count, and so does a person's resume. Cancellation is a
 BaseException, so it propagates with nothing recorded.
 """
@@ -28,7 +28,7 @@ from autobots.application.run_lifecycle import (
     PassFailure,
     record_failure,
 )
-from autobots.application.runs import LeaseLost, TransitionResult
+from autobots.application.runs import LeaseLost, TransitionResult, WorkerClaim
 from autobots.application.worker_leases import (
     FAILURE_BOUND,
     FAILURE_TYPE_LIMIT,
@@ -38,7 +38,7 @@ from autobots.application.worker_leases import (
     retry_delay,
 )
 from autobots.domain.models import ModelRoute
-from autobots.domain.runs import Actor, CommandRefused, RunCommand, RunStatus
+from autobots.domain.runs import CommandRefused, RunCommand, RunStatus
 from autobots.domain.stops import PassOutcome, StopCode
 from autobots.operations import job_dispatch
 from autobots.operations.logs import JsonFormatter
@@ -124,7 +124,7 @@ class Database:
 
 @dataclass
 class Transitions:
-    """Each `apply_command` the recording applied, and a refusal to raise instead."""
+    """Each `apply_worker_command` the recording applied, and a refusal to raise instead."""
 
     applied: list[dict[str, object]] = field(default_factory=list)
     refusal: Exception | None = None
@@ -136,19 +136,23 @@ def _record(
     error: Exception,
     transitions: Transitions | None = None,
 ) -> PassFailure:
-    """`record_failure` against the arranged job, its transition behaving as `apply_command` does
-    under its row locks: a suspension leaves the run paused and its job done."""
+    """`record_failure` against the arranged job, its transition behaving as `apply_worker_command`
+    does under its row locks: a suspension leaves the run paused and its job done, and its stop
+    reason commits with it."""
     transitions = transitions or Transitions()
 
-    async def apply_command(connection: object, **fields: object) -> TransitionResult:
+    async def apply_worker_command(
+        connection: object, claim: WorkerClaim, command: RunCommand, **fields: object
+    ) -> TransitionResult:
         assert database.depth > 0, "the suspension commits with the count"
-        transitions.applied.append(fields)
+        transitions.applied.append({"command": command, "generation": claim.generation, **fields})
         if transitions.refusal is not None:
             raise transitions.refusal
+        database.stop_reasons.append(fields["stop_reason"])
         database.run_status, database.job.status = RunStatus.PAUSED, "done"
         return TransitionResult(LEASE.run_id, 5, RunStatus.PAUSED.value, True)
 
-    monkeypatch.setattr(run_lifecycle, "apply_command", apply_command)
+    monkeypatch.setattr(run_lifecycle, "apply_worker_command", apply_worker_command)
     return asyncio.run(record_failure(database, LEASE, error))
 
 
@@ -217,7 +221,6 @@ def test_the_third_consecutive_failure_suspends_the_run_with_worker_failed(
     assert failure == PassFailure(FailureEnding.SUSPENDED, 3)
     [applied] = transitions.applied
     assert applied["command"] is RunCommand.SUSPEND
-    assert applied["actor"] is Actor.WORKER
     assert applied["generation"] == LEASE.generation
     assert database.stop_reasons == [StopCode.WORKER_FAILED]
     # Paused and resumable, its job done: nothing requeues it.
@@ -490,7 +493,8 @@ def test_a_completed_pass_resets_the_count(monkeypatch: pytest.MonkeyPatch) -> N
 
 @dataclass
 class Commands:
-    """The connection `apply_command` uses, for one run in `status` whose job nobody holds."""
+    """The connection a person's `apply_command` uses, for one run in `status` whose job nobody
+    holds."""
 
     status: RunStatus
     statements: list[str] = field(default_factory=list)
@@ -525,7 +529,6 @@ def _command(status: RunStatus, command: RunCommand) -> list[str]:
             workspace_id=UUID(int=1),
             run_id=LEASE.run_id,
             command=command,
-            actor=Actor.USER,
             expected_version=7,
         )
     )

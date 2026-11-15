@@ -14,7 +14,7 @@ from autobots.application.artifacts import ArtifactUnavailable, object_path, rea
 from autobots.application.retention import RetentionPolicy, apply_retention, write_policy
 from autobots.application.runs import admit_run, apply_command
 from autobots.domain.models import resolve_role_policy
-from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.runs import RunCommand
 from pydantic import SecretStr
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
@@ -35,13 +35,13 @@ async def admit(workspace: str) -> None:
 async def resume(workspace: str, run: str) -> None:
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         version = (await (await db.execute("select version from public.runs where id = %s", (run,))).fetchone())[0]
-        await apply_command(db, workspace_id=UUID(workspace), run_id=UUID(run), command=RunCommand.RESUME, actor=Actor.USER, expected_version=version)
+        await apply_command(db, workspace_id=UUID(workspace), run_id=UUID(run), command=RunCommand.RESUME, expected_version=version)
 
 
 async def cancel(workspace: str, run: str) -> None:
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         version = (await (await db.execute("select version from public.runs where id = %s", (run,))).fetchone())[0]
-        await apply_command(db, workspace_id=UUID(workspace), run_id=UUID(run), command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
+        await apply_command(db, workspace_id=UUID(workspace), run_id=UUID(run), command=RunCommand.CANCEL, expected_version=version)
 
 
 class Down:

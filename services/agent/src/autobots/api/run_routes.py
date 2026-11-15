@@ -31,7 +31,13 @@ from autobots.application.run_admission import (
     saved_workspace_policy,
 )
 from autobots.application.run_projection import public_text, read_summary
-from autobots.application.runs import apply_command, existing_receipt, request_hash, store_receipt
+from autobots.application.runs import (
+    CommandReceipt,
+    apply_command,
+    existing_receipt,
+    request_hash,
+    store_receipt,
+)
 from autobots.contracts.run_commands import (
     EffectEvidence,
     ModelCallReconciliation,
@@ -45,7 +51,7 @@ from autobots.contracts.run_commands import (
 from autobots.contracts.runs import RunSummary
 from autobots.contracts.settings import PreviewProfile, RunPreview, budget_range
 from autobots.domain.models import PROFILES, ModelProfileId
-from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.runs import RunCommand
 from autobots.domain.tools import LOOP_TOOL_GRANTS, PLAN_TOOLS
 from autobots.persistence.records import read_expert_config
 
@@ -187,10 +193,8 @@ async def _command(
             workspace_id=workspace_id,
             run_id=run_id,
             command=command,
-            actor=Actor.USER,
             expected_version=body.expected_version,
-            actor_id=user_id,
-            idempotency_key=key,
+            receipt=CommandReceipt(user_id, key),
             response=response,
         )
     return RunCommandResult(
