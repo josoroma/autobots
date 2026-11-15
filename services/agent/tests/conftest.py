@@ -5,7 +5,13 @@ An inherited provider key is removed too, so no test can read a developer's real
 
 import os
 import socket
-from typing import NoReturn
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, NoReturn
+
+import pytest
+
+if TYPE_CHECKING:
+    from fake_api import ApiClient
 
 os.environ.pop("OPENROUTER_API_KEY", None)
 
@@ -25,3 +31,14 @@ socket.socket.connect_ex = _refuse  # type: ignore[method-assign]
 socket.socket.sendto = _refuse  # type: ignore[method-assign]
 socket.create_connection = _refuse
 socket.getaddrinfo = _refuse
+
+
+@pytest.fixture
+def api_client() -> Iterator["ApiClient"]:
+    """The app in process, its lifespan running, over a fake membership, a fake pool and signed
+    sessions (refactor plan R-31, PAPI-15). Imported here, so the app's imports run under the
+    block above."""
+    from fake_api import ApiClient
+
+    with ApiClient.started() as client:
+        yield client

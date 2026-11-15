@@ -5,12 +5,13 @@ from datetime import UTC
 from typing import Any
 from uuid import UUID
 
+from autobots.application.run_admission import expert_overrides, saved_workspace_policy
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.workflows import (
     WorkflowExecutionSummary,
     WorkflowStepView,
 )
-from autobots.domain.models import PROFILES, ModelRole, resolve_role_policy
+from autobots.domain.models import PROFILES, ModelRole
 from autobots.domain.runs import TERMINAL, RunStatus
 from autobots.domain.workflows import step_order
 
@@ -116,12 +117,7 @@ async def preview_steps(
     started now would use, and the Expert's tools. An approval step is marked as the gate."""
     nodes = {node["id"]: node for node in graph.get("nodes", [])}
     known = await _experts(connection, workspace_id, sorted(set(_agent_experts(graph))))
-    cursor = await connection.execute(
-        "select default_profile, role_overrides from app_private.model_policies "
-        "where workspace_id = %s",
-        (workspace_id,),
-    )
-    saved = await cursor.fetchone()
+    saved = await saved_workspace_policy(connection, workspace_id)
     steps = []
     for name in step_order(graph):
         node = nodes[name]
@@ -129,12 +125,10 @@ async def preview_steps(
         found = known.get(str(expert_id)) if expert_id else None
         model = None
         if found is not None:
-            policy = resolve_role_policy(
-                run_role_overrides={
-                    role: profile.value for role, profile in found[1].role_bindings.items()
-                },
-                workspace_default=saved[0] if saved else None,
-                workspace_role_overrides=saved[1] if saved else None,
+            # With the step's Expert's role bindings, where its child run inherits the workflow
+            # run's policy, resolved without them (PPRD-09). A preview refuses nothing.
+            policy = saved.for_new_work(
+                run_role_overrides=expert_overrides(found[1]), require_offer=False
             )
             model = PROFILES[policy.bindings[ModelRole.EXECUTOR]].canonical_id
         steps.append(

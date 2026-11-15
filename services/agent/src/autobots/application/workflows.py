@@ -6,6 +6,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from autobots.application.experts import create_session
+from autobots.application.run_admission import saved_workspace_policy
 from autobots.application.run_projection import public_text
 from autobots.application.runs import (
     Fresh,
@@ -29,12 +30,7 @@ from autobots.contracts.workflows import (
     WorkflowVersionView,
     WorkflowView,
 )
-from autobots.domain.models import (
-    ProfileNotOffered,
-    RolePolicy,
-    require_offered,
-    resolve_role_policy,
-)
+from autobots.domain.models import ProfileNotOffered, RolePolicy
 from autobots.domain.runs import TERMINAL
 from autobots.domain.tools import DELEGATION_TOOL, LOOP_TOOL_GRANTS, PLAN_TOOLS
 from autobots.domain.workflows import (
@@ -368,21 +364,18 @@ async def create_execution(  # noqa: PLR0913 - baseline 2026-11-14, shrink only 
         if existing is None:
             session_id = await _agent_session(connection, workspace_id, actor_id, graph)
             if policy is None:
-                cursor = await connection.execute(
-                    "select default_profile, role_overrides from app_private.model_policies "
-                    "where workspace_id = %s",
-                    (workspace_id,),
-                )
-                chosen = await cursor.fetchone()
-                policy = resolve_role_policy(
-                    workspace_default=chosen[0] if chosen else None,
-                    workspace_role_overrides=chosen[1] if chosen else None,
-                )
-                if await needs_model(connection, workspace_id, workflow_id, version):
-                    try:
-                        require_offered(policy.bindings.values())
-                    except ProfileNotOffered as refused:
-                        raise WorkflowRefused(refused.code, reason=str(refused)) from None
+                saved = await saved_workspace_policy(connection, workspace_id)
+                try:
+                    # With no Expert's role bindings, and a profile not offered refuses only when an
+                    # agent step will call a model, so a workflow without one runs under any saved
+                    # choice. A preview applies an agent step's Expert's bindings (PPRD-09).
+                    policy = saved.for_new_work(
+                        require_offer=await needs_model(
+                            connection, workspace_id, workflow_id, version
+                        )
+                    )
+                except ProfileNotOffered as refused:
+                    raise WorkflowRefused(refused.code, reason=str(refused)) from None
             granted = (
                 WORKFLOW_TOOLS
                 if tools is None

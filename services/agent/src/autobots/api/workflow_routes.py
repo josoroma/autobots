@@ -11,8 +11,8 @@ from autobots.api.pool import request_pool
 from autobots.api.run_routes import budget_error
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, provider_settings, require_owner
-from autobots.application.model_admission import remaining_daily_micro_usd
 from autobots.application.provider_settings import ProviderSettings
+from autobots.application.run_admission import ModelNotReady, chosen_limit, require_model_ready
 from autobots.application.runs import IdempotencyConflict
 from autobots.application.workflow_overview import preview_steps, recent_executions
 from autobots.application.workflows import (
@@ -49,7 +49,7 @@ from autobots.contracts.workflows import (
     WorkflowValidation,
     WorkflowView,
 )
-from autobots.domain.budgets import BudgetRefused, require_budget
+from autobots.domain.budgets import BudgetRefused
 from autobots.domain.models import NOT_OFFERED_CODE, NOT_OFFERED_MESSAGE
 from autobots.domain.workflows import (
     BLOCKS,
@@ -341,22 +341,21 @@ async def post_execution(
 ) -> ExecutionBinding:
     if body.version == "draft":
         raise ApiError(409, DRAFT_NOT_RUNNABLE, "Only a published version can run.")
-    limit = DEFAULT_LIMIT_MICRO_USD
     async with request_pool(request).connection() as connection:
-        if body.budget_micro_usd is not None:
+        try:
             # WF-05: the same budget rules as a goal run (Decision 0022 D11).
-            try:
-                require_budget(
-                    body.budget_micro_usd,
-                    await remaining_daily_micro_usd(connection, workspace),
-                )
-            except BudgetRefused as refused:
-                raise budget_error(refused.code) from None
-            limit = body.budget_micro_usd
-        if await needs_model(connection, workspace, workflow_id, body.version):
-            code = await settings.run_intent(workspace)
-            if code != "ready":
-                raise ApiError(409, code, "An agent step needs a usable OpenRouter key.")
+            limit = await chosen_limit(
+                connection, workspace, body.budget_micro_usd, otherwise=DEFAULT_LIMIT_MICRO_USD
+            )
+        except BudgetRefused as refused:
+            raise budget_error(refused.code) from None
+        # A workflow with no agent step calls no model, so it needs no key.
+        needed = await needs_model(connection, workspace, workflow_id, body.version)
+        try:
+            await require_model_ready(settings.run_intent, workspace, needed=needed)
+        except ModelNotReady as refused:
+            message = "An agent step needs a usable OpenRouter key."
+            raise ApiError(409, refused.code, message) from None
         try:
             return await create_execution(
                 connection,

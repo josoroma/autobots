@@ -1,5 +1,6 @@
 """Run admission and user commands. A request records intent; a worker owns execution."""
 
+from functools import partial
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -10,8 +11,13 @@ from autobots.api.errors import ApiError
 from autobots.api.operation_routes import require_ready
 from autobots.api.pool import request_pool
 from autobots.api.security import current_user, require_internal
-from autobots.api.settings_routes import current_workspace, provider_settings, require_owner
-from autobots.application.experts import ExpertRefused, resolve_binding
+from autobots.api.settings_routes import (
+    current_workspace,
+    process_environment,
+    provider_settings,
+    require_owner,
+)
+from autobots.application.experts import ExpertRefused
 from autobots.application.goal_loop import execution_block
 from autobots.application.model_admission import ModelAdmission, remaining_daily_micro_usd
 from autobots.application.provider_settings import ProviderSettings
@@ -21,22 +27,29 @@ from autobots.application.reconciliation import (
     record_evidence,
 )
 from autobots.application.recovery import outstanding
+from autobots.application.run_admission import (
+    AdmissionInput,
+    AdmissionRefused,
+    ModelNotReady,
+    PolicyNotOffered,
+    RequestRefusal,
+    admit_from_request,
+    expert_overrides,
+    require_model_ready,
+    saved_workspace_policy,
+)
 from autobots.application.run_projection import public_text, read_summary
 from autobots.application.runs import (
-    Fresh,
     IdempotencyConflict,
     LinkRefused,
-    RunAdmission,
     RunNotFound,
     VersionConflict,
-    admit,
     apply_command,
     existing_receipt,
     request_hash,
     store_receipt,
 )
-from autobots.application.tool_catalog import ToolsUnavailable, require_available
-from autobots.application.tool_keys import key_sources
+from autobots.application.tool_catalog import ToolsUnavailable
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.run_commands import (
     EffectEvidence,
@@ -50,15 +63,8 @@ from autobots.contracts.run_commands import (
 )
 from autobots.contracts.runs import RunSummary
 from autobots.contracts.settings import PreviewProfile, RunPreview, budget_range
-from autobots.domain.budgets import BudgetRefused, require_budget
-from autobots.domain.models import (
-    PROFILES,
-    ModelProfileId,
-    ProfileNotOffered,
-    is_offered,
-    require_offered,
-    resolve_role_policy,
-)
+from autobots.domain.budgets import BudgetRefused
+from autobots.domain.models import PROFILES, ModelProfileId
 from autobots.domain.runs import Actor, CommandRefused, RunCommand
 from autobots.domain.tools import LOOP_TOOL_GRANTS, PLAN_TOOLS
 
@@ -97,6 +103,48 @@ def budget_error(code: str) -> ApiError:
     return ApiError(409 if code == "budget_above_daily_cap" else 422, code, BUDGET_MESSAGES[code])
 
 
+KEY_NEEDED = "Model-backed work needs a usable OpenRouter key."
+REQUEST_REFUSALS: dict[RequestRefusal, tuple[int, str]] = {
+    "session_required": (422, "An Expert is chosen through a session."),
+    "budget_conflict": (422, "Choose a budget or a limit, not both."),
+    "owner_required": (403, "Only an owner can choose an Expert version."),
+}
+ADMISSION_REFUSALS = (
+    AdmissionRefused,
+    BudgetRefused,
+    ModelNotReady,
+    ExpertRefused,
+    ToolsUnavailable,
+    PolicyNotOffered,
+    IdempotencyConflict,
+    LinkRefused,
+)
+
+
+def admission_error(error: Exception) -> ApiError:
+    """Each refusal `admit_from_request` raises, with its status and fixed wording."""
+    if isinstance(error, AdmissionRefused):
+        status_code, message = REQUEST_REFUSALS[error.code]
+        return ApiError(status_code, error.code, message)
+    if isinstance(error, BudgetRefused):
+        return budget_error(error.code)
+    if isinstance(error, ModelNotReady):
+        return ApiError(409, error.code, KEY_NEEDED)
+    if isinstance(error, ExpertRefused):
+        status_code = 404 if error.code.endswith("not_found") else 409
+        return ApiError(status_code, error.code, "That routing isn't available.")
+    if isinstance(error, ToolsUnavailable):
+        return ApiError(
+            409,
+            error.code,
+            "A tool this Expert grants is unavailable in this install. "
+            "See Tools for what it needs.",
+        )
+    if isinstance(error, PolicyNotOffered):
+        return ApiError(422 if error.named else 409, error.code, str(error))
+    return as_api_error(error)
+
+
 PROFILE_LABELS = {
     ModelProfileId.DEEPSEEK_FLASH: "DeepSeek",
     ModelProfileId.TERRA: "Terra",
@@ -114,13 +162,7 @@ async def preview_run(
     """HM-03: the profiles each role would resolve to, the tools and the budgets, as admission
     would see them now. It creates nothing and calls no model."""
     async with request_pool(request).connection() as connection:
-        row = await (
-            await connection.execute(
-                "select default_profile, role_overrides from app_private.model_policies "
-                "where workspace_id = %s",
-                (workspace_id,),
-            )
-        ).fetchone()
+        saved = await saved_workspace_policy(connection, workspace_id)
         role_bindings: dict[str, str] | None = None
         tools = sorted(tool for tool in LOOP_TOOL_GRANTS if tool not in PLAN_TOOLS)
         if expert_id is not None:
@@ -135,14 +177,13 @@ async def preview_run(
             if found is None:
                 raise ApiError(404, "expert_not_found", "That Expert is not available.")
             config = ExpertConfig.model_validate(found[0])
-            role_bindings = {role: profile.value for role, profile in config.role_bindings.items()}
+            role_bindings = expert_overrides(config)
             tools = sorted(config.tools)
         remaining = await remaining_daily_micro_usd(connection, workspace_id)
-    policy = resolve_role_policy(
-        run_role_overrides=role_bindings,
-        run_profile=run_profile.value if run_profile else None,
-        workspace_default=row[0] if row else None,
-        workspace_role_overrides=row[1] if row else None,
+    # It shows what admission would resolve, and refusing a profile that isn't offered is
+    # admission's to do.
+    policy = saved.for_new_work(
+        run_role_overrides=role_bindings, run_profile=run_profile, require_offer=False
     )
     grouped: dict[ModelProfileId, list[str]] = {}
     for role, profile in policy.bindings.items():
@@ -178,96 +219,21 @@ async def post_run(
     workspace_id: Annotated[UUID, Depends(current_workspace)],
     user_id: Annotated[UUID, Depends(current_user)],
 ) -> RunAccepted:
-    if body.session_id is None and (body.expert_id is not None or body.expert_version is not None):
-        raise ApiError(422, "session_required", "An Expert is chosen through a session.")
-    limit = body.limit_micro_usd
-    if body.budget_micro_usd is not None:
-        if "limit_micro_usd" in body.model_fields_set:
-            raise ApiError(422, "budget_conflict", "Choose a budget or a limit, not both.")
-        async with request_pool(request).connection() as connection:
-            remaining = await remaining_daily_micro_usd(connection, workspace_id)
-        try:
-            require_budget(body.budget_micro_usd, remaining)
-        except BudgetRefused as refused:
-            raise budget_error(refused.code) from None
-        limit = body.budget_micro_usd
-    code = await settings.run_intent(workspace_id)
-    if code != "ready":
-        raise ApiError(409, code, "Model-backed work needs a usable OpenRouter key.")
-    async with request_pool(request).connection() as connection:
-        row = await (
-            await connection.execute(
-                "select default_profile, role_overrides from app_private.model_policies "
-                "where workspace_id = %s",
-                (workspace_id,),
-            )
-        ).fetchone()
-        binding = None
-        if body.session_id is not None:
-            if (
-                body.expert_version is not None
-                and await request.app.state.membership.role_in(user_id, workspace_id) != "owner"
-            ):
-                # An earlier version could hold tools an owner has since removed.
-                raise ApiError(403, "owner_required", "Only an owner can choose an Expert version.")
-            try:
-                binding = await resolve_binding(
-                    connection,
-                    workspace_id,
-                    body.session_id,
-                    expert_id=body.expert_id,
-                    version=body.expert_version,
-                )
-            except ExpertRefused as error:
-                status_code = 404 if error.code.endswith("not_found") else 409
-                raise ApiError(status_code, error.code, "That routing isn't available.") from None
+    try:
+        result = await admit_from_request(
+            AdmissionInput.of(
+                body, workspace_id=workspace_id, user_id=user_id, idempotency_key=idempotency_key
+            ),
+            database=request_pool(request),
+            model_ready=settings.run_intent,
+            role=partial(request.app.state.membership.role_in, user_id, workspace_id),
             # Decisions 0024 K1 and 0025 V3 order the keys, and the process environment in that
             # order is the one the entry point read at start, as the OpenRouter key's is. The
             # `settings` dependency has already refused a missing provider context.
-            environment = request.app.state.provider_context.process_environment
-            try:
-                # PK-02: only a run that grants an unavailable tool is refused, before it exists.
-                require_available(
-                    binding.tools, await key_sources(connection, workspace_id, environment)
-                )
-            except ToolsUnavailable as refused:
-                raise ApiError(
-                    409,
-                    refused.code,
-                    "A tool this Expert grants is unavailable in this install. "
-                    "See Tools for what it needs.",
-                ) from None
-        policy = resolve_role_policy(
-            run_role_overrides=binding.role_bindings if binding else None,
-            run_profile=body.run_profile.value if body.run_profile else None,
-            workspace_default=row[0] if row else None,
-            workspace_role_overrides=row[1] if row else None,
+            environment=process_environment(request),
         )
-        try:
-            require_offered(policy.bindings.values())
-        except ProfileNotOffered as refused:
-            # Named in this request it's a bad request. Otherwise it's a saved choice to change.
-            named = body.run_profile is not None and not is_offered(body.run_profile)
-            raise ApiError(422 if named else 409, refused.code, str(refused)) from None
-        try:
-            result = await admit(
-                connection,
-                RunAdmission(
-                    workspace_id=workspace_id,
-                    actor_id=user_id,
-                    idempotency_key=idempotency_key,
-                    goal_text=body.goal_text,
-                    limit_micro_usd=limit,
-                    origin=Fresh(policy, binding, started_by=user_id),
-                    acceptance_criteria=tuple(body.acceptance_criteria),
-                    continues_run_id=body.continues_run_id,
-                    required_artifacts=tuple(body.required_artifacts),
-                    input_documents=tuple(body.input_documents),
-                    run_profile=body.run_profile.value if body.run_profile else None,
-                ),
-            )
-        except (IdempotencyConflict, LinkRefused) as error:
-            raise as_api_error(error) from None
+    except ADMISSION_REFUSALS as refused:
+        raise admission_error(refused) from None
     return RunAccepted(
         schema_version=1,
         run_id=result.run_id,
@@ -371,9 +337,12 @@ async def post_resume(
     settings: Annotated[ProviderSettings, Depends(provider_settings)],
 ) -> RunCommandResult:
     """Readiness is checked here, and again by the worker before anything is dispatched."""
-    code = await settings.run_intent(workspace)
-    if code != "ready":
-        raise ApiError(409, code, "Model-backed work needs a usable OpenRouter key.")
+    try:
+        # Offering isn't checked again: a resumed run keeps the policy it froze at admission, as a
+        # policy change reaches future runs only (PRD-Model-Providers MP-01).
+        await require_model_ready(settings.run_intent, workspace, needed=True)
+    except ModelNotReady as refused:
+        raise ApiError(409, refused.code, KEY_NEEDED) from None
     async with request_pool(request).connection() as connection:
         await _require_run(connection, workspace, run_id)
         left = await outstanding(connection, run_id)

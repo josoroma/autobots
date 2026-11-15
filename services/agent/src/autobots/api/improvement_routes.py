@@ -18,6 +18,11 @@ from autobots.application.improvements import (
     run_regression,
 )
 from autobots.application.provider_settings import ProviderSettings
+from autobots.application.run_admission import (
+    ModelNotReady,
+    require_model_ready,
+    workspace_role_policy,
+)
 from autobots.application.runs import IdempotencyConflict
 from autobots.contracts.improvements import (
     CandidateDecision,
@@ -27,7 +32,7 @@ from autobots.contracts.improvements import (
     ReplayRequest,
     RollbackRequest,
 )
-from autobots.domain.models import ProfileNotOffered, require_offered, resolve_role_policy
+from autobots.domain.models import ProfileNotOffered
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 Owner = Annotated[UUID, Depends(require_owner)]
@@ -87,23 +92,15 @@ async def post_replay(
     key: Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)],
 ) -> CandidateList:
     """Held-out tasks run as ordinary runs, each up to the limit. Requesting authorizes that."""
-    code = await settings.run_intent(workspace)
-    if code != "ready":
-        raise ApiError(409, code, "A replay needs a usable OpenRouter key.")
+    try:
+        await require_model_ready(settings.run_intent, workspace, needed=True)
+    except ModelNotReady as refused:
+        raise ApiError(409, refused.code, "A replay needs a usable OpenRouter key.") from None
     async with request_pool(request).connection() as connection:
-        row = await (
-            await connection.execute(
-                "select default_profile, role_overrides from app_private.model_policies "
-                "where workspace_id = %s",
-                (workspace,),
-            )
-        ).fetchone()
-        policy = resolve_role_policy(
-            workspace_default=row[0] if row else None,
-            workspace_role_overrides=row[1] if row else None,
-        )
         try:
-            require_offered(policy.bindings.values())
+            # A held-out task names no Expert and no profile, so it resolves the workspace's saved
+            # policy alone, and a profile there that isn't offered is a saved choice to change.
+            policy = await workspace_role_policy(connection, workspace, require_offer=True)
         except ProfileNotOffered as refused:
             raise ApiError(409, refused.code, str(refused)) from None
         try:

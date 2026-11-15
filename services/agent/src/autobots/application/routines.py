@@ -6,13 +6,20 @@ occurrence takes its version's frozen configuration, so an edit can't reach a ru
 
 import logging
 import os
-from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
 from autobots.application.experts import ExpertRefused, get_expert
 from autobots.application.improvements import active_skill_text
+from autobots.application.run_admission import (
+    CredentialCheck,
+    ModelNotReady,
+    expert_overrides,
+    require_model_ready,
+    require_tools_available,
+    workspace_role_policy,
+)
 from autobots.application.runs import (
     Fresh,
     IdempotencyConflict,
@@ -26,7 +33,7 @@ from autobots.application.runs import (
 from autobots.application.workflows import WorkflowRefused, create_execution
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.routines import OccurrenceView, RoutineConfig, RoutineView
-from autobots.domain.models import ProfileNotOffered, require_offered, resolve_role_policy
+from autobots.domain.models import ProfileNotOffered
 from autobots.domain.routines import (
     TriggerInvalid,
     occurrences,
@@ -36,9 +43,6 @@ from autobots.domain.routines import (
 from autobots.domain.runs import TERMINAL
 from autobots.domain.tools import EXPERT_TOOLS, PLAN_TOOLS
 from autobots.operations.logs import log_event
-
-# Says whether a workspace can make model calls now. It reports, and never starts anything.
-CredentialCheck = Callable[[UUID], Awaitable[str]]
 
 logger = logging.getLogger("autobots.routines")
 
@@ -288,11 +292,13 @@ async def run_routine_now(
         if await _has_active_run(connection, routine_id):
             await _record(connection, routine_id, moment, version, "skipped_overlap", "run_active")
             return "skipped_overlap", "run_active", None
-        if await _needs_model(config, connection):
-            code = await credential_check(workspace_id)
-            if code != "ready":
-                await _record(connection, routine_id, moment, version, "blocked", code)
-                return "blocked", code, None
+        try:
+            await require_model_ready(
+                credential_check, workspace_id, needed=await _needs_model(config, connection)
+            )
+        except ModelNotReady as refused:
+            await _record(connection, routine_id, moment, version, "blocked", refused.code)
+            return "blocked", refused.code, None
         try:
             run_id = await _admit(connection, workspace_id, routine_id, version, config, moment)
         except (RoutineRefused, WorkflowRefused, IdempotencyConflict, ExpertRefused) as refused:
@@ -353,27 +359,23 @@ async def _admit(
         return binding.run_id
     expert = await _expert_config(connection, workspace_id, config)
     tools = config.tools if config.tools is not None else expert.tools
-    cursor = await connection.execute(
-        "select default_profile, role_overrides from app_private.model_policies "
-        "where workspace_id = %s",
-        (workspace_id,),
-    )
-    policy_row = await cursor.fetchone()
-    policy = resolve_role_policy(
-        run_role_overrides={r: p.value for r, p in expert.role_bindings.items()},
-        workspace_default=policy_row[0] if policy_row else None,
-        workspace_role_overrides=policy_row[1] if policy_row else None,
-    )
     try:
-        require_offered(policy.bindings.values())
+        # The pinned version's role bindings, and no run-wide profile, which a routine can't name.
+        policy = await workspace_role_policy(
+            connection,
+            workspace_id,
+            run_role_overrides=expert_overrides(expert),
+            require_offer=True,
+        )
     except ProfileNotOffered as refused:
         raise RoutineRefused(refused.code) from None
-    from autobots.application.tool_catalog import ToolsUnavailable, require_available
-    from autobots.application.tool_keys import key_sources
+    from autobots.application.tool_catalog import ToolsUnavailable
 
     try:
-        # PK-02: a missing key refuses this occurrence, before a run exists.
-        require_available(tools, await key_sources(connection, workspace_id, os.environ))
+        # PK-02: a missing key refuses this occurrence, before a run exists. Its keys come from
+        # this process's environment as it is now, where POST /v1/runs reads the one its entry
+        # point read at start.
+        await require_tools_available(connection, workspace_id, tools, os.environ)
     except ToolsUnavailable as refused:
         raise RoutineRefused(refused.code) from None
     grant = RunGrant(
@@ -452,11 +454,13 @@ async def _evaluate_one(
         if await _has_active_run(connection, routine_id):
             await _record(connection, routine_id, latest, version, "skipped_overlap", "run_active")
             return 0
-        if await _needs_model(config, connection):
-            code = await credential_check(workspace_id)
-            if code != "ready":
-                await _record(connection, routine_id, latest, version, "blocked", code)
-                return 0
+        try:
+            await require_model_ready(
+                credential_check, workspace_id, needed=await _needs_model(config, connection)
+            )
+        except ModelNotReady as refused:
+            await _record(connection, routine_id, latest, version, "blocked", refused.code)
+            return 0
         try:
             run_id = await _admit(connection, workspace_id, routine_id, version, config, latest)
         except (RoutineRefused, WorkflowRefused, IdempotencyConflict, ExpertRefused) as refused:
