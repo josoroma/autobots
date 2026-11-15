@@ -12,6 +12,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -302,27 +303,149 @@ async def settle_children(connection: Connection, lease: Lease) -> datetime | No
     return retry_at
 
 
-async def _holds_lease(connection: Connection, lease: Lease) -> bool:
-    cursor = await connection.execute(
-        "select 1 from app_private.run_jobs where run_id = %s and generation = %s "
-        "and status = 'claimed' and lease_expires_at > clock_timestamp()",
-        (lease.run_id, lease.generation),
+@dataclass(frozen=True)
+class Observed:
+    """What `decide` reads, read once as a pass ends: the run's status and whether this worker
+    still holds its lease, from one statement so the two agree, and its plan's state (PRUN-03)."""
+
+    status: RunStatus
+    holds_lease: bool
+    plan_version: int | None
+    plan_finished: bool
+
+
+class Ending(StrEnum):
+    """The step `finish` takes once it has decided."""
+
+    # Not this worker's to write: another owner, a person or a pending approval has the run.
+    LEAVE = "leave"
+    # A person paused the run: its job is done, and the run waits for a resume, held by nobody.
+    LET_GO = "let_go"
+    # A run being cancelled: settle its children, classify what is in flight, then FINISH_CANCEL.
+    SETTLE = "settle"
+    # Apply the command, with the code as its stop reason.
+    TRANSITION = "transition"
+
+
+@dataclass(frozen=True)
+class Decision:
+    """How a pass ends: the step, the code it ends with, the command a transition or settlement
+    applies, and whether the code was missing from the table, which its caller logs (Decision 0028
+    E3)."""
+
+    ending: Ending
+    code: str | None
+    command: RunCommand | None = None
+    unmapped: bool = False
+
+
+def decide(code: str | None, observed: Observed) -> Decision:
+    """How a pass that stopped with `code` ends, from one observation of its run (SP-010, SP-012).
+
+    A lost lease writes nothing. A run being cancelled is settled by the worker that holds its
+    lease, whatever stopped the pass, and by nobody else, since settling classifies what is in
+    flight. Otherwise a pass with no code and an unfinished plan stops as `plan_missing` or
+    `plan_incomplete`. A run a person paused waits for a resume: its job is let go as
+    `run_not_running` when the pass stopped with that code, or with a code whose command the paused
+    run would refuse while this worker holds the lease (R-34). Any other code's disposition picks
+    its command, or none, and `apply_command` re-validates it under its row locks.
+    """
+    if code == StopCode.LEASE_LOST:
+        return Decision(Ending.LEAVE, StopCode.LEASE_LOST)
+    if observed.status is RunStatus.CANCELLING:
+        if observed.holds_lease:
+            return Decision(Ending.SETTLE, StopCode.RUN_NOT_RUNNING, RunCommand.FINISH_CANCEL)
+        return Decision(Ending.LEAVE, StopCode.LEASE_LOST)
+    if code is None and not observed.plan_finished:
+        code = StopCode.PLAN_MISSING if observed.plan_version is None else StopCode.PLAN_INCOMPLETE
+    known = disposition_of(code)
+    command = COMMANDS.get(UNMAPPED if known is None else known)
+    if observed.status is RunStatus.PAUSED and (
+        code == StopCode.RUN_NOT_RUNNING or (command is not None and observed.holds_lease)
+    ):
+        return Decision(Ending.LET_GO, StopCode.RUN_NOT_RUNNING, unmapped=known is None)
+    if command is None:
+        return Decision(Ending.LEAVE, code)
+    return Decision(Ending.TRANSITION, code, command, unmapped=known is None)
+
+
+def outcome_of(code: str | None) -> PassOutcome:
+    """What a pass that ended with `code` reports beside it."""
+    if code is None:
+        return PassOutcome.CANDIDATE
+    if code == StopCode.APPROVAL_PENDING:
+        return PassOutcome.WAITING
+    if disposition_of(code) is Disposition.RELEASE:
+        return PassOutcome.LOST
+    return PassOutcome.STOPPED
+
+
+async def observe(connection: Connection, lease: Lease, goal: GoalSpec) -> Observed:
+    """The run as `decide` needs it. Ownership is the lease's generation on a claimed job whose
+    lease is live by database time, as `apply_command` checks it (SP-012)."""
+    view = await plan_view(connection, lease.run_id, goal)
+    status, holds = await _row(
+        connection,
+        "select r.status, exists (select 1 from app_private.run_jobs j where j.run_id = r.id "
+        "and j.generation = %s and j.status = 'claimed' "
+        "and j.lease_expires_at > clock_timestamp()) from public.runs r where r.id = %s",
+        (lease.generation, lease.run_id),
     )
-    return await cursor.fetchone() is not None
+    return Observed(RunStatus(status), bool(holds), view.version, view.finished)
 
 
-def _disposition(lease: Lease, code: str | None) -> Disposition:
-    """The table's disposition. A code missing from it suspends the run, so it stays resumable, and
-    the warning names the code so that it can join the table (Decision 0028 E3, SP-010)."""
-    disposition = disposition_of(code)
-    if disposition is None:
-        logger.log(
-            logging.WARNING,
-            "worker.stop_code_unmapped",
-            extra={"fields": {"run": str(lease.run_id), "code": code}},
+async def _settle(connection: Connection, lease: Lease) -> str | None:
+    """Settles a run being cancelled: its children first, then what is in flight, classified with
+    this owner's own receipts before FINISH_CANCEL (SP-010). Returns the code FINISH_CANCEL
+    records, or None when a child still has a live owner, and the job is requeued until then."""
+    retry_at = await settle_children(connection, lease)
+    if retry_at is not None:
+        await connection.execute(
+            "update app_private.run_jobs set status = 'queued', lease_owner = null, "
+            "lease_expires_at = null, available_at = %s "
+            "where run_id = %s and generation = %s and status = 'claimed'",
+            (retry_at, lease.run_id, lease.generation),
         )
-        return UNMAPPED
-    return disposition
+        return None
+    await classify_interrupted(connection, lease.run_id, lease.generation + 1)
+    left = await outstanding(connection, lease.run_id)
+    if left.uncertain_calls or left.unknown_effects:
+        return StopCode.CANCELLED_WITH_UNKNOWN_OUTCOMES
+    return StopCode.CANCELLED
+
+
+async def _transition(
+    connection: Connection, lease: Lease, command: RunCommand, code: str | None
+) -> tuple[str | None, str | None]:
+    """Applies `command` with `code` as its stop reason, in one transaction under the lease's
+    generation, so a worker that lost the run writes neither (SP-012). The code the pass ends with
+    and the status reached, which is None when nothing was written."""
+    version = (
+        await _row(connection, "select version from public.runs where id = %s", (lease.run_id,))
+    )[0]
+    try:
+        async with connection.transaction():
+            result = await apply_command(
+                connection,
+                workspace_id=lease.workspace_id,
+                run_id=lease.run_id,
+                command=command,
+                actor=Actor.WORKER,
+                expected_version=version,
+                generation=lease.generation,
+            )
+            # A run can stop before its first segment, so the row may not exist yet.
+            await connection.execute(
+                "insert into app_private.run_usage (run_id, stop_reason) values (%s, %s) "
+                "on conflict (run_id) do update set stop_reason = excluded.stop_reason",
+                (lease.run_id, code),
+            )
+    except CommandRefused:
+        # The run moved after `finish` looked, a person's pause or cancel say (R-34).
+        return StopCode.COMMAND_REFUSED, None
+    except (LeaseLost, VersionConflict):
+        return StopCode.LEASE_LOST, None
+    return code, result.status
 
 
 async def finish(
@@ -330,42 +453,33 @@ async def finish(
 ) -> LoopResult:
     """Ends a pass through the canonical transitions, whatever stopped it (SP-010).
 
-    A run being cancelled finishes cancelling: the worker that still holds the lease settles its
-    children, classifies what is in flight and writes `cancelled`, while one that lost the lease
-    writes nothing. Otherwise a pass with no code and an unfinished plan stops as `plan_missing` or
-    `plan_incomplete`, and the code's disposition picks the command. The transition commits with
-    its stop reason in one transaction under the lease's generation, and a refused one is reported
-    as `lease_lost` (SP-012).
+    It reads the run once into `Observed`, lets `decide` choose the step, then takes it. Each job
+    write keeps the lease's generation and `status = 'claimed'` predicates. A transition commits
+    with its stop reason in one transaction under the lease's generation; a refused one ends the
+    pass as `command_refused`, and a lost lease or a moved version as `lease_lost` (SP-012).
     """
-    view = await plan_view(connection, lease.run_id, goal)
-    code = stop_code
-    # Whatever stopped this pass, a run being cancelled finishes that. Anything else is refused.
-    if (
-        code != StopCode.LEASE_LOST
-        and await run_status(connection, lease) == RunStatus.CANCELLING.value
-    ):
-        # Settling classifies what's in flight, so a worker that lost the run must not start it.
-        code = (
-            StopCode.RUN_NOT_RUNNING
-            if await _holds_lease(connection, lease)
-            else StopCode.LEASE_LOST
+    decision = decide(stop_code, await observe(connection, lease, goal))
+    if decision.unmapped:
+        # A code missing from the table is decided as UNMAPPED, a suspension that leaves the run
+        # resumable, and the warning names the code so that it can join the table (Decision 0028
+        # E3, SP-010).
+        logger.log(
+            logging.WARNING,
+            "worker.stop_code_unmapped",
+            extra={"fields": {"run": str(lease.run_id), "code": stop_code}},
         )
-    if code is None and not view.finished:
-        code = StopCode.PLAN_MISSING if view.version is None else StopCode.PLAN_INCOMPLETE
-    command: RunCommand | None
-    if (
-        code == StopCode.RUN_NOT_RUNNING
-        and await run_status(connection, lease) == RunStatus.CANCELLING.value
-    ):
-        # This worker still owns it, and it is the one who settles the cancellation.
-        retry_at = await settle_children(connection, lease)
-        if retry_at is not None:
-            await connection.execute(
-                "update app_private.run_jobs set status = 'queued', lease_owner = null, "
-                "lease_expires_at = null, available_at = %s "
-                "where run_id = %s and generation = %s and status = 'claimed'",
-                (retry_at, lease.run_id, lease.generation),
-            )
+    code = decision.code
+    status: str | None = None
+    if decision.ending is Ending.LET_GO:
+        await connection.execute(
+            "update app_private.run_jobs set status = 'done', lease_owner = null, "
+            "lease_expires_at = null where run_id = %s and generation = %s "
+            "and status = 'claimed'",
+            (lease.run_id, lease.generation),
+        )
+    elif decision.ending is Ending.SETTLE:
+        code = await _settle(connection, lease)
+        if code is None:
             return await result_of(
                 connection,
                 lease,
@@ -374,62 +488,6 @@ async def finish(
                 StopCode.CHILDREN_SETTLING,
                 RunStatus.CANCELLING.value,
             )
-        await classify_interrupted(connection, lease.run_id, lease.generation + 1)
-        left = await outstanding(connection, lease.run_id)
-        code = (
-            StopCode.CANCELLED_WITH_UNKNOWN_OUTCOMES
-            if left.uncertain_calls or left.unknown_effects
-            else StopCode.CANCELLED
-        )
-        command = RunCommand.FINISH_CANCEL
-    else:
-        disposition = _disposition(lease, code)
-        command = COMMANDS.get(disposition)
-        if (
-            disposition is Disposition.RELEASE
-            and code == StopCode.RUN_NOT_RUNNING
-            and await run_status(connection, lease) == RunStatus.PAUSED.value
-        ):
-            # Stopped at a safe boundary. The run waits for a resume with nobody holding it.
-            await connection.execute(
-                "update app_private.run_jobs set status = 'done', lease_owner = null, "
-                "lease_expires_at = null where run_id = %s and generation = %s "
-                "and status = 'claimed'",
-                (lease.run_id, lease.generation),
-            )
-    status = None
-    if command is not None:
-        version = (
-            await _row(connection, "select version from public.runs where id = %s", (lease.run_id,))
-        )[0]
-        try:
-            # The reason commits with the transition, so a worker that lost the run writes nothing.
-            async with connection.transaction():
-                result = await apply_command(
-                    connection,
-                    workspace_id=lease.workspace_id,
-                    run_id=lease.run_id,
-                    command=command,
-                    actor=Actor.WORKER,
-                    expected_version=version,
-                    generation=lease.generation,
-                )
-                # A run can stop before its first segment, so the row may not exist yet.
-                await connection.execute(
-                    "insert into app_private.run_usage (run_id, stop_reason) values (%s, %s) "
-                    "on conflict (run_id) do update set stop_reason = excluded.stop_reason",
-                    (lease.run_id, code),
-                )
-            status = result.status
-        except (LeaseLost, VersionConflict, CommandRefused):
-            code = StopCode.LEASE_LOST
-    outcome = (
-        PassOutcome.CANDIDATE
-        if code is None
-        else PassOutcome.WAITING
-        if code == StopCode.APPROVAL_PENDING
-        else PassOutcome.LOST
-        if disposition_of(code) is Disposition.RELEASE
-        else PassOutcome.STOPPED
-    )
-    return await result_of(connection, lease, goal, outcome, code, status)
+    if decision.command is not None:
+        code, status = await _transition(connection, lease, decision.command, code)
+    return await result_of(connection, lease, goal, outcome_of(code), code, status)

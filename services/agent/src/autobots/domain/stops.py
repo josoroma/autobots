@@ -87,7 +87,10 @@ class StopCode(_Code):
     ASSIGNMENT_BUSY = "assignment_busy"
     OUTCOME_UNKNOWN = "outcome_unknown"
     OUTPUT_TOO_LARGE = "output_too_large"
-    # The plan and verification's verdict (run_lifecycle.finish and goal_loop.py).
+    # The transition `run_lifecycle.finish` applied was refused under the run's row lock. Never
+    # stored, since the transaction that would store it rolls back (R-34, PRUN-03).
+    COMMAND_REFUSED = "command_refused"
+    # The plan and verification's verdict (run_lifecycle.decide and goal_loop.py).
     PLAN_MISSING = "plan_missing"
     PLAN_INCOMPLETE = "plan_incomplete"
     CRITERIA_UNMET = "criteria_unmet"
@@ -101,7 +104,7 @@ class StopCode(_Code):
     CHILDREN_SETTLING = "children_settling"
 
 
-# Each code's disposition, as `run_lifecycle.finish` applies it. tests/test_stop_codes.py holds it
+# Each code's disposition, as `run_lifecycle.decide` applies it. tests/test_stop_codes.py holds it
 # equal to the sets it replaced, so a change here is a behavior change and needs its own decision
 # (R-29).
 DISPOSITION: Final[Mapping[StopCode, Disposition]] = MappingProxyType(
@@ -133,6 +136,9 @@ DISPOSITION: Final[Mapping[StopCode, Disposition]] = MappingProxyType(
         StopCode.RUN_NOT_RUNNING: Disposition.RELEASE,
         StopCode.RUN_NOT_FOUND: Disposition.RELEASE,
         StopCode.APPROVAL_PENDING: Disposition.RELEASE,
+        # A person's pause or cancel moved the run after `finish` looked, so nothing was written
+        # and the run is theirs (R-34).
+        StopCode.COMMAND_REFUSED: Disposition.RELEASE,
         # Retries, limits and refusals that waiting would not change.
         StopCode.RATE_LIMITED: Disposition.FAIL,
         StopCode.PROVIDER_ERROR: Disposition.FAIL,

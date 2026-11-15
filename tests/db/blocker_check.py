@@ -72,8 +72,8 @@ async def pause_inside_assignment(db: Db) -> None:
     """B6 inside an agent step (PPRD-03, R-29). A person's pause lands after the tool gateway admitted
     the assignment and before the assignment's leased read of its run, which then refuses with
     parent_not_running. The step must stop without failing, so the run resumes it rather than ending
-    workflow_node_failed, a failure no one can resume (SP-010). The run has no money, so its child
-    stops at admission with no model call."""
+    workflow_node_failed, a failure no one can resume (SP-010), and the pass lets the paused run's
+    job go (R-34). The run has no money, so its child stops at admission with no model call."""
     cases = db.cases
     expert = await create_expert(db.connection, workspace_id=db.workspace, actor_id=db.actor, idempotency_key='blocker-race-helper',
                                  name='Blocker race helper', config=ExpertConfig(tools=['calculate']))
@@ -117,7 +117,7 @@ async def pause_inside_assignment(db: Db) -> None:
 
     lease = await db.claim(run, worker_id='b6-assignment')
     with patch.object(assignments, 'resolve_binding', pause_then_bind):
-        await run_workflow(db.connection, URL, lease, Script(items=[]), config, drive=drive_lease)
+        ended = await run_workflow(db.connection, URL, lease, Script(items=[]), config, drive=drive_lease)
     cases.check('arranged: the pause lands after the gateway admitted the assignment, before its leased read',
                 "once, on a running run whose receipt is started", seen, lambda found: found == [('running', 'started')])
     status, children = await standing()
@@ -125,6 +125,12 @@ async def pause_inside_assignment(db: Db) -> None:
                 'ask has no instance, run paused, receipt failed with parent_not_running, no child',
                 (await ask(), status, await db.row(receipt_sql, run, DELEGATION_TOOL), children),
                 lambda found: found == (None, 'paused', ('failed', 'parent_not_running'), 0))
+    # A paused run refuses the step's suspension, so finish lets the job go and nobody holds the run
+    # until a person resumes it (R-34).
+    cases.check('the pass ends as run_not_running and lets the paused run\'s job go',
+                'lost, run_not_running, job done with no owner',
+                (ended.outcome, ended.code, await db.row('select status, lease_owner from app_private.run_jobs where run_id = %s', run)),
+                lambda found: found == ('lost', 'run_not_running', ('done', None)))
     await db.command(run, RunCommand.RESUME, Actor.USER)
     lease = await db.claim(run, worker_id='b6-assignment-resume')
     model = Script(items=[say('never asked')])

@@ -3,8 +3,8 @@
 The `OLD_*` literals are copies of the sets the table replaced: goal_loop's PAUSE_FOR and NOT_OURS,
 loop_middleware's STOPPING and REPAIRABLE, plans' PLAN_REJECTIONS and workflow_runner's STOPS. A
 derived set that drifts from them changes run behavior, so it fails here (PRUN-02, PPRD-03,
-PTOL-09). The one deliberate change is Decision 0028 E3: a code missing from the table suspends the
-run instead of failing it.
+PTOL-09). The deliberate changes are Decision 0028 E3, by which a code missing from the table
+suspends the run instead of failing it, and R-34's `command_refused`, which releases the run.
 """
 
 import ast
@@ -76,6 +76,8 @@ OLD_PAUSE_FOR = {
     "route_not_bound",
 }
 OLD_NOT_OURS = {"lease_lost", "run_not_running", "run_not_found", "approval_pending"}
+# A refused transition reports this instead of lease_lost, and releases the run (R-34, PRUN-03).
+ADDED_RELEASE = {"command_refused"}
 # Every other code that reached `finish` failed the run, these by name.
 OLD_FAILS = {
     "rate_limited",
@@ -240,7 +242,7 @@ def test_each_value_is_the_stored_string() -> None:
         for member in vocabulary:
             assert member.value == member.name.lower() and str(member) == member.value
     assert {code.value for code in StopCode} == (
-        OLD_PAUSE_FOR | OLD_NOT_OURS | OLD_FAILS | OLD_SETTLEMENT
+        OLD_PAUSE_FOR | OLD_NOT_OURS | ADDED_RELEASE | OLD_FAILS | OLD_SETTLEMENT
     )
     assert {outcome.value for outcome in PassOutcome} == {
         "candidate",
@@ -267,7 +269,7 @@ def test_every_known_code_has_one_explicit_disposition() -> None:
 
 def test_every_disposition_keeps_todays_behavior() -> None:
     for code, disposition in DISPOSITION.items():
-        if code in OLD_NOT_OURS:
+        if code in OLD_NOT_OURS | ADDED_RELEASE:
             assert disposition is Disposition.RELEASE, code
         elif code in OLD_PAUSE_FOR:
             assert disposition is Disposition.SUSPEND, code
@@ -281,14 +283,14 @@ def test_every_disposition_keeps_todays_behavior() -> None:
         Disposition.VERIFY: 0,
         Disposition.SUSPEND: 19,
         Disposition.FAIL: 22,
-        Disposition.RELEASE: 4,
+        Disposition.RELEASE: 5,
     }
     assert disposition_of(None) is Disposition.VERIFY
 
 
 def test_derived_sets_equal_the_literals_they_replaced() -> None:
     assert PAUSE_FOR == OLD_PAUSE_FOR
-    assert NOT_OURS == OLD_NOT_OURS
+    assert NOT_OURS == OLD_NOT_OURS | ADDED_RELEASE
     # The loop stopped on these two inline as well, beside its STOPPING set.
     assert STOPPING == OLD_STOPPING | {"lease_lost", "run_not_running"}
     assert REPAIRABLE == OLD_REPAIRABLE
@@ -464,18 +466,21 @@ LEASE = Lease(uuid4(), uuid4(), 3, "worker", 1, "running")
 
 
 class Connection:
-    """What `finish` sends once its reads are replaced: the run's version and the stop reason."""
+    """What `finish` reads and sends once its plan and transition are replaced: a running run this
+    worker holds, its version, and the stop reason."""
 
     def __init__(self) -> None:
         self.stop_reasons: list[object] = []
+        self.answer: tuple[object, ...] = (4,)
 
     async def execute(self, statement: str, values: Sequence[object] = ()) -> "Connection":
         if "stop_reason" in statement:
             self.stop_reasons.append(values[1])
+        self.answer = ("running", True) if statement.startswith("select r.status") else (4,)
         return self
 
-    async def fetchone(self) -> tuple[int]:
-        return (4,)
+    async def fetchone(self) -> tuple[object, ...]:
+        return self.answer
 
     async def fetchall(self) -> list[tuple[int]]:
         return [(4,)]
@@ -487,15 +492,12 @@ class Connection:
 def _finish(
     monkeypatch: pytest.MonkeyPatch, code: str
 ) -> tuple[list[object], Connection, run_lifecycle.LoopResult]:
-    """`finish` on a running run whose plan is done, with its reads and transition replaced."""
+    """`finish` on a running run whose plan is done, with its plan and transition replaced."""
     applied: list[object] = []
     reached = {RunCommand.SUSPEND: "paused", RunCommand.FAIL: "failed"}
 
     async def plan_view(*_: object) -> PlanView:
         return PlanView(1, ("t1",), (), ())
-
-    async def run_status(*_: object) -> str:
-        return "running"
 
     async def apply_command(_: object, **fields: object) -> TransitionResult:
         command = fields["command"]
@@ -507,7 +509,6 @@ def _finish(
         return {}
 
     monkeypatch.setattr(run_lifecycle, "plan_view", plan_view)
-    monkeypatch.setattr(run_lifecycle, "run_status", run_status)
     monkeypatch.setattr(run_lifecycle, "apply_command", apply_command)
     monkeypatch.setattr(run_lifecycle, "usage_view", usage_view)
     connection = Connection()
