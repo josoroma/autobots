@@ -55,6 +55,27 @@ class FakeMembership:
         return self.roles.get(user_id) if workspace_id == WORKSPACE else None
 
 
+class PooledMembership(FakeMembership):
+    """As `PostgresMembership` answers: each question borrows one of `database`'s connections, so a
+    test sees a membership check made while the request holds another (PAPI-11)."""
+
+    def __init__(self, log: list[str], database: "FakeDatabase") -> None:
+        super().__init__(log)
+        self.database = database
+
+    async def is_member(self, user_id: UUID, workspace_id: UUID) -> bool:
+        async with self.database.connection():
+            return await super().is_member(user_id, workspace_id)
+
+    async def workspaces_for(self, user_id: UUID) -> list[UUID]:
+        async with self.database.connection():
+            return await super().workspaces_for(user_id)
+
+    async def role_in(self, user_id: UUID, workspace_id: UUID) -> str | None:
+        async with self.database.connection():
+            return await super().role_in(user_id, workspace_id)
+
+
 class Rows:
     def __init__(self, rows: list[Row]) -> None:
         self.rows = rows

@@ -5,13 +5,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
 
+from autobots.api.dependencies import CurrentUser, require_workspace_member
 from autobots.api.errors import ApiError
-from autobots.api.security import (
-    current_user,
-    require_internal,
-    require_workspace_member,
-    session_email,
-)
+from autobots.api.pool import request_pool
+from autobots.api.security import require_internal, session_email
 from autobots.application.profiles import (
     DisplayNameInvalid,
     fallback_name,
@@ -40,7 +37,7 @@ async def health() -> ServiceHealth:
 @router.get("/session", operation_id="getSession", response_model=SessionSummary)
 async def get_session(
     request: Request,
-    user_id: Annotated[UUID, Depends(current_user)],
+    user_id: CurrentUser,
     email: Annotated[str | None, Depends(session_email)],
 ) -> SessionSummary:
     workspaces = await request.app.state.membership.workspaces_for(user_id)
@@ -69,7 +66,7 @@ async def get_session(
 @router.get("/profile", operation_id="getProfile", response_model=ProfileView)
 async def get_profile(
     request: Request,
-    user_id: Annotated[UUID, Depends(current_user)],
+    user_id: CurrentUser,
     email: Annotated[str | None, Depends(session_email)],
 ) -> ProfileView:
     saved = await saved_name(request.app.state.pool, user_id)
@@ -85,7 +82,7 @@ async def get_profile(
 async def update_profile(
     body: ProfileUpdate,
     request: Request,
-    user_id: Annotated[UUID, Depends(current_user)],
+    user_id: CurrentUser,
     email: Annotated[str | None, Depends(session_email)],
 ) -> ProfileView:
     try:
@@ -94,10 +91,7 @@ async def update_profile(
         raise ApiError(
             422, "display_name_invalid", "A display name needs 1 to 60 characters."
         ) from error
-    pool = request.app.state.pool
-    if pool is None:
-        raise ApiError(503, "service_unavailable", "The database is unavailable.")
-    saved = await save_name(pool, user_id, name)
+    saved = await save_name(request_pool(request), user_id, name)
     return ProfileView(schema_version=1, display_name=saved, saved=True, email=email)
 
 

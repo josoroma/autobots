@@ -12,8 +12,8 @@ import pytest
 from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute
 
-from autobots.api.run_routes import router
-from autobots.api.settings_routes import current_workspace, require_owner
+from autobots.api import run_command_routes, run_reconcile_routes
+from autobots.api.dependencies import current_workspace, require_owner
 from autobots.application.run_projection import user_commands
 from autobots.contracts.run_workspace import RunWorkspace, UserRunCommand
 from autobots.domain.runs import Actor, CommandRefused, RunCommand, RunStatus, next_status
@@ -63,7 +63,7 @@ def _calls(dependant: Dependant) -> Iterator[object]:
 
 
 def _depends_on(path: str) -> set[object]:
-    for route in router.routes:
+    for route in [*run_command_routes.router.routes, *run_reconcile_routes.router.routes]:
         if isinstance(route, APIRoute) and route.path == path and route.methods == {"POST"}:
             return set(_calls(route.dependant))
     raise AssertionError(f"no POST route at {path}")

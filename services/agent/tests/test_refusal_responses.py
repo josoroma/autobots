@@ -9,9 +9,10 @@ family's codes are the ones its routes can raise today, read from their raise si
 database or model is used.
 """
 
-from collections.abc import Awaitable, Callable, Iterator, Mapping
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Mapping
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import NoReturn
+from typing import NoReturn, Self
 from uuid import UUID
 
 import pytest
@@ -24,11 +25,19 @@ from autobots.api import (
     improvement_routes,
     memory_routes,
     routine_routes,
+    run_command_routes,
+    run_reconcile_routes,
     run_routes,
     workflow_routes,
 )
-from autobots.api.operation_routes import require_ready
-from autobots.api.settings_routes import keys_and_vars_settings, provider_settings
+from autobots.api.dependencies import (
+    keys_and_vars_settings,
+    model_key_check,
+    provider_settings,
+    require_ready,
+)
+from autobots.api.errors import STATUS, refusal_message
+from autobots.application import reconciliation
 from autobots.application.approvals import ApprovalRefused
 from autobots.application.artifacts import ArtifactUnavailable
 from autobots.application.credentials.store import CredentialMissing, CredentialStorageUnavailable
@@ -131,6 +140,11 @@ class Settings:
     async def run_intent(self, _workspace_id: UUID) -> str:
         return self.intent
 
+    @asynccontextmanager
+    async def opened(self) -> AsyncIterator[Self]:
+        """As a handler opens the settings it was given, on no connection at all."""
+        yield self
+
 
 def answer(client: ApiClient, request: str, body: Body = None) -> Reply:
     method, path = request.split(" ", 1)
@@ -162,11 +176,12 @@ def client(api_client: ApiClient, monkeypatch: pytest.MonkeyPatch) -> Iterator[A
     storage is configured."""
     api_client.app.dependency_overrides[require_ready] = lambda: None
     api_client.app.dependency_overrides[provider_settings] = lambda: Settings()
+    api_client.app.dependency_overrides[model_key_check] = lambda: Settings().run_intent
     api_client.database.answer("select 1 from public.runs where id", (1,))
     api_client.app.state.object_store = object()
-    monkeypatch.setattr(run_routes, "outstanding", nothing_outstanding)
-    monkeypatch.setattr(run_routes, "has_unresolvable_effect", no_effect)
-    monkeypatch.setattr(run_routes, "execution_block", none)
+    monkeypatch.setattr(reconciliation, "outstanding", nothing_outstanding)
+    monkeypatch.setattr(reconciliation, "has_unresolvable_effect", no_effect)
+    monkeypatch.setattr(reconciliation, "execution_block", none)
     yield api_client
 
 
@@ -178,6 +193,8 @@ MODULES = {
     "improvement_routes": improvement_routes,
     "memory_routes": memory_routes,
     "routine_routes": routine_routes,
+    "run_command_routes": run_command_routes,
+    "run_reconcile_routes": run_reconcile_routes,
     "run_routes": run_routes,
     "workflow_routes": workflow_routes,
 }
@@ -257,7 +274,7 @@ COMMAND_REFUSALS: list[tuple[Exception, Reply]] = [
     ),
 ]
 COMMANDS = [
-    Case(f"POST /v1/runs/{RUN}/{command}", "run_routes.apply_command", refusal, reply, body)
+    Case(f"POST /v1/runs/{RUN}/{command}", "run_command_routes.apply_command", refusal, reply, body)
     for command, body in (
         ("input", {"expected_version": 1, "value": "yes"}),
         ("pause", {"expected_version": 1}),
@@ -272,7 +289,7 @@ RECONCILIATION = [
     *(
         Case(
             f"POST /v1/runs/{RUN}/effects/op-1/reconcile",
-            "run_routes.record_evidence",
+            "run_reconcile_routes.record_evidence",
             ReconciliationRefused(code),
             (status, code, "That can't be recorded."),
             EVIDENCE,
@@ -285,14 +302,14 @@ RECONCILIATION = [
     ),
     Case(
         f"POST /v1/runs/{RUN}/effects/op-1/reconcile",
-        "run_routes.record_evidence",
+        "run_reconcile_routes.record_evidence",
         IdempotencyConflict("arranged"),
         (409, "idempotency_conflict", KEY_REUSED),
         EVIDENCE,
     ),
     Case(
         f"POST /v1/runs/{RUN}/model-calls/reconcile",
-        "run_routes.existing_receipt",
+        "run_reconcile_routes.reconcile_oldest_uncertain_call",
         IdempotencyConflict("arranged"),
         (409, "idempotency_conflict", KEY_REUSED),
         {"charged_micro_usd": 10},
@@ -817,8 +834,8 @@ def test_each_route_words_a_missing_key_for_its_own_work(
         return True
 
     monkeypatch.setattr(workflow_routes, "needs_model", needs)
-    client.app.dependency_overrides[provider_settings] = lambda: Settings(
-        intent="credential_invalid"
+    client.app.dependency_overrides[model_key_check] = lambda: (
+        Settings(intent="credential_invalid").run_intent
     )
     assert answer(client, request_line, body) == (409, "credential_invalid", expected)
 
@@ -834,8 +851,8 @@ def test_a_workflow_execution_checks_the_draft_then_the_budget_then_the_key(
 ) -> None:
     """Each refusal holds while every later one would also apply."""
     monkeypatch.setattr(workflow_routes, "chosen_limit", raising(BudgetRefused("budget_off_step")))
-    client.app.dependency_overrides[provider_settings] = lambda: Settings(
-        intent="credential_invalid"
+    client.app.dependency_overrides[model_key_check] = lambda: (
+        Settings(intent="credential_invalid").run_intent
     )
     path = f"POST /v1/workflows/{WORKFLOW}/executions"
     assert answer(client, path, {"version": "draft", "budget_micro_usd": 1}) == (
@@ -864,15 +881,15 @@ def test_a_resume_checks_the_key_then_the_run_then_what_needs_reconciling(
     async def incompatible(*_args: object) -> str:
         return "incompatible_version"
 
-    monkeypatch.setattr(run_routes, "outstanding", everything_outstanding)
-    monkeypatch.setattr(run_routes, "has_unresolvable_effect", effect)
-    monkeypatch.setattr(run_routes, "execution_block", incompatible)
+    monkeypatch.setattr(reconciliation, "outstanding", everything_outstanding)
+    monkeypatch.setattr(reconciliation, "has_unresolvable_effect", effect)
+    monkeypatch.setattr(reconciliation, "execution_block", incompatible)
     path, body = f"POST /v1/runs/{RUN}/resume", {"expected_version": 1}
-    client.app.dependency_overrides[provider_settings] = lambda: Settings(
-        intent="credential_invalid"
+    client.app.dependency_overrides[model_key_check] = lambda: (
+        Settings(intent="credential_invalid").run_intent
     )
     assert answer(client, path, body) == (409, "credential_invalid", KEY_NEEDED)
-    client.app.dependency_overrides[provider_settings] = lambda: Settings()
+    client.app.dependency_overrides[model_key_check] = lambda: Settings().run_intent
     client.database.answer("select 1 from public.runs where id")
     assert answer(client, path, body) == (404, "run_not_found", "That run is not available.")
     client.database.answer("select 1 from public.runs where id", (1,))
@@ -881,15 +898,24 @@ def test_a_resume_checks_the_key_then_the_run_then_what_needs_reconciling(
         "incompatible_version",
         "This run can't continue on this release. Start a new one.",
     )
-    monkeypatch.setattr(run_routes, "execution_block", none)
+    monkeypatch.setattr(reconciliation, "execution_block", none)
     assert answer(client, path, body) == (
         409,
         "uncertain_model_call",
         "A model call's outcome must be reconciled first.",
     )
-    monkeypatch.setattr(run_routes, "outstanding", nothing_outstanding)
+    monkeypatch.setattr(reconciliation, "outstanding", nothing_outstanding)
     assert answer(client, path, body) == (
         409,
         "unknown_effect",
         "An effect's outcome must be reconciled first.",
+    )
+
+
+def test_a_resume_block_without_wording_of_its_own_is_still_a_conflict() -> None:
+    """A code `api/errors.py` doesn't word yet reads as its kind's wording, never a server error."""
+    unworded = reconciliation.ResumeBlocked("arranged_new_block")
+    assert (STATUS[unworded.kind], refusal_message(unworded)) == (
+        409,
+        "Conflicts with the current state.",
     )

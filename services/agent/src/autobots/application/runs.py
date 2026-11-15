@@ -277,6 +277,15 @@ RUN_TREE = (
 )
 
 
+async def require_run(connection: Any, workspace_id: UUID, run_id: UUID) -> None:
+    """Raises RunNotFound unless the run is this workspace's, as for a run that doesn't exist."""
+    cursor = await connection.execute(
+        "select 1 from public.runs where id = %s and workspace_id = %s", (run_id, workspace_id)
+    )
+    if await cursor.fetchone() is None:
+        raise RunNotFound("that run is not available")
+
+
 async def current_status(connection: Any, run_id: UUID) -> RunStatus | None:
     """The run's status now, or None when there is no such run."""
     cursor = await connection.execute("select status from public.runs where id = %s", (run_id,))
@@ -885,4 +894,5 @@ __all__ = [
     "current_status",
     "frozen_snapshot",
     "record_transition",
+    "require_run",
 ]

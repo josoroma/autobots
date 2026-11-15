@@ -13,10 +13,10 @@ from fastapi.responses import StreamingResponse
 from psycopg import AsyncConnection
 
 from autobots.adapters.result_stream import CHANNEL as RESULT_CHANNEL
+from autobots.api.dependencies import MemberWorkspace
 from autobots.api.errors import ApiError
 from autobots.api.pool import ConnectionPool, request_pool
 from autobots.api.security import require_internal
-from autobots.api.settings_routes import current_workspace
 from autobots.application.run_projection import (
     RUN_LIST_SIZE,
     read_events,
@@ -24,6 +24,7 @@ from autobots.application.run_projection import (
     read_run_list,
     read_workspace,
 )
+from autobots.application.runs import current_status
 from autobots.application.tool_uses import list_tool_uses
 from autobots.contracts.run_workspace import (
     EventPage,
@@ -37,15 +38,44 @@ from autobots.contracts.run_workspace import (
 )
 from autobots.contracts.runs import ResultTextDelta, RunEvent, ToolUseList
 from autobots.domain.models import ModelProfileId
-from autobots.domain.runs import TERMINAL, RunStatus
+from autobots.domain.runs import TERMINAL
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
-Workspace = Annotated[UUID, Depends(current_workspace)]
 Cursor = Annotated[int, Query(ge=0)]
 POLL_SECONDS = 0.5
 # A stream ends after a while, and the client reconnects from its cursor.
 DEFAULT_STREAM_SECONDS = 60.0
 KEEPALIVE_SECONDS = 15.0
+# Each live stream listens on a direct connection outside the pool. Past this many at once, a
+# stream polls stored events only, as one does when LISTEN can't connect (PAPI-11).
+MAX_LISTENERS = 10
+
+
+class ListenerSlots:
+    """How many streams hold a LISTEN connection now, in this process. One event loop serves every
+    stream, and nothing awaits between reading the count and changing it."""
+
+    def __init__(self, limit: int = MAX_LISTENERS) -> None:
+        self.limit = limit
+        self.held = 0
+
+    def take(self) -> bool:
+        if self.held >= self.limit:
+            return False
+        self.held += 1
+        return True
+
+    def give_back(self) -> None:
+        self.held -= 1
+
+
+def listener_slots(request: Request) -> ListenerSlots:
+    """This process's slots, made on first use."""
+    slots: ListenerSlots | None = getattr(request.app.state, "listener_slots", None)
+    if slots is None:
+        slots = ListenerSlots()
+        request.app.state.listener_slots = slots
+    return slots
 
 
 def _not_found() -> ApiError:
@@ -54,14 +84,16 @@ def _not_found() -> ApiError:
 
 @router.get("/runs/{run_id}/events", operation_id="listRunEvents", response_model=EventPage)
 async def get_events(
-    run_id: UUID, request: Request, workspace_id: Workspace, after: Cursor = 0
+    run_id: UUID, request: Request, workspace_id: MemberWorkspace, after: Cursor = 0
 ) -> EventPage:
     async with request_pool(request).connection() as connection:
         return await read_events(connection, workspace_id, run_id, after=after)
 
 
 @router.get("/runs/{run_id}/workspace", operation_id="getRunWorkspace", response_model=RunWorkspace)
-async def get_workspace(run_id: UUID, request: Request, workspace_id: Workspace) -> RunWorkspace:
+async def get_workspace(
+    run_id: UUID, request: Request, workspace_id: MemberWorkspace
+) -> RunWorkspace:
     async with request_pool(request).connection() as connection:
         return await read_workspace(connection, workspace_id, run_id)
 
@@ -69,7 +101,7 @@ async def get_workspace(run_id: UUID, request: Request, workspace_id: Workspace)
 @router.get("/runs", operation_id="listRuns", response_model=RunList)
 async def get_runs(
     request: Request,
-    workspace_id: Workspace,
+    workspace_id: MemberWorkspace,
     group: RunListGroup = "all",
     q: Annotated[str | None, Query(max_length=200)] = None,
     profile: ModelProfileId | None = None,
@@ -90,7 +122,9 @@ async def get_runs(
 
 
 @router.get("/runs/{run_id}/inspector", operation_id="getRunInspector", response_model=RunInspector)
-async def get_inspector(run_id: UUID, request: Request, workspace_id: Workspace) -> RunInspector:
+async def get_inspector(
+    run_id: UUID, request: Request, workspace_id: MemberWorkspace
+) -> RunInspector:
     async with request_pool(request).connection() as connection:
         return await read_inspector(connection, workspace_id, run_id)
 
@@ -99,7 +133,7 @@ async def get_inspector(run_id: UUID, request: Request, workspace_id: Workspace)
 async def get_tool_uses(
     run_id: UUID,
     request: Request,
-    workspace_id: Workspace,
+    workspace_id: MemberWorkspace,
     after: Cursor = 0,
     limit: Annotated[int, Query(ge=1, le=200)] = 100,
 ) -> ToolUseList:
@@ -120,10 +154,29 @@ async def _listener(request: Request) -> AsyncConnection[Any] | None:
         return None
     try:
         connection = await psycopg.AsyncConnection.connect(url, autocommit=True)
-        await connection.execute(f"listen {RESULT_CHANNEL}")
     except psycopg.Error:
         return None
+    try:
+        await connection.execute(f"listen {RESULT_CHANNEL}")
+    except psycopg.Error:
+        # Closed here, so a connection that can't listen never outlives its stream's slot.
+        await connection.close()
+        return None
     return connection
+
+
+async def _held_listener(request: Request, slots: ListenerSlots) -> AsyncConnection[Any] | None:
+    """A listening connection within the process's cap, or None past it or when none connects."""
+    if not slots.take():
+        return None
+    try:
+        listener = await _listener(request)
+    except BaseException:
+        slots.give_back()
+        raise
+    if listener is None:
+        slots.give_back()
+    return listener
 
 
 def _frame(name: StreamFrameName, data: str, *, event_id: int | None = None) -> str:
@@ -180,13 +233,17 @@ def live_frame(run_id: UUID, cursor: int, payload: str) -> str | None:
 async def _frames(
     request: Request, pool: ConnectionPool, workspace_id: UUID, run_id: UUID, after: int
 ) -> AsyncIterator[str]:
-    listener = await _listener(request)
+    slots = listener_slots(request)
+    listener = await _held_listener(request, slots)
     try:
         async for frame in _durable_and_live(request, pool, workspace_id, run_id, after, listener):
             yield frame
     finally:
         if listener is not None:
-            await listener.close()
+            try:
+                await listener.close()
+            finally:
+                slots.give_back()
 
 
 async def _durable_and_live(
@@ -206,9 +263,7 @@ async def _durable_and_live(
     while loop.time() - started < lifetime and not await request.is_disconnected():
         async with pool.connection() as connection:
             page = await read_events(connection, workspace_id, run_id, after=cursor)
-            status_row = await (
-                await connection.execute("select status from public.runs where id = %s", (run_id,))
-            ).fetchone()
+            status = await current_status(connection, run_id)
         if page.gap:
             yield gap_frame(cursor)
             last_sent = loop.time()
@@ -218,7 +273,7 @@ async def _durable_and_live(
         if page.next_cursor != cursor:
             cursor = page.next_cursor
             yield cursor_frame(cursor)
-        elif status_row is not None and RunStatus(status_row[0]) in TERMINAL:
+        elif status is not None and status in TERMINAL:
             yield END_FRAME
             return
         if loop.time() - last_sent >= KEEPALIVE_SECONDS:
@@ -237,7 +292,7 @@ async def _durable_and_live(
 
 @router.get("/runs/{run_id}/events/stream", include_in_schema=False)
 async def stream_events(
-    run_id: UUID, request: Request, workspace_id: Workspace, after: Cursor = 0
+    run_id: UUID, request: Request, workspace_id: MemberWorkspace, after: Cursor = 0
 ) -> StreamingResponse:
     """Authorized before the first byte, so a refusal is a status and not an empty stream."""
     pool = request_pool(request)

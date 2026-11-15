@@ -25,7 +25,7 @@ import pytest
 from pydantic import ValidationError
 
 from autobots.adapters.tool_registry import catalog, catalog_registry
-from autobots.api.operation_routes import require_ready
+from autobots.api.dependencies import require_ready
 from autobots.application import (
     approvals,
     artifacts,

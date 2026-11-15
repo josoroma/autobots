@@ -273,6 +273,20 @@ async def _option(
     )
 
 
+async def latest_version_config(
+    connection: Any, workspace_id: UUID, expert_id: UUID
+) -> ExpertConfigRecord | None:
+    """The Expert's latest saved version's configuration, if this workspace has that Expert."""
+    cursor = await connection.execute(
+        "select v.config from public.experts e join public.expert_versions v "
+        "on v.expert_id = e.id and v.version = e.latest_version "
+        "where e.id = %s and e.workspace_id = %s",
+        (expert_id, workspace_id),
+    )
+    row = await cursor.fetchone()
+    return None if row is None else read_expert_config(row[0])
+
+
 async def saved_version(
     connection: Any, workspace_id: UUID, expert_id: UUID, version: int
 ) -> ExpertConfigRecord | None:

@@ -16,8 +16,7 @@ from uuid import UUID
 import pytest
 
 from autobots.adapters.tool_registry import catalog
-from autobots.api.operation_routes import require_ready
-from autobots.api.settings_routes import provider_settings
+from autobots.api.dependencies import model_key_check, require_ready
 from autobots.application.experts import expert_record
 from autobots.application.routines import run_routine_now
 from autobots.application.run_admission import (
@@ -247,7 +246,7 @@ class KeyCheck:
 def overridden(client: ApiClient, key: str) -> None:
     client.app.state.provider_context = provider_context()
     client.app.dependency_overrides[require_ready] = lambda: None
-    client.app.dependency_overrides[provider_settings] = lambda: KeyCheck(key, client.log)
+    client.app.dependency_overrides[model_key_check] = lambda: KeyCheck(key, client.log).run_intent
 
 
 def reads_policy(client: ApiClient) -> bool:

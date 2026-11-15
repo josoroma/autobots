@@ -45,51 +45,42 @@ def require_internal(
         raise ApiError(401, "unauthorized", "This request is not authorized.")
 
 
-def current_user(
+def verified_claims(
     settings: Annotated[Settings, Depends(app_settings)],
     authorization: Annotated[str | None, Header()] = None,
-) -> UUID:
-    """A verified session subject. A browser-supplied user or workspace id is never trusted."""
+) -> dict[str, object]:
+    """The session token's claims, verified once per request: FastAPI caches a dependency's answer
+    for the request, so `current_user` and `session_email` read the same decode (PAPI-16)."""
     secret = settings.jwt_secret.get_secret_value()
     scheme, _, token = (authorization or "").partition(" ")
     if not secret or scheme.lower() != "bearer" or not token:
         raise ApiError(401, "unauthorized", "This request is not authorized.")
     try:
-        claims = jwt.decode(
+        claims: dict[str, object] = jwt.decode(
             token,
             secret,
             algorithms=["HS256"],
             audience="authenticated",
             options={"require": ["exp", "sub", "aud"]},
         )
-        return UUID(claims["sub"])
     except (jwt.InvalidTokenError, ValueError) as error:
+        raise ApiError(401, "unauthorized", "This request is not authorized.") from error
+    return claims
+
+
+Claims = Annotated[dict[str, object], Depends(verified_claims)]
+
+
+def current_user(claims: Claims) -> UUID:
+    """A verified session subject. A browser-supplied user or workspace id is never trusted."""
+    try:
+        # PyJWT has already refused a subject that isn't a string.
+        return UUID(str(claims["sub"]))
+    except ValueError as error:
         raise ApiError(401, "unauthorized", "This request is not authorized.") from error
 
 
-def session_email(
-    settings: Annotated[Settings, Depends(app_settings)],
-    _user: Annotated[UUID, Depends(current_user)],
-    authorization: Annotated[str | None, Header()] = None,
-) -> str | None:
+def session_email(_user: Annotated[UUID, Depends(current_user)], claims: Claims) -> str | None:
     """The verified session's own email claim, after `current_user` accepted the token."""
-    token = (authorization or "").partition(" ")[2]
-    claims = jwt.decode(
-        token,
-        settings.jwt_secret.get_secret_value(),
-        algorithms=["HS256"],
-        audience="authenticated",
-    )
     email = claims.get("email")
     return email if isinstance(email, str) and email else None
-
-
-async def require_workspace_member(
-    workspace_id: UUID,
-    request: Request,
-    user_id: Annotated[UUID, Depends(current_user)],
-) -> UUID:
-    store: MembershipStore = request.app.state.membership
-    if not await store.is_member(user_id, workspace_id):
-        raise ApiError(403, "forbidden", "This workspace is not available.")
-    return workspace_id

@@ -15,16 +15,20 @@ from autobots.api.errors import ERROR_RESPONSES, register_error_handlers
 from autobots.api.event_routes import router as event_router
 from autobots.api.expert_routes import router as expert_router
 from autobots.api.improvement_routes import router as improvement_router
+from autobots.api.keys_and_vars_routes import router as keys_and_vars_router
 from autobots.api.memory_routes import router as memory_router
+from autobots.api.model_policy_routes import router as model_policy_router
 from autobots.api.operation_routes import router as operation_router
 from autobots.api.pool import POOL_WAIT_SECONDS
+from autobots.api.provider_routes import router as provider_router
 from autobots.api.routes import router
 from autobots.api.routine_routes import router as routine_router
+from autobots.api.run_command_routes import router as run_command_router
+from autobots.api.run_reconcile_routes import router as run_reconcile_router
 from autobots.api.run_routes import router as run_router
 from autobots.api.search_routes import router as search_router
 from autobots.api.security import DenyAllMembership, MembershipStore
 from autobots.api.settings import Settings
-from autobots.api.settings_routes import router as settings_router
 from autobots.api.tool_routes import router as tool_router
 from autobots.api.workflow_routes import router as workflow_router
 from autobots.application.tool_catalog import Catalog
@@ -89,8 +93,12 @@ def create_app(
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(resolved.allowed_hosts))
     register_error_handlers(app)
     app.include_router(router, responses=ERROR_RESPONSES)
-    app.include_router(settings_router, responses=ERROR_RESPONSES)
+    app.include_router(provider_router, responses=ERROR_RESPONSES)
+    app.include_router(keys_and_vars_router, responses=ERROR_RESPONSES)
+    app.include_router(model_policy_router, responses=ERROR_RESPONSES)
     app.include_router(run_router, responses=ERROR_RESPONSES)
+    app.include_router(run_command_router, responses=ERROR_RESPONSES)
+    app.include_router(run_reconcile_router, responses=ERROR_RESPONSES)
     app.include_router(artifact_router, responses=ERROR_RESPONSES)
     app.include_router(approval_router, responses=ERROR_RESPONSES)
     app.include_router(event_router, responses=ERROR_RESPONSES)

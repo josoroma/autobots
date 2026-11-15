@@ -242,8 +242,9 @@ async def admit_from_request(
     1. An Expert is chosen through a session.
     2. A budget or a limit, and a budget within the rules and today's cap.
     3. A usable OpenRouter key.
-    4. The workspace's saved policy is read.
-    5. Only an owner pins an Expert version, so `role` is asked only then.
+    4. Only an owner pins an Expert version, so `role` is asked only then. It is asked before the
+       admission's connection opens, as a membership store may borrow one of its own (PAPI-11).
+    5. The workspace's saved policy is read.
     6. The session's routing resolves.
     7. No granted tool is unavailable, by `environment`'s keys and `catalog`.
     8. Every resolved profile is offered.
@@ -256,9 +257,12 @@ async def admit_from_request(
         raise AdmissionRefused("session_required")
     limit = await _request_limit(database, data)
     await require_model_ready(model_ready, data.workspace_id, needed=True)
+    if data.expert_version is not None and await role() != "owner":
+        # An earlier version could hold tools an owner has since removed (Decision 0011 M8).
+        raise AdmissionRefused("owner_required")
     async with database.connection() as connection:
         saved = await saved_workspace_policy(connection, data.workspace_id)
-        binding = await _session_binding(connection, data, role, environment, catalog)
+        binding = await _session_binding(connection, data, environment, catalog)
         policy = saved.for_new_work(
             run_role_overrides=binding.role_bindings if binding else None,
             run_profile=data.run_profile,
@@ -298,16 +302,12 @@ async def _request_limit(database: Connections, data: AdmissionInput) -> int:
 async def _session_binding(
     connection: Connection,
     data: AdmissionInput,
-    role: Callable[[], Awaitable[str | None]],
     environment: Mapping[str, str],
     catalog: Catalog,
 ) -> RunBinding | None:
-    """Steps 5 to 7, for a request through a session. Any other request has no binding."""
+    """Steps 6 and 7, for a request through a session. Any other request has no binding."""
     if data.session_id is None:
         return None
-    if data.expert_version is not None and await role() != "owner":
-        # An earlier version could hold tools an owner has since removed (Decision 0011 M8).
-        raise AdmissionRefused("owner_required")
     binding = await resolve_binding(
         connection,
         data.workspace_id,

@@ -1,13 +1,12 @@
 """Memory search and notes, scoped by the verified workspace, PRD 8.4."""
 
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, status
 
+from autobots.api.dependencies import CurrentUser, MemberWorkspace, OwnerWorkspace
 from autobots.api.pool import request_pool
-from autobots.api.security import current_user, require_internal
-from autobots.api.settings_routes import current_workspace, require_owner
+from autobots.api.security import require_internal
 from autobots.application.memory import search, store_memory
 from autobots.contracts.memory import MemoryCreate, MemoryCreated, MemorySearchView
 
@@ -17,11 +16,11 @@ router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 @router.get("/memory/search", operation_id="searchMemory", response_model=MemorySearchView)
 async def get_search(
     request: Request,
-    workspace: Annotated[UUID, Depends(current_workspace)],
+    workspace_id: MemberWorkspace,
     q: Annotated[str, Query(min_length=1, max_length=500)],
 ) -> MemorySearchView:
     async with request_pool(request).connection() as connection:
-        return MemorySearchView(schema_version=1, hits=await search(connection, workspace, q))
+        return MemorySearchView(schema_version=1, hits=await search(connection, workspace_id, q))
 
 
 @router.post(
@@ -33,15 +32,15 @@ async def get_search(
 async def post_memory(
     body: MemoryCreate,
     request: Request,
-    workspace: Annotated[UUID, Depends(require_owner)],
-    user: Annotated[UUID, Depends(current_user)],
+    workspace_id: OwnerWorkspace,
+    user_id: CurrentUser,
 ) -> MemoryCreated:
     """A person's own note. Anything a run learned goes through review, in US-8.2."""
     async with request_pool(request).connection() as connection:
         memory_id = await store_memory(
             connection,
-            workspace_id=workspace,
-            actor_id=user,
+            workspace_id=workspace_id,
+            actor_id=user_id,
             title=body.title,
             content=body.content,
             source={"kind": "owner_note"},

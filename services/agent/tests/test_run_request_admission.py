@@ -7,10 +7,11 @@ resolution, tool availability, MP-01's policy order and `runs.admit` run for rea
 database or model is used.
 
 The steps, in order: (1) an Expert needs a session; (2) a budget or a limit, and a budget within
-Decision 0022 D11's rules and today's cap; (3) a usable OpenRouter key; (4) the workspace's saved
-policy is read; (5) only an owner pins an Expert version (Decision 0011 M8); (6) the session's
-routing resolves; (7) no granted tool is unavailable (PRD-Tool-Catalog PK-02); (8) every resolved
-profile is offered (PRD-Model-Providers MP-01); (9) the run is admitted under its idempotency key.
+Decision 0022 D11's rules and today's cap; (3) a usable OpenRouter key; (4) only an owner pins an
+Expert version (Decision 0011 M8), asked before admission opens its connection; (5) the workspace's
+saved policy is read; (6) the session's routing resolves; (7) no granted tool is unavailable
+(PRD-Tool-Catalog PK-02); (8) every resolved profile is offered (PRD-Model-Providers MP-01); (9) the
+run is admitted under its idempotency key.
 """
 
 import json
@@ -22,9 +23,8 @@ from uuid import UUID
 
 import pytest
 
+from autobots.api.dependencies import model_key_check, require_ready
 from autobots.api.errors import ApiError
-from autobots.api.operation_routes import require_ready
-from autobots.api.settings_routes import provider_settings
 from fake_api import MEMBER, OWNER, WORKSPACE, ApiClient
 from fake_openrouter import provider_context
 
@@ -109,7 +109,9 @@ def post(client: ApiClient, arranged: Arranged, idempotency_key: str = "key-1") 
         database.answer("original_request", (arranged.stored_goal,))
     client.app.state.provider_context = provider_context(environment=arranged.startup)
     client.app.dependency_overrides[require_ready] = lambda: None
-    client.app.dependency_overrides[provider_settings] = lambda: KeyCheck(arranged.key, client.log)
+    client.app.dependency_overrides[model_key_check] = lambda: (
+        KeyCheck(arranged.key, client.log).run_intent
+    )
     headers = client.headers(arranged.user, **{"Idempotency-Key": idempotency_key})
     response = client.http.post("/v1/runs", headers=headers, json=arranged.body)
     return Reply(response.status_code, response.json())
@@ -340,14 +342,14 @@ def test_without_a_usable_key_nothing_else_is_read(api_client: ApiClient, code: 
     assert trace(api_client) == ["run_intent"]
 
 
-# (4) and (5) The saved policy is read, then only an owner pins an Expert version
+# (4) and (5) Only an owner pins an Expert version, then the saved policy is read
 
 
 def test_a_member_choosing_an_expert_version_is_refused(api_client: ApiClient) -> None:
     arranged = Arranged(user=MEMBER, body={**THROUGH_SESSION, "expert_version": 1})
     reply = post(api_client, arranged)
     assert refusal(reply) == (403, "owner_required", "Only an owner can choose an Expert version.")
-    assert trace(api_client) == ["run_intent", "connect", "workspace policy", "role_in", "release"]
+    assert trace(api_client) == ["run_intent", "role_in"]
 
 
 def test_an_owner_may_choose_an_expert_version(api_client: ApiClient) -> None:
@@ -356,9 +358,9 @@ def test_an_owner_may_choose_an_expert_version(api_client: ApiClient) -> None:
     assert reply.status_code == 202
     assert trace(api_client)[:5] == [
         "run_intent",
+        "role_in",
         "connect",
         "workspace policy",
-        "role_in",
         "session",
     ]
     assert run_row(api_client)["version"] == 2
@@ -562,7 +564,7 @@ STEPS: list[tuple[str, Callable[[Arranged], None], tuple[int, str, str]]] = [
     ("2 budget", budget_off_step, (422, "budget_off_step", "Choose a budget in steps of US$0.25.")),
     ("3 key", key_missing, (409, "credentials_required", KEY_NEEDED)),
     (
-        "5 version pin",
+        "4 version pin",
         member_pins_a_version,
         (403, "owner_required", "Only an owner can choose an Expert version."),
     ),

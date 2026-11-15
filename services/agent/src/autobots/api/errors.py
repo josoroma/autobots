@@ -29,7 +29,7 @@ from autobots.application.provider_settings import (
     StaleVersion,
     ValidationUnavailable,
 )
-from autobots.application.reconciliation import ReconciliationRefused
+from autobots.application.reconciliation import ReconciliationRefused, ResumeBlocked
 from autobots.application.routines import RoutineRefused
 from autobots.application.run_admission import AdmissionRefused, ModelNotReady
 from autobots.application.run_projection import InvalidCursor
@@ -132,6 +132,13 @@ WORDING: Final[Mapping[type, Wording]] = MappingProxyType(
         CommandRefused: Wording("That is not allowed in the run's current state."),
         InvalidCursor: Wording("That page cursor is not valid."),
         ReconciliationRefused: Wording("That can't be recorded."),
+        ResumeBlocked: Wording(
+            codes={
+                "incompatible_version": "This run can't continue on this release. Start a new one.",
+                "uncertain_model_call": "A model call's outcome must be reconciled first.",
+                "unknown_effect": "An effect's outcome must be reconciled first.",
+            }
+        ),
         ApprovalRefused: Wording("That decision can't be applied."),
         ArtifactUnavailable: Wording("That artifact is not available."),
         ImprovementRefused: Wording("That can't be done to this proposal."),

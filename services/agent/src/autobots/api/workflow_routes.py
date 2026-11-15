@@ -1,16 +1,21 @@
 """Workflow validation, publication and execution binding. Publishing changes what can run."""
 
-from typing import Annotated, Literal
+from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Request, status
+from fastapi import APIRouter, Depends, Request, status
 
+from autobots.api.dependencies import (
+    CurrentUser,
+    IdempotencyKey,
+    MemberWorkspace,
+    ModelKeyCheck,
+    OwnerWorkspace,
+    require_ready,
+)
 from autobots.api.errors import ApiError, reworded
-from autobots.api.operation_routes import require_ready
 from autobots.api.pool import request_pool
-from autobots.api.security import current_user, require_internal
-from autobots.api.settings_routes import current_workspace, provider_settings, require_owner
-from autobots.application.provider_settings import ProviderSettings
+from autobots.api.security import require_internal
 from autobots.application.run_admission import ModelNotReady, chosen_limit, require_model_ready
 from autobots.application.workflow_overview import preview_steps, recent_executions
 from autobots.application.workflows import (
@@ -55,10 +60,6 @@ from autobots.domain.workflows import (
 )
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
-Key = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)]
-Member = Annotated[UUID, Depends(current_workspace)]
-Owner = Annotated[UUID, Depends(require_owner)]
-User = Annotated[UUID, Depends(current_user)]
 
 
 def _views(errors: list[GraphError]) -> list[WorkflowErrorView]:
@@ -69,7 +70,7 @@ DRAFT_NOT_RUNNABLE = "draft_not_runnable"
 
 
 @router.get("/workflow-blocks", operation_id="listWorkflowBlocks", response_model=BlockCatalog)
-async def get_blocks(_: Member) -> BlockCatalog:
+async def get_blocks(_: MemberWorkspace) -> BlockCatalog:
     return BlockCatalog(
         schema_version=1,
         blocks=[
@@ -93,15 +94,17 @@ async def get_blocks(_: Member) -> BlockCatalog:
     operation_id="getWorkflowExecution",
     response_model=ExecutionView,
 )
-async def get_execution(execution_id: UUID, request: Request, workspace: Member) -> ExecutionView:
+async def get_execution(
+    execution_id: UUID, request: Request, workspace_id: MemberWorkspace
+) -> ExecutionView:
     async with request_pool(request).connection() as connection:
-        return await read_execution(connection, workspace, execution_id)
+        return await read_execution(connection, workspace_id, execution_id)
 
 
 @router.post(
     "/workflows/validate", operation_id="validateWorkflow", response_model=WorkflowValidation
 )
-async def post_validate(graph: WorkflowGraph, _: Member) -> WorkflowValidation:
+async def post_validate(graph: WorkflowGraph, _: MemberWorkspace) -> WorkflowValidation:
     plain = ir_normalized(graph.model_dump(mode="json"))
     errors = validate_graph(plain)
     return WorkflowValidation(
@@ -113,9 +116,11 @@ async def post_validate(graph: WorkflowGraph, _: Member) -> WorkflowValidation:
 
 
 @router.get("/workflows", operation_id="listWorkflows", response_model=WorkflowList)
-async def get_workflows(request: Request, workspace: Member) -> WorkflowList:
+async def get_workflows(request: Request, workspace_id: MemberWorkspace) -> WorkflowList:
     async with request_pool(request).connection() as connection:
-        return WorkflowList(schema_version=1, workflows=await list_workflows(connection, workspace))
+        return WorkflowList(
+            schema_version=1, workflows=await list_workflows(connection, workspace_id)
+        )
 
 
 @router.post(
@@ -125,14 +130,18 @@ async def get_workflows(request: Request, workspace: Member) -> WorkflowList:
     status_code=status.HTTP_201_CREATED,
 )
 async def post_workflow(
-    body: WorkflowCreate, request: Request, key: Key, workspace: Owner, user: User
+    body: WorkflowCreate,
+    request: Request,
+    idempotency_key: IdempotencyKey,
+    workspace_id: OwnerWorkspace,
+    user_id: CurrentUser,
 ) -> WorkflowView:
     async with request_pool(request).connection() as connection:
         return await create_workflow(
             connection,
-            workspace_id=workspace,
-            actor_id=user,
-            idempotency_key=key,
+            workspace_id=workspace_id,
+            actor_id=user_id,
+            idempotency_key=idempotency_key,
             name=body.name,
             description=body.description,
         )
@@ -144,12 +153,12 @@ async def post_workflow(
     response_model=WorkflowExecutionList,
 )
 async def get_executions(
-    workflow_id: UUID, request: Request, workspace: Member
+    workflow_id: UUID, request: Request, workspace_id: MemberWorkspace
 ) -> WorkflowExecutionList:
     """WF-04: the ten newest executions, with version, state, spend and duration."""
     async with request_pool(request).connection() as connection:
-        await get_workflow(connection, workspace, workflow_id)
-        executions = await recent_executions(connection, workspace, workflow_id)
+        await get_workflow(connection, workspace_id, workflow_id)
+        executions = await recent_executions(connection, workspace_id, workflow_id)
     return WorkflowExecutionList(schema_version=1, executions=executions)
 
 
@@ -159,11 +168,11 @@ async def get_executions(
     response_model=WorkflowPreview,
 )
 async def get_preview(
-    workflow_id: UUID, version: str, request: Request, workspace: Member
+    workflow_id: UUID, version: str, request: Request, workspace_id: MemberWorkspace
 ) -> WorkflowPreview:
     """WF-03: a published version's steps, or the draft's, with `version=draft`."""
     async with request_pool(request).connection() as connection:
-        view = await get_workflow(connection, workspace, workflow_id)
+        view = await get_workflow(connection, workspace_id, workflow_id)
         if version == "draft":
             if view.draft is None:
                 raise ApiError(404, "workflow_draft_not_found", "This workflow has no saved draft.")
@@ -175,7 +184,7 @@ async def get_preview(
                 raise ApiError(404, "workflow_version_not_found", "That version doesn't exist.")
             graph, shown = found.graph, found.version
         steps = await preview_steps(
-            connection, workspace, ir_normalized(graph.model_dump(mode="json"))
+            connection, workspace_id, ir_normalized(graph.model_dump(mode="json"))
         )
     return WorkflowPreview(schema_version=1, version=shown, steps=steps)
 
@@ -184,11 +193,15 @@ async def get_preview(
     "/workflows/{workflow_id}/draft", operation_id="saveWorkflowDraft", response_model=WorkflowView
 )
 async def put_draft(
-    workflow_id: UUID, body: WorkflowDraftSave, request: Request, workspace: Owner, user: User
+    workflow_id: UUID,
+    body: WorkflowDraftSave,
+    request: Request,
+    workspace_id: OwnerWorkspace,
+    user_id: CurrentUser,
 ) -> WorkflowView:
     """WF-02: an owner keeps one draft, replaced by each save."""
     async with request_pool(request).connection() as connection:
-        return await save_draft(connection, workspace, user, workflow_id, body.graph)
+        return await save_draft(connection, workspace_id, user_id, workflow_id, body.graph)
 
 
 @router.delete(
@@ -196,9 +209,11 @@ async def put_draft(
     operation_id="discardWorkflowDraft",
     response_model=WorkflowView,
 )
-async def delete_draft(workflow_id: UUID, request: Request, workspace: Owner) -> WorkflowView:
+async def delete_draft(
+    workflow_id: UUID, request: Request, workspace_id: OwnerWorkspace
+) -> WorkflowView:
     async with request_pool(request).connection() as connection:
-        return await discard_draft(connection, workspace, workflow_id)
+        return await discard_draft(connection, workspace_id, workflow_id)
 
 
 @router.post(
@@ -211,17 +226,17 @@ async def post_draft_publish(
     workflow_id: UUID,
     body: WorkflowDraftPublish,
     request: Request,
-    key: Key,
-    workspace: Owner,
-    user: User,
+    idempotency_key: IdempotencyKey,
+    workspace_id: OwnerWorkspace,
+    user_id: CurrentUser,
 ) -> WorkflowView:
     async with request_pool(request).connection() as connection:
         return await publish_draft(
             connection,
-            workspace_id=workspace,
-            actor_id=user,
+            workspace_id=workspace_id,
+            actor_id=user_id,
             workflow_id=workflow_id,
-            idempotency_key=key,
+            idempotency_key=idempotency_key,
             expected_version=body.expected_version,
         )
 
@@ -232,16 +247,18 @@ async def post_draft_publish(
     response_model=WorkflowView,
 )
 async def put_description(
-    workflow_id: UUID, body: WorkflowDescription, request: Request, workspace: Owner
+    workflow_id: UUID, body: WorkflowDescription, request: Request, workspace_id: OwnerWorkspace
 ) -> WorkflowView:
     async with request_pool(request).connection() as connection:
-        return await set_description(connection, workspace, workflow_id, body.description)
+        return await set_description(connection, workspace_id, workflow_id, body.description)
 
 
 @router.get("/workflows/{workflow_id}", operation_id="getWorkflow", response_model=WorkflowView)
-async def read_workflow(workflow_id: UUID, request: Request, workspace: Member) -> WorkflowView:
+async def read_workflow(
+    workflow_id: UUID, request: Request, workspace_id: MemberWorkspace
+) -> WorkflowView:
     async with request_pool(request).connection() as connection:
-        return await get_workflow(connection, workspace, workflow_id)
+        return await get_workflow(connection, workspace_id, workflow_id)
 
 
 @router.post(
@@ -254,17 +271,17 @@ async def post_version(
     workflow_id: UUID,
     body: WorkflowPublish,
     request: Request,
-    key: Key,
-    workspace: Owner,
-    user: User,
+    idempotency_key: IdempotencyKey,
+    workspace_id: OwnerWorkspace,
+    user_id: CurrentUser,
 ) -> WorkflowView:
     async with request_pool(request).connection() as connection:
         return await publish_version(
             connection,
-            workspace_id=workspace,
-            actor_id=user,
+            workspace_id=workspace_id,
+            actor_id=user_id,
             workflow_id=workflow_id,
-            idempotency_key=key,
+            idempotency_key=idempotency_key,
             expected_version=body.expected_version,
             graph=body.graph,
             source=body.source,
@@ -282,31 +299,34 @@ async def post_execution(
     workflow_id: UUID,
     body: ExecutionCreate,
     request: Request,
-    key: Key,
-    workspace: Member,
-    user: User,
-    settings: Annotated[ProviderSettings, Depends(provider_settings)],
+    idempotency_key: IdempotencyKey,
+    workspace_id: MemberWorkspace,
+    user_id: CurrentUser,
+    model_key: ModelKeyCheck,
 ) -> ExecutionBinding:
     if body.version == "draft":
         raise ApiError(409, DRAFT_NOT_RUNNABLE, "Only a published version can run.")
-    async with request_pool(request).connection() as connection:
+    pool = request_pool(request)
+    async with pool.connection() as connection:
         # WF-05: the same budget rules as a goal run (Decision 0022 D11).
         limit = await chosen_limit(
-            connection, workspace, body.budget_micro_usd, otherwise=DEFAULT_LIMIT_MICRO_USD
+            connection, workspace_id, body.budget_micro_usd, otherwise=DEFAULT_LIMIT_MICRO_USD
         )
         # A workflow with no agent step calls no model, so it needs no key.
-        needed = await needs_model(connection, workspace, workflow_id, body.version)
-        try:
-            await require_model_ready(settings.run_intent, workspace, needed=needed)
-        except ModelNotReady as refused:
-            raise reworded(refused, "An agent step needs a usable OpenRouter key.") from None
+        needed = await needs_model(connection, workspace_id, workflow_id, body.version)
+    # Between this request's connections, which it holds one at a time (PAPI-11).
+    try:
+        await require_model_ready(model_key, workspace_id, needed=needed)
+    except ModelNotReady as refused:
+        raise reworded(refused, "An agent step needs a usable OpenRouter key.") from None
+    async with pool.connection() as connection:
         return await create_execution(
             connection,
-            workspace_id=workspace,
-            actor_id=user,
-            started_by=user,
+            workspace_id=workspace_id,
+            actor_id=user_id,
+            started_by=user_id,
             workflow_id=workflow_id,
-            idempotency_key=key,
+            idempotency_key=idempotency_key,
             version=body.version,
             inputs=body.inputs,
             documents=tuple(body.documents),
