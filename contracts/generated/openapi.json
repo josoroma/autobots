@@ -5218,6 +5218,18 @@
       "RunWorkspace": {
         "additionalProperties": false,
         "properties": {
+          "allowed_commands": {
+            "items": {
+              "enum": [
+                "pause",
+                "resume",
+                "cancel"
+              ],
+              "type": "string"
+            },
+            "title": "Allowed Commands",
+            "type": "array"
+          },
           "artifacts": {
             "items": {
               "$ref": "#/components/schemas/ArtifactSummary"
@@ -5357,6 +5369,7 @@
           "role_map",
           "budgets",
           "can_continue",
+          "allowed_commands",
           "metered_tool_calls",
           "metered_tool_call_limit"
         ],
@@ -5719,6 +5732,52 @@
           "timezone"
         ],
         "title": "SessionWorkspace",
+        "type": "object"
+      },
+      "StreamCursor": {
+        "additionalProperties": false,
+        "description": "The newest sequence the stream has covered, so a reconnect resumes after it.",
+        "properties": {
+          "cursor": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Cursor",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cursor"
+        ],
+        "title": "StreamCursor",
+        "type": "object"
+      },
+      "StreamFrame": {
+        "description": "A frame's name, exported so the browser listens for exactly these.",
+        "enum": [
+          "run",
+          "live",
+          "cursor",
+          "gap",
+          "end"
+        ],
+        "title": "StreamFrame",
+        "type": "string"
+      },
+      "StreamGap": {
+        "additionalProperties": false,
+        "description": "Retained events can't fill the range after `after`, so the client reads a snapshot\n(SP-011).",
+        "properties": {
+          "after": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "After",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "after"
+        ],
+        "title": "StreamGap",
         "type": "object"
       },
       "TaskView": {
@@ -7407,6 +7466,10 @@
               }
             ]
           },
+          "draft_unreadable": {
+            "title": "Draft Unreadable",
+            "type": "boolean"
+          },
           "experts": {
             "items": {
               "type": "string"
@@ -7466,6 +7529,7 @@
           "latest_version",
           "versions",
           "draft",
+          "draft_unreadable",
           "experts",
           "step_count",
           "last_execution",

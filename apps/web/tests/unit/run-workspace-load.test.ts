@@ -11,7 +11,7 @@ import {
   withFailure,
   withSnapshot,
   type WorkspaceLoad,
-} from "../../lib/run-workspace-load.ts";
+} from "../../lib/runs/workspace-load.ts";
 
 // The run page's load states: which failures stop it, how long it waits between attempts, and when a
 // snapshot may replace the one shown (WRUN-02, WRUN-04, refactor plan R-28).

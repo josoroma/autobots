@@ -1,6 +1,7 @@
 /**
  * Pins the run vocabulary every screen shares, keyed by the generated RunStatus (R-37): the short
- * words, the run page's sentences, one tone per state, the terminal set and what each state offers.
+ * words, the run page's sentences, one tone per state and the terminal set. What a run offers comes
+ * from the service (run-commands.test.ts).
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -8,9 +9,6 @@ import { test } from "node:test";
 import type { RunStatus } from "@autobots/api-client";
 
 import {
-  COMMAND_LABEL,
-  commandTarget,
-  commandsFor,
   isRunStatus,
   isTerminal,
   RUN_STATUS_LABEL,
@@ -88,32 +86,6 @@ test("only succeeded, failed and cancelled are terminal, as the service's TERMIN
     "cancelled",
   ]);
   assert.equal(isTerminal("not_a_status"), false);
-});
-
-test("each state offers the commands SP-010 allows it", () => {
-  assert.deepEqual(
-    Object.fromEntries(STATUSES.map((s) => [s, commandsFor(s)])),
-    {
-      queued: ["pause", "cancel"],
-      running: ["pause", "cancel"],
-      waiting_input: ["pause", "cancel"],
-      waiting_approval: ["pause", "cancel"],
-      paused: ["resume", "cancel"],
-      verifying: ["pause", "cancel"],
-      cancelling: [],
-      succeeded: [],
-      failed: [],
-      cancelled: [],
-    },
-  );
-  assert.deepEqual(COMMAND_LABEL, {
-    pause: "Pause",
-    resume: "Resume",
-    cancel: "Cancel run",
-  });
-  assert.equal(commandTarget("pause"), "");
-  assert.equal(commandTarget("resume"), "");
-  assert.equal(commandTarget("cancel"), "cancel");
 });
 
 test("a status the contract types as a string is labelled when known, and shown as sent otherwise", () => {

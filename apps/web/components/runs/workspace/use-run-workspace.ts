@@ -1,35 +1,19 @@
 /**
- * The run page's state from React: `lib/run-connection.ts` reads the snapshot, replays and follows
+ * The run page's state from React: `lib/runs/connection.ts` reads the snapshot, replays and follows
  * the stream, and this hook gives it the browser's EventSource, timers and stream preference
  * (WRUN-02, WRUN-04). Leaving the page closes the stream and aborts its reads, and nothing else: a
  * run's work belongs to its worker (PRD-Development-Harness DH-06).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import {
-  EMPTY_VIEW,
-  FRAME_TYPES,
-  RunConnection,
-  type RunView,
-  type Stream,
-  type StreamHandlers,
-} from "@/lib/run-connection";
+import { EMPTY_VIEW, RunConnection, type RunView } from "@/lib/runs/connection";
+import { openEventSource } from "@/lib/runs/stream";
 
 export interface RunWorkspaceState extends RunView {
   /** Reads the snapshot again, in turn with the stream's refreshes, such as after a page action. */
   refresh: () => void;
   /** Tries again now rather than after the current wait. */
   retry: () => void;
-}
-
-function openStream(url: string, on: StreamHandlers): Stream {
-  const source = new EventSource(url);
-  source.onopen = () => on.open();
-  source.onerror = () => on.error();
-  for (const type of FRAME_TYPES) {
-    source.addEventListener(type, (message) => on.frame(type, message.data));
-  }
-  return source;
 }
 
 function later(run: () => void, ms: number): () => void {
@@ -57,7 +41,7 @@ export function useRunWorkspace(runId: string): RunWorkspaceState {
   useEffect(() => {
     const opened = new RunConnection({
       runId,
-      open: openStream,
+      open: openEventSource,
       later,
       streamWanted,
       report,

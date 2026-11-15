@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  FRAME_TYPES,
   parseCursorFrame,
   parseEventFrame,
   splitEventPage,
-} from "../../lib/stream-frames.ts";
+} from "../../lib/runs/stream.ts";
 
 const RUN = "11111111-1111-4111-8111-111111111111";
 const event = (sequence: number) => ({
@@ -21,6 +22,10 @@ const event = (sequence: number) => ({
   },
 });
 
+test("the stream listens for the frames the contract names", () => {
+  assert.deepEqual(FRAME_TYPES, ["run", "live", "cursor", "gap", "end"]);
+});
+
 test("a cursor frame gives a safe, non-negative integer", () => {
   assert.equal(parseCursorFrame(JSON.stringify({ cursor: 7 })), 7);
   assert.equal(parseCursorFrame(JSON.stringify({ cursor: 0 })), 0);
@@ -33,6 +38,8 @@ test("a cursor frame without a usable number is null, never NaN", () => {
     JSON.stringify({ cursor: -1 }),
     JSON.stringify({ cursor: 1.5 }),
     JSON.stringify({ cursor: 2 ** 60 }),
+    JSON.stringify({ cursor: 7, extra: true }),
+    JSON.stringify(null),
     "not json",
     undefined,
   ]) {

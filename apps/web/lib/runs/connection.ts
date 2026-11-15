@@ -4,16 +4,26 @@
  * mismatch, and backs off on an outage. Snapshot reads run one at a time, every refresh shares that
  * queue, and an older snapshot never replaces a newer one. It only reads: closing it, as a browser
  * going away does, never changes the run (PRD-Development-Harness DH-06). The stream, the clock and
- * fetch are passed in, so it also runs under `node --test`.
+ * fetch are passed in, so it also runs under `node --test`. Replay, the stream, backoff,
+ * deduplication and live text stay one state machine, since a refusal on any read stops them all.
  */
 import {
   parseRunWorkspace,
   type RunEvent,
   type RunWorkspace,
+  type StreamFrame,
 } from "@autobots/api-client";
 
-import { coalesce } from "./coalesce.ts";
-import { loadJson, type Loaded, type LoadFailure } from "./load.ts";
+import { coalesce } from "../coalesce.ts";
+import { loadJson, type Loaded, type LoadFailure } from "../load.ts";
+import { mergeEvents, withDelta, type LiveText } from "./run-events.ts";
+import {
+  parseCursorFrame,
+  parseEventFrame,
+  splitEventPage,
+  type Stream,
+  type StreamHandlers,
+} from "./stream.ts";
 import {
   retryDelay,
   stops,
@@ -22,59 +32,7 @@ import {
   withSnapshot,
   type Connection,
   type WorkspaceLoad,
-} from "./run-workspace-load.ts";
-import {
-  parseCursorFrame,
-  parseEventFrame,
-  splitEventPage,
-} from "./stream-frames.ts";
-
-/** The stream's named frames (event_routes.py). */
-export type FrameType = "run" | "live" | "cursor" | "gap" | "end";
-export const FRAME_TYPES: readonly FrameType[] = [
-  "run",
-  "live",
-  "cursor",
-  "gap",
-  "end",
-];
-
-export interface StreamHandlers {
-  open(): void;
-  error(): void;
-  frame(type: FrameType, data: unknown): void;
-}
-
-export interface Stream {
-  close(): void;
-}
-
-/** Result text while it's written (US-15.24). Never stored, so never part of the timeline. */
-export interface LiveText {
-  segment: number;
-  text: string;
-  joined: boolean;
-}
-
-/**
- * A live piece extends the text only where it continues it. One that starts later, after a
- * reconnect, is shown as joined partway, and the stored artifact replaces it all once published.
- */
-export function withDelta(
-  current: LiveText | null,
-  delta: { segment: number; offset: number; text: string },
-): LiveText {
-  if (current === null || current.segment !== delta.segment)
-    return {
-      segment: delta.segment,
-      text: delta.text,
-      joined: delta.offset > 0,
-    };
-  if (delta.offset + delta.text.length <= current.text.length) return current;
-  if (delta.offset === current.text.length)
-    return { ...current, text: current.text + delta.text };
-  return { ...current, text: current.text + delta.text, joined: true };
-}
+} from "./workspace-load.ts";
 
 export interface RunView {
   load: WorkspaceLoad<RunWorkspace>;
@@ -281,7 +239,7 @@ export class RunConnection {
     );
   }
 
-  #frame(type: FrameType, data: unknown): void {
+  #frame(type: StreamFrame, data: unknown): void {
     switch (type) {
       case "run": {
         const event = parseEventFrame(data);
@@ -303,6 +261,9 @@ export class RunConnection {
         if (next !== null) this.#cursor = Math.max(this.#cursor, next);
         return;
       }
+      // SP-011: retained events can't fill the range, so the page marks the gap and reads the
+      // authoritative snapshot. The StreamGap body says only where the range broke, which nothing
+      // here uses, so it isn't parsed, and a malformed body can never hide a gap.
       case "gap":
         this.#update({ gap: true });
         this.refresh();
@@ -316,9 +277,10 @@ export class RunConnection {
 
   #add(incoming: readonly RunEvent[], gap: boolean): void {
     if (incoming.length === 0 && (!gap || this.#view.gap)) return;
-    const events = new Map(this.#view.events);
-    for (const event of incoming) events.set(event.sequence, event);
-    this.#update({ events, gap: this.#view.gap || gap });
+    this.#update({
+      events: mergeEvents(this.#view.events, incoming),
+      gap: this.#view.gap || gap,
+    });
   }
 
   #setConnection(connection: Connection): void {

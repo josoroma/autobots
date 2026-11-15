@@ -9,6 +9,12 @@ from uuid import UUID
 from pydantic import ValidationError
 
 from autobots.application.artifacts import list_artifacts
+from autobots.application.model_admission import (
+    LEDGER_PARAMS,
+    SettlementReason,
+    spend_columns,
+    unreported_column,
+)
 from autobots.application.plans import GoalMissing, latest_plan, load_goal
 from autobots.application.reconciliation import unknown_operations
 from autobots.application.recovery import outstanding
@@ -38,6 +44,7 @@ from autobots.contracts.run_workspace import (
     ToolAttemptView,
     UnknownEffect,
     UsageSummary,
+    UserRunCommand,
     VerificationSummary,
 )
 from autobots.contracts.runs import RunEvent, RunSummary
@@ -50,7 +57,16 @@ from autobots.domain.models import (
     UnknownModelProfile,
     approved_profile,
 )
-from autobots.domain.runs import IN_PROGRESS, NEEDS_YOU, TERMINAL
+from autobots.domain.runs import (
+    IN_PROGRESS,
+    NEEDS_YOU,
+    TERMINAL,
+    Actor,
+    CommandRefused,
+    RunCommand,
+    RunStatus,
+    next_status,
+)
 from autobots.domain.secret_patterns import redact_shown
 from autobots.domain.tools import PLAN_TOOLS
 
@@ -73,16 +89,17 @@ _NAMES = (
     "checkpoint_thread_id",
     "version",
 )
+# Spent and reserved are the ledger's, as admission counts them (Decision 0029 F10).
 _SELECT_RUN = (
     "select r.id, r.workspace_id, r.parent_run_id, r.status, r.created_at, r.updated_at, "
-    "(select coalesce(sum(coalesce(i.charged_micro_usd, 0)), 0)::bigint "
-    "from app_private.model_invocations i where i.root_run_id = r.id or i.run_id = r.id), "
-    "(select coalesce(sum(i.reserved_micro_usd) filter (where i.status in "
-    "('reserved', 'dispatched', 'uncertain') and i.reconciled_at is null), 0)::bigint "
-    "from app_private.model_invocations i where i.root_run_id = r.id or i.run_id = r.id), "
+    f"{spend_columns('r')}, "
     "r.limit_micro_usd, r.lease_generation, r.checkpoint_thread_id, r.version, r.event_sequence "
-    "from public.runs r where r.id = %s and r.workspace_id = %s"
+    "from public.runs r where r.id = %(run)s and r.workspace_id = %(workspace)s"
 )
+
+
+def _run_params(workspace_id: UUID, run_id: UUID) -> dict[str, Any]:
+    return {"run": run_id, "workspace": workspace_id, **LEDGER_PARAMS}
 
 
 def public_text(text: str, *, limit: int = MAX_TEXT) -> str:
@@ -109,7 +126,7 @@ def project_event(run_id: UUID, sequence: int, payload: Any, occurred_at: Any) -
 
 
 async def _require_run(connection: Any, workspace_id: UUID, run_id: UUID) -> Any:
-    cursor = await connection.execute(_SELECT_RUN, (run_id, workspace_id))
+    cursor = await connection.execute(_SELECT_RUN, _run_params(workspace_id, run_id))
     row = await cursor.fetchone()
     if row is None:
         raise RunNotFound("that run is not available")
@@ -121,7 +138,7 @@ def _summary(row: Any) -> RunSummary:
 
 
 async def read_summary(connection: Any, workspace_id: UUID, run_id: UUID) -> RunSummary | None:
-    cursor = await connection.execute(_SELECT_RUN, (run_id, workspace_id))
+    cursor = await connection.execute(_SELECT_RUN, _run_params(workspace_id, run_id))
     row = await cursor.fetchone()
     return None if row is None else _summary(row)
 
@@ -302,6 +319,25 @@ async def _metered_calls(connection: Any, run_id: UUID) -> int:
     return int((await cursor.fetchone())[0])
 
 
+# The order the page shows them in.
+_PAGE_COMMANDS: tuple[UserRunCommand, ...] = ("pause", "resume", "cancel")
+
+
+def user_commands(status: RunStatus) -> list[UserRunCommand]:
+    """What a person may send a run in this status: each command SP-010's next_status moves it
+    with (WRUN-12). A repeated cancellation changes nothing, so it isn't offered. The command routes
+    admit any member, so no role narrows this, and the writes check the status again."""
+    offered: list[UserRunCommand] = []
+    for command in _PAGE_COMMANDS:
+        try:
+            moves = next_status(status, RunCommand(command), Actor.USER) is not None
+        except CommandRefused:
+            moves = False
+        if moves:
+            offered.append(command)
+    return offered
+
+
 async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> RunWorkspace:
     row = await _require_run(connection, workspace_id, run_id)
     summary = _summary(row)
@@ -338,6 +374,7 @@ async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> R
         can_continue=(
             summary.status in TERMINAL and summary.parent_run_id is None and not is_workflow
         ),
+        allowed_commands=user_commands(summary.status),
         objective=objective,
         criteria=criteria,
         plan=await _plan_summary(connection, run_id),
@@ -445,14 +482,7 @@ _LIST_SELECT = (
     "where q.run_id = r.id))), "
     "array(select distinct b.value from "
     "jsonb_each_text(coalesce(r.policy_snapshot -> 'bindings', '{}'::jsonb)) b order by 1), "
-    "(select coalesce(sum(coalesce(i.charged_micro_usd, 0)), 0)::bigint "
-    "from app_private.model_invocations i where i.root_run_id = r.id or i.run_id = r.id), "
-    "(select coalesce(sum(i.reserved_micro_usd) filter (where i.status in "
-    "('reserved', 'dispatched', 'uncertain') and i.reconciled_at is null), 0)::bigint "
-    "from app_private.model_invocations i where i.root_run_id = r.id or i.run_id = r.id), "
-    "exists (select 1 from app_private.model_invocations i where (i.root_run_id = r.id "
-    "or i.run_id = r.id) and i.status = 'uncertain' and i.reconciled_at is null "
-    "and i.failure_class = 'charge_not_reported'), "
+    f"{spend_columns('r')}, {unreported_column('r')}, "
     "r.limit_micro_usd "
 )
 
@@ -491,7 +521,7 @@ async def read_run_list(
         all=int(totals[0]), active=int(totals[1]), needs_you=int(totals[2]), finished=int(totals[3])
     )
     where = ""
-    page_params = {**params, "limit": limit + 1}
+    page_params = {**params, **LEDGER_PARAMS, "limit": limit + 1}
     if group != "all":
         where += "and r.status = any(%(statuses)s) "
         page_params["statuses"] = list(GROUPS[group])
@@ -618,7 +648,7 @@ async def read_inspector(connection: Any, workspace_id: UUID, run_id: UUID) -> R
             created_at=item[15],
             reconciled=item[16],
             # The call worked and only its charge was missing, so its outcome was never in doubt.
-            outcome_unknown=item[16] and item[14] != "charge_not_reported",
+            outcome_unknown=item[16] and item[14] != SettlementReason.CHARGE_NOT_REPORTED,
             charge_source_unknown=item[17],
         )
         for item in await cursor.fetchall()

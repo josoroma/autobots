@@ -31,6 +31,9 @@ from autobots.contracts.run_workspace import (
     RunList,
     RunListGroup,
     RunWorkspace,
+    StreamCursor,
+    StreamFrameName,
+    StreamGap,
 )
 from autobots.contracts.runs import ResultTextDelta, RunEvent, ToolUseList
 from autobots.domain.models import ModelProfileId
@@ -123,6 +126,29 @@ async def _listener(request: Request) -> AsyncConnection[Any] | None:
     return connection
 
 
+def _frame(name: StreamFrameName, data: str, *, event_id: int | None = None) -> str:
+    """One server-sent event. Only a stored event has an id, so only it moves the replay cursor."""
+    head = "" if event_id is None else f"id: {event_id}\n"
+    return f"{head}event: {name}\ndata: {data}\n\n"
+
+
+def event_frame(event: RunEvent) -> str:
+    """A stored event, sent as `run` with its sequence as the id the browser resumes after."""
+    return _frame("run", event.model_dump_json(), event_id=event.sequence)
+
+
+def cursor_frame(cursor: int) -> str:
+    return _frame("cursor", StreamCursor(cursor=cursor).model_dump_json())
+
+
+def gap_frame(after: int) -> str:
+    return _frame("gap", StreamGap(after=after).model_dump_json())
+
+
+# The run has finished and every event is sent, so the browser stops listening.
+END_FRAME = _frame("end", "{}")
+
+
 def live_frame(run_id: UUID, cursor: int, payload: str) -> str | None:
     """Only this run's text, re-validated as the typed delta. Sent as `live`, with no `id:`, so it
     never moves the browser's replay cursor; `sequence` names the durable event it follows."""
@@ -148,7 +174,7 @@ def live_frame(run_id: UUID, cursor: int, payload: str) -> str | None:
         )
     except (KeyError, ValueError):
         return None
-    return f"event: live\ndata: {event.model_dump_json()}\n\n"
+    return _frame("live", event.model_dump_json())
 
 
 async def _frames(
@@ -184,16 +210,16 @@ async def _durable_and_live(
                 await connection.execute("select status from public.runs where id = %s", (run_id,))
             ).fetchone()
         if page.gap:
-            yield f"event: gap\ndata: {json.dumps({'after': cursor})}\n\n"
+            yield gap_frame(cursor)
             last_sent = loop.time()
         for event in page.events:
-            yield (f"id: {event.sequence}\nevent: run\ndata: {event.model_dump_json()}\n\n")
+            yield event_frame(event)
             last_sent = loop.time()
         if page.next_cursor != cursor:
             cursor = page.next_cursor
-            yield f"event: cursor\ndata: {json.dumps({'cursor': cursor})}\n\n"
+            yield cursor_frame(cursor)
         elif status_row is not None and RunStatus(status_row[0]) in TERMINAL:
-            yield "event: end\ndata: {}\n\n"
+            yield END_FRAME
             return
         if loop.time() - last_sent >= KEEPALIVE_SECONDS:
             yield ": keepalive\n\n"

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { RunInspectorView } from "@/components/run-inspector";
+import { RunInspectorView } from "@/components/runs/inspector/run-inspector";
 
 export const metadata: Metadata = { title: "Run inspector" };
 

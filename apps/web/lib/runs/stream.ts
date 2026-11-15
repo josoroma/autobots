@@ -1,13 +1,42 @@
 /**
- * A run's stream frames and replay pages, read through the generated parsers (R-09, WRUN-06). A
- * cursor frame without a number once became NaN, so every reconnect asked for after=NaN.
+ * A run's event stream in one place: the frame names the service's contract declares, the
+ * browser's EventSource, and each frame's body read through the generated parsers (R-09, R-49,
+ * XTYP-07). A cursor is a safe, non-negative integer or nothing, so a reconnect never asks for
+ * after=NaN (WRUN-06). Runs in the browser and under `node --test`, which never opens a stream.
  */
 import {
   parseEventPage,
   parseRunEvent,
+  parseStreamCursor,
+  schemas,
   type EventPage,
   type RunEvent,
+  type StreamFrame,
 } from "@autobots/api-client";
+
+/** The stream's named frames, as the contract's StreamFrame lists them (event_routes.py). */
+export const FRAME_TYPES: readonly StreamFrame[] = schemas.StreamFrame.enum;
+
+export interface StreamHandlers {
+  open(): void;
+  error(): void;
+  frame(type: StreamFrame, data: unknown): void;
+}
+
+export interface Stream {
+  close(): void;
+}
+
+/** The browser's EventSource on `url`, passing on each named frame's body as it arrives. */
+export function openEventSource(url: string, on: StreamHandlers): Stream {
+  const source = new EventSource(url);
+  source.onopen = () => on.open();
+  source.onerror = () => on.error();
+  for (const type of FRAME_TYPES) {
+    source.addEventListener(type, (message) => on.frame(type, message.data));
+  }
+  return source;
+}
 
 /** Decision 0017 Q13: an event of a type this page doesn't know is skipped, never an error. */
 export function knownEvent(raw: unknown): RunEvent | null {
@@ -32,18 +61,13 @@ export function parseEventFrame(data: unknown): RunEvent | null {
   return knownEvent(frameJson(data));
 }
 
-/** A `cursor` frame's position: a safe, non-negative integer, or null. */
+/** A `cursor` frame's StreamCursor position: a safe, non-negative integer, or null. */
 export function parseCursorFrame(data: unknown): number | null {
-  const value = frameJson(data);
-  if (typeof value !== "object" || value === null || !("cursor" in value)) {
+  try {
+    return parseStreamCursor(frameJson(data)).cursor;
+  } catch {
     return null;
   }
-  const { cursor } = value;
-  return typeof cursor === "number" &&
-    Number.isSafeInteger(cursor) &&
-    cursor >= 0
-    ? cursor
-    : null;
 }
 
 export interface SplitPage {

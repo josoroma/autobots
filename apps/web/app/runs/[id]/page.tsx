@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { RunWorkspaceView } from "@/components/run-workspace";
+import { RunWorkspaceView } from "@/components/runs/workspace/run-workspace";
 
 export const metadata: Metadata = { title: "Run" };
 

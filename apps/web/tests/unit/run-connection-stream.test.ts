@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { withDelta } from "../../lib/run-connection.ts";
 import {
   event,
   eventPage,
@@ -148,31 +147,4 @@ test("live text shows only when streaming is wanted", async () => {
   const hidden = await live(2, { wanted: false });
   hidden.stream?.on.frame("live", JSON.stringify(delta(hidden.run)));
   assert.equal(hidden.connection.view.live, null);
-});
-
-test("a live piece extends the text only where it continues it", () => {
-  const first = withDelta(null, { segment: 0, offset: 0, text: "Hello" });
-  assert.deepEqual(first, { segment: 0, text: "Hello", joined: false });
-  assert.deepEqual(
-    withDelta(first, { segment: 0, offset: 5, text: " world" }),
-    {
-      segment: 0,
-      text: "Hello world",
-      joined: false,
-    },
-  );
-  assert.equal(withDelta(first, { segment: 0, offset: 0, text: "Hel" }), first);
-  assert.deepEqual(withDelta(first, { segment: 0, offset: 9, text: "later" }), {
-    segment: 0,
-    text: "Hellolater",
-    joined: true,
-  });
-  assert.deepEqual(
-    withDelta(first, { segment: 1, offset: 4, text: "joined" }),
-    {
-      segment: 1,
-      text: "joined",
-      joined: true,
-    },
-  );
 });

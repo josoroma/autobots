@@ -2,9 +2,9 @@
  * The run page's load states, built on the read classification in `load.ts` (WRUN-02, WRUN-04). A
  * refusal or a contract mismatch stops the page, since reading again can't change it; an outage is
  * tried again after a growing wait; and a snapshot read before the one shown never replaces it. Runs
- * in the browser and under `node --test`; `run-connection.ts` drives it.
+ * in the browser and under `node --test`; `connection.ts` drives it.
  */
-import { backoff, type LoadFailure } from "./load.ts";
+import { backoff, type LoadFailure } from "../load.ts";
 
 /** The stream's state while a snapshot is shown, as `data-connection` names it. */
 export type Connection = "loading" | "live" | "reconnecting" | "ended";

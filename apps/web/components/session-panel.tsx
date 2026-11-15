@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { AdmissionMessage } from "@/components/admission-message";
 import { HeldNote } from "@/components/held-note";
 import { Button } from "@/components/ui/button";
-import { RunDisclosure } from "@/components/run-disclosure";
+import { RunDisclosure } from "@/components/runs/disclosure/run-disclosure";
 import { Card } from "@/components/ui/card";
 import { Choice, Textarea } from "@/components/ui/field";
 import { SectionLabel } from "@/components/ui/page-header";

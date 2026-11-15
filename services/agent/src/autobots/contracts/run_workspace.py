@@ -1,11 +1,11 @@
 """What the run workspace may see. Built by code from typed records, never from graph state."""
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 from autobots.contracts.artifacts import ArtifactSummary
-from autobots.contracts.primitives import Identifier, UtcTimestamp
+from autobots.contracts.primitives import MAX_SAFE_INTEGER, Identifier, UtcTimestamp
 from autobots.contracts.runs import RunEvent, RunSummary
 from autobots.domain.runs import RunStatus
 
@@ -22,6 +22,40 @@ class EventPage(BaseModel):
     events: list[RunEvent]
     next_cursor: int
     gap: bool
+
+
+# The named frames of `GET /v1/runs/{run_id}/events/stream`, which stays out of the OpenAPI paths
+# (XTYP-07). `run` carries a stored RunEvent with its sequence as the replay id, `live` a
+# result.text.delta with no id, `cursor` a StreamCursor, `gap` a StreamGap, and `end` an empty body.
+StreamFrameName = Literal["run", "live", "cursor", "gap", "end"]
+# A stream position: the API's `after` query takes any of these, and JavaScript holds each exactly.
+StreamPosition = Annotated[int, Field(ge=0, le=MAX_SAFE_INTEGER)]
+
+
+class StreamFrame(RootModel[StreamFrameName]):
+    """A frame's name, exported so the browser listens for exactly these."""
+
+
+class StreamCursor(BaseModel):
+    """The newest sequence the stream has covered, so a reconnect resumes after it."""
+
+    model_config = VIEW
+
+    cursor: StreamPosition
+
+
+class StreamGap(BaseModel):
+    """Retained events can't fill the range after `after`, so the client reads a snapshot
+    (SP-011)."""
+
+    model_config = VIEW
+
+    after: StreamPosition
+
+
+# The run commands a person sends from a run's page (SP-010). Workers' commands and the input and
+# approval commands, which have their own screens, are not among them.
+UserRunCommand = Literal["pause", "resume", "cancel"]
 
 
 class CriterionView(BaseModel):
@@ -165,6 +199,9 @@ class RunWorkspace(BaseModel):
     budgets: RunBudgets
     # A goal run of its own that has finished. A child or a workflow's run isn't one.
     can_continue: bool
+    # What a person may send this run now, in this order, as SP-010's next_status allows it. Any
+    # member of the workspace may send these, so it is the same for an owner and a member.
+    allowed_commands: list[UserRunCommand]
     # Decision 0017 Q4: metered tool calls made in this run's root tree, of what one tree may make.
     metered_tool_calls: int
     metered_tool_call_limit: int

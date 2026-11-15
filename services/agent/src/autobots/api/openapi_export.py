@@ -11,14 +11,19 @@ from pydantic.json_schema import models_json_schema
 
 from autobots.api.app import create_app
 from autobots.contracts.models import EffectiveRolePolicy
+from autobots.contracts.run_workspace import StreamCursor, StreamFrame, StreamGap
 from autobots.contracts.runs import ErrorResponse, RunEvent, RunSummary
 
-# Public models not yet referenced by a route still belong in the contract.
+# Public models not yet referenced by a route still belong in the contract. The stream's frames are
+# among them, as its route stays out of the paths (XTYP-07).
 PUBLIC_MODELS: tuple[type[BaseModel], ...] = (
     RunSummary,
     RunEvent,
     ErrorResponse,
     EffectiveRolePolicy,
+    StreamFrame,
+    StreamCursor,
+    StreamGap,
 )
 
 

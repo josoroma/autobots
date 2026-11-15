@@ -5,10 +5,10 @@ import Link from "next/link";
 
 import { StateLine } from "@/components/runs/run-state";
 import {
-  ToolUseTable,
   ToolUsesState,
-  useToolUses,
-} from "@/components/tool-uses";
+  ToolUseTable,
+} from "@/components/runs/tool-uses/tool-use-table";
+import { useToolUses } from "@/components/runs/tool-uses/use-tool-uses";
 import { Card } from "@/components/ui/card";
 import { LoadState } from "@/components/ui/load-state";
 import { SectionLabel } from "@/components/ui/page-header";

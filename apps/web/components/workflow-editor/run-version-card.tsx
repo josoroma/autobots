@@ -6,7 +6,7 @@ import {
 import { Play } from "lucide-react";
 
 import { HeldNote } from "@/components/held-note";
-import { RunDisclosure } from "@/components/run-disclosure";
+import { RunDisclosure } from "@/components/runs/disclosure/run-disclosure";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Select, Textarea } from "@/components/ui/field";

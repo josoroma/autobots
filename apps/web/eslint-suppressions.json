@@ -1,38 +1,4 @@
 {
-  "components/run-controls.tsx": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "components/run-disclosure.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "components/run-inspector.tsx": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "components/run-panel.tsx": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "components/run-workspace.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "components/session-panel.tsx": {
     "max-lines-per-function": {
       "count": 1

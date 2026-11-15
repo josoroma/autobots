@@ -1,8 +1,9 @@
 /**
  * The run vocabulary every screen shares, keyed by the generated RunStatus so that a status the
- * contract gains fails the type check here until it has words, a tone, a terminal flag and its
- * commands (R-37, XTYP-06, XWEB-08). Presentation only: the service owns the transitions. Pure and
- * JSX-free; `components/runs/run-state.tsx` draws the tones.
+ * contract gains fails the type check here until it has words, a tone and a terminal flag (R-37,
+ * XTYP-06, XWEB-08). Presentation only: the service owns the transitions, and sends the commands a
+ * run offers as RunWorkspace.allowed_commands (`commands.ts`). Pure and JSX-free;
+ * `components/runs/run-state.tsx` draws the tones.
  */
 import type { RunStatus } from "@autobots/api-client";
 
@@ -87,35 +88,4 @@ export function runStatusText(status: string): string {
 /** A stop code's words, as the run page, the run list and the workflow monitor all say them. */
 export function stopReasonText(code: string): string {
   return code.replaceAll("_", " ");
-}
-
-export type RunCommand = "pause" | "resume" | "cancel";
-
-export const COMMAND_LABEL: Readonly<Record<RunCommand, string>> = {
-  pause: "Pause",
-  resume: "Resume",
-  cancel: "Cancel run",
-};
-
-// SP-010: what each state can take. A terminal or cancelling run takes nothing, so nothing is offered.
-const COMMANDS: Readonly<Record<RunStatus, readonly RunCommand[]>> = {
-  queued: ["pause", "cancel"],
-  running: ["pause", "cancel"],
-  waiting_input: ["pause", "cancel"],
-  waiting_approval: ["pause", "cancel"],
-  paused: ["resume", "cancel"],
-  verifying: ["pause", "cancel"],
-  cancelling: [],
-  succeeded: [],
-  failed: [],
-  cancelled: [],
-};
-
-export function commandsFor(status: RunStatus): readonly RunCommand[] {
-  return COMMANDS[status];
-}
-
-/** A command's target for the submit hook: the run for Pause and Resume, its own for Cancel. */
-export function commandTarget(command: RunCommand): string {
-  return command === "cancel" ? "cancel" : "";
 }

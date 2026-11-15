@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 
-import {
-  RunConnection,
-  type RunView,
-  type StreamHandlers,
-} from "../../lib/run-connection.ts";
+import { RunConnection, type RunView } from "../../lib/runs/connection.ts";
+import type { StreamHandlers } from "../../lib/runs/stream.ts";
 
 // Fakes for the run page's connection: a server that answers each path from arranged replies, a
 // stream and a clock the test drives, and fixtures that the generated parsers accept. Shared by
@@ -61,6 +58,7 @@ export function snapshot(run: string, cursor: number, status = "queued") {
     role_map: [],
     budgets: { context_tokens: 1000, max_output_tokens_per_call: 100 },
     can_continue: false,
+    allowed_commands: [],
     metered_tool_calls: 0,
     metered_tool_call_limit: 0,
   };

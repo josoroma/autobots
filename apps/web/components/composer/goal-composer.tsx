@@ -17,7 +17,7 @@ import {
 import { useRunOptions } from "@/components/composer/use-run-options";
 import { useRunPreview } from "@/components/composer/use-run-preview";
 import { HeldNote } from "@/components/held-note";
-import { RunDisclosure } from "@/components/run-disclosure";
+import { RunDisclosure } from "@/components/runs/disclosure/run-disclosure";
 import { Button } from "@/components/ui/button";
 import {
   Card,

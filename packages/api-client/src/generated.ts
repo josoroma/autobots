@@ -5219,6 +5219,18 @@ export const schemas = {
   "RunWorkspace": {
     "additionalProperties": false,
     "properties": {
+      "allowed_commands": {
+        "items": {
+          "enum": [
+            "pause",
+            "resume",
+            "cancel"
+          ],
+          "type": "string"
+        },
+        "title": "Allowed Commands",
+        "type": "array"
+      },
       "artifacts": {
         "items": {
           "$ref": "#/components/schemas/ArtifactSummary"
@@ -5358,6 +5370,7 @@ export const schemas = {
       "role_map",
       "budgets",
       "can_continue",
+      "allowed_commands",
       "metered_tool_calls",
       "metered_tool_call_limit"
     ],
@@ -5720,6 +5733,52 @@ export const schemas = {
       "timezone"
     ],
     "title": "SessionWorkspace",
+    "type": "object"
+  },
+  "StreamCursor": {
+    "additionalProperties": false,
+    "description": "The newest sequence the stream has covered, so a reconnect resumes after it.",
+    "properties": {
+      "cursor": {
+        "maximum": 9007199254740991,
+        "minimum": 0,
+        "title": "Cursor",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "cursor"
+    ],
+    "title": "StreamCursor",
+    "type": "object"
+  },
+  "StreamFrame": {
+    "description": "A frame's name, exported so the browser listens for exactly these.",
+    "enum": [
+      "run",
+      "live",
+      "cursor",
+      "gap",
+      "end"
+    ],
+    "title": "StreamFrame",
+    "type": "string"
+  },
+  "StreamGap": {
+    "additionalProperties": false,
+    "description": "Retained events can't fill the range after `after`, so the client reads a snapshot\n(SP-011).",
+    "properties": {
+      "after": {
+        "maximum": 9007199254740991,
+        "minimum": 0,
+        "title": "After",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "after"
+    ],
+    "title": "StreamGap",
     "type": "object"
   },
   "TaskView": {
@@ -7408,6 +7467,10 @@ export const schemas = {
           }
         ]
       },
+      "draft_unreadable": {
+        "title": "Draft Unreadable",
+        "type": "boolean"
+      },
       "experts": {
         "items": {
           "type": "string"
@@ -7467,6 +7530,7 @@ export const schemas = {
       "latest_version",
       "versions",
       "draft",
+      "draft_unreadable",
       "experts",
       "step_count",
       "last_execution",
@@ -8916,6 +8980,7 @@ export function parseRunSummary(value: unknown): RunSummary {
 }
 
 export interface RunWorkspace {
+  allowed_commands: ("pause" | "resume" | "cancel")[];
   artifacts: ArtifactSummary[];
   assignments: AssignmentView[];
   budgets: RunBudgets;
@@ -9045,6 +9110,28 @@ export interface SessionWorkspace {
 
 export function parseSessionWorkspace(value: unknown): SessionWorkspace {
   return parseWith(schemas, "SessionWorkspace", value) as SessionWorkspace;
+}
+
+export interface StreamCursor {
+  cursor: number;
+}
+
+export function parseStreamCursor(value: unknown): StreamCursor {
+  return parseWith(schemas, "StreamCursor", value) as StreamCursor;
+}
+
+export type StreamFrame = "run" | "live" | "cursor" | "gap" | "end";
+
+export function parseStreamFrame(value: unknown): StreamFrame {
+  return parseWith(schemas, "StreamFrame", value) as StreamFrame;
+}
+
+export interface StreamGap {
+  after: number;
+}
+
+export function parseStreamGap(value: unknown): StreamGap {
+  return parseWith(schemas, "StreamGap", value) as StreamGap;
 }
 
 export interface TaskView {
@@ -9450,6 +9537,7 @@ export function parseWorkflowVersionView(value: unknown): WorkflowVersionView {
 export interface WorkflowView {
   description: string | null;
   draft: WorkflowDraftView | null;
+  draft_unreadable: boolean;
   experts: string[];
   id: string;
   last_execution: WorkflowExecutionSummary | null;

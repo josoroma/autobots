@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
-import { RunList } from "@/components/run-list";
+import { RunList } from "@/components/runs/list/run-list";
 
 export const metadata: Metadata = { title: "Runs" };
 
