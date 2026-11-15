@@ -9,7 +9,9 @@ import type {
   RunList,
 } from "@autobots/api-client";
 
-import type { LoadFailure } from "../load.ts";
+import { firstParam, parseTab, type SearchParam } from "../list-filter.ts";
+import type { LoadFailure } from "../load-failure.ts";
+import { profileChoice } from "../model-profile.ts";
 import { RUN_STATUS_LABEL, stopReasonText } from "./status.ts";
 
 // The API's run groups, as the list's query names them.
@@ -27,6 +29,49 @@ export interface RunFilters {
   query: string;
   /** A profile, or "" for any. */
   profile: ModelProfileId | "";
+}
+
+const RUN_GROUP_IDS: readonly RunGroup[] = RUN_GROUPS.map((item) => item.id);
+
+/**
+ * The list's filters from the page's URL (XWEB-13). A group or profile the list doesn't offer, as a
+ * hand-edited URL can name, reads as none (PRD-Model-Providers MP-A08).
+ */
+export function runFiltersFrom(
+  params: Readonly<Record<string, SearchParam>>,
+): RunFilters {
+  return {
+    group: parseTab(firstParam(params.group), RUN_GROUP_IDS, "all"),
+    query: firstParam(params.q) ?? "",
+    profile: profileChoice(firstParam(params.profile) ?? "") ?? "",
+  };
+}
+
+/** The filters a URL query names, read as `runFiltersFrom` reads a page's parameters. */
+export function runFiltersFromQuery(query: string): RunFilters {
+  return runFiltersFrom(Object.fromEntries(new URLSearchParams(query)));
+}
+
+/**
+ * The filters as a URL query, always in one order, so equal filters give equal strings. A filter at
+ * its default is left out, so the plain list is plain /runs. The search is trimmed for the URL, or
+ * kept as typed for what the search box shows.
+ */
+export function runFilterQuery(filters: RunFilters, asTyped = false): string {
+  const params = new URLSearchParams();
+  if (filters.group !== "all") params.set("group", filters.group);
+  const query = asTyped ? filters.query : filters.query.trim();
+  if (query !== "") params.set("q", query);
+  if (filters.profile !== "") params.set("profile", filters.profile);
+  return params.toString();
+}
+
+/**
+ * A draft of the filters, as the search box holds it, in the form the URL keeps: the search
+ * trimmed. Equal for a page's own filters, so opening the list writes nothing.
+ */
+export function runFilterQueryForUrl(draft: string): string {
+  return runFilterQuery(runFiltersFromQuery(draft));
 }
 
 /** The list's query. Defaults are left out, so the first load is plain /api/v1/runs. */
@@ -80,8 +125,25 @@ export interface More {
   loading: boolean;
 }
 
+/**
+ * The rows of a first page and the pages added to it, each run once. A run in the first page keeps
+ * that row, as the newest server render, and a repeat later is left out.
+ */
+export function mergeRuns(
+  first: readonly RunRow[],
+  more: readonly RunRow[],
+): RunRow[] {
+  const seen = new Set<string>();
+  return [...first, ...more].filter((run) => {
+    if (seen.has(run.id)) return false;
+    seen.add(run.id);
+    return true;
+  });
+}
+
 export function withMore(base: RunList, more: More | null): RunList {
-  return more?.next == null
-    ? base
-    : { ...more.next, runs: [...base.runs, ...more.runs] };
+  const runs = mergeRuns(base.runs, more?.next == null ? [] : more.runs);
+  if (more?.next == null)
+    return runs.length === base.runs.length ? base : { ...base, runs };
+  return { ...more.next, runs };
 }

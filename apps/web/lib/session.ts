@@ -6,6 +6,7 @@ import {
   type SupabaseClient,
 } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { cache } from "react";
 
 import { cookieOptions } from "@/lib/bff-policy";
 import { SESSION_COOKIE } from "@/lib/request-guard";
@@ -38,13 +39,14 @@ export async function sessionClient(): Promise<SupabaseClient> {
 /**
  * The token for the Python API, which verifies it itself. Nothing here trusts its contents. Null
  * means signed out. An expired token that can't be refreshed because Auth is unreachable throws
- * instead, so an outage never reads as a sign-out (WSHL-02).
+ * instead, so an outage never reads as a sign-out (WSHL-02). Read once per server request: React's
+ * `cache()` keeps it for that request only, and a route handler reads it afresh (WSHL-14).
  */
-export async function accessToken(): Promise<string | null> {
+export const accessToken = cache(async (): Promise<string | null> => {
   const client = await sessionClient();
   const { data, error } = await client.auth.getSession();
   if (error !== null && isAuthRetryableFetchError(error)) {
     throw error;
   }
   return data.session?.access_token ?? null;
-}
+});

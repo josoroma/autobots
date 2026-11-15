@@ -3,9 +3,9 @@ import { EXPERT_FILTERS, type ExpertFilter } from "@/lib/experts/card";
 import { cn } from "@/lib/utils";
 
 /**
- * The Experts list's filter and search, kept in component state, as PRD-Studio EX-02 doesn't say
- * where they live (WBLD-09). Until the catalog is read the two class filters have no count and wait,
- * since no Expert can be called read only yet.
+ * The Experts list's filter and search (PRD-Studio EX-02), which the panel keeps in the URL (XWEB-13).
+ * Until the catalog is read the two class filters have no count and wait, since no Expert can be
+ * called read only yet.
  */
 export function ExpertFilters({
   filter,

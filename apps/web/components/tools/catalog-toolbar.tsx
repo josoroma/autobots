@@ -3,6 +3,7 @@ import type { ToolCatalog } from "@autobots/api-client";
 import type { CatalogFilters } from "@/components/tools/use-catalog-filters";
 import { Input, Select } from "@/components/ui/field";
 import { providersOf } from "@/lib/tools/filters";
+import { useUrlDraft } from "@/lib/use-url-draft";
 import {
   AVAILABILITY_FILTERS,
   AVAILABILITY_LABEL,
@@ -12,9 +13,12 @@ import {
 const TOOLBAR_LABEL =
   "flex w-full flex-col items-stretch gap-1 text-[13px] font-medium sm:w-auto sm:flex-row sm:items-center sm:gap-2 [&>span:first-child]:text-muted-foreground";
 
+const trim = (raw: string): string => raw.trim();
+
 /**
  * The search and the three filters, then how many tools show and the catalog's digest
- * (PRD-Tool-Catalog TS-01).
+ * (PRD-Tool-Catalog TS-01). The search box shows what was typed and follows the URL when it changes
+ * from outside, such as the sidebar's Tools link (WTAP-15).
  */
 export function CatalogToolbar({
   catalog,
@@ -27,6 +31,10 @@ export function CatalogToolbar({
   shown: number;
 }) {
   const { values, choose } = filters;
+  const search = useUrlDraft(values.search, (q) => choose("q", q), {
+    delayMs: 150,
+    normalize: trim,
+  });
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
       <form
@@ -38,8 +46,8 @@ export function CatalogToolbar({
           <span>Search</span>
           <Input
             type="search"
-            defaultValue={values.search}
-            onChange={(event) => choose("q", event.target.value.trim())}
+            value={search.value}
+            onChange={(event) => search.change(event.target.value)}
             placeholder="Name, ID or description"
             className="h-8 w-full sm:w-56"
           />

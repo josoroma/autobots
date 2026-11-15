@@ -10,6 +10,7 @@ import {
 } from "@autobots/api-client";
 import type { ClientOptions } from "@autobots/api-client/runtime";
 import { unstable_rethrow } from "next/navigation";
+import { cache } from "react";
 
 import { apiHeaders } from "@/lib/bff-policy";
 import { readFailure } from "@/lib/failure";
@@ -36,14 +37,43 @@ export function readValue<T>(read: MemberRead<T>): T | null {
   return read.kind === "ok" ? read.value : null;
 }
 
-function client(headers: Record<string, string>): ClientOptions {
+// The shell's reads give up after 3 s, so a stopped API never holds the frame back (WSHL-02).
+const SHELL_TIMEOUT_MS = 3_000;
+
+/**
+ * Options for the server's own reads. Never from a cache: each read is this request's, for this
+ * person and workspace (PRD-Development-Harness DH-06).
+ */
+function client(
+  headers: Record<string, string>,
+  timeoutMs: number,
+): ClientOptions {
   const timed: typeof fetch = (input, init) =>
     fetch(input, {
       ...init,
       cache: "no-store",
-      signal: AbortSignal.timeout(3_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   return { baseUrl: serverConfig().apiUrl, fetch: timed, headers };
+}
+
+/**
+ * Options for one person's read, as the BFF sends it (lib/bff.ts): the internal token, the
+ * session's token and, when `withWorkspace`, the chosen workspace, which the API checks against
+ * membership (Decision 0023 E3). Null when no one is signed in. Throws when Auth can't be reached or
+ * the server's configuration is missing, so neither reads as a sign-out (WSHL-02).
+ */
+export async function memberClient(
+  withWorkspace: boolean,
+  timeoutMs: number,
+): Promise<ClientOptions | null> {
+  const token = await accessToken();
+  if (token === null) return null;
+  const workspace = withWorkspace ? await chosenWorkspace() : null;
+  return client(
+    apiHeaders(serverConfig().internalToken, token, workspace),
+    timeoutMs,
+  );
 }
 
 /**
@@ -56,12 +86,9 @@ async function memberRead<T>(
   withWorkspace: boolean,
 ): Promise<MemberRead<T>> {
   try {
-    const token = await accessToken();
-    if (token === null) return SIGNED_OUT;
-    // A member read carries the chosen workspace when there is one (Decision 0023 E3).
-    const workspace = withWorkspace ? await chosenWorkspace() : null;
-    const headers = apiHeaders(serverConfig().internalToken, token, workspace);
-    return { kind: "ok", value: await call(client(headers)) };
+    const options = await memberClient(withWorkspace, SHELL_TIMEOUT_MS);
+    if (options === null) return SIGNED_OUT;
+    return { kind: "ok", value: await call(options) };
   } catch (error) {
     unstable_rethrow(error);
     if (readFailure(error) === "signed_out") return SIGNED_OUT;
@@ -70,11 +97,18 @@ async function memberRead<T>(
   }
 }
 
+// Each read below is wrapped in React's `cache()`, which keeps a result for one server request
+// only, so the shell and the page share one read per render and nothing outlives the request
+// (WSHL-14, PRD-Development-Harness DH-06).
+
 /** An unreachable or invalid API is a visible state, and its details stay in the server's log. */
-export async function fetchServiceStatus(): Promise<ServiceStatus> {
+export const fetchServiceStatus = cache(async (): Promise<ServiceStatus> => {
   try {
     await getHealth(
-      client(apiHeaders(serverConfig().internalToken, null, null)),
+      client(
+        apiHeaders(serverConfig().internalToken, null, null),
+        SHELL_TIMEOUT_MS,
+      ),
     );
     return "available";
   } catch (error) {
@@ -82,23 +116,23 @@ export async function fetchServiceStatus(): Promise<ServiceStatus> {
     logFailure("health.read", error);
     return "unavailable";
   }
-}
+});
 
 /** The verified session as the API sees it. */
-export function fetchSession(): Promise<MemberRead<SessionSummary>> {
-  return memberRead("session.read", getSession, false);
-}
+export const fetchSession = cache((): Promise<MemberRead<SessionSummary>> =>
+  memberRead("session.read", getSession, false),
+);
 
 /** PRD-Studio SH-04: readiness any member may read. */
-export function fetchReadiness(): Promise<MemberRead<MemberReadiness>> {
-  return memberRead("readiness.read", getReadiness, true);
-}
+export const fetchReadiness = cache((): Promise<MemberRead<MemberReadiness>> =>
+  memberRead("readiness.read", getReadiness, true),
+);
 
 /** PRD-Studio SH-03: the number of pending approvals, from a count rather than a listed page. */
-export function fetchPendingApprovals(): Promise<MemberRead<number>> {
-  return memberRead(
+export const fetchPendingApprovals = cache((): Promise<MemberRead<number>> =>
+  memberRead(
     "approvals.count",
     async (options) => (await countPendingApprovals(options)).pending,
     true,
-  );
-}
+  ),
+);

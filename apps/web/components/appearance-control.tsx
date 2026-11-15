@@ -1,7 +1,8 @@
 "use client";
 
-import { useTheme } from "next-themes";
 import { useState, useSyncExternalStore } from "react";
+
+import { useThemeChoice } from "@/components/theme-provider";
 import { Choice } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 
@@ -140,7 +141,7 @@ function usePreference(
 
 // The checked state depends on the browser, so it renders only after mount, and no hydration warning is hidden.
 export function AppearanceControl() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme } = useThemeChoice();
   const mounted = useSyncExternalStore(
     subscribe,
     () => true,

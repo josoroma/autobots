@@ -1,6 +1,4 @@
-"use client";
-
-import { getRunInspector } from "@autobots/api-client";
+import type { RunInspector } from "@autobots/api-client";
 import Link from "next/link";
 
 import {
@@ -9,53 +7,41 @@ import {
   ToolAttempts,
 } from "@/components/runs/inspector/inspector-lists";
 import { ModelCalls } from "@/components/runs/inspector/model-calls";
-import { LoadState } from "@/components/ui/load-state";
-import { PageHeader } from "@/components/ui/page-header";
-import { readOf } from "@/lib/load";
-import { RUN_NOT_FOUND } from "@/lib/runs/workspace-load";
-import { useResource } from "@/lib/use-resource";
 
-// The run page's classification: a refusal, a missing run and a mismatch each say so, and only an
-// outage offers Retry (WRUN-02, PRD-Development-Harness DH-06). It reads once; Retry reads again.
-export function RunInspectorView({ runId }: { runId: string }) {
-  const { state, pending, reload } = useResource(
-    readOf(getRunInspector, runId),
-  );
-  if (state.kind !== "ready") {
-    return (
-      <div className="mx-auto max-w-4xl space-y-4">
-        <PageHeader title="Run inspector" />
-        <LoadState
-          state={state}
-          what="this run"
-          onRetry={reload}
-          pending={pending}
-          notFound={RUN_NOT_FOUND}
-        />
-      </div>
-    );
-  }
-  const view = state.value;
+// US-11.5: the run inspector, rendered on the server from the page's read (WRUN-14, R-67). It has
+// no interaction, so none of it is sent to the browser as code.
+
+/** The run's goal and the way back to it, under the page's title. */
+export function InspectorLead({
+  runId,
+  view,
+}: {
+  runId: string;
+  view: RunInspector;
+}) {
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-[32px] leading-tight">Run inspector</h1>
-        <p className="text-muted-foreground text-sm leading-relaxed">
-          <span className="text-foreground font-document text-[17px] break-words">
-            {view.goal_summary === "" ? "Untitled run" : view.goal_summary}.
-          </span>{" "}
-          <Link
-            href={`/runs/${runId}`}
-            className="text-foreground font-medium whitespace-nowrap underline underline-offset-4"
-          >
-            Back to the run
-          </Link>
-        </p>
-      </header>
+    <>
+      <span className="text-foreground font-document text-[17px] break-words">
+        {view.goal_summary === "" ? "Untitled run" : view.goal_summary}.
+      </span>{" "}
+      <Link
+        href={`/runs/${runId}`}
+        className="text-foreground font-medium whitespace-nowrap underline underline-offset-4"
+      >
+        Back to the run
+      </Link>
+    </>
+  );
+}
+
+/** Every model call, tool attempt, piece of evidence and checkpoint in the run's tree. */
+export function RunInspectorView({ view }: { view: RunInspector }) {
+  return (
+    <>
       <ModelCalls calls={view.model_calls} />
       <ToolAttempts attempts={view.tool_attempts} />
       <Evidence items={view.evidence} />
       <Checkpoints view={view} />
-    </div>
+    </>
   );
 }

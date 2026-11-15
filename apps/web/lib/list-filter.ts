@@ -1,8 +1,8 @@
 /**
  * The list filter the Experts and Workflows screens share (WBLD-09): one tab and one search matched
- * by name, with each tab's count. Where the state lives is the screen's: Workflows keeps it in the
- * URL and Experts in component state, as PRD-Studio EX-02 doesn't say where Expert filters live. The
- * tool catalog builds its URLs with `withParams` too. Pure and JSX-free, so `node --test` covers it.
+ * by name, with each tab's count. Every list keeps its filters and selection in the URL (XWEB-13,
+ * R-67), as PRD-Tool-Catalog TS-01 asks of the tool catalog, which builds its URLs with `withParams`
+ * too. Pure and JSX-free, so `node --test` covers it.
  */
 
 /** A list's chosen tab and its search as typed. */
@@ -70,4 +70,12 @@ export function withParams(
   }
   const rest = next.toString();
   return rest === "" ? pathname : `${pathname}?${rest}`;
+}
+
+/** A page's search parameter, as Next.js passes it to a Server Component. */
+export type SearchParam = string | readonly string[] | undefined;
+
+/** A search parameter's value. A repeated one reads as its first, and a missing one as null. */
+export function firstParam(value: SearchParam): string | null {
+  return typeof value === "string" ? value : (value?.[0] ?? null);
 }

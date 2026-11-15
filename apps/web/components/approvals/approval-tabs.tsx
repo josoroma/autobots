@@ -9,6 +9,9 @@ const TABS = [
   ["decided", "Decided"],
 ] as const;
 
+/** The tabs a URL's ?tab= can name. */
+export const TAB_IDS: readonly Tab[] = TABS.map(([id]) => id);
+
 /**
  * Waiting and Decided with their counts (PRD-Studio AP-01). The tabs stay while a read loads or
  * has failed, and each shows its count once a read has one (WTAP-05).

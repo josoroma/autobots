@@ -2,8 +2,8 @@
 
 import {
   admitRun,
-  getWorkSession,
   type RunRequest,
+  type SessionView,
 } from "@autobots/api-client";
 import { Play } from "lucide-react";
 import Link from "next/link";
@@ -17,7 +17,6 @@ import { Card } from "@/components/ui/card";
 import { Choice, Textarea } from "@/components/ui/field";
 import { SectionLabel } from "@/components/ui/page-header";
 import { writes } from "@/lib/api/browser";
-import { readOf } from "@/lib/load";
 import { profileField } from "@/lib/model-profile";
 import {
   ADMISSION_UNKNOWN,
@@ -25,19 +24,15 @@ import {
   CHOICE_NOT_OFFERED,
 } from "@/lib/run-admission";
 import { type Outcome, withHeld } from "@/lib/submit";
-import { useResource } from "@/lib/use-resource";
 import { useSubmit } from "@/lib/use-submit";
 
 const KEPT = "Your goal is kept.";
 
-export function SessionPanel({ sessionId }: { sessionId: string }) {
+// US-5.1: new work in a direct or coordinator session. The page reads the session on the server and
+// passes it in (WCMP-07, R-67), so this keeps only the form.
+export function SessionPanel({ session }: { session: SessionView }) {
   // One key until the outcome is known, and one press at a time (Decision 0027 D2).
   const admission = useSubmit<RunRequest>();
-  const sessionRead = useResource(readOf(getWorkSession, sessionId));
-  const session =
-    sessionRead.state.kind === "ready" ? sessionRead.state.value : null;
-  const unavailable =
-    sessionRead.state.kind !== "ready" && sessionRead.state.kind !== "loading";
   const [goal, setGoal] = useState("");
   const [chosen, setChosen] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
@@ -48,7 +43,6 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
   const [profile, setProfile] = useState("");
 
   async function run(): Promise<void> {
-    if (session === null) return;
     setProblem(null);
     setRunId(null);
     const expertId =
@@ -90,20 +84,6 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
     });
   }
 
-  if (unavailable) {
-    return (
-      <p role="alert" data-state="unavailable" className="text-sm">
-        That session is not available.
-      </p>
-    );
-  }
-  if (session === null) {
-    return (
-      <p role="status" className="text-muted-foreground text-sm">
-        Loading this session.
-      </p>
-    );
-  }
   const ready =
     goal.trim() !== "" && (session.kind === "direct" || chosen !== null);
   // While a request is held, its goal, Expert and model stay as sent (Decision 0027 D2).

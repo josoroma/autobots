@@ -1,6 +1,5 @@
 import type { RunList } from "@autobots/api-client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { StateLine } from "@/components/runs/run-state";
 import { Button } from "@/components/ui/button";
@@ -20,11 +19,14 @@ export function RunRows({
   more,
   selected,
   onMore,
+  onSelect,
 }: {
   list: RunList;
   more: More | null;
   selected: string | null;
   onMore: () => void;
+  /** Opens a run's panel. */
+  onSelect: (runId: string) => void;
 }) {
   if (list.runs.length === 0) return <NoRuns all={list.counts.all} />;
   return (
@@ -45,7 +47,12 @@ export function RunRows({
       </div>
       <ul className="divide-border divide-y border-b text-[13.5px] max-lg:border-t">
         {list.runs.map((run) => (
-          <Row key={run.id} run={run} selected={run.id === selected} />
+          <Row
+            key={run.id}
+            run={run}
+            selected={run.id === selected}
+            onSelect={onSelect}
+          />
         ))}
       </ul>
       <div className="mt-4 flex items-center gap-3 text-[12.5px]">
@@ -91,7 +98,15 @@ function NoRuns({ all }: { all: number }) {
   );
 }
 
-function Row({ run, selected }: { run: RunRow; selected: boolean }) {
+function Row({
+  run,
+  selected,
+  onSelect,
+}: {
+  run: RunRow;
+  selected: boolean;
+  onSelect: (runId: string) => void;
+}) {
   const goal = run.goal_summary === "" ? "Untitled run" : run.goal_summary;
   return (
     <li
@@ -109,7 +124,12 @@ function Row({ run, selected }: { run: RunRow; selected: boolean }) {
         >
           {goal}
         </Link>
-        <RowLabel run={run} goal={goal} selected={selected} />
+        <RowLabel
+          run={run}
+          goal={goal}
+          selected={selected}
+          onSelect={onSelect}
+        />
       </div>
       <StateLine status={run.status} text={stateLine(run)} />
       <span
@@ -130,17 +150,19 @@ function Row({ run, selected }: { run: RunRow; selected: boolean }) {
   );
 }
 
-// RN-04: Details opens the run's panel under the list, and the address keeps it open.
+// RN-04: Details opens the run's panel under the list, and the address keeps it open with the
+// list's filters.
 function RowLabel({
   run,
   goal,
   selected,
+  onSelect,
 }: {
   run: RunRow;
   goal: string;
   selected: boolean;
+  onSelect: (runId: string) => void;
 }) {
-  const router = useRouter();
   return (
     <span
       data-field="label"
@@ -151,11 +173,7 @@ function RowLabel({
       {" · "}
       <button
         type="button"
-        onClick={() =>
-          router.replace(`/runs?run=${encodeURIComponent(run.id)}`, {
-            scroll: false,
-          })
-        }
+        onClick={() => onSelect(run.id)}
         aria-expanded={selected}
         aria-controls={selected ? "run-panel" : undefined}
         aria-label={`Details for ${goal}`}

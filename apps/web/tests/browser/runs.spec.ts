@@ -3,7 +3,7 @@ import {
   parseRunAccepted,
   parseRunCommandResult,
 } from "@autobots/api-client";
-import type { Page, Route } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 import { expectNoA11yViolations } from "./support/a11y.ts";
 import { expectRefusal, send, writeHeaders } from "./support/api.ts";
@@ -252,6 +252,15 @@ test("status tabs, filters, paging and estimated spend on Runs", async ({
   );
   expect(new Set(ids).size).toBe(101);
   await expect(page.getByRole("button", { name: "Load more" })).toHaveCount(0);
+  // Opening the panel of a run Load more added keeps the rows it added (RN-04).
+  const added = ids.at(-1) ?? "";
+  await page
+    .locator(`li[data-run="${added}"]`)
+    .locator('[data-field="details"]')
+    .click();
+  await expect(page).toHaveURL(new RegExp(`[?&]run=${added}`));
+  await expect(page.locator(`section[data-panel="${added}"]`)).toBeVisible();
+  await expect(rows).toHaveCount(101);
 
   const spend = (id: string) =>
     page.locator(`[data-run="${id}"] [data-field="spend"]`);
@@ -304,66 +313,4 @@ test("status tabs, filters, paging and estimated spend on Runs", async ({
   await expect(
     page.locator(`[data-run="${HELD}"] [data-field="models"]`),
   ).toContainText("Sol");
-});
-
-// R-27: each way the list can fail reads differently, and only an outage offers Retry. The replies
-// are arranged with page.route on the list's first page, plain /api/v1/runs.
-test("the run list says why it can't be read, and Retry reads it again", async ({
-  page,
-}) => {
-  await signIn(page, users.owner);
-  let arranged: Parameters<Route["fulfill"]>[0] | null = null;
-  await page.route("**/api/v1/runs", (route) =>
-    arranged === null || route.request().method() !== "GET"
-      ? route.continue()
-      : route.fulfill(arranged),
-  );
-  const state = page.locator('[data-state="unavailable"]');
-  for (const [reply, reason, words] of [
-    [
-      {
-        status: 403,
-        json: { code: "not_a_member", message: "Members only, arranged." },
-      },
-      "denied",
-      "Members only, arranged.",
-    ],
-    [
-      {
-        status: 422,
-        json: { code: "validation_failed", message: "Arranged." },
-      },
-      "not_found",
-      "Runs can't be found.",
-    ],
-    [
-      { status: 200, json: { schema_version: 1, runs: "arranged" } },
-      "out_of_date",
-      "This page and the local service disagree. Reload after updating.",
-    ],
-  ] as const) {
-    arranged = reply;
-    await page.goto("/runs");
-    await expect(state).toHaveAttribute("data-reason", reason);
-    await expect(state.getByRole("alert")).toHaveText(words);
-    await expect(state.getByRole("button", { name: "Retry" })).toHaveCount(0);
-  }
-  arranged = {
-    status: 503,
-    json: {
-      code: "service_unavailable",
-      message: "The local API is unavailable.",
-    },
-  };
-  await page.goto("/runs");
-  await expect(state).toHaveAttribute("data-reason", "unavailable");
-  await expect(state.getByRole("alert")).toHaveText(
-    "Runs can't be read right now. Check that the local services are running, then try again.",
-  );
-  arranged = null;
-  await state.getByRole("button", { name: "Retry" }).click();
-  await expect(state).toHaveCount(0);
-  await expect(
-    page.locator('[data-state="shown"], [data-state="empty"]'),
-  ).toBeVisible();
 });

@@ -3,13 +3,15 @@
  * AP-04). One key per decision until its outcome is known, scoped to the request, so a press for
  * the other decision while one is held sends nothing (Decision 0027 D2). The message comes from the
  * status the service returned. Every decision except a `changed` press reads the list again through
- * `reload`, which reads the tab shown then, not the one the press came from (WTAP-04).
+ * `reload`, which reads the tab shown then, not the one the press came from (WTAP-04), and renders the
+ * page again on the server, so the sidebar's pending count follows (XWEB-14, PRD-Studio SH-03).
  */
 import {
   decideApproval,
   type ApprovalDecision as DecisionBody,
   type ApprovalView,
 } from "@autobots/api-client";
+import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 
 import { writes } from "@/lib/api/browser";
@@ -26,6 +28,7 @@ export interface ApprovalDecision {
 
 export function useApprovalDecision(reload: () => void): ApprovalDecision {
   const { submit } = useSubmit<DecisionBody>();
+  const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const clearMessage = useCallback(() => setMessage(null), []);
 
@@ -43,8 +46,9 @@ export function useApprovalDecision(reload: () => void): ApprovalDecision {
       setMessage(decisionText(result));
       if (result.outcome === "changed") return;
       reload();
+      router.refresh();
     },
-    [submit, reload],
+    [submit, reload, router],
   );
 
   return { message, decide, clearMessage };

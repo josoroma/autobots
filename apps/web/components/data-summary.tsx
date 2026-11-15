@@ -1,10 +1,5 @@
-"use client";
-
-import { getRetentionSummary } from "@autobots/api-client";
+import type { RetentionSummary } from "@autobots/api-client";
 import Link from "next/link";
-
-import { readOf } from "@/lib/load";
-import { useResource } from "@/lib/use-resource";
 
 function kept(days: number | null, what: string): string {
   return days === null
@@ -13,24 +8,8 @@ function kept(days: number | null, what: string): string {
 }
 
 // PRD-Studio SE-06: what this workspace keeps, read-only for every member. Only the owner changes it,
-// on Operations, so only the owner is offered the link.
-export function DataSummary() {
-  const { state } = useResource(readOf(getRetentionSummary));
-  const summary = state.kind === "ready" ? state.value : null;
-
-  if (state.kind !== "ready" && state.kind !== "loading")
-    return (
-      <p role="alert" className="text-sm">
-        The retention summary is unavailable. Sign in, and check that the local
-        API is running.
-      </p>
-    );
-  if (summary === null)
-    return (
-      <p role="status" className="text-muted-foreground text-sm">
-        Loading the retention summary.
-      </p>
-    );
+// on Operations, so only the owner is offered the link. The page reads it on the server (R-67).
+export function DataSummary({ summary }: { summary: RetentionSummary }) {
   return (
     <section
       aria-labelledby="retention-heading"

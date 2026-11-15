@@ -1,8 +1,11 @@
 /**
  * Saves the retention windows (WSYS-01, R-19). One save at a time; it sends no key and replaces the
- * windows whole, so it's never held. An accepted save reads the status again through `onSaved`.
+ * windows whole, so it's never held. An accepted save reads the status again through `onSaved`, and
+ * renders the page again on the server, so a server-read page such as Settings → Data that Back
+ * returns to isn't stale (XWEB-14).
  */
 import { setRetention, type RetentionSettings } from "@autobots/api-client";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { writes } from "@/lib/api/browser";
@@ -19,6 +22,7 @@ export interface RetentionSave {
 
 export function useRetentionSave(onSaved: () => void): RetentionSave {
   const saves = useSubmit<RetentionSettings>();
+  const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
 
   async function save(request: () => RetentionSettings | null): Promise<void> {
@@ -32,7 +36,9 @@ export function useRetentionSave(onSaved: () => void): RetentionSave {
     const accepted = result.outcome === "accepted";
     // A refused save keeps what was typed, so it can be corrected.
     setMessage(retentionOutcome(accepted, result.refusal));
-    if (accepted) onSaved();
+    if (!accepted) return;
+    onSaved();
+    router.refresh();
   }
 
   return { pending: saves.pending, message, save };

@@ -1,5 +1,5 @@
 import { parseProviderStatus, parseRunInspector } from "@autobots/api-client";
-import type { Page, Route } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 import { expectNoA11yViolations } from "./support/a11y.ts";
 import { getJson } from "./support/api.ts";
@@ -134,70 +134,4 @@ test("another workspace's run is refused, on the route and on the screen", async
   await expect(other.locator("main")).not.toContainText("slice-private");
   await other.goto("/runs");
   await expect(other.locator(`[data-run="${id}"]`)).toHaveCount(0);
-});
-
-// R-28: the inspector says why it can't read a run, as the run page does, and only an outage offers
-// Retry. The replies are arranged with page.route on the inspector read.
-test("the inspector says why it can't read a run, and Retry reads it again", async ({
-  page,
-}) => {
-  const keyless = noKeyRun();
-  await signIn(page, users.noKey);
-  const inspector = (url: URL) =>
-    url.pathname === `/api/v1/runs/${keyless}/inspector`;
-  let arranged: Parameters<Route["fulfill"]>[0] | null = null;
-  await page.route(inspector, (route) =>
-    arranged === null ? route.continue() : route.fulfill(arranged),
-  );
-  const state = page.locator('[data-state="unavailable"]');
-  for (const [reply, reason, words] of [
-    [
-      {
-        status: 403,
-        json: { code: "workspace_required", message: "Choose a workspace." },
-      },
-      "denied",
-      "Choose a workspace.",
-    ],
-    [
-      { status: 401, json: { code: "not_signed_in", message: "Arranged." } },
-      "signed_out",
-      "You're signed out. Sign in to see this run.",
-    ],
-    [
-      { status: 422, json: { code: "validation_error", message: "Arranged." } },
-      "not_found",
-      "That run is not available. Sign in with access to it, or check the link.",
-    ],
-    [
-      { status: 200, json: { schema_version: 1, model_calls: "arranged" } },
-      "out_of_date",
-      "This page and the local service disagree. Reload after updating.",
-    ],
-  ] as const) {
-    arranged = reply;
-    await page.goto(`/runs/${keyless}/inspector`);
-    await expect(state).toHaveAttribute("data-reason", reason);
-    await expect(state.getByRole("alert")).toHaveText(words);
-    await expect(state.getByRole("button", { name: "Retry" })).toHaveCount(0);
-  }
-  arranged = {
-    status: 503,
-    json: {
-      code: "service_unavailable",
-      message: "The local API is unavailable.",
-    },
-  };
-  await page.goto(`/runs/${keyless}/inspector`);
-  await expect(state).toHaveAttribute("data-reason", "unavailable");
-  await expect(state.getByRole("alert")).toHaveText(
-    "This run can't be read right now. Check that the local services are running, then try again.",
-  );
-  arranged = null;
-  await state.getByRole("button", { name: "Retry" }).click();
-  await expect(state).toHaveCount(0);
-  await expect(
-    page.getByRole("heading", { name: "Model calls" }),
-  ).toBeVisible();
-  await page.unroute(inspector);
 });

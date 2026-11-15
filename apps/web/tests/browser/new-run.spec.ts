@@ -74,7 +74,8 @@ test("⇧⌘O in a text field does nothing, and the field keeps its content and 
   await page.keyboard.press(`Shift+${MODIFIER}+KeyO`);
   // A negative observation: the shortcut navigates nowhere within 400 ms.
   await page.waitForTimeout(400);
-  await expect(page).toHaveURL(/\/runs$/);
+  // The filter keeps its text in ?q= (XWEB-13), so the page is checked by its path.
+  expect(new URL(page.url()).pathname).toBe("/runs");
   await expect(filter).toBeFocused();
   await expect(filter).toHaveValue("kept text");
 });

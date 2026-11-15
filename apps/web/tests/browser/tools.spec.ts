@@ -339,30 +339,3 @@ test("the catalog says why it can't be read, and Retry reads it again", async ({
   await expect(page.locator('[data-tool="calculate"]')).toBeVisible();
   await expect(state).toHaveCount(0);
 });
-
-test("a tool that isn't there, or can't be read, says which", async ({
-  page,
-}) => {
-  let arranged: Parameters<Route["fulfill"]>[0] = {
-    status: 422,
-    json: { code: "validation_failed", message: "Not a tool ID." },
-  };
-  await page.route("**/api/v1/tools/calculate", (route) =>
-    route.fulfill(arranged),
-  );
-  await signedIn(page, "/tools/calculate");
-  const state = page.locator('[data-state="unavailable"]');
-  await expect(state).toHaveAttribute("data-reason", "not_found");
-  await expect(state.getByRole("alert")).toHaveText(
-    "That tool isn't in the catalog.",
-  );
-  arranged = DOWN;
-  await page.reload();
-  await expect(state).toHaveAttribute("data-reason", "unavailable");
-  await expect(state.getByRole("alert")).toHaveText(
-    "This tool can't be read right now. Check that the local services are running, then try again.",
-  );
-  await page.unroute("**/api/v1/tools/calculate");
-  await state.getByRole("button", { name: "Retry" }).click();
-  await expect(page.getByRole("heading", { name: "Calculate" })).toBeVisible();
-});

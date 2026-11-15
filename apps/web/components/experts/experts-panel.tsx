@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 import { CoordinatorBar } from "@/components/experts/coordinator-bar";
 import { ExpertCard } from "@/components/experts/expert-card";
 import { ExpertFilters } from "@/components/experts/expert-filters";
@@ -10,23 +8,35 @@ import { useExpertList } from "@/components/experts/use-expert-list";
 import { CreateByName } from "@/components/list-detail/create-by-name";
 import { ListSection } from "@/components/list-detail/list-section";
 import { LoadState } from "@/components/ui/load-state";
-import {
-  EXPERT_FILTER_IDS,
-  inExpertFilter,
-  type ExpertFilter,
-} from "@/lib/experts/card";
-import { filterList, tabCounts } from "@/lib/list-filter";
+import { EXPERT_FILTER_IDS, inExpertFilter } from "@/lib/experts/card";
+import { filterList, parseTab, tabCounts } from "@/lib/list-filter";
+import { useUrlDraft } from "@/lib/use-url-draft";
+import { useUrlParams } from "@/lib/use-url-params";
+
+const trim = (raw: string): string => raw.trim();
 
 /**
  * The Experts list (US-5.1, PRD-Studio EX-01 to EX-03): cards with their class and approval note,
  * a filter and search, direct and coordinator sessions, and a new Expert. Each read says why it
- * failed, and the catalog's own failure offers Retry beside the filters it holds back.
+ * failed, and the catalog's own failure offers Retry beside the filters it holds back. The filter
+ * and search are ?tab= and ?q=, changed in place, as every list keeps them (XWEB-13, R-67); the list
+ * follows what was chosen or typed at once.
  */
 export function ExpertsPanel() {
   const data = useExpertList();
   const actions = useExpertActions();
-  const [filter, setFilter] = useState<ExpertFilter>("all");
-  const [search, setSearch] = useState("");
+  const url = useUrlParams();
+  const tab = useUrlDraft(
+    parseTab(url.get("tab"), EXPERT_FILTER_IDS, "all"),
+    (next) => url.replace({ tab: next === "all" ? null : next }),
+  );
+  const query = useUrlDraft(
+    url.get("q") ?? "",
+    (next) => url.replace({ q: next }),
+    { delayMs: 150, normalize: trim },
+  );
+  const filter = parseTab(tab.value, EXPERT_FILTER_IDS, "all");
+  const search = query.value;
 
   if (data.experts === null) {
     return (
@@ -53,7 +63,7 @@ export function ExpertsPanel() {
           <>
             <ExpertFilters
               filter={filter}
-              onFilter={setFilter}
+              onFilter={tab.change}
               counts={tabCounts(
                 data.classified,
                 EXPERT_FILTER_IDS,
@@ -61,7 +71,7 @@ export function ExpertsPanel() {
               )}
               known={data.tools !== null}
               search={search}
-              onSearch={setSearch}
+              onSearch={query.change}
             />
             {data.tools !== null ||
             data.catalog.state.kind === "loading" ? null : (

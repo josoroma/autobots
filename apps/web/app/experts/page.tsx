@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { ExpertsPanel } from "@/components/experts/experts-panel";
 import { PageHeader } from "@/components/ui/page-header";
@@ -12,7 +13,16 @@ export default function ExpertsPage() {
         title="Experts"
         description="Specialists with their own purpose, instructions, granted tools and model. Open one to work with it directly, or include several in a coordinator session."
       />
-      <ExpertsPanel />
+      {/* The panel reads its filters from the URL. */}
+      <Suspense
+        fallback={
+          <p role="status" className="text-muted-foreground text-sm">
+            Loading Experts.
+          </p>
+        }
+      >
+        <ExpertsPanel />
+      </Suspense>
     </div>
   );
 }

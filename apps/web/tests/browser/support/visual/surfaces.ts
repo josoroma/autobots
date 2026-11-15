@@ -191,18 +191,20 @@ export const SURFACES: readonly Surface[] = [
       ).toBeVisible();
     },
   },
+  // The Experts list reads in the browser, so a route can hold or refuse its read. The run list's
+  // first page is read on the server (R-67), where no route reaches.
   {
     name: "state-loading",
     context: "owner",
-    path: () => "/runs",
-    arrange: (page) => hang(page, "**/api/v1/runs"),
+    path: () => "/experts",
+    arrange: (page) => hang(page, "**/api/v1/experts"),
     ready: shows('[data-state="loading"]'),
   },
   {
     name: "state-error",
     context: "owner",
-    path: () => "/runs",
-    arrange: (page) => refuse(page, "**/api/v1/runs"),
+    path: () => "/experts",
+    arrange: (page) => refuse(page, "**/api/v1/experts"),
     ready: shows('[data-state="unavailable"]'),
   },
   {

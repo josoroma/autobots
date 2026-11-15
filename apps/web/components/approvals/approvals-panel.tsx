@@ -1,16 +1,18 @@
 "use client";
 
 import type { ApprovalView } from "@autobots/api-client";
-import { useState } from "react";
 
 import { ApprovalDetail } from "@/components/approvals/approval-detail";
 import { ApprovalList } from "@/components/approvals/approval-list";
-import { ApprovalTabs, type Tab } from "@/components/approvals/approval-tabs";
+import { ApprovalTabs, TAB_IDS } from "@/components/approvals/approval-tabs";
 import { useApprovalDecision } from "@/components/approvals/use-approval-decision";
 import { useApprovalList } from "@/components/approvals/use-approval-list";
 import { useApprovalShortcuts } from "@/components/approvals/use-approval-shortcuts";
 import { Card, INNER_BOX } from "@/components/ui/card";
 import { LoadState } from "@/components/ui/load-state";
+import { parseTab } from "@/lib/list-filter";
+import { useUrlDraft } from "@/lib/use-url-draft";
+import { useUrlParams } from "@/lib/use-url-params";
 import { cn } from "@/lib/utils";
 
 // The chosen request while it's listed, or else the first, so a reload never selects a missing one.
@@ -25,15 +27,21 @@ function selectedIn(
 
 // PRD-Studio AP-01 to AP-04: Waiting and Decided with counts, the list beside the selected request,
 // J and K to move, and ⌘↵ or ⌘⌫ pressed twice within 2 s to decide. Every decision is the
-// service's; this screen reads the list, asks for decisions and shows what they did.
-export function ApprovalsPanel({
-  initial = null,
-}: {
-  // HM-04: Home's Review link opens with its request selected, when it's still waiting.
-  initial?: string | null;
-}) {
-  const [tab, setTab] = useState<Tab>("waiting");
-  const [chosen, setChosen] = useState<string | null>(initial);
+// service's; this screen reads the list, asks for decisions and shows what they did. The tab and the
+// selected request are ?tab= and ?approval=, changed in place, so a reload and Back keep them
+// (XWEB-13, R-67), and Home's Review link opens with its request selected (HM-04).
+export function ApprovalsPanel() {
+  const url = useUrlParams();
+  const tabDraft = useUrlDraft(
+    parseTab(url.get("tab"), TAB_IDS, "waiting"),
+    (next) => url.replace({ tab: next === "waiting" ? null : next }),
+  );
+  const chosenDraft = useUrlDraft(url.get("approval") ?? "", (next) =>
+    url.replace({ approval: next }),
+  );
+  const tab = parseTab(tabDraft.value, TAB_IDS, "waiting");
+  const chosen = chosenDraft.value === "" ? null : chosenDraft.value;
+  const setChosen = (id: string) => chosenDraft.change(id);
   const read = useApprovalList(tab);
   const decision = useApprovalDecision(read.reload);
   const approvals = read.list?.approvals ?? [];
@@ -55,7 +63,7 @@ export function ApprovalsPanel({
         tab={tab}
         counts={read.counts}
         onChoose={(next) => {
-          setTab(next);
+          tabDraft.change(next);
           decision.clearMessage();
           shortcuts.disarm();
         }}

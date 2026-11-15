@@ -56,6 +56,22 @@ Tests that build on the one before them are grouped in an untitled `test.describ
 so a failure skips its dependents instead of failing them for its reason (TWEB-07). The group adds
 nothing to the tests' titles. Tests that don't depend on each other stay out of these groups.
 
+## Pages that read on the server
+
+The run list's first page, the run inspector, a tool's page, a session, Settings → Data and Home's
+Needs you and Recent runs are read on the server (R-67), with the session and chosen workspace of
+the request, as the BFF reads for the browser. `page.route` sees only the browser's requests, so it
+can't arrange how those reads fail. `server-reads.spec.ts`, in `web`, reaches each state for real:
+no session, a session the API refuses, a person in no workspace, a chosen workspace the person
+isn't in, a name the API doesn't know, and the web server whose API is closed. The out-of-date
+state, which no running service answers, is pinned in `tests/unit/load-failure.test.ts`. Screens
+that still read in the browser, such as Experts, keep their `page.route` cases, and the visual
+walk's loading and error surfaces open Experts for that reason.
+
+These pages are dynamic and read for each request, and no server cache holds their data. After
+signing out, Back can still show a page from the browser's own history cache. That's accepted: any
+read that page makes next, on the server or through the BFF, is refused as signed out.
+
 ## Selectors
 
 - Find by role and accessible name first, then by label: `getByRole("button", { name: "Save" })`,

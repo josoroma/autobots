@@ -2,6 +2,7 @@ import { chosenWorkspace, currentWorkspace } from "@/lib/workspace-choice";
 import type { SessionSummary } from "@autobots/api-client";
 import { Server, UserRound } from "lucide-react";
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { AboutServices } from "@/components/about-services";
 import { GoalComposer } from "@/components/composer/goal-composer";
@@ -100,7 +101,22 @@ export default async function HomePage() {
         </p>
       </header>
       <GoalComposer />
-      {session === null ? null : <HomeActivity />}
+      {/* What needs the person streams in after the composer, which needs none of it (WCMP-07). */}
+      {session === null ? null : (
+        <Suspense
+          fallback={
+            <p
+              role="status"
+              data-state="loading"
+              className="text-muted-foreground mt-14 text-sm"
+            >
+              Loading what needs you and recent runs.
+            </p>
+          }
+        >
+          <HomeActivity />
+        </Suspense>
+      )}
       <div className="mt-14 grid gap-10 md:grid-cols-2 md:gap-8">
         <section aria-labelledby="account-heading" className={LOWER_SECTION}>
           <div className={LOWER_HEAD}>

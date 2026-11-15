@@ -9,7 +9,13 @@ import { test } from "node:test";
 import { listRuns, parseRunList, type RunList } from "@autobots/api-client";
 
 import { load, readOf } from "../../lib/load.ts";
+import { pendingWrite, startDraft } from "../../lib/url-draft.ts";
 import {
+  mergeRuns,
+  runFilterQuery,
+  runFilterQueryForUrl,
+  runFiltersFrom,
+  runFiltersFromQuery,
   runListQuery,
   spendShare,
   stateLine,
@@ -136,4 +142,96 @@ test("Load more appends to the first page it was read for, and keeps the newest 
   assert.equal(shown.has_more, false);
   assert.equal(shown.runs.length, 1);
   assert.equal(withMore(base, { ...more, next: null, loading: true }), base);
+});
+
+test("the filters come from the page's URL, and a value the list doesn't offer reads as none", () => {
+  assert.deepEqual(runFiltersFrom({}), ALL);
+  assert.deepEqual(
+    runFiltersFrom({
+      group: "needs_you",
+      q: "fully reported",
+      profile: "openrouter_sol",
+      run: "11111111-1111-4111-8111-111111111111",
+    }),
+    { group: "needs_you", query: "fully reported", profile: "openrouter_sol" },
+  );
+  assert.deepEqual(
+    runFiltersFrom({ group: "everything", profile: "openai/gpt-unknown" }),
+    ALL,
+  );
+  // A repeated parameter reads as its first value.
+  assert.deepEqual(runFiltersFrom({ group: ["finished", "active"] }), {
+    ...ALL,
+    group: "finished",
+  });
+});
+
+test("a filter at its default leaves the URL, so the plain list is plain /runs", () => {
+  assert.equal(runFilterQuery(ALL), "");
+  assert.equal(
+    runFilterQuery({
+      group: "active",
+      query: " fully reported ",
+      profile: "openrouter_terra",
+    }),
+    "group=active&q=fully+reported&profile=openrouter_terra",
+  );
+  assert.equal(runFilterQuery({ ...ALL, query: "   " }), "");
+  // What the search box shows keeps its spaces until it's written to the URL.
+  const typed = runFilterQuery({ ...ALL, query: "fully " }, true);
+  assert.equal(typed, "q=fully+");
+  assert.deepEqual(runFiltersFromQuery(typed), { ...ALL, query: "fully " });
+  assert.equal(runFilterQuery(runFiltersFromQuery(typed)), "q=fully");
+});
+
+test("a first page and the pages Load more added show each run once, as the first page has it", () => {
+  const first = row({ id: "11111111-1111-4111-8111-111111111111" });
+  const newer = { ...first, status: "running" as const };
+  const second = row({ id: "22222222-2222-4222-8222-222222222222" });
+  const merged = mergeRuns([newer, second], [first, second]);
+  assert.deepEqual(
+    merged.map((run) => run.id),
+    [first.id, second.id],
+  );
+  assert.equal(merged[0]?.status, "running");
+  const base = parseRunList({
+    schema_version: 1,
+    has_more: false,
+    next_cursor: null,
+    total: 2,
+    counts: { all: 2, active: 1, needs_you: 0, finished: 1 },
+    runs: [newer, newer, second],
+  });
+  assert.deepEqual(
+    withMore(base, null).runs.map((run) => run.id),
+    [first.id, second.id],
+  );
+  const shown = withMore(base, {
+    base,
+    runs: [first],
+    next: { ...base, runs: [first] },
+    failure: null,
+    loading: false,
+  });
+  assert.deepEqual(
+    shown.runs.map((run) => run.id),
+    [first.id, second.id],
+  );
+});
+
+test("opening the list writes no URL: a page's own filters are already in the form the URL keeps", () => {
+  for (const params of [
+    {},
+    { group: "needs_you" },
+    { q: "fully reported", profile: "openrouter_sol" },
+    { q: "  spaced  ", group: "everything" },
+  ]) {
+    const opened = runFilterQuery(runFiltersFrom(params));
+    assert.equal(pendingWrite(startDraft(opened), runFilterQueryForUrl), null);
+  }
+  // Typing writes, trimmed, and only what differs from the URL.
+  assert.equal(
+    runFilterQueryForUrl(runFilterQuery({ ...ALL, query: " fully " }, true)),
+    "q=fully",
+  );
 });

@@ -1,4 +1,5 @@
 import { admitRun, type RunRequest } from "@autobots/api-client";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { writes } from "@/lib/api/browser";
@@ -20,8 +21,12 @@ export interface ContinueProblem {
   text: string;
 }
 
-/** Starts a new run linked to a finished one, which stays as it is. */
+/**
+ * Starts a new run linked to a finished one, which stays as it is. An accepted run renders the page
+ * again on the server, so its server-read parts, such as the sidebar, include it (XWEB-14).
+ */
 export function useContinueRun(runId: string) {
+  const router = useRouter();
   const [profile, setProfile] = useState("");
   const [started, setStarted] = useState<string | null>(null);
   const [problem, setProblem] = useState<ContinueProblem | null>(null);
@@ -52,6 +57,7 @@ export function useContinueRun(runId: string) {
     if (result.outcome === "accepted" && result.value !== null) {
       setAlready(result.value.replayed);
       setStarted(result.value.run_id);
+      router.refresh();
       return;
     }
     setProblem({

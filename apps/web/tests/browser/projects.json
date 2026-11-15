@@ -1,5 +1,10 @@
 {
-  "web": ["appearance.spec.ts", "boundary.spec.ts", "tools.spec.ts"],
+  "web": [
+    "appearance.spec.ts",
+    "boundary.spec.ts",
+    "server-reads.spec.ts",
+    "tools.spec.ts"
+  ],
   "main": [
     "approvals.spec.ts",
     "artifacts.spec.ts",
@@ -8,6 +13,7 @@
     "experts.spec.ts",
     "home.spec.ts",
     "identity.spec.ts",
+    "list-filters.spec.ts",
     "models.spec.ts",
     "new-run.spec.ts",
     "operations-history.spec.ts",

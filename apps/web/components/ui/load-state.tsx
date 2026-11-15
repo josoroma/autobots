@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { type ReactNode, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { type ReactNode, useEffect, useTransition } from "react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
-import { failureWords, mismatchRecord } from "@/lib/load";
+import { failureWords, mismatchRecord, type LoadFailure } from "@/lib/load";
 import type { ResourceState } from "@/lib/use-resource";
 import { cn } from "@/lib/utils";
 
@@ -97,6 +98,35 @@ export function LoadState({
         </Link>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Why a read that a Server Component made failed (R-67), in the same words and hooks as LoadState.
+ * Retry renders the page again on the server, which reads again, and waits while it does.
+ */
+export function ServerLoadState({
+  state,
+  what,
+  notFound,
+  className,
+}: {
+  state: LoadFailure;
+  what: string;
+  notFound?: string;
+  className?: string;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  return (
+    <LoadState
+      state={state}
+      what={what}
+      pending={pending}
+      onRetry={() => startTransition(() => router.refresh())}
+      {...(notFound === undefined ? {} : { notFound })}
+      {...(className === undefined ? {} : { className })}
+    />
   );
 }
 

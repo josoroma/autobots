@@ -1,7 +1,6 @@
 import type { RunWorkspace } from "@autobots/api-client";
 
 import { LoadState } from "@/components/ui/load-state";
-import { PageHeader } from "@/components/ui/page-header";
 import {
   RUN_NOT_FOUND,
   retryWords,
@@ -10,7 +9,8 @@ import {
 } from "@/lib/runs/workspace-load";
 
 // PRD-Development-Harness DH-06: loading, a refusal, a missing run, an outage being retried and a
-// mismatch each read differently, and only an outage offers Retry (WRUN-02).
+// mismatch each read differently, and only an outage offers Retry (WRUN-02). The page's header stays
+// above it (XWEB-19).
 export function RunLoadState({
   load,
   onRetry,
@@ -20,8 +20,7 @@ export function RunLoadState({
 }) {
   const state = shownState(load);
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
-      <PageHeader title="Run" />
+    <div className="space-y-4">
       {state === null ? null : (
         <LoadState
           state={state}
