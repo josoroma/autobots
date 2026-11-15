@@ -42,6 +42,19 @@ class ApiError(Exception):
         self.message = message
 
 
+BUDGET_MESSAGES = {
+    "budget_out_of_range": "Choose a budget from US$0.25 to US$5.00.",
+    "budget_off_step": "Choose a budget in steps of US$0.25.",
+    "budget_above_daily_cap": "That budget is more than what's left of today's spending cap.",
+}
+
+
+def budget_error(code: str) -> ApiError:
+    """A chosen budget's refusal, for a goal run and a workflow execution alike (Decision 0022
+    D11): past today's cap is a conflict, and out of range or off step a bad request (PAPI-04)."""
+    return ApiError(409 if code == "budget_above_daily_cap" else 422, code, BUDGET_MESSAGES[code])
+
+
 def _response(status_code: int, code: str, message: str) -> JSONResponse:
     body = ErrorResponse(code=code, message=message).model_dump()
     return JSONResponse(status_code=status_code, content=body)

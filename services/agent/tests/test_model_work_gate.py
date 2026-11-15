@@ -8,6 +8,7 @@ pass it differently, and each difference is pinned here. No socket, database or 
 """
 
 import asyncio
+import json
 from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
 from uuid import UUID
@@ -28,8 +29,10 @@ from autobots.application.run_admission import (
     saved_workspace_policy,
     workspace_role_policy,
 )
+from autobots.application.runs import Inheritance, Inherited, RunAdmission, admit
 from autobots.application.tool_catalog import ToolsUnavailable
 from autobots.application.workflow_overview import preview_steps
+from autobots.application.workflows import create_execution
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.routines import RoutineConfig, RoutineTarget
 from autobots.domain.budgets import BudgetRefused
@@ -391,7 +394,9 @@ def test_the_run_preview_shows_a_profile_not_offered_instead_of_refusing(
 # The workflow preview
 
 
-def test_the_workflow_preview_applies_each_steps_expert_and_reads_the_policy_once() -> None:
+def test_every_agent_step_shows_the_workflow_runs_executor_from_one_policy_read() -> None:
+    """Decision 0028 E6: an Expert's own binding isn't applied, and a step whose Expert isn't in
+    this workspace shows no model."""
     database, connection = fresh()
     second = {"expert_id": str(SECOND_EXPERT)}
     graph = {
@@ -414,10 +419,174 @@ def test_the_workflow_preview_applies_each_steps_expert_and_reads_the_policy_onc
     )
     database.answer("app_private.model_policies", ("openrouter_sol", {}))
     steps = {step.id: step for step in run(preview_steps(connection, WORKSPACE, graph))}
-    assert steps["ask"].model == PROFILES[DEEPSEEK].canonical_id
-    assert steps["again"].model == PROFILES[ModelProfileId.SOL].canonical_id
-    assert steps["in"].model is None
+    sol = PROFILES[ModelProfileId.SOL].canonical_id
+    assert (steps["ask"].model, steps["again"].model, steps["in"].model) == (sol, sol, None)
     assert [text for text, _ in database.statements].count(POLICY_READ) == 1
+    database.answers.clear()
+    gone = {step.id: step for step in run(preview_steps(connection, WORKSPACE, graph))}
+    assert (gone["ask"].expert_name, gone["ask"].model) == (None, None)
+
+
+def test_the_workflow_preview_names_the_model_its_agent_steps_child_will_use() -> None:
+    """Decision 0028 E6: an agent step's child inherits the workflow run's frozen policy, which is
+    resolved without the step Expert's role bindings, so the preview shows that policy's executor
+    even when the Expert binds another model."""
+    database, connection = fresh()
+    expert = {"tools": ["calculate"], "role_bindings": {"executor": "openrouter_sol"}}
+    database.answer(
+        "select e.id::text, e.name, v.config from public.experts e",
+        (str(EXPERT), "Researcher", expert),
+    )
+    (step,) = [s for s in run(preview_steps(connection, WORKSPACE, AGENT_GRAPH)) if s.id == "ask"]
+    # The workflow run, as creating an execution freezes it.
+    database.answer("event_sequence = event_sequence + 1", (1,))
+    database.answer("select v.graph, v.graph_hash", (AGENT_GRAPH, "digest", {}, "Weekly digest"))
+    database.answer("select v.graph from public.workflow_versions", (AGENT_GRAPH,))
+    database.answer(
+        "select id, name, latest_version from public.experts", (EXPERT, "Researcher", 1)
+    )
+    database.answer("from public.expert_versions where expert_id", (1, expert))
+    database.answer("count(*), max(created_at) from public.runs", (0, None))
+    database.answer("select e.name, v.config from public.experts e", ("Researcher", expert))
+    database.answer(
+        "select kind, experts from public.sessions",
+        ("coordinator", [{"expert_id": str(EXPERT), "version": 1}]),
+    )
+    binding = run(
+        create_execution(
+            connection,
+            workspace_id=WORKSPACE,
+            actor_id=OWNER,
+            workflow_id=FLOW,
+            idempotency_key="k",
+            version=1,
+            inputs={"in": "x"},
+        )
+    )
+    (workflow_run,) = database.written("public.runs")
+    assert isinstance(workflow_run, tuple) and workflow_run[0] == binding.run_id
+    snapshot = json.loads(workflow_run[6])
+    # The child, admitted as assignments.py admits one: with the parent's snapshot as it is.
+    child = FakeDatabase([])
+    child.answer("event_sequence = event_sequence + 1", (1,))
+    inheritance = Inheritance(
+        parent_run_id=binding.run_id,
+        root_run_id=binding.run_id,
+        snapshot=snapshot,
+        tools={"calculate": 1},
+        paths=("inputs", "outputs/child-1"),
+        instructions="",
+        session_id=FLOW,
+        expert_id=EXPERT,
+        version=1,
+    )
+    admission = RunAdmission(
+        workspace_id=WORKSPACE,
+        actor_id=binding.run_id,
+        idempotency_key="child",
+        goal_text="Summarize",
+        limit_micro_usd=1_000,
+        origin=Inherited(inheritance),
+    )
+    run(admit(connection_of(child), admission))
+    (child_run,) = child.written("public.runs")
+    assert isinstance(child_run, tuple)
+    inherited = json.loads(child_run[6])
+    executor = inherited["bindings"]["executor"]
+    assert executor == "openrouter_terra", "the child doesn't apply the step Expert's binding"
+    assert step.model == inherited["routes"][executor]["canonical_id"]
+    assert step.model == PROFILES[ModelProfileId.TERRA].canonical_id
+
+
+# The run intent check: it reports the gate's answer instead of refusing
+
+
+FULL_BUDGET = {
+    "min_micro_usd": 250_000,
+    "max_micro_usd": 5_000_000,
+    "step_micro_usd": 250_000,
+    "default_micro_usd": 1_000_000,
+    "remaining_daily_micro_usd": 5_000_000,
+}
+NAMES = {
+    "app_private.model_policies": "workspace policy",
+    "app_private.model_spend_limits": "daily cap",
+    "app_private.model_invocations": "spent today",
+}
+
+
+def intent(client: ApiClient, key: str) -> dict[str, object]:
+    overridden(client, key)
+    reply = client.http.post("/v1/runs/intent", headers=client.headers(OWNER))
+    assert reply.status_code == 200
+    body: dict[str, object] = reply.json()
+    return body
+
+
+def consulted(client: ApiClient) -> list[str]:
+    return [next((name for part, name in NAMES.items() if part in e), e) for e in client.log]
+
+
+AFTER_THE_POLICY = ["connect", "daily cap", "spent today", "release"]
+
+
+@pytest.mark.parametrize(
+    "code", ["credentials_required", "credential_invalid", "credential_unavailable"]
+)
+def test_without_a_usable_key_the_intent_check_reports_it_and_reads_no_policy(
+    api_client: ApiClient, code: str
+) -> None:
+    api_client.database.answer("app_private.model_policies", (DEEPSEEK.value, {}))
+    reported = intent(api_client, code)
+    assert reported == {"schema_version": 1, "ready": False, "code": code, "budget": FULL_BUDGET}
+    assert consulted(api_client) == ["run_intent", *AFTER_THE_POLICY]
+
+
+def test_with_a_usable_key_and_offered_profiles_the_intent_check_is_ready(
+    api_client: ApiClient,
+) -> None:
+    reported = intent(api_client, "ready")
+    assert reported == {"schema_version": 1, "ready": True, "code": "ready", "budget": FULL_BUDGET}
+    assert consulted(api_client) == [
+        "run_intent",
+        "connect",
+        "workspace policy",
+        "release",
+        *AFTER_THE_POLICY,
+    ]
+
+
+@pytest.mark.parametrize(
+    ("saved", "ready"),
+    [
+        ((DEEPSEEK.value, {}), False),
+        ((None, {"executor": DEEPSEEK.value}), False),
+        (("openrouter_sol", {"executor": "openrouter_terra"}), True),
+    ],
+    ids=["saved default not offered", "saved role not offered", "saved choices offered"],
+)
+def test_the_intent_check_reports_a_saved_profile_not_offered(
+    api_client: ApiClient, saved: tuple[str | None, dict[str, str]], ready: bool
+) -> None:
+    api_client.database.answer("app_private.model_policies", saved)
+    reported = intent(api_client, "ready")
+    assert (reported["ready"], reported["code"]) == (
+        ready,
+        "ready" if ready else "model_not_offered",
+    )
+    assert consulted(api_client)[:4] == ["run_intent", "connect", "workspace policy", "release"]
+
+
+def test_the_intent_check_reports_whats_left_today_whatever_the_key(api_client: ApiClient) -> None:
+    api_client.database.answer("app_private.model_spend_limits", (1_000_000,))
+    api_client.database.answer("app_private.model_invocations", (250_000,))
+    assert intent(api_client, "credentials_required")["budget"] == {
+        "min_micro_usd": 250_000,
+        "max_micro_usd": 750_000,
+        "step_micro_usd": 250_000,
+        "default_micro_usd": 750_000,
+        "remaining_daily_micro_usd": 750_000,
+    }
 
 
 # A routine's occurrence

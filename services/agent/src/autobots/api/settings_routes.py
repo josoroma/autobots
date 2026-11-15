@@ -25,6 +25,12 @@ from autobots.application.provider_settings import (
     ValidationUnavailable,
     policy_overrides_json,
 )
+from autobots.application.run_admission import (
+    ModelNotReady,
+    PolicyNotOffered,
+    require_model_ready,
+    saved_workspace_policy,
+)
 from autobots.application.tool_key_settings import ToolKeySettings
 from autobots.contracts.models import effective_policy
 from autobots.contracts.settings import (
@@ -401,25 +407,18 @@ async def check_run_intent(
     """A user's Run click checks readiness here. It admits nothing: POST /v1/runs admits a run
     (US-4.1)."""
     # current_workspace needs the database, so the pool is always open by now.
-    code = await settings.run_intent(workspace_id)
     pool = request_pool(request)
-    if code == "ready":
-        # Kept here, as a resume and the worker read `run_intent` for the key alone.
+    try:
+        await require_model_ready(settings.run_intent, workspace_id, needed=True)
+        # Kept here, as a resume and the worker read `run_intent` for the key alone. It names no
+        # Expert or profile, so it resolves the saved policy alone, and reports instead of refusing.
         async with pool.connection() as connection:
-            cursor = await connection.execute(
-                "select default_profile, role_overrides from app_private.model_policies "
-                "where workspace_id = %s",
-                (workspace_id,),
-            )
-            row = await cursor.fetchone()
-        policy = resolve_role_policy(
-            workspace_default=row[0] if row else None,
-            workspace_role_overrides=row[1] if row else None,
-        )
-        try:
-            require_offered(policy.bindings.values())
-        except ProfileNotOffered as refused:
-            code = refused.code
+            saved = await saved_workspace_policy(connection, workspace_id)
+        saved.for_new_work(require_offer=True)
+    except (ModelNotReady, PolicyNotOffered) as refused:
+        code = refused.code
+    else:
+        code = "ready"
     async with pool.connection() as connection:
         budget = budget_range(await remaining_daily_micro_usd(connection, workspace_id))
     return RunIntentCheck(

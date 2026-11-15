@@ -6,8 +6,9 @@ answer. Only the last step writes anything, so a refused request leaves nothing 
 records intent, and a worker executes it (PRD-Development-Harness DH-06).
 
 The gate is `require_model_ready`, `workspace_role_policy` with its offered check, `chosen_limit`
-and `require_tools_available`. A goal run, a resume, a held-out replay, a workflow execution, a
-routine's occurrence and the previews use it. Where they differ on purpose, the difference is an
+and `require_tools_available`, and `expert_overrides` turns an Expert's bindings into run
+overrides. A goal run, a resume, a held-out replay, a workflow execution, a routine's occurrence,
+the run intent check and the run preview use it. Where they differ on purpose, the difference is an
 argument at the call site, not a missing line.
 """
 
@@ -18,10 +19,10 @@ from typing import Any, Literal, Protocol, Self
 from uuid import UUID
 
 from autobots.application.experts import RunBinding, resolve_binding
+from autobots.application.experts import expert_overrides as expert_overrides
 from autobots.application.model_admission import remaining_daily_micro_usd
 from autobots.application.runs import AdmissionResult, Fresh, RunAdmission, admit
 from autobots.application.tool_keys import key_sources
-from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.plans import InputDocument, RequiredArtifact
 from autobots.contracts.run_commands import RunRequest
 from autobots.domain.budgets import require_budget
@@ -152,11 +153,6 @@ async def workspace_role_policy(
         run_profile=run_profile,
         require_offer=require_offer,
     )
-
-
-def expert_overrides(config: ExpertConfig) -> dict[str, str]:
-    """An Expert's role bindings as run role overrides, the first step of MP-01's order."""
-    return {role: profile.value for role, profile in config.role_bindings.items()}
 
 
 async def chosen_limit(

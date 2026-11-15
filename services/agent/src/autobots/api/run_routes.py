@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Request, status
 from psycopg import AsyncConnection
 
-from autobots.api.errors import ApiError
+from autobots.api.errors import ApiError, budget_error
 from autobots.api.operation_routes import require_ready
 from autobots.api.pool import request_pool
 from autobots.api.security import current_user, require_internal
@@ -90,17 +90,6 @@ def as_api_error(error: Exception) -> ApiError:
             409, "transition_refused", "That is not allowed in the run's current state."
         )
     raise error
-
-
-BUDGET_MESSAGES = {
-    "budget_out_of_range": "Choose a budget from US$0.25 to US$5.00.",
-    "budget_off_step": "Choose a budget in steps of US$0.25.",
-    "budget_above_daily_cap": "That budget is more than what's left of today's spending cap.",
-}
-
-
-def budget_error(code: str) -> ApiError:
-    return ApiError(409 if code == "budget_above_daily_cap" else 422, code, BUDGET_MESSAGES[code])
 
 
 KEY_NEEDED = "Model-backed work needs a usable OpenRouter key."

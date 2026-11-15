@@ -5,7 +5,7 @@ from datetime import UTC
 from typing import Any
 from uuid import UUID
 
-from autobots.application.run_admission import expert_overrides, saved_workspace_policy
+from autobots.application.run_admission import saved_workspace_policy
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.workflows import (
     WorkflowExecutionSummary,
@@ -113,24 +113,25 @@ async def expert_chain(
 async def preview_steps(
     connection: Any, workspace_id: UUID, graph: Mapping[str, Any]
 ) -> list[WorkflowStepView]:
-    """WF-03: each step in order. An agent step shows its Expert, the executor's model a run
-    started now would use, and the Expert's tools. An approval step is marked as the gate."""
+    """WF-03: each step in order. An agent step shows its Expert, the model its child run would
+    use if the workflow started now, and the Expert's tools. An approval step is marked as the
+    gate."""
     nodes = {node["id"]: node for node in graph.get("nodes", [])}
     known = await _experts(connection, workspace_id, sorted(set(_agent_experts(graph))))
     saved = await saved_workspace_policy(connection, workspace_id)
+    # An agent step's child inherits the workflow run's frozen policy, which creating the execution
+    # resolves with no Expert's role bindings, so each step shows that policy's executor, not its
+    # Expert's binding (Decision 0028 E6). A preview refuses nothing, and with no step that has a
+    # known Expert, it resolves nothing.
+    executor = None
+    if known:
+        policy = saved.for_new_work(require_offer=False)
+        executor = PROFILES[policy.bindings[ModelRole.EXECUTOR]].canonical_id
     steps = []
     for name in step_order(graph):
         node = nodes[name]
         expert_id = node.get("config", {}).get("expert_id") if node["block"] == "agent" else None
         found = known.get(str(expert_id)) if expert_id else None
-        model = None
-        if found is not None:
-            # With the step's Expert's role bindings, where its child run inherits the workflow
-            # run's policy, resolved without them (PPRD-09). A preview refuses nothing.
-            policy = saved.for_new_work(
-                run_role_overrides=expert_overrides(found[1]), require_offer=False
-            )
-            model = PROFILES[policy.bindings[ModelRole.EXECUTOR]].canonical_id
         steps.append(
             WorkflowStepView(
                 id=name,
@@ -138,7 +139,7 @@ async def preview_steps(
                 label=node.get("label"),
                 expert_id=UUID(str(expert_id)) if found is not None else None,
                 expert_name=found[0] if found is not None else None,
-                model=model,
+                model=executor if found is not None else None,
                 tools=sorted(found[1].tools) if found is not None else [],
                 approval=node["block"] == "approval",
             )

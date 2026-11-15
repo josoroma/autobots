@@ -21,6 +21,12 @@ from autobots.domain.models import approved_role
 from autobots.domain.tools import DELEGATION_TOOL, EXPERT_TOOLS, PLAN_TOOLS
 
 
+def expert_overrides(config: ExpertConfig) -> dict[str, str]:
+    """An Expert's role bindings as run role overrides, the first step of MP-01's order
+    (PRD-Model-Providers MP-01)."""
+    return {role: profile.value for role, profile in config.role_bindings.items()}
+
+
 class ExpertRefused(Exception):
     """A typed reason, and nothing changes."""
 
@@ -217,7 +223,7 @@ async def _option(
         version=version,
         purpose=config.purpose,
         tools=config.tools,
-        role_bindings={role: profile.value for role, profile in config.role_bindings.items()},
+        role_bindings=expert_overrides(config),
     )
 
 
@@ -328,5 +334,5 @@ async def resolve_binding(
             **{tool: EXPERT_TOOLS[tool] for tool in config.tools},
             **({DELEGATION_TOOL: 1} if kind == "coordinator" else {}),
         },
-        role_bindings={role: profile.value for role, profile in config.role_bindings.items()},
+        role_bindings=expert_overrides(config),
     )

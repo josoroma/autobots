@@ -368,7 +368,8 @@ async def create_execution(  # noqa: PLR0913 - baseline 2026-11-14, shrink only 
                 try:
                     # With no Expert's role bindings, and a profile not offered refuses only when an
                     # agent step will call a model, so a workflow without one runs under any saved
-                    # choice. A preview applies an agent step's Expert's bindings (PPRD-09).
+                    # choice. Each agent step's child inherits this policy, and the workflow's
+                    # preview shows it (Decision 0028 E6).
                     policy = saved.for_new_work(
                         require_offer=await needs_model(
                             connection, workspace_id, workflow_id, version
