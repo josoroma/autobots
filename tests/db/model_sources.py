@@ -13,6 +13,7 @@ import sys
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.application.experts import create_expert, create_session, resolve_binding
 from autobots.application.runs import admit_run
 from autobots.contracts.experts import ExpertConfig, SessionExpert
@@ -29,7 +30,7 @@ async def main() -> None:
             "values (%s, 1, null, '{\"coder\": \"openrouter_terra\"}')", (workspace,))
         expert = await create_expert(db, workspace_id=workspace, actor_id=owner, idempotency_key=str(uuid4()),
                                      name='Sol executor', config=ExpertConfig(tools=['calculate'],
-                                                                             role_bindings={'executor': 'openrouter_sol'}))
+                                                                             role_bindings={'executor': 'openrouter_sol'}), catalog=tool_registry.catalog())
         session = await create_session(db, workspace_id=workspace, actor_id=owner, idempotency_key=str(uuid4()),
                                        kind='direct', experts=[SessionExpert(expert_id=expert.id)])
         binding = await resolve_binding(db, workspace, session.id)

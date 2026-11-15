@@ -1,4 +1,5 @@
-"""What an interruption left behind, classified before anything is dispatched, SP-012 and MP-08."""
+"""What an interruption left behind, classified before anything is dispatched, SP-012 and MP-08, and
+whether a saved run can continue under this release at all (domain/execution.py)."""
 
 from dataclasses import dataclass
 from typing import Any
@@ -7,6 +8,7 @@ from uuid import UUID
 from autobots.application import receipts
 from autobots.application.model_admission import InvocationStatus, ModelAdmission, SettlementReason
 from autobots.application.runs import RUN_TREE
+from autobots.domain.execution import incompatibility
 
 
 @dataclass(frozen=True)
@@ -56,3 +58,13 @@ async def open_obligation(connection: Any, run_id: UUID) -> tuple[str, str] | No
     )
     row = await cursor.fetchone()
     return (row[0], row[1]) if row else None
+
+
+async def execution_block(connection: Any, run_id: UUID) -> str | None:
+    """Why a saved run can't continue under this release, or None. It stays as it was saved. The
+    worker checks it before a pass, and a resume before it is accepted."""
+    cursor = await connection.execute(
+        "select execution_contract from public.runs where id = %s", (run_id,)
+    )
+    row = await cursor.fetchone()
+    return incompatibility(None if row is None else row[0])

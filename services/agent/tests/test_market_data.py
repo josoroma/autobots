@@ -7,14 +7,8 @@ import httpx
 import pytest
 
 from autobots.adapters.market_data import market_tools
-from autobots.application.tool_gateway import (
-    Refused,
-    ToolContext,
-    ToolFailed,
-    ToolRegistry,
-    ToolScope,
-    resolve,
-)
+from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolRegistry, ToolScope
+from autobots.application.tool_gateway import Refused, resolve
 from autobots.domain.stops import GatewayCode
 
 CONTEXT = ToolContext(None, ToolScope(uuid4(), uuid4(), 1, {}), None)

@@ -37,7 +37,7 @@ from autobots.contracts.workflows import (
 from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.models import ProfileNotOffered, RolePolicy
 from autobots.domain.runs import TERMINAL
-from autobots.domain.tools import DELEGATION_TOOL, LOOP_TOOL_GRANTS, PLAN_TOOLS
+from autobots.domain.tools import PLAN_TOOLS, WORKFLOW_TOOLS
 from autobots.domain.workflows import (
     GraphError,
     block_versions,
@@ -48,9 +48,7 @@ from autobots.domain.workflows import (
 )
 
 logger = logging.getLogger("autobots.workflows")
-# What a workflow's own blocks reach. Its approval step is the only consequential one here.
 DEFAULT_LIMIT_MICRO_USD = 1_000_000
-WORKFLOW_TOOLS = {**LOOP_TOOL_GRANTS, DELEGATION_TOOL: 1, "workflow_approval": 1}
 
 
 class WorkflowRefused(Refusal):

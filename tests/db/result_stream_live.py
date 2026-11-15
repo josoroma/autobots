@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import admit_run
@@ -32,7 +33,7 @@ async def main() -> None:
     workspace, delay, wait = UUID(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3])
     url = os.environ['AUTOBOTS_DATABASE_URL']
     store = SupabaseObjectStore(os.environ['AUTOBOTS_STORAGE_BASE'], SecretStr(os.environ['AUTOBOTS_STORAGE_SERVICE']))
-    config = LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0))
+    config = LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0), tool_set=tool_registry.build_registry)
     steps = [calls(('propose_plan', {'tasks': [TASK]})),
              calls(('save_artifact', {'path': 'outputs/report.md', 'content': CONTENT})),
              calls(('publish_artifact', {'path': 'outputs/report.md', 'version': 1})),

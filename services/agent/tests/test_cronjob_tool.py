@@ -10,11 +10,12 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
+from autobots.adapters.tool_registry import catalog
 from autobots.application import cronjob_tool as cronjob_module
-from autobots.application.cronjob_tool import CRONJOB, routine_config
+from autobots.application.cronjob_tool import cronjob_tool, routine_config
 from autobots.application.routines import RoutineRefused, routine_record
-from autobots.application.tool_catalog import all_descriptors, latest
-from autobots.application.tool_gateway import ToolContext, ToolFailed
+from autobots.application.tool_catalog import latest
+from autobots.application.tool_definitions import ToolContext, ToolFailed
 from autobots.contracts.cronjob import (
     MAX_LIMIT_MICRO_USD,
     CronjobInput,
@@ -31,6 +32,8 @@ TASK = {
     "goal": "Summarize",
 }
 ROUTINE = str(uuid4())
+CATALOG = catalog()
+CRONJOB = cronjob_tool(CATALOG)
 
 
 @pytest.mark.parametrize(
@@ -150,7 +153,7 @@ def test_a_routine_the_model_saves_carries_the_tools_cap(
 
 
 def test_the_catalog_lists_it_under_automation_for_experts_only() -> None:
-    item = next(d for d in latest(all_descriptors({})) if d.tool_id == "cronjob")
+    item = next(d for d in latest(CATALOG.descriptors({})) if d.tool_id == "cronjob")
     assert (item.group, item.approval, item.grantable_to, item.operation_class) == (
         "automation",
         "by_action",

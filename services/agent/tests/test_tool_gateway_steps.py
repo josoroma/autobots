@@ -24,15 +24,15 @@ from autobots.application.approvals import (
     scope_snapshot,
 )
 from autobots.application.runs import WorkerClaim
-from autobots.application.tool_gateway import (
+from autobots.application.tool_definitions import (
     ApprovalPolicy,
     ToolContext,
     ToolDefinition,
-    ToolGateway,
     ToolRegistry,
     ToolResult,
     ToolScope,
 )
+from autobots.application.tool_gateway import ToolGateway
 from autobots.application.tool_uses import input_digest
 from autobots.contracts.tools import CalculateInput, CalculateOutput
 from autobots.domain.runs import RunCommand

@@ -12,6 +12,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.application.experts import create_expert, create_session
 from autobots.application.model_admission import ledger_usage
 from autobots.application.run_projection import InvalidCursor, read_run_list, read_summary
@@ -35,13 +36,13 @@ async def main() -> None:
             await db.execute('insert into public.workspaces (id, name) values (%s, %s)', (identifier, name))
         tag = uuid4().hex[:6]
         expert = await create_expert(db, workspace_id=workspace, actor_id=uuid4(), idempotency_key=str(uuid4()),
-                                     name=f'Writer {tag}', config=ExpertConfig(tools=['calculate']))
+                                     name=f'Writer {tag}', config=ExpertConfig(tools=['calculate']), catalog=tool_registry.catalog())
         try:
             session = await create_session(db, workspace_id=workspace, actor_id=uuid4(), idempotency_key=str(uuid4()),
                                            kind='coordinator', experts=[SessionExpert(expert_id=expert.id)])
         except Exception:  # noqa: BLE001 - a coordinator may need more Experts; a second one is added then.
             second = await create_expert(db, workspace_id=workspace, actor_id=uuid4(), idempotency_key=str(uuid4()),
-                                         name=f'Reader {tag}', config=ExpertConfig(tools=['calculate']))
+                                         name=f'Reader {tag}', config=ExpertConfig(tools=['calculate']), catalog=tool_registry.catalog())
             session = await create_session(db, workspace_id=workspace, actor_id=uuid4(), idempotency_key=str(uuid4()),
                                            kind='coordinator', experts=[SessionExpert(expert_id=expert.id),
                                                                         SessionExpert(expert_id=second.id)])

@@ -11,12 +11,14 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.object_storage import SupabaseObjectStore
+from autobots.adapters.tool_registry import build_registry
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import admit_run
-from autobots.application.tool_gateway import ToolGateway, ToolScope
+from autobots.application.tool_definitions import ToolScope
+from autobots.application.tool_gateway import ToolGateway
 from autobots.application.tool_uses import list_tool_uses
-from autobots.application.tools import default_registry
 from autobots.application.worker_leases import claim_next
 from autobots.application.workflows import create_execution, create_workflow, publish_version
 from autobots.contracts.plans import InputDocument
@@ -56,7 +58,7 @@ FILES = {
 
 async def main() -> None:
     store = SupabaseObjectStore(BASE, SERVICE)
-    config = LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0))
+    config = LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0), tool_set=tool_registry.build_registry)
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
         flow = await create_workflow(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='tool-view', name='Tool uses by node')
@@ -77,7 +79,7 @@ async def main() -> None:
         assert lease is not None and lease.run_id == admitted.run_id
         await db.execute("insert into app_private.plan_versions (run_id, version, tasks) values (%s, 1, %s)", (admitted.run_id, json.dumps(TASKS)))
         scope = ToolScope(WORKSPACE, admitted.run_id, lease.generation, GRANTS, ('inputs', 'outputs'))
-        gateway = ToolGateway(default_registry())
+        gateway = ToolGateway(build_registry(None))
         added = await gateway.execute(db, scope, 'calculate', {'operation': 'sum', 'values': [1, 2]})
         refused = await gateway.execute(db, scope, 'publish_artifact', {'path': 'outputs/x.md', 'version': 1})
         check('the live run has two uses before the page opens', 'succeeded, tool_not_granted', (added.outcome.value, refused.code),

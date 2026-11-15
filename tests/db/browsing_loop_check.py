@@ -24,7 +24,7 @@ from autobots.application.browsing_loop import ACTION_TOOLS, Link, PageView, adm
 from autobots.application.model_attempts import FailureClass, ProviderFailure
 from autobots.application.run_usage import RootLimits, ensure_usage
 from autobots.application.runs import admit_run
-from autobots.application.tool_gateway import ToolScope
+from autobots.application.tool_definitions import ToolScope
 from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy
 from goal_loop_script import ROUTE, Script, calls

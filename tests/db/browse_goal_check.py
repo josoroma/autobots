@@ -17,7 +17,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-from autobots.adapters import loop_middleware
+from autobots.adapters import loop_middleware, tool_registry
 from autobots.adapters.browser_executor import BrowserExecutor
 from autobots.adapters.loop_middleware import LoopMiddleware, ModelRoute
 from autobots.application import browsing_tool
@@ -25,8 +25,8 @@ from autobots.application.approvals import decide
 from autobots.application.experts import ExpertRefused, create_expert
 from autobots.application.run_usage import RootLimits, ensure_usage
 from autobots.application.runs import admit_run
-from autobots.application.tool_catalog import all_descriptors, catalog_registry
-from autobots.application.tool_gateway import ToolGateway, ToolRegistry, ToolScope
+from autobots.application.tool_definitions import ToolRegistry, ToolScope
+from autobots.application.tool_gateway import ToolGateway
 from autobots.application.worker_leases import claim_next
 from autobots.contracts.experts import ExpertConfig
 from autobots.domain.models import resolve_role_policy
@@ -70,19 +70,19 @@ async def main() -> None:
 
         # Unqualified: the owner's switch is off.
         os.environ.pop(browsing_tool.ENABLE, None)
-        planned = next(item for item in all_descriptors({}) if item.tool_id == 'browse_goal')
+        planned = next(item for item in tool_registry.catalog().descriptors({}) if item.tool_id == 'browse_goal')
         try:
             await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), name=f'Off {uuid4().hex[:6]}',
-                                config=ExpertConfig(tools=['browse_goal']))
+                                config=ExpertConfig(tools=['browse_goal']), catalog=tool_registry.catalog())
             refused = 'saved'
         except ExpertRefused as refusal:
             refused = refusal.code if hasattr(refusal, 'code') else str(refusal)
-        providers = {item.provider for item in all_descriptors({})}
+        providers = {item.provider for item in tool_registry.catalog().descriptors({})}
         check('while unqualified, browse_goal is disabled by policy, unregistered, and an Expert naming it is refused',
               'disabled_by_policy with its repair reason, provider autobots, not registered, expert_tool_unavailable, TC-03 providers only',
               (planned.availability, planned.availability_reason, planned.provider, planned.registered, refused, sorted(providers)),
               planned.availability == 'disabled_by_policy' and planned.availability_reason == 'isolated_executor_not_qualified'
-              and planned.provider == 'autobots' and not planned.registered and catalog_registry().get('browse_goal', 1) is None
+              and planned.provider == 'autobots' and not planned.registered and tool_registry.catalog_registry().get('browse_goal', 1) is None
               and 'expert_tool_unavailable' in refused
               and providers <= {'autobots', 'tavily', 'jina', 'yahoo_finance', 'world_bank', 'github'})
 
@@ -90,7 +90,7 @@ async def main() -> None:
         check('the executor is qualified on this Mac, and the owner turned browsing on', 'ready', browsing_tool.executor_ready(),
               browsing_tool.executor_ready())
         expert = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), name=f'Browser {uuid4().hex[:6]}',
-                                     config=ExpertConfig(tools=['browse_goal']))
+                                     config=ExpertConfig(tools=['browse_goal']), catalog=tool_registry.catalog())
         executor = BrowserExecutor()
 
         async def start(expert_id: UUID | None) -> UUID:

@@ -64,6 +64,8 @@ EXPERT_TOOLS = {
 LOOP_TOOL_GRANTS = {**PLAN_TOOLS, **GENERAL_TOOLS}
 # Only a coordinator session's runs get this, and an Expert's own configuration can't name it.
 DELEGATION_TOOL = "assign_specialist"
+# What a workflow's own blocks reach. Its approval step is the only consequential one here.
+WORKFLOW_TOOLS = {**LOOP_TOOL_GRANTS, DELEGATION_TOOL: 1, "workflow_approval": 1}
 RUN_FILE_GRANTS = ("inputs", "outputs")
 
 # Only these leave an effect, so only these get an operation identity and a receipt.

@@ -10,6 +10,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.application.experts import create_expert
 from autobots.application.routines import (
     RoutineRefused,
@@ -60,10 +61,10 @@ async def main() -> None:
 
         # A saved key alone starts nothing.
         await clear_active()
-        started = await evaluate_routines(db, ready, START)
+        started = await evaluate_routines(db, ready, START, catalog=tool_registry.catalog())
         check('with no enabled routine, nothing starts and no key is even looked at', '0, not asked', (started, asked), started == 0 and asked == [])
 
-        expert = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='r-e', name='Routine worker', config=ExpertConfig(tools=['calculate', 'save_artifact'], instructions='Be brief.'))
+        expert = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='r-e', name='Routine worker', config=ExpertConfig(tools=['calculate', 'save_artifact'], instructions='Be brief.'), catalog=tool_registry.catalog())
 
         def config(goal: str = 'Summarize the day', **options: Any) -> RoutineConfig:
             return RoutineConfig(target=RoutineTarget(kind='expert', id=expert.id, version=1), trigger={'kind': 'interval', 'minutes': 60}, goal=goal, **options)
@@ -77,28 +78,28 @@ async def main() -> None:
 
         async def worker() -> int:
             async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as other:
-                return await evaluate_routines(other, ready, START + timedelta(hours=1))
+                return await evaluate_routines(other, ready, START + timedelta(hours=1), catalog=tool_registry.catalog())
 
         results = await asyncio.gather(*(worker() for _ in range(6)))
         rows = await history(made.id)
         check('six concurrent evaluations admit one occurrence', '1 admitted', (sum(results), rows), sum(results) == 1 and rows == ['admitted'])
-        again = await evaluate_routines(db, ready, START + timedelta(hours=1))
+        again = await evaluate_routines(db, ready, START + timedelta(hours=1), catalog=tool_registry.catalog())
         check('evaluating the same time again adds nothing', '0, 1 row', (again, await history(made.id)), again == 0 and await history(made.id) == ['admitted'])
         run = await value('select run_id from public.routine_occurrences where routine_id = %s', made.id)
         spec = await value('select spec from app_private.goal_specs where run_id = %s', run)
         check('the run takes the routine\'s goal and its Expert\'s frozen scope', 'calculate and save only', sorted(spec['allowed_tools']), spec['objective'] == 'Summarize the day' and 'read_run_file' not in spec['allowed_tools'] and 'save_artifact' in spec['allowed_tools'])
 
         # Overlap: the first run is still active.
-        due = await evaluate_routines(db, ready, START + timedelta(hours=2))
+        due = await evaluate_routines(db, ready, START + timedelta(hours=2), catalog=tool_registry.catalog())
         check('with a run still active, the next occurrence is skipped, and says so', '0 admitted, skipped_overlap', (due, await history(made.id)), due == 0 and await history(made.id) == ['admitted', 'skipped_overlap'])
         version = await value('select version from public.runs where id = %s', run)
         await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, expected_version=version)
-        due = await evaluate_routines(db, ready, START + timedelta(hours=3))
+        due = await evaluate_routines(db, ready, START + timedelta(hours=3), catalog=tool_registry.catalog())
         check('once it finishes, the next one runs', '1 admitted', (due, (await history(made.id))[-1]), due == 1 and (await history(made.id))[-1] == 'admitted')
 
         # Missed work: only the latest catches up, and the rest are visible.
         await db.execute("update public.runs r set status = 'cancelled' from public.routine_occurrences o where o.run_id = r.id and o.routine_id = %s", (made.id,))
-        due = await evaluate_routines(db, ready, START + timedelta(hours=8))
+        due = await evaluate_routines(db, ready, START + timedelta(hours=8), catalog=tool_registry.catalog())
         rows = await history(made.id)
         check('after the Mac wakes, one catch-up runs and the rest show as missed', '4 missed, then 1 admitted', rows[-5:], due == 1 and rows[-5:] == ['missed', 'missed', 'missed', 'missed', 'admitted'])
         reason = await value("select reason from public.routine_occurrences where routine_id = %s and status = 'missed' limit 1", made.id)
@@ -110,7 +111,7 @@ async def main() -> None:
         await add_routine_version(db, workspace_id=WORKSPACE, actor_id=ACTOR, routine_id=made.id, idempotency_key='v2', expected_version=1, config=config('A different goal', tools=['calculate'], limit_micro_usd=500), budget_cap=None)
         unchanged = await value('select spec from app_private.goal_specs where run_id = %s', latest_run)
         check('an edit does not change a run already admitted', 'the old goal and tools', unchanged['objective'], unchanged['objective'] == 'Summarize the day' and 'save_artifact' in unchanged['allowed_tools'])
-        await evaluate_routines(db, ready, START + timedelta(hours=9))
+        await evaluate_routines(db, ready, START + timedelta(hours=9), catalog=tool_registry.catalog())
         newest = await (await db.execute("select routine_version, run_id from public.routine_occurrences where routine_id = %s order by occurrence_time desc limit 1", (made.id,))).fetchone()
         spec = await value('select spec from app_private.goal_specs where run_id = %s', newest[1])
         limit = await value('select limit_micro_usd from public.runs where id = %s', newest[1])
@@ -140,14 +141,14 @@ async def main() -> None:
 
         # With no usable key, nothing is admitted, and that shows.
         blocked = await routine('No key')
-        due = await evaluate_routines(db, no_key, START + timedelta(hours=1))
+        due = await evaluate_routines(db, no_key, START + timedelta(hours=1), catalog=tool_registry.catalog())
         reason = await value('select reason from public.routine_occurrences where routine_id = %s', blocked.id)
         check('with no usable key, an occurrence is blocked rather than started', '0, credentials_required', (due, await history(blocked.id), reason), due == 0 and await history(blocked.id) == ['blocked'] and reason == 'credentials_required')
 
         # A disabled routine stays quiet, and doesn't catch up when turned back on.
         quiet = await routine('Quiet')
         await set_enabled(db, WORKSPACE, quiet.id, False)
-        due = await evaluate_routines(db, ready, START + timedelta(hours=5))
+        due = await evaluate_routines(db, ready, START + timedelta(hours=5), catalog=tool_registry.catalog())
         check('a disabled routine admits nothing', '0, no rows', (due, await history(quiet.id)), due == 0 and await history(quiet.id) == [])
         await set_enabled(db, WORKSPACE, quiet.id, True)
         moved = await value('select evaluated_until from public.routines where id = %s', quiet.id)
@@ -161,14 +162,14 @@ async def main() -> None:
         await publish_version(db, workspace_id=WORKSPACE, actor_id=ACTOR, workflow_id=flow.id, idempotency_key='r-wp', expected_version=0, graph=graph, source='user')
         await clear_active()
         scheduled = await create_routine(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='r-flow', name='Flow routine', config=RoutineConfig(target=RoutineTarget(kind='workflow', id=flow.id, version=1), trigger={'kind': 'interval', 'minutes': 30}, inputs={'in': 'hello'}), budget_cap=None, now=START)
-        due = await evaluate_routines(db, no_key, START + timedelta(minutes=30))
+        due = await evaluate_routines(db, no_key, START + timedelta(minutes=30), catalog=tool_registry.catalog())
         bound = await value('select workflow_version from public.workflow_executions e join public.routine_occurrences o on o.run_id = e.run_id where o.routine_id = %s', scheduled.id)
         check('a workflow routine binds its exact version, and needs no key without an agent step', '1, version 1', (due, bound), due == 1 and bound == 1)
 
         # A daily routine in its own timezone.
         await clear_active()
         daily = await create_routine(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='r-day', name='Daily', config=RoutineConfig(target=RoutineTarget(kind='expert', id=expert.id, version=1), trigger={'kind': 'daily', 'time': '09:00'}, timezone='America/Costa_Rica', goal='Morning'), budget_cap=None, now=datetime(2026, 11, 5, 14, 0, tzinfo=UTC))
-        await evaluate_routines(db, ready, datetime(2026, 11, 5, 15, 30, tzinfo=UTC))
+        await evaluate_routines(db, ready, datetime(2026, 11, 5, 15, 30, tzinfo=UTC), catalog=tool_registry.catalog())
         when = await value('select occurrence_time from public.routine_occurrences where routine_id = %s', daily.id)
         check('a daily occurrence is stored as a UTC instant for its local time', '15:00 UTC for 09:00 in Costa Rica', when.astimezone(UTC).isoformat(), when.astimezone(UTC) == datetime(2026, 11, 5, 15, 0, tzinfo=UTC))
         try:

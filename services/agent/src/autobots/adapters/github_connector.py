@@ -9,7 +9,6 @@ write's is a failure only when GitHub's status proves nothing was written (PADP-
 
 import base64
 import binascii
-import re
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -28,12 +27,12 @@ from autobots.adapters.provider_http import (
     write_json,
 )
 from autobots.application.approvals import ApprovedRequest
-from autobots.application.tool_gateway import ToolContext, ToolFailed
-from autobots.domain.tool_catalog import KeyRequirement
+from autobots.application.tool_definitions import ToolContext, ToolFailed
+from autobots.application.tool_keys import ITEMS, key_requirement
 
 API_URL = "https://api.github.com"
-REPOSITORY_VARIABLE = "GITHUB_REPOSITORY"
-TOKEN_VARIABLE = "GITHUB_TOKEN"
+REPOSITORY_VARIABLE = ITEMS["github_repository"].variable
+TOKEN_VARIABLE = ITEMS["github_token"].variable
 # Decision 0022 D6: a fine-grained token limited to the one repository, with exactly these.
 TOKEN_SCOPES = (
     "Issues: read and write",
@@ -42,13 +41,12 @@ TOKEN_SCOPES = (
     "Actions: read",
     "Metadata: read",
 )
-GITHUB_KEY = KeyRequirement("github", (REPOSITORY_VARIABLE, TOKEN_VARIABLE), TOKEN_SCOPES)
+GITHUB_KEY = key_requirement("github_repository", "github_token", scopes=TOKEN_SCOPES)
 TARGET_PREFIX = "GitHub repository "
 # Each request's bound. Every GitHub tool's timeout is longer: 30 s for the reads and the issue, and
 # 60 s for a pull request (tests/test_github_connector.py).
 REQUEST_SECONDS = 15.0
 PROVIDER = "github"
-_REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 _HEADERS = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
 
 # A read GitHub refused for a reason of the request, the token or the repository, such as a 409 for
@@ -118,13 +116,11 @@ def file_text(entry: FileReply) -> tuple[bytes, str]:
 async def _configured(
     context: ToolContext, environ: Mapping[str, str]
 ) -> tuple[str | None, str | None]:
-    """The repository and token resolved for the run's workspace by Decision 0025's order."""
-    from autobots.application.tool_keys import ToolKeyUnavailable, github_target
-
-    try:
-        return await github_target(context.connection, context.scope.workspace_id, environ)
-    except ToolKeyUnavailable as error:
-        raise ToolFailed(error.code) from None
+    """The repository and token resolved for the run's workspace by Decision 0025's order, each
+    once per attempt. A repository without the owner/name form is not configured."""
+    repository = await context.setting("github_repository", environ)
+    token = await context.setting("github_token", environ)
+    return ITEMS["github_repository"].usable(repository), token
 
 
 def approved_repository(approved: ApprovedRequest | None) -> str | None:
@@ -145,9 +141,10 @@ async def attempt_credentials(context: ToolContext, environ: Mapping[str, str]) 
     approved = approved_repository(context.approval)
     if approved is not None:
         repository = approved
-    if not token or not repository or not _REPOSITORY.fullmatch(repository):
+    usable = ITEMS["github_repository"].usable(repository)
+    if not token or usable is None:
         raise ToolFailed("connector_not_configured")
-    return repository, token
+    return usable, token
 
 
 async def approval_label(context: ToolContext, environ: Mapping[str, str]) -> str:

@@ -21,6 +21,7 @@ from uuid import UUID, uuid4
 
 import httpx
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.github_issues import github_issue_tool
 from autobots.adapters.github_pulls import github_pull_request_tool
 from autobots.adapters.github_reads import github_read_tools
@@ -30,8 +31,9 @@ from autobots.application.credentials.master_key import create_master_key
 from autobots.application.experts import ExpertRefused, create_expert
 from autobots.application.provider_settings import InvalidKey, ProviderContext, StaleVersion
 from autobots.application.runs import admit_run
-from autobots.application.tool_catalog import ToolsUnavailable, require_available, tool_catalog
-from autobots.application.tool_gateway import ToolGateway, ToolRegistry, ToolScope
+from autobots.application.tool_catalog import ToolsUnavailable
+from autobots.application.tool_definitions import ToolRegistry, ToolScope
+from autobots.application.tool_gateway import ToolGateway
 from autobots.application.tool_key_settings import ToolKeySettings
 from autobots.application.tool_keys import key_sources
 from autobots.application.worker_inference import CatalogCache, InferenceSource, frozen_policy
@@ -231,9 +233,9 @@ async def main() -> None:
 
         async def browse_state(workspace: UUID, process: dict[str, str]) -> tuple[str, str, str, bool]:
             view = await key_sources(db, workspace, process)
-            catalog = {t.tool_id: t.availability for t in tool_catalog(view).tools}
+            catalog = {t.tool_id: t.availability for t in tool_registry.catalog().catalog(view).tools}
             try:
-                require_available(['browse_goal'], view)
+                tool_registry.catalog().require_available(['browse_goal'], view)
                 admitted = 'admitted'
             except ToolsUnavailable as error:
                 admitted = error.code
@@ -241,7 +243,7 @@ async def main() -> None:
             os.environ.update({k: v for k, v in process.items() if k == 'AUTOBOTS_BROWSER_EXECUTOR'})
             try:
                 await create_expert(db, workspace_id=workspace, actor_id=actor, idempotency_key=str(uuid4()),
-                                    name=f'Browser {uuid4().hex[:6]}', config=ExpertConfig(tools=['browse_goal', 'save_artifact', 'publish_artifact']))
+                                    name=f'Browser {uuid4().hex[:6]}', config=ExpertConfig(tools=['browse_goal', 'save_artifact', 'publish_artifact']), catalog=tool_registry.catalog())
                 expert = 'saved'
             except ExpertRefused as error:
                 expert = error.code

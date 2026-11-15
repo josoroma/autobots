@@ -27,6 +27,7 @@ from autobots.adapters.models.factory import (
     chat_model,
     prepare_attempt,
 )
+from autobots.application import browsing_tool
 from autobots.application.credentials.store import (
     CredentialBlocked,
     CredentialMissing,
@@ -46,6 +47,8 @@ from autobots.application.provider_settings import (
     ProviderContext,
     ProviderSettings,
 )
+from autobots.application.tool_definitions import Browsing
+from autobots.application.tool_keys import key_sources
 from autobots.application.worker_leases import Lease
 from autobots.domain.models import (
     MAX_OUTPUT_TOKENS,
@@ -316,31 +319,27 @@ class InferenceSource:
         rate, tier = await self._input_rate(profile)
         route = ModelRoute(ROLE.value, profile.id.value, profile.wire_id, worst_case, rate, tier)
         model = AttemptModel(self, lease.workspace_id, policy, reserved_micro_usd=worst_case)
-        tools = config.tools + await self._browsing(connection, lease)
-        return lambda: model, replace(config, route=route, refusal=refusal, tools=tools)
+        browsing = await self._browsing(connection, lease)
+        return lambda: model, replace(config, route=route, refusal=refusal, browsing=browsing)
 
-    async def _browsing(self, connection: Any, lease: Lease) -> tuple[Any, ...]:
-        """`browse_goal`, bound to this run's researcher route, while the executor is qualified."""
-        from autobots.application.browsing_tool import BrowsingRuntime, browse_tool, executor_ready
-
+    async def _browsing(self, connection: Any, lease: Lease) -> Browsing | None:
+        """`browse_goal` for this job, bound to the run's researcher route, while browsing is
+        switched on and its executor qualified. The pass's tool set registers it from this
+        (adapters/tool_registry.py)."""
         if self.browser is None:
-            return ()
-        from autobots.application.tool_keys import key_sources
-
+            return None
         # Decision 0025 V6: the run's workspace decides, by its saved switch, then the environment.
         view = await key_sources(connection, lease.workspace_id, os.environ)
-        if not executor_ready(environ=view):
-            return ()
+        if not browsing_tool.executor_ready(environ=view):
+            return None
         bound = await self.role_route(connection, lease, ModelRole.RESEARCHER)
         if isinstance(bound, str):
             _log_refusal("browsing", UnknownModelProfile(bound))
-            return ()
+            return None
         model, route = bound
-        return (
-            browse_tool(
-                BrowsingRuntime(self.browser, model, route),
-                qualified=lambda: executor_ready(environ=view),
-            ),
+        return Browsing(
+            qualified=lambda: browsing_tool.executor_ready(environ=view),
+            runtime=browsing_tool.BrowsingRuntime(self.browser, model, route),
         )
 
     async def role_route(

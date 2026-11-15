@@ -22,7 +22,8 @@ from autobots.adapters.github_issues import marker
 from autobots.adapters.github_pulls import TOOL_ID, branch_for, github_pull_request_tool
 from autobots.application.approvals import DEFAULT_TTL_SECONDS, decide, list_approvals
 from autobots.application.runs import admit_run
-from autobots.application.tool_gateway import ToolGateway, ToolRegistry, ToolScope
+from autobots.application.tool_definitions import ToolRegistry, ToolScope
+from autobots.application.tool_gateway import ToolGateway
 from autobots.application.worker_leases import Lease, claim_next, claim_run
 from autobots.contracts.approvals import ApprovalReviewDetail
 from autobots.domain.models import resolve_role_policy

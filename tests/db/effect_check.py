@@ -12,6 +12,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.application.approvals import decide
 from autobots.application.reconciliation import (
     ReconciliationRefused,
@@ -57,7 +58,7 @@ async def main() -> dict[str, str]:
 
         async def advance(sink: Sink, items: list[Any], behavior: dict[str, str] | None = None) -> tuple[Any, Script]:
             model = Script(items=items, seen=[], bound=[])
-            config = LoopConfig(route=ROUTE, tools=tools(sink, behavior=behavior), sleep=lambda _: asyncio.sleep(0))
+            config = LoopConfig(route=ROUTE, tools=tools(sink, behavior=behavior), sleep=lambda _: asyncio.sleep(0), tool_set=tool_registry.build_registry)
             return await process_next(db, URL, 'worker', lambda: model, config), model
 
         async def approve(run: UUID) -> None:

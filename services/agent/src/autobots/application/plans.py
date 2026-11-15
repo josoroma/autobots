@@ -8,7 +8,13 @@ from typing import Any
 from uuid import UUID
 
 from autobots.application.run_usage import LimitReached, RootLimits, consume
-from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed, hold_lease
+from autobots.application.tool_definitions import (
+    ToolContext,
+    ToolDefinition,
+    ToolFailed,
+    refuse_unbound,
+)
+from autobots.application.tool_gateway import hold_lease
 from autobots.contracts.plans import (
     CompleteTask,
     GoalSpec,
@@ -308,7 +314,9 @@ async def complete_task(arguments: CompleteTask, context: ToolContext) -> TaskCo
     )
 
 
-def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
+def plan_tools(limits: RootLimits | None) -> tuple[ToolDefinition, ToolDefinition]:
+    """With no limits, as the catalog describes them, proposing a plan refuses before anything is
+    written (XMOD-01). Completing a task needs no runtime."""
     return (
         ToolDefinition(
             tool_id="propose_plan",
@@ -321,7 +329,7 @@ def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
             input_model=PlanProposal,
             output_model=PlanCommitted,
             operation_class=OperationClass.REVERSIBLE_INTERNAL_WRITE,
-            handler=partial(propose_plan, limits=limits),
+            handler=refuse_unbound if limits is None else partial(propose_plan, limits=limits),
             reconcile=plan_proposed_already,
             safe_to_repeat=True,
         ),

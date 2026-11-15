@@ -11,16 +11,8 @@ from uuid import UUID
 import pytest
 from pydantic import BaseModel
 
-from autobots.application.tool_gateway import (
-    Call,
-    Refused,
-    ToolDefinition,
-    ToolRegistry,
-    ToolScope,
-    _hash,
-    _operation_id,
-    resolve,
-)
+from autobots.application.tool_definitions import ToolDefinition, ToolRegistry, ToolScope
+from autobots.application.tool_gateway import Call, Refused, _hash, _operation_id, resolve
 from autobots.contracts.tools import CalculateInput, CalculateOutput, ReadRunFileInput
 from autobots.domain.stops import GatewayCode
 from autobots.domain.tools import OperationClass

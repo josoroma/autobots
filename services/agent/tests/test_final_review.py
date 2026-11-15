@@ -26,7 +26,7 @@ from autobots.application.operations import (
     database_conditions,
     restore_history,
 )
-from autobots.application.tool_gateway import ToolFailed
+from autobots.application.tool_definitions import ToolFailed
 from autobots.application.worker_inference import AttemptModel, CatalogCache, InferenceSource
 from autobots.contracts.run_commands import RunRequest
 from autobots.domain.models import ModelRole, ModelRoute, resolve_role_policy

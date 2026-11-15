@@ -27,7 +27,7 @@ from autobots.adapters.provider_http import (
     read_json,
     refusal_code,
 )
-from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed
+from autobots.application.tool_definitions import ToolContext, ToolDefinition, ToolFailed
 from autobots.contracts.market_tools import (
     CountryInflation,
     InflationInput,

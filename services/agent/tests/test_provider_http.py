@@ -27,7 +27,7 @@ from autobots.adapters.provider_http import (
     write,
     write_json,
 )
-from autobots.application.tool_gateway import OutcomeUnknown, ToolFailed
+from autobots.application.tool_definitions import OutcomeUnknown, ToolFailed
 
 REFUSED = frozenset({400, 401, 403, 404, 410, 422, 429})
 

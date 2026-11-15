@@ -9,15 +9,16 @@ from langchain_core.messages import AIMessage
 from pydantic import ValidationError
 
 from autobots.adapters.browser_page import CdpPage
+from autobots.adapters.tool_registry import catalog, catalog_registry
 from autobots.application import browsing_tool
 from autobots.application.browsing_loop import Link, PageView
 from autobots.application.loop_admission import active_middleware
 from autobots.application.loop_policy import LoopStopped
-from autobots.application.tool_catalog import all_descriptors, catalog_registry, tool_catalog
-from autobots.application.tool_gateway import ToolContext, ToolFailed, ToolRegistry, ToolScope
+from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolRegistry, ToolScope
 from autobots.contracts.browsing import BrowseGoalInput
 
 TC_03_PROVIDERS = {"autobots", "tavily", "jina", "yahoo_finance", "world_bank", "github"}
+CATALOG = catalog()
 ARGS = {
     "task": "What is example.com for?",
     "start_url": "https://example.com/",
@@ -30,7 +31,7 @@ def qualified(state: bool, monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def browse_descriptor() -> Any:
-    return next(item for item in all_descriptors({}) if item.tool_id == "browse_goal")
+    return next(item for item in CATALOG.descriptors({}) if item.tool_id == "browse_goal")
 
 
 def test_unqualified_it_is_planned_disabled_and_unregistered(
@@ -44,7 +45,7 @@ def test_unqualified_it_is_planned_disabled_and_unregistered(
     )
     assert (item.provider, item.registered, item.grantable_to) == ("autobots", False, [])
     assert catalog_registry().get("browse_goal", 1) is None
-    assert {tool.provider for tool in tool_catalog({}).tools} <= TC_03_PROVIDERS
+    assert {tool.provider for tool in CATALOG.catalog({}).tools} <= TC_03_PROVIDERS
 
 
 def test_qualified_it_is_registered_expert_only_metered_and_always_approved(
@@ -97,10 +98,10 @@ def test_an_expert_grant_follows_qualification(
     qualified(state, monkeypatch)
     config = ExpertConfig(tools=["browse_goal"])
     if state:
-        validate_config(config, {})
+        validate_config(config, CATALOG, {})
     else:
         with pytest.raises(ExpertRefused, match="expert_tool_unavailable"):
-            validate_config(config, {})
+            validate_config(config, CATALOG, {})
 
 
 @pytest.mark.parametrize(

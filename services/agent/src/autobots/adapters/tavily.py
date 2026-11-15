@@ -21,14 +21,14 @@ from autobots.adapters.provider_http import (
     ProviderReply,
     Strings,
     Text,
-    attempt_key,
     fit,
     http_client,
     read_json,
     refusal_code,
 )
 from autobots.adapters.url_guard import Resolver, check_url, system_resolver
-from autobots.application.tool_gateway import ToolContext, ToolDefinition
+from autobots.application.tool_definitions import ToolContext, ToolDefinition
+from autobots.application.tool_keys import key_requirement
 from autobots.contracts.web_tools import (
     ExtractedPage,
     FailedPage,
@@ -46,7 +46,7 @@ from autobots.domain.tool_catalog import CostClass, KeyRequirement, ToolGroup, T
 from autobots.domain.tools import OperationClass
 
 API_URL = "https://api.tavily.com"
-TAVILY_KEY = KeyRequirement("tavily", ("TAVILY_API_KEY",))
+TAVILY_KEY = key_requirement("tavily")
 # Sent on every request, whatever a caller passed, so the provider never generates text.
 NO_INFERENCE = {"include_answer": False, "auto_parameters": False}
 OUTPUT_BYTES = 500_000
@@ -86,7 +86,7 @@ class TavilyConnector:
     async def post[T: BaseModel](
         self, context: ToolContext, path: str, body: Mapping[str, object], model: type[T]
     ) -> T:
-        key = await attempt_key(context, TAVILY_KEY, self.environ)
+        key = await context.key("tavily", self.environ)
         async with http_client(
             API_URL,
             timeout=REQUEST_SECONDS,

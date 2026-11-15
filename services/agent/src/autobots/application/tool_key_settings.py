@@ -15,17 +15,9 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from autobots.application.credentials.precedence import looks_usable
 from autobots.application.credentials.store import CredentialMissing, ProviderCredentialStore
 from autobots.application.provider_settings import InvalidKey, StaleVersion
-from autobots.application.tool_keys import (
-    ITEMS,
-    REPOSITORY,
-    SWITCH_VALUES,
-    Item,
-    resolve_item,
-    saved_items,
-)
+from autobots.application.tool_keys import ITEMS, Item, resolve, saved_items
 
 
 @dataclass(frozen=True)
@@ -40,16 +32,12 @@ class ItemState:
 
 
 def checked(item: Item, value: str) -> str:
-    """The value to save, or `InvalidKey`. A secret's shape, a value's form."""
-    if item.secret:
-        if not looks_usable(value):
-            raise InvalidKey("that key was not accepted")
-        return value
-    value = value.strip()
-    if item.name == "github_repository" and not REPOSITORY.fullmatch(value):
-        raise InvalidKey("that repository is not owner/name")
-    if item.name == "browser_executor" and value not in SWITCH_VALUES:
-        raise InvalidKey("the switch is enabled or disabled")
+    """The value to save, or `InvalidKey` with the item's own refusal. A secret's shape, as it was
+    given; a value's form, once its surrounding space is gone (tool_keys.ITEMS)."""
+    if not item.secret:
+        value = value.strip()
+    if not item.accepts(value):
+        raise InvalidKey(item.refusal)
     return value
 
 
@@ -87,14 +75,14 @@ class ToolKeySettings:
         saved = await saved_items(self._connection, workspace_id)
         states = []
         for item in ITEMS.values():
-            source, value = resolve_item(item, saved, self._environ)
+            found = await resolve(item, saved, self._environ)
             states.append(
                 ItemState(
                     name=item.name,
                     variable=item.variable,
                     kind="secret" if item.secret else "value",
-                    source=source,
-                    value=None if item.secret else value,
+                    source=found.source,
+                    value=None if item.secret else found.value,
                     version=await self._version(workspace_id, item.name),
                 )
             )

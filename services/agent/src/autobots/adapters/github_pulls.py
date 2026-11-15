@@ -30,7 +30,7 @@ from autobots.adapters.github_connector import (
     marker,
 )
 from autobots.adapters.provider_http import ProviderReply, Text, UnclearReply
-from autobots.application.tool_gateway import (
+from autobots.application.tool_definitions import (
     ApprovalPolicy,
     NotDelivered,
     ToolContext,

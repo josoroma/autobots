@@ -7,7 +7,6 @@ this module imports neither it nor the workflow runner (Decision 0029 F7, PPRD-0
 
 from dataclasses import replace
 from typing import Any
-from uuid import UUID
 
 from deepagents import create_deep_agent
 from langchain.agents.middleware import AgentMiddleware
@@ -27,10 +26,6 @@ from autobots.application.artifacts import reconcile_run
 from autobots.application.assignments import Delegation
 from autobots.application.loop_policy import LoopStopped, UnadmittedModelCall
 from autobots.application.loop_prompts import SYSTEM_PROMPT, opening, scope_guidance
-
-# `loop_registry` and `LoopConfig` are re-exported for the modules and tests that import them from
-# here.
-from autobots.application.loop_tools import loop_registry as loop_registry
 from autobots.application.plans import load_goal
 from autobots.application.recovery import classify_interrupted, open_obligation, outstanding
 from autobots.application.run_lifecycle import (
@@ -38,16 +33,19 @@ from autobots.application.run_lifecycle import (
     LoopResult,
     finish,
     lease_heartbeat,
+    pass_registry,
     result_of,
     run_status,
 )
+
+# `LoopConfig` is re-exported for the disposable checks that import it from here.
 from autobots.application.run_lifecycle import LoopConfig as LoopConfig
 from autobots.application.run_usage import begin_segment, end_segment, ensure_usage
 from autobots.application.runs import LeaseLost, apply_worker_command
-from autobots.application.tool_gateway import ToolGateway, ToolScope
+from autobots.application.tool_definitions import ToolRegistry, ToolScope
+from autobots.application.tool_gateway import ToolGateway
 from autobots.application.worker_leases import Lease
 from autobots.contracts.plans import GoalSpec
-from autobots.domain.execution import incompatibility
 from autobots.domain.models import ModelRoute
 from autobots.domain.runs import RunCommand, RunStatus
 from autobots.domain.stops import PassOutcome, StopCode
@@ -71,15 +69,14 @@ def build_stage(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (STD-06)
     scope: ToolScope,
     config: LoopConfig,
     *,
+    registry: ToolRegistry,
     instructions: str = "",
-    delegation: Delegation | None = None,
     goal: GoalSpec | None = None,
     summary_route: ModelRoute | None = None,
 ) -> Any:
-    """Explicit tools and middleware. Skills, memory, subagents and a backend stay unset here."""
-    gateway = ToolGateway(
-        loop_registry(config.limits, config.object_store, delegation, config.tools)
-    )
+    """Explicit tools and middleware. Skills, memory, subagents and a backend stay unset here. The
+    tools are the pass's registry, from the process's tool set (run_lifecycle.pass_registry)."""
+    gateway = ToolGateway(registry)
     return create_deep_agent(
         model=AdmittedModel(delegate=model),
         tools=visible_tools(gateway, scope),
@@ -133,6 +130,8 @@ async def run_goal(
         return await drive(child_connection, database_url, child_lease, lambda: model, config)
 
     delegation = Delegation(drive_child, config.limits, config.lease_seconds, config.sleep)
+    # Built first, so a process that composed no tools stops before anything is written or sent.
+    registry = pass_registry(config, delegation)
     scope = ToolScope(
         lease.workspace_id,
         lease.run_id,
@@ -187,8 +186,8 @@ async def run_goal(
                 saver,
                 scope,
                 config,
+                registry=registry,
                 instructions=f"{goal.instructions}\n\n{guidance}",
-                delegation=delegation,
                 goal=goal,
                 summary_route=summary_route,
             )
@@ -216,15 +215,6 @@ async def run_goal(
         # Fenced by the lease, so a worker that lost the run leaves the new owner's segment.
         await end_segment(connection, lease)
     return await finish(connection, lease, goal, code)
-
-
-async def execution_block(connection: Any, run_id: UUID) -> str | None:
-    """Why a saved run can't continue under this release, or None. It stays as it was saved."""
-    cursor = await connection.execute(
-        "select execution_contract from public.runs where id = %s", (run_id,)
-    )
-    row = await cursor.fetchone()
-    return incompatibility(None if row is None else row[0])
 
 
 async def _obligation_holds(connection: Any, lease: Lease) -> bool:

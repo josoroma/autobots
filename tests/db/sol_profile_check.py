@@ -9,6 +9,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.application.experts import create_expert, create_session
 from autobots.application.runs import Inheritance, admit_run
 from autobots.application.worker_inference import frozen_policy
@@ -73,7 +74,7 @@ async def main() -> None:
         parent = UUID(plain['run_id'])
         snapshot = {key: item for key, item in plain.items() if key != 'run_id'}
         expert = await create_expert(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), name=f'Researcher {uuid4().hex[:6]}',
-                                     config=ExpertConfig(tools=['calculate']))
+                                     config=ExpertConfig(tools=['calculate']), catalog=tool_registry.catalog())
         session = await create_session(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), kind='direct',
                                        experts=[SessionExpert(expert_id=expert.id)])
         child = await admit_run(db, workspace_id=WORKSPACE, actor_id=parent, idempotency_key=str(uuid4()), goal_text='child', limit_micro_usd=100,

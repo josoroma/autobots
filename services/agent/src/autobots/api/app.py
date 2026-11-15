@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from psycopg_pool import AsyncConnectionPool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from autobots.adapters.tool_registry import catalog
 from autobots.api.approval_routes import router as approval_router
 from autobots.api.artifact_routes import router as artifact_router
 from autobots.api.errors import ERROR_RESPONSES, register_error_handlers
@@ -26,6 +27,7 @@ from autobots.api.settings import Settings
 from autobots.api.settings_routes import router as settings_router
 from autobots.api.tool_routes import router as tool_router
 from autobots.api.workflow_routes import router as workflow_router
+from autobots.application.tool_catalog import Catalog
 
 
 class Pool(Protocol):
@@ -49,7 +51,11 @@ def create_app(
     *,
     membership: MembershipStore | None = None,
     pool_factory: Callable[[str], Pool] = default_pool,
+    tools: Catalog | None = None,
 ) -> FastAPI:
+    """`tools` is the tool catalog the routes read and admit through. By default it is the one
+    over the registry the worker builds (adapters/tool_registry.py, XMOD-01); a test passes its
+    own. Building it opens nothing."""
     resolved = Settings() if settings is None else settings
 
     @asynccontextmanager
@@ -79,6 +85,7 @@ def create_app(
     app.state.membership = DenyAllMembership() if membership is None else membership
     app.state.pool = None
     app.state.provider_context = None
+    app.state.tools = catalog() if tools is None else tools
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(resolved.allowed_hosts))
     register_error_handlers(app)
     app.include_router(router, responses=ERROR_RESPONSES)

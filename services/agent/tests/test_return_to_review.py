@@ -19,7 +19,7 @@ import httpx
 import pytest
 
 from autobots.application.runs import LeaseLost
-from autobots.application.tool_gateway import ToolContext, ToolFailed, ToolScope
+from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolScope
 from autobots.application.worker_leases import Lease
 from autobots.contracts.tools import GithubOpenPullRequestInput
 
@@ -49,6 +49,10 @@ class Cursor:
 
     async def fetchone(self) -> tuple[Any, ...] | None:
         return self._row
+
+    async def fetchall(self) -> list[tuple[Any, ...]]:
+        """The workspace's saved Keys & vars, which this ledger has none of."""
+        return []
 
 
 class Ledger:

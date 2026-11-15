@@ -3,8 +3,8 @@ XMOD-02, PADP-13; SP-010; Decision 0029 F8).
 
 Only application/receipts.py writes a tool receipt and only application/approvals.py an approval
 request. Each status write admits only the states its command moves from, so a move outside the
-table matches no row. Adapters send no SQL to the application's tables, and hand ToolContext's
-connection only to the key resolver.
+table matches no row. Adapters send no SQL to the application's tables and never read ToolContext's
+connection: a key comes from the context's own `key` and `setting` (refactor plan R-53, PTOL-12).
 """
 
 import ast
@@ -12,7 +12,6 @@ import asyncio
 import contextlib
 import json
 import re
-from collections import Counter
 from collections.abc import AsyncIterator
 from pathlib import Path
 from uuid import UUID
@@ -35,9 +34,6 @@ RUN = UUID("b0000000-0000-4000-8000-000000000002")
 WORKSPACE = UUID("a0000000-0000-4000-8000-000000000001")
 APPROVAL = UUID("d0000000-0000-4000-8000-000000000004")
 ACTOR = UUID("c0000000-0000-4000-8000-000000000003")
-# Adapters hand ToolContext's connection only to tool_keys, to resolve a key for the run's
-# workspace. The count may only fall: lower it when one goes.
-HANDED_TO_KEYS = {"github_connector.py": 1, "provider_http.py": 1}
 
 
 def writers(pattern: str) -> list[str]:
@@ -294,17 +290,40 @@ def test_adapters_send_no_sql_to_the_applications_tables() -> None:
     assert found == []
 
 
-def test_adapters_hand_the_connection_only_to_the_key_resolver() -> None:
-    """The ratchet counts only attributes written literally as `context.connection`, each a hand-off
-    to tool_keys today. A connection reached under another name isn't counted."""
-    found: Counter[str] = Counter()
-    for path in sorted((SOURCE / "adapters").rglob("*.py")):
-        for node in ast.walk(ast.parse(path.read_text())):
-            if (
-                isinstance(node, ast.Attribute)
-                and node.attr == "connection"
-                and isinstance(node.value, ast.Name)
-                and node.value.id == "context"
-            ):
-                found[path.name] += 1
-    assert dict(found) == HANDED_TO_KEYS
+def connection_reads(tree: ast.AST) -> list[str]:
+    """Every way a module could reach a connection attribute: any `.connection`, whatever names
+    its owner, and the name as a string, as `getattr` or `attrgetter` would take it. As
+    `line:source`."""
+    return [
+        f"{node.lineno}:{ast.unparse(node)}"
+        for node in ast.walk(tree)
+        if (isinstance(node, ast.Attribute) and node.attr == "connection")
+        or (isinstance(node, ast.Constant) and node.value == "connection")
+    ]
+
+
+def test_adapters_never_read_a_connection() -> None:
+    """The hand-off ratchet R-62 left at two is at zero, and adapters reach no connection at all:
+    a key comes from ToolContext.key or ToolContext.setting, which resolve it in the application
+    (R-53, XMOD-02). Application tools still use the connection for the tables they own."""
+    found = {
+        path.name: reads
+        for path in sorted((SOURCE / "adapters").rglob("*.py"))
+        if (reads := connection_reads(ast.parse(path.read_text())))
+    }
+    assert found == {}
+
+
+def test_the_connection_check_sees_an_alias_or_getattr() -> None:
+    planted = ast.parse(
+        "async def handler(arguments: X, ctx: ToolContext) -> None:\n"
+        "    await ctx.connection.execute('select 1')\n"
+        "    getattr(ctx, 'connection')\n"
+        "    held = ctx\n"
+        "    held.connection\n"
+    )
+    assert sorted(read.split(":", 1)[1] for read in connection_reads(planted)) == [
+        "'connection'",
+        "ctx.connection",
+        "held.connection",
+    ]

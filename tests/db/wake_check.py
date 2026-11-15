@@ -13,6 +13,7 @@ from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.application import run_lifecycle
 from autobots.application.run_lifecycle import LeaseKeeper, LoopConfig
@@ -30,7 +31,7 @@ from autobots.domain.models import resolve_role_policy
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = UUID(sys.argv[1])
 ROUTE = ModelRoute('executor', 'openrouter_terra', 'fixture/model', 1000)
-CONFIG = LoopConfig(route=ROUTE, heartbeat_seconds=0.1, lease_seconds=60)
+CONFIG = LoopConfig(route=ROUTE, heartbeat_seconds=0.1, lease_seconds=60, tool_set=tool_registry.build_registry)
 cases: list[dict] = []
 
 
@@ -147,7 +148,7 @@ async def main() -> None:
         # With a long beat, only the beat forced after reconnecting can renew the lease in time.
         run = await admitted(db)
         lease = await claim_run(db, run, worker_id='forced')
-        keeper = asyncio.create_task(LeaseKeeper(URL, lease, LoopConfig(route=ROUTE, heartbeat_seconds=3, lease_seconds=60), ArrangedClock()).run())
+        keeper = asyncio.create_task(LeaseKeeper(URL, lease, LoopConfig(route=ROUTE, heartbeat_seconds=3, lease_seconds=60, tool_set=tool_registry.build_registry), ArrangedClock()).run())
         await asyncio.sleep(0.3)
         await db.execute("select pg_terminate_backend(pid) from pg_stat_activity where usename = current_user and pid <> pg_backend_pid()")
         await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() + interval '20 seconds' where run_id = %s", (run,))

@@ -36,7 +36,7 @@ from autobots.application.bounded import stop_task
 from autobots.application.browsing_loop import BrowseOutcome, admitted_steps, browse
 from autobots.application.loop_admission import current_middleware
 from autobots.application.loop_policy import LoopStopped
-from autobots.application.tool_gateway import (
+from autobots.application.tool_definitions import (
     ApprovalPolicy,
     ToolContext,
     ToolDefinition,

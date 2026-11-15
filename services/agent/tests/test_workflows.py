@@ -9,7 +9,8 @@ from uuid import uuid4
 import pytest
 
 from autobots.application.run_projection import public_text
-from autobots.application.tool_gateway import ToolResult, ToolScope, _operation_id
+from autobots.application.tool_definitions import ToolResult, ToolScope
+from autobots.application.tool_gateway import _operation_id
 from autobots.application.workflow_runner import InstanceStopped, _run_block, call_tool
 from autobots.contracts.assignments import AssignSpecialist
 from autobots.domain.tools import ToolOutcome

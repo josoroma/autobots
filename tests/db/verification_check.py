@@ -12,11 +12,12 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.adapters.object_storage import SupabaseObjectStore
+from autobots.adapters.tool_registry import build_registry
 from autobots.application.artifacts import publish
 from autobots.application.goal_loop import run_goal
-from autobots.application.loop_tools import loop_registry
 from autobots.application.model_admission import AdmissionRequest, ModelAdmission
 from autobots.application.model_attempts import FailureClass, ProviderFailure
 from autobots.application.recovery import classify_interrupted
@@ -31,8 +32,8 @@ from autobots.application.runs import (
     apply_worker_command,
 )
 from autobots.application.settlement import settle_candidate
-from autobots.application.tool_gateway import ToolFailed, ToolGateway, ToolScope
-from autobots.application.tools import default_registry
+from autobots.application.tool_definitions import ToolFailed, ToolRuntime, ToolScope
+from autobots.application.tool_gateway import ToolGateway
 from autobots.application.worker_leases import claim_next
 from autobots.contracts.plans import InputDocument, RequiredArtifact
 from autobots.domain.models import resolve_role_policy
@@ -57,7 +58,7 @@ def check(name: str, expected: str, observed: object, passed: bool) -> None:
 
 async def main() -> None:
     store = SupabaseObjectStore(BASE, SERVICE)
-    config = LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0))
+    config = LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0), tool_set=tool_registry.build_registry)
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         async def value(sql: str, *values: object) -> Any:
             return (await (await db.execute(sql, values)).fetchone())[0]
@@ -157,7 +158,7 @@ async def main() -> None:
             await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, expected_version=await value('select version from public.runs where id = %s', run))
 
         model = Script(items=[ProviderFailure(FailureClass.PROVIDER_ERROR), calls(PLAN)], seen=[], bound=[])
-        result = await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE, sleep=cancel_during_backoff), drive=drive_lease)
+        result = await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE, sleep=cancel_during_backoff, tool_set=tool_registry.build_registry), drive=drive_lease)
         check('a cancel during backoff stops the retry', '1 call, cancelled', (len(model.seen), result.run_status), len(model.seen) == 1 and result.run_status == 'cancelled')
         released = await value("select count(*) from app_private.model_invocations where run_id = %s and status in ('reserved', 'dispatched')", run)
         check('and the retry\'s reservation is released', '0 open', released, released == 0)
@@ -188,7 +189,7 @@ async def main() -> None:
         run = await admit(limit=500)
         lease = await claim_next(db, worker_id='cap', lease_seconds=120)
         model = Script(items=[calls(PLAN)], seen=[], bound=[])
-        result = await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE), drive=drive_lease)
+        result = await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE, tool_set=tool_registry.build_registry), drive=drive_lease)
         check('a run\'s own lower limit is enforced', 'budget_exceeded, no call', (result.code, len(model.seen)), result.code == 'budget_exceeded' and not model.seen)
         run = await admit()
         lease = await candidate(run)
@@ -210,7 +211,7 @@ async def main() -> None:
 
         pausing = asyncio.create_task(pause_soon())
         model = Script(items=[slow, say('never')], seen=[], bound=[])
-        result = await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE), drive=drive_lease)
+        result = await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE, tool_set=tool_registry.build_registry), drive=drive_lease)
         await pausing
         row = await (await db.execute('select status, charged_micro_usd from app_private.model_invocations where run_id = %s', (run,))).fetchone()
         job = await value('select status from app_private.run_jobs where run_id = %s', run)
@@ -223,7 +224,7 @@ async def main() -> None:
         # Internal writes interrupted before their receipt finish on replay, so they stay resolvable.
         run = await admit()
         lease = await claim_next(db, worker_id='internal', lease_seconds=120)
-        gateway_full = ToolGateway(loop_registry(RootLimits()))
+        gateway_full = ToolGateway(build_registry(ToolRuntime(RootLimits())))
         scope = ToolScope(WORKSPACE, run, lease.generation, {'propose_plan': 1, 'save_artifact': 1, 'complete_task': 1}, ('outputs',))
         proposal = {'tasks': [TASK]}
         first = await gateway_full.execute(db, scope, 'propose_plan', proposal)
@@ -275,7 +276,7 @@ async def main() -> None:
         run = await admit()
         lease = await claim_next(db, worker_id='hung', lease_seconds=120)
         started = time.monotonic()
-        result = await run_goal(db, URL, lease, Script(items=[hang], seen=[], bound=[]), LoopConfig(route=ROUTE, model_call_seconds=0.5), drive=drive_lease)
+        result = await run_goal(db, URL, lease, Script(items=[hang], seen=[], bound=[]), LoopConfig(route=ROUTE, model_call_seconds=0.5, tool_set=tool_registry.build_registry), drive=drive_lease)
         elapsed = time.monotonic() - started
         check('a hung model call is bounded and its outcome stays uncertain', 'uncertain_acceptance, paused, under 4s', (result.code, result.run_status, round(elapsed, 1)), result.code == 'uncertain_acceptance' and result.run_status == 'paused' and elapsed < 3.9)
 
@@ -293,7 +294,7 @@ async def main() -> None:
 
         started = time.monotonic()
         canceller = asyncio.create_task(cancel_soon())
-        result = await run_goal(db, URL, lease, Script(items=[hang], seen=[], bound=[]), LoopConfig(route=ROUTE), drive=drive_lease)
+        result = await run_goal(db, URL, lease, Script(items=[hang], seen=[], bound=[]), LoopConfig(route=ROUTE, tool_set=tool_registry.build_registry), drive=drive_lease)
         await canceller
         elapsed = time.monotonic() - started
         check('a cancel interrupts a hung call', 'cancelled, unknown outcome, under 4s', (result.run_status, result.code, round(elapsed, 1)), result.run_status == 'cancelled' and result.code == 'cancelled_with_unknown_outcomes' and elapsed < 3.9)
@@ -335,7 +336,7 @@ async def main() -> None:
             seen = len(uncertain_events())
             run = await admit()
             lease = await claim_next(db, worker_id='named', lease_seconds=120)
-            result = await run_goal(db, URL, lease, Script(items=[item], seen=[], bound=[]), LoopConfig(route=ROUTE), drive=drive_lease)
+            result = await run_goal(db, URL, lease, Script(items=[item], seen=[], bound=[]), LoopConfig(route=ROUTE, tool_set=tool_registry.build_registry), drive=drive_lease)
             event = one_new(seen, run)
             row = await (await db.execute("select id::text from app_private.model_invocations where run_id = %s and status = 'uncertain'", (run,))).fetchone()
             check(f'the log names the exception: {name}', str(wanted), (result.code, event),
@@ -346,7 +347,7 @@ async def main() -> None:
         seen = len(uncertain_events())
         run = await admit()
         lease = await claim_next(db, worker_id='known', lease_seconds=120)
-        result = await run_goal(db, URL, lease, Script(items=[known], seen=[], bound=[]), LoopConfig(route=ROUTE), drive=drive_lease)
+        result = await run_goal(db, URL, lease, Script(items=[known], seen=[], bound=[]), LoopConfig(route=ROUTE, tool_set=tool_registry.build_registry), drive=drive_lease)
         check('a known failure from inside the call logs no uncertain event', 'invalid_credential, paused, no new event', (result.code, result.run_status, len(uncertain_events()) - seen),
               result.code == 'invalid_credential' and result.run_status == 'paused' and len(uncertain_events()) == seen)
         logging.getLogger('autobots.worker').removeHandler(capture)
@@ -358,16 +359,14 @@ async def main() -> None:
         run = await admit(documents=(document,))
         lease = await claim_next(db, worker_id='docs', lease_seconds=120)
         scope = ToolScope(WORKSPACE, run, lease.generation, {'read_run_file': 1, 'save_artifact': 1}, ('inputs', 'outputs'))
-        gateway = ToolGateway(default_registry())
+        gateway = ToolGateway(build_registry(None))
         read = await gateway.execute(db, scope, 'read_run_file', {'path': 'inputs/data.md'})
         check('a tool reads a document given at admission', 'its content', read.output['content'], read.output['content'] == 'apples: 4')
         write = await gateway.execute(db, scope, 'save_artifact', {'path': 'inputs/data.md', 'content': 'pears: 100'})
         check('and can\'t change it', 'inputs_read_only', write.code, write.code == 'inputs_read_only')
         again = await gateway.execute(db, scope, 'read_run_file', {'path': 'inputs/data.md'})
         check('so it still holds the original', 'apples: 4', again.output['content'], again.output['content'] == 'apples: 4')
-        from autobots.application.artifacts import publish_tool
-        registry = default_registry()
-        registry.register(publish_tool(store))
+        registry = build_registry(ToolRuntime(RootLimits(), store))
         publishing = await ToolGateway(registry).execute(db, ToolScope(WORKSPACE, run, lease.generation, {'publish_artifact': 1}, ('inputs', 'outputs')), 'publish_artifact', {'path': 'inputs/data.md', 'version': 1})
         check('and an input can\'t be published as a result', 'artifact_source_not_output', publishing.code, publishing.code == 'artifact_source_not_output')
         assert ToolFailed and ModelRoute

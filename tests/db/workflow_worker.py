@@ -7,6 +7,7 @@ import signal
 import sys
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.run_lifecycle import LoopConfig
@@ -26,7 +27,7 @@ def die_after(step: object) -> None:
 
 async def main() -> None:
     store = SupabaseObjectStore(BASE, SecretStr(os.environ['AUTOBOTS_STORAGE_SERVICE']))
-    config = LoopConfig(route=ROUTE, object_store=store, lease_seconds=60)
+    config = LoopConfig(route=ROUTE, object_store=store, lease_seconds=60, tool_set=tool_registry.build_registry)
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         lease = await claim_next(db, worker_id='dying', lease_seconds=60)
         assert lease is not None

@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from autobots.adapters.github_connector import GITHUB_KEY, TOKEN_SCOPES
 from autobots.adapters.github_reads import MAX_FILE_BYTES, github_read_tools
-from autobots.application.tool_gateway import ToolContext, ToolFailed, ToolScope
+from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolScope
 from autobots.domain.tool_catalog import ToolAvailability, key_availability
 
 REPOSITORY = "owner/configured"

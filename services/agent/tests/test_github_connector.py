@@ -23,7 +23,7 @@ from autobots.adapters.github_issues import github_issue_tool
 from autobots.adapters.github_pulls import GITHUB_PULL_REQUEST
 from autobots.adapters.github_reads import GITHUB_READ_TOOLS, github_read_tools
 from autobots.application import tool_keys
-from autobots.application.tool_gateway import ToolContext, ToolFailed, ToolScope
+from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolScope
 
 REPOSITORY = "owner/configured"
 ENV = {"GITHUB_REPOSITORY": REPOSITORY, "GITHUB_TOKEN": "github_pat_fixture0001"}
@@ -79,16 +79,16 @@ def settled[T](awaitable: Awaitable[T]) -> T:
 
 def test_one_call_resolves_its_repository_and_token_once(monkeypatch: pytest.MonkeyPatch) -> None:
     """A workflow listing reads each failed run's jobs from the repository it listed (PADP-06)."""
-    resolved: list[UUID | None] = []
-    real = tool_keys.github_target
+    resolved: list[tuple[UUID | None, str]] = []
+    real = tool_keys.attempt_value
 
     async def counted(
-        connection: object, workspace: UUID | None, environ: Mapping[str, str]
-    ) -> tuple[str | None, str | None]:
-        resolved.append(workspace)
-        return await real(connection, workspace, environ)
+        connection: object, workspace: UUID | None, item: tool_keys.Item, environ: Mapping[str, str]
+    ) -> str | None:
+        resolved.append((workspace, item.name))
+        return await real(connection, workspace, item, environ)
 
-    monkeypatch.setattr(tool_keys, "github_target", counted)
+    monkeypatch.setattr(tool_keys, "attempt_value", counted)
     paths: list[str] = []
 
     def github(request: httpx.Request) -> httpx.Response:
@@ -104,7 +104,8 @@ def test_one_call_resolves_its_repository_and_token_once(monkeypatch: pytest.Mon
     arguments = tool.input_model.model_validate({})
     settled(tool.handler(arguments, CONTEXT))
     assert len(paths) == 4 and all(path.startswith(f"/repos/{REPOSITORY}/") for path in paths)
-    assert resolved == [CONTEXT.scope.workspace_id]
+    workspace = CONTEXT.scope.workspace_id
+    assert resolved == [(workspace, "github_repository"), (workspace, "github_token")]
 
 
 def test_an_attempt_without_a_valid_repository_sends_nothing() -> None:

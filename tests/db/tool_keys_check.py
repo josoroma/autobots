@@ -21,6 +21,7 @@ from uuid import UUID, uuid4
 
 import httpx
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.jina import jina_tools
 from autobots.adapters.tavily import tavily_tools
 from autobots.application.credentials.master_key import create_master_key
@@ -28,8 +29,9 @@ from autobots.application.credentials.store import CredentialMissing
 from autobots.application.experts import ExpertRefused, create_expert
 from autobots.application.provider_settings import InvalidKey, StaleVersion
 from autobots.application.runs import admit_run
-from autobots.application.tool_catalog import ToolsUnavailable, require_available, tool_catalog
-from autobots.application.tool_gateway import ToolGateway, ToolRegistry, ToolScope
+from autobots.application.tool_catalog import ToolsUnavailable
+from autobots.application.tool_definitions import ToolRegistry, ToolScope
+from autobots.application.tool_gateway import ToolGateway
 from autobots.application.tool_key_settings import ToolKeySettings
 from autobots.application.tool_keys import key_sources
 from autobots.application.worker_leases import claim_next
@@ -251,9 +253,9 @@ async def main() -> None:
                 tool.availability,
                 tool.key_requirement.source if tool.key_requirement else None,
             )
-            for tool in tool_catalog(view_a).tools
+            for tool in tool_registry.catalog().catalog(view_a).tools
         }
-        catalog_other = {tool.tool_id: tool.availability for tool in tool_catalog(view_other).tools}
+        catalog_other = {tool.tool_id: tool.availability for tool in tool_registry.catalog().catalog(view_other).tools}
         check(
             "the catalog follows the workspace: a saved key is available from Settings, none is key_missing",
             "tavily_search available from settings in A, key_missing elsewhere; search_web key_missing in both",
@@ -269,7 +271,7 @@ async def main() -> None:
         admitted: list[str] = []
         for _workspace, view in ((WORKSPACE_A, view_a), (other, view_other)):
             try:
-                require_available(["tavily_search"], view)
+                tool_registry.catalog().require_available(["tavily_search"], view)
                 admitted.append("admitted")
             except ToolsUnavailable as refused:
                 admitted.append(refused.code)
@@ -289,6 +291,7 @@ async def main() -> None:
                     idempotency_key=str(uuid4()),
                     name=f"Tavily reader {uuid4().hex[:6]}",
                     config=ExpertConfig(tools=["tavily_search"]),
+                    catalog=tool_registry.catalog(),
                 )
                 saved_expert.append("saved")
             except ExpertRefused as refused:

@@ -145,12 +145,14 @@ async def run_trial(  # noqa: PLR0915 - baseline 2026-11-14, shrink only (STD-06
 ) -> dict[str, Any]:
     import psycopg
 
+    from autobots.adapters.tool_registry import catalog
     from autobots.application import browsing_tool
     from autobots.application.approvals import decide
     from autobots.application.experts import create_expert
     from autobots.application.run_usage import RootLimits, ensure_usage
     from autobots.application.runs import Fresh, RunAdmission, RunGrant, admit
-    from autobots.application.tool_gateway import ToolGateway, ToolRegistry, ToolScope
+    from autobots.application.tool_definitions import ToolRegistry, ToolScope
+    from autobots.application.tool_gateway import ToolGateway
     from autobots.application.worker_inference import frozen_policy
     from autobots.application.worker_leases import claim_next
     from autobots.contracts.experts import ExpertConfig
@@ -171,6 +173,7 @@ async def run_trial(  # noqa: PLR0915 - baseline 2026-11-14, shrink only (STD-06
             idempotency_key=str(uuid4()),
             name=f"Browse trial {uuid4().hex[:6]}",
             config=ExpertConfig(tools=["browse_goal"]),
+            catalog=catalog(),
         )
         admitted = await admit(
             db,

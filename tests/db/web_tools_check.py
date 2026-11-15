@@ -20,7 +20,8 @@ from autobots.adapters.remote_files import store_remote_file_tool
 from autobots.adapters.tavily import tavily_tools
 from autobots.application.code_tools import CODE_TOOLS
 from autobots.application.runs import admit_run
-from autobots.application.tool_gateway import ToolGateway, ToolRegistry, ToolScope
+from autobots.application.tool_definitions import ToolRegistry, ToolScope
+from autobots.application.tool_gateway import ToolGateway
 from autobots.application.tool_uses import list_tool_uses
 from autobots.application.tools import READ_CSV, READ_RUN_FILE, READ_RUN_FILE_V2
 from autobots.application.worker_leases import claim_next

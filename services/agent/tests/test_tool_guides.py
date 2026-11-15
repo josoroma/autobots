@@ -4,20 +4,17 @@ from dataclasses import replace
 
 import pytest
 
-from autobots.application.tool_catalog import (
-    MissingGuide,
-    all_descriptors,
-    catalog_registry,
-    require_guides,
-    tool_catalog,
-)
-from autobots.application.tool_gateway import ToolRegistry
+from autobots.adapters.tool_registry import catalog, catalog_registry
+from autobots.application.tool_catalog import MissingGuide, all_descriptors, require_guides
+from autobots.application.tool_definitions import ToolRegistry
 from autobots.domain import tool_guides
 from autobots.domain.tool_guides import TOOL_GUIDES, ToolGuide
 
+CATALOG = catalog()
+
 
 def test_every_registered_and_planned_tool_has_a_full_guide() -> None:
-    described = all_descriptors({})
+    described = CATALOG.descriptors({})
     assert described
     require_guides(item.tool_id for item in described)
     for item in described:
@@ -29,7 +26,7 @@ def test_every_registered_and_planned_tool_has_a_full_guide() -> None:
 
 
 def test_the_catalog_and_each_version_carry_the_guide() -> None:
-    catalog = tool_catalog({})
+    catalog = CATALOG.catalog({})
     calculate = next(item for item in catalog.tools if item.tool_id == "calculate")
     assert calculate.guide.what.startswith("Computes the sum")
     assert set(calculate.guide.model_dump()) == {"what", "when", "why"}
@@ -53,10 +50,10 @@ def test_a_tool_without_a_full_guide_fails_naming_it(
     monkeypatch.setattr(tool_guides, "TOOL_GUIDES", guides)
     monkeypatch.setattr("autobots.application.tool_catalog.TOOL_GUIDES", guides)
     with pytest.raises(MissingGuide, match="unguided_tool"):
-        require_guides(item.tool_id for item in all_descriptors({}, registry))
+        require_guides(item.tool_id for item in all_descriptors(registry, {}))
     # The catalog itself still answers, showing the tool as not yet described.
     stray_view = next(
-        item for item in all_descriptors({}, registry) if item.tool_id == "unguided_tool"
+        item for item in all_descriptors(registry, {}) if item.tool_id == "unguided_tool"
     )
     if guide is None:
         assert stray_view.guide.what == "Not described yet."

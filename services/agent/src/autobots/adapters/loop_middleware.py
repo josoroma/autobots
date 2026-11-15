@@ -59,7 +59,7 @@ from autobots.application.model_attempts import (
     classify_status,
 )
 from autobots.application.run_usage import RootLimits
-from autobots.application.tool_gateway import ToolScope
+from autobots.application.tool_definitions import ToolScope
 from autobots.contracts.plans import GoalSpec
 from autobots.domain.models import ModelRoute
 

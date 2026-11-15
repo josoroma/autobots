@@ -19,14 +19,14 @@ from autobots.adapters.provider_http import (
     Objects,
     ProviderReply,
     Text,
-    attempt_key,
     fit,
     http_client,
     read_json,
     refusal_code,
 )
 from autobots.adapters.url_guard import Resolver, check_url, system_resolver
-from autobots.application.tool_gateway import ToolContext, ToolDefinition
+from autobots.application.tool_definitions import ToolContext, ToolDefinition
+from autobots.application.tool_keys import key_requirement
 from autobots.contracts.web_tools import (
     ExtractWebsiteInput,
     ExtractWebsiteOutput,
@@ -39,7 +39,7 @@ from autobots.domain.tools import OperationClass
 
 SEARCH_URL = "https://s.jina.ai"
 READER_URL = "https://r.jina.ai"
-JINA_KEY = KeyRequirement("jina", ("JINA_API_KEY",))
+JINA_KEY = key_requirement("jina")
 # Plain reader output: markdown, no model-based engine, no generated captions, no images.
 READER_HEADERS = {
     "Accept": "application/json",
@@ -98,7 +98,7 @@ class JinaConnector:
         headers: Mapping[str, str],
         model: type[T],
     ) -> T:
-        key = await attempt_key(context, JINA_KEY, self.environ)
+        key = await context.key("jina", self.environ)
         async with http_client(
             base,
             timeout=REQUEST_SECONDS,

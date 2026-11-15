@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from autobots.api.errors import ApiError
 from autobots.api.security import require_internal
 from autobots.api.settings_routes import current_workspace, process_environment
+from autobots.api.tool_routes import catalog_of
 from autobots.application.run_projection import public_text
 from autobots.application.search import search
 from autobots.application.tool_keys import key_sources
@@ -31,7 +32,7 @@ async def get_search(
         raise ApiError(503, "service_unavailable", "The database is unavailable.")
     async with pool.connection() as connection:
         keys = await key_sources(connection, workspace_id, process_environment(request))
-        hits = await search(connection, workspace_id, query, keys)
+        hits = await search(connection, workspace_id, query, keys, catalog_of(request))
     return SearchResults(
         schema_version=1,
         query=query,

@@ -5,7 +5,12 @@ import os
 import signal
 from typing import Any
 
-from autobots.application.tool_gateway import NotDelivered, ToolContext, ToolDefinition, ToolFailed
+from autobots.application.tool_definitions import (
+    NotDelivered,
+    ToolContext,
+    ToolDefinition,
+    ToolFailed,
+)
 from autobots.domain.tools import OperationClass
 from mock_sink import Sink
 from pydantic import BaseModel, ConfigDict

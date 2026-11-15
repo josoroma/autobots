@@ -1,10 +1,10 @@
 """Tool-provider keys and HTTP, PRD-Tool-Catalog PK-01 to PK-03 and Decision 0017 Q1.
 
-A key is resolved inside each attempt, for Tavily and Jina by PK-04's order (Decision 0024), and
-handed to this attempt's HTTP client only. It never enters a scope, a tool's arguments or schema,
-graph state, an event, a tool-use row, a receipt or a log line. Nothing here checks a key against
-its provider: that would be a paid call, and only an owner's explicit task makes one. Tests pass a
-fake transport.
+A key is resolved inside each attempt by PK-04's order (Decision 0024), through the tool's
+context (tool_definitions.ToolContext.key), and handed to this attempt's HTTP client only. It never
+enters a scope, a tool's arguments or schema, graph state, an event, a tool-use row, a receipt or a
+log line. Nothing here checks a key against its provider: that would be a paid call, and only an
+owner's explicit task makes one. Tests pass a fake transport.
 
 `http_client` makes every tool connector's client, the URL guard's, Storage's and the OpenRouter
 metadata client's (refactor plan R-62, PADP-05). Three clients are made elsewhere, each for its own
@@ -15,7 +15,7 @@ client, outside the tool path.
 
 Every tool request maps its reply here: a read's failure is a typed code, and a write's is a failure
 only when the reply proves nothing was written; anything else stays unknown for a readback to settle
-(tool_gateway.ToolFailed).
+(tool_definitions.ToolFailed).
 """
 
 from collections.abc import Callable, Mapping
@@ -24,25 +24,9 @@ from typing import Annotated, Literal
 import httpx
 from pydantic import BaseModel, BeforeValidator, ConfigDict
 
-from autobots.application.tool_gateway import OutcomeUnknown, ToolContext, ToolFailed
-from autobots.domain.tool_catalog import KeyRequirement
+from autobots.application.tool_definitions import OutcomeUnknown, ToolFailed
 
 MALFORMED = "provider_reply_malformed"
-
-
-async def attempt_key(
-    context: ToolContext, requirement: KeyRequirement, environ: Mapping[str, str]
-) -> str:
-    """This attempt's key by PK-04's order, for the run's workspace. A failure names the credential,
-    never the value, and the key goes to the caller's HTTP client only."""
-    from autobots.application.tool_keys import ToolKeyMissing, ToolKeyUnavailable, resolve_tool_key
-
-    try:
-        return await resolve_tool_key(
-            context.connection, context.scope.workspace_id, requirement, environ
-        )
-    except (ToolKeyMissing, ToolKeyUnavailable) as error:
-        raise ToolFailed(error.code) from None
 
 
 def http_client(

@@ -17,12 +17,12 @@ from autobots.api.settings_routes import (
     provider_settings,
     require_owner,
 )
+from autobots.api.tool_routes import catalog_of
 from autobots.application.experts import ExpertRefused
-from autobots.application.goal_loop import execution_block
 from autobots.application.model_admission import ModelAdmission, remaining_daily_micro_usd
 from autobots.application.provider_settings import ProviderSettings
 from autobots.application.reconciliation import has_unresolvable_effect, record_evidence
-from autobots.application.recovery import outstanding
+from autobots.application.recovery import execution_block, outstanding
 from autobots.application.run_admission import (
     AdmissionInput,
     admit_from_request,
@@ -146,6 +146,7 @@ async def post_run(
             # order is the one the entry point read at start, as the OpenRouter key's is. The
             # `settings` dependency has already refused a missing provider context.
             environment=process_environment(request),
+            catalog=catalog_of(request),
         )
     except ExpertRefused as refused:
         raise reworded(refused, "That routing isn't available.") from None

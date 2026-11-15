@@ -8,13 +8,14 @@ from typing import Any, Protocol
 from uuid import UUID, uuid4
 
 from autobots.application.runs import append_event
-from autobots.application.tool_gateway import (
+from autobots.application.tool_definitions import (
+    RuntimeUnbound,
     ToolContext,
     ToolDefinition,
     ToolFailed,
     ToolScope,
-    hold_lease,
 )
+from autobots.application.tool_gateway import hold_lease
 from autobots.contracts.artifacts import PublishArtifact, PublishedArtifact
 from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.tool_catalog import ToolGroup
@@ -240,10 +241,15 @@ def _media_type(path: str) -> str:
     return "text/markdown" if path.endswith(".md") else "text/plain"
 
 
-def publish_tool(store: ObjectStore) -> ToolDefinition:
-    """Bytes come from this run's own saved file, never from arguments the model wrote out again."""
+def publish_tool(store: ObjectStore | None) -> ToolDefinition:
+    """Bytes come from this run's own saved file, never from arguments the model wrote out again.
+
+    With no store, as the catalog describes it, a call refuses before anything is read or uploaded
+    (XMOD-01)."""
 
     async def run(arguments: PublishArtifact, context: ToolContext) -> PublishedArtifact:
+        if store is None:
+            raise RuntimeUnbound
         if not arguments.path.startswith("outputs/"):
             raise ToolFailed("artifact_source_not_output")
         cursor = await context.connection.execute(

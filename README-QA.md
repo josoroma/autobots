@@ -132,7 +132,7 @@ There are three decisions:
 
 For example, a goal to total provided numbers and deliver a report could lead to `propose_plan` → `calculate` → `save_artifact` → `publish_artifact` → `complete_task` → final reply. This is an illustrative sequence, not a guaranteed model response or an executed example. Multiple calls may share one model response.
 
-An instruction such as “you may use a shell” cannot create a shell tool. The schemas exposed to the model are constructed by [`visible_tools()`](services/agent/src/autobots/adapters/tool_middleware.py); the registry is assembled by [`loop_registry()`](services/agent/src/autobots/application/goal_loop.py).
+An instruction such as “you may use a shell” cannot create a shell tool. The schemas exposed to the model are constructed by [`visible_tools()`](services/agent/src/autobots/adapters/tool_middleware.py); the registry is assembled by [`tool_definitions()`](services/agent/src/autobots/adapters/tool_registry.py).
 
 ## 8. Which tools does an autobot actually have?
 
@@ -153,9 +153,9 @@ The current goal-loop inventory is below; all listed versions are **v1**. Regist
 
 Expert revisions default to an empty configurable tool list; they do not automatically receive every general tool. Their base plan/read-offload tools are supplied by the application. `workflow_approval` is a separate workflow-runner gate, not a general tool offered to the goal model.
 
-The registry now holds web search and extraction (Tavily and Jina, Decision 0017), GitHub issue and pull-request connectors, the `cronjob` tool (Decision 0026) and an isolated browser behind `browse_goal` (Decision 0020), each through the gateway's policy, approvals and receipts; `goal_loop.loop_registry` lists them. It has **no shell, unrestricted Python execution, host-file access, dynamic MCP discovery, email send or external publishing connector**. The consequential-effect fixtures use mock destinations. The required gateway policy for future MCP tools does not mean MCP integration is already implemented.
+The registry now holds web search and extraction (Tavily and Jina, Decision 0017), GitHub issue and pull-request connectors, the `cronjob` tool (Decision 0026) and an isolated browser behind `browse_goal` (Decision 0020), each through the gateway's policy, approvals and receipts; `adapters/tool_registry.tool_definitions` lists them. It has **no shell, unrestricted Python execution, host-file access, dynamic MCP discovery, email send or external publishing connector**. The consequential-effect fixtures use mock destinations. The required gateway policy for future MCP tools does not mean MCP integration is already implemented.
 
-Code: [grant vocabulary](services/agent/src/autobots/domain/tools.py), [runtime registry](services/agent/src/autobots/application/goal_loop.py), [version inventory](services/agent/src/autobots/domain/execution.py), [Expert contract](services/agent/src/autobots/contracts/experts.py), [mock effect tools](tests/db/effect_tools.py). The three-tool `default_registry()` in `application/tools.py` is a smaller helper, not the full runtime inventory.
+Code: [grant vocabulary](services/agent/src/autobots/domain/tools.py), [runtime registry](services/agent/src/autobots/adapters/tool_registry.py), [version inventory](services/agent/src/autobots/domain/execution.py), [Expert contract](services/agent/src/autobots/contracts/experts.py), [mock effect tools](tests/db/effect_tools.py).
 
 ## 9. What happens between a tool request and its result?
 
@@ -248,7 +248,7 @@ Code: [`CompactionPolicy` and `safe_split()`](services/agent/src/autobots/applic
 
 ## 17. Are these the same tools and agents used by Codex or Claude to develop Autobots?
 
-No. The development assistant's shell, browser, repository skills and collaboration tools belong to the development environment. They are separate from product tools exposed by `loop_registry()`.
+No. The development assistant's shell, browser, repository skills and collaboration tools belong to the development environment. They are separate from product tools exposed by `tool_definitions()`.
 
 Likewise, [`.claude/agents/`](.claude/agents/) contains development roles. Product Experts are versioned database-backed configurations resolved by [`experts.py`](services/agent/src/autobots/application/experts.py). Product skills contribute reviewed instructions/reference material; they do not grant executable tools or silently expand permissions. A promoted skill does not become an unrestricted Python function.
 

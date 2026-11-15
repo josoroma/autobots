@@ -24,7 +24,7 @@ from autobots.adapters.browser_executor import (
     lease_alive,
 )
 from autobots.application.runs import admit_run, apply_command
-from autobots.application.tool_gateway import ToolScope
+from autobots.application.tool_definitions import ToolScope
 from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import RunCommand

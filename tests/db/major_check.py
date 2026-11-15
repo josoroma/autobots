@@ -15,6 +15,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.loop_middleware import LoopMiddleware, LoopStopped
 from autobots.application import operations as operations_module
 from autobots.application import routines as routines_module
@@ -41,17 +42,16 @@ from autobots.application.routines import admit_occurrence, create_routine, eval
 from autobots.application.run_lifecycle import LoopResult
 from autobots.application.run_usage import RootLimits
 from autobots.application.runs import Inheritance, admit_run, apply_command
-from autobots.application.tool_gateway import (
+from autobots.application.tool_definitions import (
     ApprovalPolicy,
     NotDelivered,
     ToolContext,
     ToolDefinition,
     ToolFailed,
-    ToolGateway,
     ToolRegistry,
     ToolScope,
-    resolve,
 )
+from autobots.application.tool_gateway import ToolGateway, resolve
 from autobots.application.worker_leases import claim_next, claim_run, is_held
 from autobots.application.workflows import (
     create_execution,
@@ -205,7 +205,7 @@ async def effects_and_assignments(db: Any, cases: Cases) -> None:
 
     # M4 and M5: a parent, a child and a grandchild.
     await clear()
-    expert = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), name=f'Major {uuid4().hex[:6]}', config=ExpertConfig(tools=['calculate'], instructions='Work.'))
+    expert = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), name=f'Major {uuid4().hex[:6]}', config=ExpertConfig(tools=['calculate'], instructions='Work.'), catalog=tool_registry.catalog())
     session = await create_session(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), kind='coordinator', experts=[SessionExpert(expert_id=expert.id)])
     binding = await resolve_binding(db, WORKSPACE, session.id, expert_id=expert.id)
     root = await admit(binding=binding)
@@ -423,7 +423,7 @@ async def routines_wait_on_readiness(db: Db) -> None:
         logger.addHandler(said)
         worker_module.evaluate_routines = counted
         try:
-            worked = await worker_module.maintenance_step(worker_module.no_credential, store, settings)(connection)
+            worked = await worker_module.maintenance_step(worker_module.no_credential, store, settings, catalog=tool_registry.catalog())(connection)
         finally:
             worker_module.evaluate_routines = real
             logger.removeHandler(said)
@@ -522,7 +522,7 @@ async def workflows_routines_memory(db: Any, cases: Cases) -> None:
     await clear()
     config = RoutineConfig(target=RoutineTarget(kind='workflow', id=flow.id, version=1), trigger={'kind': 'interval', 'minutes': 60}, limit_micro_usd=500, tools=['calculate'], inputs={'in': 'x'})
     routine_id = uuid4()
-    run = await admit_occurrence(db, WORKSPACE, routine_id, 1, routines_module.routine_record(config), datetime(2026, 1, 1, tzinfo=UTC))
+    run = await admit_occurrence(db, WORKSPACE, routine_id, 1, routines_module.routine_record(config), datetime(2026, 1, 1, tzinfo=UTC), catalog=tool_registry.catalog())
     limit = await value('select limit_micro_usd from public.runs where id = %s', run)
     goal = await load_goal(db, run)
     check("a routine's limit and tools reach its workflow's run", '500, no save or publish tools', (limit, sorted(goal.allowed_tools)), limit == 500 and 'calculate' in goal.allowed_tools and 'save_artifact' not in goal.allowed_tools)
@@ -561,14 +561,14 @@ async def workflows_routines_memory(db: Any, cases: Cases) -> None:
 
     routines_module.occurrences = raises_for_one
     try:
-        admitted = await evaluate_routines(db, ready)
+        admitted = await evaluate_routines(db, ready, catalog=tool_registry.catalog())
     finally:
         routines_module.occurrences = real_occurrences
     moved = await value('select evaluated_until > clock_timestamp() - interval \'1 minute\' from public.routines where id = %s', good.id)
     check('a routine that raises leaves the others running', 'the good one admitted', (admitted, moved), admitted >= 1 and moved is True)
     await db.execute('update public.routines set enabled = false where id = %s', (bad.id,))
     until = await value('select evaluated_until from public.routines where id = %s', good.id)
-    await evaluate_routines(db, ready, until - timedelta(hours=1))
+    await evaluate_routines(db, ready, until - timedelta(hours=1), catalog=tool_registry.catalog())
     kept = await value('select evaluated_until from public.routines where id = %s', good.id)
     check('a slower worker cannot move a routine back in time', 'unchanged', kept == until, kept == until)
     await db.execute('update public.routines set enabled = false where id = %s', (good.id,))
@@ -583,7 +583,7 @@ async def workflows_routines_memory(db: Any, cases: Cases) -> None:
     lease = await claim_next(db, worker_id='m27')
     gateway = ToolGateway(ToolRegistry())
     gateway.registry.register(SEARCH_MEMORY)
-    expert = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), name=f'Other {uuid4().hex[:6]}', config=ExpertConfig(tools=['calculate'], instructions='x'))
+    expert = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), name=f'Other {uuid4().hex[:6]}', config=ExpertConfig(tools=['calculate'], instructions='x'), catalog=tool_registry.catalog())
     await store_memory(db, workspace_id=WORKSPACE, actor_id=ACTOR, title=word, content=f'{word} belongs to another Expert', source={'kind': 'test'}, expert_id=expert.id)
     await store_memory(db, workspace_id=WORKSPACE, actor_id=ACTOR, title=word, content=f'{word} is shared', source={'kind': 'test'})
     reply = await gateway.execute(db, ToolScope(WORKSPACE, lease.run_id, lease.generation, {'search_memory': 1}), 'search_memory', {'query': word})

@@ -7,6 +7,7 @@ import signal
 import sys
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.operations.job_dispatch import process_next
 from goal_loop_script import ROUTE, Script, calls
@@ -24,7 +25,7 @@ async def main() -> None:
     assign = ('assign_specialist', {'expert_id': EXPERT, 'goal': 'Do the part'})
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         model = Script(items=[calls(plan), calls(assign), die], seen=[], bound=[])
-        await process_next(db, URL, 'first-parent', lambda: model, LoopConfig(route=ROUTE, lease_seconds=60))
+        await process_next(db, URL, 'first-parent', lambda: model, LoopConfig(route=ROUTE, lease_seconds=60, tool_set=tool_registry.build_registry))
 
 
 asyncio.run(main())

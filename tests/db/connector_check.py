@@ -22,7 +22,8 @@ from autobots.adapters.github_issues import (
 from autobots.adapters.github_reads import github_read_tools
 from autobots.application.approvals import decide
 from autobots.application.runs import admit_run
-from autobots.application.tool_gateway import ToolGateway, ToolRegistry, ToolScope
+from autobots.application.tool_definitions import ToolRegistry, ToolScope
+from autobots.application.tool_gateway import ToolGateway
 from autobots.application.tool_uses import list_tool_uses
 from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy

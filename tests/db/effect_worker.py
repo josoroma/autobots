@@ -5,6 +5,7 @@ import asyncio
 import sys
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.operations.job_dispatch import process_next
 from effect_tools import tools
@@ -15,7 +16,7 @@ URL, SINK, BODY = sys.argv[1], sys.argv[2], sys.argv[3]
 
 
 async def main() -> None:
-    config = LoopConfig(route=ROUTE, tools=tools(Sink(SINK), behavior={BODY: 'die_after'}), lease_seconds=60)
+    config = LoopConfig(route=ROUTE, tools=tools(Sink(SINK), behavior={BODY: 'die_after'}), lease_seconds=60, tool_set=tool_registry.build_registry)
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         await process_next(db, URL, 'dying', lambda: Script(items=[], seen=[], bound=[]), config)
 

@@ -20,7 +20,7 @@ from autobots.adapters.github_connector import marker
 from autobots.adapters.github_pulls import TOOL_ID, branch_for, github_pull_request_tool
 from autobots.adapters.provider_http import UnclearReply
 from autobots.application.approvals import ApprovedRequest
-from autobots.application.tool_gateway import (
+from autobots.application.tool_definitions import (
     NotDelivered,
     ToolContext,
     ToolDefinition,

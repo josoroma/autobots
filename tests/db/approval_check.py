@@ -15,18 +15,19 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.application import browsing_tool
 from autobots.application.approvals import ApprovalRefused, decide, expire, expire_due
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import Inheritance, admit_run, apply_command
-from autobots.application.tool_gateway import (
+from autobots.application.tool_definitions import (
     ApprovalPolicy,
     ToolContext,
     ToolDefinition,
-    ToolGateway,
     ToolRegistry,
     ToolScope,
 )
+from autobots.application.tool_gateway import ToolGateway
 from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import RunCommand
@@ -63,7 +64,7 @@ async def send(arguments: SendInput, _: ToolContext) -> SendOutput:
 
 MOCK = ToolDefinition(tool_id='mock_send', version=1, description='Send a message to a controlled sink.', input_model=SendInput, output_model=SendOutput, approval=ApprovalPolicy(resource_target=lambda arguments: f'Mail to {arguments.to}'), operation_class=OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE, handler=send)
 SEND = ('mock_send', {'to': 'team@example.invalid', 'body': 'hello'})
-CONFIG = LoopConfig(route=ROUTE, tools=(MOCK,), sleep=lambda _: asyncio.sleep(0))
+CONFIG = LoopConfig(route=ROUTE, tools=(MOCK,), sleep=lambda _: asyncio.sleep(0), tool_set=tool_registry.build_registry)
 
 
 async def main(cases: Cases) -> dict[str, object]:

@@ -25,6 +25,7 @@ import psycopg
 from pydantic import SecretStr
 
 from autobots.adapters.object_storage import SupabaseObjectStore
+from autobots.adapters.tool_registry import build_registry, catalog
 from autobots.api.main import provider_context_from_environment
 from autobots.application.approvals import expire_due
 from autobots.application.bounded import stop_task
@@ -40,6 +41,7 @@ from autobots.application.readiness import (
 from autobots.application.retention import apply_all
 from autobots.application.routines import evaluate_routines
 from autobots.application.run_lifecycle import LoopConfig
+from autobots.application.tool_catalog import Catalog
 from autobots.application.worker_inference import CatalogCache, InferenceSource
 from autobots.application.worker_leases import is_held
 from autobots.operations.job_dispatch import process_next
@@ -193,12 +195,15 @@ def maintenance_step(
     store: Any,
     readiness: ReadinessSettings,
     retention_seconds: float = 3600,
+    *,
+    catalog: Catalog,
 ) -> Step:
     """Expired approvals, due routines and declared retention, each safe from many workers.
 
     A restore hold stops all three (SP-018). Otherwise a routine is admission, so it waits on the
     gate a person's run passes (LM-07, Decision 0023 E2), and the refusing code is logged when it
-    changes. Retention doesn't wait: it removes content, and waits on Storage by itself.
+    changes, and `catalog` refuses an occurrence whose tools are unavailable (PK-02). Retention
+    doesn't wait: it removes content, and waits on Storage by itself.
     """
     last_retention: list[float] = []
     said: list[str] = []
@@ -216,7 +221,7 @@ def maintenance_step(
         )
         admitted = 0
         if refused is None:
-            admitted = await evaluate_routines(connection, check)
+            admitted = await evaluate_routines(connection, check, catalog=catalog)
             said[:] = []
         elif said != [refused.code]:
             said[:] = [refused.code]
@@ -247,6 +252,12 @@ def credential_check_from_environment() -> Callable[[Any, UUID], Awaitable[str]]
     return check
 
 
+def loop_config(store: Any) -> LoopConfig:
+    """What every job's binder starts from: no route until the job's own policy binds one, and the
+    tool set from the composition edge, so a pass runs what the catalog lists (XMOD-01, TC-01)."""
+    return LoopConfig(route=UNBOUND, object_store=store, tool_set=build_registry)
+
+
 def inference_step(
     config: WorkerConfig, source: InferenceSource, store: Any, stop: asyncio.Event | None = None
 ) -> Step:
@@ -255,7 +266,7 @@ def inference_step(
     A pass that raises an exception no handler classifies is recorded there and its retries are
     bounded, then the exception reaches `serve`, which logs `worker.step_failed` (Decision 0028 E4).
     """
-    base = LoopConfig(route=UNBOUND, object_store=store)
+    base = loop_config(store)
 
     async def step(connection: Any) -> bool:
         # A stop can land during the maintenance before this, and a paid job shouldn't start then.
@@ -342,7 +353,10 @@ async def main(
         drain_seconds=float(os.environ.get("AUTOBOTS_WORKER_DRAIN_SECONDS", "30")),
     )
     stop = asyncio.Event()
-    step = maintenance_step(credential_check_from_environment(), store, readiness)
+    # The composition edge's catalog, for the routines this process admits (XMOD-01).
+    step = maintenance_step(
+        credential_check_from_environment(), store, readiness, catalog=catalog()
+    )
     if os.environ.get(INFERENCE_SWITCH) == "enabled":
         source = inference_from_environment(url, store, client_factory, fetch_catalog)
         config = replace(config, claims_inference=True)

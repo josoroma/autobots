@@ -20,7 +20,8 @@ from autobots.application.routines import (
     run_routine_now,
     set_enabled,
 )
-from autobots.application.tool_gateway import (
+from autobots.application.tool_catalog import Catalog
+from autobots.application.tool_definitions import (
     ApprovalPolicy,
     ToolContext,
     ToolDefinition,
@@ -89,7 +90,11 @@ def _target(arguments: CronjobInput) -> str:
     return f"Routine {subject}: {arguments.action}"
 
 
-def cronjob_tool(credential_check: CredentialCheck | None = None) -> ToolDefinition:
+def cronjob_tool(
+    catalog: Catalog, credential_check: CredentialCheck | None = None
+) -> ToolDefinition:
+    """`catalog` is the composition's, so a run started now refuses an unavailable tool as a
+    person's would (PK-02)."""
     check = credential_check or _environment_check
 
     async def handle(arguments: CronjobInput, context: ToolContext) -> CronjobOutput:
@@ -163,7 +168,7 @@ def cronjob_tool(credential_check: CredentialCheck | None = None) -> ToolDefinit
                         return await check(connection, workspace_id)
 
                     status, reason, run_id = await run_routine_now(
-                        connection, workspace, routine, ready
+                        connection, workspace, routine, ready, catalog=catalog
                     )
                     return CronjobOutput(
                         action=action,
@@ -205,6 +210,3 @@ def cronjob_tool(credential_check: CredentialCheck | None = None) -> ToolDefinit
         public_output_fields=("routine_id", "status", "run_id"),
         timeout_seconds=30.0,
     )
-
-
-CRONJOB = cronjob_tool()

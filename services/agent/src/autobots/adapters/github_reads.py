@@ -23,7 +23,7 @@ from autobots.adapters.github_connector import (
     file_text,
 )
 from autobots.adapters.provider_http import Objects, ProviderReply, Text
-from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed
+from autobots.application.tool_definitions import ToolContext, ToolDefinition, ToolFailed
 from autobots.contracts.tools import (
     GithubFailingJob,
     GithubIssue,

@@ -7,6 +7,7 @@ import sys
 import time
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.application.goal_loop import run_goal
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.worker_leases import claim_next
@@ -27,7 +28,7 @@ async def main() -> None:
         lease = await claim_next(db, worker_id='sleeper', lease_seconds=2)
         assert lease is not None
         model = Script(items=[calls(PLAN), wait, say('x')], seen=[], bound=[])
-        config = LoopConfig(route=ROUTE, heartbeat_seconds=0.5, lease_seconds=2)
+        config = LoopConfig(route=ROUTE, heartbeat_seconds=0.5, lease_seconds=2, tool_set=tool_registry.build_registry)
         result = await run_goal(db, URL, lease, model, config, drive=drive_lease)
     print(json.dumps({'outcome': result.outcome, 'code': result.code}))
 

@@ -10,6 +10,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.experts import create_expert, create_session, resolve_binding
@@ -46,13 +47,13 @@ def check(name: str, expected: str, observed: object, passed: bool) -> None:
 
 async def main() -> None:
     store = SupabaseObjectStore(BASE, SERVICE)
-    config = LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0))
+    config = LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0), tool_set=tool_registry.build_registry)
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         async def value(sql: str, *values: object) -> Any:
             return (await (await db.execute(sql, values)).fetchone())[0]
 
         async def expert(name: str, **config_values: Any) -> Any:
-            return await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=f'expert-{name}', name=name, config=ExpertConfig(**config_values))
+            return await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=f'expert-{name}', name=name, config=ExpertConfig(**config_values), catalog=tool_registry.catalog())
 
         lead = await expert('Assign Lead', tools=['calculate', 'save_artifact', 'publish_artifact'])
         helper = await expert('Assign Helper', tools=['calculate', 'save_artifact', 'publish_artifact', 'read_run_file'], role_bindings={'executor': 'openrouter_deepseek_flash'}, instructions='Help.')
@@ -114,17 +115,17 @@ async def main() -> None:
         check('an Expert outside the session is refused', 'route_not_granted', reply['code'], reply['code'] == 'route_not_granted')
 
         # Depth, headcount, outstanding and spend.
-        result, model, run = await go([calls(PARENT_PLAN), calls(assign(helper)), calls(CHILD_PLAN), calls(assign(helper)), say('child stops'), say('parent stops')], LoopConfig(route=ROUTE, object_store=store, limits=RootLimits(child_levels=1)))
+        result, model, run = await go([calls(PARENT_PLAN), calls(assign(helper)), calls(CHILD_PLAN), calls(assign(helper)), say('child stops'), say('parent stops')], LoopConfig(route=ROUTE, object_store=store, limits=RootLimits(child_levels=1), tool_set=tool_registry.build_registry))
         reply = tool_replies(model, 'assign_specialist')[0]
         check('a child at the depth limit can\'t delegate further', 'tool_not_granted', reply['code'], reply['code'] == 'tool_not_granted')
-        result, model, run = await go([calls(PARENT_PLAN), calls(assign(helper, goal='First')), calls(CHILD_PLAN), say('child stops'), calls(assign(helper, goal='Second')), say('parent stops')], LoopConfig(route=ROUTE, object_store=store, limits=RootLimits(children=1)))
+        result, model, run = await go([calls(PARENT_PLAN), calls(assign(helper, goal='First')), calls(CHILD_PLAN), say('child stops'), calls(assign(helper, goal='Second')), say('parent stops')], LoopConfig(route=ROUTE, object_store=store, limits=RootLimits(children=1), tool_set=tool_registry.build_registry))
         reply = tool_replies(model, 'assign_specialist')[-1]
         count = await value('select count(*) from app_private.assignments where root_run_id = %s', run)
         check('the headcount limit refuses another child', 'children_limit, 1 child', (reply['code'], count), reply['code'] == 'children_limit' and count == 1)
-        result, model, run = await go([calls(PARENT_PLAN), calls(assign(helper)), say('parent stops')], LoopConfig(route=ROUTE, object_store=store, limits=RootLimits(outstanding_assignments=0)))
+        result, model, run = await go([calls(PARENT_PLAN), calls(assign(helper)), say('parent stops')], LoopConfig(route=ROUTE, object_store=store, limits=RootLimits(outstanding_assignments=0), tool_set=tool_registry.build_registry))
         reply = tool_replies(model, 'assign_specialist')[-1]
         check('the outstanding limit refuses a child', 'outstanding_assignments_limit', reply['code'], reply['code'] == 'outstanding_assignments_limit')
-        result, model, run = await go([calls(PARENT_PLAN), calls(assign(helper)), calls(CHILD_PLAN), say('never'), say('never')], LoopConfig(route=ROUTE, object_store=store, limits=RootLimits(model_calls=3)))
+        result, model, run = await go([calls(PARENT_PLAN), calls(assign(helper)), calls(CHILD_PLAN), say('never'), say('never')], LoopConfig(route=ROUTE, object_store=store, limits=RootLimits(model_calls=3), tool_set=tool_registry.build_registry))
         calls_on_root = await value('select model_calls from app_private.run_usage where run_id = %s', run)
         check('calls by the child count against the root', '3 calls, then stopped', (len(model.seen), calls_on_root), len(model.seen) == 3 and calls_on_root == 3)
         roots = await value('select count(distinct root_run_id) from app_private.model_invocations where root_run_id = %s', run)
@@ -146,14 +147,14 @@ async def main() -> None:
         check('a child past the money stops, and no further call goes out', 'budget_exceeded, paused for more budget, 3 calls', (stopped, row, len(model.seen)), stopped == 'budget_exceeded' and row[0] == 'paused' and len(model.seen) == 3)
         reserved = await value("select count(*) from app_private.model_invocations where root_run_id = %s", run)
         check('nothing was reserved for the refused call', '3 on the ledger', reserved, reserved == 3)
-        result, model, run = await go([calls(PARENT_PLAN), calls(assign(helper)), on_root('update app_private.run_usage set active_seconds = 1000 where run_id = %s'), say('never'), say('never')], LoopConfig(route=ROUTE, object_store=store, limits=RootLimits(active_seconds=100)))
+        result, model, run = await go([calls(PARENT_PLAN), calls(assign(helper)), on_root('update app_private.run_usage set active_seconds = 1000 where run_id = %s'), say('never'), say('never')], LoopConfig(route=ROUTE, object_store=store, limits=RootLimits(active_seconds=100), tool_set=tool_registry.build_registry))
         row = await (await db.execute('select r.status, a.outcome from app_private.assignments a join public.runs r on r.id = a.child_run_id where a.parent_run_id = %s', (run,))).fetchone()
         stopped = await value('select u.stop_reason from app_private.run_usage u join public.runs r on r.id = u.run_id where r.parent_run_id = %s', run)
         check("a child past the root's active time stops", 'active_time_limit, failed, 3 calls', (stopped, row, len(model.seen)), stopped == 'active_time_limit' and row[0] == 'failed' and len(model.seen) == 3)
 
         # LC-04: a limit across the tree stops new work, and what a finished child made stays readable.
         result, model, run = await go([calls(PARENT_PLAN), calls(assign(helper, goal='First')), calls(CHILD_PLAN), calls(CHILD_SAVE), calls(CHILD_PUBLISH), calls(CHILD_DONE), say('child finished'), calls(assign(helper, goal='Second')), calls(CHILD_PLAN), say('never'), say('never')],
-                                      LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0), limits=RootLimits(model_calls=8)))
+                                      LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0), limits=RootLimits(model_calls=8), tool_set=tool_registry.build_registry))
         first = await (await db.execute("select child_run_id, outcome from app_private.assignments where parent_run_id = %s order by created_at limit 1", (run,))).fetchone()
         readable = await read_workspace(db, WORKSPACE, first[0])
         parent_view = await read_workspace(db, WORKSPACE, run)
@@ -167,7 +168,7 @@ async def main() -> None:
         frozen = await admit_run(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), goal_text='Lead on a frozen route', limit_micro_usd=1_000_000, policy=resolve_role_policy(run_profile='openrouter_deepseek_flash'), binding=await resolve_binding(db, WORKSPACE, session.id, expert_id=lead.id))
         held = await (await db.execute("update app_private.run_jobs set available_at = clock_timestamp() + interval '1 hour' where status = 'queued' and run_id <> %s returning run_id", (frozen.run_id,))).fetchall()
         model = Script(items=[calls(PARENT_PLAN), calls(assign(helper)), calls(CHILD_PLAN), say('child stops'), say('parent stops')], seen=[], bound=[])
-        await process_next(db, URL, 'parent', lambda: model, LoopConfig(route=ModelRoute('executor', 'openrouter_deepseek_flash', 'fixture/model', 1000), object_store=store, sleep=lambda _: asyncio.sleep(0)))
+        await process_next(db, URL, 'parent', lambda: model, LoopConfig(route=ModelRoute('executor', 'openrouter_deepseek_flash', 'fixture/model', 1000), object_store=store, sleep=lambda _: asyncio.sleep(0), tool_set=tool_registry.build_registry))
         await db.execute('update app_private.run_jobs set available_at = clock_timestamp() where run_id = any(%s)', ([row[0] for row in held],))
         inherited = await value("select r.policy_snapshot -> 'bindings' ->> 'executor' from app_private.assignments a join public.runs r on r.id = a.child_run_id where a.parent_run_id = %s", frozen.run_id)
         check('a child under a frozen DeepSeek policy is admitted on that route', 'openrouter_deepseek_flash', inherited, inherited == 'openrouter_deepseek_flash')

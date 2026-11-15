@@ -24,6 +24,7 @@ from autobots.application.experts import RunBinding, resolve_binding
 from autobots.application.experts import expert_overrides as expert_overrides
 from autobots.application.model_admission import remaining_daily_micro_usd
 from autobots.application.runs import AdmissionResult, Fresh, RunAdmission, admit
+from autobots.application.tool_catalog import Catalog
 from autobots.application.tool_keys import key_sources
 from autobots.contracts.plans import InputDocument, RequiredArtifact
 from autobots.contracts.run_commands import RunRequest
@@ -168,15 +169,16 @@ async def chosen_limit(
 
 
 async def require_tools_available(
-    connection: Connection, workspace_id: UUID, tools: Iterable[str], environment: Mapping[str, str]
+    connection: Connection,
+    workspace_id: UUID,
+    tools: Iterable[str],
+    environment: Mapping[str, str],
+    catalog: Catalog,
 ) -> None:
     """Refuses work that grants a tool this install can't use now, before the work exists, with
-    keys in PK-04's order over the workspace's saved items and `environment` (PRD-Tool-Catalog
-    PK-02 and PK-04). Raises ToolsUnavailable."""
-    # Imported here: tool_catalog imports workflows, whose own imports reach this module.
-    from autobots.application.tool_catalog import require_available
-
-    require_available(tools, await key_sources(connection, workspace_id, environment))
+    keys in PK-04's order over the workspace's saved items and `environment`, by the catalog the
+    composition edge passes (PRD-Tool-Catalog PK-02 and PK-04). Raises ToolsUnavailable."""
+    catalog.require_available(tools, await key_sources(connection, workspace_id, environment))
 
 
 # POST /v1/runs
@@ -233,6 +235,7 @@ async def admit_from_request(
     model_ready: CredentialCheck,
     role: Callable[[], Awaitable[str | None]],
     environment: Mapping[str, str],
+    catalog: Catalog,
 ) -> AdmissionResult:
     """A run request's nine steps, in order, and the first refusal is the answer.
 
@@ -242,7 +245,7 @@ async def admit_from_request(
     4. The workspace's saved policy is read.
     5. Only an owner pins an Expert version, so `role` is asked only then.
     6. The session's routing resolves.
-    7. No granted tool is unavailable, by `environment`'s keys.
+    7. No granted tool is unavailable, by `environment`'s keys and `catalog`.
     8. Every resolved profile is offered.
     9. The run is admitted under its idempotency key.
 
@@ -255,7 +258,7 @@ async def admit_from_request(
     await require_model_ready(model_ready, data.workspace_id, needed=True)
     async with database.connection() as connection:
         saved = await saved_workspace_policy(connection, data.workspace_id)
-        binding = await _session_binding(connection, data, role, environment)
+        binding = await _session_binding(connection, data, role, environment, catalog)
         policy = saved.for_new_work(
             run_role_overrides=binding.role_bindings if binding else None,
             run_profile=data.run_profile,
@@ -297,6 +300,7 @@ async def _session_binding(
     data: AdmissionInput,
     role: Callable[[], Awaitable[str | None]],
     environment: Mapping[str, str],
+    catalog: Catalog,
 ) -> RunBinding | None:
     """Steps 5 to 7, for a request through a session. Any other request has no binding."""
     if data.session_id is None:
@@ -312,5 +316,7 @@ async def _session_binding(
         version=data.expert_version,
     )
     # PK-02: only a run that grants an unavailable tool is refused, before it exists.
-    await require_tools_available(connection, data.workspace_id, binding.tools, environment)
+    await require_tools_available(
+        connection, data.workspace_id, binding.tools, environment, catalog
+    )
     return binding

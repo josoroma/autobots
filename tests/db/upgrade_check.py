@@ -10,6 +10,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.checkpoints import ADAPTER_STATEMENTS, adapter_identity, identity_of
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.adapters.object_storage import SupabaseObjectStore
@@ -56,7 +57,7 @@ BINDING_RUNS: list[UUID] = []
 async def main(workspace: UUID, queued: UUID, second: UUID, before_hash: str) -> None:
     BINDING_RUNS.extend(json.loads(os.environ['AUTOBOTS_PRIOR_RUNS']))
     store = SupabaseObjectStore(os.environ['AUTOBOTS_STORAGE_BASE'], SecretStr(os.environ['AUTOBOTS_STORAGE_SERVICE']))
-    config = LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0), lease_seconds=30)
+    config = LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0), lease_seconds=30, tool_set=tool_registry.build_registry)
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         async def value(sql: str, *values: object) -> Any:
             return (await (await db.execute(sql, values)).fetchone())[0]
@@ -73,7 +74,7 @@ async def main(workspace: UUID, queued: UUID, second: UUID, before_hash: str) ->
         await db.execute("update app_private.model_policies set default_profile = 'openrouter_terra' where workspace_id = %s", (workspace,))
         other = ModelRoute('executor', 'openrouter_terra', 'fixture/changed', 1000)
         invocations = await value('select count(*) from app_private.model_invocations')
-        refused = await process_next(db, URL, 'changed-route', fixture([calls(PLAN)]), LoopConfig(route=other, sleep=lambda _: asyncio.sleep(0), lease_seconds=30))
+        refused = await process_next(db, URL, 'changed-route', fixture([calls(PLAN)]), LoopConfig(route=other, sleep=lambda _: asyncio.sleep(0), lease_seconds=30, tool_set=tool_registry.build_registry))
         added = await value('select count(*) from app_private.model_invocations') - invocations
         check('a worker on another model leaves a saved run paused, not failed', 'paused, route_not_bound, no call', f'{await state(queued)}, {refused.code if refused else None}, {added} calls', await state(queued) == 'paused' and refused is not None and refused.code == 'route_not_bound' and added == 0)
         unchanged = await bindings(db)

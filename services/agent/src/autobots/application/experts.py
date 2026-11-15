@@ -10,6 +10,8 @@ from uuid import UUID, uuid4
 
 from autobots.application.improvements import active_skill_text
 from autobots.application.runs import existing_receipt, request_hash, store_receipt
+from autobots.application.tool_catalog import Catalog
+from autobots.application.tool_keys import key_sources
 from autobots.contracts.experts import (
     ExpertConfig,
     ExpertConfigView,
@@ -74,16 +76,16 @@ class ExpertRefused(Refusal):
     )
 
 
-def expand_groups(config: ExpertConfig, environ: Mapping[str, str] = os.environ) -> ExpertConfig:
+def expand_groups(
+    config: ExpertConfig, catalog: Catalog, environ: Mapping[str, str]
+) -> ExpertConfig:
     """Groups become explicit tools when a version is saved, so a tool added to a group later
     never changes a saved version (TC-06). A tool an editor didn't name stays out."""
     if not config.tool_groups:
         return config
-    from autobots.application.tool_catalog import expert_tools_by_group
-
     if len(set(config.tool_groups)) != len(config.tool_groups):
         raise ExpertRefused("expert_tool_group_duplicated")
-    by_group = expert_tools_by_group(environ)
+    by_group = catalog.expert_groups(environ)
     tools = list(config.tools)
     for group in config.tool_groups:
         members = by_group.get(group, [])
@@ -95,21 +97,17 @@ def expand_groups(config: ExpertConfig, environ: Mapping[str, str] = os.environ)
 
 async def _workspace_keys(connection: Any, workspace_id: UUID) -> Mapping[str, str]:
     """PK-04: a tool's key may be saved for this workspace, so availability is the workspace's."""
-    from autobots.application.tool_keys import key_sources
-
     return await key_sources(connection, workspace_id, os.environ)
 
 
-def validate_config(config: ExpertConfig, environ: Mapping[str, str] = os.environ) -> None:
-    """A revision can only name what exists and is available. Anything else is refused, not
-    dropped."""
+def validate_config(config: ExpertConfig, catalog: Catalog, environ: Mapping[str, str]) -> None:
+    """A revision can only name what exists and is available, by the catalog the composition edge
+    passes (PK-02). Anything else is refused, not dropped."""
     if any(tool not in EXPERT_TOOLS for tool in config.tools):
         raise ExpertRefused("expert_tool_not_available")
     if len(set(config.tools)) != len(config.tools):
         raise ExpertRefused("expert_tool_duplicated")
-    from autobots.application.tool_catalog import unavailable_tools
-
-    if unavailable_tools(config.tools, environ):
+    if catalog.unavailable(config.tools, environ):
         raise ExpertRefused("expert_tool_unavailable")
     try:
         for role in config.role_bindings:
@@ -169,11 +167,12 @@ async def create_expert(
     idempotency_key: str,
     name: str,
     config: ExpertConfig,
+    catalog: Catalog,
 ) -> ExpertView:
     fingerprint = request_hash({"name": name, "config": config.model_dump(mode="json")})
     keys = await _workspace_keys(connection, workspace_id)
-    config = expand_groups(config, keys)
-    validate_config(config, keys)
+    config = expand_groups(config, catalog, keys)
+    validate_config(config, catalog, keys)
     scope = (workspace_id, actor_id, "create_expert", str(workspace_id), idempotency_key)
     async with connection.transaction():
         existing = await existing_receipt(connection, scope, fingerprint)
@@ -208,14 +207,15 @@ async def add_version(
     idempotency_key: str,
     expected_version: int,
     config: ExpertConfig,
+    catalog: Catalog,
 ) -> ExpertView:
     """A new revision. Earlier ones never change, so work holding them is unaffected."""
     fingerprint = request_hash(
         {"expected": expected_version, "config": config.model_dump(mode="json")}
     )
     keys = await _workspace_keys(connection, workspace_id)
-    config = expand_groups(config, keys)
-    validate_config(config, keys)
+    config = expand_groups(config, catalog, keys)
+    validate_config(config, catalog, keys)
     scope = (workspace_id, actor_id, "add_expert_version", str(expert_id), idempotency_key)
     async with connection.transaction():
         existing = await existing_receipt(connection, scope, fingerprint)

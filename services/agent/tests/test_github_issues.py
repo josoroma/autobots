@@ -16,12 +16,7 @@ from pydantic import ValidationError
 from autobots.adapters.github_connector import REPOSITORY_VARIABLE, TOKEN_VARIABLE, marker
 from autobots.adapters.github_issues import READBACK_SETTLE_SECONDS, github_issue_tool
 from autobots.adapters.provider_http import UnclearReply
-from autobots.application.tool_gateway import (
-    NotDelivered,
-    ToolContext,
-    ToolFailed,
-    ToolScope,
-)
+from autobots.application.tool_definitions import NotDelivered, ToolContext, ToolFailed, ToolScope
 from autobots.contracts.tools import CreateGithubIssueInput
 from autobots.domain.tools import EXPERT_TOOLS, LOOP_TOOL_GRANTS, OperationClass
 

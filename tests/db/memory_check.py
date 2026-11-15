@@ -10,6 +10,8 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
+from autobots.adapters.tool_registry import build_registry
 from autobots.application.compaction import (
     SUMMARY_MARKER,
     CompactionPolicy,
@@ -17,13 +19,13 @@ from autobots.application.compaction import (
     state_block,
 )
 from autobots.application.goal_loop import run_goal
-from autobots.application.loop_tools import loop_registry
 from autobots.application.memory import search, store_memory
 from autobots.application.plans import load_goal
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.run_usage import RootLimits
 from autobots.application.runs import admit_run
-from autobots.application.tool_gateway import ToolGateway, ToolScope
+from autobots.application.tool_definitions import ToolRuntime, ToolScope
+from autobots.application.tool_gateway import ToolGateway
 from autobots.application.worker_leases import claim_next
 from autobots.contracts.plans import InputDocument
 from autobots.domain.models import resolve_role_policy
@@ -76,7 +78,7 @@ async def main() -> None:
             return (await admit_run(db, workspace_id=workspace, actor_id=ACTOR, idempotency_key=str(uuid4()), goal_text='Find the quarterly figure', limit_micro_usd=1_000_000, policy=resolve_role_policy(), acceptance_criteria=('States the figure',), input_documents=documents)).run_id
 
         policy = CompactionPolicy(context_chars=600, large_tool_chars=1000, keep_recent=2)
-        config = LoopConfig(route=ROUTE, compaction=policy, sleep=lambda _: asyncio.sleep(0))
+        config = LoopConfig(route=ROUTE, compaction=policy, sleep=lambda _: asyncio.sleep(0), tool_set=tool_registry.build_registry)
 
         # Long output moves out, the view stays bounded, and state stays outside the summary.
         run = await admit()
@@ -110,7 +112,7 @@ async def main() -> None:
         run2 = await admit()
         lease = await claim_next(db, worker_id='reader', lease_seconds=120)
         scope = ToolScope(WORKSPACE, run2, lease.generation, {'read_offload': 1, 'search_memory': 1})
-        gateway = ToolGateway(loop_registry(RootLimits()))
+        gateway = ToolGateway(build_registry(ToolRuntime(RootLimits())))
         foreign = await gateway.execute(db, scope, 'read_offload', {'offload_id': str(offload[0])})
         check('another run can\'t read a stored result', 'offload_not_found', foreign.code, foreign.code == 'offload_not_found')
 
@@ -131,7 +133,7 @@ async def main() -> None:
         # A short run stays untouched.
         await admit(documents=())
         model = Aware(items=[calls(PLAN), say('stop')], seen=[], bound=[], summaries=[])
-        await process_next(db, URL, 'worker', lambda: model, LoopConfig(route=ROUTE))
+        await process_next(db, URL, 'worker', lambda: model, LoopConfig(route=ROUTE, tool_set=tool_registry.build_registry))
         check('a short conversation isn\'t summarized', 'no summary call', len(model.summaries), not model.summaries and 'Current state' not in str(model.seen[-1]))
 
         # Lexical search, scoped to the workspace.

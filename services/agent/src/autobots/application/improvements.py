@@ -19,7 +19,7 @@ from autobots.application.runs import (
     request_hash,
     store_receipt,
 )
-from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed
+from autobots.application.tool_definitions import ToolContext, ToolDefinition, ToolFailed
 from autobots.contracts.improvements import (
     CandidateView,
     ImprovementProposal,

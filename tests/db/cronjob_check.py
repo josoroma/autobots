@@ -11,13 +11,14 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.application.approvals import decide
 from autobots.application.cronjob_tool import cronjob_tool
 from autobots.application.experts import create_expert
 from autobots.application.routines import create_routine, evaluate_routines, list_routines
 from autobots.application.runs import admit_run
-from autobots.application.tool_catalog import tool_catalog
-from autobots.application.tool_gateway import ToolGateway, ToolRegistry, ToolScope
+from autobots.application.tool_definitions import ToolRegistry, ToolScope
+from autobots.application.tool_gateway import ToolGateway
 from autobots.application.tool_uses import list_tool_uses
 from autobots.application.worker_leases import claim_next
 from autobots.contracts.experts import ExpertConfig
@@ -49,7 +50,7 @@ def task(expert: UUID, minutes: int = 60, **extra: Any) -> dict[str, Any]:
 
 async def main() -> None:
     registry = ToolRegistry()
-    registry.register(cronjob_tool(credential_check))
+    registry.register(cronjob_tool(tool_registry.catalog(), credential_check))
     gateway = ToolGateway(registry)
     tag = uuid4().hex[:6]
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
@@ -58,11 +59,11 @@ async def main() -> None:
         await db.execute("insert into public.workspace_members (workspace_id, user_id, role) values (%s, %s, 'owner') "
                          "on conflict do nothing", (WORKSPACE, ACTOR))
         target = (await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()),
-                                      name=f'Weekly {tag}', config=ExpertConfig(tools=['calculate']))).id
+                                      name=f'Weekly {tag}', config=ExpertConfig(tools=['calculate']), catalog=tool_registry.catalog())).id
         foreign = (await create_expert(db, workspace_id=other, actor_id=ACTOR, idempotency_key=str(uuid4()),
-                                       name=f'Foreign {tag}', config=ExpertConfig(tools=['calculate']))).id
+                                       name=f'Foreign {tag}', config=ExpertConfig(tools=['calculate']), catalog=tool_registry.catalog())).id
         manager = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()),
-                                      name=f'Scheduler {tag}', config=ExpertConfig(tools=['cronjob']))
+                                      name=f'Scheduler {tag}', config=ExpertConfig(tools=['cronjob']), catalog=tool_registry.catalog())
         config = RoutineConfig(target=RoutineTarget(kind='expert', id=target, version=1),
                                trigger={'kind': 'interval', 'minutes': 60}, goal='Existing')
         mine = [await create_routine(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()),
@@ -105,7 +106,7 @@ async def main() -> None:
             return {item.name: (item.enabled, item.latest_version) for item in await list_routines(db, WORKSPACE)}
 
         # The catalog lists cronjob under Automation.
-        automation = tool_catalog({}, group='automation').tools
+        automation = tool_registry.catalog().catalog({}, group='automation').tools
         shape = [(t.tool_id, t.version, t.provider, t.operation_class, t.cost_class, t.network, t.approval, t.grantable_to) for t in automation]
         check('the catalog lists cronjob once under Automation, Expert-only, approval by_action', 'cronjob 1 autobots reversible_internal_write free_local no network by_action [expert]',
               shape, shape == [('cronjob', 1, 'autobots', 'reversible_internal_write', 'free_local', False, 'by_action', ['expert'])])
@@ -205,7 +206,7 @@ async def main() -> None:
         scope = await start()
         listed_after = [item['name'] for item in ((await gateway.execute(db, scope, 'cronjob', {'action': 'list'})).output or {}).get('routines', [])]
         await db.execute("update public.routines set evaluated_until = clock_timestamp() - interval '3 hours' where id = %s", (mine[1].id,))
-        await evaluate_routines(db, lambda _: credential_check(None, WORKSPACE))
+        await evaluate_routines(db, lambda _: credential_check(None, WORKSPACE), catalog=tool_registry.catalog())
         history = await (await db.execute('select (select count(*) from public.routine_versions where routine_id = %s), '
                                           '(select count(*) from public.routine_occurrences where routine_id = %s)', (mine[1].id, mine[1].id))).fetchone()
         _, gone = await approved(await start(), {'action': 'pause', 'routine_id': rid})

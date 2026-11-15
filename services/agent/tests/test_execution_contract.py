@@ -1,13 +1,14 @@
 """The compatibility rule, and the table it reads staying equal to what the loop really offers."""
 
 import json
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
 from autobots.adapters.checkpoints import QUALIFIED_STACK, adapter_identity
+from autobots.application.artifacts import ObjectStore
 from autobots.application.assignments import Delegation
-from autobots.application.goal_loop import loop_registry
+from autobots.application.run_lifecycle import pass_registry
 from autobots.application.run_usage import RootLimits
 from autobots.application.runs import _snapshot
 from autobots.application.worker_inference import frozen_policy
@@ -18,14 +19,18 @@ from autobots.domain.execution import (
     incompatibility,
 )
 from autobots.domain.models import UnknownModelProfile, resolve_role_policy
+from autobots.operations import worker
 
 
-def test_the_version_table_is_what_the_registry_offers() -> None:
+def test_the_version_table_is_what_the_worker_registers() -> None:
+    """The registry a goal's pass runs, from the worker's own config (XMOD-01)."""
+
     async def drive(*_: Any) -> Any:
         return None
 
     delegation = Delegation(drive=drive, limits=RootLimits(), lease_seconds=1)
-    registry = loop_registry(RootLimits(), object_store=object(), delegation=delegation)
+    store = cast("ObjectStore", object())
+    registry = pass_registry(worker.loop_config(store), delegation)
     assert registry.versions() == dict(TOOL_VERSIONS)
 
 

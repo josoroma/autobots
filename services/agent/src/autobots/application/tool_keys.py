@@ -3,19 +3,20 @@
 Five items, per workspace: the Tavily key, the Jina key and the GitHub token, which are secrets, and
 the GitHub repository and the browsing switch, which aren't. Highest first: the value saved in
 Settings, the process environment, then the `.env` files under the configuration root in MP-03's
-order. The first non-blank value wins. A call resolves its item inside the attempt (PK-01), so a
-change applies to the next call without a restart. Availability needs only where a secret comes
-from, so it never unseals one.
+order. The first non-blank value wins. `resolve` is the one place that order is written (PTOL-12),
+and `ITEMS` the one description of each item. A call resolves its item inside the attempt (PK-01),
+so a change applies to the next call without a restart. Availability needs only where a secret
+comes from, so it never unseals one.
 """
 
 import re
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from autobots.application.credentials.precedence import dotenv_order, parse_dotenv
+from autobots.application.credentials.precedence import dotenv_order, looks_usable, parse_dotenv
 from autobots.application.credentials.store import (
     CredentialMissing,
     CredentialStorageUnavailable,
@@ -36,25 +37,62 @@ class Item:
     variable: str
     # The sealed credential's provider for a secret, and None for a value that isn't secret.
     credential: str | None
+    # Whether a value has this item's form: a secret's shape, a value's own form. A draft without
+    # it is refused with `refusal` as it is saved (tool_key_settings.checked).
+    accepts: Callable[[str], bool]
+    refusal: str
 
     @property
     def secret(self) -> bool:
         return self.credential is not None
 
+    def usable(self, value: str | None) -> str | None:
+        """`value` when it has this item's form, for a value item an attempt reads, such as the
+        repository. Resolution has already stopped at it, so one without the form leaves the item
+        unconfigured rather than reaching a lower source. A secret is sent as it resolved, and its
+        provider judges it."""
+        return value if value is not None and self.accepts(value) else None
+
+
+def _repository(value: str) -> bool:
+    return REPOSITORY.fullmatch(value) is not None
+
+
+def _switch(value: str) -> bool:
+    return value in SWITCH_VALUES
+
 
 ITEMS: dict[str, Item] = {
     item.name: item
     for item in (
-        Item("tavily", "TAVILY_API_KEY", "tavily"),
-        Item("jina", "JINA_API_KEY", "jina"),
-        Item("github_token", "GITHUB_TOKEN", "github"),
-        Item("github_repository", "GITHUB_REPOSITORY", None),
-        Item("browser_executor", "AUTOBOTS_BROWSER_EXECUTOR", None),
+        Item("tavily", "TAVILY_API_KEY", "tavily", looks_usable, "that key was not accepted"),
+        Item("jina", "JINA_API_KEY", "jina", looks_usable, "that key was not accepted"),
+        Item("github_token", "GITHUB_TOKEN", "github", looks_usable, "that key was not accepted"),
+        Item(
+            "github_repository",
+            "GITHUB_REPOSITORY",
+            None,
+            _repository,
+            "that repository is not owner/name",
+        ),
+        Item(
+            "browser_executor",
+            "AUTOBOTS_BROWSER_EXECUTOR",
+            None,
+            _switch,
+            "the switch is enabled or disabled",
+        ),
     )
 }
-BY_CREDENTIAL = {item.credential: item for item in ITEMS.values() if item.credential}
-# Kept for the Tavily and Jina adapters, whose requirement names the credential.
-TOOL_KEY_PROVIDERS: dict[str, str] = {"tavily": "TAVILY_API_KEY", "jina": "JINA_API_KEY"}
+_BY_CREDENTIAL = {item.credential: item for item in ITEMS.values() if item.credential}
+
+
+def key_requirement(*names: str, scopes: tuple[str, ...] = ()) -> KeyRequirement:
+    """A tool's requirement, named from `ITEMS`, so the catalog's availability and the call read
+    the same variables (PTOL-12). Its credential is the secret's among `names`."""
+    items = [ITEMS[name] for name in names]
+    credential = next(item.credential for item in items if item.credential is not None)
+    return KeyRequirement(credential, tuple(item.variable for item in items), scopes)
 
 
 class ToolKeyMissing(Exception):
@@ -102,13 +140,16 @@ class Saved:
     values: Mapping[str, str]
 
 
+NOTHING_SAVED = Saved(frozenset(), {})
+
+
 async def saved_items(connection: Any, workspace_id: UUID) -> Saved:
     cursor = await connection.execute(
         "select provider from app_private.provider_credentials "
         "where workspace_id = %s and provider = any(%s) and status = 'active'",
-        (workspace_id, list(BY_CREDENTIAL)),
+        (workspace_id, list(_BY_CREDENTIAL)),
     )
-    secrets = frozenset(BY_CREDENTIAL[str(row[0])].name for row in await cursor.fetchall())
+    secrets = frozenset(_BY_CREDENTIAL[str(row[0])].name for row in await cursor.fetchall())
     cursor = await connection.execute(
         "select provider, value from app_private.tool_key_settings "
         "where workspace_id = %s and value is not null",
@@ -118,28 +159,48 @@ async def saved_items(connection: Any, workspace_id: UUID) -> Saved:
     return Saved(secrets, values)
 
 
-async def saved_providers(connection: Any, workspace_id: UUID) -> set[str]:
-    """The Tavily and Jina providers this workspace saved a key for (US-14.17)."""
-    saved = await saved_items(connection, workspace_id)
-    return {name for name in saved.secrets if name in TOOL_KEY_PROVIDERS}
+@dataclass(frozen=True)
+class Resolved:
+    """Where an item's value comes from, and the value: a value item's always, a secret's only
+    when it was resolved for a call."""
+
+    source: str | None
+    value: str | None
 
 
-def resolve_item(
-    item: Item, saved: Saved, environ: Mapping[str, str]
-) -> tuple[str | None, str | None]:
-    """(source, value). A secret's value is never returned: it is unsealed only for a call."""
+# Unseals an item's saved secret for one call: its value, None once it is no longer saved, or
+# ToolKeyUnavailable when it can't be read.
+Unseal = Callable[[Item], Awaitable[str | None]]
+
+
+async def resolve(
+    item: Item, saved: Saved, environ: Mapping[str, str], unseal: Unseal | None = None
+) -> Resolved:
+    """Decisions 0024 and 0025, PRD-Tool-Catalog PK-04 and PK-07: Settings, then the process
+    environment, then the configuration root's `.env` files in MP-03's order.
+
+    The first non-blank value wins, and resolution stops there even when that value is unusable
+    (the model-gateway rule): a saved secret that can't be unsealed raises `ToolKeyUnavailable` and
+    never falls through, a secret without its shape is returned for its provider to refuse, and a
+    value without its item's form is returned for its caller to treat as not configured.
+    A secret removed since `saved` was read is no longer in Settings, so the environment applies.
+
+    Without `unseal`, as availability asks, a secret's value is never read, only its source. With
+    it, as one attempt asks, a saved secret is unsealed and an environment one read.
+    """
     if item.secret:
         if item.name in saved.secrets:
-            return SETTINGS, None
-        return (ENVIRONMENT, None) if environment_key(item.variable, environ) else (None, None)
-    if item.name in saved.values:
-        return SETTINGS, saved.values[item.name]
+            if unseal is None:
+                return Resolved(SETTINGS, None)
+            value = await unseal(item)
+            if value is not None:
+                return Resolved(SETTINGS, value)
+    elif item.name in saved.values:
+        return Resolved(SETTINGS, saved.values[item.name])
     value = environment_key(item.variable, environ)
-    return (ENVIRONMENT, value) if value is not None else (None, None)
-
-
-def key_source(provider: str, saved: set[str], environ: Mapping[str, str]) -> str | None:
-    return resolve_item(ITEMS[provider], Saved(frozenset(saved), {}), environ)[0]
+    if value is None:
+        return Resolved(None, None)
+    return Resolved(ENVIRONMENT, None if item.secret and unseal is None else value)
 
 
 class KeySources(dict[str, str]):
@@ -158,11 +219,11 @@ async def key_sources(
     view = KeySources(environ)
     view.sources = {}
     for item in ITEMS.values():
-        source, value = resolve_item(item, saved, environ)
+        found = await resolve(item, saved, environ)
         view.pop(item.variable, None)
-        if source is not None:
-            view[item.variable] = f"<{source}>" if item.secret else str(value)
-            view.sources[item.variable] = source
+        if found.source is not None:
+            view[item.variable] = f"<{found.source}>" if item.secret else str(found.value)
+            view.sources[item.variable] = found.source
     return view
 
 
@@ -180,55 +241,19 @@ async def _saved_secret(
     return resolved.client_secret().get_secret_value()
 
 
-async def resolve_tool_key(
-    connection: Any, workspace_id: UUID, requirement: KeyRequirement, environ: Mapping[str, str]
-) -> str:
-    """One attempt's key. Raises `ToolKeyMissing` or `ToolKeyUnavailable`, naming no value."""
-    provider = requirement.credential
-    variable = requirement.variables[0]
-    if provider in TOOL_KEY_PROVIDERS and connection is not None:
-        saved = await _saved_secret(connection, workspace_id, ITEMS[provider], environ)
-        if saved is not None:
-            return saved
-    value = environment_key(variable, environ)
-    if value is None:
-        raise ToolKeyMissing(provider)
-    return value
-
-
-async def resolve_value(
-    connection: Any, workspace_id: UUID | None, name: str, environ: Mapping[str, str]
+async def attempt_value(
+    connection: Any, workspace_id: UUID | None, item: Item, environ: Mapping[str, str]
 ) -> str | None:
-    """One attempt's value for an item that isn't secret, by PK-07's order."""
-    item = ITEMS[name]
-    if connection is not None and workspace_id is not None:
-        cursor = await connection.execute(
-            "select value from app_private.tool_key_settings "
-            "where workspace_id = %s and provider = %s and value is not null",
-            (workspace_id, item.name),
-        )
-        row = await cursor.fetchone()
-        if row is not None:
-            return str(row[0])
-    return environment_key(item.variable, environ)
+    """One attempt's value of `item` for the run's workspace, by `resolve` (PK-01). A saved secret
+    is unsealed for this call only. Without a connection, as offline checks call it, nothing is
+    saved and only the environment is read. Raises `ToolKeyUnavailable`, naming no value."""
+    if connection is None or workspace_id is None:
+        saved = NOTHING_SAVED
+    else:
+        saved = await saved_items(connection, workspace_id)
 
+    async def unseal(secret: Item) -> str | None:
+        assert workspace_id is not None
+        return await _saved_secret(connection, workspace_id, secret, environ)
 
-async def github_repository(
-    connection: Any, workspace_id: UUID | None, environ: Mapping[str, str]
-) -> str | None:
-    """The workspace's repository, or None when it isn't a valid `owner/name`."""
-    repository = await resolve_value(connection, workspace_id, "github_repository", environ)
-    return repository if repository and REPOSITORY.fullmatch(repository) else None
-
-
-async def github_target(
-    connection: Any, workspace_id: UUID | None, environ: Mapping[str, str]
-) -> tuple[str | None, str | None]:
-    """(repository, token) for one attempt, by PK-07's order. Either is None when not configured."""
-    repository = await github_repository(connection, workspace_id, environ)
-    token = None
-    if connection is not None and workspace_id is not None:
-        token = await _saved_secret(connection, workspace_id, ITEMS["github_token"], environ)
-    if token is None:
-        token = environment_key("GITHUB_TOKEN", environ)
-    return repository, token
+    return (await resolve(item, saved, environ, unseal)).value

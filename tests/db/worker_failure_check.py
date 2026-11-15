@@ -16,6 +16,7 @@ from collections.abc import Awaitable, Callable
 from unittest.mock import patch
 from uuid import UUID, uuid4
 
+from autobots.adapters import tool_registry
 from autobots.application import goal_loop
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.run_projection import read_events, read_workspace
@@ -27,7 +28,7 @@ from goal_loop_script import ROUTE, Script, say
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = UUID(sys.argv[1])
-CONFIG = LoopConfig(route=ROUTE)
+CONFIG = LoopConfig(route=ROUTE, tool_set=tool_registry.build_registry)
 # The defect's message is never stored or published; only its module-qualified type is kept, privately.
 MESSAGE = 'arranged-defect-message-never-stored'
 TYPE = '__main__.ArrangedDefect'

@@ -12,7 +12,8 @@ from uuid import UUID, uuid4
 
 import psycopg
 from autobots.application.runs import admit_run
-from autobots.application.tool_gateway import ToolDefinition, ToolGateway, ToolRegistry, ToolScope
+from autobots.application.tool_definitions import ToolDefinition, ToolRegistry, ToolScope
+from autobots.application.tool_gateway import ToolGateway
 from autobots.application.tool_uses import METERED_TOOL_CALLS, list_tool_uses
 from autobots.application.tools import CALCULATE, READ_RUN_FILE, SAVE_ARTIFACT
 from autobots.application.worker_leases import claim_next

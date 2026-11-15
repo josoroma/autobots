@@ -17,12 +17,13 @@ from uuid import UUID
 
 import pytest
 
+from autobots.adapters.tool_registry import catalog
 from autobots.application.assignments import Delegation, assign_tool
 from autobots.application.experts import RunBinding
 from autobots.application.improvements import request_replay
 from autobots.application.routines import admit_occurrence, routine_record
 from autobots.application.run_usage import RootLimits
-from autobots.application.tool_gateway import ToolContext, ToolScope
+from autobots.application.tool_definitions import ToolContext, ToolScope
 from autobots.application.worker_leases import Lease
 from autobots.application.workflows import create_execution
 from autobots.contracts.assignments import AssignSpecialist
@@ -142,7 +143,9 @@ def test_a_routines_expert_occurrence_admits_with_the_golden_fingerprint() -> No
     )
     digest = admitted_through(
         database,
-        lambda connection: admit_occurrence(connection, WORKSPACE, ROUTINE, 1, config, MOMENT),
+        lambda connection: admit_occurrence(
+            connection, WORKSPACE, ROUTINE, 1, config, MOMENT, catalog=catalog()
+        ),
     )
     assert digest == FINGERPRINTS["routine_expert"]
 

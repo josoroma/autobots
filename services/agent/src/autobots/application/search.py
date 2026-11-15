@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
-from autobots.application.tool_catalog import all_descriptors
+from autobots.application.tool_catalog import Catalog
 
 PER_KIND = 5
 
@@ -26,9 +26,10 @@ def _pattern(text: str) -> str:
 
 
 async def search(
-    connection: Any, workspace_id: UUID, query: str, environ: Mapping[str, str]
+    connection: Any, workspace_id: UUID, query: str, environ: Mapping[str, str], catalog: Catalog
 ) -> list[Hit]:
-    """Up to five of each kind, runs newest first and the rest by name."""
+    """Up to five of each kind, runs newest first and the rest by name. Tools come from `catalog`,
+    the composition edge's (XMOD-01)."""
     pattern = _pattern(query)
     hits: list[Hit] = []
     cursor = await connection.execute(
@@ -46,7 +47,7 @@ async def search(
         hits += [Hit(kind, str(row[0]), str(row[1]), None) for row in await cursor.fetchall()]
     needle = query.casefold()
     newest: dict[str, Any] = {}
-    for item in all_descriptors(environ):
+    for item in catalog.descriptors(environ):
         if item.tool_id not in newest or item.version > newest[item.tool_id].version:
             newest[item.tool_id] = item
     tools = sorted(

@@ -2,6 +2,7 @@
 
 from uuid import uuid4
 
+from autobots.adapters.tool_registry import catalog
 from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.workflows import validate_graph
 from autobots.operations.concept_seed import (
@@ -46,7 +47,8 @@ def test_every_workflow_graph_is_valid_and_each_agent_step_names_its_expert() ->
 
 
 def test_the_github_tools_are_unavailable_until_both_variables_are_set() -> None:
-    without, with_github = available_tools({}), available_tools(GITHUB)
+    tools = catalog()
+    without, with_github = available_tools({}, tools), available_tools(GITHUB, tools)
     for tool in (*GITHUB_TRIAGE, *GITHUB_RELEASE):
         assert tool not in without
         assert tool in with_github

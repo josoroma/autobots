@@ -6,7 +6,7 @@ import pytest
 
 from autobots.application.loop_prompts import opening
 from autobots.application.plans import PlanRejected, reference_shape, validate_proposal
-from autobots.application.tool_gateway import ToolResult
+from autobots.application.tool_definitions import ToolResult
 from autobots.contracts.plans import (
     CompleteTask,
     GoalSpec,

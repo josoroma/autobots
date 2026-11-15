@@ -12,9 +12,9 @@ from typing import Any
 
 from autobots.adapters.checkpoints import adapter_qualified, is_stale_owner
 from autobots.application.approvals import expire_due
-from autobots.application.goal_loop import execution_block, run_goal
+from autobots.application.goal_loop import run_goal
 from autobots.application.plans import load_goal
-from autobots.application.recovery import classify_interrupted
+from autobots.application.recovery import classify_interrupted, execution_block
 from autobots.application.run_lifecycle import (
     Connection,
     LoopConfig,

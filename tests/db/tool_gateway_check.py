@@ -11,9 +11,11 @@ from uuid import UUID, uuid4
 
 import psycopg
 from autobots.adapters.tool_middleware import GatewayMiddleware, visible_tools
+from autobots.adapters.tool_registry import build_registry
 from autobots.application.runs import admit_run, apply_worker_command
-from autobots.application.tool_gateway import ToolDefinition, ToolFailed, ToolGateway, ToolScope
-from autobots.application.tools import default_registry, first_grants
+from autobots.application.tool_definitions import ToolDefinition, ToolFailed, ToolScope
+from autobots.application.tool_gateway import ToolGateway
+from autobots.application.tools import first_grants
 from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import RunCommand
@@ -57,7 +59,7 @@ def counted(tool_id: str, result: Any = None, error: Exception | None = None, de
 
 
 async def main() -> None:
-    registry = default_registry()
+    registry = build_registry(None)
     gateway = ToolGateway(registry)
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         async def running(paths: tuple[str, ...] = ('outputs',), tools: dict[str, int] | None = None) -> ToolScope:
@@ -146,7 +148,7 @@ async def main() -> None:
         saved = await gateway.execute(db, replay_scope, 'save_artifact', {'path': 'outputs/r.md', 'content': 'r'})
         await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where run_id = %s", (replay_scope.run_id,))
         replacement = await claim_next(db, worker_id='replacement', lease_seconds=120)
-        fresh = ToolGateway(default_registry())
+        fresh = ToolGateway(build_registry(None))
         next_scope = ToolScope(WORKSPACE, replay_scope.run_id, replacement.generation, first_grants(), ('outputs',))
         result = await fresh.execute(db, next_scope, 'save_artifact', {'path': 'outputs/r.md', 'content': 'r'})
         check('a replacement generation reuses the receipt', 'replayed, same output', (result.replayed, result.output == saved.output), result.replayed and result.output == saved.output)

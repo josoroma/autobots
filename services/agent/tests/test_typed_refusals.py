@@ -12,6 +12,7 @@ from uuid import uuid4
 
 import pytest
 
+from autobots.adapters.tool_registry import catalog
 from autobots.api.errors import STATUS
 from autobots.application import experts, run_projection
 from autobots.application.approvals import ApprovalRefused
@@ -33,6 +34,8 @@ from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.models import ProfileNotOffered
 from autobots.domain.routines import TriggerInvalid
 from autobots.domain.runs import CommandRefused
+
+CATALOG = catalog()
 
 
 def test_every_kind_has_a_status() -> None:
@@ -130,7 +133,7 @@ def test_an_unknown_role_is_refused_but_a_defect_while_checking_one_is_not(
 ) -> None:
     config = ExpertConfig.model_validate({"role_bindings": {"not_a_role": "openrouter_terra"}})
     with pytest.raises(ExpertRefused) as refused:
-        validate_config(config, {})
+        validate_config(config, CATALOG, {})
     assert refused.value.code == "expert_role_unknown"
 
     def defect(_role: object) -> None:
@@ -138,7 +141,7 @@ def test_an_unknown_role_is_refused_but_a_defect_while_checking_one_is_not(
 
     monkeypatch.setattr(experts, "approved_role", defect)
     with pytest.raises(RuntimeError, match="arranged defect"):
-        validate_config(config, {})
+        validate_config(config, CATALOG, {})
 
 
 class NoRows:

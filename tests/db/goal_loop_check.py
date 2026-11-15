@@ -10,6 +10,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.loop_middleware import AdmittedModel, ModelRoute, UnadmittedModelCall
 from autobots.application.goal_loop import run_goal
 from autobots.application.model_admission import ModelAdmission
@@ -46,7 +47,7 @@ async def main() -> None:
 
         async def go(lease: Any, items: list[Any], limits: RootLimits | None = None, route: ModelRoute = ROUTE) -> tuple[Any, Script]:
             model = Script(items=items, seen=[], bound=[])
-            config = LoopConfig(route=route, limits=limits or RootLimits(), sleep=lambda _: asyncio.sleep(0), slot_wait_seconds=2)
+            config = LoopConfig(route=route, limits=limits or RootLimits(), sleep=lambda _: asyncio.sleep(0), slot_wait_seconds=2, tool_set=tool_registry.build_registry)
             return await run_goal(db, URL, lease, model, config, drive=drive_lease), model
 
         # The goal is kept, and the plan is versioned through a real loop.
@@ -225,7 +226,7 @@ async def main() -> None:
                 return super()._generate(messages, stop, run_manager, **options)
 
         model = Reassigned(items=[calls(PLAN), say('x')], seen=[], bound=[])
-        result = await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE), drive=drive_lease)
+        result = await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE, tool_set=tool_registry.build_registry), drive=drive_lease)
         status = await value('select status from public.runs where id = %s', lease.run_id)
         check('a worker that lost the lease stops and writes no status', 'lost, running', (result.outcome, result.code, status), result.outcome == 'lost' and result.code == 'lease_lost' and status == 'running')
         await latest_plan(db, lease.run_id)

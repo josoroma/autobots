@@ -11,6 +11,7 @@ from typing import Any
 from uuid import UUID
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.artifacts import read_artifact
 from autobots.application.credentials.store import (
@@ -95,7 +96,7 @@ async def verify(workspace: UUID, key_path: Path, manifest_path: Path, expected_
         check('the restore holds pending and uncertain work', 'a queued job and an uncertain call', f'{pending}, {uncertain}', pending >= 1 and uncertain >= 1)
         lease = await claim_next(db, worker_id='restored-claim')
         check('a claim under the hold takes nothing', 'none', lease, lease is None)
-        processed = await process_next(db, URL, 'restored-worker', never, LoopConfig(route=ROUTE))
+        processed = await process_next(db, URL, 'restored-worker', never, LoopConfig(route=ROUTE, tool_set=tool_registry.build_registry))
         check('a worker pass under the hold builds no model', 'none', processed, processed is None)
         after = await value("select json_agg(json_build_object('run', run_id, 'status', status, 'attempts', attempts) order by run_id) from app_private.run_jobs")
         check('every job is unchanged', 'same', before == after, before == after)

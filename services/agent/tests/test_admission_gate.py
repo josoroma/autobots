@@ -19,6 +19,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
+from autobots.adapters.tool_registry import catalog
 from autobots.api import main as api_main
 from autobots.api.app import create_app
 from autobots.api.settings import Settings, load_settings
@@ -304,7 +305,7 @@ def maintenance(
     async def expire_due(_connection: object) -> None:
         state.ran.append("approvals")
 
-    async def evaluate_routines(_connection: object, _check: object) -> int:
+    async def evaluate_routines(_connection: object, _check: object, **_: object) -> int:
         state.ran.append("routines")
         return 1
 
@@ -328,7 +329,9 @@ def maintenance(
         monkeypatch.setattr(worker, name, fake)
     monkeypatch.setattr(readiness, "database_conditions", database_conditions)
     settings = ReadinessSettings(tmp_path, install.min_free_bytes)
-    step = worker.maintenance_step(worker.no_credential, state.storage, settings, 0)
+    step = worker.maintenance_step(
+        worker.no_credential, state.storage, settings, 0, catalog=catalog()
+    )
     return state, step
 
 

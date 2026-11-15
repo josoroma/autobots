@@ -1,4 +1,6 @@
-"""US-14.17 offline: the Tavily and Jina keys' order, availability view and per-attempt use."""
+"""US-14.17 offline: the Keys & vars order, availability view and per-attempt use. One resolver
+over every item keeps Decisions 0024 and 0025's order, and a nonblank, unusable higher source never
+falls through to a lower one (PTOL-12, model-gateway rule)."""
 
 import asyncio
 import json
@@ -9,21 +11,29 @@ from uuid import uuid4
 import httpx
 import pytest
 
+from autobots.adapters import github_connector, jina, tavily
 from autobots.adapters.tavily import tavily_tools
+from autobots.adapters.tool_registry import catalog
+from autobots.application import tool_keys
 from autobots.application.provider_settings import InvalidKey
-from autobots.application.tool_catalog import tool_catalog
-from autobots.application.tool_gateway import ToolContext, ToolFailed, ToolScope
+from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolScope
 from autobots.application.tool_key_settings import ToolKeySettings
 from autobots.application.tool_keys import (
-    ToolKeyMissing,
+    ENVIRONMENT,
+    ITEMS,
+    NOTHING_SAVED,
+    SETTINGS,
+    Item,
+    Resolved,
+    ToolKeyUnavailable,
+    attempt_value,
     environment_key,
     key_sources,
-    resolve_tool_key,
+    resolve,
 )
 from autobots.contracts.web_tools import TavilySearchInput
-from autobots.domain.tool_catalog import KeyRequirement
 
-TAVILY = KeyRequirement("tavily", ("TAVILY_API_KEY",))
+CATALOG = catalog()
 
 
 def config(tmp_path: Path, files: dict[str, str]) -> dict[str, str]:
@@ -75,12 +85,10 @@ def test_a_relative_configuration_root_is_never_read(tmp_path: Path) -> None:
 
 
 def test_without_a_database_or_any_value_the_key_is_missing() -> None:
-    async def resolve() -> str:
-        return await resolve_tool_key(None, uuid4(), TAVILY, {})
-
-    with pytest.raises(ToolKeyMissing) as raised:
-        asyncio.run(resolve())
-    assert raised.value.code == "tavily_key_missing"
+    context = ToolContext(None, ToolScope(uuid4(), uuid4(), 1, {}), None)
+    with pytest.raises(ToolFailed, match=r"^tavily_key_missing$"):
+        asyncio.run(context.key("tavily", {}))
+    assert asyncio.run(attempt_value(None, uuid4(), ITEMS["tavily"], {})) is None
 
 
 class Cursor:
@@ -109,7 +117,7 @@ def test_the_availability_view_names_sources_and_never_holds_a_value(tmp_path: P
     view = asyncio.run(key_sources(Saved(), uuid4(), environ))
     assert view.sources == {"TAVILY_API_KEY": "settings", "JINA_API_KEY": "environment"}
     assert "fixture" not in json.dumps(dict(view)).replace("autobots-config", "")
-    tools = {tool.tool_id: tool for tool in tool_catalog(view).tools}
+    tools = {tool.tool_id: tool for tool in CATALOG.catalog(view).tools}
     for tool_id, source in (("tavily_search", "settings"), ("search_web", "environment")):
         requirement = tools[tool_id].key_requirement
         assert tools[tool_id].availability == "available"
@@ -117,7 +125,7 @@ def test_the_availability_view_names_sources_and_never_holds_a_value(tmp_path: P
 
 
 def test_a_missing_key_has_no_source_in_the_catalog() -> None:
-    tools = {tool.tool_id: tool for tool in tool_catalog({}).tools}
+    tools = {tool.tool_id: tool for tool in CATALOG.catalog({}).tools}
     requirement = tools["tavily_search"].key_requirement
     assert tools["tavily_search"].availability == "key_missing"
     assert requirement is not None and requirement.source is None
@@ -281,6 +289,9 @@ def test_a_write_uses_the_repository_its_approval_recorded() -> None:
                     async def fetchone(self) -> None:
                         return None
 
+                    async def fetchall(self) -> list[Any]:
+                        return []
+
                 return Nothing()
             return await super().execute(query, params)
 
@@ -336,3 +347,191 @@ def test_the_view_holds_values_and_markers_and_a_saved_switch_wins(tmp_path: Pat
     assert view["GITHUB_REPOSITORY"] == "owner/saved"
     assert view["GITHUB_TOKEN"] == "<settings>"
     assert view.sources["AUTOBOTS_BROWSER_EXECUTOR"] == "settings"
+
+
+# PTOL-12: one resolver over every item. Each has a usable fixture value, and an unusable one
+# that is still nonblank, so the order and the stop are proved for all five.
+USABLE = {
+    "tavily": "tvly-fixtureUsable01",
+    "jina": "jina_fixtureUsable001",
+    "github_token": "github_pat_fixtureUse1",
+    "github_repository": "owner/fixture",
+    "browser_executor": "enabled",
+}
+UNUSABLE = {
+    "tavily": "has a space",
+    "jina": "short",
+    "github_token": "has a space",
+    "github_repository": "https://evil.example/owner/repo",
+    "browser_executor": "on",
+}
+NAMES = sorted(ITEMS)
+
+
+def test_every_item_has_a_usable_and_an_unusable_fixture() -> None:
+    assert set(USABLE) == set(UNUSABLE) == set(ITEMS)
+    for name in NAMES:
+        assert ITEMS[name].accepts(USABLE[name])
+        assert UNUSABLE[name].strip() and not ITEMS[name].accepts(UNUSABLE[name])
+
+
+def saved_for(item: Item, value: str) -> tool_keys.Saved:
+    """A workspace that saved `value` for `item`: a secret's existence, a value's value."""
+    if item.secret:
+        return tool_keys.Saved(frozenset({item.name}), {})
+    return tool_keys.Saved(frozenset(), {item.name: value})
+
+
+def unsealing(value: str | None) -> tool_keys.Unseal:
+    async def unseal(_: Item) -> str | None:
+        return value
+
+    return unseal
+
+
+async def refusing_to_unseal(item: Item) -> str | None:
+    raise ToolKeyUnavailable(item.credential or item.name)
+
+
+def layered(tmp_path: Path, name: str, process: str, dotenv: str) -> dict[str, str]:
+    """The process environment holds `process`, and the lowest `.env` file `dotenv`."""
+    variable = ITEMS[name].variable
+    return {**config(tmp_path, {".env": f"{variable}={dotenv}"}), variable: process}
+
+
+@pytest.mark.parametrize("name", NAMES)
+def test_settings_win_then_the_process_environment_then_env_files(
+    tmp_path: Path, name: str
+) -> None:
+    item = ITEMS[name]
+    environ = layered(tmp_path, name, "process-value-1", "dotenv-value-01")
+    in_settings = asyncio.run(
+        resolve(item, saved_for(item, USABLE[name]), environ, unsealing(USABLE[name]))
+    )
+    assert in_settings == Resolved(SETTINGS, USABLE[name])
+    from_process = asyncio.run(resolve(item, NOTHING_SAVED, environ, unsealing(None)))
+    assert from_process == Resolved(ENVIRONMENT, "process-value-1")
+    blank_process = {**environ, item.variable: "   "}
+    from_file = asyncio.run(resolve(item, NOTHING_SAVED, blank_process, unsealing(None)))
+    assert from_file == Resolved(ENVIRONMENT, "dotenv-value-01")
+    assert asyncio.run(resolve(item, NOTHING_SAVED, {}, unsealing(None))) == Resolved(None, None)
+
+
+@pytest.mark.parametrize("name", NAMES)
+def test_a_nonblank_unusable_process_value_stops_resolution(tmp_path: Path, name: str) -> None:
+    """The model-gateway rule: the `.env` file's usable value is never reached."""
+    item = ITEMS[name]
+    environ = layered(tmp_path, name, UNUSABLE[name], USABLE[name])
+    found = asyncio.run(resolve(item, NOTHING_SAVED, environ, unsealing(None)))
+    assert found == Resolved(ENVIRONMENT, UNUSABLE[name])
+
+
+@pytest.mark.parametrize("name", [name for name in NAMES if not ITEMS[name].secret])
+def test_an_attempt_treats_an_unusable_value_as_not_configured(tmp_path: Path, name: str) -> None:
+    item = ITEMS[name]
+    environ = layered(tmp_path, name, UNUSABLE[name], USABLE[name])
+    context = ToolContext(None, ToolScope(uuid4(), uuid4(), 1, {}), None)
+    resolved = asyncio.run(context.setting(name, environ))
+    assert resolved == UNUSABLE[name] and item.usable(resolved) is None
+
+
+@pytest.mark.parametrize("name", [name for name in NAMES if ITEMS[name].secret])
+def test_an_attempt_sends_the_unusable_process_key_never_the_env_files(
+    tmp_path: Path, name: str
+) -> None:
+    """A secret goes to the client as it resolved, and its provider refuses it: the `.env` file's
+    usable key is never sent in its place."""
+    environ = layered(tmp_path, name, UNUSABLE[name], USABLE[name])
+    context = ToolContext(None, ToolScope(uuid4(), uuid4(), 1, {}), None)
+    assert asyncio.run(context.key(name, environ)) == UNUSABLE[name]
+
+
+def test_the_tavily_client_receives_the_process_key_over_the_env_files(tmp_path: Path) -> None:
+    environ = layered(tmp_path, "tavily", UNUSABLE["tavily"], USABLE["tavily"])
+    assert call(environ) == ([f"Bearer {UNUSABLE['tavily']}"], None)
+
+
+@pytest.mark.parametrize("name", NAMES)
+def test_an_unusable_saved_item_never_falls_through_to_the_environment(
+    tmp_path: Path, name: str
+) -> None:
+    """A saved secret that can't be unsealed refuses; a saved value without its form is returned
+    as it is, so the environment's usable value is never used (Decisions 0024 and 0025)."""
+    item = ITEMS[name]
+    environ = layered(tmp_path, name, USABLE[name], USABLE[name])
+    saved = saved_for(item, UNUSABLE[name])
+    if item.secret:
+        with pytest.raises(ToolKeyUnavailable):
+            asyncio.run(resolve(item, saved, environ, refusing_to_unseal))
+    else:
+        found = asyncio.run(resolve(item, saved, environ, unsealing(None)))
+        assert found == Resolved(SETTINGS, UNUSABLE[name])
+        assert item.usable(found.value) is None
+
+
+@pytest.mark.parametrize("name", NAMES)
+def test_availability_names_a_source_and_never_unseals_or_reads_a_secret(
+    tmp_path: Path, name: str
+) -> None:
+    item = ITEMS[name]
+    environ = layered(tmp_path, name, USABLE[name], USABLE[name])
+    saved = asyncio.run(resolve(item, saved_for(item, USABLE[name]), environ))
+    assert saved == Resolved(SETTINGS, None if item.secret else USABLE[name])
+    environment = asyncio.run(resolve(item, NOTHING_SAVED, environ))
+    assert environment == Resolved(ENVIRONMENT, None if item.secret else USABLE[name])
+
+
+def test_the_workspace_view_never_unseals(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def forbidden(*_: object) -> str | None:
+        raise AssertionError("availability never unseals a secret")
+
+    monkeypatch.setattr(tool_keys, "_saved_secret", forbidden)
+
+    class Everything:
+        async def execute(self, query: str, params: Any = None) -> Cursor:
+            if "tool_key_settings" in query:
+                return Cursor([("github_repository", "owner/saved")])
+            return Cursor([("tavily",), ("jina",), ("github",)])
+
+    view = asyncio.run(key_sources(Everything(), uuid4(), {}))
+    secrets = [item.variable for item in ITEMS.values() if item.secret]
+    assert all(view[variable] == "<settings>" for variable in secrets)
+
+
+@pytest.mark.parametrize("name", [name for name in NAMES if ITEMS[name].secret])
+def test_a_call_with_an_unsealable_saved_key_is_refused_despite_the_environment(
+    monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    """Through the tool's context, as an adapter asks: the environment's key is never sent."""
+    item = ITEMS[name]
+
+    async def unavailable(*_: object) -> str | None:
+        raise ToolKeyUnavailable(item.credential or name)
+
+    monkeypatch.setattr(tool_keys, "_saved_secret", unavailable)
+
+    class SavedKey:
+        async def execute(self, query: str, params: Any = None) -> Cursor:
+            if "tool_key_settings" in query:
+                return Cursor([])
+            return Cursor([(item.credential,)])
+
+    context = ToolContext(SavedKey(), ToolScope(uuid4(), uuid4(), 1, {}), "op")
+    environ = {item.variable: USABLE[name]}
+    with pytest.raises(ToolFailed, match=rf"^{item.credential}_key_unavailable$"):
+        asyncio.run(context.key(name, environ))
+
+
+def test_the_adapters_requirements_name_the_items_variables() -> None:
+    """Availability and the call read the same variables (PTOL-12)."""
+    assert tavily.TAVILY_KEY.variables == (ITEMS["tavily"].variable,)
+    assert jina.JINA_KEY.variables == (ITEMS["jina"].variable,)
+    assert github_connector.GITHUB_KEY.variables == (
+        ITEMS["github_repository"].variable,
+        ITEMS["github_token"].variable,
+    )
+    assert (
+        tavily.TAVILY_KEY.credential,
+        jina.JINA_KEY.credential,
+        github_connector.GITHUB_KEY.credential,
+    ) == ("tavily", "jina", "github")

@@ -9,13 +9,8 @@ import pytest
 
 from autobots.adapters.jina import jina_tools
 from autobots.adapters.url_guard import UrlRefused
-from autobots.application.tool_gateway import (
-    Refused,
-    ToolContext,
-    ToolFailed,
-    ToolRegistry,
-    ToolScope,
-)
+from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolRegistry, ToolScope
+from autobots.application.tool_gateway import Refused
 from autobots.application.tool_gateway import resolve as resolve_call
 from autobots.domain.stops import GatewayCode
 

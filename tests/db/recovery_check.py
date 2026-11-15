@@ -11,6 +11,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.application.goal_loop import run_goal
 from autobots.application.model_admission import ModelAdmission
@@ -24,7 +25,8 @@ from autobots.application.runs import (
     apply_command,
     apply_worker_command,
 )
-from autobots.application.tool_gateway import ToolDefinition, ToolGateway, ToolRegistry, ToolScope
+from autobots.application.tool_definitions import ToolDefinition, ToolRegistry, ToolScope
+from autobots.application.tool_gateway import ToolGateway
 from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import CommandRefused, RunCommand
@@ -37,7 +39,7 @@ URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE, OTHER, PYTHON = UUID(sys.argv[1]), UUID(sys.argv[2]), sys.argv[3]
 HERE = Path(__file__).parent
 cases = []
-RESUME_ROUTE = LoopConfig(route=ROUTE, sleep=lambda _: asyncio.sleep(0))
+RESUME_ROUTE = LoopConfig(route=ROUTE, sleep=lambda _: asyncio.sleep(0), tool_set=tool_registry.build_registry)
 
 
 def check(name: str, expected: str, observed: object, passed: bool) -> None:
@@ -226,13 +228,13 @@ async def main() -> None:
         await user(run, RunCommand.SUBMIT_INPUT, response='report.md')
         response = await value("select response from app_private.run_obligations where run_id = %s", run)
         check('answering meets the obligation', 'report.md', response, response == 'report.md')
-        processed = await process_next(db, URL, 'after-input', lambda: Script(items=[calls(PLAN), say('stop')], seen=[], bound=[]), LoopConfig(route=ROUTE))
+        processed = await process_next(db, URL, 'after-input', lambda: Script(items=[calls(PLAN), say('stop')], seen=[], bound=[]), LoopConfig(route=ROUTE, tool_set=tool_registry.build_registry))
         check('and the run continues', 'stopped at plan_incomplete after a real pass', (processed.code, processed.usage['model_calls']), processed.code == 'plan_incomplete' and processed.usage['model_calls'] == 2)
         await db.execute("update app_private.model_policies set default_profile = 'openrouter_terra' where workspace_id = %s", (WORKSPACE,))
 
         run = await admit()
         lease = await claim_next(db, worker_id='bound')
-        other_route = LoopConfig(route=ModelRoute('executor', 'openrouter_deepseek_flash', 'fixture/other', 1000))
+        other_route = LoopConfig(route=ModelRoute('executor', 'openrouter_deepseek_flash', 'fixture/other', 1000), tool_set=tool_registry.build_registry)
         model = Script(items=[calls(PLAN)], seen=[], bound=[])
         result = await run_goal(db, URL, lease, model, other_route, drive=drive_lease)
         check('a route that differs from the frozen policy is refused', 'route_not_bound, no call', (result.code, len(model.seen)), result.code == 'route_not_bound' and len(model.seen) == 0)

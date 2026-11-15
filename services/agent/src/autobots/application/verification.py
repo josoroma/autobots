@@ -6,7 +6,7 @@ from typing import Any
 from autobots.application.artifacts import ArtifactUnavailable, read_artifact, reconcile_run
 from autobots.application.plans import plan_view
 from autobots.application.recovery import outstanding
-from autobots.application.tool_gateway import ToolScope
+from autobots.application.tool_definitions import ToolScope
 from autobots.application.worker_leases import Lease
 from autobots.contracts.plans import GoalSpec
 

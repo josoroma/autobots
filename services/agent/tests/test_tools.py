@@ -7,16 +7,17 @@ from dataclasses import replace
 import pytest
 from pydantic import ValidationError
 
+from autobots.adapters.tool_registry import build_registry
 from autobots.application.approvals import requesting_agent, scope_hash, scope_snapshot
-from autobots.application.tool_gateway import (
+from autobots.application.tool_definitions import (
     APPROVAL_POLICY_VERSION,
     ApprovalPolicy,
     ToolDefinition,
-    ToolGateway,
     ToolRegistry,
     ToolScope,
 )
-from autobots.application.tools import default_registry, first_grants
+from autobots.application.tool_gateway import ToolGateway
+from autobots.application.tools import first_grants
 from autobots.contracts.tools import CalculateInput, CalculateOutput
 from autobots.domain.tools import OperationClass, path_granted
 
@@ -85,7 +86,7 @@ def test_a_catalog_shows_only_grants_and_no_handler() -> None:
     from uuid import uuid4
 
     scope = ToolScope(uuid4(), uuid4(), 1, {"calculate": 1})
-    catalog = ToolGateway(default_registry()).registry.catalog(scope)
+    catalog = ToolGateway(build_registry(None)).registry.catalog(scope)
     assert [tool["name"] for tool in catalog] == ["calculate"]
     assert set(catalog[0]) == {"name", "version", "description", "input_schema"}
 

@@ -15,19 +15,20 @@ from uuid import UUID, uuid4
 
 import httpx
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.provider_http import http_client
 from autobots.adapters.tool_middleware import GatewayMiddleware, visible_tools
 from autobots.application.experts import create_expert, create_session
 from autobots.application.runs import admit_run
 from autobots.application.tool_catalog import tool_catalog
-from autobots.application.tool_gateway import (
+from autobots.application.tool_definitions import (
     ToolContext,
     ToolDefinition,
     ToolFailed,
-    ToolGateway,
     ToolRegistry,
     ToolScope,
 )
+from autobots.application.tool_gateway import ToolGateway
 from autobots.application.worker_leases import claim_next
 from autobots.contracts.experts import ExpertConfig, SessionExpert
 from autobots.domain.models import resolve_role_policy
@@ -151,7 +152,7 @@ async def main() -> None:
             'checkpoints': repr(list(saver.storage.items())) + repr(pickle.dumps(dict(saver.storage))),
             'scope': repr(scope),
             'tool schema shown to the model': json.dumps(registry.catalog(scope)),
-            'catalog': tool_catalog(os.environ, registry=registry).model_dump_json(),
+            'catalog': tool_catalog(registry, os.environ).model_dump_json(),
             'log lines': log.getvalue(),
         }
         leaked = [*tables, *(place for place, text in places.items() if FAKE_KEY in text)]
@@ -169,9 +170,9 @@ async def main() -> None:
         os.environ['GITHUB_REPOSITORY'], os.environ['GITHUB_TOKEN'] = 'fixture/repository', 'ghp_fixtureNotARealToken0000000000'
         actor = uuid4()
         keyed = await create_expert(db, workspace_id=WORKSPACE, actor_id=actor, idempotency_key=str(uuid4()), name=f'Keyed {uuid4().hex[:6]}',
-                                    config=ExpertConfig(tools=['calculate', 'create_github_issue']))
+                                    config=ExpertConfig(tools=['calculate', 'create_github_issue']), catalog=tool_registry.catalog())
         plain = await create_expert(db, workspace_id=WORKSPACE, actor_id=actor, idempotency_key=str(uuid4()), name=f'Plain {uuid4().hex[:6]}',
-                                    config=ExpertConfig(tools=['calculate']))
+                                    config=ExpertConfig(tools=['calculate']), catalog=tool_registry.catalog())
         del os.environ['GITHUB_REPOSITORY'], os.environ['GITHUB_TOKEN']
         keyed_session = await create_session(db, workspace_id=WORKSPACE, actor_id=actor, idempotency_key=str(uuid4()), kind='direct',
                                              experts=[SessionExpert(expert_id=keyed.id)])

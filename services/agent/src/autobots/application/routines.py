@@ -32,6 +32,7 @@ from autobots.application.runs import (
     request_hash,
     store_receipt,
 )
+from autobots.application.tool_catalog import Catalog, ToolsUnavailable
 from autobots.application.workflows import WorkflowRefused, create_execution
 from autobots.contracts.primitives import MAX_SAFE_INTEGER
 from autobots.contracts.routines import (
@@ -350,7 +351,12 @@ async def remove_routine(connection: Any, workspace_id: UUID, routine_id: UUID) 
 
 
 async def run_routine_now(
-    connection: Any, workspace_id: UUID, routine_id: UUID, credential_check: CredentialCheck
+    connection: Any,
+    workspace_id: UUID,
+    routine_id: UUID,
+    credential_check: CredentialCheck,
+    *,
+    catalog: Catalog,
 ) -> tuple[str, str | None, UUID | None]:
     """Decision 0026 C6: one occurrence now, by the scheduled path's own checks, in order.
 
@@ -383,7 +389,7 @@ async def run_routine_now(
             return "blocked", refused.code, None
         try:
             run_id = await admit_occurrence(
-                connection, workspace_id, routine_id, version, config, moment
+                connection, workspace_id, routine_id, version, config, moment, catalog=catalog
             )
         except (RoutineRefused, WorkflowRefused, IdempotencyConflict, ExpertRefused) as refused:
             await _record(connection, routine_id, moment, version, "blocked", refused.code)
@@ -425,10 +431,13 @@ async def admit_occurrence(
     version: int,
     config: RoutineConfigRecord,
     moment: datetime,
+    *,
+    catalog: Catalog,
 ) -> UUID:
     """Admits the run one occurrence starts: the workflow's execution, or the Expert's run under its
     pinned version's bindings and tools. Its key is the routine and the occurrence time, so
-    admitting the same occurrence again returns that run (SP-014)."""
+    admitting the same occurrence again returns that run (SP-014). `catalog` decides whether its
+    tools are available (PK-02)."""
     key = f"routine:{routine_id}:{moment.isoformat()}"
     actor = routine_id
     if config.target.kind == "workflow":
@@ -456,13 +465,11 @@ async def admit_occurrence(
         )
     except ProfileNotOffered as refused:
         raise RoutineRefused(refused.code) from None
-    from autobots.application.tool_catalog import ToolsUnavailable
-
     try:
         # PK-02: a missing key refuses this occurrence, before a run exists. Its keys come from
         # this process's environment as it is now, where POST /v1/runs reads the one its entry
         # point read at start.
-        await require_tools_available(connection, workspace_id, tools, os.environ)
+        await require_tools_available(connection, workspace_id, tools, os.environ, catalog)
     except ToolsUnavailable as refused:
         raise RoutineRefused(refused.code) from None
     grant = RunGrant(
@@ -503,6 +510,7 @@ async def _evaluate_one(
     routine_id: UUID,
     credential_check: CredentialCheck,
     now: datetime | None,
+    catalog: Catalog,
 ) -> int:
     async with connection.transaction():
         row = await (
@@ -546,7 +554,7 @@ async def _evaluate_one(
             return 0
         try:
             run_id = await admit_occurrence(
-                connection, workspace_id, routine_id, version, config, latest
+                connection, workspace_id, routine_id, version, config, latest, catalog=catalog
             )
         except (RoutineRefused, WorkflowRefused, IdempotencyConflict, ExpertRefused) as refused:
             await _record(connection, routine_id, latest, version, "blocked", refused.code)
@@ -556,7 +564,11 @@ async def _evaluate_one(
 
 
 async def evaluate_routines(
-    connection: Any, credential_check: CredentialCheck, now: datetime | None = None
+    connection: Any,
+    credential_check: CredentialCheck,
+    now: datetime | None = None,
+    *,
+    catalog: Catalog,
 ) -> int:
     """Admits what's due. Run from any number of workers: a row lock and a unique key keep it once.
 
@@ -569,7 +581,7 @@ async def evaluate_routines(
     admitted = 0
     for (routine_id,) in await cursor.fetchall():
         try:
-            admitted += await _evaluate_one(connection, routine_id, credential_check, now)
+            admitted += await _evaluate_one(connection, routine_id, credential_check, now, catalog)
         except Exception as error:  # noqa: BLE001 - one routine's failure leaves it due and never stops the others
             # Rolled back on its own. This one stays due, and every other routine still runs.
             log_event(

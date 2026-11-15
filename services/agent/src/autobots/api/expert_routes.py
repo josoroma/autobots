@@ -9,6 +9,7 @@ from autobots.api.errors import ApiError
 from autobots.api.pool import request_pool
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, require_owner
+from autobots.api.tool_routes import catalog_of
 from autobots.application.experts import (
     add_version,
     create_expert,
@@ -59,6 +60,7 @@ async def post_expert(
             idempotency_key=key,
             name=body.name,
             config=body.config,
+            catalog=catalog_of(request),
         )
 
 
@@ -88,6 +90,7 @@ async def post_version(
             idempotency_key=key,
             expected_version=body.expected_version,
             config=body.config,
+            catalog=catalog_of(request),
         )
 
 

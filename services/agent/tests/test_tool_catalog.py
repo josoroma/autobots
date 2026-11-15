@@ -4,26 +4,26 @@ import json
 from uuid import uuid4
 
 import pytest
+from fastapi.testclient import TestClient
 
-from autobots.application.tool_catalog import (
-    all_descriptors,
-    catalog_digest,
-    catalog_registry,
-    tool_catalog,
-)
-from autobots.application.tool_gateway import Refused, ToolScope, resolve
+from autobots.adapters.tool_registry import catalog, catalog_registry
+from autobots.api.app import create_app
+from autobots.application.tool_catalog import Catalog, all_descriptors, catalog_digest
+from autobots.application.tool_definitions import ToolRegistry, ToolScope
+from autobots.application.tool_gateway import Refused, resolve
 from autobots.domain.stops import GatewayCode
 from autobots.domain.tool_catalog import PLANNED_TOOLS
 from autobots.domain.tools import OperationClass
-from test_api import client, headers, token
+from test_api import SETTINGS, Membership, client, headers, token
 
 FAKE_TOKEN = "zz_fixture_q8w7e6r5t4y3u2i1"
 FAKE_REPOSITORY = "zq9xv7-fixture/kq4wm2-fixture"
+CATALOG = catalog()
 
 
 def test_every_registered_tool_appears_once_and_nothing_else() -> None:
     registry = catalog_registry()
-    descriptors = all_descriptors({}, registry)
+    descriptors = all_descriptors(registry, {})
     registered = {(tool.tool_id, tool.version) for tool in registry.definitions()}
     listed = [(item.tool_id, item.version) for item in descriptors if item.registered]
     assert sorted(listed) == sorted(registered)
@@ -38,7 +38,7 @@ def test_each_registered_tool_is_fully_described() -> None:
         assert tool.title, f"{tool.tool_id} needs a title"
         item = next(
             entry
-            for entry in all_descriptors({})
+            for entry in CATALOG.descriptors({})
             if (entry.tool_id, entry.version) == (tool.tool_id, tool.version)
         )
         assert item.input_schema == tool.input_model.model_json_schema()
@@ -60,7 +60,7 @@ def test_planned_tools_are_disabled_and_never_registered() -> None:
     for tool in PLANNED_TOOLS:
         assert tool.operation_class is OperationClass.ARBITRARY_EXECUTION
         assert registry.get(tool.tool_id, tool.version) is None
-    browse = next(item for item in all_descriptors({}) if item.tool_id == "browse_goal")
+    browse = next(item for item in CATALOG.descriptors({}) if item.tool_id == "browse_goal")
     assert browse.availability == "disabled_by_policy"
     assert browse.grantable_to == []
 
@@ -70,7 +70,7 @@ def test_discovery_does_not_grant() -> None:
     scope = ToolScope(workspace_id=uuid4(), run_id=uuid4(), generation=1, tools={"calculate": 1})
     shown = {entry["name"] for entry in registry.catalog(scope)}
     assert shown == {"calculate"}
-    assert "read_run_file" in {item.tool_id for item in tool_catalog({}).tools}
+    assert "read_run_file" in {item.tool_id for item in CATALOG.catalog({}).tools}
     # Refused as the call resolves, before anything about the run is read.
     refused = resolve(registry, scope, "read_run_file", {"path": "x"})
     assert refused == Refused(GatewayCode.TOOL_NOT_GRANTED)
@@ -78,7 +78,7 @@ def test_discovery_does_not_grant() -> None:
 
 def test_no_key_value_appears_in_the_catalog() -> None:
     environ = {"GITHUB_TOKEN": FAKE_TOKEN, "GITHUB_REPOSITORY": FAKE_REPOSITORY}
-    catalog = tool_catalog(environ)
+    catalog = CATALOG.catalog(environ)
     encoded = json.dumps(catalog.model_dump(mode="json"))
     for value in environ.values():
         for start in range(0, len(value) - 7):
@@ -92,7 +92,7 @@ def test_no_key_value_appears_in_the_catalog() -> None:
 def test_a_missing_key_shows_its_typed_reason() -> None:
     github = next(
         item
-        for item in tool_catalog({"GITHUB_TOKEN": " "}).tools
+        for item in CATALOG.catalog({"GITHUB_TOKEN": " "}).tools
         if item.tool_id == "create_github_issue"
     )
     assert (github.availability, github.availability_reason) == (
@@ -102,20 +102,22 @@ def test_a_missing_key_shows_its_typed_reason() -> None:
 
 
 def test_the_digest_names_the_catalog_not_the_install() -> None:
-    without = tool_catalog({})
-    configured = tool_catalog({"GITHUB_TOKEN": FAKE_TOKEN, "GITHUB_REPOSITORY": FAKE_REPOSITORY})
+    without = CATALOG.catalog({})
+    configured = CATALOG.catalog({"GITHUB_TOKEN": FAKE_TOKEN, "GITHUB_REPOSITORY": FAKE_REPOSITORY})
     assert (
-        without.catalog_digest == configured.catalog_digest == catalog_digest(all_descriptors({}))
+        without.catalog_digest
+        == configured.catalog_digest
+        == catalog_digest(CATALOG.descriptors({}))
     )
 
 
 def test_filters_narrow_tools_and_keep_groups() -> None:
-    catalog = tool_catalog({}, group="files")
+    catalog = CATALOG.catalog({}, group="files")
     assert {item.group for item in catalog.tools} == {"files"}
     assert any(group.group == "planning" for group in catalog.groups)
-    assert {item.tool_id for item in tool_catalog({}, availability="disabled_by_policy").tools} == {
-        "browse_goal"
-    }
+    assert {
+        item.tool_id for item in CATALOG.catalog({}, availability="disabled_by_policy").tools
+    } == {"browse_goal"}
 
 
 def test_the_routes_need_a_member() -> None:
@@ -141,6 +143,19 @@ def test_the_routes_answer_members(path: str, status: int) -> None:
         assert reply.json()["tool_id"] == "calculate"
 
 
+def test_the_routes_list_the_catalog_the_app_was_built_with() -> None:
+    """The routes read the catalog the app was given and build none themselves (XMOD-01)."""
+    calculate = catalog_registry({}).get("calculate", 1)
+    assert calculate is not None
+    only = ToolRegistry()
+    only.register(calculate)
+    app = create_app(SETTINGS, membership=Membership(), tools=Catalog(lambda _: only))
+    reply = TestClient(app).get("/v1/tools", headers=headers(token()))
+    assert reply.status_code == 200
+    listed = [item["tool_id"] for item in reply.json()["tools"] if item["registered"]]
+    assert listed == ["calculate"]
+
+
 # US-14.2: a group grant expands to explicit tools when a version is saved.
 
 
@@ -148,7 +163,7 @@ def test_a_group_expands_to_the_tools_an_expert_may_name() -> None:
     from autobots.application.experts import expand_groups
     from autobots.contracts.experts import ExpertConfig
 
-    expanded = expand_groups(ExpertConfig(tools=["calculate"], tool_groups=["files"]), {})
+    expanded = expand_groups(ExpertConfig(tools=["calculate"], tool_groups=["files"]), CATALOG, {})
     assert expanded.tools == [
         "calculate",
         "publish_artifact",
@@ -164,7 +179,7 @@ def test_a_saved_expansion_does_not_follow_the_group() -> None:
     from autobots.application.experts import expand_groups
     from autobots.contracts.experts import ExpertConfig
 
-    saved = expand_groups(ExpertConfig(tool_groups=["files"]), {})
+    saved = expand_groups(ExpertConfig(tool_groups=["files"]), CATALOG, {})
     # The saved config holds the explicit list, so reading it back never re-expands it.
     assert ExpertConfig.model_validate(saved.model_dump()).tools == saved.tools
 
@@ -184,7 +199,9 @@ def test_an_unavailable_or_empty_grant_is_refused(config: dict[str, object], cod
     from autobots.contracts.experts import ExpertConfig
 
     with pytest.raises(ExpertRefused) as refused:
-        validate_config(expand_groups(ExpertConfig.model_validate(config), {}), {})
+        validate_config(
+            expand_groups(ExpertConfig.model_validate(config), CATALOG, {}), CATALOG, {}
+        )
     assert refused.value.code == code
 
 
@@ -193,8 +210,8 @@ def test_a_configured_connector_can_be_granted() -> None:
     from autobots.contracts.experts import ExpertConfig
 
     environ = {"GITHUB_TOKEN": FAKE_TOKEN, "GITHUB_REPOSITORY": FAKE_REPOSITORY}
-    config = expand_groups(ExpertConfig(tool_groups=["connectors"]), environ)
-    validate_config(config, environ)
+    config = expand_groups(ExpertConfig(tool_groups=["connectors"]), CATALOG, environ)
+    validate_config(config, CATALOG, environ)
     assert config.tools == [
         "create_github_issue",
         "github_list_pull_requests",
@@ -212,7 +229,7 @@ def test_a_configured_connector_can_be_granted() -> None:
 def test_availability_with_a_real_looking_key_makes_no_request() -> None:
     environ = {"GITHUB_TOKEN": "ghp_" + "a" * 36, "GITHUB_REPOSITORY": "owner/repo"}
     github = next(
-        item for item in tool_catalog(environ).tools if item.tool_id == "create_github_issue"
+        item for item in CATALOG.catalog(environ).tools if item.tool_id == "create_github_issue"
     )
     assert github.availability == "available"
 

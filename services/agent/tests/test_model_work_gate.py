@@ -15,6 +15,7 @@ from uuid import UUID
 
 import pytest
 
+from autobots.adapters.tool_registry import catalog
 from autobots.api.operation_routes import require_ready
 from autobots.api.settings_routes import provider_settings
 from autobots.application.experts import expert_record
@@ -213,16 +214,20 @@ def test_tool_availability_reads_the_environment_it_is_given(
     monkeypatch.setenv("TAVILY_API_KEY", "tvly-live")
     _, connection = fresh()
     with pytest.raises(ToolsUnavailable) as refused:
-        run(require_tools_available(connection, WORKSPACE, ["tavily_search"], {}))
+        run(require_tools_available(connection, WORKSPACE, ["tavily_search"], {}, catalog()))
     assert (refused.value.code, refused.value.tools) == ("tool_unavailable", ["tavily_search"])
     given = {"TAVILY_API_KEY": "tvly-given"}
-    run(require_tools_available(connection, WORKSPACE, ["tavily_search", "calculate"], given))
+    run(
+        require_tools_available(
+            connection, WORKSPACE, ["tavily_search", "calculate"], given, catalog()
+        )
+    )
 
 
 def test_a_key_saved_for_the_workspace_makes_its_tool_available() -> None:
     database, connection = fresh()
     database.answer("from app_private.provider_credentials", ("tavily",))
-    run(require_tools_available(connection, WORKSPACE, ["tavily_search"], {}))
+    run(require_tools_available(connection, WORKSPACE, ["tavily_search"], {}, catalog()))
 
 
 # Where the API's handlers differ
@@ -648,7 +653,7 @@ def occurrence(
 ) -> tuple[tuple[str, str | None, UUID | None], list[UUID]]:
     check, asked = checks(key)
     connection = connection_of(database)
-    return run(run_routine_now(connection, WORKSPACE, ROUTINE, check)), asked
+    return run(run_routine_now(connection, WORKSPACE, ROUTINE, check, catalog=catalog())), asked
 
 
 EXPERT_TARGET = RoutineTarget(kind="expert", id=EXPERT, version=1)

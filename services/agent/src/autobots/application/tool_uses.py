@@ -14,14 +14,8 @@ from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
 
 from autobots.application.runs import LeaseLost, append_event
-from autobots.application.tool_gateway import (
-    Call,
-    Refused,
-    ToolDefinition,
-    ToolResult,
-    ToolScope,
-    hold_lease,
-)
+from autobots.application.tool_definitions import ToolDefinition, ToolResult, ToolScope
+from autobots.application.tool_gateway import Call, Refused, hold_lease
 from autobots.contracts.runs import ToolUseList, ToolUseView
 from autobots.domain.tool_catalog import CostClass
 

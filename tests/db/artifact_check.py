@@ -12,6 +12,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.object_storage import BUCKET, SupabaseObjectStore
 from autobots.application.artifacts import (
     ArtifactUnavailable,
@@ -23,7 +24,8 @@ from autobots.application.artifacts import (
 from autobots.application.goal_loop import run_goal
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import LeaseLost, admit_run
-from autobots.application.tool_gateway import ToolFailed, ToolGateway, ToolRegistry, ToolScope
+from autobots.application.tool_definitions import ToolFailed, ToolRegistry, ToolScope
+from autobots.application.tool_gateway import ToolGateway
 from autobots.application.tools import SAVE_ARTIFACT
 from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy
@@ -233,7 +235,7 @@ async def main() -> dict[str, Any]:
         lease = await claim_next(db, worker_id='loop', lease_seconds=300)
         from goal_loop_script import Script
         model = Script(items=[calls(PLAN), calls(('save_artifact', {'path': 'outputs/loop.md', 'content': 'from the loop'})), calls(('publish_artifact', {'path': 'outputs/loop.md', 'version': 1})), say('stop')], seen=[], bound=[])
-        await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE, object_store=store), drive=drive_lease)
+        await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE, object_store=store, tool_set=tool_registry.build_registry), drive=drive_lease)
         name = await value("select name from public.artifacts where run_id = %s and status = 'published'", lease.run_id)
         result['loop_run'] = str(lease.run_id)
         check('the loop publishes through the gateway', 'loop.md', name, name == 'loop.md')

@@ -1,20 +1,18 @@
 """The catalog, derived from the registry the worker runs, PRD-Tool-Catalog TC-01 to TC-05.
 
 Discovery never grants: this view lists every tool, and only a run's scope decides what it may call.
-Availability is computed per request from configuration and never stored.
+Availability is computed per request from configuration and never stored. The registry comes from
+the composition edge (adapters/tool_registry.py), as a parameter, so this module builds none and
+needs no stand-in resources (XMOD-01, PTOL-08).
 """
 
 import hashlib
 import json
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass
 from typing import Any, Literal, cast
 
-from autobots.application.assignments import Delegation
-from autobots.application.loop_tools import loop_registry
-from autobots.application.run_usage import RootLimits
-from autobots.application.tool_gateway import ToolDefinition, ToolRegistry
-from autobots.application.workflow_runner import APPROVAL_GATE
-from autobots.application.workflows import WORKFLOW_TOOLS
+from autobots.application.tool_definitions import ToolDefinition, ToolRegistry
 from autobots.contracts.tools import (
     FieldDescriptor,
     GrantSiteName,
@@ -37,6 +35,7 @@ from autobots.domain.tool_catalog import (
     key_availability,
 )
 from autobots.domain.tool_guides import TOOL_GUIDES
+from autobots.domain.tools import WORKFLOW_TOOLS
 
 _SCHEMA_KEYS = (
     "enum",
@@ -52,31 +51,6 @@ _SCHEMA_KEYS = (
     "maxItems",
     "default",
 )
-
-
-async def _never(*_: Any) -> Any:  # pragma: no cover - the catalog never drives anything.
-    raise RuntimeError("the catalog registry is for description only")
-
-
-def catalog_registry(environ: Mapping[str, str] | None = None) -> ToolRegistry:
-    """Every tool any run can be granted, built as the worker builds it, without its resources.
-
-    `environ` is the workspace's view (Decision 0025 V6), so its browsing switch decides whether
-    `browse_goal` is registered for it. Without one, the process environment decides."""
-    delegation = Delegation(drive=_never, limits=RootLimits(), lease_seconds=0.0)
-    from autobots.application.browsing_tool import browse_tool, executor_ready
-
-    # AB-02: browse_goal is registered, and so described, only while its executor is qualified.
-    ready = executor_ready(environ=environ)
-    browsing = (
-        (browse_tool(None, qualified=lambda: executor_ready(environ=environ)),) if ready else ()
-    )
-    return loop_registry(
-        RootLimits(),
-        object_store=object(),
-        delegation=delegation,
-        extra=(APPROVAL_GATE, *browsing),
-    )
 
 
 def _type(schema: Mapping[str, Any], definitions: Mapping[str, Any]) -> str:
@@ -245,10 +219,7 @@ def describe_planned(tool: PlannedTool) -> ToolDescriptor:
     )
 
 
-def all_descriptors(
-    environ: Mapping[str, str], registry: ToolRegistry | None = None
-) -> list[ToolDescriptor]:
-    registry = registry or catalog_registry(environ)
+def all_descriptors(registry: ToolRegistry, environ: Mapping[str, str]) -> list[ToolDescriptor]:
     described = [describe(tool, environ) for tool in registry.definitions()]
     registered = {item.tool_id for item in described}
     described += [
@@ -279,14 +250,14 @@ def latest(descriptors: list[ToolDescriptor]) -> list[ToolDescriptor]:
 
 
 def tool_catalog(
+    registry: ToolRegistry,
     environ: Mapping[str, str],
     *,
     group: str | None = None,
     availability: str | None = None,
     provider: str | None = None,
-    registry: ToolRegistry | None = None,
 ) -> ToolCatalog:
-    descriptors = all_descriptors(environ, registry)
+    descriptors = all_descriptors(registry, environ)
     digest = catalog_digest(descriptors)
     current = latest(descriptors)
     shown = [
@@ -309,25 +280,6 @@ def tool_catalog(
     return ToolCatalog(schema_version=1, catalog_digest=digest, groups=groups, tools=shown)
 
 
-def expert_tools_by_group(environ: Mapping[str, str]) -> dict[str, list[str]]:
-    """What granting a whole group to an Expert means today: its tools an Expert may name."""
-    groups: dict[str, list[str]] = {}
-    for item in latest(all_descriptors(environ)):
-        if "expert" in item.grantable_to:
-            groups.setdefault(item.group, []).append(item.tool_id)
-    return groups
-
-
-def unavailable_tools(tool_ids: list[str], environ: Mapping[str, str]) -> list[str]:
-    """Named tools a grant can't use in this install: a missing key or a disabled class."""
-    named = set(tool_ids)
-    return [
-        item.tool_id
-        for item in latest(all_descriptors(environ))
-        if item.tool_id in named and item.availability != ToolAvailability.AVAILABLE.value
-    ]
-
-
 class ToolsUnavailable(FixedRefusal):
     """A grant names a tool this install can't use now. Refused before any run exists (PK-02).
     The tools stay internal detail; a response names none."""
@@ -339,7 +291,53 @@ class ToolsUnavailable(FixedRefusal):
         self.tools = tools
 
 
-def require_available(tool_ids: Iterable[str], environ: Mapping[str, str]) -> None:
-    missing = unavailable_tools(list(tool_ids), environ)
-    if missing:
-        raise ToolsUnavailable(missing)
+@dataclass(frozen=True)
+class Catalog:
+    """The catalog over the registry the worker runs (TC-01), and what admission and Experts ask
+    of it (PK-02). `registry` gives that registry for a workspace's Keys & vars view, so its
+    browsing switch decides whether `browse_goal` is listed (Decision 0025 V6). The API and the
+    worker take it from the composition edge and pass it in (XMOD-01)."""
+
+    registry: Callable[[Mapping[str, str]], ToolRegistry]
+
+    def descriptors(self, environ: Mapping[str, str]) -> list[ToolDescriptor]:
+        return all_descriptors(self.registry(environ), environ)
+
+    def catalog(
+        self,
+        environ: Mapping[str, str],
+        *,
+        group: str | None = None,
+        availability: str | None = None,
+        provider: str | None = None,
+    ) -> ToolCatalog:
+        return tool_catalog(
+            self.registry(environ),
+            environ,
+            group=group,
+            availability=availability,
+            provider=provider,
+        )
+
+    def expert_groups(self, environ: Mapping[str, str]) -> dict[str, list[str]]:
+        """What granting a whole group to an Expert means today: its tools an Expert may name."""
+        groups: dict[str, list[str]] = {}
+        for item in latest(self.descriptors(environ)):
+            if "expert" in item.grantable_to:
+                groups.setdefault(item.group, []).append(item.tool_id)
+        return groups
+
+    def unavailable(self, tool_ids: Iterable[str], environ: Mapping[str, str]) -> list[str]:
+        """Named tools a grant can't use in this install: a missing key or a disabled class."""
+        named = set(tool_ids)
+        return [
+            item.tool_id
+            for item in latest(self.descriptors(environ))
+            if item.tool_id in named and item.availability != ToolAvailability.AVAILABLE.value
+        ]
+
+    def require_available(self, tool_ids: Iterable[str], environ: Mapping[str, str]) -> None:
+        """Raises ToolsUnavailable naming the tools `unavailable` finds."""
+        missing = self.unavailable(tool_ids, environ)
+        if missing:
+            raise ToolsUnavailable(missing)

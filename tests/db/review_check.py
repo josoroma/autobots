@@ -10,6 +10,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.application import loop_policy
 from autobots.application.compaction import SUMMARY_MARKER, CompactionPolicy
@@ -218,7 +219,7 @@ async def main() -> None:
         try:
             calc = ('calculate', {'operation': 'sum', 'values': [1, 2]})
             model = Aware(items=[calls(calc), calls(calc), calls(calc), calls(calc), calls(calc), say('done')], seen=[], bound=[])
-            config = LoopConfig(route=route, compaction=CompactionPolicy(context_chars=200, large_tool_chars=1000, keep_recent=2), sleep=lambda _: asyncio.sleep(0))
+            config = LoopConfig(route=route, compaction=CompactionPolicy(context_chars=200, large_tool_chars=1000, keep_recent=2), sleep=lambda _: asyncio.sleep(0), tool_set=tool_registry.build_registry)
             # This exact run, so the jobs of the suites around it stay as they are.
             ran = await drive_lease(db, URL, await claim_run(db, big, worker_id='reserving'), lambda: model, config)
         finally:
@@ -231,7 +232,7 @@ async def main() -> None:
         # R3-2: a request that could reach a rate nothing was reserved at isn't sent.
         tiered = await admitted('Past the tier', 1_000_000)
         model = Aware(items=[say('never')], seen=[], bound=[])
-        result = await drive_lease(db, URL, await claim_run(db, tiered, worker_id='tiered'), lambda: model, LoopConfig(route=ModelRoute('executor', 'openrouter_terra', 'fixture/model', 1_000, 1_000_000, 1), sleep=lambda _: asyncio.sleep(0)))
+        result = await drive_lease(db, URL, await claim_run(db, tiered, worker_id='tiered'), lambda: model, LoopConfig(route=ModelRoute('executor', 'openrouter_terra', 'fixture/model', 1_000, 1_000_000, 1), sleep=lambda _: asyncio.sleep(0), tool_set=tool_registry.build_registry))
         check('a request that could reach a higher tier is refused before sending', 'cost_unavailable, no call', (result.code, len(model.seen)), result.code == 'cost_unavailable' and not model.seen)
 
         # US-12.1: a saved choice naming DeepSeek refuses new work, with no substitute and no rewrite.
@@ -244,7 +245,7 @@ async def main() -> None:
         plain = await create_execution(db, workspace_id=chooser, actor_id=actor, workflow_id=saved_flow.id, idempotency_key=str(uuid4()), version=1, inputs={'in': 'x'})
         check('a workflow with no agent step still runs under a saved DeepSeek default', 'admitted', plain.run_id, bool(plain.run_id))
         await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where run_id = %s", (plain.run_id,))
-        helper = await create_expert(db, workspace_id=chooser, actor_id=actor, idempotency_key=str(uuid4()), name=f'Saved helper {uuid4().hex[:6]}', config=ExpertConfig(tools=['calculate']))
+        helper = await create_expert(db, workspace_id=chooser, actor_id=actor, idempotency_key=str(uuid4()), name=f'Saved helper {uuid4().hex[:6]}', config=ExpertConfig(tools=['calculate']), catalog=tool_registry.catalog())
         agent_graph = {'nodes': [{'id': 'in', 'block': 'input', 'version': 1, 'config': {'type': 'string'}}, {'id': 'ask', 'block': 'agent', 'version': 1, 'config': {'expert_id': str(helper.id)}}, {'id': 'out', 'block': 'output', 'version': 1, 'config': {}}],
                        'links': [{'source': 'in', 'source_port': 'value', 'target': 'ask', 'target_port': 'goal'}, {'source': 'ask', 'source_port': 'result', 'target': 'out', 'target_port': 'value'}]}
         agent_flow = await create_workflow(db, workspace_id=chooser, actor_id=actor, idempotency_key=str(uuid4()), name=f'Saved agent {uuid4().hex[:6]}')
@@ -258,11 +259,11 @@ async def main() -> None:
         started = (await (await db.execute('select count(*) from public.runs where workspace_id = %s', (chooser,))).fetchone())[0] - started_before
         kept = (await (await db.execute('select default_profile, version from app_private.model_policies where workspace_id = %s', (chooser,))).fetchone())
         check('no run started, and the saved choice stands', "0 runs, still DeepSeek at version 1", (started, kept), started == 0 and kept == ('openrouter_deepseek_flash', 1))
-        lover = await create_expert(db, workspace_id=WORKSPACE, actor_id=actor, idempotency_key=str(uuid4()), name=f'Saved binding {uuid4().hex[:6]}', config=ExpertConfig(tools=['calculate'], role_bindings={'executor': 'openrouter_deepseek_flash'}))
+        lover = await create_expert(db, workspace_id=WORKSPACE, actor_id=actor, idempotency_key=str(uuid4()), name=f'Saved binding {uuid4().hex[:6]}', config=ExpertConfig(tools=['calculate'], role_bindings={'executor': 'openrouter_deepseek_flash'}), catalog=tool_registry.catalog())
         routine = routine_record(RoutineConfig(target=RoutineTarget(kind='expert', id=lover.id, version=1), goal='Scheduled work', trigger={'kind': 'interval', 'minutes': 60}, limit_micro_usd=500))
         before_runs = (await (await db.execute('select count(*) from public.runs where workspace_id = %s', (WORKSPACE,))).fetchone())[0]
         try:
-            await admit_occurrence(db, WORKSPACE, uuid4(), 1, routine, datetime(2026, 1, 1, tzinfo=UTC))
+            await admit_occurrence(db, WORKSPACE, uuid4(), 1, routine, datetime(2026, 1, 1, tzinfo=UTC), catalog=tool_registry.catalog())
             check("an occurrence on a saved Expert binding is refused", 'model_not_offered', 'admitted', False)
         except RoutineRefused as refused:
             after_runs = (await (await db.execute('select count(*) from public.runs where workspace_id = %s', (WORKSPACE,))).fetchone())[0]
@@ -274,7 +275,7 @@ async def main() -> None:
         model = Aware(items=[calls(('propose_plan', {'tasks': [task]})), calls(('calculate', {'operation': 'sum', 'values': [1, 2], 'note': 'x\ud83dy'})), say('after'), say('after')], seen=[], bound=[])
         odd_lease = await claim_run(db, odd, worker_id='surrogate')
         try:
-            outcome = await drive_lease(db, URL, odd_lease, lambda: model, LoopConfig(route=ModelRoute('executor', 'openrouter_terra', 'fixture/model', 1_000, 1_000_000), sleep=lambda _: asyncio.sleep(0)))
+            outcome = await drive_lease(db, URL, odd_lease, lambda: model, LoopConfig(route=ModelRoute('executor', 'openrouter_terra', 'fixture/model', 1_000, 1_000_000), sleep=lambda _: asyncio.sleep(0), tool_set=tool_registry.build_registry))
             ended = (outcome.run_status, outcome.code)
         except Exception as raised:  # noqa: BLE001 - what the worker's loop would see.
             ended = ('raised', type(raised).__name__)

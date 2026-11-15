@@ -14,7 +14,6 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from autobots.application.assignments import Delegation
-from autobots.application.loop_tools import loop_registry
 from autobots.application.plans import load_goal
 from autobots.application.recovery import classify_interrupted
 from autobots.application.run_lifecycle import (
@@ -23,20 +22,19 @@ from autobots.application.run_lifecycle import (
     LoopResult,
     finish,
     lease_heartbeat,
+    pass_registry,
     result_of,
     run_status,
 )
 from autobots.application.run_usage import ensure_usage
 from autobots.application.runs import LeaseLost, VersionConflict, apply_worker_command
-from autobots.application.tool_gateway import (
+from autobots.application.tool_definitions import (
     ApprovalPolicy,
     ToolContext,
     ToolDefinition,
-    ToolGateway,
     ToolScope,
-    hold_lease,
-    ownership_refusal,
 )
+from autobots.application.tool_gateway import ToolGateway, hold_lease, ownership_refusal
 from autobots.application.worker_leases import Lease
 from autobots.contracts.plans import GoalSpec
 from autobots.domain.runs import CommandRefused, RunCommand, RunStatus
@@ -280,6 +278,14 @@ async def run_workflow(
     `complete_workflow`. `drive` is how an agent step's child is driven, and the worker's job
     dispatch passes its own. It is required, so no caller can leave an agent step without one and
     fail its run for good (SP-010)."""
+
+    async def drive_child(child_connection: Any, child_lease: Lease) -> LoopResult:
+        return await drive(child_connection, database_url, child_lease, lambda: model, config)
+
+    delegation = Delegation(drive_child, config.limits, config.lease_seconds, config.sleep)
+    # The process's tool set, with this workflow's approval step (APPROVAL_GATE). Built first, so a
+    # process that composed no tools stops before anything is written.
+    gateway = ToolGateway(pass_registry(config, delegation, workflow=True))
     cursor = await connection.execute(
         "select e.id, e.inputs, v.graph from public.workflow_executions e "
         "join public.workflow_versions v on v.workflow_id = e.workflow_id "
@@ -301,14 +307,6 @@ async def run_workflow(
         tuple(goal.allowed_paths),
     )
 
-    async def drive_child(child_connection: Any, child_lease: Lease) -> LoopResult:
-        return await drive(child_connection, database_url, child_lease, lambda: model, config)
-
-    delegation = Delegation(drive_child, config.limits, config.lease_seconds, config.sleep)
-    registry = loop_registry(
-        config.limits, config.object_store, delegation, (*config.tools, APPROVAL_GATE)
-    )
-    gateway = ToolGateway(registry)
     shape = shape_of(graph)
     code: str | None = None
     try:

@@ -25,8 +25,9 @@ from uuid import UUID
 
 import psycopg
 
+from autobots.adapters.tool_registry import catalog
 from autobots.application.experts import create_expert
-from autobots.application.tool_catalog import all_descriptors
+from autobots.application.tool_catalog import Catalog
 from autobots.application.workflows import create_workflow, publish_version, save_draft
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.workflows import WorkflowGraph
@@ -316,9 +317,9 @@ WORKFLOWS = (
 )
 
 
-def available_tools(environ: Mapping[str, str]) -> frozenset[str]:
+def available_tools(environ: Mapping[str, str], tools: Catalog) -> frozenset[str]:
     return frozenset(
-        item.tool_id for item in all_descriptors(environ) if item.availability == "available"
+        item.tool_id for item in tools.descriptors(environ) if item.availability == "available"
     )
 
 
@@ -342,7 +343,8 @@ async def seed(connection: Any, workspace_id: UUID, environ: Mapping[str, str]) 
     if row is None:
         raise SystemExit("that workspace has no owner, so nothing was seeded")
     actor = UUID(str(row[0]))
-    usable = available_tools(environ)
+    tools = catalog()
+    usable = available_tools(environ, tools)
     report: dict[str, Any] = {"experts": {}, "workflows": {}}
     experts: dict[str, UUID] = {}
     for expert in EXPERTS:
@@ -366,6 +368,7 @@ async def seed(connection: Any, workspace_id: UUID, environ: Mapping[str, str]) 
             idempotency_key=f"concept-seed:expert:{expert.name}",
             name=expert.name,
             config=ExpertConfig(purpose=purpose, tools=granted),
+            catalog=tools,
         )
         experts[expert.name] = view.id
         report["experts"][expert.name] = {"created": True, "without": missing}

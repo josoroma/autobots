@@ -10,6 +10,7 @@ from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.application import assignments, tool_gateway
 from autobots.application.approvals import (
     ARGUMENT_LIMIT,
@@ -25,17 +26,14 @@ from autobots.application.plans import load_goal
 from autobots.application.reconciliation import record_evidence
 from autobots.application.run_lifecycle import LoopConfig, finish
 from autobots.application.runs import admit_run, apply_command
-from autobots.application.tool_gateway import (
+from autobots.application.tool_definitions import (
     ApprovalPolicy,
-    Call,
     ToolContext,
     ToolDefinition,
-    ToolGateway,
     ToolRegistry,
     ToolScope,
-    record_receipt,
-    resolve,
 )
+from autobots.application.tool_gateway import Call, ToolGateway, record_receipt, resolve
 from autobots.application.worker_leases import claim_next
 from autobots.application.workflow_runner import InstanceStopped, call_tool, run_workflow
 from autobots.application.workflows import create_execution, create_workflow, publish_version
@@ -76,7 +74,7 @@ async def pause_inside_assignment(db: Db) -> None:
     job go (R-34). The run has no money, so its child stops at admission with no model call."""
     cases = db.cases
     expert = await create_expert(db.connection, workspace_id=db.workspace, actor_id=db.actor, idempotency_key='blocker-race-helper',
-                                 name='Blocker race helper', config=ExpertConfig(tools=['calculate']))
+                                 name='Blocker race helper', config=ExpertConfig(tools=['calculate']), catalog=tool_registry.catalog())
     graph = {
         'nodes': [{'id': 'in', 'block': 'input', 'version': 1, 'config': {'type': 'string'}},
                   {'id': 'ask', 'block': 'agent', 'version': 1, 'config': {'expert_id': str(expert.id)}},
@@ -92,7 +90,7 @@ async def pause_inside_assignment(db: Db) -> None:
                                        idempotency_key='blocker-race-e', version=1, inputs={'in': 'Work it out'})
     run = execution.run_id
     await db.connection.execute('update public.runs set limit_micro_usd = 0 where id = %s', (run,))
-    config = LoopConfig(route=ROUTE, sleep=lambda _: asyncio.sleep(0))
+    config = LoopConfig(route=ROUTE, sleep=lambda _: asyncio.sleep(0), tool_set=tool_registry.build_registry)
     receipt_sql = 'select status, failure_code from app_private.tool_receipts where run_id = %s and tool_id = %s'
 
     async def ask() -> tuple[Any, ...] | None:
@@ -327,7 +325,7 @@ async def main() -> None:
         version = await value('select version from public.runs where id = %s', run)
         await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, expected_version=version)
         before = await value('select status from public.runs where id = %s', run)
-        result = await process_next(db, URL, 'new-release', _no_model, LoopConfig(route=ROUTE))
+        result = await process_next(db, URL, 'new-release', _no_model, LoopConfig(route=ROUTE, tool_set=tool_registry.build_registry))
         after = await value('select status from public.runs where id = %s', run)
         left = (await receipt('b8-open'))[0]
         check('an incompatible run being cancelled settles', 'cancelling then cancelled, its open effect unknown', (before, after, left, result.code if result else None), before == 'cancelling' and after == 'cancelled' and left == 'unknown')
@@ -338,7 +336,7 @@ async def main() -> None:
         await db.execute('update public.runs set execution_contract = %s where id = %s', (json.dumps({'graph_state': 99, 'tools': {}}), run))
         await db.execute("insert into app_private.tool_receipts (operation_id, run_id, workspace_id, tool_id, tool_version, argument_hash, status, generation) values ('b8-paused', %s, %s, 'send_once', 1, 'x', 'started', %s)", (run, WORKSPACE, lease.generation))
         await expire(run)
-        result = await process_next(db, URL, 'new-release', _no_model, LoopConfig(route=ROUTE))
+        result = await process_next(db, URL, 'new-release', _no_model, LoopConfig(route=ROUTE, tool_set=tool_registry.build_registry))
         check('a paused incompatible run has what it left classified', 'paused, unknown', (await value('select status from public.runs where id = %s', run), (await receipt('b8-paused'))[0]), await value('select status from public.runs where id = %s', run) == 'paused' and (await receipt('b8-paused'))[0] == 'unknown')
 
         # A worker that lost the run settles nothing, whatever stopped it.

@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from autobots.adapters import tool_registry
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.run_lifecycle import LoopConfig
@@ -54,7 +55,7 @@ async def main() -> None:
     route = ModelRoute(ROUTE.role, os.environ.get('AUTOBOTS_TEST_ROUTE_PROFILE', ROUTE.profile), ROUTE.wire_id, ROUTE.worst_case_micro_usd)
 
     async def step(connection: Any) -> bool:
-        result = await process_next(connection, URL, NAME, script, LoopConfig(route=route, object_store=store, lease_seconds=8, heartbeat_seconds=2))
+        result = await process_next(connection, URL, NAME, script, LoopConfig(route=route, object_store=store, lease_seconds=8, heartbeat_seconds=2, tool_set=tool_registry.build_registry))
         return result is not None
 
     await serve(WorkerConfig(worker_id=NAME, database_url=URL, claims_inference=True, idle_seconds=0.3, beat_seconds=1, drain_seconds=DRAIN), step, stop)

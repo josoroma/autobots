@@ -19,6 +19,7 @@ from uuid import UUID
 
 import psycopg
 
+from autobots.application.assignments import Delegation
 from autobots.application.bounded import stop_task
 from autobots.application.compaction import CompactionPolicy
 from autobots.application.plans import load_goal, plan_view
@@ -30,7 +31,13 @@ from autobots.application.runs import (
     apply_worker_command,
     cascade_command,
 )
-from autobots.application.tool_gateway import ToolDefinition
+from autobots.application.tool_definitions import (
+    Browsing,
+    ToolDefinition,
+    ToolRegistry,
+    ToolRuntime,
+    ToolSet,
+)
 from autobots.application.worker_leases import (
     DEFAULT_LEASE_SECONDS,
     RETRY_DELAYS_SECONDS,
@@ -72,6 +79,13 @@ class LoopConfig:
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
     slot_wait_seconds: float = 30.0
     object_store: Any = None
+    # Every tool a pass is built with, from the process's composition edge: the worker passes
+    # adapters/tool_registry.build_registry, so the catalog lists what it runs (XMOD-01, TC-01).
+    tool_set: ToolSet | None = None
+    # browse_goal for this job, which the worker's binder sets only while browsing is switched on
+    # and qualified (AB-02, Decision 0025 V6).
+    browsing: Browsing | None = None
+    # Definitions registered after the tool set's, which a disposable check adds for its fixtures.
     tools: tuple[ToolDefinition, ...] = ()
     compaction: CompactionPolicy = CompactionPolicy()  # noqa: RUF009 - frozen, so sharing is safe.
     heartbeat_seconds: float = 20.0
@@ -94,6 +108,27 @@ class LoopResult:
     remaining: tuple[str, ...]
     uncovered_criteria: tuple[str, ...]
     usage: dict[str, Any]
+
+
+class NoToolSet(LookupError):
+    """A pass needs the tool set its process composed, so one without it is refused before
+    anything is sent (XMOD-01)."""
+
+
+def pass_registry(
+    config: LoopConfig, delegation: Delegation, *, workflow: bool = False
+) -> ToolRegistry:
+    """The tools one pass runs with: the process's tool set bound to this pass's limits, store and
+    children, with browsing as its binder set it, then the config's own definitions. A workflow's
+    adds its approval step (PRD-Tool-Catalog TC-01). The goal loop and the workflow runner both
+    build theirs here."""
+    if config.tool_set is None:
+        raise NoToolSet("the pass has no tool set")
+    runtime = ToolRuntime(config.limits, config.object_store, delegation)
+    registry = config.tool_set(runtime, workflow=workflow, browsing=config.browsing)
+    for tool in config.tools:
+        registry.register(tool)
+    return registry
 
 
 # How a claimed lease is driven: (connection, database URL, lease, model factory, config). The job

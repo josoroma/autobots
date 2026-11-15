@@ -14,6 +14,7 @@ from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.experts import create_expert, create_session
 from autobots.application.run_lifecycle import LoopConfig
@@ -42,7 +43,7 @@ async def main() -> None:
     waiting_in, keyless_in = UUID(sys.argv[1]), UUID(sys.argv[2])
     store = SupabaseObjectStore(BASE, SERVICE)
     config = LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0),
-                        tools=tools(Sink(Path(tempfile.mkdtemp()) / 'sink.log')))
+                        tools=tools(Sink(Path(tempfile.mkdtemp()) / 'sink.log')), tool_set=tool_registry.build_registry)
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         async def run(workspace: UUID, goal: str, items: list, granted: dict) -> str:
             binding = SimpleNamespace(session_id=None, expert_id=None, version=None, instructions='', tools=granted)
@@ -60,7 +61,7 @@ async def main() -> None:
                              {**PLAN_TOOLS, **LOOP_TOOL_GRANTS})
         # A saved binding no write can make now, for the screens that have to say so.
         stale = await create_expert(db, workspace_id=waiting_in, actor_id=uuid4(), idempotency_key=str(uuid4()), name='Saved on DeepSeek',
-                                    config=ExpertConfig(tools=['calculate'], role_bindings={'executor': 'openrouter_deepseek_flash', 'coder': 'openrouter_deepseek_flash'}))
+                                    config=ExpertConfig(tools=['calculate'], role_bindings={'executor': 'openrouter_deepseek_flash', 'coder': 'openrouter_deepseek_flash'}), catalog=tool_registry.catalog())
         pinned = await create_session(db, workspace_id=waiting_in, actor_id=uuid4(), idempotency_key=str(uuid4()), kind='direct', experts=[SessionExpert(expert_id=stale.id)])
         states = {}
         for name, run_id in (('waiting', waiting), ('finished', finished)):

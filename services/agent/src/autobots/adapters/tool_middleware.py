@@ -14,7 +14,8 @@ from langchain_core.tools import BaseTool, StructuredTool
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.types import Command
 
-from autobots.application.tool_gateway import ToolGateway, ToolResult, ToolScope
+from autobots.application.tool_definitions import ToolResult, ToolScope
+from autobots.application.tool_gateway import ToolGateway
 from autobots.domain.tools import ToolOutcome
 
 

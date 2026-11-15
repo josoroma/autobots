@@ -10,7 +10,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from autobots.application.run_projection import public_text
-from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed
+from autobots.application.tool_definitions import ToolContext, ToolDefinition, ToolFailed
 from autobots.contracts.memory import (
     OffloadContent,
     ReadOffload,

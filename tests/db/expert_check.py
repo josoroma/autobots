@@ -9,6 +9,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.application.experts import (
     ExpertRefused,
@@ -45,18 +46,18 @@ async def main() -> None:
             await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
             return (await admit_run(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), goal_text='Use the tools', limit_micro_usd=1_000_000, policy=policy or resolve_role_policy(), binding=binding)).run_id
 
-        expert = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='x1', name='Frozen', config=ExpertConfig(instructions='Always answer in rhyme.', tools=['calculate', 'save_artifact'], skills=['style-guide']))
+        expert = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='x1', name='Frozen', config=ExpertConfig(instructions='Always answer in rhyme.', tools=['calculate', 'save_artifact'], skills=['style-guide']), catalog=tool_registry.catalog())
         session = await create_session(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='s1', kind='direct', experts=[SessionExpert(expert_id=expert.id)])
         binding = await resolve_binding(db, WORKSPACE, session.id)
         check('a session pins the revision it started with', 'version 1', binding.version, binding.version == 1)
         running = await admit(binding)
         lease = await claim_next(db, worker_id='frozen', lease_seconds=120)
 
-        await add_version(db, workspace_id=WORKSPACE, actor_id=ACTOR, expert_id=expert.id, idempotency_key='x2', expected_version=1, config=ExpertConfig(instructions='Plain prose only.', tools=['calculate']))
+        await add_version(db, workspace_id=WORKSPACE, actor_id=ACTOR, expert_id=expert.id, idempotency_key='x2', expected_version=1, config=ExpertConfig(instructions='Plain prose only.', tools=['calculate']), catalog=tool_registry.catalog())
         stored = await value('select spec from app_private.goal_specs where run_id = %s', running)
         check('work in flight keeps its frozen tools and instructions', 'save_artifact kept, rhyme', (sorted(stored['allowed_tools']), stored['instructions']), 'save_artifact' in stored['allowed_tools'] and stored['instructions'] == 'Always answer in rhyme.')
         model = Script(items=[calls(('save_artifact', {'path': 'outputs/a.md', 'content': 'kept'})), say('stop')], seen=[], bound=[])
-        await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE), drive=drive_lease)
+        await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE, tool_set=tool_registry.build_registry), drive=drive_lease)
         files = await value('select count(*) from app_private.run_files where run_id = %s', running)
         check('so it can still use the tool the new revision removed', '1 file', files, files == 1)
         system = ' '.join(str(item.content) for item in model.seen[0] if item.type == 'system')
@@ -69,7 +70,7 @@ async def main() -> None:
         new_run = await admit(chosen)
         lease = await claim_next(db, worker_id='new', lease_seconds=120)
         model = Script(items=[calls(('save_artifact', {'path': 'outputs/a.md', 'content': 'no'})), say('stop')], seen=[], bound=[])
-        await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE), drive=drive_lease)
+        await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE, tool_set=tool_registry.build_registry), drive=drive_lease)
         files = await value('select count(*) from app_private.run_files where run_id = %s', new_run)
         reply = json.loads([m for m in model.seen[-1] if m.type == 'tool'][-1].content)
         check('new work on the later revision loses the tool, at the gateway', 'tool_not_granted, no file', (reply['code'], files), reply['code'] == 'tool_not_granted' and files == 0)
@@ -78,7 +79,7 @@ async def main() -> None:
         check('the run records its Expert and revision', 'version 2', recorded[2], recorded == (session.id, expert.id, 2))
 
         # Expert model bindings are frozen into the run's own policy.
-        terra = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='x3', name='Bound', config=ExpertConfig(role_bindings={'executor': 'openrouter_deepseek_flash'}))
+        terra = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='x3', name='Bound', config=ExpertConfig(role_bindings={'executor': 'openrouter_deepseek_flash'}), catalog=tool_registry.catalog())
         direct = await create_session(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='s2', kind='direct', experts=[SessionExpert(expert_id=terra.id)])
         bound = await resolve_binding(db, WORKSPACE, direct.id)
         run = await admit(bound, resolve_role_policy(run_role_overrides=bound.role_bindings))
@@ -86,12 +87,12 @@ async def main() -> None:
         check('an Expert binding reaches the run policy', 'executor deepseek, others default', (snapshot['bindings']['executor'], snapshot['bindings']['planner']), snapshot['bindings']['executor'] == 'openrouter_deepseek_flash' and snapshot['bindings']['planner'] == 'openrouter_terra')
         lease = await claim_next(db, worker_id='route', lease_seconds=120)
         model = Script(items=[say('x')], seen=[], bound=[])
-        result = await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE), drive=drive_lease)
+        result = await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE, tool_set=tool_registry.build_registry), drive=drive_lease)
         check('a worker route that differs from the Expert binding is refused', 'route_not_bound, no call', (result.code, len(model.seen)), result.code == 'route_not_bound' and not model.seen)
         run = await admit(bound, resolve_role_policy(run_role_overrides=bound.role_bindings))
         lease = await claim_next(db, worker_id='route', lease_seconds=120)
         model = Script(items=[say('x')], seen=[], bound=[])
-        result = await run_goal(db, URL, lease, model, LoopConfig(route=ModelRoute('executor', 'openrouter_deepseek_flash', 'fixture/terra', 1000)), drive=drive_lease)
+        result = await run_goal(db, URL, lease, model, LoopConfig(route=ModelRoute('executor', 'openrouter_deepseek_flash', 'fixture/terra', 1000), tool_set=tool_registry.build_registry), drive=drive_lease)
         check('the bound route runs', 'a model call', len(model.seen), len(model.seen) == 1)
         wire = await value('select wire_id from app_private.model_invocations where run_id = %s', run)
         check('and admission records that route, with nothing substituted', 'fixture/terra', wire, wire == 'fixture/terra')
@@ -102,9 +103,9 @@ async def main() -> None:
                 ('a session on another workspace', lambda: resolve_binding(db, OTHER, session.id), 'session_not_found'),
                 ('a version that does not exist', lambda: resolve_binding(db, WORKSPACE, session.id, version=99), 'expert_version_not_found'),
                 ('an unlisted Expert', lambda: resolve_binding(db, WORKSPACE, session.id, expert_id=terra.id), 'route_not_granted'),
-                ('a stale revision', lambda: add_version(db, workspace_id=WORKSPACE, actor_id=ACTOR, expert_id=expert.id, idempotency_key='x4', expected_version=1, config=ExpertConfig()), 'expert_version_conflict'),
-                ('another workspace saving a revision', lambda: add_version(db, workspace_id=OTHER, actor_id=ACTOR, expert_id=expert.id, idempotency_key='x5', expected_version=2, config=ExpertConfig()), 'expert_not_found'),
-                ('a shell tool', lambda: create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='x6', name='Shell', config=ExpertConfig(tools=['execute'])), 'expert_tool_not_available'),
+                ('a stale revision', lambda: add_version(db, workspace_id=WORKSPACE, actor_id=ACTOR, expert_id=expert.id, idempotency_key='x4', expected_version=1, config=ExpertConfig(), catalog=tool_registry.catalog()), 'expert_version_conflict'),
+                ('another workspace saving a revision', lambda: add_version(db, workspace_id=OTHER, actor_id=ACTOR, expert_id=expert.id, idempotency_key='x5', expected_version=2, config=ExpertConfig(), catalog=tool_registry.catalog()), 'expert_not_found'),
+                ('a shell tool', lambda: create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='x6', name='Shell', config=ExpertConfig(tools=['execute']), catalog=tool_registry.catalog()), 'expert_tool_not_available'),
                 ('another workspace\'s Expert in a session', lambda: create_session(db, workspace_id=OTHER, actor_id=ACTOR, idempotency_key='s3', kind='direct', experts=[SessionExpert(expert_id=expert.id)]), 'expert_not_found'),
                 ('a direct session with two Experts', lambda: create_session(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='s4', kind='direct', experts=[SessionExpert(expert_id=expert.id), SessionExpert(expert_id=terra.id)]), 'session_needs_one_expert')):
             try:

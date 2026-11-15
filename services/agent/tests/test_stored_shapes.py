@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from pydantic import ValidationError
 
+from autobots.adapters.tool_registry import catalog
 from autobots.application import routines as routines_module
 from autobots.application.experts import expert_record, expert_view_config
 from autobots.application.plans import goal_spec, plan_task, plan_task_record
@@ -255,7 +256,7 @@ def test_a_stored_daily_time_that_is_not_text_reads_and_never_runs(
     async def ready(_workspace_id: UUID) -> str:
         return "ready"
 
-    assert run(evaluate_routines(FakeConnection(database), ready)) == 0
+    assert run(evaluate_routines(FakeConnection(database), ready, catalog=catalog())) == 0
     assert database.changes() == []
     (error,) = failed
     assert isinstance(error, TriggerInvalid) and error.code == "daily_time_invalid"

@@ -9,10 +9,9 @@ absent `old_string`, or one found more than once without `replace_all`, writes n
 import json
 from collections.abc import Mapping
 
-from autobots.application import code_search
+from autobots.application import code_search, run_files
 from autobots.application.bounded import BoundExceeded, ChildFailed, run_module
-from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed
-from autobots.application.tools import write_run_file
+from autobots.application.tool_definitions import ToolContext, ToolDefinition, ToolFailed
 from autobots.contracts.code_tools import (
     CodeFileWritten,
     NumberedLine,
@@ -58,14 +57,10 @@ async def bounded_search(
 
 
 async def _latest_files(context: ToolContext) -> dict[str, str]:
-    cursor = await context.connection.execute(
-        "select distinct on (path) path, content from app_private.run_files "
-        "where run_id = %s order by path, version desc",
-        (context.scope.run_id,),
-    )
+    """The latest version of each file the scope's path grants cover."""
     return {
         path: content
-        for path, content in await cursor.fetchall()
+        for path, content in (await run_files.latest_contents(context)).items()
         if path_granted(path, context.scope.paths)
     }
 
@@ -77,25 +72,13 @@ async def _search(arguments: SearchFilesInput, context: ToolContext) -> SearchFi
     return await bounded_search(files, arguments)
 
 
-async def _latest(context: ToolContext, path: str) -> tuple[int, str]:
-    cursor = await context.connection.execute(
-        "select version, content from app_private.run_files where run_id = %s and path = %s "
-        "order by version desc limit 1",
-        (context.scope.run_id, path),
-    )
-    row = await cursor.fetchone()
-    if row is None:
-        raise ToolFailed("file_not_found")
-    return row[0], row[1]
-
-
 async def _read(arguments: ReadCodeFileInput, context: ToolContext) -> ReadCodeFileOutput:
-    version, content = await _latest(context, arguments.path)
-    lines = content.splitlines()
+    found = await run_files.latest(context, arguments.path)
+    lines = found.content.splitlines()
     end = arguments.offset + arguments.limit
     return ReadCodeFileOutput(
         path=arguments.path,
-        version=version,
+        version=found.version,
         lines=[
             NumberedLine(number=index + 1, text=code_search.cut(lines[index], LINE_CHARACTERS))
             for index in range(arguments.offset, min(end, len(lines)))
@@ -107,12 +90,14 @@ async def _read(arguments: ReadCodeFileInput, context: ToolContext) -> ReadCodeF
 
 
 async def _write(arguments: WriteCodeFileInput, context: ToolContext) -> CodeFileWritten:
-    version, digest = await write_run_file(context, arguments.path, arguments.content, "text/plain")
+    version, digest = await run_files.write(
+        context, arguments.path, arguments.content, "text/plain"
+    )
     return CodeFileWritten(path=arguments.path, version=version, sha256=digest)
 
 
 async def _patch(arguments: PatchCodeFileInput, context: ToolContext) -> CodeFileWritten:
-    _, content = await _latest(context, arguments.path)
+    content = (await run_files.latest(context, arguments.path)).content
     count = content.count(arguments.old_string)
     if count == 0:
         raise ToolFailed("old_string_not_found")
@@ -121,7 +106,7 @@ async def _patch(arguments: PatchCodeFileInput, context: ToolContext) -> CodeFil
     patched = content.replace(
         arguments.old_string, arguments.new_string, -1 if arguments.replace_all else 1
     )
-    version, digest = await write_run_file(context, arguments.path, patched, "text/plain")
+    version, digest = await run_files.write(context, arguments.path, patched, "text/plain")
     return CodeFileWritten(
         path=arguments.path,
         version=version,
@@ -133,15 +118,12 @@ async def _patch(arguments: PatchCodeFileInput, context: ToolContext) -> CodeFil
 async def _written(
     arguments: WriteCodeFileInput | PatchCodeFileInput, context: ToolContext
 ) -> CodeFileWritten | None:
-    """A crash after the write committed: the row under this operation ID says so."""
-    cursor = await context.connection.execute(
-        "select version, sha256 from app_private.run_files where operation_id = %s",
-        (context.operation_id,),
-    )
-    row = await cursor.fetchone()
-    if row is None:
+    """A crash after the write committed: the row under this operation ID says so. A patch's
+    replacement count isn't stored, so a reconciled patch reports none."""
+    found = await run_files.by_operation(context)
+    if found is None:
         return None
-    return CodeFileWritten(path=arguments.path, version=row[0], sha256=row[1])
+    return CodeFileWritten(path=arguments.path, version=found.version, sha256=found.sha256)
 
 
 SEARCH_FILES = ToolDefinition(

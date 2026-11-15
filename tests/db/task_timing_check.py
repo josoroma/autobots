@@ -17,14 +17,15 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
+from autobots.adapters.tool_registry import build_registry
 from autobots.application.experts import create_expert
-from autobots.application.plans import plan_tools
 from autobots.application.run_projection import read_workspace
 from autobots.application.run_usage import RootLimits
 from autobots.application.runs import CommandReceipt, admit_run, apply_command
-from autobots.application.tool_gateway import ToolGateway, ToolScope
+from autobots.application.tool_definitions import ToolRuntime, ToolScope
+from autobots.application.tool_gateway import ToolGateway
 from autobots.application.tool_uses import admit_metered
-from autobots.application.tools import default_registry
 from autobots.application.worker_leases import claim_run
 from autobots.contracts.experts import ExpertConfig
 from autobots.domain.models import resolve_role_policy
@@ -47,11 +48,8 @@ def check(name: str, expected: str, observed: object, passed: bool) -> None:
 
 
 async def main() -> None:
-    # The planning tools are registered as the goal loop registers them, beside the defaults.
-    registry = default_registry()
-    for tool in plan_tools(RootLimits()):
-        registry.register(tool)
-    gateway = ToolGateway(registry)
+    # Every tool, the planning tools among them, as a pass registers them (adapters/tool_registry.py).
+    gateway = ToolGateway(build_registry(ToolRuntime(RootLimits())))
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         async def one(sql: str, *values: object) -> Any:
             return await (await db.execute(sql, values)).fetchone()
@@ -62,7 +60,7 @@ async def main() -> None:
 
         actor = uuid4()
         expert = await create_expert(db, workspace_id=WORKSPACE, actor_id=actor, idempotency_key=str(uuid4()), name='Figures analyst',
-                                     config=ExpertConfig(tools=['calculate', 'save_artifact']))
+                                     config=ExpertConfig(tools=['calculate', 'save_artifact']), catalog=tool_registry.catalog())
         binding = SimpleNamespace(session_id=None, expert_id=expert.id, version=expert.latest_version, instructions='', tools=GRANTS)
         admitted = await admit_run(db, workspace_id=WORKSPACE, actor_id=actor, idempotency_key=str(uuid4()), goal_text='Summarize the quarter figures',
                                    limit_micro_usd=1_000_000, policy=resolve_role_policy(), binding=binding,

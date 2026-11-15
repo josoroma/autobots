@@ -8,6 +8,7 @@ from dataclasses import replace
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.api.main import provider_context_from_environment
 from autobots.application.artifacts import read_artifact
@@ -55,8 +56,8 @@ async def admit_lead(workspace: str) -> None:
     tools = ['calculate', 'save_artifact', 'publish_artifact']
     place, actor = UUID(workspace), uuid4()
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
-        lead = await create_expert(db, workspace_id=place, actor_id=actor, idempotency_key=str(uuid4()), name='Worker lead', config=ExpertConfig(tools=tools))
-        helper = await create_expert(db, workspace_id=place, actor_id=actor, idempotency_key=str(uuid4()), name='Worker helper', config=ExpertConfig(tools=tools, instructions='Help.'))
+        lead = await create_expert(db, workspace_id=place, actor_id=actor, idempotency_key=str(uuid4()), name='Worker lead', config=ExpertConfig(tools=tools), catalog=tool_registry.catalog())
+        helper = await create_expert(db, workspace_id=place, actor_id=actor, idempotency_key=str(uuid4()), name='Worker helper', config=ExpertConfig(tools=tools, instructions='Help.'), catalog=tool_registry.catalog())
         session = await create_session(db, workspace_id=place, actor_id=actor, idempotency_key=str(uuid4()), kind='coordinator', experts=[SessionExpert(expert_id=item.id) for item in (lead, helper)])
         binding = await resolve_binding(db, place, session.id, expert_id=lead.id)
         accepted = await admit_run(db, workspace_id=place, actor_id=actor, idempotency_key=str(uuid4()),

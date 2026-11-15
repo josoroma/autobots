@@ -66,7 +66,8 @@ from autobots.application.run_usage import (
     model_calls_used,
 )
 from autobots.application.runs import ancestors_running, current_status
-from autobots.application.tool_gateway import ToolScope, ownership_refusal
+from autobots.application.tool_definitions import ToolScope
+from autobots.application.tool_gateway import ownership_refusal
 from autobots.contracts.plans import GoalSpec
 from autobots.domain.models import ModelRoute
 from autobots.domain.runs import INTERRUPTING

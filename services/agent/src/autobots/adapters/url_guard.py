@@ -19,7 +19,7 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 import httpx
 
 from autobots.adapters.provider_http import http_client
-from autobots.application.tool_gateway import ToolFailed
+from autobots.application.tool_definitions import ToolFailed
 
 MAX_URL_LENGTH = 2048
 MAX_REDIRECTS = 3

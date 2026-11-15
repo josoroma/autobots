@@ -10,8 +10,8 @@ from typing import Any
 import httpx
 
 from autobots.adapters.url_guard import Resolver, guarded_fetch, system_resolver
-from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed
-from autobots.application.tools import stored_file, write_run_file
+from autobots.application import run_files
+from autobots.application.tool_definitions import ToolContext, ToolDefinition, ToolFailed
 from autobots.contracts.tools import StoreRemoteFileInput, StoreRemoteFileOutput
 from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import OperationClass
@@ -43,7 +43,7 @@ def store_remote_file_tool(
             text = fetched.body.decode("utf-8")
         except UnicodeDecodeError:
             raise ToolFailed("not_text") from None
-        version, digest = await write_run_file(context, arguments.path, text, media_type)
+        version, digest = await run_files.write(context, arguments.path, text, media_type)
         return StoreRemoteFileOutput(
             path=arguments.path,
             version=version,
@@ -55,7 +55,7 @@ def store_remote_file_tool(
     async def stored_already(
         arguments: StoreRemoteFileInput, context: ToolContext
     ) -> StoreRemoteFileOutput | None:
-        stored = await stored_file(context)
+        stored = await run_files.by_operation(context)
         if stored is None:
             return None
         # Validated, so the stored media type meets the output's field as the one `store` saved did.

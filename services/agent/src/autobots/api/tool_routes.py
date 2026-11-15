@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Request
 from autobots.api.errors import ApiError
 from autobots.api.security import require_internal
 from autobots.api.settings_routes import current_workspace, process_environment
-from autobots.application.tool_catalog import all_descriptors, tool_catalog
+from autobots.application.tool_catalog import Catalog
 from autobots.application.tool_grants import tool_grants
 from autobots.application.tool_keys import key_sources
 from autobots.contracts.tools import (
@@ -25,6 +25,13 @@ from autobots.contracts.tools import (
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 Member = Annotated[UUID, Depends(current_workspace)]
+
+
+def catalog_of(request: Request) -> Catalog:
+    """The catalog the app was built with, over the registry the worker runs (TC-01). The routes
+    that read or admit tools take it from here, never build one (XMOD-01)."""
+    catalog: Catalog = request.app.state.tools
+    return catalog
 
 
 async def _keys(request: Request, workspace: UUID) -> Mapping[str, str]:
@@ -46,12 +53,14 @@ async def list_tools(
     provider: ToolProviderName | None = None,
 ) -> ToolCatalog:
     keys = await _keys(request, workspace)
-    return tool_catalog(keys, group=group, availability=availability, provider=provider)
+    return catalog_of(request).catalog(
+        keys, group=group, availability=availability, provider=provider
+    )
 
 
 async def _versions(request: Request, workspace: UUID, tool_id: str) -> list[ToolDescriptor]:
     keys = await _keys(request, workspace)
-    found = [item for item in all_descriptors(keys) if item.tool_id == tool_id]
+    found = [item for item in catalog_of(request).descriptors(keys) if item.tool_id == tool_id]
     if not found:
         raise ApiError(404, "tool_not_found", "That tool isn't in the catalog.")
     return found

@@ -18,7 +18,8 @@ from autobots.adapters.checkpoints import (
     is_stale_owner,
 )
 from autobots.application.runs import LeaseLost, admit_run, apply_command, apply_worker_command
-from autobots.application.tool_gateway import ToolScope, ownership_refusal
+from autobots.application.tool_definitions import ToolScope
+from autobots.application.tool_gateway import ownership_refusal
 from autobots.application.worker_leases import claim_next, heartbeat
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import RunCommand

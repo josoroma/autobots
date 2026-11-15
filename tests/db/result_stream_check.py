@@ -17,6 +17,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.adapters.result_stream import CHANNEL
 from autobots.api.event_routes import live_frame
@@ -51,7 +52,7 @@ def check(name: str, expected: str, observed: object, passed: bool) -> None:
 
 async def main() -> None:
     store = SupabaseObjectStore(BASE, SERVICE)
-    config = LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0))
+    config = LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0), tool_set=tool_registry.build_registry)
     notes: list[dict[str, Any]] = []
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db, \
             await psycopg.AsyncConnection.connect(URL, autocommit=True) as listener:

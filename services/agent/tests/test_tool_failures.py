@@ -20,17 +20,17 @@ from pydantic import BaseModel
 from autobots.adapters import github_connector, github_issues, github_pulls
 from autobots.adapters.provider_http import UnclearReply
 from autobots.application.bounded import stop_task
-from autobots.application.tool_gateway import (
+from autobots.application.tool_definitions import (
     ApprovalPolicy,
     OutcomeUnknown,
     ToolContext,
     ToolDefinition,
     ToolFailed,
-    ToolGateway,
     ToolRegistry,
     ToolResult,
     ToolScope,
 )
+from autobots.application.tool_gateway import ToolGateway
 from autobots.domain.tools import OperationClass, ToolOutcome
 from autobots.operations.logs import JsonFormatter
 

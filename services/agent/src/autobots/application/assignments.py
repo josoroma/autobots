@@ -19,12 +19,13 @@ from autobots.application.runs import (
     cascade_command,
     current_status,
 )
-from autobots.application.tool_gateway import (
+from autobots.application.tool_definitions import (
+    RuntimeUnbound,
     ToolContext,
     ToolDefinition,
     ToolFailed,
-    hold_lease,
 )
+from autobots.application.tool_gateway import hold_lease
 from autobots.application.worker_leases import Lease, claim_run
 from autobots.contracts.assignments import AssignmentResult, AssignSpecialist
 from autobots.domain.runs import RunCommand, RunStatus
@@ -186,8 +187,13 @@ async def _claim_child(connection: Any, child: UUID, delegation: Delegation) -> 
     raise ToolFailed(GatewayCode.ASSIGNMENT_BUSY)
 
 
-def assign_tool(delegation: Delegation) -> ToolDefinition:  # noqa: C901 - baseline 2026-11-14, shrink only (STD-06)
+def assign_tool(delegation: Delegation | None) -> ToolDefinition:  # noqa: C901 - baseline 2026-11-14, shrink only (STD-06)
+    """With no delegation, as the catalog describes it, a call refuses before any assignment or
+    child exists (XMOD-01)."""
+
     async def run(arguments: AssignSpecialist, context: ToolContext) -> AssignmentResult:
+        if delegation is None:
+            raise RuntimeUnbound
         connection = context.connection
         cursor = await connection.execute(
             "select id, child_run_id, status, result from app_private.assignments "
@@ -314,6 +320,6 @@ def assign_tool(delegation: Delegation) -> ToolDefinition:  # noqa: C901 - basel
         output_model=AssignmentResult,
         operation_class=OperationClass.REVERSIBLE_INTERNAL_WRITE,
         handler=run,
-        timeout_seconds=delegation.limits.active_seconds,
+        timeout_seconds=(delegation.limits if delegation else RootLimits()).active_seconds,
         safe_to_repeat=True,
     )

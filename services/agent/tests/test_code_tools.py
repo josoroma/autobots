@@ -3,7 +3,7 @@
 import pytest
 
 from autobots.application.code_tools import CODE_TOOLS, search
-from autobots.application.tool_gateway import ToolFailed
+from autobots.application.tool_definitions import ToolFailed
 from autobots.contracts.code_tools import SearchFilesInput
 
 FILES = {

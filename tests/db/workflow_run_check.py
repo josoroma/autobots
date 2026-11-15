@@ -11,6 +11,7 @@ from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.adapters import tool_registry
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application import workflow_runner
 from autobots.application.approvals import decide
@@ -78,7 +79,7 @@ GATED = {
 
 async def main() -> None:
     store = SupabaseObjectStore(BASE, SERVICE)
-    config = LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0))
+    config = LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0), tool_set=tool_registry.build_registry)
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         async def value(sql: str, *values: object) -> Any:
             return (await (await db.execute(sql, values)).fetchone())[0]
@@ -164,7 +165,8 @@ async def main() -> None:
         check('a stale worker commits nothing', 'lost, 0 instances', (result.outcome, rows), result.outcome == 'lost' and rows == 0)
 
         # commit_instance's own fence, with a scope whose generation has moved on.
-        from autobots.application.tool_gateway import LeaseLost, ToolScope
+        from autobots.application.tool_definitions import ToolScope
+        from autobots.application.tool_gateway import LeaseLost
         from autobots.application.workflow_runner import commit_instance
         from autobots.domain.workflow_execution import Step
         stale_scope = ToolScope(WORKSPACE, execution.run_id, lease.generation, {})
@@ -197,7 +199,7 @@ async def main() -> None:
         check('a rejection fails the step, and blocks what follows', 'ok failed, out blocked, run failed', (found.get('ok'), found.get('out'), await run_state(execution)), found.get('ok') == 'failed' and found.get('out') == 'blocked' and await run_state(execution) == 'failed')
 
         # An agent step is a bounded assignment.
-        helper = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='wf-e', name='Workflow helper', config=ExpertConfig(tools=['calculate']))
+        helper = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='wf-e', name='Workflow helper', config=ExpertConfig(tools=['calculate']), catalog=tool_registry.catalog())
         agent_graph = {
             'nodes': [node('in', 'input', type='string'), node('ask', 'agent', expert_id=str(helper.id)), node('out', 'output')],
             'links': [link('in', 'value', 'ask', 'goal'), link('ask', 'result', 'out', 'value')],

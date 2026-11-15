@@ -19,14 +19,14 @@ from langgraph.prebuilt.tool_node import ToolCallRequest, ToolRuntime
 from pydantic import BaseModel
 
 from autobots.adapters.tool_middleware import GatewayMiddleware, gateway_code, visible_tools
-from autobots.application.tool_gateway import (
+from autobots.application.tool_definitions import (
     ToolContext,
     ToolDefinition,
-    ToolGateway,
     ToolRegistry,
     ToolResult,
     ToolScope,
 )
+from autobots.application.tool_gateway import ToolGateway
 from autobots.domain.tools import OperationClass, ToolOutcome
 
 SCOPE = ToolScope(uuid4(), uuid4(), 1, {"granted": 1})
