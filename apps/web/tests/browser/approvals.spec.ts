@@ -254,6 +254,9 @@ test("a long request is shown whole, and one too long can't be approved", async 
       "aria-pressed",
       "true",
     );
+    // A tab shows its loading line until its own list renders, never the other tab's items (WTAP-04),
+    // so the items are counted only once it's gone.
+    await expect(page.locator('[data-state="loading"]')).toHaveCount(0);
     const items = page.locator("[data-approval-item]");
     for (let index = 0; index < (await items.count()); index += 1) {
       const id = await items.nth(index).getAttribute("data-approval-item");
