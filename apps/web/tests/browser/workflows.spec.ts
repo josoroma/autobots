@@ -164,7 +164,7 @@ test("a workflow's optional description and step labels, edited in the editor an
   expect(draft.nodes[1].label).toBe("Shout it");
   await page.getByRole("button", { name: "Validate" }).click();
   await expect(page.locator('[data-validation="valid"]')).toBeVisible();
-  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await page.getByRole("button", { name: "Publish what is shown" }).click();
   await expect(page.locator('[data-message="editor"]')).toContainText(
     "Published as version 1",
   );
@@ -175,11 +175,11 @@ test("a workflow's optional description and step labels, edited in the editor an
     "Shout it",
     null,
   ]);
-  // Clearing the only label returns the draft to IR version 1.
+  // Clearing the only label keeps IR version 2, as the domain's label rule does (Decision 0029 F1).
   await page.getByLabel("up (transform)").fill("");
-  expect(
-    JSON.parse(await page.getByLabel("Graph").inputValue()).ir_version,
-  ).toBeUndefined();
+  const cleared = JSON.parse(await page.getByLabel("Graph").inputValue());
+  expect(cleared.ir_version).toBe(2);
+  expect(cleared.nodes[1].label).toBeUndefined();
 
   // An unlabelled graph still validates and publishes at IR version 1, with the hash it always had.
   const checked = await validate(page, `validate-${stamp}`, GRAPH);
@@ -280,7 +280,7 @@ test("one saved draft: the owner saves it, publishes it under the expected versi
 
   // Publishing from the editor names version 3 and creates immutable version 4.
   await page.reload();
-  await page.getByRole("button", { name: "Publish draft" }).click();
+  await page.getByRole("button", { name: "Publish saved draft" }).click();
   await expect(page.locator('[data-message="editor"]')).toHaveText(
     "Published the draft as version 4. Earlier versions don't change.",
   );
@@ -339,4 +339,85 @@ test("one saved draft: the owner saves it, publishes it under the expected versi
   ).toEqual(hashes);
   expect(current.versions[3]?.graph_hash).toBe(fourth);
   await expect(page.locator('[data-field="draft-badge"]')).toHaveCount(0);
+});
+
+// R-43, WBLD-05: the editor tells its text from the saved draft, and each publish action says which
+// one it publishes.
+test("unsaved changes are named, and Publish saved draft waits until they're saved", async ({
+  page,
+}) => {
+  await signIn(page, users.owner);
+  await page.goto("/workflows");
+  const stamp = Date.now();
+  const flow = await createWorkflow(page, `unsaved-${stamp}`, {
+    name: `Unsaved ${stamp}`,
+  });
+  await publish(page, flow.id, {
+    key: `unsaved-${stamp}`,
+    expectedVersion: 0,
+    graph: GRAPH,
+  });
+  await page.goto(`/workflows/${flow.id}`);
+  const text = page.getByLabel("Graph");
+  const unsaved = page.locator('[data-field="unsaved-badge"]');
+  const draftBadge = page.locator('[data-field="draft-badge"]');
+  const publishSaved = page.getByRole("button", {
+    name: "Publish saved draft",
+  });
+  const message = page.locator('[data-message="editor"]');
+
+  // The published version opens as it is, with no saved draft to publish.
+  await expect(text).not.toHaveValue("");
+  expect(JSON.parse(await text.inputValue()).nodes).toHaveLength(3);
+  await expect(unsaved).toHaveCount(0);
+  await expect(draftBadge).toHaveCount(0);
+  await expect(publishSaved).toBeDisabled();
+  const published = await text.inputValue();
+
+  // An edit is named until it's saved as the draft.
+  await text.fill(
+    JSON.stringify({
+      ...GRAPH,
+      nodes: GRAPH.nodes.map((item) =>
+        item.id === "up" ? { ...item, config: { operation: "lower" } } : item,
+      ),
+    }),
+  );
+  await expect(unsaved).toHaveText("Unsaved changes");
+  await page.getByRole("button", { name: "Save draft" }).click();
+  await expect(message).toHaveText(
+    "Draft saved. Runs keep using the published versions.",
+  );
+  await expect(unsaved).toHaveCount(0);
+  await expect(draftBadge).toBeVisible();
+  await expect(publishSaved).toBeEnabled();
+  const saved = await text.inputValue();
+  expect(JSON.parse(saved).nodes[1].config.operation).toBe("lower");
+
+  // Text that differs from the saved draft can't publish it, and returning to it clears the mark.
+  await text.fill(published);
+  await expect(unsaved).toBeVisible();
+  await expect(draftBadge).toBeVisible();
+  await expect(publishSaved).toBeDisabled();
+  await text.fill(saved);
+  await expect(unsaved).toHaveCount(0);
+  await expect(publishSaved).toBeEnabled();
+
+  // Text that isn't JSON is checked once, before either publish action sends anything.
+  let sent = 0;
+  await page.route(`**/api/v1/workflows/${flow.id}/versions`, (route) => {
+    sent += 1;
+    return route.continue();
+  });
+  await text.fill("{ not json");
+  await page.getByRole("button", { name: "Publish what is shown" }).click();
+  await expect(message).toHaveText("That isn't valid JSON.");
+  await expect(publishSaved).toBeDisabled();
+  expect(sent).toBe(0);
+  await page.unroute(`**/api/v1/workflows/${flow.id}/versions`);
+  const current = await readWorkflow(page, flow.id);
+  expect(current.latest_version).toBe(1);
+  expect(current.draft?.graph.nodes?.[1]?.config).toEqual({
+    operation: "lower",
+  });
 });

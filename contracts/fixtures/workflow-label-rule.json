@@ -1,0 +1,203 @@
+[
+  {
+    "name": "an unlabelled graph stays at IR version 1, unchanged",
+    "graph": {
+      "nodes": [
+        {
+          "id": "in",
+          "block": "input",
+          "version": 1,
+          "config": { "type": "string" }
+        },
+        { "id": "out", "block": "output", "version": 1 }
+      ],
+      "links": [
+        {
+          "source": "in",
+          "source_port": "value",
+          "target": "out",
+          "target_port": "value"
+        }
+      ]
+    },
+    "normalized": {
+      "nodes": [
+        {
+          "id": "in",
+          "block": "input",
+          "version": 1,
+          "config": { "type": "string" }
+        },
+        { "id": "out", "block": "output", "version": 1 }
+      ],
+      "links": [
+        {
+          "source": "in",
+          "source_port": "value",
+          "target": "out",
+          "target_port": "value"
+        }
+      ]
+    }
+  },
+  {
+    "name": "the API's null labels and null IR version are left out, so an unlabelled graph keeps version 1",
+    "graph": {
+      "nodes": [
+        {
+          "id": "in",
+          "block": "input",
+          "version": 1,
+          "config": { "type": "string" },
+          "label": null
+        },
+        {
+          "id": "out",
+          "block": "output",
+          "version": 1,
+          "config": {},
+          "label": null
+        }
+      ],
+      "links": [
+        {
+          "source": "in",
+          "source_port": "value",
+          "target": "out",
+          "target_port": "value"
+        }
+      ],
+      "ir_version": null
+    },
+    "normalized": {
+      "nodes": [
+        {
+          "id": "in",
+          "block": "input",
+          "version": 1,
+          "config": { "type": "string" }
+        },
+        { "id": "out", "block": "output", "version": 1, "config": {} }
+      ],
+      "links": [
+        {
+          "source": "in",
+          "source_port": "value",
+          "target": "out",
+          "target_port": "value"
+        }
+      ]
+    }
+  },
+  {
+    "name": "a label on a graph with no IR version stores it at version 2",
+    "graph": {
+      "nodes": [
+        { "id": "in", "block": "input", "version": 1 },
+        {
+          "id": "up",
+          "block": "transform",
+          "version": 1,
+          "config": { "operation": "upper" },
+          "label": "Shout it"
+        },
+        { "id": "out", "block": "output", "version": 1 }
+      ],
+      "links": []
+    },
+    "normalized": {
+      "nodes": [
+        { "id": "in", "block": "input", "version": 1 },
+        {
+          "id": "up",
+          "block": "transform",
+          "version": 1,
+          "config": { "operation": "upper" },
+          "label": "Shout it"
+        },
+        { "id": "out", "block": "output", "version": 1 }
+      ],
+      "links": [],
+      "ir_version": 2
+    }
+  },
+  {
+    "name": "a label beside the API's nulls stores the graph at version 2, without the nulls",
+    "graph": {
+      "nodes": [
+        { "id": "in", "block": "input", "version": 1, "label": "Start" },
+        { "id": "out", "block": "output", "version": 1, "label": null }
+      ],
+      "links": [],
+      "ir_version": null
+    },
+    "normalized": {
+      "nodes": [
+        { "id": "in", "block": "input", "version": 1, "label": "Start" },
+        { "id": "out", "block": "output", "version": 1 }
+      ],
+      "links": [],
+      "ir_version": 2
+    }
+  },
+  {
+    "name": "a stored labelled graph is unchanged",
+    "graph": {
+      "nodes": [
+        { "id": "in", "block": "input", "version": 1, "label": "Start" },
+        { "id": "out", "block": "output", "version": 1 }
+      ],
+      "links": [],
+      "ir_version": 2
+    },
+    "normalized": {
+      "nodes": [
+        { "id": "in", "block": "input", "version": 1, "label": "Start" },
+        { "id": "out", "block": "output", "version": 1 }
+      ],
+      "links": [],
+      "ir_version": 2
+    }
+  },
+  {
+    "name": "a graph declared at version 2 stays there when no label is left",
+    "graph": {
+      "nodes": [
+        { "id": "in", "block": "input", "version": 1, "label": null },
+        { "id": "out", "block": "output", "version": 1 }
+      ],
+      "links": [],
+      "ir_version": 2
+    },
+    "normalized": {
+      "nodes": [
+        { "id": "in", "block": "input", "version": 1 },
+        { "id": "out", "block": "output", "version": 1 }
+      ],
+      "links": [],
+      "ir_version": 2
+    }
+  },
+  {
+    "name": "a graph declared at version 1 keeps it beside a label, for validation to refuse",
+    "graph": {
+      "nodes": [
+        { "id": "in", "block": "input", "version": 1, "label": "Start" }
+      ],
+      "links": [],
+      "ir_version": 1
+    },
+    "normalized": {
+      "nodes": [
+        { "id": "in", "block": "input", "version": 1, "label": "Start" }
+      ],
+      "links": [],
+      "ir_version": 1
+    }
+  },
+  {
+    "name": "a graph without nodes gains an empty list",
+    "graph": { "links": [] },
+    "normalized": { "links": [], "nodes": [] }
+  }
+]

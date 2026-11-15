@@ -34,15 +34,19 @@ BASELINE = frozenset({
     'components/sign-out-button.tsx',
     'components/unknown-effects.tsx',
     'components/waiting-notifier.tsx',
-    'components/workflow-editor.tsx',
+    'components/workflow-editor/use-description.ts',
+    'components/workflow-editor/use-graph-draft.ts',
+    'components/workflow-editor/use-version-run.ts',
     'components/workflows-panel.tsx',
     'components/workspace-chooser.tsx',
 })
 
 
 def callers(web: Path) -> set[str]:
-    return {path.relative_to(web).as_posix() for path in (web / 'components').rglob('*.tsx')
-            if RAW.search(path.read_text())}
+    """Every component file that calls fetch, the hooks beside a screen included (`*.ts`), so a
+    call moved out of the JSX into a hook still counts."""
+    return {path.relative_to(web).as_posix() for pattern in ('*.tsx', '*.ts')
+            for path in (web / 'components').rglob(pattern) if RAW.search(path.read_text())}
 
 
 class RawFetch(unittest.TestCase):

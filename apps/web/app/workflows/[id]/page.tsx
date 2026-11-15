@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { PageHeader } from "@/components/ui/page-header";
-import { WorkflowEditor } from "@/components/workflow-editor";
+import { WorkflowEditor } from "@/components/workflow-editor/workflow-editor";
 
 export const metadata: Metadata = { title: "Workflow" };
 

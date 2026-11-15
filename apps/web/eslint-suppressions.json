@@ -127,20 +127,6 @@
       "count": 2
     }
   },
-  "components/workflow-editor.tsx": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 2
-    },
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "components/workflows-panel.tsx": {
     "@typescript-eslint/consistent-type-assertions": {
       "count": 1
@@ -174,17 +160,6 @@
   },
   "tests/browser/run-workspace.spec.ts": {
     "max-lines": {
-      "count": 1
-    }
-  },
-  "tests/browser/slice-visual.spec.ts": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
       "count": 1
     }
   }

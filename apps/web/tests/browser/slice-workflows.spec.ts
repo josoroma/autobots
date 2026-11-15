@@ -1,7 +1,11 @@
-import { parseExecutionView, parseWorkflowList } from "@autobots/api-client";
+import {
+  parseExecutionView,
+  parseWorkflowList,
+  parseWorkflowView,
+} from "@autobots/api-client";
 
 import { expectNoA11yViolations } from "./support/a11y.ts";
-import { getJson } from "./support/api.ts";
+import { getJson, send } from "./support/api.ts";
 import { signIn, users } from "./support/auth.ts";
 import { link, node } from "./support/builders.ts";
 import { expect, test } from "./support/fixtures.ts";
@@ -49,7 +53,7 @@ test("a graph is validated, published, run and monitored, and the monitor only r
   await expect(
     page.locator('[data-error="foreach_bound_required"]'),
   ).toContainText("at each");
-  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await page.getByRole("button", { name: "Publish what is shown" }).click();
   await expect(page.locator('[data-message="editor"]')).toContainText(
     "foreach_bound_required",
   );
@@ -61,7 +65,7 @@ test("a graph is validated, published, run and monitored, and the monitor only r
   await page.getByRole("button", { name: "Validate" }).click();
   await expect(page.locator('[data-validation="valid"]')).toBeVisible();
   await expectNoA11yViolations(page);
-  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await page.getByRole("button", { name: "Publish what is shown" }).click();
   await expect(page.locator('[data-message="editor"]')).toContainText(
     "Published as version 1",
   );
@@ -195,7 +199,7 @@ test("a failed branch is shown as failed, with what it blocked", async ({
     ],
   };
   await page.getByLabel("Graph").fill(JSON.stringify(graph));
-  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await page.getByRole("button", { name: "Publish what is shown" }).click();
   await expect(page.locator('[data-message="editor"]')).toContainText(
     "Published",
   );
@@ -247,4 +251,75 @@ test("another workspace can't see a workflow or an execution", async ({
   await expect(state).toHaveAttribute("data-reason", "denied");
   await expect(state).toHaveText("Members only, arranged.");
   await expect(state.getByRole("button", { name: "Retry" })).toHaveCount(0);
+});
+
+// R-43, WBLD-04: each secondary read has its own unavailable state, arranged with page.route, and
+// the editor stays usable beside it.
+test("the block catalog and today's budget choices say when they can't be read, and Retry reads them again", async ({
+  page,
+}) => {
+  await signIn(page, users.owner);
+  await page.goto("/workflows");
+  const stamp = Date.now();
+  const flow = await send(page, {
+    path: "/api/v1/workflows",
+    key: `reads-${stamp}`,
+    data: { name: `Reads ${stamp}` },
+    status: 201,
+    parse: parseWorkflowView,
+  });
+  await send(page, {
+    path: `/api/v1/workflows/${flow.id}/versions`,
+    key: `reads-published-${stamp}`,
+    data: { expected_version: 0, graph: LOOP },
+    status: 201,
+    parse: parseWorkflowView,
+  });
+  let failing = true;
+  const reads = ["**/api/v1/workflow-blocks", "**/api/v1/run-preview"];
+  for (const read of reads) {
+    await page.route(read, (route) =>
+      failing
+        ? route.fulfill({
+            status: 503,
+            json: {
+              code: "service_unavailable",
+              message: "The local API is unavailable.",
+            },
+          })
+        : route.continue(),
+    );
+  }
+  await page.goto(`/workflows/${flow.id}`);
+  const blocks = page.getByRole("region", { name: "Blocks" });
+  const run = page.getByRole("region", { name: "Run a version" });
+  await expect(blocks.locator('[data-state="unavailable"]')).toHaveAttribute(
+    "data-reason",
+    "unavailable",
+  );
+  await expect(
+    blocks.locator('[data-state="unavailable"]').getByRole("alert"),
+  ).toHaveText(
+    "The block catalog can't be read right now. Check that the local services are running, then try again.",
+  );
+  await expect(
+    run.locator('[data-state="unavailable"]').getByRole("alert"),
+  ).toHaveText(
+    "Today's budget choices can't be read right now. Check that the local services are running, then try again.",
+  );
+  await expect(page.getByLabel("Budget")).toHaveCount(0);
+  await expect(page.locator("[data-block]")).toHaveCount(0);
+  await expect(page.getByLabel("Graph")).toBeEditable();
+  await expect(
+    page.getByRole("button", { name: "Run this version" }),
+  ).toBeEnabled();
+
+  failing = false;
+  await blocks.getByRole("button", { name: "Retry" }).click();
+  await expect(blocks.locator('[data-block="input"]')).toBeVisible();
+  await expect(run.locator('[data-state="unavailable"]')).toBeVisible();
+  await run.getByRole("button", { name: "Retry" }).click();
+  await expect(page.getByLabel("Budget").locator("option")).not.toHaveCount(0);
+  await expect(page.locator('[data-state="unavailable"]')).toHaveCount(0);
+  for (const read of reads) await page.unroute(read);
 });
