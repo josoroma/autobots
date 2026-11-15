@@ -28,7 +28,7 @@ from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.api.main import provider_context_from_environment
 from autobots.application.approvals import expire_due
 from autobots.application.bounded import stop_task
-from autobots.application.goal_loop import UNBOUND, LoopConfig, process_next
+from autobots.application.goal_loop import UNBOUND
 from autobots.application.provider_settings import CatalogFetcher, ProviderSettings
 from autobots.application.readiness import (
     LentConnection,
@@ -39,8 +39,10 @@ from autobots.application.readiness import (
 )
 from autobots.application.retention import apply_all
 from autobots.application.routines import evaluate_routines
+from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.worker_inference import CatalogCache, InferenceSource
 from autobots.application.worker_leases import is_held
+from autobots.operations.job_dispatch import process_next
 from autobots.operations.logs import Repeated, configure_logging, forbid_remote_tracing, log_event
 
 logger = logging.getLogger("autobots.worker")

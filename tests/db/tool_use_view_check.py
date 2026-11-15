@@ -12,7 +12,7 @@ from uuid import UUID, uuid4
 
 import psycopg
 from autobots.adapters.object_storage import SupabaseObjectStore
-from autobots.application.goal_loop import LoopConfig, process_next
+from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import admit_run
 from autobots.application.tool_gateway import ToolGateway, ToolScope
 from autobots.application.tool_uses import list_tool_uses
@@ -22,6 +22,7 @@ from autobots.application.workflows import create_execution, create_workflow, pu
 from autobots.contracts.plans import InputDocument
 from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.models import resolve_role_policy
+from autobots.operations.job_dispatch import process_next
 from goal_loop_script import ROUTE
 from pydantic import SecretStr
 

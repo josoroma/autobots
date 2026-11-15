@@ -464,12 +464,12 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
         return await store_summary(
             self._connection,
             self._scope.run_id,
-            cut,
-            text,
-            earlier,
-            previous,
-            route.role,
-            route.profile,
+            covers=cut,
+            summary=text,
+            earlier=earlier,
+            previous=previous,
+            role=route.role,
+            profile=route.profile,
         )
 
     async def _admitted_call(  # noqa: PLR0915 - baseline 2026-11-14, shrink only (STD-06)

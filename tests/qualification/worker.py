@@ -11,7 +11,7 @@ from pathlib import Path
 
 import httpx
 from autobots.adapters.github_issues import REPOSITORY_VARIABLE, TOKEN_VARIABLE, github_issue_tool
-from autobots.application import goal_loop
+from autobots.application import loop_tools
 from autobots.operations.worker import main
 
 SINK = Path(os.environ['AUTOBOTS_TEST_SINK'])
@@ -32,5 +32,5 @@ def handle(request: httpx.Request) -> httpx.Response:
     return httpx.Response(201, json=issue)
 
 
-goal_loop.GITHUB_ISSUE = github_issue_tool(httpx.MockTransport(handle), {REPOSITORY_VARIABLE: 'owner/fixture', TOKEN_VARIABLE: 'arranged-not-a-token'})
+loop_tools.GITHUB_ISSUE = github_issue_tool(httpx.MockTransport(handle), {REPOSITORY_VARIABLE: 'owner/fixture', TOKEN_VARIABLE: 'arranged-not-a-token'})
 asyncio.run(main())

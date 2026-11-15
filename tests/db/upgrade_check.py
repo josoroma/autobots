@@ -13,11 +13,12 @@ import psycopg
 from autobots.adapters.checkpoints import ADAPTER_STATEMENTS, adapter_identity, identity_of
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.adapters.object_storage import SupabaseObjectStore
-from autobots.application.goal_loop import LoopConfig, process_next
+from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import admit_run, apply_command
 from autobots.domain.execution import current_contract
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import Actor, RunCommand
+from autobots.operations.job_dispatch import process_next
 from goal_loop_script import DONE_A, SAVE, TASK_A, Script, calls, say
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg.rows import dict_row

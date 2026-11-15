@@ -21,7 +21,7 @@ from autobots.application import routines as routines_module
 from autobots.application.approvals import decide, list_approvals
 from autobots.application.assignments import Delegation, assign_tool
 from autobots.application.experts import create_expert, create_session, resolve_binding
-from autobots.application.goal_loop import scope_guidance
+from autobots.application.loop_prompts import scope_guidance
 from autobots.application.memory import SEARCH_MEMORY, MemoryRefused, search, store_memory
 from autobots.application.operations import database_conditions
 from autobots.application.plans import load_goal

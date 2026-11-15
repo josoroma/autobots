@@ -16,20 +16,18 @@ from autobots.application.compaction import (
     pairing_is_valid,
     state_block,
 )
-from autobots.application.goal_loop import (
-    LoopConfig,
-    loop_registry,
-    process_next,
-    run_goal,
-)
+from autobots.application.goal_loop import run_goal
+from autobots.application.loop_tools import loop_registry
 from autobots.application.memory import search, store_memory
 from autobots.application.plans import load_goal
+from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.run_usage import RootLimits
 from autobots.application.runs import admit_run
 from autobots.application.tool_gateway import ToolGateway, ToolScope
 from autobots.application.worker_leases import claim_next
 from autobots.contracts.plans import InputDocument
 from autobots.domain.models import resolve_role_policy
+from autobots.operations.job_dispatch import process_next
 from goal_loop_script import PLAN, ROUTE, Script, calls, say
 from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatResult

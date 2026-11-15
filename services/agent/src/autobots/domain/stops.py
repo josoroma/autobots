@@ -93,7 +93,7 @@ class StopCode(_Code):
     # Passes kept raising an exception no handler classifies until the bound, so the run is
     # suspended (run_lifecycle.record_failure, Decision 0028 E4).
     WORKER_FAILED = "worker_failed"
-    # The plan and verification's verdict (run_lifecycle.decide and goal_loop.py).
+    # The plan and verification's verdict (run_lifecycle.decide and settlement.py).
     PLAN_MISSING = "plan_missing"
     PLAN_INCOMPLETE = "plan_incomplete"
     CRITERIA_UNMET = "criteria_unmet"

@@ -16,13 +16,13 @@ from uuid import UUID, uuid4
 import psycopg
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.experts import create_expert, create_session
-from autobots.application.goal_loop import drive_lease
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import admit_run
 from autobots.application.worker_leases import claim_run
 from autobots.contracts.experts import ExpertConfig, SessionExpert
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.tools import LOOP_TOOL_GRANTS, PLAN_TOOLS
+from autobots.operations.job_dispatch import drive_lease
 from effect_tools import tools
 from goal_loop_script import ROUTE, Script, calls, say
 from mock_sink import Sink

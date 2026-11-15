@@ -11,7 +11,8 @@ from typing import Any
 
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.adapters.object_storage import SupabaseObjectStore
-from autobots.application.goal_loop import LoopConfig, process_next
+from autobots.application.run_lifecycle import LoopConfig
+from autobots.operations.job_dispatch import process_next
 from autobots.operations.logs import configure_logging, forbid_remote_tracing, log_event
 from autobots.operations.worker import WorkerConfig, install_signal_handlers, serve
 from goal_loop_script import DONE_A, ROUTE, SAVE, TASK_A, Script, calls, say

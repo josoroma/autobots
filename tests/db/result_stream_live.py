@@ -14,12 +14,12 @@ from uuid import UUID, uuid4
 
 import psycopg
 from autobots.adapters.object_storage import SupabaseObjectStore
-from autobots.application.goal_loop import drive_lease
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import admit_run
 from autobots.application.worker_leases import claim_run
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.tools import LOOP_TOOL_GRANTS
+from autobots.operations.job_dispatch import drive_lease
 from goal_loop_script import ROUTE, calls, say
 from pydantic import SecretStr
 from stream_script import StreamScript

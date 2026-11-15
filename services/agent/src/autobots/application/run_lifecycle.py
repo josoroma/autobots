@@ -2,9 +2,9 @@
 lease while it works, finishing the run through the canonical transitions, and recording a pass
 that raised (SP-010, SP-012, Decision 0028 E4).
 
-The goal loop and the workflow runner both build on it, and neither imports the other: the goal loop
-passes its own drive function to the workflow runner, which drives its agent steps' children with it
-(PPRD-02, R-33).
+The goal loop and the workflow runner both build on it, and neither imports the other: the worker's
+job dispatch passes its drive function to both, and the workflow runner drives its agent steps'
+children with it (PPRD-02, R-33, Decision 0029 F7).
 """
 
 import asyncio
@@ -90,8 +90,8 @@ class LoopResult:
     usage: dict[str, Any]
 
 
-# How a claimed lease is driven: (connection, database URL, lease, model factory, config). The goal
-# loop passes its own, so the workflow runner drives an agent step's child without importing it.
+# How a claimed lease is driven: (connection, database URL, lease, model factory, config). The job
+# dispatch passes its own, so the workflow runner drives an agent step's child without importing it.
 Drive = Callable[[Any, str, Lease, Callable[[], Any], LoopConfig], Awaitable[LoopResult]]
 
 

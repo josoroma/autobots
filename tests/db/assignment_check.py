@@ -13,7 +13,6 @@ import psycopg
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.experts import create_expert, create_session, resolve_binding
-from autobots.application.goal_loop import process_next
 from autobots.application.model_admission import ModelAdmission
 from autobots.application.plans import load_goal
 from autobots.application.run_lifecycle import LoopConfig, finish
@@ -25,6 +24,7 @@ from autobots.contracts.experts import ExpertConfig, SessionExpert
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import Actor, RunCommand
 from autobots.domain.tools import DELEGATION_TOOL
+from autobots.operations.job_dispatch import process_next
 from goal_loop_script import ROUTE, Script, calls, say
 from pydantic import SecretStr
 

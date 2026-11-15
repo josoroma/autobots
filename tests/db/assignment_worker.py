@@ -7,7 +7,8 @@ import signal
 import sys
 
 import psycopg
-from autobots.application.goal_loop import LoopConfig, process_next
+from autobots.application.run_lifecycle import LoopConfig
+from autobots.operations.job_dispatch import process_next
 from goal_loop_script import ROUTE, Script, calls
 
 URL, EXPERT = sys.argv[1], sys.argv[2]

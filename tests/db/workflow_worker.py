@@ -9,9 +9,10 @@ import sys
 import psycopg
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.adapters.object_storage import SupabaseObjectStore
-from autobots.application.goal_loop import LoopConfig, drive_lease
+from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.worker_leases import claim_next
 from autobots.application.workflow_runner import run_workflow
+from autobots.operations.job_dispatch import drive_lease
 from pydantic import SecretStr
 
 URL, BASE, DIE_AFTER = sys.argv[1], sys.argv[2], sys.argv[3]

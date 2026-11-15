@@ -198,6 +198,7 @@ async def latest_summary(connection: Any, run_id: UUID) -> StoredSummary | None:
 async def store_summary(
     connection: Any,
     run_id: UUID,
+    *,
     covers: int,
     summary: str,
     earlier: Sequence[Any],

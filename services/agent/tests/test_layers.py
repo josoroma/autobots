@@ -20,7 +20,7 @@ ALLOWED = {
 }
 BASELINE = {
     ("application", "adapters"): 21,
-    ("application", "operations"): 6,
+    ("application", "operations"): 5,
     ("adapters", "operations"): 2,
     ("api", "operations"): 2,
     ("operations", "api"): 1,

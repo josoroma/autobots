@@ -11,7 +11,6 @@ from uuid import UUID, uuid4
 import psycopg
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.experts import create_expert, create_session, resolve_binding
-from autobots.application.goal_loop import LoopConfig, process_next
 from autobots.application.improvements import (
     ImprovementRefused,
     decide,
@@ -22,10 +21,12 @@ from autobots.application.improvements import (
     run_regression,
 )
 from autobots.application.memory import search
+from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import admit_run
 from autobots.contracts.experts import ExpertConfig, SessionExpert
 from autobots.contracts.improvements import EvidenceRef, ImprovementProposal, RegressionCase
 from autobots.domain.models import resolve_role_policy
+from autobots.operations.job_dispatch import process_next
 from goal_loop_script import ROUTE, Script, calls, say
 from pydantic import SecretStr
 

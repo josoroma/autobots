@@ -83,7 +83,7 @@ Layers under `services/agent/src/autobots/`:
 - **`contracts/`:** the public Pydantic DTOs, which are the source of OpenAPI. Row helpers are in `persistence/rows.py`.
 - **`application/`:**
   - Admission: `runs.py` (typed `RunAdmission`), `run_admission.py` (the request's use case and the gate for model-backed work), `readiness.py` (one installation gate for people and routines).
-  - Goal loop: `goal_loop.py`, `run_lifecycle.py` (how a pass ends, the lease keeper and bounded worker failures), `loop_tools.py`, `plans.py`, `run_usage.py`, `verification.py`, `recovery.py`, `compaction.py`, `bounded.py` (a child interpreter a timeout can stop, and `stop_task`).
+  - Goal loop: `goal_loop.py` (the pass and its graph), `loop_prompts.py`, `settlement.py` (a candidate's verdict), `run_lifecycle.py` (how a pass ends, the lease keeper and bounded worker failures), `loop_tools.py`, `plans.py`, `run_usage.py`, `verification.py`, `recovery.py`, `compaction.py`, `bounded.py` (a child interpreter a timeout can stop, and `stop_task`). Job dispatch (`process_next`, `drive_lease`) is in `operations/job_dispatch.py` (Decision 0029 F7).
   - Model spend: `model_admission.py`, `model_attempts.py`, `worker_inference.py`, `profiles.py`.
   - Tools: `tool_gateway.py`, `tools.py`, `tool_catalog.py`, `tool_grants.py`, `tool_uses.py`, `code_tools.py`, `browsing_loop.py`, `browsing_tool.py`, `reconciliation.py`, `approvals.py`.
   - Product surfaces: `experts.py`, `assignments.py`, `workflows.py`, `workflow_overview.py`, `workflow_runner.py`, `routines.py`, `memory.py`, `improvements.py`, `artifacts.py`, `run_projection.py`, `search.py`.
@@ -120,7 +120,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
 
 **Ownership.** `worker_leases.py` claims jobs by database time with a rising generation. Triggers from `20261105000008_worker_ownership.sql` refuse checkpoint writes from any other generation. `WakeClock` and the lease keeper in `run_lifecycle.py` handle sleep and wake ([US-12.5](docs/engineering/evidence/US-12.5/summary.md)).
 
-**Live result text.** `goal_loop.py:350` creates a per-run `ResultTap` (`adapters/result_stream.py`).
+**Live result text.** `goal_loop.run_goal` creates a per-run `ResultTap` (`adapters/result_stream.py`).
 - It reads only the growing `content` of `save_artifact` calls whose path is under `outputs/`.
 - It coalesces it (0.15 s, 1,500-character pieces) and sends it with `NOTIFY` on `autobots_result_text`. A tap failure never stops the run.
 - The stream route opens its own `LISTEN` connection (`api/event_routes.py`, `_listener`) and forwards this run's notes as `event: live` frames carrying a `result.text.delta` `RunEvent`, with no `id:`, so they never move the replay cursor and are never stored.
@@ -136,7 +136,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
 - **API:** `uvicorn --factory autobots.api.main:create_configured_app`. It turns inherited tracing off first and logs JSON lines with no access lines (`operations/logs.py`).
 - **Worker:** `python -m autobots.operations.worker`.
   - It always runs `maintenance_step`: expiring approvals, evaluating routines, and `retention.apply_all` hourly.
-  - `AUTOBOTS_WORKER_INFERENCE=enabled` adds `inference_step` (`goal_loop.process_next`).
+  - `AUTOBOTS_WORKER_INFERENCE=enabled` adds `inference_step` (`operations/job_dispatch.process_next`).
   - It exits on a partial configuration: `AUTOBOTS_DATABASE_URL`, an absolute `AUTOBOTS_CONFIG_ROOT`, and the Supabase URL and service key (`operations/worker.py:284–323`).
 - **Web:** `next start` in `apps/web`, or `make start-web` ([local app runbook](docs/engineering/runbooks/local-app.md), `README-SETUP-RUN.md`).
 - **Owner bootstrap:** `python -m autobots.operations.bootstrap_owner`.
@@ -295,7 +295,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
   - One draft per workflow, which an owner can save, publish or discard. Executions and routines refuse `"draft"` with `draft_not_runnable`.
   - The list gives the Experts, step count, last execution and run count, with `/executions` and `/preview`.
   - Executions accept a D11 budget.
-- **Concept seed:** `operations/concept_seed.py` creates five Experts and six workflows through the application layer, as the owner. Since Decision 0023 E7, after the analyzed revision, Market watcher and Research analyst also get `publish_artifact`. Since E8, `goal_loop.SYSTEM_PROMPT`, the goal's opening and `PlanTask.criteria`'s description say a plan cites criterion IDs only.
+- **Concept seed:** `operations/concept_seed.py` creates five Experts and six workflows through the application layer, as the owner. Since Decision 0023 E7, after the analyzed revision, Market watcher and Research analyst also get `publish_artifact`. Since E8, `loop_prompts.SYSTEM_PROMPT`, the goal's opening and `PlanTask.criteria`'s description say a plan cites criterion IDs only.
   - It keeps anything already named.
   - It strips unavailable tools and says so in the Expert's purpose.
   - It saves the GitHub-dependent workflows (while GitHub is unavailable) and Interview synthesis as drafts.

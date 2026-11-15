@@ -12,9 +12,10 @@ from uuid import UUID, uuid4
 
 import psycopg
 from autobots.adapters.loop_middleware import ModelRoute
-from autobots.application.goal_loop import LoopConfig, process_next, run_goal
+from autobots.application.goal_loop import run_goal
 from autobots.application.model_admission import ModelAdmission
 from autobots.application.recovery import outstanding
+from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import (
     LeaseLost,
     LinkRefused,
@@ -27,6 +28,7 @@ from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import Actor, CommandRefused, RunCommand
 from autobots.domain.tools import OperationClass
+from autobots.operations.job_dispatch import drive_lease, process_next
 from goal_loop_script import DONE_A, PLAN, ROUTE, SAVE, Script, calls, say
 from pydantic import BaseModel
 
@@ -73,7 +75,7 @@ async def main() -> None:
             await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where run_id = %s", (run,))
 
         async def finish(lease: Any, items: list[Any]) -> Any:
-            return await run_goal(db, URL, lease, Script(items=items, seen=[], bound=[]), RESUME_ROUTE)
+            return await run_goal(db, URL, lease, Script(items=items, seen=[], bound=[]), RESUME_ROUTE, drive=drive_lease)
 
         # Cancel from every nonterminal state.
         run = await admit()
@@ -152,7 +154,7 @@ async def main() -> None:
                 return super()._generate(messages, stop, run_manager, **options)
 
         model = Cancels(items=[calls(PLAN), calls(SAVE), calls(DONE_A), say('x')], seen=[], bound=[])
-        result = await run_goal(db, URL, lease, model, RESUME_ROUTE)
+        result = await run_goal(db, URL, lease, model, RESUME_ROUTE, drive=drive_lease)
         files = await value('select count(*) from app_private.run_files where run_id = %s', run)
         check('a cancel during a model call stops the next dispatch', 'cancelled, 2 calls, no file', (result.run_status, len(model.seen), files), result.run_status == 'cancelled' and len(model.seen) == 2 and files == 0)
 
@@ -231,7 +233,7 @@ async def main() -> None:
         lease = await claim_next(db, worker_id='bound')
         other_route = LoopConfig(route=ModelRoute('executor', 'openrouter_deepseek_flash', 'fixture/other', 1000))
         model = Script(items=[calls(PLAN)], seen=[], bound=[])
-        result = await run_goal(db, URL, lease, model, other_route)
+        result = await run_goal(db, URL, lease, model, other_route, drive=drive_lease)
         check('a route that differs from the frozen policy is refused', 'route_not_bound, no call', (result.code, len(model.seen)), result.code == 'route_not_bound' and len(model.seen) == 0)
 
         # Terminal states take a linked new run.
@@ -301,7 +303,7 @@ async def main() -> None:
                 other.execute("update app_private.model_invocations set status = 'uncertain', failure_class = 'worker_lost' where run_id = %s and status = 'dispatched'", (run,))
             return say('late')
 
-        result = await run_goal(db, URL, lease, Script(items=[classified_while_out], seen=[], bound=[]), RESUME_ROUTE)
+        result = await run_goal(db, URL, lease, Script(items=[classified_while_out], seen=[], bound=[]), RESUME_ROUTE, drive=drive_lease)
         row = await (await db.execute('select status, charged_micro_usd from app_private.model_invocations where run_id = %s', (run,))).fetchone()
         check('a late response settles the charge as evidence', 'succeeded, 100', row, row == ('succeeded', 100) and result.outcome == 'lost')
 
@@ -313,7 +315,7 @@ async def main() -> None:
         await admission.mark_dispatched(ticket.invocation_id)
         await admission.mark_uncertain(ticket.invocation_id, 'partial_stream', 'par')
         model = Script(items=[calls(PLAN)], seen=[], bound=[])
-        result = await run_goal(db, URL, lease, model, RESUME_ROUTE)
+        result = await run_goal(db, URL, lease, model, RESUME_ROUTE, drive=drive_lease)
         check('an unreconciled call blocks another paid dispatch', 'paused, 0 model calls', (result.run_status, len(model.seen)), result.run_status == 'paused' and len(model.seen) == 0)
     print(json.dumps({'cases': cases}))
 

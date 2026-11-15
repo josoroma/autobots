@@ -20,7 +20,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from autobots.application import goal_loop, run_lifecycle, runs
+from autobots.application import run_lifecycle, runs
 from autobots.application.run_lifecycle import (
     FailureEnding,
     LoopConfig,
@@ -40,6 +40,7 @@ from autobots.application.worker_leases import (
 from autobots.domain.models import ModelRoute
 from autobots.domain.runs import Actor, CommandRefused, RunCommand, RunStatus
 from autobots.domain.stops import PassOutcome, StopCode
+from autobots.operations import job_dispatch
 from autobots.operations.logs import JsonFormatter
 
 MIGRATION = (
@@ -387,7 +388,7 @@ class Dispatch:
 def _dispatch(
     monkeypatch: pytest.MonkeyPatch,
     drive: Callable[[], Awaitable[LoopResult]],
-    bind: goal_loop.JobBinder | None = None,
+    bind: job_dispatch.JobBinder | None = None,
 ) -> tuple[Dispatch, Callable[[], LoopResult | None]]:
     """The replaced `process_next`, and a call that runs it once."""
     seen = Dispatch()
@@ -416,12 +417,12 @@ def _dispatch(
         "record_failure": seen.record,
         "reset_failures": seen.reset_failures,
     }.items():
-        monkeypatch.setattr(goal_loop, name, value)
+        monkeypatch.setattr(job_dispatch, name, value)
     config = LoopConfig(route=ModelRoute("executor", "openrouter_terra", "fixture/model", 1))
 
     def run() -> LoopResult | None:
         return asyncio.run(
-            goal_loop.process_next(object(), "unused", "w", object, config, bind=bind)
+            job_dispatch.process_next(Database(), "unused", "w", object, config, bind=bind)
         )
 
     return seen, run

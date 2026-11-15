@@ -203,7 +203,7 @@ These checks have a bounded meaning: evidence exists, publication is consistent,
 
 The canonical state machine permits `verifying → running` for bounded repair. **The current goal-run candidate handler directly succeeds or fails after verification; it does not automatically start that repair loop.** Workflow runs have a separate completion path based on settled node instances.
 
-Code: [`verify_candidate()`](services/agent/src/autobots/application/verification.py), [`settle_candidate()`](services/agent/src/autobots/application/goal_loop.py), [`plan_view()` and evidence checks](services/agent/src/autobots/application/plans.py), [`artifacts.py`](services/agent/src/autobots/application/artifacts.py).
+Code: [`verify_candidate()`](services/agent/src/autobots/application/verification.py), [`settle_candidate()`](services/agent/src/autobots/application/settlement.py), [`plan_view()` and evidence checks](services/agent/src/autobots/application/plans.py), [`artifacts.py`](services/agent/src/autobots/application/artifacts.py).
 
 ## 13. What happens on pause, cancellation, browser closure or worker restart?
 

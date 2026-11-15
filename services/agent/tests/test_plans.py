@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from autobots.application.goal_loop import _opening
+from autobots.application.loop_prompts import opening
 from autobots.application.plans import PlanRejected, reference_shape, validate_proposal
 from autobots.application.tool_gateway import ToolResult
 from autobots.contracts.plans import (
@@ -114,15 +114,15 @@ def test_the_opening_says_a_goal_is_delivered_by_publishing() -> None:
             "required_artifacts": [required],
         }
     )
-    opening = _opening(goal)
-    assert "publish_artifact" in opening
-    assert "named report.md" in opening
-    assert '"Trade-offs covered: 3"' in opening
-    assert "c1: Has a summary" in opening
+    text = opening(goal)
+    assert "publish_artifact" in text
+    assert "named report.md" in text
+    assert '"Trade-offs covered: 3"' in text
+    assert "c1: Has a summary" in text
 
 
 def test_the_opening_names_no_tool_the_run_cannot_call() -> None:
-    assert "publish" not in _opening(GOAL).lower()
+    assert "publish" not in opening(GOAL).lower()
 
 
 @pytest.mark.parametrize(
@@ -168,10 +168,10 @@ def test_the_opening_says_a_plan_cites_criteria_by_id() -> None:
     the plan was refused as out of scope twice. The model is told the IDs, and that steps aren't
     criteria."""
     goal = GOAL.model_copy(update={"allowed_tools": {"save_artifact": 1, "publish_artifact": 1}})
-    opening = _opening(goal)
-    assert "criterion IDs from this list (c1, c2)" in opening
-    assert "never their text, and no new criteria" in opening
-    assert "These are steps, not criteria." in opening
+    text = opening(goal)
+    assert "criterion IDs from this list (c1, c2)" in text
+    assert "never their text, and no new criteria" in text
+    assert "These are steps, not criteria." in text
 
 
 def test_the_plan_schema_describes_criteria_as_ids() -> None:

@@ -7,8 +7,10 @@ import sys
 import time
 
 import psycopg
-from autobots.application.goal_loop import LoopConfig, run_goal
+from autobots.application.goal_loop import run_goal
+from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.worker_leases import claim_next
+from autobots.operations.job_dispatch import drive_lease
 from goal_loop_script import PLAN, ROUTE, SAVE, Script, calls, say
 from langchain_core.messages import AIMessage
 
@@ -26,7 +28,7 @@ async def main() -> None:
         assert lease is not None
         model = Script(items=[calls(PLAN), wait, say('x')], seen=[], bound=[])
         config = LoopConfig(route=ROUTE, heartbeat_seconds=0.5, lease_seconds=2)
-        result = await run_goal(db, URL, lease, model, config)
+        result = await run_goal(db, URL, lease, model, config, drive=drive_lease)
     print(json.dumps({'outcome': result.outcome, 'code': result.code}))
 
 

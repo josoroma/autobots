@@ -17,11 +17,13 @@ from autobots.application.experts import (
     create_session,
     resolve_binding,
 )
-from autobots.application.goal_loop import LoopConfig, run_goal
+from autobots.application.goal_loop import run_goal
+from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import admit_run
 from autobots.application.worker_leases import claim_next
 from autobots.contracts.experts import ExpertConfig, SessionExpert
 from autobots.domain.models import ModelRole, resolve_role_policy
+from autobots.operations.job_dispatch import drive_lease
 from goal_loop_script import ROUTE, Script, calls, say
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
@@ -54,7 +56,7 @@ async def main() -> None:
         stored = await value('select spec from app_private.goal_specs where run_id = %s', running)
         check('work in flight keeps its frozen tools and instructions', 'save_artifact kept, rhyme', (sorted(stored['allowed_tools']), stored['instructions']), 'save_artifact' in stored['allowed_tools'] and stored['instructions'] == 'Always answer in rhyme.')
         model = Script(items=[calls(('save_artifact', {'path': 'outputs/a.md', 'content': 'kept'})), say('stop')], seen=[], bound=[])
-        await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE))
+        await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE), drive=drive_lease)
         files = await value('select count(*) from app_private.run_files where run_id = %s', running)
         check('so it can still use the tool the new revision removed', '1 file', files, files == 1)
         system = ' '.join(str(item.content) for item in model.seen[0] if item.type == 'system')
@@ -67,7 +69,7 @@ async def main() -> None:
         new_run = await admit(chosen)
         lease = await claim_next(db, worker_id='new', lease_seconds=120)
         model = Script(items=[calls(('save_artifact', {'path': 'outputs/a.md', 'content': 'no'})), say('stop')], seen=[], bound=[])
-        await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE))
+        await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE), drive=drive_lease)
         files = await value('select count(*) from app_private.run_files where run_id = %s', new_run)
         reply = json.loads([m for m in model.seen[-1] if m.type == 'tool'][-1].content)
         check('new work on the later revision loses the tool, at the gateway', 'tool_not_granted, no file', (reply['code'], files), reply['code'] == 'tool_not_granted' and files == 0)
@@ -84,12 +86,12 @@ async def main() -> None:
         check('an Expert binding reaches the run policy', 'executor deepseek, others default', (snapshot['bindings']['executor'], snapshot['bindings']['planner']), snapshot['bindings']['executor'] == 'openrouter_deepseek_flash' and snapshot['bindings']['planner'] == 'openrouter_terra')
         lease = await claim_next(db, worker_id='route', lease_seconds=120)
         model = Script(items=[say('x')], seen=[], bound=[])
-        result = await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE))
+        result = await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE), drive=drive_lease)
         check('a worker route that differs from the Expert binding is refused', 'route_not_bound, no call', (result.code, len(model.seen)), result.code == 'route_not_bound' and not model.seen)
         run = await admit(bound, resolve_role_policy(run_role_overrides=bound.role_bindings))
         lease = await claim_next(db, worker_id='route', lease_seconds=120)
         model = Script(items=[say('x')], seen=[], bound=[])
-        result = await run_goal(db, URL, lease, model, LoopConfig(route=ModelRoute('executor', 'openrouter_deepseek_flash', 'fixture/terra', 1000)))
+        result = await run_goal(db, URL, lease, model, LoopConfig(route=ModelRoute('executor', 'openrouter_deepseek_flash', 'fixture/terra', 1000)), drive=drive_lease)
         check('the bound route runs', 'a model call', len(model.seen), len(model.seen) == 1)
         wire = await value('select wire_id from app_private.model_invocations where run_id = %s', run)
         check('and admission records that route, with nothing substituted', 'fixture/terra', wire, wire == 'fixture/terra')

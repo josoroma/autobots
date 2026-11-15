@@ -15,7 +15,6 @@ from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application import workflow_runner
 from autobots.application.approvals import decide
 from autobots.application.experts import create_expert
-from autobots.application.goal_loop import drive_lease, process_next
 from autobots.application.plans import load_goal
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import apply_command
@@ -31,6 +30,7 @@ from autobots.contracts.plans import InputDocument
 from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.runs import Actor, RunCommand
 from autobots.domain.workflows import block_versions, graph_hash
+from autobots.operations.job_dispatch import drive_lease, process_next
 from goal_loop_script import ROUTE, Script, say
 from pydantic import SecretStr
 

@@ -12,7 +12,7 @@ from uuid import UUID, uuid4
 
 import psycopg
 from autobots.application.approvals import ApprovalRefused, decide, expire_due
-from autobots.application.goal_loop import LoopConfig, process_next
+from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import Inheritance, admit_run, apply_command
 from autobots.application.tool_gateway import (
     ApprovalPolicy,
@@ -26,6 +26,7 @@ from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import Actor, RunCommand
 from autobots.domain.tools import PLAN_TOOLS, OperationClass
+from autobots.operations.job_dispatch import process_next
 from goal_loop_script import ROUTE, Script, calls, say
 from pydantic import BaseModel, ConfigDict
 

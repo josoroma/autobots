@@ -432,7 +432,7 @@ def test_every_code_a_pass_stops_with_by_name_has_a_disposition() -> None:
             elif (name := _named(argument, "StopCode")) is not None:
                 assert StopCode[name] in DISPOSITION or StopCode[name] in SETTLEMENT, where
                 checked += 1
-    # Every caller in goal_loop.py, workflow_runner.py, run_lifecycle.py and loop_middleware.py
+    # Every caller in the goal loop, workflow_runner.py, run_lifecycle.py and loop_middleware.py
     # was reached.
     assert checked >= 24
 

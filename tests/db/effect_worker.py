@@ -5,7 +5,8 @@ import asyncio
 import sys
 
 import psycopg
-from autobots.application.goal_loop import LoopConfig, process_next
+from autobots.application.run_lifecycle import LoopConfig
+from autobots.operations.job_dispatch import process_next
 from effect_tools import tools
 from goal_loop_script import ROUTE, Script
 from mock_sink import Sink

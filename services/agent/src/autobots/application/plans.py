@@ -3,6 +3,7 @@
 import json
 import re
 from dataclasses import dataclass
+from functools import partial
 from typing import Any
 from uuid import UUID
 
@@ -166,92 +167,101 @@ async def evidence_exists(connection: Any, run_id: UUID, kind: str, reference: s
     return await cursor.fetchone() is not None
 
 
-def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
-    async def propose(arguments: PlanProposal, context: ToolContext) -> PlanCommitted:
-        run_id = context.scope.run_id
-        goal = await load_goal(context.connection, run_id)
-        plan = await latest_plan(context.connection, run_id)
-        done = await completed_tasks(context.connection, run_id)
-        try:
-            validate_proposal(goal, arguments, plan[1] if plan else None, done)
-        except PlanRejected as rejected:
-            raise ToolFailed(rejected.code, detail=rejected.detail) from None
-        version = plan[0] + 1 if plan else 1
-        try:
-            async with context.connection.transaction():
-                await hold_lease(context.connection, context.scope)
-                if plan is not None:
-                    await consume(
-                        context.connection,
-                        context.scope.budget_run_id,
-                        "plan_revisions",
-                        limits.plan_revisions,
-                    )
-                await context.connection.execute(
-                    "insert into app_private.plan_versions (run_id, version, tasks, "
-                    "revision_reason) values (%s, %s, %s, %s)",
-                    (
-                        run_id,
-                        version,
-                        json.dumps([task.model_dump() for task in arguments.tasks]),
-                        arguments.revision_reason,
-                    ),
-                )
-        except LimitReached:
-            raise ToolFailed(GatewayCode.PLAN_REVISIONS_LIMIT) from None
-        return PlanCommitted(version=version, tasks=[task.id for task in arguments.tasks])
-
-    async def proposed_already(
-        arguments: PlanProposal, context: ToolContext
-    ) -> PlanCommitted | None:
-        """A crash may have committed this exact plan. If not, the transaction left nothing."""
-        plan = await latest_plan(context.connection, context.scope.run_id)
-        if plan is None or plan[1] != arguments.tasks:
-            return None
-        return PlanCommitted(version=plan[0], tasks=[task.id for task in arguments.tasks])
-
-    async def complete(arguments: CompleteTask, context: ToolContext) -> TaskCompleted:
-        run_id = context.scope.run_id
-        plan = await latest_plan(context.connection, run_id)
-        if plan is None:
-            raise ToolFailed(GatewayCode.PLAN_MISSING)
-        tasks = {task.id: task for task in plan[1]}
-        task = tasks.get(arguments.task_id)
-        if task is None:
-            raise ToolFailed(GatewayCode.TASK_UNKNOWN)
-        done = await completed_tasks(context.connection, run_id)
-        if not set(task.depends_on) <= done:
-            raise ToolFailed(GatewayCode.TASK_DEPENDENCIES_OPEN)
-        for item in arguments.evidence:
-            if not await evidence_exists(context.connection, run_id, item.kind, item.reference):
-                detail = f"{item.kind}:{reference_shape(item.reference)}"
-                raise ToolFailed(GatewayCode.EVIDENCE_INVALID, detail=detail)
+async def propose_plan(
+    arguments: PlanProposal, context: ToolContext, *, limits: RootLimits
+) -> PlanCommitted:
+    """Commits the first plan, or a revision that spends one of the root's plan revisions, under
+    the lease in one transaction (SP-011)."""
+    run_id = context.scope.run_id
+    goal = await load_goal(context.connection, run_id)
+    plan = await latest_plan(context.connection, run_id)
+    done = await completed_tasks(context.connection, run_id)
+    try:
+        validate_proposal(goal, arguments, plan[1] if plan else None, done)
+    except PlanRejected as rejected:
+        raise ToolFailed(rejected.code, detail=rejected.detail) from None
+    version = plan[0] + 1 if plan else 1
+    try:
         async with context.connection.transaction():
             await hold_lease(context.connection, context.scope)
+            if plan is not None:
+                await consume(
+                    context.connection,
+                    context.scope.budget_run_id,
+                    "plan_revisions",
+                    limits.plan_revisions,
+                )
             await context.connection.execute(
-                "insert into app_private.plan_evidence (run_id, task_id, evidence, summary) "
-                "values (%s, %s, %s, %s) on conflict (run_id, task_id) do nothing",
+                "insert into app_private.plan_versions (run_id, version, tasks, "
+                "revision_reason) values (%s, %s, %s, %s)",
                 (
                     run_id,
-                    arguments.task_id,
-                    json.dumps([item.model_dump() for item in arguments.evidence]),
-                    arguments.summary,
+                    version,
+                    json.dumps([task.model_dump() for task in arguments.tasks]),
+                    arguments.revision_reason,
                 ),
             )
-            # RN-05: its finish, in database time. The first one stands, as a repeat changes
-            # nothing. A task finished with no use that served it starts and finishes together.
-            await context.connection.execute(
-                "insert into app_private.plan_task_times "
-                "(run_id, task_id, started_at, finished_at) values (%s, %s, now(), now()) "
-                "on conflict (run_id, task_id) do update "
-                "set finished_at = coalesce(plan_task_times.finished_at, excluded.finished_at)",
-                (run_id, arguments.task_id),
-            )
-        return TaskCompleted(
-            task_id=arguments.task_id,
-            remaining=sorted(set(tasks) - done - {arguments.task_id}),
-        )
+    except LimitReached:
+        raise ToolFailed(GatewayCode.PLAN_REVISIONS_LIMIT) from None
+    return PlanCommitted(version=version, tasks=[task.id for task in arguments.tasks])
 
+
+async def plan_proposed_already(
+    arguments: PlanProposal, context: ToolContext
+) -> PlanCommitted | None:
+    """A crash may have committed this exact plan. If not, the transaction left nothing."""
+    plan = await latest_plan(context.connection, context.scope.run_id)
+    if plan is None or plan[1] != arguments.tasks:
+        return None
+    return PlanCommitted(version=plan[0], tasks=[task.id for task in arguments.tasks])
+
+
+async def complete_task(arguments: CompleteTask, context: ToolContext) -> TaskCompleted:
+    """Records a task's evidence under the lease, once its dependencies are done and each cited
+    reference is on record (SP-011)."""
+    run_id = context.scope.run_id
+    plan = await latest_plan(context.connection, run_id)
+    if plan is None:
+        raise ToolFailed(GatewayCode.PLAN_MISSING)
+    tasks = {task.id: task for task in plan[1]}
+    task = tasks.get(arguments.task_id)
+    if task is None:
+        raise ToolFailed(GatewayCode.TASK_UNKNOWN)
+    done = await completed_tasks(context.connection, run_id)
+    if not set(task.depends_on) <= done:
+        raise ToolFailed(GatewayCode.TASK_DEPENDENCIES_OPEN)
+    for item in arguments.evidence:
+        if not await evidence_exists(context.connection, run_id, item.kind, item.reference):
+            detail = f"{item.kind}:{reference_shape(item.reference)}"
+            raise ToolFailed(GatewayCode.EVIDENCE_INVALID, detail=detail)
+    async with context.connection.transaction():
+        await hold_lease(context.connection, context.scope)
+        await context.connection.execute(
+            "insert into app_private.plan_evidence (run_id, task_id, evidence, summary) "
+            "values (%s, %s, %s, %s) on conflict (run_id, task_id) do nothing",
+            (
+                run_id,
+                arguments.task_id,
+                json.dumps([item.model_dump() for item in arguments.evidence]),
+                arguments.summary,
+            ),
+        )
+        # RN-05: its finish, in database time. The first one stands, as a repeat changes
+        # nothing. A task finished with no use that served it starts and finishes together.
+        await context.connection.execute(
+            "insert into app_private.plan_task_times "
+            "(run_id, task_id, started_at, finished_at) values (%s, %s, now(), now()) "
+            "on conflict (run_id, task_id) do update "
+            "set finished_at = coalesce(plan_task_times.finished_at, excluded.finished_at)",
+            (run_id, arguments.task_id),
+        )
+    return TaskCompleted(
+        task_id=arguments.task_id,
+        remaining=sorted(set(tasks) - done - {arguments.task_id}),
+    )
+
+
+def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
     return (
         ToolDefinition(
             tool_id="propose_plan",
@@ -264,8 +274,8 @@ def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
             input_model=PlanProposal,
             output_model=PlanCommitted,
             operation_class=OperationClass.REVERSIBLE_INTERNAL_WRITE,
-            handler=propose,
-            reconcile=proposed_already,
+            handler=partial(propose_plan, limits=limits),
+            reconcile=plan_proposed_already,
             safe_to_repeat=True,
         ),
         ToolDefinition(
@@ -282,7 +292,7 @@ def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
             input_model=CompleteTask,
             output_model=TaskCompleted,
             operation_class=OperationClass.REVERSIBLE_INTERNAL_WRITE,
-            handler=complete,
+            handler=complete_task,
             # Its insert ignores a repeat, so finishing an interrupted attempt can't double it.
             safe_to_repeat=True,
         ),

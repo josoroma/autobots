@@ -20,7 +20,6 @@ from autobots.application.approvals import (
 )
 from autobots.application.compaction import CompactionPolicy, offload_large
 from autobots.application.experts import create_expert
-from autobots.application.goal_loop import drive_lease, process_next
 from autobots.application.memory import READ_OFFLOAD
 from autobots.application.plans import load_goal
 from autobots.application.reconciliation import record_evidence
@@ -45,6 +44,7 @@ from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import Actor, RunCommand
 from autobots.domain.tools import DELEGATION_TOOL, LOOP_TOOL_GRANTS, OperationClass
+from autobots.operations.job_dispatch import drive_lease, process_next
 from checklib import Cases, Db
 from goal_loop_script import ROUTE, Script, say
 from langchain_core.messages import ToolMessage

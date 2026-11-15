@@ -14,7 +14,6 @@ from autobots.adapters import loop_middleware
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.application.compaction import SUMMARY_MARKER, CompactionPolicy
 from autobots.application.experts import create_expert
-from autobots.application.goal_loop import drive_lease
 from autobots.application.model_admission import ModelAdmission
 from autobots.application.operations import REQUIRED_COLUMNS, database_conditions
 from autobots.application.plans import load_goal
@@ -33,6 +32,7 @@ from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.routines import RoutineConfig, RoutineTarget
 from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.models import resolve_role_policy
+from autobots.operations.job_dispatch import drive_lease
 from goal_loop_script import Script, calls, say
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']

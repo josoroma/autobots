@@ -7,8 +7,10 @@ import signal
 import sys
 
 import psycopg
-from autobots.application.goal_loop import LoopConfig, run_goal
+from autobots.application.goal_loop import run_goal
+from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.worker_leases import claim_next
+from autobots.operations.job_dispatch import drive_lease
 from goal_loop_script import PLAN, ROUTE, SAVE, Script, calls
 
 URL = sys.argv[1]
@@ -23,7 +25,7 @@ async def main() -> None:
         lease = await claim_next(db, worker_id='first-worker', lease_seconds=60)
         assert lease is not None
         model = Script(items=[calls(PLAN), calls(SAVE), die], seen=[], bound=[])
-        await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE))
+        await run_goal(db, URL, lease, model, LoopConfig(route=ROUTE), drive=drive_lease)
 
 
 asyncio.run(main())

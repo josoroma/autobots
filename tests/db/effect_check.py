@@ -13,18 +13,19 @@ from uuid import UUID, uuid4
 
 import psycopg
 from autobots.application.approvals import decide
-from autobots.application.goal_loop import LoopConfig, process_next
 from autobots.application.reconciliation import (
     ReconciliationRefused,
     has_unresolvable_effect,
     record_evidence,
     unknown_operations,
 )
+from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.run_projection import read_workspace
 from autobots.application.runs import admit_run, apply_command
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import Actor, RunCommand
 from autobots.domain.tools import PLAN_TOOLS
+from autobots.operations.job_dispatch import process_next
 from effect_tools import tools
 from goal_loop_script import ROUTE, Script, calls, say
 from mock_sink import Sink

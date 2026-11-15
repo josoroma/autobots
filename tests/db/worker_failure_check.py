@@ -17,11 +17,11 @@ from unittest.mock import patch
 from uuid import UUID, uuid4
 
 from autobots.application import goal_loop
-from autobots.application.goal_loop import process_next
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.run_projection import read_events, read_workspace
 from autobots.application.worker_leases import FAILURE_BOUND, RETRY_DELAYS_SECONDS, claim_next
 from autobots.domain.runs import Actor, RunCommand
+from autobots.operations.job_dispatch import process_next
 from checklib import QUIESCE, Cases, Db, run_check
 from goal_loop_script import ROUTE, Script, say
 
